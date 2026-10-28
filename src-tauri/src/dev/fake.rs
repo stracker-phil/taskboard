@@ -115,18 +115,18 @@ pub fn drift() -> AppResult<String> {
         colleague,
         "Pushed a fix for the totals, please have a look.",
     );
-    let in_review = demo::demo()
+    let done = demo::demo()
         .statuses
         .into_iter()
-        .find(|s| s["name"] == "In Review")
-        .ok_or_else(|| AppError::Internal("The demo site has no In Review status".into()))?;
-    fake.edit_issue("NW-1044", |fields| fields["status"] = in_review);
+        .find(|s| s["name"] == "Done")
+        .ok_or_else(|| AppError::Internal("The demo site has no Done status".into()))?;
+    fake.edit_issue("NW-1044", |fields| fields["status"] = done);
     fake.edit_issue("NW-1049", |fields| {
-        fields["priority"] = json!({ "id": "1", "name": "Highest" })
+        fields["priority"] = json!({ "id": "4", "name": "Low" })
     });
     let added = fake.add_issue("NW-1042", "NW", "Update the cookie banner copy");
     fake.delete_issue("NW-1055");
     Ok(format!(
-        "Drifted the fake Jira: comment on NW-1042, NW-1044 in review, NW-1049 highest, new {added}, NW-1055 deleted"
+        "Drifted the fake Jira: comment on NW-1042, NW-1044 done, NW-1049 lowered to Low, new {added}, NW-1055 deleted"
     ))
 }

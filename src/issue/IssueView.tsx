@@ -11,9 +11,12 @@ import { useViewRows } from "../queries/views";
 import { findLevel, spaceOf } from "../shell/levels";
 import { narrowingKey } from "../state/slices/narrowing";
 import type { IssueOrigin } from "../state/slices/issueView";
+import { attempt } from "../state/requests";
 import { useStore } from "../state/store";
 import { useIssueActions } from "../views/list/useIssueActions";
 import { Activity } from "./Activity";
+import { SinceBanner } from "./SinceBanner";
+import { useSeenOnLeave } from "./useSeenOnLeave";
 import { FieldGrid } from "./FieldGrid";
 import { JiraHtml } from "./JiraHtml";
 import { Children, Links } from "./Related";
@@ -33,6 +36,7 @@ export function IssueView({ id, origin }: { id: string; origin: IssueOrigin }) {
   const { data: issue, isError } = useIssue(id);
   const back = useStore((s) => s.issueBack);
   const neighbours = useNeighbours(origin, id);
+  useSeenOnLeave(id, Boolean(issue?.since));
 
   useEffect(() => {
     // Comments may be newer in Jira than in the cache; a failure (offline) leaves the cached ones.
@@ -137,6 +141,7 @@ function IssueMain({ issue, origin }: { issue: IssueDetail; origin: IssueOrigin 
         <span>{comments}</span>
       </div>
       <h1 className="issue-main__title">{issue.summary}</h1>
+      {issue.since && <SinceBanner since={issue.since} onMarkSeen={() => void attempt(api.issuesMarkSeen([issue.id]), "Could not mark it seen")} />}
       <FieldGrid issue={issue} onOpenEpic={openRelated} />
       {related && <Links links={related.links} onOpen={openRelated} />}
       <section className="issue-main__description" aria-label="Description">

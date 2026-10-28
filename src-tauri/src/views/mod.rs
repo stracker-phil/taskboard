@@ -17,4 +17,4 @@ pub use edit::{
     view_set_wrap, views_of,
 };
 pub use model::{DEFAULT_COLUMNS, GroupBy, Layout, Sort, SortBy, View};
-pub use query::{Narrowing, ViewData, view_rows};
+pub use query::{Narrowing, ViewData, unseen_ids, view_rows};

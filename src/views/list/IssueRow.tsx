@@ -30,7 +30,7 @@ export function IssueRow({ row, columns, position, wrap = false, selected, onSel
         <span className="list-row__summary">{row.summary}</span>
         {row.changeNote && <ChangeChip note={row.changeNote} />}
         <CommentCount count={row.commentCount} />
-        <RowActions issueKey={row.key} actions={actions} />
+        <RowActions issueId={row.id} issueKey={row.key} changed={row.changed} actions={actions} />
       </span>
       {columns.map((id) => (
         <span key={id} className="list-row__cell" role="gridcell">

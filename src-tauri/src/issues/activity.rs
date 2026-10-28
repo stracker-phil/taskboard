@@ -6,6 +6,7 @@ use rusqlite::Connection;
 use serde::Serialize;
 use ts_rs::TS;
 
+use crate::changes::unseen_since;
 use crate::db::Db;
 use crate::error::AppResult;
 use crate::lists::Viewer;
@@ -28,6 +29,8 @@ pub enum ActivityItem {
         /// UTC, RFC 3339.
         at: String,
         edited: bool,
+        /// After the owner last saw the issue, while it has unseen changes.
+        fresh: bool,
     },
     Change {
         /// `status`, `assignee`, `due_date`, `priority` or `created`.
@@ -35,6 +38,7 @@ pub enum ActivityItem {
         from: Option<ChangeValue>,
         to: Option<ChangeValue>,
         at: String,
+        fresh: bool,
     },
 }
 
@@ -56,6 +60,16 @@ fn activity(conn: &Connection, viewer: &Viewer, id: &str) -> AppResult<Vec<Activ
     let mut items = comments(conn, id, me.as_deref())?;
     items.extend(changes(conn, id, me.as_deref())?);
     items.sort_by(|a, b| at(a).cmp(at(b)));
+    if let Some(boundary) = unseen_since(conn, id)? {
+        for item in &mut items {
+            let newer = at(item) > boundary.as_str();
+            match item {
+                ActivityItem::Comment { fresh, .. } | ActivityItem::Change { fresh, .. } => {
+                    *fresh = newer
+                }
+            }
+        }
+    }
     Ok(items)
 }
 
@@ -82,6 +96,7 @@ fn comments(conn: &Connection, id: &str, me: Option<&str>) -> AppResult<Vec<Acti
             body_html: r.get(3)?,
             edited: updated != created,
             at: created,
+            fresh: false,
         })
     })?;
     Ok(rows.collect::<Result<_, _>>()?)
@@ -134,18 +149,19 @@ fn changes(conn: &Connection, id: &str, me: Option<&str>) -> AppResult<Vec<Activ
             to: value(&field, new),
             field,
             at,
+            fresh: false,
         });
     }
     Ok(items)
 }
 
-fn status_names(conn: &Connection) -> AppResult<HashMap<String, (String, String)>> {
+pub(crate) fn status_names(conn: &Connection) -> AppResult<HashMap<String, (String, String)>> {
     let mut query = conn.prepare("SELECT id, name, category FROM cache.status")?;
     let rows = query.query_map([], |r| Ok((r.get(0)?, (r.get(1)?, r.get(2)?))))?;
     Ok(rows.collect::<Result<_, _>>()?)
 }
 
-fn user_names(conn: &Connection) -> AppResult<HashMap<String, String>> {
+pub(crate) fn user_names(conn: &Connection) -> AppResult<HashMap<String, String>> {
     let mut query = conn.prepare("SELECT account_id, name FROM cache.user")?;
     let rows = query.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?;
     Ok(rows.collect::<Result<_, _>>()?)

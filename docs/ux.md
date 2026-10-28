@@ -43,7 +43,9 @@ an item.
   label, a "⌘K" key hint (11px, `--fill-subtle`, 5px radius). Disabled until the palette exists.
 - **Home** (`HomeRows`): Everything (`Layers2`), then the Home lists in Rust's order: Recently changed
   (`History`), Pinned (`Pin`) and global filter lists (`Funnel`). 34px rows, 10px padding and gap, 8px radius,
-  `--text-strong-body`; icons 17/1.8; the count 12px `--text-muted`, hidden while Rust has none.
+  `--text-strong-body`; icons 17/1.8; the count 12px `--text-muted`, hidden while Rust has none. Recently
+  changed has no count: while it has unseen issues its label is 600 and a badge (20px, `--accent`, white
+  11/700) shows how many.
 - **Spaces** (`SpacesSection`, scrolls): the "Spaces" header (12/600 `--text-muted`) with "+" (24px), which
   opens Settings → Projects (`app:settings:projects`). Each Space (`SpaceRow`): 36px, a 10px ▾/▸ chevron in
   `--text-faint`, the 22px tile (6px radius, 11/800 letter on `--space-tile-N`), the name and the open count.
@@ -77,6 +79,8 @@ an item.
   `--text-tertiary`, opens the Space), "/" in `--text-faint`, the funnel 15/2 in `--text-tertiary`, then the
   list name (19/700).
 - Everything and the Home lists: their sidebar icon (20/1.8, `--text-tertiary`) and name.
+- **Mark all seen** on the right for Recently changed: 28px, 7px radius, a `--border` frame, 12/600; disabled
+  while nothing is unseen.
 - **Open in Jira ↗** on the right for a Space and its lists: 32px, 12px padding, 8px radius, a `--border`
   frame, 13px `--text-secondary`; opens `<site>/browse/<KEY>`. Hidden elsewhere and without a site.
 
@@ -148,7 +152,24 @@ columns that no longer fit beside a 240px title, rightmost first, until it close
 - Body: title 22/750, one line of chips (status pill `peek`, epic chip, release outline chip, priority,
   assignee), the sanitised description, the latest three activity items with "All activity".
 - Footer 36: the keys.
-- Hovering a row shows its toolbar at the end of the title: Copy key, Pin, Open in Jira (`RowActions`).
+- Hovering a row shows its toolbar at the end of the title: Mark seen (changed rows), Copy key, Pin, Open in
+  Jira (`RowActions`).
+
+## Change tracking
+
+An issue is changed while the sync recorded a change after the owner last saw it (`src-tauri/src/changes/`).
+
+- Changed rows: `--changed-bg`, a 600 summary and the change chip with the most important change ("New",
+  "2 new comments", "Moved to Review", "Priority raised", "Assigned to you", "Due date changed"; "+N" for
+  more kinds). Changed epic children in the Issue view get the same background.
+- The Since-yesterday banner (`SinceBanner`, `--banner-info-*`) in the peek and the Issue view: "Since
+  yesterday:" (or "Since you last looked:" when that was over a day ago) and every change in words; the Issue
+  view adds Mark seen.
+- Activity after the last look (`fresh`, decided in Rust) sits under a "New since yesterday" divider
+  (`--accent-text`, `--changed-border` lines); new comments and changes have `--changed-bg`.
+- Leaving an issue that was open for a second marks it seen (`useSeenOnLeave`), so the banner and the new
+  activity stay while the owner reads and J/K skimming counts too. Mark seen, Mark all seen and the row's
+  Mark seen clear it at once.
 
 ## Sync chip and token banners
 

@@ -7,6 +7,7 @@ use serde::Serialize;
 use serde_json::Value;
 use ts_rs::TS;
 
+use crate::changes::UNSEEN;
 use crate::db::Db;
 use crate::error::AppResult;
 use crate::lists::Viewer;
@@ -25,6 +26,8 @@ pub struct RelatedIssue {
     pub style: Style,
     pub issue_type: String,
     pub assignee: Option<Person>,
+    /// Has changes the owner hasn't seen.
+    pub changed: bool,
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
@@ -64,12 +67,17 @@ pub async fn issue_related(db: &Db, viewer: Viewer, id: String) -> AppResult<Rel
     .await
 }
 
-const RELATED: &str =
-    "SELECT i.id, i.key, i.summary, i.status_id, COALESCE(st.name, ''), i.status_category,
-        i.issue_type, i.assignee_id, u.name
-    FROM cache.issue i
-    LEFT JOIN cache.status st ON st.id = i.status_id
-    LEFT JOIN cache.user u ON u.account_id = i.assignee_id";
+/// The related issues matching `condition`, each with whether it has unseen changes.
+fn related_sql(condition: &str) -> String {
+    format!(
+        "SELECT i.id, i.key, i.summary, i.status_id, COALESCE(st.name, ''), i.status_category,
+            i.issue_type, i.assignee_id, u.name, {UNSEEN}
+        FROM cache.issue i
+        LEFT JOIN cache.status st ON st.id = i.status_id
+        LEFT JOIN cache.user u ON u.account_id = i.assignee_id
+        WHERE {condition}"
+    )
+}
 
 fn related_from(
     r: &rusqlite::Row,
@@ -91,12 +99,13 @@ fn related_from(
             .unwrap_or_else(|| detect(&category, &status_name)),
         issue_type: r.get(6)?,
         assignee: assignee.map(|a| rows::person(&a, name.as_deref().unwrap_or(&a), me)),
+        changed: r.get(9)?,
     })
 }
 
 fn children(conn: &Connection, id: &str, me: Option<&str>) -> AppResult<Children> {
     let styles = styles(conn)?;
-    let mut query = conn.prepare(&format!("{RELATED} WHERE i.parent_id = ?1 AND i.gone = 0"))?;
+    let mut query = conn.prepare(&related_sql("i.parent_id = ?1 AND i.gone = 0"))?;
     let all = query
         .query_map([id], |r| related_from(r, &styles, me))?
         .collect::<Result<Vec<_>, _>>()?;
@@ -159,6 +168,7 @@ fn links(conn: &Connection, id: &str, me: Option<&str>) -> AppResult<Vec<IssueLi
                 .unwrap_or_default()
                 .to_string(),
             assignee: None,
+            changed: false,
         };
         links.push(IssueLink {
             relation: relation.to_string(),
@@ -175,10 +185,8 @@ fn related_by_key(
     me: Option<&str>,
 ) -> AppResult<Option<RelatedIssue>> {
     Ok(conn
-        .query_row(
-            &format!("{RELATED} WHERE i.key = ?1 AND i.gone = 0"),
-            [key],
-            |r| related_from(r, styles, me),
-        )
+        .query_row(&related_sql("i.key = ?1 AND i.gone = 0"), [key], |r| {
+            related_from(r, styles, me)
+        })
         .optional()?)
 }

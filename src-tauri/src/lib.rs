@@ -3,6 +3,7 @@
 
 mod app;
 pub mod bus;
+pub mod changes;
 pub mod cli;
 mod commands;
 pub mod connection;

@@ -9,6 +9,8 @@ import { useIssue, useIssueActivity } from "../queries/issues";
 import { ActivityEntry } from "./Activity";
 import { hasContent } from "../lib/jiraHtml";
 import { JiraHtml } from "./JiraHtml";
+import { SinceBanner } from "./SinceBanner";
+import { useSeenOnLeave } from "./useSeenOnLeave";
 import { useIssueActions } from "../views/list/useIssueActions";
 
 /** The 540px panel beside the list (artboard 4): the selected issue at a glance. */
@@ -16,6 +18,7 @@ export function Peek({ id, onClose, onExpand }: { id: string; onClose: () => voi
   const { data: issue, isError } = useIssue(id);
   const actions = useIssueActions();
   const bodyRef = useRef<HTMLDivElement>(null);
+  useSeenOnLeave(id, Boolean(issue?.since));
 
   useEffect(() => {
     if (bodyRef.current) bodyRef.current.scrollTop = 0;
@@ -92,6 +95,7 @@ function Body({ issue, onExpand }: { issue: IssueDetail; onExpand: () => void })
           </span>
         ))}
       </div>
+      {issue.since && <SinceBanner since={issue.since} />}
       {issue.descriptionHtml && hasContent(issue.descriptionHtml) ? (
         <JiraHtml html={issue.descriptionHtml} className="peek__description" />
       ) : (

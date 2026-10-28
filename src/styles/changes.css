@@ -1,0 +1,25 @@
+/* Change tracking (docs/ux.md → Change tracking): the Since-yesterday banner, new activity and changed issues. */
+.since-banner {
+  display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-radius: 9px;
+  background: var(--banner-info-bg); color: var(--banner-info-text); font-size: 13px; line-height: 1.4;
+  animation: fade-in var(--motion-base) var(--ease-out);
+}
+.since-banner--detail { gap: 10px; padding: 10px 14px; border-radius: 10px; }
+.since-banner__dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--banner-info-dot); }
+.since-banner--detail .since-banner__dot { width: 8px; height: 8px; }
+.since-banner__text { flex: 1; min-width: 0; }
+.since-banner__btn {
+  flex: none; padding: 0; border: 0; background: transparent; color: var(--link); font: inherit; font-size: 13px; font-weight: 600;
+  cursor: default;
+}
+.since-banner__btn:hover { text-decoration: underline; }
+
+.activity__divider {
+  display: flex; align-items: center; gap: 8px; padding: 0 4px; font-size: 12px; font-weight: 600; color: var(--accent-text);
+}
+.activity__divider::before, .activity__divider::after { content: ""; flex: 1; height: 1px; background: var(--changed-border); }
+.comment-card--new { border-color: var(--changed-border); background: var(--changed-bg); }
+.change-line--new { padding: 8px 12px; border-radius: 10px; background: var(--changed-bg); }
+
+.related-issue--changed { background: var(--changed-bg); }
+.related-issue--changed .related-issue__summary { font-weight: 600; }

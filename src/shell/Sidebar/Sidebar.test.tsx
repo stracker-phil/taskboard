@@ -71,7 +71,8 @@ async function renderSidebar(tree: SidebarTree = treeWith(), nav: Nav = navAt(nu
 }
 
 // A row's label and count are adjacent spans, so its accessible name is the label followed by the count, no space.
-const named = (label: string) => new RegExp(`^${label}\\d*$`);
+// Recently changed shows its count as a badge labelled "<n> unseen".
+const named = (label: string) => new RegExp(`^${label}\\s*(\\d+( unseen)?)?$`);
 const spaceButton = (label: string) => screen.getByRole("button", { name: named(label) });
 
 function menuEntry(text: string) {
@@ -105,6 +106,22 @@ describe("Sidebar", () => {
 
       expect(within(within(home).getByRole("button", { name: named("Everything") })).getByText("42")).toBeInTheDocument();
       expect(within(within(home).getByRole("button", { name: named("Recently changed") })).getByText("8")).toBeInTheDocument();
+    });
+
+    it("show Recently changed's count as an unseen badge", async () => {
+      await renderSidebar();
+
+      expect(within(screen.getByRole("navigation", { name: "Home" })).getByLabelText("8 unseen")).toHaveTextContent("8");
+    });
+
+    it.each([0, null])("show no badge and no count on Recently changed when its count is %s", async (count) => {
+      const tree = treeWith();
+      tree.home = [list(2, "Recently changed", { kind: "recent", count }), list(3, "Pinned", { kind: "pinned", count: null })];
+      await renderSidebar(tree);
+
+      const row = within(screen.getByRole("navigation", { name: "Home" })).getByRole("button", { name: "Recently changed" });
+      expect(row).toHaveTextContent(/^Recently changed$/);
+      expect(screen.queryByLabelText(/unseen/)).not.toBeInTheDocument();
     });
 
     it("show no count when it is null", async () => {

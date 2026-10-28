@@ -97,6 +97,23 @@ describe("ListView", () => {
       expect(screen.getByRole("row", { name: /NW-1042/ })).not.toHaveClass("list-row--changed");
     });
 
+    it("offers Mark seen on a changed row, which marks it seen without selecting it", async () => {
+      const changed = row({ id: "3", key: "NW-1003", summary: "Fix the footer links", changed: true, changeNote: "2 new comments" });
+      await renderList(viewData([groupOf([OPEN, changed])], [OPEN, changed]));
+
+      await userEvent.click(await screen.findByRole("button", { name: "Mark NW-1003 seen" }));
+
+      expect(mocked.issuesMarkSeen).toHaveBeenCalledWith(["3"]);
+      expect(screen.getByRole("row", { name: /NW-1003/ })).toHaveAttribute("aria-selected", "false");
+    });
+
+    it("offers no Mark seen on an unchanged row", async () => {
+      await renderList(viewData([groupOf([OPEN])], [OPEN]));
+
+      await screen.findByRole("row", { name: /NW-1042/ });
+      expect(screen.queryByRole("button", { name: /Mark .* seen/ })).not.toBeInTheDocument();
+    });
+
     it("selects the row that is clicked", async () => {
       await renderList(viewData([groupOf([OPEN, DONE])], [OPEN, DONE]));
 

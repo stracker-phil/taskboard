@@ -81,6 +81,25 @@ describe("useIssueActions", () => {
     });
   });
 
+  describe("markSeen", () => {
+    it("marks the issue seen", async () => {
+      const actions = await renderActions("");
+
+      actions.current.markSeen("10042");
+
+      expect(mocked.issuesMarkSeen).toHaveBeenCalledWith(["10042"]);
+    });
+
+    it("shows an error when marking fails", async () => {
+      mocked.issuesMarkSeen.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
+      const actions = await renderActions("");
+
+      actions.current.markSeen("10042");
+
+      await waitFor(() => expect(toasts()).toEqual([["error", "Could not mark it seen: Disk full"]]));
+    });
+  });
+
   describe("openInJira", () => {
     it("opens the issue's page on the Jira site", async () => {
       const actions = await renderActions("https://example.atlassian.net/");

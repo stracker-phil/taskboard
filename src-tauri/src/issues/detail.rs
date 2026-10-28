@@ -7,6 +7,8 @@ use rusqlite::{Connection, OptionalExtension};
 use serde::Serialize;
 use ts_rs::TS;
 
+use super::{status_names, user_names};
+use crate::changes::{Names, Since, since};
 use crate::db::Db;
 use crate::error::{AppError, AppResult};
 use crate::lists::Viewer;
@@ -47,6 +49,8 @@ pub struct IssueDetail {
     pub gone: bool,
     /// The custom fields the owner shows (marked shown or used as a view column), with their value if any.
     pub custom: Vec<CustomField>,
+    /// The banner over an issue with unseen changes.
+    pub since: Option<Since>,
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
@@ -133,6 +137,7 @@ fn read(conn: &Connection, viewer: &Viewer, id: &str) -> AppResult<IssueDetail> 
             is_epic: r.get::<_, i64>(23)? != 0,
             gone: r.get::<_, i64>(24)? != 0,
             custom: Vec::new(),
+            since: None,
         };
         let raw: String = r.get(25)?;
         Ok((detail, raw))
@@ -140,10 +145,24 @@ fn read(conn: &Connection, viewer: &Viewer, id: &str) -> AppResult<IssueDetail> 
     .optional()?
     .map(|(mut detail, raw)| -> AppResult<IssueDetail> {
         detail.custom = custom_fields(conn, &raw, me)?;
+        detail.since = since_banner(conn, viewer, id)?;
         Ok(detail)
     })
     .transpose()?
     .ok_or_else(|| AppError::NotFound(format!("Issue {id} isn't in the cache")))
+}
+
+fn since_banner(conn: &Connection, viewer: &Viewer, id: &str) -> AppResult<Option<Since>> {
+    let statuses = status_names(conn)?
+        .into_iter()
+        .map(|(id, (name, _))| (id, name))
+        .collect();
+    let names = Names {
+        me: viewer.me.as_deref(),
+        statuses: &statuses,
+        people: &user_names(conn)?,
+    };
+    since(conn, viewer, id, &names)
 }
 
 fn custom_fields(conn: &Connection, raw: &str, me: Option<&str>) -> AppResult<Vec<CustomField>> {

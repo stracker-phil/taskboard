@@ -4,7 +4,7 @@ import { useConnection } from "../../queries/settings";
 import { attempt } from "../../state/requests";
 import { useStore } from "../../state/store";
 
-/** Copy key, copy URL and Open in Jira for an issue key; the URL ones are null without a Jira site. */
+/** Copy key, copy URL, Open in Jira and Mark seen; the URL ones are null without a Jira site. */
 export function useIssueActions() {
   const { data: connection } = useConnection();
   const toast = useStore((s) => s.toast);
@@ -21,5 +21,6 @@ export function useIssueActions() {
       if (url) copy(url, `Copied the link to ${key}`);
     },
     openInJira: site ? (key: string) => void attempt(api.openUrl(urlOf(key) ?? ""), "Could not open Jira") : null,
+    markSeen: (id: string) => void attempt(api.issuesMarkSeen([id]), "Could not mark it seen"),
   };
 }

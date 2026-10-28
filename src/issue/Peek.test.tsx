@@ -1,7 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
 
@@ -36,6 +36,7 @@ function detail(patch: Partial<IssueDetail> = {}): IssueDetail {
     isEpic: false,
     gone: false,
     custom: [],
+    since: null,
     ...patch,
   };
 }
@@ -130,6 +131,98 @@ describe("Peek", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Full view" }));
 
     expect(onExpand).toHaveBeenCalled();
+  });
+
+  describe("unseen changes", () => {
+    const SINCE = { label: "Since yesterday", text: "2 new comments, moved to Review." };
+
+    it("shows the banner of what changed, without a Mark seen button", async () => {
+      mocked.issueGet.mockResolvedValue(detail({ since: SINCE }));
+      renderPeek();
+
+      expect(await screen.findByRole("status")).toHaveTextContent("Since yesterday: 2 new comments, moved to Review.");
+      expect(screen.queryByRole("button", { name: "Mark seen" })).not.toBeInTheDocument();
+    });
+
+    it("shows no banner for an issue without unseen changes", async () => {
+      renderPeek();
+
+      await screen.findByRole("heading", { name: "Redesign the pricing page" });
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("marking seen on leave", () => {
+    const SINCE = { label: "Since yesterday", text: "1 new comment." };
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    function renderSwitchable(id: string) {
+      const client = createQueryClient();
+      const view = (shown: string) => (
+        <QueryClientProvider client={client}>
+          <Peek id={shown} onClose={vi.fn()} onExpand={vi.fn()} />
+        </QueryClientProvider>
+      );
+      const result = render(view(id));
+      return { ...result, show: (next: string) => result.rerender(view(next)) };
+    }
+
+    function serveByKey() {
+      mocked.issueGet.mockImplementation(async (id) => detail({ id, key: id === "10042" ? "NW-1042" : "NW-1043", summary: `Issue ${id}`, since: id === "10042" ? SINCE : null }));
+    }
+
+    it("marks the issue seen when it is unmounted after being open for a second", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      serveByKey();
+      const { unmount } = renderSwitchable("10042");
+      await screen.findByRole("status");
+
+      vi.setSystemTime(Date.now() + 1500);
+      unmount();
+
+      expect(mocked.issuesMarkSeen).toHaveBeenCalledWith(["10042"]);
+    });
+
+    it("marks the issue seen when another issue is shown after a second", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      serveByKey();
+      const { show } = renderSwitchable("10042");
+      await screen.findByRole("status");
+
+      vi.setSystemTime(Date.now() + 1500);
+      show("10043");
+
+      expect(mocked.issuesMarkSeen).toHaveBeenCalledWith(["10042"]);
+    });
+
+    it("does not mark an issue left within a second", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      serveByKey();
+      const { unmount } = renderSwitchable("10042");
+      await screen.findByRole("status");
+
+      vi.setSystemTime(Date.now() + 500);
+      unmount();
+
+      expect(mocked.issuesMarkSeen).not.toHaveBeenCalled();
+    });
+
+    it("does not mark an issue without unseen changes", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      serveByKey();
+      const { show, unmount } = renderSwitchable("10043");
+      await screen.findByRole("heading", { name: "Issue 10043" });
+
+      vi.setSystemTime(Date.now() + 5000);
+      show("10042");
+      await screen.findByRole("status");
+      unmount();
+
+      expect(mocked.issuesMarkSeen).not.toHaveBeenCalledWith(["10043"]);
+    });
   });
 
   describe("latest activity", () => {

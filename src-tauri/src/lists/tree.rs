@@ -6,6 +6,7 @@ use ts_rs::TS;
 
 use super::context::{Viewer, names};
 use super::nodes::{Kind, Node, all_nodes, scope_of};
+use crate::changes::UNSEEN;
 use crate::db::Db;
 use crate::error::AppResult;
 use crate::filter::{Compiled, Ctx, Names, OPEN_ISSUES, TRACKED_ISSUES, compile, describe};
@@ -28,7 +29,8 @@ pub struct ListNode {
     pub id: i64,
     pub kind: Kind,
     pub name: String,
-    /// Open issues; none for Recently changed and Pinned, and for a filter that can't be compiled.
+    /// Open issues; for Recently changed its unseen issues (the badge); none for Pinned and for a filter that
+    /// can't be compiled.
     pub count: Option<i64>,
     /// Conditions of its own, for the Filter button's badge.
     pub own_conditions: usize,
@@ -152,7 +154,31 @@ fn build(conn: &Connection, viewer: &Viewer) -> AppResult<SidebarTree> {
         spaces,
     };
     counter.fill(conn, &mut tree)?;
+    for node in tree
+        .home
+        .iter_mut()
+        .filter(|n| n.kind == Kind::Recent && n.error.is_none())
+    {
+        node.count = unseen_count(conn, &nodes, node.id, &ctx)?;
+    }
     Ok(tree)
+}
+
+/// Recently changed counts its unseen issues, open or not.
+fn unseen_count(conn: &Connection, nodes: &[Node], id: i64, ctx: &Ctx) -> AppResult<Option<i64>> {
+    let Some(node) = nodes.iter().find(|n| n.id == id) else {
+        return Ok(None);
+    };
+    let compiled = compile(&scope_of(nodes, node).all()?, ctx)?;
+    let sql = format!(
+        "SELECT COUNT(*) FROM cache.issue i WHERE {} AND {UNSEEN}",
+        compiled.where_clause()
+    );
+    Ok(Some(conn.query_row(
+        &sql,
+        params_from_iter(compiled.params.iter()),
+        |r| r.get(0),
+    )?))
 }
 
 /// A node without its count; `Counter::fill` adds it once every node is known.

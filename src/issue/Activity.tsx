@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import type { ActivityItem, ChangeValue } from "../api";
 import { Avatar } from "../components/issue/Avatar";
 import { StatusPill } from "../components/issue/StatusPill";
@@ -30,7 +30,7 @@ function Value({ value }: { value: ChangeValue | null }) {
 export function ActivityEntry({ item }: { item: ActivityItem }) {
   if (item.kind === "comment") {
     return (
-      <article className="comment-card">
+      <article className={item.fresh ? "comment-card comment-card--new" : "comment-card"}>
         <header className="comment-card__head">
           {item.author && <Avatar person={item.author} size={26} />}
           <strong>{item.author?.name ?? "Someone"}</strong>
@@ -44,7 +44,7 @@ export function ActivityEntry({ item }: { item: ActivityItem }) {
     );
   }
   return (
-    <div className="change-line">
+    <div className={item.fresh ? "change-line change-line--new" : "change-line"}>
       <span className="change-line__text">
         {item.field === "created" ? (
           "Created the issue"
@@ -61,7 +61,21 @@ export function ActivityEntry({ item }: { item: ActivityItem }) {
   );
 }
 
-/** Comments and recorded changes, oldest first, with All / Comments / Changes. Commenting arrives with writes. */
+/** Comments and recorded changes, oldest first, with All / Comments / Changes; new ones under a divider. */
+function ActivityList({ items }: { items: ActivityItem[] }) {
+  const firstNew = items.findIndex((item) => item.fresh);
+  return items.map((item, i) => (
+    <Fragment key={item.kind === "comment" ? item.id : `${item.field}:${item.at}:${i}`}>
+      {i === firstNew && (
+        <div className="activity__divider" role="separator">
+          New since yesterday
+        </div>
+      )}
+      <ActivityEntry item={item} />
+    </Fragment>
+  ));
+}
+
 export function Activity({ id }: { id: string }) {
   const [filter, setFilter] = useState<Filter>("all");
   const { data: items = [] } = useIssueActivity(id);
@@ -79,7 +93,7 @@ export function Activity({ id }: { id: string }) {
         </div>
       </header>
       <div className="activity__list">
-        {shown.length === 0 ? <p className="activity__empty">Nothing here yet.</p> : shown.map((item, i) => <ActivityEntry key={item.kind === "comment" ? item.id : `${item.field}:${item.at}:${i}`} item={item} />)}
+        {shown.length === 0 ? <p className="activity__empty">Nothing here yet.</p> : <ActivityList items={shown} />}
       </div>
       <div className="activity__composer">
         <div className="activity__box" aria-disabled="true">

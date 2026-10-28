@@ -506,6 +506,7 @@ async fn an_issue_created_after_the_first_sync_shows_a_created_change() {
             from: None,
             to: Some(ChangeValue::Text(key.clone())),
             at: LATER_UTC.into(),
+            fresh: true,
         }]
     );
 }
@@ -514,6 +515,8 @@ async fn an_issue_created_after_the_first_sync_shows_a_created_change() {
 #[ignore = "syncs the demo site into a temp database"]
 async fn a_status_edited_on_the_site_shows_as_a_change_with_names_and_styles() {
     let site = Site::new().await;
+    site.execute("UPDATE cache.issue_seen SET seen_at = '2026-10-28T10:00:00.000Z'")
+        .await;
     site.fake.set_now(later());
     site.fake
         .edit_issue("NW-1044", |fields| fields["status"] = done_status());
@@ -533,6 +536,7 @@ async fn a_status_edited_on_the_site_shows_as_a_change_with_names_and_styles() {
                 style: Style::Done,
             }),
             at: LATER_UTC.into(),
+            fresh: true,
         }]
     );
 }
@@ -568,6 +572,8 @@ async fn a_chosen_status_style_colours_the_status_change() {
 #[ignore = "syncs the demo site into a temp database"]
 async fn an_assignee_edited_on_the_site_shows_as_a_change_between_people() {
     let site = Site::new().await;
+    site.execute("UPDATE cache.issue_seen SET seen_at = '2026-10-28T10:00:00.000Z'")
+        .await;
     site.fake.set_now(later());
     let marta_user = demo::demo()
         .users
@@ -587,6 +593,7 @@ async fn an_assignee_edited_on_the_site_shows_as_a_change_between_people() {
             from: Some(ChangeValue::Person(alex())),
             to: Some(ChangeValue::Person(marta())),
             at: LATER_UTC.into(),
+            fresh: true,
         }]
     );
 }
@@ -652,6 +659,7 @@ async fn the_blocking_issue_links_to_the_blocked_one_with_its_cached_status() {
                 style: Style::Todo,
                 issue_type: "Story".into(),
                 assignee: Some(alex()),
+                changed: false,
             },
         }]
     );
@@ -675,6 +683,7 @@ async fn the_blocked_issue_links_back_with_the_inward_words() {
                 style: Style::Progress,
                 issue_type: "Story".into(),
                 assignee: Some(alex()),
+                changed: false,
             },
         }]
     );
@@ -700,6 +709,7 @@ async fn a_linked_issue_the_cache_does_not_hold_shows_the_links_own_fields() {
                 style: Style::Todo,
                 issue_type: "Story".into(),
                 assignee: None,
+                changed: false,
             },
         }]
     );

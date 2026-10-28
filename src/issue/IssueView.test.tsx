@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
 
@@ -209,6 +209,64 @@ describe("IssueView", () => {
       renderIssue();
 
       expect(await title("Checkout: address validation for DACH postcodes")).toBeInTheDocument();
+    });
+  });
+
+  describe("unseen changes", () => {
+    const SINCE = { label: "Since you last looked", text: "Moved to Review." };
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("shows the banner with Mark seen, which marks the issue seen", async () => {
+      serve(issueDetail({ since: SINCE }));
+      renderIssue();
+
+      expect(await screen.findByRole("status")).toHaveTextContent("Since you last looked: Moved to Review.");
+      await userEvent.click(screen.getByRole("button", { name: "Mark seen" }));
+
+      expect(mocked.issuesMarkSeen).toHaveBeenCalledWith(["10042"]);
+    });
+
+    it("shows an error toast when marking seen fails", async () => {
+      serve(issueDetail({ since: SINCE }));
+      mocked.issuesMarkSeen.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
+      renderIssue();
+
+      await userEvent.click(await screen.findByRole("button", { name: "Mark seen" }));
+
+      await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not mark it seen: Disk full"));
+    });
+
+    it("shows no banner for an issue without unseen changes", async () => {
+      renderIssue();
+
+      await title("Checkout: address validation for DACH postcodes");
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    });
+
+    it("marks the issue seen when the view is left after a second", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      serve(issueDetail({ since: SINCE }));
+      const { unmount } = renderIssue();
+      await screen.findByRole("status");
+
+      vi.setSystemTime(Date.now() + 1500);
+      unmount();
+
+      expect(mocked.issuesMarkSeen).toHaveBeenCalledWith(["10042"]);
+    });
+
+    it("does not mark the issue seen when the view is left within a second", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      serve(issueDetail({ since: SINCE }));
+      const { unmount } = renderIssue();
+      await screen.findByRole("status");
+
+      unmount();
+
+      expect(mocked.issuesMarkSeen).not.toHaveBeenCalled();
     });
   });
 

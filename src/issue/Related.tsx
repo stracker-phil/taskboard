@@ -22,7 +22,12 @@ export function Links({ links, onOpen }: { links: IssueLink[]; onOpen: (id: stri
 function IssueButton({ issue, onOpen, compact = false }: { issue: RelatedIssue; onOpen: (id: string) => void; compact?: boolean }) {
   const id = issue.id;
   return (
-    <button type="button" className={compact ? "related-issue related-issue--compact" : "related-issue"} disabled={id === null} onClick={() => id && onOpen(id)}>
+    <button
+      type="button"
+      className={["related-issue", compact && "related-issue--compact", issue.changed && "related-issue--changed"].filter(Boolean).join(" ")}
+      disabled={id === null}
+      onClick={() => id && onOpen(id)}
+    >
       <StatusSquare style={issue.style} />
       <span className="related-issue__key">{issue.key}</span>
       <span className="related-issue__summary">{issue.summary}</span>

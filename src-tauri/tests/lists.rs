@@ -398,7 +398,7 @@ mod the_seeded_levels {
     }
 
     #[tokio::test]
-    async fn home_holds_recently_changed_and_pinned_without_counts() {
+    async fn home_holds_recently_changed_with_its_unseen_count_and_pinned_without_a_count() {
         let (_dir, db) = lab().await;
 
         let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
@@ -411,7 +411,7 @@ mod the_seeded_levels {
         assert_eq!(
             home,
             [
-                (Kind::Recent, "Recently changed", None),
+                (Kind::Recent, "Recently changed", Some(0)),
                 (Kind::Pinned, "Pinned", None)
             ]
         );

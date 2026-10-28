@@ -21,6 +21,8 @@ const LIST_LEVEL: Level = { kind: "list", space: space(), node: listNode() };
 const EVERYTHING: Level = { kind: "home", node: listNode({ id: 1, kind: "everything", name: "Everything" }) };
 const PINNED: Level = { kind: "home", node: listNode({ id: 3, kind: "pinned", name: "Pinned" }) };
 
+const recent = (count: number | null): Level => ({ kind: "home", node: listNode({ id: 2, kind: "recent", name: "Recently changed", count }) });
+
 async function renderHeader(level: Level) {
   render(
     <QueryClientProvider client={createQueryClient()}>
@@ -69,6 +71,41 @@ describe("Header", () => {
       await renderHeader(level);
 
       expect(screen.getByRole("heading", { level: 1, name })).toBeInTheDocument();
+    });
+  });
+
+  describe("Mark all seen", () => {
+    it("marks every issue of Recently changed seen", async () => {
+      await renderHeader(recent(3));
+
+      await userEvent.click(screen.getByRole("button", { name: "Mark all seen" }));
+
+      expect(mocked.listMarkAllSeen).toHaveBeenCalledWith(2);
+    });
+
+    it.each([0, null])("is disabled when the unseen count is %s", async (count) => {
+      await renderHeader(recent(count));
+
+      expect(screen.getByRole("button", { name: "Mark all seen" })).toBeDisabled();
+    });
+
+    it.each([
+      ["Everything", EVERYTHING],
+      ["a Space", SPACE_LEVEL],
+      ["a filter list", LIST_LEVEL],
+    ])("is absent on %s", async (_name, level) => {
+      await renderHeader(level);
+
+      expect(screen.queryByRole("button", { name: "Mark all seen" })).not.toBeInTheDocument();
+    });
+
+    it("shows an error toast when marking fails", async () => {
+      mocked.listMarkAllSeen.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
+      await renderHeader(recent(3));
+
+      await userEvent.click(screen.getByRole("button", { name: "Mark all seen" }));
+
+      await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not mark them seen: Disk full"));
     });
   });
 

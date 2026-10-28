@@ -50,7 +50,7 @@ commands, which validate them. Tracking a project writes `local.space`, not the 
 | `status` | `id, name, category` (`new`, `indeterminate`, `done`) |
 | `issue` | keyed by the numeric Jira id (as text), never the key. Normalised columns for everything the UI filters, groups or sorts on, `raw` for the rest. Ours, derived during sync: `status_category`, `type_is_subtask`, `is_epic`, `sprint_id`, `sprint_state`, `comment_count`, `comments_synced_at`, `synced_at`, `gone` |
 | `issue_change` | what the sync saw change (status, assignee, due date, priority, comments, created) |
-| `issue_seen` | when the owner last looked at an issue |
+| `issue_seen` | when the owner last looked at an issue: changes after it are unseen (`changes::UNSEEN`) |
 | `comment` | `body_html` from Jira, `body_text` (ours) for search |
 | `version`, `user`, `field` | releases, people, custom field names (`field.shown` is ours) |
 | `sync_state` | one row per sync scope, or per project for the full sync's cursor |
@@ -100,8 +100,8 @@ views and pins; a level keeps at least one view.
 ### Group and sort keys
 
 `view_rows(listId, viewId, narrowing)` returns the view's issues as `ViewData { groupBy, groups, rows,
-columns }`: the level's filter, plus the kind's own rule (Recently changed: updated in the last day until
-change tracking; Pinned: the pinned issues), plus the narrowing (`me`, `text` in the key or summary ignoring
+columns }`: the level's filter, plus the kind's own rule (Recently changed: issues with unseen changes,
+open or done; Pinned: the pinned issues), plus the narrowing (`me`, `text` in the key or summary ignoring
 case and accents, `epic`).
 
 | `groupBy` | Groups, in order |

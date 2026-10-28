@@ -50,13 +50,14 @@ export function issueDetail(patch: Partial<IssueDetail> = {}): IssueDetail {
     isEpic: false,
     gone: false,
     custom: [],
+    since: null,
     ...patch,
   };
 }
 
 /** An issue as the Child issues and Links sections list it; override per test. */
 export function relatedIssue(patch: Partial<RelatedIssue> = {}): RelatedIssue {
-  return { id: "10051", key: "NW-1051", summary: "Guest checkout: remember shipping country", style: "todo", issueType: "Story", assignee: ALEX, ...patch };
+  return { id: "10051", key: "NW-1051", summary: "Guest checkout: remember shipping country", style: "todo", issueType: "Story", assignee: ALEX, changed: false, ...patch };
 }
 
 /** The related issues of an issue: none unless overridden. */
@@ -66,7 +67,7 @@ export function related(patch: Partial<Related> = {}): Related {
 
 /** A comment in an issue's activity; override per test. */
 export function commentItem(patch: Partial<Extract<ActivityItem, { kind: "comment" }>> = {}): ActivityItem {
-  return { kind: "comment", id: "20001", author: SAM, bodyHtml: "<p>Looks good to me.</p>", at: "2026-10-05T10:00:00Z", edited: false, ...patch };
+  return { kind: "comment", id: "20001", author: SAM, bodyHtml: "<p>Looks good to me.</p>", at: "2026-10-05T10:00:00Z", edited: false, fresh: false, ...patch };
 }
 
 /** A recorded change in an issue's activity (a status change unless overridden). */
@@ -77,6 +78,7 @@ export function changeItem(patch: Partial<Extract<ActivityItem, { kind: "change"
     from: { kind: "status", value: { name: "In Review", style: "review" } },
     to: { kind: "status", value: { name: "Done", style: "done" } },
     at: "2026-10-06T11:00:00Z",
+    fresh: false,
     ...patch,
   };
 }

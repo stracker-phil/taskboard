@@ -442,7 +442,7 @@ mod rows {
 
     #[tokio::test]
     #[ignore = "syncs the demo site into a temp database"]
-    async fn nobody_is_marked_changed_before_change_tracking_exists() {
+    async fn nobody_is_marked_changed_after_the_first_sync() {
         let site = Site::new().await;
 
         let data = site.nw_data(Narrowing::default()).await;

@@ -71,6 +71,30 @@ describe("Activity", () => {
     expect(text.indexOf("Sam Lee")).toBeLessThan(text.indexOf("Changed status"));
   });
 
+  describe("new since yesterday", () => {
+    const old = () => commentItem({ id: "1", author: SAM, bodyHtml: "<p>Old note</p>" });
+    const first = () => commentItem({ id: "2", author: SAM, bodyHtml: "<p>First new note</p>", fresh: true });
+    const second = () => commentItem({ id: "3", author: SAM, bodyHtml: "<p>Second new note</p>", fresh: true });
+
+    it("puts one separator right before the first fresh item, even when later ones are fresh too", async () => {
+      renderActivity([old(), first(), second()]);
+
+      const separator = await screen.findByRole("separator");
+      expect(separator).toHaveTextContent("New since yesterday");
+      expect(screen.getAllByRole("separator")).toHaveLength(1);
+      const text = screen.getByRole("complementary", { name: "Activity" }).textContent ?? "";
+      expect(text.indexOf("Old note")).toBeLessThan(text.indexOf("New since yesterday"));
+      expect(text.indexOf("New since yesterday")).toBeLessThan(text.indexOf("First new note"));
+    });
+
+    it("shows no separator when no item is fresh", async () => {
+      renderActivity([old(), changeItem()]);
+
+      await screen.findByText("Old note");
+      expect(screen.queryByRole("separator")).not.toBeInTheDocument();
+    });
+  });
+
   describe("filter", () => {
     const items = () => [created(), commentItem({ author: SAM }), changeItem()];
 

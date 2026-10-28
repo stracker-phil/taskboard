@@ -36,6 +36,13 @@
   font-size: 13px;
 }
 .content-header__jira:hover { background: var(--fill-subtle); }
+.content-header__action {
+  height: 28px; padding: 0 10px; border: 1px solid var(--border); border-radius: 7px; background: var(--panel-bg);
+  color: var(--text-secondary); font: inherit; font-size: 12px; font-weight: 600; cursor: default;
+  transition: background-color var(--motion-fast) var(--ease-out), opacity var(--motion-fast) var(--ease-out);
+}
+.content-header__action:hover:not(:disabled) { background: var(--fill-subtle); }
+.content-header__action:disabled { opacity: 0.45; }
 
 .view-tabs {
   display: flex;

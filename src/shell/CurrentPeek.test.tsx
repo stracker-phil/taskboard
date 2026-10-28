@@ -38,6 +38,7 @@ const detail = (): IssueDetail => ({
   isEpic: false,
   gone: false,
   custom: [],
+  since: null,
 });
 
 function renderPeek() {

@@ -132,8 +132,8 @@ export const api = {
   viewSetColumns: (id: number, columns: string[]) => invoke<View>("view_set_columns", { id, columns }),
   viewSetGroup: (id: number, groupBy: GroupBy) => invoke<View>("view_set_group", { id, groupBy }),
   viewSetSort: (id: number, sort: Sort) => invoke<View>("view_set_sort", { id, sort }),
-  /** The Table layout's column widths by column id; Rust clamps them to 48–800. */
   viewSetWrap: (id: number, wrap: boolean) => invoke<View>("view_set_wrap", { id, wrap }),
+  /** The Table layout's column widths by column id; Rust clamps them to 48–800. */
   viewSetWidths: (id: number, widths: Record<string, number>) => invoke<View>("view_set_widths", { id, widths }),
   viewMove: (id: number, position: number) => invoke<View[]>("view_move", { id, position }),
   /** Rejects with `invalid_input` for the last view of a level. */
@@ -143,6 +143,10 @@ export const api = {
   issueGet: (id: string) => invoke<IssueDetail>("issue_get", { id }),
   issueActivity: (id: string) => invoke<ActivityItem[]>("issue_activity", { id }),
   issueRelated: (id: string) => invoke<Related>("issue_related", { id }),
+  /** Their highlight and change chip clear. */
+  issuesMarkSeen: (ids: string[]) => invoke<void>("issues_mark_seen", { ids }),
+  /** Marks every issue of the filter list with unseen changes seen. */
+  listMarkAllSeen: (listId: number) => invoke<void>("list_mark_all_seen", { listId }),
   /** Fetches the issue's comments from Jira when the cached ones may be behind. */
   issueSyncComments: (id: string) => invoke<boolean>("issue_sync_comments", { id }),
   placeGet: (listId: number, viewId: number) => invoke<ViewPlace | null>("place_get", { listId, viewId }),

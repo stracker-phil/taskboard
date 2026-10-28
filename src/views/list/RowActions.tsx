@@ -1,14 +1,23 @@
-import { Copy, ExternalLink, Pin } from "lucide-react";
+import { CheckCheck, Copy, ExternalLink, Pin } from "lucide-react";
 import type { MouseEvent } from "react";
 
 export interface RowActionHandlers {
   copyKey: (key: string) => void;
   /** Null without a Jira site. */
   openInJira: ((key: string) => void) | null;
+  markSeen: (id: string) => void;
 }
 
-/** The hover toolbar at the end of a row's title: Copy key, Pin (pins arrive later), Open in Jira. */
-export function RowActions({ issueKey, actions }: { issueKey: string; actions: RowActionHandlers }) {
+interface Props {
+  issueId: string;
+  issueKey: string;
+  /** Has unseen changes: adds Mark seen. */
+  changed: boolean;
+  actions: RowActionHandlers;
+}
+
+/** The hover toolbar at the end of a row's title: Mark seen, Copy key, Pin (pins arrive later), Open in Jira. */
+export function RowActions({ issueId, issueKey, changed, actions }: Props) {
   // The row's own click selects it; an action must not.
   const run = (action: () => void) => (e: MouseEvent) => {
     e.stopPropagation();
@@ -16,6 +25,11 @@ export function RowActions({ issueKey, actions }: { issueKey: string; actions: R
   };
   return (
     <span className="row-actions">
+      {changed && (
+        <button type="button" className="row-actions__btn" title="Mark seen" aria-label={`Mark ${issueKey} seen`} onClick={run(() => actions.markSeen(issueId))}>
+          <CheckCheck size={13} strokeWidth={2} aria-hidden="true" />
+        </button>
+      )}
       <button type="button" className="row-actions__btn" title="Copy key (⌘C)" aria-label={`Copy ${issueKey}`} onClick={run(() => actions.copyKey(issueKey))}>
         <Copy size={13} strokeWidth={2} aria-hidden="true" />
       </button>

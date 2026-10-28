@@ -2,6 +2,7 @@
 
 use tauri::ipc::Invoke;
 
+use crate::changes::commands as changes;
 use crate::connection::commands as connection;
 use crate::lists::commands as lists;
 use crate::views::commands as views;
@@ -21,6 +22,8 @@ pub fn handlers() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
         commands::open_url,
         commands::log_frontend_error,
         commands::take_launch_events,
+        changes::issues_mark_seen,
+        changes::list_mark_all_seen,
         connection::connection_get,
         connection::connection_save,
         connection::connection_test,

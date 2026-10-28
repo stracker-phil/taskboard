@@ -3,7 +3,7 @@
 
 use std::collections::{BTreeMap, HashMap};
 
-use chrono::{Duration, NaiveDate};
+use chrono::NaiveDate;
 use rusqlite::types::Value as SqlValue;
 use rusqlite::{Connection, params_from_iter};
 use serde::{Deserialize, Serialize};
@@ -16,12 +16,13 @@ use super::groups::{Facts, Group, Lookup, SpaceInfo, Version, group};
 use super::model::GroupBy;
 use super::rows::{self, Row};
 use super::sorting::{fold, sort};
+use crate::changes::{Names, UNSEEN, chip, facts, unseen_changes};
 use crate::db::Db;
 use crate::error::{AppError, AppResult};
 use crate::filter::{Ctx, compile};
+use crate::issues::status_names;
 use crate::lists::{Kind, Viewer, all_nodes, scope_of};
 use crate::status_style::{Style, detect, styles};
-use crate::sync::map::format_utc;
 
 /// The toolbar's quick narrowing on top of the level's filter.
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, TS)]
@@ -45,9 +46,6 @@ pub struct ViewData {
     pub rows: HashMap<String, Row>,
     pub columns: Vec<String>,
 }
-
-/// Recently changed: issues updated within this many days.
-const RECENT_DAYS: i64 = 1;
 
 pub async fn view_rows(
     db: &Db,
@@ -87,8 +85,9 @@ fn build(
         versions: &versions,
         custom: custom_columns(conn, &view.columns)?,
     };
-    let (condition, params) = conditions(conn, viewer, &ctx, list_id, narrowing)?;
+    let (condition, params) = conditions(conn, &ctx, list_id, narrowing)?;
     let mut items = fetch(conn, &source, &condition, params)?;
+    mark_changed(conn, ctx.me.as_deref(), &mut items)?;
     let needle = fold(narrowing.text.trim());
     if !needle.is_empty() {
         items.retain(|(row, _)| {
@@ -108,10 +107,44 @@ fn build(
     })
 }
 
+/// Rows with unseen changes are highlighted and say what changed.
+fn mark_changed(conn: &Connection, me: Option<&str>, items: &mut [(Row, Facts)]) -> AppResult<()> {
+    let unseen = unseen_changes(conn)?;
+    if unseen.is_empty() {
+        return Ok(());
+    }
+    let statuses: HashMap<String, String> = status_names(conn)?
+        .into_iter()
+        .map(|(id, (name, _))| (id, name))
+        .collect();
+    let names = Names {
+        me,
+        statuses: &statuses,
+        people: &HashMap::new(),
+    };
+    for (row, _) in items {
+        if let Some(changes) = unseen.get(&row.id) {
+            row.changed = true;
+            row.change_note = chip(&facts(changes), &names);
+        }
+    }
+    Ok(())
+}
+
+/// The filter list's issues with unseen changes, for Mark all seen.
+pub fn unseen_ids(conn: &Connection, viewer: &Viewer, list_id: i64) -> AppResult<Vec<String>> {
+    let ctx = viewer.ctx(conn)?;
+    let (condition, params) = conditions(conn, &ctx, list_id, &Narrowing::default())?;
+    let mut query = conn.prepare(&format!(
+        "SELECT i.id FROM cache.issue i WHERE {condition} AND {UNSEEN}"
+    ))?;
+    let ids = query.query_map(params_from_iter(params), |r| r.get(0))?;
+    Ok(ids.collect::<Result<_, _>>()?)
+}
+
 /// The level's conditions with its kind's own rule and the narrowing, as one SQL condition.
 fn conditions(
     conn: &Connection,
-    viewer: &Viewer,
     ctx: &Ctx,
     list_id: i64,
     narrowing: &Narrowing,
@@ -126,8 +159,8 @@ fn conditions(
     let mut params = compiled.params;
     match node.kind {
         Kind::Recent => {
-            condition.push_str(" AND i.updated_at >= ?");
-            params.push(format_utc(viewer.now - Duration::days(RECENT_DAYS)).into());
+            condition.push_str(" AND ");
+            condition.push_str(UNSEEN);
         }
         Kind::Pinned => condition.push_str(
             " AND i.id IN (SELECT target_id FROM pin WHERE target_kind = 'issue' AND unpinned_at IS NULL)",
