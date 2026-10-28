@@ -125,7 +125,8 @@ src/
   queries/                   TanStack Query hooks and the event → query-key map (ADR 0018)
   state/store.ts slices/     UI-only state (zustand)
   shell/                     the main window frame: sidebar and content panel
-  views/list/                the List layout: column header, groups, virtualised rows
+  shell/toolbar/             the view toolbar: Group menu, Columns and Filter popovers, Me chip, text filter
+  views/list/ views/table/   the List and Table layouts over the view query's rows
   commands/ registry/        in-window keys; Settings page registry
   components/ (issue/: rings, pills, chips, avatars) windows/<name>/ lib/ styles/ test/
 docs/                        this folder; adr/ holds the decision records; plan/ (gitignored) the steps

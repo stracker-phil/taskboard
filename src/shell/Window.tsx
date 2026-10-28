@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
-import { useNav, useSidebar } from "../queries/sidebar";
+import { useNav, useSidebar, useViews } from "../queries/sidebar";
 import { Header } from "./Header";
 import { findLevel } from "./levels";
 import { Sidebar } from "./Sidebar/Sidebar";
+import { Toolbar } from "./toolbar/Toolbar";
 import { ViewTabs } from "./ViewTabs";
 
 interface Props {
@@ -27,17 +28,20 @@ export function Window({ sidebarHidden, children }: Props) {
   );
 }
 
-/** The current level's header and view tabs, once the tree and the place are known. */
+/** The current level's header, view tabs and toolbar, once the tree and the place are known. */
 function LevelChrome() {
   const { data: tree } = useSidebar();
   const { data: nav } = useNav();
   const location = nav?.location;
+  const { data: views } = useViews(location?.listId ?? null);
   const level = tree && location ? findLevel(tree, location.listId) : null;
   if (!level || !location) return null;
+  const view = views?.find((v) => v.id === location.viewId);
   return (
     <>
       <Header level={level} />
       <ViewTabs listId={location.listId} viewId={location.viewId} />
+      {view && <Toolbar level={level} view={view} />}
     </>
   );
 }

@@ -67,6 +67,15 @@ pub async fn view_set_sort(state: State<'_, AppState>, id: i64, sort: Sort) -> A
 }
 
 #[tauri::command]
+pub async fn view_set_widths(
+    state: State<'_, AppState>,
+    id: i64,
+    widths: std::collections::BTreeMap<String, i64>,
+) -> AppResult<View> {
+    super::view_set_widths(&state.db, id, widths).await
+}
+
+#[tauri::command]
 pub async fn view_move(state: State<'_, AppState>, id: i64, position: i64) -> AppResult<Vec<View>> {
     super::view_move(&state.db, id, position).await
 }

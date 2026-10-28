@@ -8,7 +8,9 @@ import {
   type ConnectionView,
   type EventName,
   type EventPayloads,
+  type FilterOptions,
   type Keybindings,
+  type ListConditions,
   type Nav,
   type ScopeView,
   type Settings,
@@ -18,6 +20,7 @@ import {
   type UiState,
   type ViewData,
 } from "../api/types";
+import { filterOptions } from "./filters";
 
 type Api = typeof realApi;
 
@@ -82,6 +85,8 @@ export function createApiMock(): Api {
     listDelete: vi.fn(),
     listMove: vi.fn(),
     listSetFilter: vi.fn(),
+    listConditions: vi.fn(async (): Promise<ListConditions> => ({ kind: "everything", locked: [], own: [], error: null })),
+    filterOptions: vi.fn(async (): Promise<FilterOptions> => filterOptions()),
     listMatchCount: vi.fn(),
     spaceMove: vi.fn(),
     spaceUpdate: vi.fn(),
@@ -97,6 +102,7 @@ export function createApiMock(): Api {
     viewSetColumns: vi.fn(),
     viewSetGroup: vi.fn(),
     viewSetSort: vi.fn(),
+    viewSetWidths: vi.fn(),
     viewMove: vi.fn(),
     viewDelete: vi.fn(),
     viewRows: vi.fn(async (): Promise<ViewData> => ({ groupBy: "none", groups: [], rows: {}, columns: [] })),

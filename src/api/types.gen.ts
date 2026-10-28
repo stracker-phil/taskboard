@@ -16,6 +16,8 @@ export type AppErrorField = { path: string, message: string, };
 
 export type Cell = { "kind": "text", "value": string } | { "kind": "person", "value": Person };
 
+export type Choice = { id: string, name: string, };
+
 export type Column = { 
 /**
  * A standard id or a Jira field id (`customfield_10071`).
@@ -74,6 +76,17 @@ export type Field = string;
 
 export type Filter = { conditions: Array<Condition>, };
 
+export type FilterField = { 
+/**
+ * A filter field id (`status`, `customfield_10071`).
+ */
+id: string, name: string, kind: ValueKind, };
+
+/**
+ * Everything the Filter popover's selects offer, from the cache.
+ */
+export type FilterOptions = { fields: Array<FilterField>, statuses: Array<Choice>, types: Array<Choice>, users: Array<Choice>, priorities: Array<Choice>, epics: Array<Choice>, releases: Array<Choice>, sprints: Array<Choice>, labels: Array<Choice>, projects: Array<Choice>, };
+
 export type Group = { key: string, label: string, mark: GroupMark | null, count: number, collapsedByDefault: boolean, rowIds: Array<string>, };
 
 export type GroupBy = "status" | "project" | "client" | "assignee" | "epic" | "release" | "priority" | "due" | "none";
@@ -107,6 +120,20 @@ tint: number, };
 export type LaunchEvent = { "type": "error", message: string, } | { "type": "activate" };
 
 export type Layout = "list" | "board" | "table";
+
+export type ListConditions = { kind: ListKind, 
+/**
+ * Conditions from the level itself (a Space's project) and its ancestors; they can't be edited here.
+ */
+locked: Array<LockedCondition>, 
+/**
+ * The filter list's own conditions; always empty on Everything, a Space or a Home level.
+ */
+own: Array<Condition>, 
+/**
+ * Why the stored filter can't be read.
+ */
+error: string | null, };
 
 export type ListKind = "everything" | "space" | "list" | "recent" | "pinned";
 
@@ -142,6 +169,12 @@ export type LocalPart = "spaces" | "lists" | "views" | "pins" | "styles";
  * A sidebar level (a `filter_list` id: Everything, a Home list, a Space or a filter list) and its view.
  */
 export type Location = { listId: number, viewId: number, };
+
+export type LockedCondition = { field: string, op: string, value: string, 
+/**
+ * Where it comes from: "this Space" or "from Space".
+ */
+source: string, };
 
 export type MatchCount = { open: number, total: number, };
 
@@ -325,11 +358,20 @@ export type UiState = { sidebarHidden: boolean, };
 
 export type Value = number | string | Array<string>;
 
+/**
+ * How a field's value is picked.
+ */
+export type ValueKind = "status" | "statusCategory" | "type" | "user" | "priority" | "epic" | "release" | "sprint" | "label" | "project" | "date" | "text" | "number";
+
 export type View = { id: number, listId: number, name: string, layout: Layout, 
 /**
  * Column ids in order (`assignee`, `customfield_10071`); a board's card fields.
  */
-columns: Array<string>, groupBy: GroupBy, sort: Sort, position: number, 
+columns: Array<string>, groupBy: GroupBy, sort: Sort, 
+/**
+ * The Table layout's column widths in points, by column id; missing ids use their default.
+ */
+widths: { [key in string]: number }, position: number, 
 /**
  * The tab a level opens with.
  */

@@ -120,7 +120,8 @@ case and accents, `epic`).
 project), `due`, `summary`, `status`; empty priorities and due dates sort last either way; ties keep the
 issue id order. Columns are standard ids (`assignee`, `epic`, `release`, `priority`, `labels`, `sprint`,
 `due`) or a Jira custom field id (`columns_catalogue` lists them; Jira's internal `any` fields and the sprint
-field are left out). `status_style` holds the owner's style per status (`status_style_set`).
+field are left out). `view.widths` (migration `local/0003`) holds the Table layout's column widths by column id.
+`status_style` holds the owner's style per status (`status_style_set`).
 
 ## Rules
 

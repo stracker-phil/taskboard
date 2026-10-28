@@ -2,6 +2,7 @@
 //! counts on the demo site synced from the in-process fake Jira, ancestor filtering and the edits that keep
 //! positions dense.
 
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use chrono::{DateTime, NaiveDate, Utc};
@@ -17,7 +18,8 @@ use taskboard_lib::error::{AppError, ErrorKind};
 use taskboard_lib::filter::{Condition, Field, Filter};
 use taskboard_lib::jira::{Limiter, TokenKind};
 use taskboard_lib::lists::{
-    Kind, LIST_VIEW, ListNode, SidebarTree, SpaceNode, SpaceUpdate, Viewer, ensure_tracked_spaces,
+    Kind, LIST_VIEW, ListConditions, ListNode, LockedCondition, SidebarTree, SpaceNode,
+    SpaceUpdate, ValueKind, Viewer, ensure_tracked_spaces, filter_options, list_conditions,
     list_create, list_delete, list_duplicate, list_match_count, list_move, list_rename,
     list_set_filter, sidebar_tree, space_move, space_update,
 };
@@ -29,7 +31,7 @@ use taskboard_lib::test_support::{FakeSecrets, temp_config_dir};
 use taskboard_lib::views::{
     DEFAULT_COLUMNS, GroupBy, Layout, Sort, SortBy, View, space_default_columns, view_create,
     view_delete, view_duplicate, view_move, view_rename, view_set_columns, view_set_group,
-    view_set_layout, view_set_sort, views_of,
+    view_set_layout, view_set_sort, view_set_widths, views_of,
 };
 
 const ME_ACCOUNT_ID: &str = "712020:5a1e0c3f-8d2b-4f61-9c7e-1b2a3c4d5e01";
@@ -733,6 +735,174 @@ mod the_tree_on_the_demo_site {
         assert_eq!(count.open, 55);
         assert_eq!(count.total, 74);
     }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn the_filter_fields_are_the_standard_ones_then_the_custom_fields_worth_filtering() {
+        let site = Synced::new().await;
+
+        let options = filter_options(site.db()).await.unwrap();
+
+        let ids: Vec<&str> = options.fields.iter().map(|f| f.id.as_str()).collect();
+        assert_eq!(
+            ids[..14],
+            [
+                "status",
+                "statusCategory",
+                "type",
+                "assignee",
+                "reporter",
+                "priority",
+                "epic",
+                "release",
+                "sprint",
+                "labels",
+                "due",
+                "updated",
+                "created",
+                "project",
+            ]
+        );
+        let kind_of = |id: &str| options.fields.iter().find(|f| f.id == id).map(|f| f.kind);
+        assert_eq!(kind_of(REVIEWER), Some(ValueKind::User));
+        assert_eq!(kind_of("customfield_10016"), Some(ValueKind::Number));
+        for left_out in [
+            "customfield_10020",
+            "customfield_10017",
+            "customfield_10019",
+        ] {
+            assert_eq!(kind_of(left_out), None, "{left_out}");
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn the_filter_choices_come_from_the_cache_in_a_useful_order() {
+        let site = Synced::new().await;
+
+        let options = filter_options(site.db()).await.unwrap();
+
+        assert!(!options.statuses.is_empty());
+        let priorities: Vec<&str> = options.priorities.iter().map(|c| c.name.as_str()).collect();
+        let rank = |name: &str| priorities.iter().position(|p| *p == name);
+        for (higher, lower) in [("Highest", "High"), ("High", "Medium"), ("Medium", "Low")] {
+            if let (Some(a), Some(b)) = (rank(higher), rank(lower)) {
+                assert!(a < b, "{higher} before {lower}: {priorities:?}");
+            }
+        }
+        let sprint_ids: Vec<&str> = options.sprints.iter().map(|c| c.id.as_str()).collect();
+        assert_eq!(sprint_ids[..3], ["active", "future", "closed"]);
+        let tracked_epics = number(
+            site.db(),
+            "SELECT COUNT(*) FROM cache.issue
+             WHERE is_epic = 1 AND gone = 0 AND project_id IN (SELECT project_id FROM space WHERE tracked = 1)",
+        )
+        .await;
+        assert_eq!(options.epics.len() as i64, tracked_epics);
+        assert!(options.epics.iter().any(|c| c.name == "NW · Checkout"));
+        assert!(options.releases.iter().any(|c| c.name == "NW · 2.4.0"));
+        let mut labels: Vec<&str> = options.labels.iter().map(|c| c.id.as_str()).collect();
+        let total = labels.len();
+        labels.sort();
+        labels.dedup();
+        assert_eq!(labels.len(), total);
+    }
+}
+
+mod the_conditions_a_level_shows {
+    use super::*;
+
+    fn locked(source: &str) -> LockedCondition {
+        LockedCondition {
+            field: "Project".into(),
+            op: "=".into(),
+            value: "NW".into(),
+            source: source.into(),
+        }
+    }
+
+    #[tokio::test]
+    async fn everything_has_no_locked_and_no_own_conditions() {
+        let (_dir, db) = tracked_lab().await;
+
+        let shown = list_conditions(&db, node_id(&db, "everything").await)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            shown,
+            ListConditions {
+                kind: Kind::Everything,
+                locked: vec![],
+                own: vec![],
+                error: None,
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn a_space_locks_its_project_and_has_no_own_conditions() {
+        let (_dir, db) = tracked_lab().await;
+
+        let shown = list_conditions(&db, space_node_id(&db, NW).await)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            shown,
+            ListConditions {
+                kind: Kind::Space,
+                locked: vec![locked("this Space")],
+                own: vec![],
+                error: None,
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn a_list_in_a_space_locks_the_spaces_project_and_keeps_its_stored_conditions_as_own() {
+        let (_dir, db) = tracked_lab().await;
+        let open_bugs = list_id(&db, "Open bugs").await;
+        let stored = text(
+            &db,
+            format!("SELECT filter FROM filter_list WHERE id = {open_bugs}"),
+        )
+        .await;
+
+        let shown = list_conditions(&db, open_bugs).await.unwrap();
+
+        assert_eq!(shown.kind, Kind::List);
+        assert_eq!(shown.locked, [locked("from Space")]);
+        assert_eq!(shown.own, Filter::parse(Some(&stored)).unwrap().conditions);
+        assert_eq!(shown.own.len(), 2);
+        assert_eq!(shown.error, None);
+    }
+
+    #[tokio::test]
+    async fn a_list_whose_stored_filter_is_broken_reports_an_error() {
+        let (_dir, db) = tracked_lab().await;
+        execute(
+            &db,
+            "UPDATE filter_list SET filter = 'not json' WHERE name = 'Epics'",
+        )
+        .await;
+
+        let shown = list_conditions(&db, list_id(&db, "Epics").await)
+            .await
+            .unwrap();
+
+        assert!(shown.error.is_some());
+        assert!(shown.own.is_empty());
+    }
+
+    #[tokio::test]
+    async fn an_unknown_level_is_not_found() {
+        let (_dir, db) = tracked_lab().await;
+
+        let err = list_conditions(&db, 9999).await.unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::NotFound);
+    }
 }
 
 mod editing_filter_lists {
@@ -1389,6 +1559,119 @@ mod editing_views {
         assert_eq!(err.kind(), ErrorKind::NotFound);
     }
 
+    fn widths(pairs: &[(&str, i64)]) -> BTreeMap<String, i64> {
+        pairs.iter().map(|(k, v)| (k.to_string(), *v)).collect()
+    }
+
+    #[tokio::test]
+    async fn a_new_view_has_no_widths() {
+        let (_dir, db) = tracked_lab().await;
+
+        assert!(
+            space_views(&db)
+                .await
+                .iter()
+                .all(|view| view.widths.is_empty())
+        );
+    }
+
+    #[tokio::test]
+    async fn widths_are_stored_per_view_and_read_back_with_the_tabs() {
+        let (_dir, db) = tracked_lab().await;
+        let views = space_views(&db).await;
+
+        let table = view_set_widths(&db, views[2].id, widths(&[("assignee", 120), ("due", 90)]))
+            .await
+            .unwrap();
+
+        assert_eq!(table.widths, widths(&[("assignee", 120), ("due", 90)]));
+        let after = space_views(&db).await;
+        assert_eq!(after[2].widths, table.widths);
+        assert!(after[0].widths.is_empty());
+    }
+
+    #[tokio::test]
+    async fn widths_outside_the_allowed_range_are_clamped() {
+        let (_dir, db) = tracked_lab().await;
+        let id = space_views(&db).await[2].id;
+
+        let view = view_set_widths(
+            &db,
+            id,
+            widths(&[
+                ("a", 10),
+                ("b", 48),
+                ("c", 300),
+                ("d", 800),
+                ("e", 5000),
+                ("f", -3),
+            ]),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(
+            view.widths,
+            widths(&[
+                ("a", 48),
+                ("b", 48),
+                ("c", 300),
+                ("d", 800),
+                ("e", 800),
+                ("f", 48)
+            ])
+        );
+    }
+
+    #[tokio::test]
+    async fn setting_widths_replaces_the_earlier_ones() {
+        let (_dir, db) = tracked_lab().await;
+        let id = space_views(&db).await[2].id;
+        view_set_widths(&db, id, widths(&[("assignee", 120)]))
+            .await
+            .unwrap();
+
+        let view = view_set_widths(&db, id, widths(&[("due", 90)]))
+            .await
+            .unwrap();
+
+        assert_eq!(view.widths, widths(&[("due", 90)]));
+    }
+
+    #[tokio::test]
+    async fn widths_of_an_unknown_view_are_not_found() {
+        let (_dir, db) = tracked_lab().await;
+
+        let err = view_set_widths(&db, 9999, widths(&[("due", 90)]))
+            .await
+            .unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::NotFound);
+    }
+
+    #[tokio::test]
+    async fn a_duplicate_view_and_a_duplicate_list_keep_the_widths() {
+        let (_dir, db) = tracked_lab().await;
+        let table = space_views(&db).await[2].id;
+        view_set_widths(&db, table, widths(&[("assignee", 120)]))
+            .await
+            .unwrap();
+        let epics = list_id(&db, "Epics").await;
+        let epics_view = views_of(&db, epics).await.unwrap()[0].id;
+        view_set_widths(&db, epics_view, widths(&[("due", 77)]))
+            .await
+            .unwrap();
+
+        let copy = view_duplicate(&db, table).await.unwrap();
+        let copied_list = list_duplicate(&db, epics).await.unwrap();
+
+        assert_eq!(copy.widths, widths(&[("assignee", 120)]));
+        assert_eq!(
+            views_of(&db, copied_list).await.unwrap()[0].widths,
+            widths(&[("due", 77)])
+        );
+    }
+
     #[tokio::test]
     async fn a_view_serializes_for_the_page_in_camel_case() {
         let (_dir, db) = tracked_lab().await;
@@ -1405,6 +1688,7 @@ mod editing_views {
                 "columns": ["assignee", "epic", "release", "priority"],
                 "groupBy": "status",
                 "sort": { "by": "updated", "descending": true },
+                "widths": {},
                 "position": 0,
                 "isDefault": true,
             })

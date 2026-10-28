@@ -1,0 +1,109 @@
+/* The view toolbar and its popovers (docs/ux.md → Toolbar). */
+.toolbar { display: flex; flex: none; align-items: center; gap: 8px; height: 50px; padding: 0 24px; }
+.toolbar__spacer { flex: 1; }
+.toolbar__anchor { position: relative; display: flex; }
+
+.toolbar-btn {
+  display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 11px; box-sizing: border-box;
+  border: 1px solid var(--border); border-radius: 8px; background: var(--panel-bg); color: var(--text-secondary);
+  font: inherit; font-size: 13px; cursor: default;
+}
+.toolbar-btn:hover { background: var(--fill-hover); }
+.toolbar-btn--open { background: var(--accent-soft-bg); }
+.toolbar-btn--filter { padding: 0 9px 0 11px; }
+.toolbar-btn--active { background: var(--accent-soft-bg); border-color: var(--accent-soft-border); }
+.toolbar-badge {
+  display: flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box;
+  border-radius: 9px; background: var(--accent); color: var(--text-on-accent); font-size: 11px; font-weight: 700;
+}
+
+.me-chip {
+  display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px 0 4px; box-sizing: border-box;
+  border: 1px solid var(--accent-soft-border); border-radius: 15px; background: var(--accent-soft-bg); color: var(--accent-text);
+  font: inherit; font-size: 13px; cursor: default;
+}
+.me-chip__avatar { width: 22px; height: 22px; }
+
+.text-filter {
+  display: flex; align-items: center; gap: 6px; width: 190px; height: 30px; padding: 0 10px; box-sizing: border-box;
+  border: 1px solid var(--border); border-radius: 8px; color: var(--text-muted);
+}
+.text-filter input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text); font: inherit; font-size: 13px; }
+
+/* Popovers: under their button, over the view. */
+.popover {
+  position: absolute; top: calc(100% + 3px); z-index: 5; display: flex; flex-direction: column; overflow: hidden;
+  border: 1px solid var(--border); border-radius: 12px; background: var(--panel-bg); box-shadow: var(--shadow-popover); color: var(--text);
+}
+.popover__header { display: flex; align-items: center; gap: 8px; padding: 14px 16px 6px; }
+.popover__title { flex: 1; font-size: 14px; font-weight: 700; }
+.popover__meta { font-size: 12px; color: var(--text-muted); }
+.popover__caps { padding: 8px 8px 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-muted); }
+.popover__caps--spaced { padding-top: 10px; }
+.popover__footer {
+  display: flex; align-items: center; gap: 8px; padding: 10px 16px;
+  border-top: 1px solid var(--hairline); background: var(--panel-subtle-bg); font-size: 12px; color: var(--text-tertiary);
+}
+.popover__footer-text { flex: 1; }
+.popover__small-btn {
+  height: 26px; padding: 0 10px; border: 1px solid var(--border); border-radius: 7px; background: var(--panel-bg);
+  color: var(--text-secondary); font: inherit; font-size: 12px; cursor: default;
+}
+
+.columns-popover { left: -8px; width: 340px; }
+.columns-popover__body { padding: 4px 8px 8px; }
+.columns-popover__section { position: relative; display: flex; flex-direction: column; }
+.column-row {
+  display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 8px; border: 0; border-radius: 7px;
+  background: transparent; color: var(--text-strong-body); font: inherit; font-size: 13px; text-align: left; cursor: default;
+}
+.column-row:hover { background: var(--fill-hover); }
+.column-row[data-dragging] { opacity: 0.5; }
+.column-row__handle { font-size: 12px; letter-spacing: -2px; color: var(--text-faint); cursor: grab; }
+.column-row__label { flex: 1; }
+.column-row__hint { font-size: 11px; color: var(--text-muted); }
+
+.toggle { display: flex; flex: none; width: 30px; height: 18px; padding: 2px; box-sizing: border-box; border-radius: 9px; background: var(--border-strong); }
+.toggle--on { justify-content: flex-end; background: var(--accent); }
+.toggle__knob { width: 14px; height: 14px; border-radius: 50%; background: var(--panel-bg); box-shadow: var(--shadow-knob); }
+
+.filter-popover { right: 0; width: 440px; }
+.filter-popover__header { padding-bottom: 4px; }
+.filter-popover__icon { color: var(--text-tertiary); }
+.filter-popover__body { display: flex; flex-direction: column; gap: 6px; padding: 10px 16px 16px; }
+.filter-popover__error { margin: 0; font-size: 12px; color: var(--banner-error-text); }
+.filter-popover__add {
+  align-self: flex-start; height: 28px; padding: 0 10px; border: 1px dashed var(--border-strong); border-radius: 7px;
+  background: transparent; color: var(--text-tertiary); font: inherit; font-size: 12px; cursor: default;
+}
+.locked-condition {
+  display: flex; align-items: center; gap: 6px; height: 34px; padding: 0 10px; border-radius: 8px;
+  background: var(--fill-subtle); color: var(--text-tertiary); font-size: 13px;
+}
+.locked-condition__field { font-weight: 600; color: var(--text-secondary); }
+.locked-condition__value { font-family: var(--font-mono); color: var(--text); }
+.locked-condition__source { margin-left: auto; font-size: 11px; color: var(--text-muted); }
+
+.condition-row { display: flex; align-items: center; gap: 6px; }
+.condition-row select,
+.condition-row input {
+  height: 30px; padding: 0 8px; box-sizing: border-box; border: 1px solid var(--border-strong); border-radius: 7px;
+  background: var(--panel-bg); color: var(--text); font: inherit; font-size: 13px;
+}
+.condition-row__field { width: 110px; }
+.condition-row__op { width: 70px; }
+.condition-row__value { flex: 1; min-width: 0; }
+.condition-row__remove {
+  display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 7px;
+  background: transparent; color: var(--text-muted); cursor: default;
+}
+
+.btn-secondary {
+  height: 30px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel-bg);
+  color: var(--text-secondary); font: inherit; font-size: 13px; cursor: default;
+}
+.btn-secondary:disabled { opacity: 0.45; }
+.btn-primary-dark {
+  height: 30px; padding: 0 14px; border: 0; border-radius: 8px; background: var(--button-primary-bg);
+  color: var(--button-primary-text); font: inherit; font-size: 13px; font-weight: 600; cursor: default;
+}

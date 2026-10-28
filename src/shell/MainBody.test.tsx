@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -6,9 +6,11 @@ vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await impo
 
 import { api } from "../api";
 import { createQueryClient } from "../queries/queryClient";
-import { resetStore } from "../state/store";
+import { narrowingKey } from "../state/slices/narrowing";
+import { resetStore, useStore } from "../state/store";
 import { groupOf, row, viewData } from "../test/issues";
 import { projectCounts, syncOverview } from "../test/jira";
+import { view } from "../test/views";
 import { MainBody } from "./MainBody";
 
 const mocked = vi.mocked(api, true);
@@ -67,6 +69,60 @@ describe("MainBody", () => {
 
     expect(await screen.findByText("Redesign the pricing page")).toBeInTheDocument();
     expect(mocked.viewRows).toHaveBeenCalledWith(11, 101, expect.anything());
+  });
+
+  describe("layouts", () => {
+    beforeEach(() => {
+      const issue = row({ summary: "Redesign the pricing page" });
+      mocked.navCurrent.mockResolvedValue({ location: { listId: 11, viewId: 101 }, expanded: [] });
+      mocked.syncOverview.mockResolvedValue(syncOverview({ projects: [projectCounts()] }));
+      mocked.viewRows.mockResolvedValue(viewData([groupOf([issue])], [issue]));
+    });
+
+    it("shows the table for a view with the table layout", async () => {
+      mocked.viewsOf.mockResolvedValue([view({ layout: "table" })]);
+
+      renderBody();
+
+      expect(await screen.findByText("Key")).toBeInTheDocument();
+      expect(screen.queryByText("Name")).not.toBeInTheDocument();
+    });
+
+    it.each(["list", "board"] as const)("shows the list for a view with the %s layout", async (layout) => {
+      mocked.viewsOf.mockResolvedValue([view({ layout })]);
+
+      renderBody();
+
+      expect(await screen.findByText("Name")).toBeInTheDocument();
+      expect(screen.queryByText("Key")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("narrowing", () => {
+    beforeEach(() => {
+      mocked.navCurrent.mockResolvedValue({ location: { listId: 11, viewId: 101 }, expanded: [] });
+      mocked.syncOverview.mockResolvedValue(syncOverview({ projects: [projectCounts()] }));
+    });
+
+    it.each(["list", "table"] as const)("asks for the rows narrowed to me in a %s view", async (layout) => {
+      mocked.viewsOf.mockResolvedValue([view({ layout })]);
+      useStore.getState().setNarrowing(narrowingKey(11, 101), { me: true });
+
+      renderBody();
+
+      await waitFor(() => expect(mocked.viewRows).toHaveBeenCalledWith(11, 101, { me: true, text: "", epic: null }));
+    });
+
+    it("asks for the rows narrowed by the text of this view only", async () => {
+      mocked.viewsOf.mockResolvedValue([view()]);
+      useStore.getState().setNarrowing(narrowingKey(11, 101), { text: "pricing" });
+      useStore.getState().setNarrowing(narrowingKey(11, 102), { me: true });
+
+      renderBody();
+
+      await waitFor(() => expect(mocked.viewRows).toHaveBeenCalledWith(11, 101, { me: false, text: "pricing", epic: null }));
+      expect(mocked.viewRows).not.toHaveBeenCalledWith(11, 101, expect.objectContaining({ me: true }));
+    });
   });
 
   it("keeps the sync status when there are issues but no place to show", async () => {

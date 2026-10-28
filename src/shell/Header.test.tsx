@@ -28,7 +28,9 @@ async function renderHeader(level: Level) {
     </QueryClientProvider>,
   );
   await waitFor(() => expect(mocked.connectionGet).toHaveBeenCalled());
-  await act(async () => {});
+  await act(async () => {
+    await mocked.connectionGet.mock.results[0].value;
+  });
 }
 
 beforeEach(() => {
@@ -77,7 +79,7 @@ describe("Header", () => {
     ])("opens the Space's project page without a double slash for %s", async (_name, level) => {
       await renderHeader(level);
 
-      await userEvent.click(screen.getByRole("button", { name: /Open in Jira/ }));
+      await userEvent.click(await screen.findByRole("button", { name: /Open in Jira/ }));
 
       expect(mocked.openUrl).toHaveBeenCalledWith("https://example.atlassian.net/browse/NW");
     });
@@ -103,7 +105,7 @@ describe("Header", () => {
       mocked.openUrl.mockRejectedValue({ kind: "io", message: "No browser", code: null });
       await renderHeader(SPACE_LEVEL);
 
-      await userEvent.click(screen.getByRole("button", { name: /Open in Jira/ }));
+      await userEvent.click(await screen.findByRole("button", { name: /Open in Jira/ }));
 
       await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not open Jira: No browser"));
     });

@@ -1,5 +1,7 @@
 //! A view: one tab of a sidebar level. It decides how issues show, never which.
 
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
@@ -72,6 +74,8 @@ pub struct View {
     pub columns: Vec<String>,
     pub group_by: GroupBy,
     pub sort: Sort,
+    /// The Table layout's column widths in points, by column id; missing ids use their default.
+    pub widths: BTreeMap<String, i64>,
     pub position: i64,
     /// The tab a level opens with.
     pub is_default: bool,

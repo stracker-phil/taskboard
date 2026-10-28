@@ -16,6 +16,8 @@ import type {
   Keybindings,
   LaunchEvent,
   Layout,
+  FilterOptions,
+  ListConditions,
   MatchCount,
   Narrowing,
   Nav,
@@ -38,14 +40,18 @@ import type {
 export * from "./types";
 
 /** An item of a native context menu: runs `run` when chosen, or opens `items` as a submenu. */
-export type MenuEntry = { text: string; enabled?: boolean; run?: () => void; items?: MenuEntry[] } | "separator";
+export type MenuEntry = { text: string; enabled?: boolean; checked?: boolean; run?: () => void; items?: MenuEntry[] } | "separator";
 
-type NativeEntry = { item: "Separator" } | { text: string; enabled?: boolean; action?: () => void; items?: NativeEntry[] };
+type NativeEntry =
+  | { item: "Separator" }
+  | { text: string; enabled?: boolean; checked?: boolean; action?: () => void; items?: NativeEntry[] };
 
+/** `checked` (true or false) makes a check item. */
 function nativeEntry(entry: MenuEntry): NativeEntry {
   if (entry === "separator") return { item: "Separator" };
   if (entry.items) return { text: entry.text, enabled: entry.enabled, items: entry.items.map(nativeEntry) };
-  return { text: entry.text, enabled: entry.enabled, action: entry.run };
+  const item = { text: entry.text, enabled: entry.enabled, action: entry.run };
+  return entry.checked === undefined ? item : { ...item, checked: entry.checked };
 }
 
 /** The app's IPC entry point (ADR 0002). Tests mock this module. */
@@ -99,6 +105,10 @@ export const api = {
   listMove: (id: number, position: number) => invoke<void>("list_move", { id, position }),
   listSetFilter: (id: number, filter: Filter) => invoke<void>("list_set_filter", { id, filter }),
   /** What `id` inherits ANDed with `filter` in place of its own conditions. */
+  /** A level's locked conditions (with display names) and a filter list's own ones. */
+  listConditions: (id: number) => invoke<ListConditions>("list_conditions", { id }),
+  /** The fields and cached values the Filter popover's selects offer. */
+  filterOptions: () => invoke<FilterOptions>("filter_options"),
   listMatchCount: (id: number, filter: Filter) => invoke<MatchCount>("list_match_count", { id, filter }),
   spaceMove: (projectId: string, position: number) => invoke<void>("space_move", { projectId, position }),
   spaceUpdate: (projectId: string, update: SpaceUpdate) => invoke<void>("space_update", { projectId, update }),
@@ -118,6 +128,8 @@ export const api = {
   viewSetColumns: (id: number, columns: string[]) => invoke<View>("view_set_columns", { id, columns }),
   viewSetGroup: (id: number, groupBy: GroupBy) => invoke<View>("view_set_group", { id, groupBy }),
   viewSetSort: (id: number, sort: Sort) => invoke<View>("view_set_sort", { id, sort }),
+  /** The Table layout's column widths by column id; Rust clamps them to 48–800. */
+  viewSetWidths: (id: number, widths: Record<string, number>) => invoke<View>("view_set_widths", { id, widths }),
   viewMove: (id: number, position: number) => invoke<View[]>("view_move", { id, position }),
   /** Rejects with `invalid_input` for the last view of a level. */
   viewDelete: (id: number) => invoke<View[]>("view_delete", { id }),

@@ -3,7 +3,7 @@
 use chrono::Utc;
 use tauri::State;
 
-use super::{MatchCount, SidebarTree, SpaceUpdate, Viewer};
+use super::{FilterOptions, ListConditions, MatchCount, SidebarTree, SpaceUpdate, Viewer};
 use crate::error::AppResult;
 use crate::filter::Filter;
 use crate::state::AppState;
@@ -78,4 +78,16 @@ pub async fn space_update(
     update: SpaceUpdate,
 ) -> AppResult<()> {
     super::space_update(&state.db, project_id, update).await
+}
+
+/// A level's locked and own conditions for the Filter popover.
+#[tauri::command]
+pub async fn list_conditions(state: State<'_, AppState>, id: i64) -> AppResult<ListConditions> {
+    super::list_conditions(&state.db, id).await
+}
+
+/// The fields and values the Filter popover offers.
+#[tauri::command]
+pub async fn filter_options(state: State<'_, AppState>) -> AppResult<FilterOptions> {
+    super::filter_options(&state.db).await
 }

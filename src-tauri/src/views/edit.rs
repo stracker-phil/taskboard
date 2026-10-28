@@ -1,5 +1,7 @@
 //! Reading and changing the view tabs of a sidebar level. Every change keeps positions dense.
 
+use std::collections::BTreeMap;
+
 use rusqlite::types::Value as SqlValue;
 use rusqlite::{Connection, OptionalExtension, Row, params};
 
@@ -9,8 +11,7 @@ use crate::error::{AppError, AppResult};
 use crate::lists::{Kind, node};
 use crate::order::Siblings;
 
-const COLUMNS: &str =
-    "id, list_id, name, layout, columns, group_by, sort_by, sort_order, position, is_default";
+const COLUMNS: &str = "id, list_id, name, layout, columns, group_by, sort_by, sort_order, position, is_default, widths";
 
 fn siblings(list_id: i64) -> Siblings<'static> {
     Siblings {
@@ -38,6 +39,10 @@ fn from_row(row: &Row) -> rusqlite::Result<View> {
         },
         position: row.get(8)?,
         is_default: row.get(9)?,
+        widths: row
+            .get::<_, Option<String>>(10)?
+            .and_then(|json| serde_json::from_str(&json).ok())
+            .unwrap_or_default(),
     })
 }
 
@@ -109,6 +114,7 @@ fn copy_view(conn: &Connection, view: &View, list_id: i64, name: &str) -> AppRes
         &view.columns,
     )?;
     write_sort(conn, id, view.sort)?;
+    write_widths(conn, id, &view.widths)?;
     Ok(id)
 }
 
@@ -152,6 +158,18 @@ fn write_sort(conn: &Connection, id: i64, sort: Sort) -> AppResult<()> {
     )?;
     Ok(())
 }
+
+fn write_widths(conn: &Connection, id: i64, widths: &BTreeMap<String, i64>) -> AppResult<()> {
+    conn.execute(
+        "UPDATE view SET widths = ?2 WHERE id = ?1",
+        params![id, serde_json::to_string(widths)?],
+    )?;
+    Ok(())
+}
+
+/// Narrowest and widest a Table column can be dragged.
+const MIN_WIDTH: i64 = 48;
+const MAX_WIDTH: i64 = 800;
 
 pub fn clean_name(name: &str) -> AppResult<String> {
     let name = name.trim();
@@ -262,6 +280,15 @@ pub async fn view_set_group(db: &Db, id: i64, group_by: GroupBy) -> AppResult<Vi
 
 pub async fn view_set_sort(db: &Db, id: i64, sort: Sort) -> AppResult<View> {
     edit(db, id, move |conn| write_sort(conn, id, sort)).await
+}
+
+/// Clamps each width to the Table column bounds.
+pub async fn view_set_widths(db: &Db, id: i64, widths: BTreeMap<String, i64>) -> AppResult<View> {
+    let widths: BTreeMap<String, i64> = widths
+        .into_iter()
+        .map(|(column, width)| (column, width.clamp(MIN_WIDTH, MAX_WIDTH)))
+        .collect();
+    edit(db, id, move |conn| write_widths(conn, id, &widths)).await
 }
 
 pub async fn view_move(db: &Db, id: i64, position: i64) -> AppResult<Vec<View>> {

@@ -8,6 +8,7 @@ use crate::error::{AppError, AppResult};
 pub const LOCAL: &[&str] = &[
     include_str!("../../migrations/local/0001_init.sql"),
     include_str!("../../migrations/local/0002_tree.sql"),
+    include_str!("../../migrations/local/0003_view_widths.sql"),
 ];
 pub const CACHE: &[&str] = &[include_str!("../../migrations/cache/0001_init.sql")];
 

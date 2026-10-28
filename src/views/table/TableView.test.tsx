@@ -1,0 +1,254 @@
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("../../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../../test/apiMock")).createApiMock() }));
+
+import { api, type View, type ViewData } from "../../api";
+import { createQueryClient } from "../../queries/queryClient";
+import { resetStore, useStore } from "../../state/store";
+import { COLUMNS, groupOf, row, viewData } from "../../test/issues";
+import { view } from "../../test/views";
+import { TableView } from "./TableView";
+
+const mocked = vi.mocked(api, true);
+
+type Restorable = { mockRestore: () => void };
+let spies: Restorable[] = [];
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  resetStore();
+  mocked.columnsCatalogue.mockResolvedValue([...COLUMNS, { id: "due", name: "Due", custom: false }]);
+  mocked.viewSetSort.mockResolvedValue(view());
+  mocked.viewSetWidths.mockResolvedValue(view());
+  spies = [
+    vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(1000),
+    vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(800),
+  ];
+});
+
+afterEach(() => {
+  spies.forEach((s) => s.mockRestore());
+});
+
+const TABLE = view({ layout: "table", sort: { by: "key", descending: false } });
+const OPEN = row({ id: "1", key: "NW-1042", summary: "Redesign the pricing page" });
+const DONE = row({ id: "2", key: "NW-1001", summary: "Publish the launch notes", style: "done", statusName: "Done" });
+
+async function renderTable(data: ViewData = viewData([groupOf([OPEN, DONE])], [OPEN, DONE], { columns: ["assignee", "priority"] }), current: View = TABLE) {
+  mocked.viewRows.mockResolvedValue(data);
+  render(
+    <QueryClientProvider client={createQueryClient()}>
+      <TableView view={current} />
+    </QueryClientProvider>,
+  );
+  await screen.findByRole("grid");
+}
+
+/** The header cell with this column name. */
+const header = (name: string) => screen.getByText(name).closest<HTMLElement>('[role="columnheader"]')!;
+
+describe("TableView", () => {
+  it("renders nothing until the rows have loaded", () => {
+    mocked.viewRows.mockReturnValue(new Promise(() => {}));
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <TableView view={TABLE} />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.queryByRole("grid")).not.toBeInTheDocument();
+  });
+
+  describe("headers", () => {
+    it("starts with Key, Summary and Status, then the view's columns by their names", async () => {
+      await renderTable();
+
+      await waitFor(() => expect(screen.getAllByRole("columnheader").map((h) => h.textContent?.replace(/[↑↓]/, ""))).toEqual(["Key", "Summary", "Status", "Assignee", "Priority"]));
+    });
+
+    it("marks only the sorted column with aria-sort", async () => {
+      await renderTable();
+
+      expect(header("Key")).toHaveAttribute("aria-sort", "ascending");
+      expect(header("Summary")).not.toHaveAttribute("aria-sort");
+      expect(header("Status")).not.toHaveAttribute("aria-sort");
+    });
+
+    it("marks a descending sort as descending", async () => {
+      await renderTable(undefined, view({ layout: "table", sort: { by: "key", descending: true } }));
+
+      expect(header("Key")).toHaveAttribute("aria-sort", "descending");
+    });
+
+    it("marks no column when the view sorts by one the table has no header for", async () => {
+      await renderTable(undefined, view({ layout: "table", sort: { by: "updated", descending: true } }));
+
+      expect(screen.getAllByRole("columnheader").some((h) => h.hasAttribute("aria-sort"))).toBe(false);
+    });
+
+    it("flips the direction when the sorted header is clicked", async () => {
+      await renderTable();
+
+      await userEvent.click(screen.getByRole("button", { name: /^Key/ }));
+
+      expect(mocked.viewSetSort).toHaveBeenCalledWith(101, { by: "key", descending: true });
+    });
+
+    it.each([
+      ["Summary", { by: "summary", descending: false }],
+      ["Status", { by: "status", descending: false }],
+      ["Priority", { by: "priority", descending: true }],
+      ["Due", { by: "due", descending: true }],
+    ])("sorts by %s in its natural direction when another column is sorted", async (name, sort) => {
+      await renderTable(viewData([groupOf([OPEN])], [OPEN], { columns: ["priority", "due"] }));
+      await screen.findByRole("button", { name });
+
+      await userEvent.click(screen.getByRole("button", { name }));
+
+      expect(mocked.viewSetSort).toHaveBeenCalledWith(101, sort);
+    });
+
+    it("offers no sort button on a column that cannot sort", async () => {
+      await renderTable();
+      await screen.findByText("Assignee");
+
+      expect(within(header("Assignee")).queryByRole("button")).not.toBeInTheDocument();
+    });
+
+    it("shows a toast when the sort cannot be saved", async () => {
+      mocked.viewSetSort.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
+      await renderTable();
+
+      await userEvent.click(screen.getByRole("button", { name: /^Key/ }));
+
+      await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not sort the view: Disk full"));
+    });
+  });
+
+  describe("column widths", () => {
+    it("applies a stored width to the header cell", async () => {
+      await renderTable(undefined, view({ layout: "table", widths: { key: 150 } }));
+
+      expect(header("Key")).toHaveStyle({ width: "150px" });
+    });
+
+    it("uses the default width for a column without a stored one", async () => {
+      await renderTable();
+
+      expect(header("Key")).toHaveStyle({ width: "90px" });
+    });
+
+    it("saves the widths with the dragged column's new width once the pointer is released", async () => {
+      await renderTable(undefined, view({ layout: "table", widths: { status: 160 } }));
+      const handle = screen.getByRole("separator", { name: "Resize Key" });
+
+      fireEvent.pointerDown(handle, { button: 0, clientX: 100 });
+      fireEvent.pointerMove(window, { clientX: 120 });
+      fireEvent.pointerMove(window, { clientX: 140 });
+      fireEvent.pointerUp(window);
+
+      await waitFor(() => expect(mocked.viewSetWidths).toHaveBeenCalledWith(101, { status: 160, key: 130 }));
+      expect(mocked.viewSetWidths).toHaveBeenCalledTimes(1);
+    });
+
+    it("widens the header while the pointer is still down", async () => {
+      await renderTable();
+
+      fireEvent.pointerDown(screen.getByRole("separator", { name: "Resize Key" }), { button: 0, clientX: 100 });
+      fireEvent.pointerMove(window, { clientX: 140 });
+
+      expect(header("Key")).toHaveStyle({ width: "130px" });
+      expect(mocked.viewSetWidths).not.toHaveBeenCalled();
+      fireEvent.pointerUp(window);
+    });
+
+    it("never narrows a column below 48", async () => {
+      await renderTable();
+
+      fireEvent.pointerDown(screen.getByRole("separator", { name: "Resize Key" }), { button: 0, clientX: 300 });
+      fireEvent.pointerMove(window, { clientX: 0 });
+      fireEvent.pointerUp(window);
+
+      await waitFor(() => expect(mocked.viewSetWidths).toHaveBeenCalledWith(101, { key: 48 }));
+    });
+
+    it("saves nothing when the pointer is released where it went down", async () => {
+      await renderTable();
+
+      fireEvent.pointerDown(screen.getByRole("separator", { name: "Resize Key" }), { button: 0, clientX: 100 });
+      fireEvent.pointerUp(window);
+
+      expect(mocked.viewSetWidths).not.toHaveBeenCalled();
+    });
+
+    it("gives Summary no resize handle", async () => {
+      await renderTable();
+
+      expect(screen.queryByRole("separator", { name: "Resize Summary" })).not.toBeInTheDocument();
+    });
+  });
+
+  describe("rows", () => {
+    it("shows key, summary and status of each issue", async () => {
+      await renderTable();
+
+      const issue = await screen.findByRole("row", { name: /NW-1001/ });
+      expect(issue).toHaveTextContent("Publish the launch notes");
+      expect(issue).toHaveTextContent("Done");
+    });
+
+    it("selects the row that is clicked", async () => {
+      await renderTable();
+
+      await userEvent.click(await screen.findByText("Publish the launch notes"));
+
+      expect(screen.getByRole("row", { name: /NW-1001/ })).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByRole("row", { name: /NW-1042/ })).toHaveAttribute("aria-selected", "false");
+    });
+
+    it("renders only the visible part of 5,000 rows", async () => {
+      const many = Array.from({ length: 5000 }, (_, i) => row({ id: String(i), key: `NW-${i + 1}`, summary: `Task ${i + 1}` }));
+      await renderTable(viewData([groupOf(many)], many));
+
+      await screen.findByText("Task 1");
+      const rendered = within(screen.getByRole("grid")).getAllByRole("row").length;
+      expect(rendered).toBeGreaterThan(1);
+      expect(rendered).toBeLessThan(200);
+    });
+  });
+
+  describe("groups", () => {
+    const groups = () => [
+      groupOf([OPEN], { key: "status:progress", label: "In Progress", mark: { kind: "status", style: "progress" } }),
+      groupOf([DONE], { key: "status:done", label: "Done", count: 12, collapsedByDefault: true, mark: { kind: "status", style: "done" } }),
+    ];
+
+    it("shows a group header with its count and hides the rows of a collapsed-by-default group", async () => {
+      await renderTable(viewData(groups(), [OPEN, DONE]));
+
+      expect(await screen.findByText("12")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Expand group" })).toHaveAttribute("aria-expanded", "false");
+      expect(screen.queryByText("Publish the launch notes")).not.toBeInTheDocument();
+    });
+
+    it("shows the rows of a group once it is expanded", async () => {
+      await renderTable(viewData(groups(), [OPEN, DONE]));
+
+      await userEvent.click(await screen.findByRole("button", { name: "Expand group" }));
+
+      expect(await screen.findByText("Publish the launch notes")).toBeInTheDocument();
+    });
+
+    it("hides the rows of an open group when it is collapsed", async () => {
+      await renderTable(viewData(groups(), [OPEN, DONE]));
+      expect(await screen.findByText("Redesign the pricing page")).toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole("button", { name: "Collapse group" }));
+
+      expect(screen.queryByText("Redesign the pricing page")).not.toBeInTheDocument();
+    });
+  });
+});

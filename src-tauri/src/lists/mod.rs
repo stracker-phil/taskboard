@@ -2,12 +2,17 @@
 //! issues a level holds.
 
 pub mod commands;
+mod conditions;
 mod context;
 mod defaults;
 mod edit;
 mod nodes;
 mod tree;
 
+pub use conditions::{
+    Choice, FilterField, FilterOptions, ListConditions, LockedCondition, ValueKind, filter_options,
+    list_conditions,
+};
 pub use context::Viewer;
 pub use defaults::{LIST_VIEW, ensure_space};
 pub use edit::{

@@ -27,7 +27,25 @@ pub fn describe(conditions: &[Condition], names: &Names) -> String {
         .join(" and ")
 }
 
+/// A condition in words, split for display: "Project", "=", "NW".
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Parts {
+    pub field: String,
+    pub op: String,
+    /// Empty for operators without a value ("is empty").
+    pub value: String,
+}
+
 fn sentence(c: &Condition, names: &Names) -> String {
+    let Parts { field, op, value } = parts(c, names);
+    if value.is_empty() {
+        format!("{field} {op}")
+    } else {
+        format!("{field} {op} {value}")
+    }
+}
+
+pub fn parts(c: &Condition, names: &Names) -> Parts {
     let field = field_name(&c.field, names);
     let value = |v: &str| value_name(&c.field, v, names);
     let one = || match &c.value {
@@ -41,18 +59,23 @@ fn sentence(c: &Condition, names: &Names) -> String {
         Some(Value::Days(n)) => format!("{n} days"),
         _ => "days".to_string(),
     };
-    match c.op {
-        Op::Is => format!("{field} = {}", one()),
-        Op::IsNot => format!("{field} ≠ {}", one()),
-        Op::In => format!("{field} in {}", one()),
-        Op::NotIn => format!("{field} not in {}", one()),
-        Op::IsEmpty => format!("{field} is empty"),
-        Op::IsNotEmpty => format!("{field} is set"),
-        Op::Contains => format!("{field} contains “{}”", one()),
-        Op::Before => format!("{field} before {}", one()),
-        Op::After => format!("{field} after {}", one()),
-        Op::WithinLastDays => format!("{field} in the last {}", days()),
-        Op::WithinNextDays => format!("{field} in the next {}", days()),
+    let (op, value) = match c.op {
+        Op::Is => ("=", one()),
+        Op::IsNot => ("≠", one()),
+        Op::In => ("in", one()),
+        Op::NotIn => ("not in", one()),
+        Op::IsEmpty => ("is empty", String::new()),
+        Op::IsNotEmpty => ("is set", String::new()),
+        Op::Contains => ("contains", format!("“{}”", one())),
+        Op::Before => ("before", one()),
+        Op::After => ("after", one()),
+        Op::WithinLastDays => ("in the last", days()),
+        Op::WithinNextDays => ("in the next", days()),
+    };
+    Parts {
+        field,
+        op: op.to_string(),
+        value,
     }
 }
 
@@ -320,6 +343,66 @@ mod tests {
             describe(&conditions, &names()),
             "Status = In Review and Reviewer = me"
         );
+    }
+
+    fn parts_of(field: Field, op: Op, value: Option<Value>) -> (String, String, String) {
+        let Parts { field, op, value } = parts(&Condition::new(field, op, value), &names());
+        (field, op, value)
+    }
+
+    #[test]
+    fn parts_split_a_condition_into_field_operator_and_value() {
+        let triple = |a: &str, b: &str, c: &str| (a.to_string(), b.to_string(), c.to_string());
+        for (field, op, value, expected) in [
+            (
+                Field::Status,
+                Op::Is,
+                one("10002"),
+                triple("Status", "=", "In Review"),
+            ),
+            (
+                Field::Due,
+                Op::IsEmpty,
+                None,
+                triple("Due date", "is empty", ""),
+            ),
+            (
+                Field::Labels,
+                Op::IsNotEmpty,
+                None,
+                triple("Labels", "is set", ""),
+            ),
+            (
+                Field::Labels,
+                Op::Contains,
+                one("urgent"),
+                triple("Labels", "contains", "“urgent”"),
+            ),
+            (
+                Field::Updated,
+                Op::WithinLastDays,
+                Some(Value::Days(1)),
+                triple("Updated", "in the last", "day"),
+            ),
+            (
+                Field::Updated,
+                Op::WithinLastDays,
+                Some(Value::Days(7)),
+                triple("Updated", "in the last", "7 days"),
+            ),
+            (
+                Field::Project,
+                Op::Is,
+                one("p1"),
+                triple("Project", "=", "NW"),
+            ),
+        ] {
+            assert_eq!(
+                parts_of(field.clone(), op, value),
+                expected,
+                "{field:?} {op:?}"
+            );
+        }
     }
 
     #[test]

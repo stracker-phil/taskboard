@@ -10,6 +10,7 @@ export function view(patch: Partial<View> = {}): View {
     columns: [],
     groupBy: "status",
     sort: { by: "updated", descending: true },
+    widths: {},
     position: 0,
     isDefault: false,
     ...patch,

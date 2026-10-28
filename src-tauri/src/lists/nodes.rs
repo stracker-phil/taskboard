@@ -127,7 +127,7 @@ pub fn scope_of(nodes: &[Node], node: &Node) -> Scope {
     }
 }
 
-fn own_conditions(node: &Node) -> Result<Vec<Condition>, String> {
+pub(super) fn own_conditions(node: &Node) -> Result<Vec<Condition>, String> {
     match (node.kind, &node.project_id) {
         (Kind::Space, Some(project_id)) => Ok(vec![Condition::is(Field::Project, project_id)]),
         _ => Filter::parse(node.filter.as_deref())

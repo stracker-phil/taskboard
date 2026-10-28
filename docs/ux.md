@@ -126,6 +126,35 @@ overrides it per status.
   `--changed-bg`), change chip, comment count, then the cells. A clicked row is selected (`--selection-bg`).
 - Rows are virtualised (`@tanstack/react-virtual`), so a 5,000-issue view renders only what is on screen.
 
+## Toolbar
+
+`src/shell/toolbar/`, 50 high under the tabs, one popover open at a time (`components/Popover.tsx`: under its
+button, Escape and a press outside close it, focus goes back to the button).
+
+- **Group: Status** (30 high, `--border`, 8 radius): a native menu of the groupings (Status, Space, Client,
+  Assignee, Epic, Release, Priority, Due date, None) with Sort by ▸ (Updated, Created, Priority, Key, Due date,
+  Summary, Status; Ascending, Descending). Saves to the view.
+- **Columns** ("Card fields" on a board): the *Columns for this view* popover (340 wide): Jira fields, then
+  "Custom fields · this project" with the field id as `cf_N`; a row per field with a drag handle (⋮⋮) to reorder
+  and a 30 × 18 switch (`components/Toggle.tsx`). Each change saves to the view; "Use as Space default" sets
+  the columns new views in the Space start with.
+- **Filter** (badge: the filter list's own conditions): the *Filter* popover (440 wide, right-aligned): "Show
+  issues where" and the live count of open issues ("N issues match" on a filter list or with a draft, "N open
+  issues" on a Space before any condition); inherited conditions locked on `--fill-subtle` with a lock, "this Space" / "from Space"; own
+  conditions as field / operator / value selects (value pickers from the cache, dates, days, text) with ×;
+  "+ Add condition". On a filter list changes save as you edit ("Changes save to “Name”."); on a Space or
+  Everything they are a draft that "Save as filter list" turns into a new list and opens.
+- **Me** chip (on: `--accent-soft-*` pill with the `--avatar-1` avatar and "Me ×") and **Filter this view**
+  (190 wide, filters by key or summary as you type). Both narrow only the current view and are never saved.
+
+## Table view
+
+`src/views/table/`: the same rows as the list, 36 high, with a sticky 34px header: Key, Summary (flexible),
+Status, then the view's columns. A sortable header (Key, Summary, Status, Priority, Due) sorts on click and
+again flips the direction (`aria-sort`, ↑/↓); a 6px handle at each header's right edge resizes the column
+(48–800), saved on the view. Grouped tables keep the list's group headers; the table scrolls sideways when the
+columns are wider than the window.
+
 ## Tokens
 
 One palette per macOS mode in `src/styles/palettes/` (`light.css`; the dark palette joins later), selected by
