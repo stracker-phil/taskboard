@@ -32,6 +32,7 @@ const SEARCH_FIELDS: &[&str] = &[
     "project",
     "comment",
     "description",
+    "issuelinks",
 ];
 
 /// What every project of one run shares.

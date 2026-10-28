@@ -1,6 +1,12 @@
-//! One issue in full: what the peek and the Issue view show.
+//! One issue in full: what the peek and the Issue view show, and the detail sync of its comments.
 
+mod activity;
 pub mod commands;
+mod comments;
 mod detail;
+mod related;
 
-pub use detail::{IssueDetail, issue_get};
+pub use activity::{ActivityItem, ChangeValue, issue_activity};
+pub use comments::issue_sync_comments;
+pub use detail::{CustomField, IssueDetail, issue_get};
+pub use related::{Children, IssueLink, Related, RelatedIssue, issue_related};

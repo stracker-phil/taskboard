@@ -25,6 +25,8 @@ pub struct IssueSpec {
     pub created: String,
     pub updated: String,
     pub description: Option<String>,
+    /// Keys of the issues this one blocks.
+    pub blocks: Vec<&'static str>,
 }
 
 /// A new issue reported by Jonas, unassigned, Medium, created and updated at `created`.
@@ -48,6 +50,7 @@ pub fn issue(key: &str, kind: Kind, status: Status, summary: &str) -> IssueSpec 
         created: String::new(),
         updated: String::new(),
         description: None,
+        blocks: Vec::new(),
     }
 }
 
@@ -95,6 +98,11 @@ impl IssueSpec {
 
     pub fn points(mut self, points: f64) -> Self {
         self.points = Some(points);
+        self
+    }
+
+    pub fn blocks(mut self, key: &'static str) -> Self {
+        self.blocks.push(key);
         self
     }
 

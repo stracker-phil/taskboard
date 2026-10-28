@@ -11,7 +11,9 @@ use crate::db::Db;
 use crate::error::{AppError, AppResult};
 use crate::lists::Viewer;
 use crate::status_style::{Style, detect, styles};
-use crate::views::rows::{self, EpicChip, Label, Person, Priority};
+use crate::sync::store::shown_fields;
+use crate::views::columns::custom_columns;
+use crate::views::rows::{self, Cell, EpicChip, Label, Person, Priority};
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
 #[ts(export, export_to = "src/api/types.gen.ts")]
@@ -43,6 +45,17 @@ pub struct IssueDetail {
     pub is_epic: bool,
     /// Deleted in Jira or no longer visible.
     pub gone: bool,
+    /// The custom fields the owner shows (marked shown or used as a view column), with their value if any.
+    pub custom: Vec<CustomField>,
+}
+
+#[derive(Serialize, Clone, Debug, PartialEq, TS)]
+#[ts(export, export_to = "src/api/types.gen.ts")]
+#[serde(rename_all = "camelCase")]
+pub struct CustomField {
+    pub id: String,
+    pub name: String,
+    pub value: Option<Cell>,
 }
 
 pub async fn issue_get(db: &Db, viewer: Viewer, id: String) -> AppResult<IssueDetail> {
@@ -52,7 +65,7 @@ pub async fn issue_get(db: &Db, viewer: Viewer, id: String) -> AppResult<IssueDe
 const SELECT: &str = "SELECT i.id, i.key, i.issue_type, i.summary, i.status_id, COALESCE(st.name, ''),
     i.status_category, e.id, e.summary, e.epic_color, i.fix_versions, i.priority, i.assignee_id, a.name,
     i.reporter_id, r.name, i.sprint, i.labels, i.due_date, i.created_at, i.updated_at, i.description_html,
-    i.comment_count, i.is_epic, i.gone
+    i.comment_count, i.is_epic, i.gone, i.raw
     FROM cache.issue i
     LEFT JOIN cache.status st ON st.id = i.status_id
     LEFT JOIN cache.user a ON a.account_id = i.assignee_id
@@ -83,7 +96,7 @@ fn read(conn: &Connection, viewer: &Viewer, id: &str) -> AppResult<IssueDetail> 
             }),
             _ => None,
         };
-        Ok(IssueDetail {
+        let detail = IssueDetail {
             id: r.get(0)?,
             key: r.get(1)?,
             issue_type: r.get(2)?,
@@ -119,10 +132,36 @@ fn read(conn: &Connection, viewer: &Viewer, id: &str) -> AppResult<IssueDetail> 
             comment_count: r.get(22)?,
             is_epic: r.get::<_, i64>(23)? != 0,
             gone: r.get::<_, i64>(24)? != 0,
-        })
+            custom: Vec::new(),
+        };
+        let raw: String = r.get(25)?;
+        Ok((detail, raw))
     })
     .optional()?
+    .map(|(mut detail, raw)| -> AppResult<IssueDetail> {
+        detail.custom = custom_fields(conn, &raw, me)?;
+        Ok(detail)
+    })
+    .transpose()?
     .ok_or_else(|| AppError::NotFound(format!("Issue {id} isn't in the cache")))
+}
+
+fn custom_fields(conn: &Connection, raw: &str, me: Option<&str>) -> AppResult<Vec<CustomField>> {
+    let raw: serde_json::Value = serde_json::from_str(raw).unwrap_or_default();
+    let mut names = conn.prepare("SELECT name FROM cache.field WHERE id = ?1")?;
+    let mut fields = Vec::new();
+    for column in custom_columns(conn, &shown_fields(conn)?)? {
+        let name: String = names
+            .query_row([&column.id], |r| r.get(0))
+            .optional()?
+            .unwrap_or_else(|| column.id.clone());
+        fields.push(CustomField {
+            value: rows::cell(&column.kind, &raw["fields"][&column.id], me),
+            name,
+            id: column.id,
+        });
+    }
+    Ok(fields)
 }
 
 fn string_list(json: Option<String>) -> Vec<String> {

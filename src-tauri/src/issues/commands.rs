@@ -3,13 +3,38 @@
 use chrono::Utc;
 use tauri::State;
 
-use super::IssueDetail;
+use super::{ActivityItem, IssueDetail, Related};
 use crate::error::AppResult;
 use crate::lists::Viewer;
 use crate::state::AppState;
 
+fn viewer(state: &AppState) -> Viewer {
+    Viewer::of(&state.settings.get().connection, Utc::now())
+}
+
 #[tauri::command]
 pub async fn issue_get(state: State<'_, AppState>, id: String) -> AppResult<IssueDetail> {
-    let viewer = Viewer::of(&state.settings.get().connection, Utc::now());
-    super::issue_get(&state.db, viewer, id).await
+    super::issue_get(&state.db, viewer(&state), id).await
+}
+
+/// Comments and recorded field changes, oldest first.
+#[tauri::command]
+pub async fn issue_activity(
+    state: State<'_, AppState>,
+    id: String,
+) -> AppResult<Vec<ActivityItem>> {
+    super::issue_activity(&state.db, viewer(&state), id).await
+}
+
+/// Children (an epic's issues, a task's subtasks) and links.
+#[tauri::command]
+pub async fn issue_related(state: State<'_, AppState>, id: String) -> AppResult<Related> {
+    super::issue_related(&state.db, viewer(&state), id).await
+}
+
+/// Fetches the issue's comments when the cached ones may be behind; true when it fetched.
+#[tauri::command]
+pub async fn issue_sync_comments(state: State<'_, AppState>, id: String) -> AppResult<bool> {
+    let connection = state.settings.get().connection;
+    super::issue_sync_comments(&state.db, &state.jira, &connection, id).await
 }

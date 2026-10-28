@@ -27,7 +27,7 @@ pub fn issues() -> Vec<IssueSpec> {
         issue("NW-1005", Epic, ToDo, "Emails").to(MK).prio(Low).color("ghx-label-9").at("2026-08-04 11:25", "2026-10-19 10:30"),
         issue("NW-1020", Epic, InProgress, "Checkout").to(JR).by(MK).fix("2.4.0").color("ghx-label-7").desc(CHECKOUT).at("2026-09-01 09:30", "2026-10-28 10:02"),
         // Open
-        issue("NW-1042", Story, InProgress, "Checkout: address validation for DACH postcodes").to(AM).prio(High).parent("NW-1020").labels(&["frontend"]).fix("2.4.0").sprints(&[22]).points(5.0).reviewer(MK).due("2026-10-30").desc(POSTCODES).at("2026-10-12 09:14", "2026-10-28 11:42"),
+        issue("NW-1042", Story, InProgress, "Checkout: address validation for DACH postcodes").to(AM).prio(High).parent("NW-1020").labels(&["frontend"]).fix("2.4.0").sprints(&[22]).points(5.0).reviewer(MK).due("2026-10-30").blocks("NW-1051").desc(POSTCODES).at("2026-10-12 09:14", "2026-10-28 11:42"),
         issue("NW-1047", Task, InProgress, "Migrate cart totals to the Store API").to(AM).parent("NW-1020").labels(&["backend"]).fix("2.4.0").sprints(&[22]).points(3.0).reviewer(JR).at("2026-10-14 13:20", "2026-10-27 16:45"),
         issue("NW-1049", Story, InProgress, "Express payment buttons on product page").to(AM).prio(Highest).parent("NW-1002").labels(&["frontend"]).fix("2.5.0").sprints(&[22]).points(8.0).at("2026-10-15 10:00", "2026-10-28 08:15"),
         issue("NW-1038", Bug, InReview, "Shipping costs not refreshed after address change").to(AM).by(MK).prio(Highest).parent("NW-1020").labels(&["frontend"]).fix("2.4.0").sprints(&[21, 22]).points(2.0).reviewer(MK).at("2026-10-07 11:05", "2026-10-28 09:28"),

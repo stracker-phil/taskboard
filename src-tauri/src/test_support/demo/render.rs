@@ -53,9 +53,12 @@ pub fn render(
                 .unwrap_or_else(|| panic!("demo parent {key}"));
             parent_json(parent)
         });
+        let links = links_json(spec, specs, &specs_by_key);
         let last_comment = own.iter().map(|(_, c)| c.at).max().unwrap_or("");
         let updated = spec.updated.as_str().max(last_comment);
-        issues.push(issue_json(spec, &id, parent, updated, &rendered, clock));
+        let mut issue = issue_json(spec, &id, parent, updated, &rendered, clock);
+        issue["fields"]["issuelinks"] = links;
+        issues.push(issue);
         if !rendered.is_empty() {
             comment_map.insert(id, rendered.into_iter().map(|c| c.endpoint).collect());
         }
@@ -105,6 +108,21 @@ fn rendered_comment(issue_id: &str, id: u64, spec: &CommentSpec, clock: &Clock) 
 fn page(comments: Vec<Value>) -> Value {
     let total = comments.len();
     json!({ "comments": comments, "maxResults": total, "total": total, "startAt": 0 })
+}
+
+/// "Blocks" links: outward to the issues `spec` blocks, inward from the issues that block it.
+fn links_json(spec: &IssueSpec, specs: &[IssueSpec], by_key: &HashMap<&str, &IssueSpec>) -> Value {
+    let kind =
+        json!({ "id": "10000", "name": "Blocks", "inward": "is blocked by", "outward": "blocks" });
+    let outward = spec.blocks.iter().map(|key| {
+        let other = by_key.get(key).unwrap_or_else(|| panic!("demo link {key}"));
+        json!({ "id": format!("{}-{}", spec.key, key), "type": kind, "outwardIssue": parent_json(other) })
+    });
+    let inward = specs
+        .iter()
+        .filter(|other| other.blocks.contains(&spec.key.as_str()))
+        .map(|other| json!({ "id": format!("{}-{}", other.key, spec.key), "type": kind, "inwardIssue": parent_json(other) }));
+    Value::Array(outward.chain(inward).collect())
 }
 
 fn parent_json(parent: &IssueSpec) -> Value {
