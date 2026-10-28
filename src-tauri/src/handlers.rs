@@ -14,6 +14,7 @@ pub fn handlers() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
     tauri::generate_handler![
         commands::get_settings,
         commands::update_settings,
+        commands::appearance_set,
         commands::get_keybindings,
         commands::set_keybindings,
         commands::get_ui_state,

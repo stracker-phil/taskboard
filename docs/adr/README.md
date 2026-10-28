@@ -18,7 +18,7 @@ stands in Taskboard. The numbers in this table are Taskboard's.
 | [0006](0006-test-doubles-behind-test-util.md) | Test doubles and the demo seed ship behind a `test-util` feature | Accepted (2026-10-28) |
 | [0007](0007-color-palettes.md) | Color palettes are complete token sets; no color literal outside a palette | Accepted (2026-10-28) |
 | [0008](0008-cli-asks-the-running-app.md) | The CLI is a second process that asks the running app over the socket | Accepted (2026-10-28) |
-| [0009](0009-a-scheme-per-system-mode.md) | Appearance follows macOS, with one of three schemes per mode | Superseded in part by 0017 |
+| [0009](0009-a-scheme-per-system-mode.md) | Appearance follows macOS, with one of three schemes per mode | Superseded in part by 0017; by 0028 |
 | [0010](0010-native-macos-look.md) | The app looks native and light | Superseded by 0017 for the main window |
 | [0011](0011-debug-build-is-a-separate-app-with-demo-data.md) | The debug build is a separate app with demo data | Accepted (2026-10-28) |
 | [0012](0012-commands-live-in-rust.md) | Commands live in Rust | Accepted (2026-10-28) |
@@ -37,5 +37,6 @@ stands in Taskboard. The numbers in this table are Taskboard's.
 | [0025](0025-all-jira-traffic-goes-through-one-allowlisted-gateway.md) | All Jira traffic goes through one allowlisted gateway | Accepted (2026-10-28) |
 | [0026](0026-the-debug-build-keeps-its-demo-token-in-memory.md) | The debug build keeps its demo token in memory | Accepted (2026-10-28) |
 | [0027](0027-jira-html-is-sanitised-and-shows-no-remote-content.md) | Jira HTML is sanitised and shows no remote content | Accepted (2026-10-28) |
+| [0028](0028-automatic-light-or-dark-with-one-palette-each.md) | Automatic, light or dark, with one palette each | Accepted (2026-10-29) |
 
 Open: integrations with Daybook and TimeTracker.

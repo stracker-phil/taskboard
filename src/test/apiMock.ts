@@ -3,6 +3,7 @@ import type { api as realApi } from "../api";
 // Must not import the store or "../api": they would load the real api module while it is being mocked.
 import {
   EMPTY_UI_STATE,
+  type Appearance,
   type BoardData,
   type Connection,
   type ConnectionInput,
@@ -27,6 +28,7 @@ import {
 } from "../api/types";
 import { filterOptions } from "./filters";
 import { issueDetail } from "./issues";
+import { settings } from "./settings";
 
 type Api = typeof realApi;
 
@@ -50,7 +52,6 @@ const emptySidebar = (): SidebarTree => ({
   spaces: [],
 });
 
-const defaultSync = (): SyncSettings => ({ scopeOverride: null, focusedMinutes: 5, backgroundMinutes: 15, keepDoneDays: 90 });
 type Handler = (payload: never) => void;
 
 const listeners = new WeakMap<object, Map<string, Set<Handler>>>();
@@ -59,8 +60,9 @@ const listeners = new WeakMap<object, Map<string, Set<Handler>>>();
 export function createApiMock(): Api {
   const byEvent = new Map<string, Set<Handler>>();
   const mock: Api = {
-    getSettings: vi.fn(async (): Promise<Settings> => ({ connection: emptyConnection(), sync: defaultSync() })),
+    getSettings: vi.fn(async (): Promise<Settings> => settings()),
     updateSettings: vi.fn(async (s: Settings) => s),
+    appearanceSet: vi.fn(async (appearance: Appearance): Promise<Settings> => settings({ appearance })),
     getKeybindings: vi.fn().mockResolvedValue({}),
     setKeybindings: vi.fn(async (bindings: Keybindings) => bindings),
     getUiState: vi.fn().mockResolvedValue(EMPTY_UI_STATE),

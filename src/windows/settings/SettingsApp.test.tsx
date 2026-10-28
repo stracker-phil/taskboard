@@ -10,6 +10,7 @@ import { createQueryClient } from "../../queries/queryClient";
 import { registerSettingsPage } from "../../registry/settingsPages";
 import { resetStore } from "../../state/store";
 import { emitEvent } from "../../test/apiMock";
+import { settings } from "../../test/settings";
 import { SettingsApp } from "./SettingsApp";
 
 const mocked = vi.mocked(api, true);
@@ -23,6 +24,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
   mocked.appInfo.mockResolvedValue({ name: "Taskboard", version: "4.5.6" });
+  mocked.getSettings.mockResolvedValue(settings());
+  mocked.appearanceSet.mockImplementation(async (appearance) => settings({ appearance }));
 });
 
 afterEach(() => {
@@ -35,8 +38,8 @@ describe("SettingsApp", () => {
 
     const nav = screen.getByRole("navigation", { name: "Settings pages" });
     const entries = within(nav).getAllByRole("button").map((b) => b.textContent?.trim());
-    expect(entries).toEqual(["Connection", "Projects", "Spaces", "Statuses", "Sync", "General", "Shortcuts"]);
-    expect(nav.textContent).toMatch(/Jira.*Connection.*Projects.*Spaces.*Statuses.*Sync.*System.*General.*Shortcuts/);
+    expect(entries).toEqual(["Connection", "Projects", "Spaces", "Statuses", "Sync", "General", "Appearance", "Shortcuts"]);
+    expect(nav.textContent).toMatch(/Jira.*Connection.*Projects.*Spaces.*Statuses.*Sync.*System.*General.*Appearance.*Shortcuts/);
     expect(screen.getByRole("heading", { name: "Connection" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Connection/ })).toHaveAttribute("aria-current", "page");
   });
@@ -105,6 +108,29 @@ describe("SettingsApp", () => {
       await userEvent.click(screen.getByRole("button", { name: "Open Log Folder" }));
 
       expect(await screen.findByText("Could not open the log folder: No such folder")).toBeInTheDocument();
+    });
+  });
+
+  describe("Appearance page", () => {
+    beforeEach(() => {
+      window.history.replaceState({}, "", "/?page=appearance");
+    });
+
+    it("shows the current appearance under System", async () => {
+      mocked.getSettings.mockResolvedValue(settings({ appearance: "dark" }));
+      await renderSettings();
+
+      const group = screen.getByRole("group", { name: "Appearance" });
+      await waitFor(() => expect(within(group).getByRole("button", { name: "Dark" })).toHaveAttribute("aria-pressed", "true"));
+    });
+
+    it("shows an error toast when the appearance cannot be changed", async () => {
+      mocked.appearanceSet.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
+      await renderSettings();
+
+      await userEvent.click(within(screen.getByRole("group", { name: "Appearance" })).getByRole("button", { name: "Light" }));
+
+      expect(await screen.findByText("Could not change the appearance: Disk full")).toBeInTheDocument();
     });
   });
 

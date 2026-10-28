@@ -20,6 +20,20 @@ pub struct Settings {
     pub connection: Connection,
     /// Changed only through the sync commands, which validate it.
     pub sync: SyncSettings,
+    pub appearance: Appearance,
+}
+
+/// Light or dark: following macOS (the default) or fixed.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq, TS)]
+#[ts(export, export_to = "src/api/types.gen.ts")]
+#[serde(rename_all = "camelCase")]
+pub enum Appearance {
+    Light,
+    Dark,
+    /// Also what an unknown value in the file reads as, so the rest of the file stays.
+    #[default]
+    #[serde(other)]
+    System,
 }
 
 impl Settings {

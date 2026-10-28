@@ -4,27 +4,11 @@ import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { contrastRatio, hexToRgb, over, type Rgb } from "./contrast";
 
-const css = readFileSync(join(resolve(process.cwd(), "src"), "styles", "palettes", "light.css"), "utf8");
+const SCHEMES = ["light", "dark"] as const;
 
-function token(name: string): string {
-  const m = css.match(new RegExp(`^\\s*${name}:\\s*([^;]+);`, "m"));
-  if (!m) throw new Error(`missing token ${name}`);
-  return m[1].trim();
-}
-
-/** A token's color; an rgba() value is composited over `bg`. */
-function color(name: string, bg?: Rgb): Rgb {
-  const value = token(name);
-  if (value.startsWith("#")) return hexToRgb(value);
-  const m = value.match(/^rgba\(\s*(\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)$/);
-  if (!m || !bg) throw new Error(`cannot resolve ${name}: ${value}`);
-  return over([+m[1] / 255, +m[2] / 255, +m[3] / 255], +m[4], bg);
-}
-
-const ratio = (fg: string, bg: string) => {
-  const background = color(bg);
-  return contrastRatio(color(fg, background), background);
-};
+const sheets = Object.fromEntries(
+  SCHEMES.map((scheme) => [scheme, readFileSync(join(resolve(process.cwd(), "src"), "styles", "palettes", `${scheme}.css`), "utf8")]),
+);
 
 describe("contrastRatio", () => {
   it("is 21 for black on white and 1 for identical colors", () => {
@@ -33,7 +17,29 @@ describe("contrastRatio", () => {
   });
 });
 
-describe("light palette contrast", () => {
+describe.each(SCHEMES)("%s palette contrast", (scheme) => {
+  const css = sheets[scheme];
+
+  function token(name: string): string {
+    const m = css.match(new RegExp(`^\\s*${name}:\\s*([^;]+);`, "m"));
+    if (!m) throw new Error(`missing token ${name}`);
+    return m[1].trim();
+  }
+
+  /** A token's color; an rgba() value is composited over `bg`. */
+  function color(name: string, bg?: Rgb): Rgb {
+    const value = token(name);
+    if (value.startsWith("#")) return hexToRgb(value);
+    const m = value.match(/^rgba\(\s*(\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)$/);
+    if (!m || !bg) throw new Error(`cannot resolve ${name}: ${value}`);
+    return over([+m[1] / 255, +m[2] / 255, +m[3] / 255], +m[4], bg);
+  }
+
+  const ratio = (fg: string, bg: string) => {
+    const background = color(bg);
+    return contrastRatio(color(fg, background), background);
+  };
+
   it.each(["--text", "--text-strong-body", "--text-secondary", "--text-tertiary", "--text-muted", "--link", "--accent-text"])(
     "%s reads at 4.5:1 on the panel",
     (fg) => {

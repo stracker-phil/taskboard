@@ -6,6 +6,7 @@ import type {
   ActivityItem,
   AppError,
   AppInfo,
+  Appearance,
   BoardData,
   ConnectionInput,
   ConnectionTest,
@@ -148,6 +149,8 @@ export const api = {
   /** The Board layout: a column per status of the issues shown, with the cards' rows. */
   viewBoard: (listId: number, viewId: number, narrowing: Narrowing) => invoke<BoardData>("view_board", { listId, viewId, narrowing }),
   viewSetColumnCollapsed: (id: number, statusId: string, collapsed: boolean) => invoke<View>("view_set_column_collapsed", { id, statusId, collapsed }),
+  /** Light, dark or following macOS; every window repaints. */
+  appearanceSet: (appearance: Appearance) => invoke<Settings>("appearance_set", { appearance }),
   issueGet: (id: string) => invoke<IssueDetail>("issue_get", { id }),
   /** Remove from cache: only for an issue gone from Jira. */
   issueForget: (id: string) => invoke<void>("issue_forget", { id }),

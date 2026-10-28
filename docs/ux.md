@@ -323,8 +323,10 @@ columns are wider than the window.
 
 ## Tokens
 
-One palette per macOS mode in `src/styles/palettes/` (`light.css`; the dark palette joins later), selected by
-`data-scheme` on `<html>` (`lib/theme.ts`). Every palette defines the same tokens.
+Two palettes in `src/styles/palettes/` (`light.css`, `dark.css`), selected by `data-scheme` on `<html>`
+(`lib/theme.ts`): Settings → Appearance is Automatic (follows macOS, the default), Light or Dark (ADR 0028).
+Every palette defines the same tokens; the dark one is designed (macOS dark greys, status fills kept, tints at
+low strength), and both pass the same contrast checks.
 
 | Group | Tokens | Light |
 |---|---|---|

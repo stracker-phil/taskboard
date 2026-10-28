@@ -55,7 +55,7 @@ impl SettingsStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::store::settings::{Connection, SyncSettings};
+    use crate::store::settings::{Appearance, Connection, SyncSettings};
     use crate::test_support::temp_config_dir;
     use std::fs;
 
@@ -175,6 +175,112 @@ mod tests {
         assert_eq!(saved, expected);
         assert_eq!(store.get(), expected);
         assert_eq!(SettingsStore::open(dir.path()).get(), expected);
+    }
+
+    #[test]
+    fn a_file_without_appearance_reads_as_system() {
+        let dir = temp_config_dir();
+        fs::write(
+            dir.path().join(FILE_NAME),
+            r#"{"sync":{"focusedMinutes":10}}"#,
+        )
+        .unwrap();
+
+        let settings = SettingsStore::open(dir.path()).get();
+
+        assert_eq!(settings.appearance, Appearance::System);
+        assert_eq!(settings.sync.focused_minutes, 10);
+    }
+
+    #[tokio::test]
+    async fn each_appearance_round_trips_through_the_store_and_the_file() {
+        for (appearance, name) in [
+            (Appearance::System, "system"),
+            (Appearance::Light, "light"),
+            (Appearance::Dark, "dark"),
+        ] {
+            let dir = temp_config_dir();
+            let store = SettingsStore::open(dir.path());
+
+            let saved = store
+                .edit(move |s| s.appearance = appearance)
+                .await
+                .unwrap();
+
+            assert_eq!(saved.appearance, appearance, "{name}");
+            assert_eq!(store.get().appearance, appearance, "{name}");
+            assert_eq!(
+                SettingsStore::open(dir.path()).get().appearance,
+                appearance,
+                "{name}"
+            );
+            let file: serde_json::Value =
+                serde_json::from_str(&fs::read_to_string(dir.path().join(FILE_NAME)).unwrap())
+                    .unwrap();
+            assert_eq!(file["appearance"], serde_json::json!(name), "{name}");
+        }
+    }
+
+    #[test]
+    fn an_unknown_appearance_in_the_file_reads_as_system_and_keeps_the_rest() {
+        let dir = temp_config_dir();
+        fs::write(
+            dir.path().join(FILE_NAME),
+            r#"{"appearance":"sepia","sync":{"focusedMinutes":10}}"#,
+        )
+        .unwrap();
+
+        let settings = SettingsStore::open(dir.path()).get();
+
+        assert_eq!(
+            settings,
+            Settings {
+                appearance: Appearance::System,
+                sync: SyncSettings {
+                    focused_minutes: 10,
+                    ..SyncSettings::default()
+                },
+                ..Settings::default()
+            }
+        );
+        assert_eq!(file_names(dir.path()), vec![FILE_NAME.to_string()]);
+    }
+
+    #[tokio::test]
+    async fn changing_the_appearance_keeps_the_connection_and_sync_settings() {
+        let dir = temp_config_dir();
+        let store = store_with_connection_and_sync(dir.path()).await;
+        let stored = store.get();
+
+        let saved = store
+            .edit(|s| s.appearance = Appearance::Dark)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            saved,
+            Settings {
+                appearance: Appearance::Dark,
+                ..stored
+            }
+        );
+        assert_eq!(saved.connection, connected());
+        assert_eq!(saved.sync.focused_minutes, 10);
+        assert_eq!(saved.sync.scope_override.as_deref(), Some("project = NW"));
+        assert_eq!(SettingsStore::open(dir.path()).get(), saved);
+    }
+
+    #[test]
+    fn settings_serialize_with_the_camel_case_appearance() {
+        let settings = Settings {
+            appearance: Appearance::Light,
+            ..Settings::default()
+        };
+
+        assert_eq!(
+            serde_json::to_value(&settings).unwrap()["appearance"],
+            serde_json::json!("light")
+        );
     }
 
     #[test]

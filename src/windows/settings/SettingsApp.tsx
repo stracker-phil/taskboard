@@ -5,6 +5,7 @@ import { useCommandKeys } from "../../commands";
 import { SettingsWindow } from "../../components/settings/SettingsWindow";
 import { Toasts } from "../../components/Toasts";
 import { useErrorToasts } from "../../lib/useErrorToasts";
+import { useAppearance } from "../../lib/theme";
 import { trackWindowFocus } from "../../lib/windowFocus";
 import { queryClient as defaultClient } from "../../queries/queryClient";
 import { useEvents } from "../../queries/useEvents";
@@ -27,6 +28,7 @@ function SettingsRoot() {
   useOpenSettings(setPage);
   useCommandKeys();
   useEvents();
+  useAppearance();
   useErrorToasts();
   useEffect(trackWindowFocus, []);
 

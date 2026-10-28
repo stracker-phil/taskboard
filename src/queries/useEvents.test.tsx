@@ -11,6 +11,7 @@ import { SyncPage } from "../components/settings/jira/SyncPage";
 import { emitEvent } from "../test/apiMock";
 import { connectionView, PROJECTS, projectCounts, syncOverview } from "../test/jira";
 import { row, statusStyle, viewData } from "../test/issues";
+import { settings } from "../test/settings";
 import { lumenSpace, sidebarTree, space } from "../test/spaces";
 import { createQueryClient } from "./queryClient";
 import { useNav, useSpaces } from "./sidebar";
@@ -94,10 +95,7 @@ describe("useEvents", () => {
     mocked.connectionGet.mockResolvedValue(connectionView({ email: "sam.lee@example.com" }));
 
     act(() =>
-      emitEvent(api, "settings_changed", {
-        connection: connectionView().connection,
-        sync: { scopeOverride: null, focusedMinutes: 5, backgroundMinutes: 15, keepDoneDays: 90 },
-      }),
+      emitEvent(api, "settings_changed", settings({ connection: connectionView().connection })),
     );
 
     await waitFor(() => expect(screen.getByLabelText("Email")).toHaveValue("sam.lee@example.com"));

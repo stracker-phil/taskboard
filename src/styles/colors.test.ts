@@ -52,9 +52,9 @@ describe("color literals", () => {
 });
 
 describe("palette files", () => {
-  it("include the light palette", () => {
+  it("include the light and the dark palette", () => {
     const names = paletteFiles.map(([path]) => path.slice(palettesDir.length));
-    expect(names).toContain("light.css");
+    expect(names).toEqual(expect.arrayContaining(["light.css", "dark.css"]));
   });
 
   it("all define the same custom properties", () => {

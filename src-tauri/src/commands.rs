@@ -10,7 +10,7 @@ use crate::launch::LaunchEvent;
 use crate::state::AppState;
 use crate::store::keybindings::Keybindings;
 use crate::store::places::ViewPlace;
-use crate::store::settings::Settings;
+use crate::store::settings::{Appearance, Settings};
 use crate::store::ui_state::UiState;
 
 #[tauri::command]
@@ -27,6 +27,21 @@ pub async fn update_settings(
     let (_, saved) = state.settings.update(settings).await?;
     announce_settings(&app, &saved);
     log::info!("Settings updated");
+    Ok(saved)
+}
+
+/// Light, dark or following macOS; every window repaints from `settings_changed`.
+#[tauri::command]
+pub async fn appearance_set(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    appearance: Appearance,
+) -> AppResult<Settings> {
+    let saved = state
+        .settings
+        .edit(move |s| s.appearance = appearance)
+        .await?;
+    announce_settings(&app, &saved);
     Ok(saved)
 }
 

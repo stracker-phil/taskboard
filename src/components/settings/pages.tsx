@@ -1,6 +1,7 @@
 /** The core settings pages. Modules register their own pages from their install function. */
-import { CircleDot, FolderKanban, Keyboard, LayoutGrid, PlugZap, RefreshCw, SlidersHorizontal } from "lucide-react";
+import { CircleDot, FolderKanban, Keyboard, LayoutGrid, Palette, PlugZap, RefreshCw, SlidersHorizontal } from "lucide-react";
 import { registerSettingsPage } from "../../registry/settingsPages";
+import { AppearancePage } from "./AppearancePage";
 import { GeneralPage } from "./GeneralPage";
 import { ShortcutsPage } from "./ShortcutsPage";
 import { ConnectionPage } from "./jira/ConnectionPage";
@@ -64,5 +65,6 @@ export function registerCoreSettingsPages() {
     Body: SyncPage,
   });
   registerSettingsPage({ id: "general", group: "System", label: "General", icon: SlidersHorizontal, order: 0, sections: [{ id: "about", title: "About" }], Body: GeneralPage });
-  registerSettingsPage({ id: "shortcuts", group: "System", label: "Shortcuts", icon: Keyboard, order: 1, sections: [{ id: "shortcuts", title: "Shortcuts" }], Body: ShortcutsPage });
+  registerSettingsPage({ id: "appearance", group: "System", label: "Appearance", icon: Palette, order: 1, sections: [{ id: "appearance", title: "Appearance" }], Body: AppearancePage });
+  registerSettingsPage({ id: "shortcuts", group: "System", label: "Shortcuts", icon: Keyboard, order: 2, sections: [{ id: "shortcuts", title: "Shortcuts" }], Body: ShortcutsPage });
 }

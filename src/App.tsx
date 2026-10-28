@@ -6,6 +6,7 @@ import { Toasts } from "./components/Toasts";
 import { useErrorToasts } from "./lib/useErrorToasts";
 import { trackWindowFocus } from "./lib/windowFocus";
 import { queryClient } from "./queries/queryClient";
+import { useAppearance } from "./lib/theme";
 import { CommandPalette } from "./palette/CommandPalette";
 import { usePinExpiry } from "./queries/pins";
 import { useEvents } from "./queries/useEvents";
@@ -27,6 +28,7 @@ function MainWindow() {
   useCommandKeys();
   useEvents();
   usePinExpiry();
+  useAppearance();
   useErrorToasts();
   useEffect(trackWindowFocus, []);
   const sidebarHidden = useStore((s) => s.sidebarHidden);

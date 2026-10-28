@@ -32,6 +32,11 @@ field?: AppErrorField, };
  */
 export type AppErrorField = { path: string, message: string, };
 
+/**
+ * Light or dark: following macOS (the default) or fixed.
+ */
+export type Appearance = "light" | "dark" | "system";
+
 export type BoardColumn = { statusId: string, name: string, style: Style, 
 /**
  * Shown as a 48px strip.
@@ -424,7 +429,7 @@ connection: Connection,
 /**
  * Changed only through the sync commands, which validate it.
  */
-sync: SyncSettings, };
+sync: SyncSettings, appearance: Appearance, };
 
 export type SidebarTree = { everything: ListNode, 
 /**
