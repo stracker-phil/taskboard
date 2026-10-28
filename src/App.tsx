@@ -6,6 +6,7 @@ import { Toasts } from "./components/Toasts";
 import { useErrorToasts } from "./lib/useErrorToasts";
 import { trackWindowFocus } from "./lib/windowFocus";
 import { queryClient } from "./queries/queryClient";
+import { CommandPalette } from "./palette/CommandPalette";
 import { usePinExpiry } from "./queries/pins";
 import { useEvents } from "./queries/useEvents";
 import { MainBody } from "./shell/MainBody";
@@ -34,6 +35,7 @@ function MainWindow() {
       <Window sidebarHidden={sidebarHidden}>
         <MainBody />
       </Window>
+      <CommandPalette />
       <ConfirmHost />
       <Toasts />
     </>

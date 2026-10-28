@@ -18,3 +18,4 @@ pub use edit::{
 };
 pub use model::{DEFAULT_COLUMNS, GroupBy, Layout, Sort, SortBy, View};
 pub use query::{Narrowing, ViewData, unseen_ids, view_rows};
+pub use sorting::fold;

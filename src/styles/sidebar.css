@@ -13,6 +13,8 @@
   text-align: left;
 }
 .sb-search__label { flex: 1; }
+.sb-search { cursor: default; transition: border-color var(--motion-fast) var(--ease-out); }
+.sb-search:hover { border-color: var(--border-strong); }
 .sb-kbd {
   padding: 1px 5px;
   border-radius: 5px;

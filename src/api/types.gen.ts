@@ -158,6 +158,20 @@ custom: Array<CustomField>,
  */
 since: Since | null, };
 
+export type IssueHit = { id: string, key: string, 
+/**
+ * Opening the hit shows it in this project's Space.
+ */
+projectId: string, summary: Array<TextPart>, style: Style, statusName: string, matchedIn: MatchedIn, 
+/**
+ * The words around the match when only a comment matched.
+ */
+comment: Array<TextPart> | null, 
+/**
+ * Deleted in Jira or no longer visible.
+ */
+gone: boolean, };
+
 export type IssueLink = { 
 /**
  * Jira's words for this side of the link ("blocks", "is blocked by").
@@ -207,6 +221,16 @@ error: string | null,
  */
 projectFixed: boolean, };
 
+export type ListHit = { id: number, name: string, 
+/**
+ * The Space's project for a Space or one of its lists; none for Everything and Home lists.
+ */
+projectId: string | null, 
+/**
+ * The Space itself rather than one of its lists.
+ */
+isSpace: boolean, };
+
 export type ListKind = "everything" | "space" | "list" | "recent" | "pinned";
 
 export type ListNode = { id: number, kind: ListKind, name: string, 
@@ -251,6 +275,8 @@ source: string, };
 
 export type MatchCount = { open: number, total: number, };
 
+export type MatchedIn = "key" | "summary" | "description" | "comment";
+
 /**
  * The toolbar's quick narrowing on top of the level's filter.
  */
@@ -282,6 +308,8 @@ location: Location | null,
 expanded: Array<number>, };
 
 export type Op = "is" | "isNot" | "in" | "notIn" | "isEmpty" | "isNotEmpty" | "contains" | "before" | "after" | "withinLastDays" | "withinNextDays";
+
+export type PaletteResults = { issues: Array<IssueHit>, lists: Array<ListHit>, };
 
 export type Person = { accountId: string, name: string, initials: string, 
 /**
@@ -478,6 +506,11 @@ keepDoneDays: number, };
 
 export type SyncState = { "state": "idle", lastOk: string | null, } | { "state": "running", job: Job, } | { "state": "error", kind: ErrorKind, message: string, } | { "state": "offline", since: string, } | { "state": "paused", message: string, };
 
+/**
+ * Text with its matches marked; the page bolds the `strong` parts.
+ */
+export type TextPart = { text: string, strong: boolean, };
+
 export type TokenExpiry = { "state": "fine" } | { "state": "soon", days: number, } | { "state": "expired" };
 
 /**
@@ -492,7 +525,7 @@ export type Value = number | string | Array<string>;
 /**
  * How a field's value is picked.
  */
-export type ValueKind = "status" | "statusCategory" | "type" | "user" | "priority" | "epic" | "release" | "sprint" | "label" | "project" | "date" | "text" | "number";
+export type ValueKind = "status" | "statusCategory" | "type" | "user" | "priority" | "epic" | "release" | "sprint" | "label" | "project" | "date" | "text" | "number" | "search";
 
 export type View = { id: number, listId: number, name: string, layout: Layout, 
 /**

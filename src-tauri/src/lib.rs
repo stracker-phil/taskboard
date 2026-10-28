@@ -27,6 +27,7 @@ pub mod net;
 mod order;
 pub mod pins;
 mod remote;
+pub mod search;
 pub mod secrets;
 pub mod state;
 pub mod status_style;

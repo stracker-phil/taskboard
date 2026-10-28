@@ -171,6 +171,21 @@ An issue is changed while the sync recorded a change after the owner last saw it
   activity stay while the owner reads and J/K skimming counts too. Mark seen, Mark all seen and the row's
   Mark seen clear it at once.
 
+## Command palette
+
+`src/palette/` (⌘K, or Search in the sidebar); Rust's `search::palette_query` finds the issues and lists.
+
+- A `--scrim` over the window; the 640px panel (16px radius, `--shadow-palette`) 110px from the top, rising in.
+- Input row 56: search icon, the 17px field, "N issues · M actions" on the right.
+- Issues (max 8): a whole key or a bare number first, then full-text hits (every word as a prefix; key and
+  summary weigh most). Each 46px row: status square, mono key (70), the summary with the match bold, the
+  status pill, ↩ on the active row; a comment-only match adds "Matched in comment: “…”" under it.
+- Filter lists (max 6): Spaces and lists whose name holds the text; Space tile and "Space › List".
+- Actions (max 6): Open KEY in Jira (⌘↩), Save “text” as a filter list (⌘S; a `text contains` list under the
+  current Space or Everything, opened), Refresh now (⌘R), Full sync, Group by …, then every titled command.
+- Keys: ↑↓ move (wrapping), ↩ opens (an issue in its Space's view with the peek; a list; an action), ⌘C copies
+  the key, esc or a click outside closes. The active row is `--palette-active-bg`. Footer 38 lists the keys.
+
 ## Pins
 
 Local only (`src-tauri/src/pins/`, `src/pins/`). Issues, comments and filter lists can be pinned.

@@ -8,7 +8,7 @@ vi.mock("../../api", async (orig) => ({ ...(await orig<object>()), api: (await i
 import { api, type ListNode, type MenuEntry, type Nav, type SidebarTree, type SpaceNode } from "../../api";
 import { createQueryClient } from "../../queries/queryClient";
 import { SIDEBAR_KEY } from "../../queries/sidebar";
-import { resetStore } from "../../state/store";
+import { resetStore, useStore } from "../../state/store";
 import { listTarget, pinItem, pins } from "../../test/pins";
 import { lumenSpace, space } from "../../test/spaces";
 import { ConfirmHost } from "../../components/ConfirmSheet";
@@ -102,6 +102,16 @@ beforeEach(() => {
 });
 
 describe("Sidebar", () => {
+  describe("Search", () => {
+    it("opens the command palette", async () => {
+      await renderSidebar();
+
+      await userEvent.click(screen.getByRole("button", { name: /^Search/ }));
+
+      expect(useStore.getState().paletteOpen).toBe(true);
+    });
+  });
+
   describe("Home rows", () => {
     it("show each row's count", async () => {
       await renderSidebar();

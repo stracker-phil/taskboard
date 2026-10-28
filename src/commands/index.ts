@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { api } from "../api";
 import { runBusCommand } from "../state/requests";
+import { useStore } from "../state/store";
 import { isRecordingTarget, registerCommands, resolveKeydown, setOverrides, type Command } from "./registry";
 import { activeScopes, registerScope } from "./scopes";
 import { ISSUE_KEY_COMMANDS } from "./issueKeys";
@@ -23,6 +24,7 @@ export function registerCoreScopes() {
 const APP_COMMANDS: Command[] = [
   { id: "sidebar.toggle", title: "Toggle sidebar", scope: "main", defaultBinding: "Mod+\\", run: () => runBusCommand("view:toggleSidebar", "Could not toggle the sidebar") },
   { id: "space.previous", title: "Previous Space", scope: "main", defaultBinding: "Mod+Alt+ArrowUp", run: () => runBusCommand("nav:previousSpace", "Could not open the Space") },
+  { id: "palette.open", title: "Command palette", scope: "main", defaultBinding: "Mod+K", run: () => useStore.getState().setPaletteOpen(true) },
   { id: "space.next", title: "Next Space", scope: "main", defaultBinding: "Mod+Alt+ArrowDown", run: () => runBusCommand("nav:nextSpace", "Could not open the Space") },
   ...VIEW_KEY_COMMANDS,
   ...ISSUE_KEY_COMMANDS,

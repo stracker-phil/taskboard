@@ -29,6 +29,7 @@ const OPS: Record<ValueKind, Op[]> = {
   date: ["before", "after", "withinLastDays", "withinNextDays", "isEmpty", "isNotEmpty"],
   text: ["contains", "is", "isEmpty", "isNotEmpty"],
   number: ["is", "isNot", "isEmpty", "isNotEmpty"],
+  search: ["contains"],
 };
 
 const STATUS_CATEGORIES: Choice[] = [

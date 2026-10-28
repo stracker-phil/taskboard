@@ -54,7 +54,7 @@ commands, which validate them. Tracking a project writes `local.space`, not the 
 | `comment` | `body_html` from Jira, `body_text` (ours) for search |
 | `version`, `user`, `field` | releases, people, custom field names (`field.shown` is ours) |
 | `sync_state` | one row per sync scope, or per project for the full sync's cursor |
-| `issue_fts` | FTS5 over key, summary, description and comments; rowid = the issue id; keeps its text for snippets; `remove_diacritics 2` |
+| `issue_fts` | FTS5 over key, summary, description and comments; rowid = the issue id; keeps its text for snippets; `remove_diacritics 2`. Queried by the palette and the `text` filter field, always through `search::match_expression` (quoted prefix terms, so typed FTS5 syntax stays literal) |
 
 **local** (the owner's):
 

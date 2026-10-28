@@ -6,6 +6,7 @@ use crate::changes::commands as changes;
 use crate::connection::commands as connection;
 use crate::lists::commands as lists;
 use crate::pins::commands as pins;
+use crate::search::commands as search;
 use crate::views::commands as views;
 use crate::{bus, commands};
 
@@ -25,6 +26,7 @@ pub fn handlers() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
         commands::take_launch_events,
         changes::issues_mark_seen,
         pins::pins_list,
+        search::palette_query,
         pins::pin_create,
         pins::pin_remove,
         pins::pin_toggle_issue,

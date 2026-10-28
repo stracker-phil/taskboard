@@ -27,6 +27,7 @@ describe("opsFor", () => {
     ["project", ["is", "isNot"]],
     ["date", ["before", "after", "withinLastDays", "withinNextDays", "isEmpty", "isNotEmpty"]],
     ["text", ["contains", "is", "isEmpty", "isNotEmpty"]],
+    ["search", ["contains"]],
     ["number", ["is", "isNot", "isEmpty", "isNotEmpty"]],
   ])("offers the operators of a %s field", (kind, ops) => {
     expect(opsFor(kind)).toEqual(ops);

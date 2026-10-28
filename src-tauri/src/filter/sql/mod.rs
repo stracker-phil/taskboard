@@ -83,6 +83,8 @@ enum Shape {
         expr: Sql,
         timestamp: bool,
     },
+    /// Matched through the full-text index.
+    FullText,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -165,6 +167,7 @@ fn shape(field: &Field, ctx: &Ctx) -> AppResult<Shape> {
             expr: Sql::column("i.created_at"),
             timestamp: true,
         },
+        Field::Text => Shape::FullText,
         Field::Custom(id) => custom_shape(id, ctx)?,
     })
 }
@@ -217,5 +220,6 @@ fn compile_one(condition: &Condition, ctx: &Ctx) -> AppResult<Compiled> {
         Shape::List { array, text } => ops::list(condition, &array, text),
         Shape::Sprint => ops::sprint(condition),
         Shape::Date { expr, timestamp } => ops::date(condition, &expr, timestamp, ctx),
+        Shape::FullText => ops::full_text(condition),
     }
 }

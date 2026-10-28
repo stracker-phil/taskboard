@@ -7,6 +7,7 @@ use rusqlite::types::Value as SqlValue;
 use super::{Compiled, Ctx, ScalarKind, Sql};
 use crate::error::{AppError, AppResult};
 use crate::filter::model::{Condition, ME, Op, Value};
+use crate::search::{TEXT_MATCH, match_expression};
 use crate::sync::map::format_utc;
 
 const SPRINT_STATES: [&str; 3] = ["active", "future", "closed"];
@@ -199,6 +200,20 @@ fn start_of(day: NaiveDate, tz: Tz) -> chrono::DateTime<Utc> {
 fn days_after(c: &Condition, day: NaiveDate, days: u64) -> AppResult<NaiveDate> {
     day.checked_add_days(Days::new(days))
         .ok_or_else(|| rejected(c, "is out of range"))
+}
+
+/// Every word of the value in the key, summary, description or comments; no words match everything.
+pub(super) fn full_text(c: &Condition) -> AppResult<Compiled> {
+    if c.op != Op::Contains {
+        return Err(not_applicable(c));
+    }
+    Ok(match match_expression(one(c)?) {
+        Some(expression) => Compiled {
+            condition: TEXT_MATCH.to_string(),
+            params: vec![SqlValue::Text(expression)],
+        },
+        None => constant(true),
+    })
 }
 
 fn constant(matches: bool) -> Compiled {

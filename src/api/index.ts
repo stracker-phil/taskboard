@@ -23,6 +23,7 @@ import type {
   MatchCount,
   Narrowing,
   Nav,
+  PaletteResults,
   PinDuration,
   PinKind,
   Pins,
@@ -146,6 +147,8 @@ export const api = {
   issueGet: (id: string) => invoke<IssueDetail>("issue_get", { id }),
   issueActivity: (id: string) => invoke<ActivityItem[]>("issue_activity", { id }),
   issueRelated: (id: string) => invoke<Related>("issue_related", { id }),
+  /** The command palette's issues (by key and full text) and filter lists for the typed text. */
+  paletteQuery: (text: string) => invoke<PaletteResults>("palette_query", { text }),
   /** Their highlight and change chip clear. */
   issuesMarkSeen: (ids: string[]) => invoke<void>("issues_mark_seen", { ids }),
   pinsList: () => invoke<Pins>("pins_list"),

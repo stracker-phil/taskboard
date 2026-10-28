@@ -15,6 +15,7 @@ use taskboard_lib::connection::track_project;
 use taskboard_lib::db::Db;
 use taskboard_lib::jira::dto::{Field, Issue, Project, Status, Version};
 use taskboard_lib::lists::{Viewer, sidebar_tree};
+use taskboard_lib::search::palette_query;
 use taskboard_lib::sync::map::format_utc;
 use taskboard_lib::sync::store::{store_fields, store_page, store_statuses, store_versions};
 use taskboard_lib::test_support::demo::{DEMO_NOW, synthetic};
@@ -172,4 +173,42 @@ async fn the_sidebar_tree_stays_fast_on_5000_issues() {
     eprintln!("sidebar_tree: {sidebar:?}");
     let max = limit(20);
     assert!(sidebar < max, "sidebar tree {sidebar:?} >= {max:?}");
+}
+
+#[tokio::test]
+#[ignore = "fills 5000 issues; meant for the release profile"]
+async fn the_palette_search_stays_fast_on_5000_issues_with_comments() {
+    let (_dir, db) = synthetic_site().await;
+    db.write(|tx, _| {
+        tx.execute_batch(
+            "UPDATE cache.issue_fts SET comments = 'Checked on staging, the totals look right.'
+             WHERE rowid % 3 = 0",
+        )?;
+        Ok(())
+    })
+    .await
+    .unwrap();
+
+    let max = limit(30);
+    for text in [
+        "fix the login",
+        "order exp",
+        "totals staging",
+        "e",
+        "NW-12",
+        "17",
+    ] {
+        let mut times = Vec::new();
+        for _ in 0..RUNS {
+            let started = Instant::now();
+            palette_query(&db, text.to_string()).await.unwrap();
+            times.push(started.elapsed());
+        }
+        let search = median(times);
+
+        eprintln!("palette_query {text:?}: {search:?}");
+        assert!(search < max, "search {text:?} {search:?} >= {max:?}");
+    }
+    let hits = palette_query(&db, "order exp".into()).await.unwrap();
+    assert!(!hits.issues.is_empty());
 }

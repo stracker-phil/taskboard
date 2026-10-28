@@ -95,6 +95,7 @@ fn field_name(field: &Field, names: &Names) -> String {
         Field::Updated => "Updated",
         Field::Created => "Created",
         Field::Project => "Project",
+        Field::Text => "Text",
         Field::Custom(id) => return names.fields.get(id).cloned().unwrap_or_else(|| id.clone()),
     }
     .to_string()
@@ -200,6 +201,12 @@ mod tests {
                 "Labels contains “urgent”",
             ),
             (
+                Field::Text,
+                Op::Contains,
+                one("checkout totals"),
+                "Text contains “checkout totals”",
+            ),
+            (
                 Field::Due,
                 Op::Before,
                 one("2026-11-01"),
@@ -257,6 +264,7 @@ mod tests {
             (Field::Updated, "Updated"),
             (Field::Created, "Created"),
             (Field::Project, "Project"),
+            (Field::Text, "Text"),
             (custom("customfield_10073"), "Notes"),
             (custom("customfield_99999"), "customfield_99999"),
         ] {

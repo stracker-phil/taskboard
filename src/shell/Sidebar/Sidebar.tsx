@@ -3,6 +3,7 @@ import { Search } from "lucide-react";
 import type { SpaceNode } from "../../api";
 import { SpacePopover } from "../../components/SpaceEditor";
 import { useNav, useNavGo, useSetExpanded, useSidebar } from "../../queries/sidebar";
+import { useStore } from "../../state/store";
 import { findLevel, spaceOf } from "../levels";
 import { HomeRows } from "./HomeRows";
 import { SidebarFooter } from "./SidebarFooter";
@@ -15,6 +16,7 @@ export function Sidebar() {
   const { data: nav } = useNav();
   const open = useNavGo();
   const setExpanded = useSetExpanded();
+  const setPaletteOpen = useStore((s) => s.setPaletteOpen);
   const [renamingId, setRenamingId] = useState<number | null>(null);
   // The Space popover ("Colour and icon…", "Client label…") opens from here.
   const [editing, setEditing] = useState<{ space: SpaceNode; focus: SpaceEditFocus } | null>(null);
@@ -25,7 +27,7 @@ export function Sidebar() {
   return (
     <aside className="sidebar" aria-label="Sidebar">
       <div className="sidebar__traffic-lights" data-tauri-drag-region />
-      <button type="button" className="sb-search" disabled title="Search (⌘K)">
+      <button type="button" className="sb-search" title="Search (⌘K)" onClick={() => setPaletteOpen(true)}>
         <Search size={15} strokeWidth={2} aria-hidden="true" />
         <span className="sb-search__label">Search</span>
         <kbd className="sb-kbd">⌘K</kbd>

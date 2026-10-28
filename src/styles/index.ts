@@ -14,6 +14,7 @@ import "./peek.css";
 import "./issue-view.css";
 import "./changes.css";
 import "./pins.css";
+import "./palette.css";
 import "./overlays.css";
 import "./settings.css";
 import "./spaces.css";

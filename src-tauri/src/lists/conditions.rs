@@ -119,6 +119,8 @@ pub enum ValueKind {
     Date,
     Text,
     Number,
+    /// Words searched in the key, summary, description and comments.
+    Search,
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
@@ -174,6 +176,7 @@ const STANDARD_FIELDS: &[(Field, &str, ValueKind)] = &[
     (Field::Updated, "Updated", ValueKind::Date),
     (Field::Created, "Created", ValueKind::Date),
     (Field::Project, "Project", ValueKind::Project),
+    (Field::Text, "Text", ValueKind::Search),
 ];
 
 pub async fn filter_options(db: &Db) -> AppResult<FilterOptions> {

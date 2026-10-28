@@ -73,10 +73,12 @@ pub enum Field {
     Updated,
     Created,
     Project,
+    /// Key, summary, description or comments hold every word (full-text search).
+    Text,
     Custom(String),
 }
 
-const SYSTEM_FIELDS: [(Field, &str); 14] = [
+const SYSTEM_FIELDS: [(Field, &str); 15] = [
     (Field::Status, "status"),
     (Field::StatusCategory, "statusCategory"),
     (Field::Type, "type"),
@@ -91,6 +93,7 @@ const SYSTEM_FIELDS: [(Field, &str); 14] = [
     (Field::Updated, "updated"),
     (Field::Created, "created"),
     (Field::Project, "project"),
+    (Field::Text, "text"),
 ];
 
 impl From<String> for Field {
@@ -226,6 +229,7 @@ mod tests {
             ("updated", Field::Updated),
             ("created", Field::Created),
             ("project", Field::Project),
+            ("text", Field::Text),
             (
                 "customfield_10071",
                 Field::Custom("customfield_10071".into()),

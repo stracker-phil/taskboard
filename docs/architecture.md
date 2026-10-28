@@ -114,6 +114,7 @@ src-tauri/
   src/filter/                filter conditions: the model, SQL compiler, conditions in words
   src/lists/ views/          the sidebar tree with counts and defaults; the view tabs and the view query (filter,
                              group, sort, rows, columns); order.rs keeps positions
+  src/search/                full-text search: safe FTS5 queries, the palette's issues and lists, the text field
   src/pins/                  local pins: durations to local midnights, the Pinned view, Pin to Home
   src/changes/               unseen changes: the change chip and Since-yesterday words, Mark seen
   src/status_style/          the five status styles: detection and the owner's overrides

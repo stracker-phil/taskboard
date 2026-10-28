@@ -1,0 +1,27 @@
+import type { IssueHit, ListHit, TextPart } from "../api/types";
+
+/** Plain text, or the parts of a match: `parts("Fix the ", ["login"], " form")` marks "login" strong. */
+export function parts(...pieces: (string | [string])[]): TextPart[] {
+  return pieces.map((p) => (typeof p === "string" ? { text: p, strong: false } : { text: p[0], strong: true }));
+}
+
+/** An issue hit in the "Website relaunch" project; override per test. */
+export function issueHit(patch: Partial<IssueHit> = {}): IssueHit {
+  return {
+    id: "10043",
+    key: "NW-43",
+    projectId: "10001",
+    summary: parts("Fix the contact form"),
+    style: "progress",
+    statusName: "In Progress",
+    matchedIn: "summary",
+    comment: null,
+    gone: false,
+    ...patch,
+  };
+}
+
+/** A filter list of the "Website relaunch" Space; override per test. */
+export function listHit(patch: Partial<ListHit> = {}): ListHit {
+  return { id: 21, name: "Current sprint", projectId: "10001", isSpace: false, ...patch };
+}
