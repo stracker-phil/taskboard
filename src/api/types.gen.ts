@@ -8,11 +8,15 @@ bodyHtml: string | null,
 /**
  * UTC, RFC 3339.
  */
-at: string, edited: boolean, } | { "kind": "change", 
+at: string, edited: boolean, 
+/**
+ * After the owner last saw the issue, while it has unseen changes.
+ */
+fresh: boolean, } | { "kind": "change", 
 /**
  * `status`, `assignee`, `due_date`, `priority` or `created`.
  */
-field: string, from: ChangeValue | null, to: ChangeValue | null, at: string, };
+field: string, from: ChangeValue | null, to: ChangeValue | null, at: string, fresh: boolean, };
 
 /**
  * The JSON shape of an `AppError`.
@@ -148,7 +152,11 @@ gone: boolean,
 /**
  * The custom fields the owner shows (marked shown or used as a view column), with their value if any.
  */
-custom: Array<CustomField>, };
+custom: Array<CustomField>, 
+/**
+ * The banner over an issue with unseen changes.
+ */
+since: Since | null, };
 
 export type IssueLink = { 
 /**
@@ -199,7 +207,8 @@ export type ListKind = "everything" | "space" | "list" | "recent" | "pinned";
 
 export type ListNode = { id: number, kind: ListKind, name: string, 
 /**
- * Open issues; none for Recently changed and Pinned, and for a filter that can't be compiled.
+ * Open issues; for Recently changed its unseen issues (the badge); none for Pinned and for a filter that
+ * can't be compiled.
  */
 count: number | null, 
 /**
@@ -299,7 +308,11 @@ export type RelatedIssue = {
 /**
  * None for a linked issue the cache doesn't hold.
  */
-id: string | null, key: string, summary: string, style: Style, issueType: string, assignee: Person | null, };
+id: string | null, key: string, summary: string, style: Style, issueType: string, assignee: Person | null, 
+/**
+ * Has changes the owner hasn't seen.
+ */
+changed: boolean, };
 
 export type Row = { id: string, key: string, summary: string, style: Style, statusName: string, commentCount: number, 
 /**
@@ -344,6 +357,19 @@ home: Array<ListNode>,
  * Tracked projects in Space order.
  */
 spaces: Array<SpaceNode>, };
+
+/**
+ * The banner over an issue with unseen changes.
+ */
+export type Since = { 
+/**
+ * "Since yesterday", or "Since you last looked" when that was longer ago.
+ */
+label: string, 
+/**
+ * "2 new comments, moved to Review."
+ */
+text: string, };
 
 export type Sort = { by: SortBy, descending: boolean, };
 

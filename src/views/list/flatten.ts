@@ -36,6 +36,11 @@ export const GROUP_HEIGHT = 30;
 /** Space above every group but the first: one row. */
 export const GROUP_GAP = 44;
 
+/** Stable across refreshes, so a measured height stays with its row when rows come and go. */
+export function itemKey(item: Item): string {
+  return item.kind === "row" ? `row:${item.row.id}` : `group:${item.group.key}`;
+}
+
 export function itemHeight(item: Item): number {
   if (item.kind === "row") return ROW_HEIGHT;
   return item.first ? GROUP_HEIGHT : GROUP_HEIGHT + GROUP_GAP;

@@ -1,6 +1,6 @@
 import { useVirtualizer, type VirtualItem } from "@tanstack/react-virtual";
 import { type CSSProperties, type RefObject, useLayoutEffect, useRef } from "react";
-import { type Item, itemHeight } from "./flatten";
+import { type Item, itemHeight, itemKey } from "./flatten";
 
 /** How far a row's group is open while it animates (1 when still). */
 function motionFactor(item: Item, factors: Record<string, number>): number {
@@ -17,6 +17,7 @@ export function useRowSizing(items: Item[], factors: Record<string, number>, wra
     count: items.length,
     getScrollElement: () => scrollRef.current,
     estimateSize: heightOf,
+    getItemKey: (index) => itemKey(items[index]),
     // An element that reports no height yet keeps its estimate.
     measureElement: (element, _entry, instance) =>
       Math.round(element.getBoundingClientRect().height) || heightOf(instance.indexFromElement(element)),

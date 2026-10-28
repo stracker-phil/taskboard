@@ -7,7 +7,7 @@ import { useColumnsCatalogue, useViewRows } from "../../queries/views";
 import { narrowingKey } from "../../state/slices/narrowing";
 import { useStore } from "../../state/store";
 import { columnDef } from "./columns";
-import { flatten, type Item, itemGroupKey } from "./flatten";
+import { flatten, type Item, itemGroupKey, itemKey } from "./flatten";
 import { GroupHeader } from "./GroupHeader";
 import { IssueRow } from "./IssueRow";
 import { canvasMeasure, columnWidths, fittingColumns, gridTemplate } from "./measure";
@@ -168,7 +168,7 @@ function Rows({ listId, viewId, data, wrapTitles }: { listId: number; viewId: nu
           const group = itemGroupKey(item);
           return (
             <div
-              key={item.kind === "row" ? `row:${item.row.id}` : `group:${item.group.key}`}
+              key={itemKey(item)}
               {...itemProps(virtual, item)}
               className={itemClass(item)}
               data-group={group}
