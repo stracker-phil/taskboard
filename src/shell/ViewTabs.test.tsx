@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
 
 import { api, type MenuEntry } from "../api";
+import { ConfirmHost } from "../components/ConfirmSheet";
 import { installCommands, useCommandKeys } from "../commands";
 import { createQueryClient } from "../queries/queryClient";
 import { resetStore, useStore } from "../state/store";
@@ -28,6 +29,7 @@ async function renderTabs(views = [LIST, BOARD], viewId = 101) {
   render(
     <QueryClientProvider client={createQueryClient()}>
       <Harness viewId={viewId} />
+      <ConfirmHost />
     </QueryClientProvider>,
   );
   await screen.findByRole("tab", { name: views[0].name });
@@ -185,7 +187,7 @@ describe("ViewTabs", () => {
       expect(entry("Delete").enabled).toBe(false);
     });
 
-    it("deletes the current view and opens the level's default view", async () => {
+    it("asks first, then deletes the current view and opens the level's default view", async () => {
       mocked.viewDelete.mockResolvedValue([BOARD]);
       await renderTabs([LIST, BOARD], 101);
       await userEvent.pointer({ keys: "[MouseRight]", target: screen.getByRole("tab", { name: "List" }) });
@@ -193,8 +195,24 @@ describe("ViewTabs", () => {
       expect(entry("Delete").enabled).toBe(true);
       await choose("Delete");
 
-      expect(mocked.viewDelete).toHaveBeenCalledWith(101);
+      expect(await screen.findByRole("alertdialog", { name: "Delete the view “List”?" })).toBeInTheDocument();
+      expect(mocked.viewDelete).not.toHaveBeenCalled();
+      await userEvent.click(screen.getByRole("button", { name: "Delete View" }));
+
+      await waitFor(() => expect(mocked.viewDelete).toHaveBeenCalledWith(101));
       await waitFor(() => expect(mocked.navGo).toHaveBeenCalledWith(11, null));
+    });
+
+    it("keeps the view when the deletion is cancelled", async () => {
+      await renderTabs([LIST, BOARD], 101);
+      await userEvent.pointer({ keys: "[MouseRight]", target: screen.getByRole("tab", { name: "List" }) });
+      await choose("Delete");
+
+      await userEvent.click(await screen.findByRole("button", { name: "Cancel" }));
+
+      expect(mocked.viewDelete).not.toHaveBeenCalled();
+      expect(mocked.navGo).not.toHaveBeenCalled();
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
     });
 
     it("stays on the current view when another view is deleted", async () => {
@@ -203,8 +221,9 @@ describe("ViewTabs", () => {
       await userEvent.pointer({ keys: "[MouseRight]", target: screen.getByRole("tab", { name: "Overview" }) });
 
       await choose("Delete");
+      await userEvent.click(await screen.findByRole("button", { name: "Delete View" }));
 
-      expect(mocked.viewDelete).toHaveBeenCalledWith(103);
+      await waitFor(() => expect(mocked.viewDelete).toHaveBeenCalledWith(103));
       expect(mocked.navGo).not.toHaveBeenCalled();
     });
 
@@ -214,6 +233,7 @@ describe("ViewTabs", () => {
       await userEvent.pointer({ keys: "[MouseRight]", target: screen.getByRole("tab", { name: "List" }) });
 
       await choose("Delete");
+      await userEvent.click(await screen.findByRole("button", { name: "Delete View" }));
 
       await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not delete the view: Disk full"));
       expect(mocked.navGo).not.toHaveBeenCalled();

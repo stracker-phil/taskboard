@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { useCommandKeys } from "./commands";
+import { ConfirmHost } from "./components/ConfirmSheet";
 import { Toasts } from "./components/Toasts";
 import { useErrorToasts } from "./lib/useErrorToasts";
 import { trackWindowFocus } from "./lib/windowFocus";
@@ -31,6 +32,7 @@ function MainWindow() {
       <Window sidebarHidden={sidebarHidden}>
         <SyncStatusView />
       </Window>
+      <ConfirmHost />
       <Toasts />
     </>
   );

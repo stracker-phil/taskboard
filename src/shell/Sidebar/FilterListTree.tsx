@@ -3,6 +3,7 @@ import { Funnel } from "lucide-react";
 import { api, type ListNode, type SpaceNode } from "../../api";
 import { InlineRename } from "../../components/InlineRename";
 import { attempt } from "../../state/requests";
+import { useStore } from "../../state/store";
 import { DropLine } from "./DropLine";
 import { ListCount } from "./ListCount";
 import { useDragReorder } from "./useDragReorder";
@@ -74,7 +75,7 @@ function FilterListRow({ list, active, renaming, onOpen, onRename, onRenameDone,
       { text: "Duplicate", run: () => void attempt(api.listDuplicate(list.id), "Could not duplicate the filter list") },
       { text: "Pin to Home", enabled: false },
       "separator",
-      { text: "Delete", run: () => void attempt(api.listDelete(list.id), "Could not delete the filter list") },
+      { text: "Delete", run: () => void deleteList(list) },
     ]);
   };
   const icon = <Funnel size={15} strokeWidth={2} aria-hidden="true" />;
@@ -106,4 +107,13 @@ function FilterListRow({ list, active, renaming, onOpen, onRename, onRenameDone,
       <ListCount list={list} />
     </button>
   );
+}
+
+async function deleteList(list: ListNode) {
+  const confirmed = await useStore.getState().confirm({
+    title: `Delete the filter list “${list.name}”?`,
+    text: "Its conditions, its views and its pins go. The issues stay in Jira and in the Space.",
+    action: "Delete Filter List",
+  });
+  if (confirmed) await attempt(api.listDelete(list.id), "Could not delete the filter list");
 }

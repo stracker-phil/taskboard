@@ -156,6 +156,9 @@ Toasts and dialogs are `--pop` with `--shadow` (no border). Toasts (`--radius`, 
 themselves (success 2.5 s, info 4 s, errors 8 s, with an action 10 s), repeats count up (`×3`); an error reads
 "Something went wrong" with Details. Sheets (`Modal`, `--radius-lg`, 20px padding, over `--scrim`) take Esc
 first, a click on the scrim closes them, Tab cycles inside them, and closing returns the focus to where it was.
+Everything that loses the owner's setup asks first in a `ConfirmSheet` (`components/ConfirmSheet.tsx`; the page
+calls `useStore.getState().confirm({ title, text, action })` and `ConfirmHost` shows it): deleting a filter list
+or a view, Stop tracking, Reset Cache. The question names what goes and what stays; Cancel and Esc keep it.
 
 ## Settings
 

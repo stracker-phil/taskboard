@@ -5,6 +5,7 @@ import { onSelectView } from "../commands/viewKeys";
 import { InlineRename } from "../components/InlineRename";
 import { useNavGo, useViews } from "../queries/sidebar";
 import { attempt } from "../state/requests";
+import { useStore } from "../state/store";
 
 const LAYOUTS: Record<Layout, { name: string; icon: LucideIcon }> = {
   list: { name: "List", icon: List },
@@ -34,6 +35,12 @@ export function ViewTabs({ listId, viewId }: { listId: number; viewId: number })
   };
 
   const remove = async (view: View) => {
+    const confirmed = await useStore.getState().confirm({
+      title: `Delete the view “${view.name}”?`,
+      text: "Its layout, grouping, sort and columns go. The issues stay.",
+      action: "Delete View",
+    });
+    if (!confirmed) return;
     const left = await attempt(api.viewDelete(view.id), "Could not delete the view");
     if (left && view.id === viewId) await open(listId);
   };

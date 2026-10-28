@@ -3,6 +3,7 @@ import { api, type SpaceNode } from "../../api";
 import { InlineRename } from "../../components/InlineRename";
 import { SpaceTile } from "../../components/SpaceTile";
 import { attempt } from "../../state/requests";
+import { useStore } from "../../state/store";
 
 /** Which part of a Space the small Space popover opens on. */
 export type SpaceEditFocus = "appearance" | "client";
@@ -39,7 +40,7 @@ export function SpaceRow({ space, active, holdsActive, expanded, renaming, onOpe
       { text: "Colour and icon…", run: () => onEdit("appearance") },
       { text: "Client label…", run: () => onEdit("client") },
       "separator",
-      { text: "Stop tracking", run: () => void attempt(api.projectTrack(space.projectId, false), "Could not stop tracking the Space") },
+      { text: "Stop tracking", run: () => void stopTracking(space) },
     ]);
   };
   const state = active ? "active" : holdsActive ? "holds-active" : undefined;
@@ -68,4 +69,14 @@ export function SpaceRow({ space, active, holdsActive, expanded, renaming, onOpe
       )}
     </div>
   );
+}
+
+/** Hides the Space and stops syncing its project; tracking it again brings back its lists and views. */
+async function stopTracking(space: SpaceNode) {
+  const confirmed = await useStore.getState().confirm({
+    title: `Stop tracking “${space.name}”?`,
+    text: "Its issues leave the sidebar and the next sync skips the project. Its filter lists and views are kept for when you track it again.",
+    action: "Stop Tracking",
+  });
+  if (confirmed) await attempt(api.projectTrack(space.projectId, false), "Could not stop tracking the Space");
 }

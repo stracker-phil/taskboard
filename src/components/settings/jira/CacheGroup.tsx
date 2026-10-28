@@ -1,31 +1,13 @@
-import { useId, useState } from "react";
+import { useState } from "react";
 import { api, type ProjectCounts } from "../../../api";
 import { formatLocalTime } from "../../../lib/time";
 import { describeSyncState, useSyncOverview } from "../../../queries/sync";
 import { fail, useStore } from "../../../state/store";
-import { Modal } from "../../Modal";
+import { ConfirmSheet } from "../../ConfirmSheet";
 import { Group, Row } from "../controls";
 import { useBusyAction } from "../useBusyAction";
 
 const WHAT_STAYS = "Taskboard deletes its copy of your Jira issues and fetches them again. Spaces, filter lists, views and pins stay.";
-
-function ConfirmReset({ onCancel, onConfirm }: { onCancel: () => void; onConfirm: () => void }) {
-  const id = useId();
-  return (
-    <Modal role="alertdialog" labelledBy={`${id}-title`} describedBy={`${id}-text`} onClose={onCancel}>
-      <h2 id={`${id}-title`}>Reset the cache?</h2>
-      <p id={`${id}-text`}>{WHAT_STAYS}</p>
-      <div className="actions">
-        <button type="button" className="btn" onClick={onCancel}>
-          Cancel
-        </button>
-        <button type="button" className="btn btn-danger" onClick={onConfirm}>
-          Reset Cache
-        </button>
-      </div>
-    </Modal>
-  );
-}
 
 const issues = (n: number) => (n === 1 ? "1 issue" : `${n} issues`);
 
@@ -81,7 +63,7 @@ export function CacheGroup() {
           Reset Cache
         </button>
       </Row>
-      {confirming && <ConfirmReset onCancel={() => setConfirming(false)} onConfirm={reset} />}
+      {confirming && <ConfirmSheet title="Reset the cache?" text={WHAT_STAYS} action="Reset Cache" onCancel={() => setConfirming(false)} onConfirm={reset} />}
     </Group>
   );
 }

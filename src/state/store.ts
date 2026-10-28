@@ -1,12 +1,13 @@
 import { create, type StoreApi } from "zustand";
+import { confirmSlice, type ConfirmSlice } from "./slices/confirm";
 import { uiSlice, type UiSlice } from "./slices/ui";
 
 export { fail } from "./requests";
 export type { Toast, ToastAction } from "./slices/ui";
+export type { Confirmation } from "./slices/confirm";
 
 /** Every slice's members; modules add theirs with `declare module "../state/store" { interface Store { … } }`. */
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type -- an interface, so modules can merge into it
-export interface Store extends UiSlice {}
+export interface Store extends UiSlice, ConfirmSlice {}
 
 type SetStore = StoreApi<Store>["setState"];
 type GetStore = StoreApi<Store>["getState"];
@@ -34,3 +35,4 @@ export function resetStore(patch: Partial<Store> = {}) {
 }
 
 registerSlice(uiSlice);
+registerSlice(confirmSlice);
