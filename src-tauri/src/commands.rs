@@ -9,6 +9,7 @@ use crate::events::{KEYBINDINGS_CHANGED_EVENT, announce_settings};
 use crate::launch::LaunchEvent;
 use crate::state::AppState;
 use crate::store::keybindings::Keybindings;
+use crate::store::places::ViewPlace;
 use crate::store::settings::Settings;
 use crate::store::ui_state::UiState;
 
@@ -55,6 +56,21 @@ pub fn get_ui_state(state: State<'_, AppState>) -> UiState {
 #[tauri::command]
 pub async fn set_ui_state(state: State<'_, AppState>, ui: UiState) -> AppResult<UiState> {
     state.ui_state.set(ui).await
+}
+
+#[tauri::command]
+pub fn place_get(state: State<'_, AppState>, list_id: i64, view_id: i64) -> Option<ViewPlace> {
+    state.places.get(list_id, view_id)
+}
+
+#[tauri::command]
+pub async fn place_set(
+    state: State<'_, AppState>,
+    list_id: i64,
+    view_id: i64,
+    place: ViewPlace,
+) -> AppResult<()> {
+    state.places.set(list_id, view_id, place).await
 }
 
 #[tauri::command]

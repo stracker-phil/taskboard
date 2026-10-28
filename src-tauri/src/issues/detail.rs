@@ -1,0 +1,137 @@
+//! An issue as the peek and the Issue view show it, resolved and formatted here like a list row.
+
+use std::collections::HashMap;
+
+use chrono::NaiveDate;
+use rusqlite::{Connection, OptionalExtension};
+use serde::Serialize;
+use ts_rs::TS;
+
+use crate::db::Db;
+use crate::error::{AppError, AppResult};
+use crate::lists::Viewer;
+use crate::status_style::{Style, detect, styles};
+use crate::views::rows::{self, EpicChip, Label, Person, Priority};
+
+#[derive(Serialize, Clone, Debug, PartialEq, TS)]
+#[ts(export, export_to = "src/api/types.gen.ts")]
+#[serde(rename_all = "camelCase")]
+pub struct IssueDetail {
+    pub id: String,
+    pub key: String,
+    /// Jira's type name as plain text ("Story", "Bug", "Epic").
+    pub issue_type: String,
+    pub summary: String,
+    pub style: Style,
+    pub status_name: String,
+    pub epic: Option<EpicChip>,
+    /// Fix versions by name, in Jira's order.
+    pub releases: Vec<String>,
+    pub priority: Option<Priority>,
+    pub assignees: Vec<Person>,
+    pub reporter: Option<Person>,
+    pub sprint: Option<String>,
+    pub labels: Vec<Label>,
+    /// As the list shows it ("Oct 30").
+    pub due: Option<String>,
+    /// UTC, RFC 3339.
+    pub created_at: String,
+    pub updated_at: String,
+    /// Jira's rendered HTML, untrusted: the page sanitises it before showing it.
+    pub description_html: Option<String>,
+    pub comment_count: i64,
+    pub is_epic: bool,
+    /// Deleted in Jira or no longer visible.
+    pub gone: bool,
+}
+
+pub async fn issue_get(db: &Db, viewer: Viewer, id: String) -> AppResult<IssueDetail> {
+    db.read(move |conn| read(conn, &viewer, &id)).await
+}
+
+const SELECT: &str = "SELECT i.id, i.key, i.issue_type, i.summary, i.status_id, COALESCE(st.name, ''),
+    i.status_category, e.id, e.summary, e.epic_color, i.fix_versions, i.priority, i.assignee_id, a.name,
+    i.reporter_id, r.name, i.sprint, i.labels, i.due_date, i.created_at, i.updated_at, i.description_html,
+    i.comment_count, i.is_epic, i.gone
+    FROM cache.issue i
+    LEFT JOIN cache.status st ON st.id = i.status_id
+    LEFT JOIN cache.user a ON a.account_id = i.assignee_id
+    LEFT JOIN cache.user r ON r.account_id = i.reporter_id
+    LEFT JOIN cache.issue e ON e.id = i.parent_id AND e.is_epic = 1
+    WHERE i.id = ?1";
+
+fn read(conn: &Connection, viewer: &Viewer, id: &str) -> AppResult<IssueDetail> {
+    let ctx = viewer.ctx(conn)?;
+    let me = ctx.me.as_deref();
+    let styles = styles(conn)?;
+    let versions = version_names(conn)?;
+    let person = |id: Option<String>, name: Option<String>| {
+        id.map(|id| rows::person(&id, name.as_deref().unwrap_or(&id), me))
+    };
+    conn.query_row(SELECT, [id], |r| {
+        let status_id: String = r.get(4)?;
+        let status_name: String = r.get(5)?;
+        let category: String = r.get(6)?;
+        let epic = match (
+            r.get::<_, Option<String>>(7)?,
+            r.get::<_, Option<String>>(8)?,
+        ) {
+            (Some(id), Some(name)) => Some(EpicChip {
+                color: rows::epic_color(r.get::<_, Option<String>>(9)?.as_deref(), &id),
+                id,
+                name,
+            }),
+            _ => None,
+        };
+        Ok(IssueDetail {
+            id: r.get(0)?,
+            key: r.get(1)?,
+            issue_type: r.get(2)?,
+            summary: r.get(3)?,
+            style: styles
+                .get(&status_id)
+                .copied()
+                .unwrap_or_else(|| detect(&category, &status_name)),
+            status_name,
+            epic,
+            releases: string_list(r.get(10)?)
+                .iter()
+                .filter_map(|id| versions.get(id).cloned())
+                .collect(),
+            priority: r
+                .get::<_, Option<String>>(11)?
+                .as_deref()
+                .map(rows::priority),
+            assignees: person(r.get(12)?, r.get(13)?).into_iter().collect(),
+            reporter: person(r.get(14)?, r.get(15)?),
+            sprint: r.get(16)?,
+            labels: string_list(r.get(17)?)
+                .iter()
+                .map(|name| rows::label(name))
+                .collect(),
+            due: r
+                .get::<_, Option<String>>(18)?
+                .and_then(|d| NaiveDate::parse_from_str(&d, "%Y-%m-%d").ok())
+                .map(|d| rows::format_due(d, ctx.today)),
+            created_at: r.get(19)?,
+            updated_at: r.get(20)?,
+            description_html: r.get(21)?,
+            comment_count: r.get(22)?,
+            is_epic: r.get::<_, i64>(23)? != 0,
+            gone: r.get::<_, i64>(24)? != 0,
+        })
+    })
+    .optional()?
+    .ok_or_else(|| AppError::NotFound(format!("Issue {id} isn't in the cache")))
+}
+
+fn string_list(json: Option<String>) -> Vec<String> {
+    json.and_then(|j| serde_json::from_str(&j).ok())
+        .unwrap_or_default()
+}
+
+fn version_names(conn: &Connection) -> AppResult<HashMap<String, String>> {
+    let mut query = conn.prepare("SELECT id, name FROM cache.version")?;
+    let rows = query.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?;
+    Ok(rows.collect::<Result<_, _>>()?)
+}

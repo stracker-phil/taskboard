@@ -15,6 +15,7 @@ pub mod filter;
 mod handlers;
 mod instance;
 pub mod ipc;
+pub mod issues;
 pub mod jira;
 pub mod launch;
 pub mod lists;

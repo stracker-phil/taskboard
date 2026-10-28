@@ -3,5 +3,6 @@
 pub mod json_file;
 pub mod json_store;
 pub mod keybindings;
+pub mod places;
 pub mod settings;
 pub mod ui_state;

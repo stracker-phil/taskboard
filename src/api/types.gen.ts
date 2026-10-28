@@ -96,6 +96,32 @@ export type GroupBy = "status" | "project" | "client" | "assignee" | "epic" | "r
  */
 export type GroupMark = { "kind": "status", style: Style, } | { "kind": "space", letter: string, color: string | null, } | { "kind": "person", person: Person, } | { "kind": "epic", color: number, } | { "kind": "priority", level: number, };
 
+export type IssueDetail = { id: string, key: string, 
+/**
+ * Jira's type name as plain text ("Story", "Bug", "Epic").
+ */
+issueType: string, summary: string, style: Style, statusName: string, epic: EpicChip | null, 
+/**
+ * Fix versions by name, in Jira's order.
+ */
+releases: Array<string>, priority: Priority | null, assignees: Array<Person>, reporter: Person | null, sprint: string | null, labels: Array<Label>, 
+/**
+ * As the list shows it ("Oct 30").
+ */
+due: string | null, 
+/**
+ * UTC, RFC 3339.
+ */
+createdAt: string, updatedAt: string, 
+/**
+ * Jira's rendered HTML, untrusted: the page sanitises it before showing it.
+ */
+descriptionHtml: string | null, commentCount: number, isEpic: boolean, 
+/**
+ * Deleted in Jira or no longer visible.
+ */
+gone: boolean, };
+
 /**
  * Payload of `issues_changed`.
  */
@@ -378,3 +404,9 @@ widths: { [key in string]: number }, position: number,
 isDefault: boolean, };
 
 export type ViewData = { groupBy: GroupBy, groups: Array<Group>, rows: { [key in string]: Row }, columns: Array<string>, };
+
+export type ViewPlace = { scrollTop: number, 
+/**
+ * Groups the owner opened (`true`) or closed (`false`); the others keep their default.
+ */
+toggled: { [key in string]: boolean }, selectedId: string | null, peekOpen: boolean, };

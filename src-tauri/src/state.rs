@@ -11,6 +11,7 @@ use crate::launch::LaunchQueue;
 use crate::nav::NavStore;
 use crate::secrets::Keychain;
 use crate::store::keybindings::KeybindingsStore;
+use crate::store::places::PlaceStore;
 use crate::store::settings::SettingsStore;
 use crate::store::ui_state::UiStateStore;
 
@@ -22,6 +23,7 @@ pub struct AppState {
     pub db: Db,
     pub jira: JiraAccess,
     pub nav: NavStore,
+    pub places: PlaceStore,
 }
 
 impl AppState {
@@ -37,6 +39,7 @@ impl AppState {
                 Arc::new(Limiter::default()),
             ),
             nav: NavStore::open(config_dir),
+            places: PlaceStore::open(config_dir),
         })
     }
 }
