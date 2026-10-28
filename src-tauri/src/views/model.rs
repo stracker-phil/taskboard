@@ -23,8 +23,10 @@ pub enum GroupBy {
     Project,
     Client,
     Assignee,
-    Due,
+    Epic,
+    Release,
     Priority,
+    Due,
     None,
 }
 

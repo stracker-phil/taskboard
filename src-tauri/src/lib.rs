@@ -26,6 +26,7 @@ mod order;
 mod remote;
 pub mod secrets;
 pub mod state;
+pub mod status_style;
 pub mod store;
 pub mod sync;
 #[cfg(any(test, debug_assertions, feature = "test-util"))]

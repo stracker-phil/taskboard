@@ -62,7 +62,7 @@ These rules hold everywhere in the code. Keep them when you change things.
   ([ADR 0016](adr/0016-closing-the-window-keeps-the-app-running.md)). There is no tray, LaunchAgent or global
   shortcut.
 - **The CLI**: `taskboard` starts or activates the app; `status [--json]`, `show`, `focus`, `hide`,
-  `open <KEY>`, `sync [--full]` and `quit` (debug builds also `dev drift`) ask the running app (`cli/`, `remote.rs`). `show` and `focus` start it when it
+  `open <KEY>`, `sync [--full]` and `quit` (debug builds also `dev drift` and `dev seed-synthetic <n>`) ask the running app (`cli/`, `remote.rs`). `show` and `focus` start it when it
   isn't running; the others exit 2 with "Taskboard isn't running".
 - **Settings** is a window of its own ([ux.md](ux.md#settings)).
 
@@ -110,7 +110,9 @@ src-tauri/
   src/connection/            the Jira connection: Keychain access, Test Connection, tracked projects, scope
   src/sync/                  the sync engine: one task, the full sync, Jira JSON to rows, change records
   src/filter/                filter conditions: the model, SQL compiler, conditions in words
-  src/lists/ views/          the sidebar tree with counts and defaults; the view tabs; order.rs keeps positions
+  src/lists/ views/          the sidebar tree with counts and defaults; the view tabs and the view query (filter,
+                             group, sort, rows, columns); order.rs keeps positions
+  src/status_style/          the five status styles: detection and the owner's overrides
   src/nav/                   where the main window is (level and view, nav.json); previous/next Space
   src/<feature>/             one folder per feature: types, pure logic, commands.rs, tests
   src/window/ menu/          the main and Settings windows, the native app menu
@@ -123,8 +125,9 @@ src/
   queries/                   TanStack Query hooks and the event → query-key map (ADR 0018)
   state/store.ts slices/     UI-only state (zustand)
   shell/                     the main window frame: sidebar and content panel
+  views/list/                the List layout: column header, groups, virtualised rows
   commands/ registry/        in-window keys; Settings page registry
-  components/ windows/<name>/ lib/ styles/ test/
+  components/ (issue/: rings, pills, chips, avatars) windows/<name>/ lib/ styles/ test/
 docs/                        this folder; adr/ holds the decision records; plan/ (gitignored) the steps
 scripts/*.sh scripts/dev/    install, stop, signing; the dev loop
 .claude/                     rules, agents, skills, settings

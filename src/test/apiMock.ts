@@ -16,6 +16,7 @@ import {
   type SyncOverview,
   type SyncSettings,
   type UiState,
+  type ViewData,
 } from "../api/types";
 
 type Api = typeof realApi;
@@ -98,6 +99,10 @@ export function createApiMock(): Api {
     viewSetSort: vi.fn(),
     viewMove: vi.fn(),
     viewDelete: vi.fn(),
+    viewRows: vi.fn(async (): Promise<ViewData> => ({ groupBy: "none", groups: [], rows: {}, columns: [] })),
+    columnsCatalogue: vi.fn().mockResolvedValue([]),
+    statusStylesList: vi.fn().mockResolvedValue([]),
+    statusStyleSet: vi.fn().mockResolvedValue([]),
     syncOverview: vi.fn(async (): Promise<SyncOverview> => ({ state: { state: "idle", lastOk: null }, lastFullAt: null, projects: [] })),
     syncRun: vi.fn().mockResolvedValue(undefined),
     popupMenu: vi.fn().mockResolvedValue(undefined),

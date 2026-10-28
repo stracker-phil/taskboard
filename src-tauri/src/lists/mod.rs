@@ -14,5 +14,5 @@ pub use edit::{
     MatchCount, SpaceUpdate, ensure_tracked_spaces, list_create, list_delete, list_duplicate,
     list_match_count, list_move, list_rename, list_set_filter, space_move, space_update,
 };
-pub use nodes::{Kind, node};
+pub use nodes::{Kind, all_nodes, node, scope_of};
 pub use tree::{ListNode, SidebarTree, SpaceNode, sidebar_tree};

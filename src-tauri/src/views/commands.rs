@@ -2,8 +2,11 @@
 
 use tauri::State;
 
-use super::{GroupBy, Layout, Sort, View};
+use chrono::Utc;
+
+use super::{Column, GroupBy, Layout, Narrowing, Sort, View, ViewData};
 use crate::error::AppResult;
+use crate::lists::Viewer;
 use crate::state::AppState;
 
 #[tauri::command]
@@ -81,4 +84,20 @@ pub async fn space_default_columns(
     columns: Vec<String>,
 ) -> AppResult<()> {
     super::space_default_columns(&state.db, project_id, columns).await
+}
+
+#[tauri::command]
+pub async fn view_rows(
+    state: State<'_, AppState>,
+    list_id: i64,
+    view_id: i64,
+    narrowing: Narrowing,
+) -> AppResult<ViewData> {
+    let viewer = Viewer::of(&state.settings.get().connection, Utc::now());
+    super::view_rows(&state.db, viewer, list_id, view_id, narrowing).await
+}
+
+#[tauri::command]
+pub async fn columns_catalogue(state: State<'_, AppState>) -> AppResult<Vec<Column>> {
+    super::columns_catalogue(&state.db).await
 }

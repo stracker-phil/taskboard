@@ -63,6 +63,10 @@ pub async fn handle(app: AppHandle, message: IpcMessage) -> HandlerResult {
         }
         #[cfg(debug_assertions)]
         IpcMessage::DevDrift => json(crate::dev::drift()?),
+        #[cfg(debug_assertions)]
+        IpcMessage::DevSeedSynthetic { count } => {
+            json(crate::dev::seed_synthetic(&app, count).await?)
+        }
         IpcMessage::Open { .. } => Err(AppError::NotConnected(
             "Taskboard isn't connected to Jira yet; set up the connection in Settings".into(),
         )

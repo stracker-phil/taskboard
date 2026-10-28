@@ -68,7 +68,7 @@
   color: var(--text-muted);
 }
 
-/* Until the issue list (step 9): what the sync is doing. */
+/* Before the cache holds issues: what the sync is doing. */
 .sync-status { display: grid; justify-items: center; gap: 8px; color: var(--text-secondary); text-align: center; }
 .sync-status p { margin: 0; }
 .sync-status__detail { color: var(--text-muted); }

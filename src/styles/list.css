@@ -1,0 +1,38 @@
+/* The List layout (artboard 1): column header 34, group header 44, rows 46 (docs/ux.md → List view). */
+.list-view { display: flex; flex-direction: column; height: 100%; }
+
+/* 50 = the panel's 24 plus the row's 26 indent, so "Name" lines up with the rings. */
+.list-columns {
+  display: flex; flex: none; align-items: center; height: 34px; padding: 0 24px 0 50px;
+  border-bottom: 1px solid var(--hairline); font-size: 12px; color: var(--text-muted);
+}
+.list-columns > span { flex: none; }
+.list-columns > .list-columns__name { flex: 1; }
+
+.list-scroll { flex: 1; min-height: 0; overflow: auto; padding: 0 24px; }
+.list-scroll__space { position: relative; width: 100%; }
+.list-item { position: absolute; top: 0; left: 0; width: 100%; box-sizing: border-box; }
+.list-item--gap { padding-top: 14px; }
+
+.list-group { display: flex; align-items: center; gap: 10px; height: 44px; }
+.list-group__chevron { width: 22px; height: 22px; padding: 0; border: 0; background: transparent; color: var(--text-muted); font-size: 10px; cursor: pointer; }
+.list-group__label { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--text); }
+.list-group__count { font-size: 13px; color: var(--text-muted); }
+
+.list-row {
+  display: flex; align-items: center; height: 46px; padding-left: 26px; box-sizing: border-box;
+  border-bottom: 1px solid var(--row-hairline); border-radius: 6px; color: var(--text); cursor: default;
+}
+.list-row--changed { background: var(--changed-bg); }
+.list-row--selected { background: var(--selection-bg); }
+.list-row__name { display: flex; flex: 1; align-items: center; gap: 10px; min-width: 0; padding-right: 12px; }
+.list-row__key { flex: none; font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); }
+.list-row__summary { overflow: hidden; font-size: 14px; white-space: nowrap; text-overflow: ellipsis; }
+.list-row--changed .list-row__summary { font-weight: 600; }
+.list-row__cell { display: flex; flex: none; align-items: center; min-width: 0; }
+
+.list-cell--mono { font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary); }
+.list-cell--secondary { font-size: 13px; color: var(--text-secondary); }
+.list-cell--tertiary { font-size: 13px; color: var(--text-tertiary); }
+.list-cell--priority { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--text-secondary); }
+.list-cell--labels { display: flex; gap: 4px; overflow: hidden; }

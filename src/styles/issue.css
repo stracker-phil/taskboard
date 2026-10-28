@@ -1,0 +1,56 @@
+/* The status language and the small parts of an issue (docs/ux.md → Status language). */
+.status-ring { display: inline-block; flex: none; box-sizing: border-box; border-radius: 50%; border: 2px solid var(--status-progress-ring); }
+.status-ring--todo { border: 2px dashed var(--status-todo-ring); }
+.status-ring--progress { border-color: var(--status-progress-ring); }
+.status-ring--review { border-color: var(--status-review-ring); }
+.status-ring--blocked { border-color: var(--status-blocked-ring); }
+.status-ring--done { border-color: var(--status-done-ring); }
+.status-ring--on-pill { border-color: currentColor; }
+
+.status-pill {
+  display: inline-flex; flex: none; align-items: center; gap: 6px; height: 26px; padding: 0 10px 0 8px; box-sizing: border-box;
+  border: 1px solid; border-radius: 7px; font-size: 12px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; white-space: nowrap;
+}
+.status-pill--todo { background: var(--status-todo-bg); color: var(--status-todo-fg); border-color: var(--status-todo-border); }
+.status-pill--progress { background: var(--status-progress-bg); color: var(--status-progress-fg); border-color: var(--status-progress-border); }
+.status-pill--review { background: var(--status-review-bg); color: var(--status-review-fg); border-color: var(--status-review-border); }
+.status-pill--blocked { background: var(--status-blocked-bg); color: var(--status-blocked-fg); border-color: var(--status-blocked-border); }
+.status-pill--done { background: var(--status-done-bg); color: var(--status-done-fg); border-color: var(--status-done-border); }
+
+.epic-chip {
+  display: inline-flex; align-items: center; max-width: 164px; height: 22px; padding: 0 8px; box-sizing: border-box; overflow: hidden;
+  border-radius: 6px; font-size: 12px; font-weight: 500; white-space: nowrap; text-overflow: ellipsis;
+}
+.epic-chip--1 { background: var(--epic-1-bg); color: var(--epic-1-fg); }
+.epic-chip--2 { background: var(--epic-2-bg); color: var(--epic-2-fg); }
+.epic-chip--3 { background: var(--epic-3-bg); color: var(--epic-3-fg); }
+.epic-chip--4 { background: var(--epic-4-bg); color: var(--epic-4-fg); }
+.epic-chip--5 { background: var(--epic-5-bg); color: var(--epic-5-fg); }
+
+.label-chip { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 6px; font-size: 12px; white-space: nowrap; }
+.label-chip--0 { background: var(--label-neutral-bg); color: var(--label-neutral-fg); }
+.label-chip--1 { background: var(--label-1-bg); color: var(--label-1-fg); }
+.label-chip--2 { background: var(--label-2-bg); color: var(--label-2-fg); }
+
+.avatar {
+  display: inline-flex; flex: none; align-items: center; justify-content: center; box-sizing: border-box; border-radius: 50%;
+  color: var(--text-on-accent); font-size: 9px; font-weight: 700;
+}
+.avatar--1 { background: var(--avatar-1); }
+.avatar--2 { background: var(--avatar-2); }
+.avatar--3 { background: var(--avatar-3); }
+.avatar--4 { background: var(--avatar-4); }
+.avatar-stack > .avatar { border: 2px solid var(--avatar-ring); margin-right: -6px; }
+.avatar-stack { display: flex; }
+
+.priority-flag { flex: none; }
+.priority-flag--highest { fill: var(--flag-highest); stroke: var(--flag-highest); }
+.priority-flag--high { fill: var(--flag-high); stroke: var(--flag-high); }
+.priority-flag--medium { fill: var(--flag-medium); stroke: var(--flag-medium); }
+.priority-flag--low { fill: var(--flag-low); stroke: var(--flag-low); }
+
+.change-chip {
+  display: inline-flex; flex: none; align-items: center; height: 18px; padding: 0 6px; border-radius: 5px;
+  background: var(--changed-chip-bg); color: var(--changed-chip-text); font-size: 11px; font-weight: 600; white-space: nowrap;
+}
+.comment-count { display: inline-flex; flex: none; align-items: center; gap: 3px; font-size: 12px; color: var(--text-muted); }

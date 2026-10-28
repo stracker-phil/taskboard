@@ -38,6 +38,7 @@ zeroize = "1"
 chrono-tz = "0.10"
 fastrand = "2"
 base64 = "0.22"
+unicode-normalization = "0.1.26"
 
 [features]
 # Exposes test helpers to integration tests in tests/.

@@ -17,6 +17,7 @@ import type {
   LaunchEvent,
   Layout,
   MatchCount,
+  Narrowing,
   Nav,
   ProjectRow,
   ScopeView,
@@ -24,10 +25,14 @@ import type {
   SidebarTree,
   Sort,
   SpaceUpdate,
+  Column,
+  StatusStyleRow,
+  Style,
   SyncOverview,
   SyncSettings,
   UiState,
   View,
+  ViewData,
 } from "./types";
 
 export * from "./types";
@@ -116,6 +121,13 @@ export const api = {
   viewMove: (id: number, position: number) => invoke<View[]>("view_move", { id, position }),
   /** Rejects with `invalid_input` for the last view of a level. */
   viewDelete: (id: number) => invoke<View[]>("view_delete", { id }),
+  /** A view's issues, filtered by its level and `narrowing`, grouped and sorted by the view. */
+  viewRows: (listId: number, viewId: number, narrowing: Narrowing) => invoke<ViewData>("view_rows", { listId, viewId, narrowing }),
+  /** Every column a view can show: the standard ones, then the site's custom fields. */
+  columnsCatalogue: () => invoke<Column[]>("columns_catalogue"),
+  statusStylesList: () => invoke<StatusStyleRow[]>("status_styles_list"),
+  /** `style` null: back to the detected style. */
+  statusStyleSet: (statusId: string, style: Style | null) => invoke<StatusStyleRow[]>("status_style_set", { statusId, style }),
   /** Shows a native context menu at the mouse; the chosen entry's `run` is called. */
   popupMenu: async (entries: MenuEntry[]): Promise<void> => {
     const menu = await Menu.new({ items: entries.map(nativeEntry) });

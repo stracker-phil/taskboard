@@ -1,4 +1,5 @@
-//! The fake Jira in the debug app: started at launch, connected on first launch, changed by `dev drift`.
+//! The fake Jira in the debug app: started at launch, connected on first launch, changed by `dev drift` and
+//! `dev seed-synthetic`.
 
 use std::sync::OnceLock;
 
@@ -83,11 +84,26 @@ async fn connect_to_fake(app: &AppHandle, url: &str) -> AppResult<()> {
     Ok(())
 }
 
+fn running() -> AppResult<&'static FakeJira> {
+    FAKE.get()
+        .ok_or_else(|| AppError::NotConnected("The fake Jira isn't running".into()))
+}
+
+/// `taskboard dev seed-synthetic <count>`: serves `count` generated issues instead of the demo tables, then
+/// empties the cache and syncs them.
+pub async fn seed_synthetic(app: &AppHandle, count: usize) -> AppResult<String> {
+    let fake = running()?;
+    fake.replace_data(demo::synthetic(count));
+    app.state::<AppState>().db.reset_cache().await?;
+    app.state::<SyncEngine>().queue(Job::Full);
+    Ok(format!(
+        "Serving {count} generated issues; syncing them now"
+    ))
+}
+
 /// `taskboard dev drift`: changes the demo site the way a working day would, for the next sync to find.
 pub fn drift() -> AppResult<String> {
-    let fake = FAKE
-        .get()
-        .ok_or_else(|| AppError::NotConnected("The fake Jira isn't running".into()))?;
+    let fake = running()?;
     fake.set_now(chrono::Utc::now());
     let colleague = demo::demo()
         .users

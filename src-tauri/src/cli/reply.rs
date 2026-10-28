@@ -22,7 +22,7 @@ pub fn render(message: &IpcMessage, result: &Value) -> Result<Option<String>, St
     Ok(match message {
         IpcMessage::Status => Some(status_text(&read::<StatusReport>(result)?)),
         #[cfg(debug_assertions)]
-        IpcMessage::DevDrift => Some(read::<String>(result)?),
+        IpcMessage::DevDrift | IpcMessage::DevSeedSynthetic { .. } => Some(read::<String>(result)?),
         _ => None,
     })
 }
@@ -224,6 +224,27 @@ mod tests {
     #[test]
     fn a_dev_drift_reply_that_is_not_text_is_an_error() {
         let error = render(&IpcMessage::DevDrift, &json!({ "done": true })).unwrap_err();
+        assert!(
+            error.starts_with("The running Taskboard sent an unexpected reply"),
+            "{error}"
+        );
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    fn dev_seed_synthetic_prints_the_apps_text_as_it_is() {
+        let message = IpcMessage::DevSeedSynthetic { count: 5000 };
+        assert_eq!(
+            render(&message, &json!("Synced 5000 issues")),
+            Ok(Some("Synced 5000 issues".to_string()))
+        );
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    fn a_dev_seed_synthetic_reply_that_is_not_text_is_an_error() {
+        let message = IpcMessage::DevSeedSynthetic { count: 5000 };
+        let error = render(&message, &json!({ "done": true })).unwrap_err();
         assert!(
             error.starts_with("The running Taskboard sent an unexpected reply"),
             "{error}"

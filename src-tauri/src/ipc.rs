@@ -50,6 +50,11 @@ pub enum IpcMessage {
     /// Changes the fake Jira's demo site (`taskboard dev drift`).
     #[cfg(debug_assertions)]
     DevDrift,
+    /// Serves `count` generated issues from the fake Jira and syncs them (`taskboard dev seed-synthetic`).
+    #[cfg(debug_assertions)]
+    DevSeedSynthetic {
+        count: usize,
+    },
     /// Runs JavaScript in the window (used by scripts/dev to drive the UI).
     #[cfg(debug_assertions)]
     Eval {
@@ -71,6 +76,8 @@ impl IpcMessage {
             IpcMessage::Sync { .. } => "Sync",
             #[cfg(debug_assertions)]
             IpcMessage::DevDrift => "DevDrift",
+            #[cfg(debug_assertions)]
+            IpcMessage::DevSeedSynthetic { .. } => "DevSeedSynthetic",
             #[cfg(debug_assertions)]
             IpcMessage::Eval { .. } => "Eval",
         }
@@ -499,6 +506,11 @@ mod tests {
         cases.push((
             IpcMessage::DevDrift,
             serde_json::json!({ "type": "devDrift" }),
+        ));
+        #[cfg(debug_assertions)]
+        cases.push((
+            IpcMessage::DevSeedSynthetic { count: 5000 },
+            serde_json::json!({ "type": "devSeedSynthetic", "count": 5000 }),
         ));
         for (message, wire) in cases {
             assert_eq!(serde_json::to_value(&message).unwrap(), wire, "{wire}");

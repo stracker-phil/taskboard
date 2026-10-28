@@ -161,6 +161,11 @@ impl FakeJira {
         content.now += chrono::Duration::from_std(by).expect("a short duration");
     }
 
+    /// Serves `data` from now on.
+    pub fn replace_data(&self, data: JiraData) {
+        self.content().data = data;
+    }
+
     /// Sets the fake's clock.
     pub fn set_now(&self, now: DateTime<Utc>) {
         self.content().now = now;

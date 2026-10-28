@@ -14,6 +14,14 @@ field?: AppErrorField, };
  */
 export type AppErrorField = { path: string, message: string, };
 
+export type Cell = { "kind": "text", "value": string } | { "kind": "person", "value": Person };
+
+export type Column = { 
+/**
+ * A standard id or a Jira field id (`customfield_10071`).
+ */
+id: string, name: string, custom: boolean, };
+
 export type Condition = { field: Field, op: Op, value?: Value, };
 
 export type Connection = { 
@@ -50,6 +58,12 @@ export type ConnectionTest = { displayName: string, accountId: string, timeZone:
  */
 export type ConnectionView = { connection: Connection, hasToken: boolean, expiry: TokenExpiry, };
 
+export type EpicChip = { id: string, name: string, 
+/**
+ * The `--epic-N-*` token pair.
+ */
+color: number, };
+
 export type ErrorKind = "io" | "invalid_input" | "not_found" | "not_connected" | "db" | "auth" | "offline" | "invalid_jql" | "internal";
 
 /**
@@ -60,7 +74,14 @@ export type Field = string;
 
 export type Filter = { conditions: Array<Condition>, };
 
-export type GroupBy = "status" | "project" | "client" | "assignee" | "due" | "priority" | "none";
+export type Group = { key: string, label: string, mark: GroupMark | null, count: number, collapsedByDefault: boolean, rowIds: Array<string>, };
+
+export type GroupBy = "status" | "project" | "client" | "assignee" | "epic" | "release" | "priority" | "due" | "none";
+
+/**
+ * What the group header draws before its label.
+ */
+export type GroupMark = { "kind": "status", style: Style, } | { "kind": "space", letter: string, color: string | null, } | { "kind": "person", person: Person, } | { "kind": "epic", color: number, } | { "kind": "priority", level: number, };
 
 /**
  * Payload of `issues_changed`.
@@ -72,6 +93,12 @@ export type IssuesChanged = { ids: Array<string>,
 all: boolean, };
 
 export type Job = "full";
+
+export type Label = { name: string, 
+/**
+ * The `--label-N-*` token pair; 0 is the neutral one.
+ */
+tint: number, };
 
 /**
  * Something the page acts on once it listens: from the launch that started the app, a later launch,
@@ -119,6 +146,23 @@ export type Location = { listId: number, viewId: number, };
 export type MatchCount = { open: number, total: number, };
 
 /**
+ * The toolbar's quick narrowing on top of the level's filter.
+ */
+export type Narrowing = { 
+/**
+ * Only issues assigned to the connected account.
+ */
+me: boolean, 
+/**
+ * Key or summary contains it, ignoring case and accents.
+ */
+text: string, 
+/**
+ * Only children of this epic.
+ */
+epic: string | null, };
+
+/**
  * What the page needs to draw the sidebar's place.
  */
 export type Nav = { 
@@ -133,6 +177,18 @@ expanded: Array<number>, };
 
 export type Op = "is" | "isNot" | "in" | "notIn" | "isEmpty" | "isNotEmpty" | "contains" | "before" | "after" | "withinLastDays" | "withinNextDays";
 
+export type Person = { accountId: string, name: string, initials: string, 
+/**
+ * The `--avatar-N` token.
+ */
+color: number, };
+
+export type Priority = { name: string, 
+/**
+ * 1 Highest … 5 Lowest; an unknown name counts as Medium.
+ */
+level: number, };
+
 export type ProjectCounts = { id: string, key: string, name: string, 
 /**
  * Issues in the cache, open or done.
@@ -140,6 +196,24 @@ export type ProjectCounts = { id: string, key: string, name: string,
 cached: number, open: number, lastFullAt: string | null, };
 
 export type ProjectRow = { id: string, key: string, name: string, tracked: boolean, };
+
+export type Row = { id: string, key: string, summary: string, style: Style, statusName: string, commentCount: number, 
+/**
+ * Changed since the owner last looked.
+ */
+changed: boolean, 
+/**
+ * The change chip's text ("2 new comments").
+ */
+changeNote: string | null, assignees: Array<Person>, epic: EpicChip | null, release: string | null, priority: Priority | null, labels: Array<Label>, sprint: string | null, 
+/**
+ * The due date as the list shows it ("Oct 30").
+ */
+due: string | null, 
+/**
+ * Custom column values by field id; a field without a value is absent.
+ */
+custom: { [key in string]: Cell }, };
 
 export type ScopeView = { 
 /**
@@ -198,6 +272,21 @@ icon: string | null,
  */
 color: string | null, client: string | null, };
 
+export type StatusStyleRow = { id: string, name: string, 
+/**
+ * Jira's status category: `new`, `indeterminate` or `done`.
+ */
+category: string, detected: Style, 
+/**
+ * The owner's choice; none = Automatic.
+ */
+chosen: Style | null, };
+
+/**
+ * Stored as its name; the `--status-{style}-*` tokens draw it. Ordered as the list's status groups.
+ */
+export type Style = "progress" | "review" | "blocked" | "todo" | "done";
+
 export type SyncOverview = { state: SyncState, lastFullAt: string | null, projects: Array<ProjectCounts>, };
 
 /**
@@ -245,3 +334,5 @@ columns: Array<string>, groupBy: GroupBy, sort: Sort, position: number,
  * The tab a level opens with.
  */
 isDefault: boolean, };
+
+export type ViewData = { groupBy: GroupBy, groups: Array<Group>, rows: { [key in string]: Row }, columns: Array<string>, };

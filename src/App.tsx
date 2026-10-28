@@ -7,7 +7,7 @@ import { useErrorToasts } from "./lib/useErrorToasts";
 import { trackWindowFocus } from "./lib/windowFocus";
 import { queryClient } from "./queries/queryClient";
 import { useEvents } from "./queries/useEvents";
-import { SyncStatusView } from "./shell/SyncStatusView";
+import { MainBody } from "./shell/MainBody";
 import { Window } from "./shell/Window";
 import { useAppEvents } from "./state/useAppEvents";
 import { useStore } from "./state/store";
@@ -30,7 +30,7 @@ function MainWindow() {
   return (
     <>
       <Window sidebarHidden={sidebarHidden}>
-        <SyncStatusView />
+        <MainBody />
       </Window>
       <ConfirmHost />
       <Toasts />

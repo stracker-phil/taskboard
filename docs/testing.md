@@ -36,8 +36,10 @@ step.
   ([ADR 0006](adr/0006-test-doubles-behind-test-util.md)).
 - **Contracts:** `lib.rs` tests compare `IDENTIFIER` and `LINK_SCHEME` with both Tauri configs; each
   `#[ts(export)]` type has an `export_bindings_*` test (`bun run types`).
-- **Performance**, once there is a database: a seeded integration test with median limits per view, as
-  TimeTracker's `tests/performance.rs`.
+- **Performance** (`tests/performance.rs`, ignored): `synthetic(5000)` synced from the fake Jira into a temp
+  database; the median of 20 `view_rows` runs (Everything by status, by project, with a text narrowing) stays
+  under 50 ms and of 20 `sidebar_tree` runs under 20 ms. The limits hold for the release profile
+  (`cargo test --release --test performance -- --ignored`); debug builds get ten times as much.
 
 ## Frontend
 
@@ -60,7 +62,9 @@ it starts the fake at `http://127.0.0.1:47470` with the demo site dated to today
 launch (`alex.morgan@example.com`, a demo token in the debug Keychain service), tracks the five demo Spaces and
 runs a full sync, so every screen goes through the real sync. `taskboard dev drift` (the debug binary) changes
 the demo site the way a working day would (a comment, a status, a priority, a new and a deleted issue); the
-next sync picks it up. To start over, quit the debug app and delete
+next sync picks it up. `taskboard dev seed-synthetic 5000` serves 5,000 generated issues instead and resyncs
+from an empty cache, for scrolling and timing checks; to go back, quit the debug app and delete `cache.sqlite*`
+in its data folder. To start over, quit the debug app and delete
 `~/Library/Application Support/com.philippstracker.taskboard.debug/`.
 
 ## Driving the app

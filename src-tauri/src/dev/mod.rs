@@ -4,7 +4,7 @@
 
 mod fake;
 
-pub use fake::{drift, start_fake_jira};
+pub use fake::{drift, seed_synthetic, start_fake_jira};
 
 /// `TASKBOARD_WINDOW_FRAME="x,y,width,height"` (logical points) places the main window.
 pub fn window_frame() -> Option<(f64, f64, f64, f64)> {

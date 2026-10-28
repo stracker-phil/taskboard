@@ -35,8 +35,8 @@ describe("SettingsApp", () => {
 
     const nav = screen.getByRole("navigation", { name: "Settings pages" });
     const entries = within(nav).getAllByRole("button").map((b) => b.textContent?.trim());
-    expect(entries).toEqual(["Connection", "Projects", "Spaces", "Sync", "General"]);
-    expect(nav.textContent).toMatch(/Jira.*Connection.*Projects.*Spaces.*Sync.*System.*General/);
+    expect(entries).toEqual(["Connection", "Projects", "Spaces", "Statuses", "Sync", "General"]);
+    expect(nav.textContent).toMatch(/Jira.*Connection.*Projects.*Spaces.*Statuses.*Sync.*System.*General/);
     expect(screen.getByRole("heading", { name: "Connection" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Connection/ })).toHaveAttribute("aria-current", "page");
   });
@@ -48,6 +48,15 @@ describe("SettingsApp", () => {
 
     expect(screen.getByRole("heading", { name: "Sync" })).toBeInTheDocument();
     expect(await screen.findByRole("button", { name: "Reset Cache" })).toBeInTheDocument();
+  });
+
+  it("shows the Statuses page when chosen in the page list", async () => {
+    await renderSettings();
+
+    await userEvent.click(screen.getByRole("button", { name: /Statuses/ }));
+
+    expect(screen.getByRole("button", { name: /Statuses/ })).toHaveAttribute("aria-current", "page");
+    expect(await screen.findByText("Statuses appear after the first sync.")).toBeInTheDocument();
   });
 
   describe("search", () => {

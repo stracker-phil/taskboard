@@ -10,10 +10,12 @@ import { ProjectsPage } from "../components/settings/jira/ProjectsPage";
 import { SyncPage } from "../components/settings/jira/SyncPage";
 import { emitEvent } from "../test/apiMock";
 import { connectionView, PROJECTS, projectCounts, syncOverview } from "../test/jira";
+import { row, statusStyle, viewData } from "../test/issues";
 import { lumenSpace, sidebarTree, space } from "../test/spaces";
 import { createQueryClient } from "./queryClient";
 import { useNav, useSpaces } from "./sidebar";
 import { useEvents } from "./useEvents";
+import { useStatusStyles, useViewRows } from "./views";
 
 const mocked = vi.mocked(api, true);
 
@@ -99,6 +101,57 @@ describe("useEvents", () => {
     );
 
     await waitFor(() => expect(screen.getByLabelText("Email")).toHaveValue("sam.lee@example.com"));
+  });
+
+  describe("view rows and status styles", () => {
+    function RowsHarness() {
+      useEvents();
+      const { data: view } = useViewRows(11, 101);
+      const { data: styles } = useStatusStyles();
+      return (
+        <>
+          <p>Rows: {view ? Object.values(view.rows).map((r) => r.key).join(", ") || "none" : "loading"}</p>
+          <p>Styles: {styles?.map((s) => `${s.name}=${s.chosen ?? "auto"}`).join(", ") || "none"}</p>
+        </>
+      );
+    }
+
+    async function renderRows() {
+      mocked.viewRows.mockResolvedValue(viewData([], [row({ key: "NW-1" })]));
+      mocked.statusStylesList.mockResolvedValue([]);
+      render(
+        <QueryClientProvider client={createQueryClient()}>
+          <RowsHarness />
+        </QueryClientProvider>,
+      );
+      await screen.findByText("Rows: NW-1");
+      await waitFor(() => expect(mocked.listen).toHaveBeenCalledWith("issues_changed", expect.any(Function)));
+    }
+
+    it.each([
+      ["local_changed", { parts: ["views"] }],
+      ["issues_changed", { ids: ["1"], all: false }],
+    ] as const)("refetches the view rows when %s arrives", async (event, payload) => {
+      await renderRows();
+      mocked.viewRows.mockResolvedValue(viewData([], [row({ key: "NW-1" }), row({ id: "10043", key: "NW-2" })]));
+
+      act(() => emitEvent(api, event, payload as never));
+
+      expect(await screen.findByText("Rows: NW-1, NW-2")).toBeInTheDocument();
+    });
+
+    it.each([
+      ["local_changed", { parts: ["statuses"] }],
+      ["issues_changed", { ids: [], all: true }],
+    ] as const)("refetches the status styles when %s arrives", async (event, payload) => {
+      await renderRows();
+      await screen.findByText("Styles: none");
+      mocked.statusStylesList.mockResolvedValue([statusStyle({ chosen: "blocked" })]);
+
+      act(() => emitEvent(api, event, payload as never));
+
+      expect(await screen.findByText("Styles: In Progress=blocked")).toBeInTheDocument();
+    });
   });
 
   describe("sidebar and place", () => {

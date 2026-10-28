@@ -30,7 +30,7 @@ directly.
    statuses, versions of every tracked project, `/myself` (account id, name, time zone).
 2. Per tracked project, in Space order: Jira's approximate count of `(<scope>) AND project = KEY`, then that
    query `ORDER BY updated ASC` with `expand=renderedFields` and `SEARCH_FIELDS` plus the sprint, epic colour
-   and `shown` custom fields. Every page is stored in one transaction and announced as `sync_progress`.
+   and the custom fields that are `shown` or a view's column. Every page is stored in one transaction and announced as `sync_progress`.
 3. A `sync_state` row `full:<project id>` after each project; the `scope` row (`last_full_at`, and
    `last_delta_at` = the newest `updated` stored) after all of them. A failed page ends the job before its
    cursors move; the next run repeats it.

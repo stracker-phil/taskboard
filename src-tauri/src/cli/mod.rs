@@ -88,6 +88,11 @@ enum Command {
 enum DevCommand {
     /// Change the demo site (a comment, a status, a priority, a new and a deleted issue)
     Drift,
+    /// Replace the demo site with generated issues and sync them (for scrolling and timing checks)
+    SeedSynthetic {
+        /// How many issues
+        count: usize,
+    },
 }
 
 /// A message for the running app and how to print its reply.
@@ -148,6 +153,10 @@ where
         Some(Command::Sync { full }) => ask(IpcMessage::Sync { full }, false),
         #[cfg(debug_assertions)]
         Some(Command::Dev(DevCommand::Drift)) => ask(IpcMessage::DevDrift, false),
+        #[cfg(debug_assertions)]
+        Some(Command::Dev(DevCommand::SeedSynthetic { count })) => {
+            ask(IpcMessage::DevSeedSynthetic { count }, false)
+        }
     }
 }
 
@@ -351,6 +360,27 @@ mod tests {
             parse_args(&["dev", "drift"]),
             ask(IpcMessage::DevDrift, false)
         );
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    fn dev_seed_synthetic_asks_the_running_app_for_that_many_issues() {
+        assert_eq!(
+            parse_args(&["dev", "seed-synthetic", "5000"]),
+            ask(IpcMessage::DevSeedSynthetic { count: 5000 }, false)
+        );
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    fn dev_seed_synthetic_without_a_numeric_count_is_a_usage_error() {
+        for args in [
+            &["dev", "seed-synthetic"][..],
+            &["dev", "seed-synthetic", "many"],
+            &["dev", "seed-synthetic", "-5"],
+        ] {
+            assert_eq!(exit_code(parse_args(args)), 2, "{args:?}");
+        }
     }
 
     #[cfg(debug_assertions)]

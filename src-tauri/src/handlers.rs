@@ -56,6 +56,10 @@ pub fn handlers() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
         views::view_move,
         views::view_delete,
         views::space_default_columns,
+        views::view_rows,
+        views::columns_catalogue,
+        crate::status_style::commands::status_styles_list,
+        crate::status_style::commands::status_style_set,
         bus::app::run_command,
     ]
 }

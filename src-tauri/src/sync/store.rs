@@ -34,9 +34,15 @@ pub fn store_fields(conn: &Connection, fields: &[Field]) -> AppResult<FieldIds> 
     Ok(ids)
 }
 
-/// Custom fields the owner marked `shown`, fetched with every issue.
+/// Custom fields fetched with every issue: those the owner marked `shown` and those a view shows as a column.
 pub fn shown_fields(conn: &Connection) -> AppResult<Vec<String>> {
-    let mut query = conn.prepare("SELECT id FROM cache.field WHERE shown = 1 ORDER BY id")?;
+    let mut query = conn.prepare(
+        "SELECT id FROM cache.field WHERE shown = 1
+         UNION
+         SELECT DISTINCT c.value FROM view v, json_each(v.columns) c
+         WHERE c.value LIKE 'customfield\\_%' ESCAPE '\\'
+         ORDER BY 1",
+    )?;
     let ids = query.query_map([], |row| row.get(0))?;
     Ok(ids.collect::<Result<_, _>>()?)
 }

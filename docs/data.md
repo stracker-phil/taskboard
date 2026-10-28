@@ -97,6 +97,31 @@ filter lists Current sprint, Epics, Release *next unreleased version* (when the 
 with one List view. Positions among siblings stay 0, 1, 2, … (`order.rs`). Deleting a filter list deletes its
 views and pins; a level keeps at least one view.
 
+### Group and sort keys
+
+`view_rows(listId, viewId, narrowing)` returns the view's issues as `ViewData { groupBy, groups, rows,
+columns }`: the level's filter, plus the kind's own rule (Recently changed: updated in the last day until
+change tracking; Pinned: the pinned issues), plus the narrowing (`me`, `text` in the key or summary ignoring
+case and accents, `epic`).
+
+| `groupBy` | Groups, in order |
+|---|---|
+| `status` | by style (In progress, In review, Blocked, To do, Done), then name; Done starts collapsed |
+| `project` | the Spaces in sidebar order |
+| `client` | client labels A–Z, then Internal |
+| `assignee` | me, the others A–Z, then Unassigned |
+| `epic` | epics A–Z, then No epic |
+| `release` | the first fix version, by release date, then No release |
+| `priority` | Highest to Lowest, then No priority |
+| `due` | Overdue, Today, This week (to Sunday), Later, No due date |
+| `none` | one group, no header |
+
+`sort.by`: `updated`, `created`, `priority` (highest first when descending), `key` (by number within a
+project), `due`, `summary`, `status`; empty priorities and due dates sort last either way; ties keep the
+issue id order. Columns are standard ids (`assignee`, `epic`, `release`, `priority`, `labels`, `sprint`,
+`due`) or a Jira custom field id (`columns_catalogue` lists them; Jira's internal `any` fields and the sprint
+field are left out). `status_style` holds the owner's style per status (`status_style_set`).
+
 ## Rules
 
 - Timestamps are UTC ISO 8601; the UI shows local time.

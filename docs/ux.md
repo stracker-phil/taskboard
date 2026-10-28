@@ -94,6 +94,38 @@ padding, 2px gap, a `--hairline` bottom line.
   the only view; deleting the current view opens the level's default).
 - ⌘1–⌘9 open the nth tab.
 
+## Status language
+
+One language for every Jira status (`src-tauri/src/status_style/`): five styles, To do, In progress, In
+review, Blocked and Done. Jira's category decides To do (`new`) and Done (`done`); otherwise a name containing
+"review" is In review, one containing "block" is Blocked, everything else In progress. Settings → Statuses
+overrides it per status.
+
+- **StatusRing** (`components/issue/StatusRing.tsx`): a 2px circle in `--status-*-ring`, dashed for To do;
+  15 in list rows, 12 inside pills, where it takes the pill's text colour.
+- **StatusPill**: caps 12/700 (0.03em), 26 high, 7 radius, `--status-*-bg/fg/border`, the ring inside.
+- **EpicChip** (22, 12/500, at most 164 wide, `--epic-N-*`): Jira's epic colour (`ghx-label-N`) maps to the
+  nearest of the five tints; an epic without one gets a tint from its id.
+- **Avatar** (26, white 9/700 initials on `--avatar-N`): the connected account is always `--avatar-1`, other
+  people one of the rest by a stable hash of their account id. In a stack each has a 2px `--avatar-ring` border
+  and overlaps by 6.
+- **PriorityFlag** (14, `--flag-*`, Lowest shares Low's colour), **ChangeChip** (18, `--changed-chip-*`, 11/600),
+  **CommentCount** (12, bubble icon), label chips (22, `--label-N-*` by a hash of the name).
+
+## List view
+
+`src/views/list/`, fed by `view_rows` (`views/query.rs`): Rust filters, groups and sorts, the page only draws.
+
+- Column header 34 (`--hairline` below, 12px `--text-muted`), padded 50 on the left so "Name" lines up with
+  the rings; then each visible column at its width: Assignee 96, Epic 176, Release 96, Priority 104, Labels
+  120, Sprint 100, Due 80, custom fields 90.
+- Groups 14 apart: a 44px header with a 22px chevron (▼ open, ▶ closed), the group's label (a status pill
+  when grouped by status; a Space tile, an avatar, an epic chip or a flag for the other groupings) and its
+  count. Done groups start closed. Without grouping there are no headers.
+- Rows 46, 26 indent, `--row-hairline` between, 6 radius: ring, mono key, summary (600 when changed, on
+  `--changed-bg`), change chip, comment count, then the cells. A clicked row is selected (`--selection-bg`).
+- Rows are virtualised (`@tanstack/react-virtual`), so a 5,000-issue view renders only what is on screen.
+
 ## Tokens
 
 One palette per macOS mode in `src/styles/palettes/` (`light.css`; the dark palette joins later), selected by
@@ -195,11 +227,13 @@ owner's own Settings design replaces it. Its colours are the `--settings-*` toke
     is tracked. The sidebar's "Colour and icon…" and "Client label…" items open `SpacePopover` (300px, 12px
     radius, `--shadow-popover`, at the top left of the content panel) with the same fields; Esc, Done or a
     click outside close it.
+  - **Statuses**: every cached Jira status as its pill with its Jira category, and a button with a native menu
+    of Automatic (naming the detected style) and the five styles.
   - **Sync**: *Scope* (the effective JQL in a monospaced field; Validate, Save, Reset to Default), *Intervals*
     (minutes in front and in the background, days to keep done issues) and *Cache* (the sync state line with
     Sync Now, one row per tracked project with its key, last full sync and "N issues · M open", then Reset
     Cache, confirmed in a sheet). It stays as the diagnostics view of the cache.
-  - **General** (System): About and logs. Statuses, Shortcuts and Appearance join with their features.
+  - **General** (System): About and logs. Shortcuts and Appearance join with their features.
 - The layout stays Daybook's until the owner's own Settings design arrives.
 
 ## Keys
