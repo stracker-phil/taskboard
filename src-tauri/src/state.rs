@@ -9,7 +9,7 @@ use crate::error::AppResult;
 use crate::jira::Limiter;
 use crate::launch::LaunchQueue;
 use crate::nav::NavStore;
-use crate::secrets::Keychain;
+use crate::secrets::SecretStore;
 use crate::store::keybindings::KeybindingsStore;
 use crate::store::places::PlaceStore;
 use crate::store::settings::SettingsStore;
@@ -34,12 +34,26 @@ impl AppState {
             ui_state: UiStateStore::open(config_dir),
             launches: LaunchQueue::default(),
             db: Db::open(config_dir)?,
-            jira: JiraAccess::new(
-                Arc::new(Keychain::new(crate::APP_NAME)),
-                Arc::new(Limiter::default()),
-            ),
+            jira: JiraAccess::new(secret_store(), Arc::new(Limiter::default())),
             nav: NavStore::open(config_dir),
             places: PlaceStore::open(config_dir),
         })
+    }
+}
+
+/// The release build keeps the token in the Keychain. The debug build only talks to the fake Jira, which takes
+/// any token, so it keeps the demo token in memory (ADR 0026): no Keychain prompt after each rebuild, and no
+/// owner token can end up in it.
+fn secret_store() -> Arc<dyn SecretStore> {
+    #[cfg(debug_assertions)]
+    {
+        use crate::test_support::FakeSecrets;
+        use crate::test_support::demo::ME_EMAIL;
+        use crate::test_support::fake_jira::DEMO_TOKEN;
+        Arc::new(FakeSecrets::with(ME_EMAIL, DEMO_TOKEN))
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        Arc::new(crate::secrets::Keychain::new(crate::APP_NAME))
     }
 }

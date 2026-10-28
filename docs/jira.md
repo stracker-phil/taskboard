@@ -40,7 +40,8 @@ dated to today; any email and token connect to it.
 - `browse_url(key)` is the issue's page on the site.
 
 The token lives in the Keychain (`secrets.rs`, service `APP_NAME`, account = the email;
-[ADR 0021](adr/0021-the-token-lives-in-the-keychain-through-secrets-rs.md)). `JiraClient` reads it for every
+[ADR 0021](adr/0021-the-token-lives-in-the-keychain-through-secrets-rs.md)); the debug build keeps the demo token
+in memory instead ([ADR 0026](adr/0026-the-debug-build-keeps-its-demo-token-in-memory.md)). `JiraClient` reads it for every
 request and sends `Authorization: Basic base64(email:token)` (never to `_edge/tenant_info`). No command returns it; `net::redact` removes
 `Authorization` values, `Basic`/`Bearer` tokens and the email from the lines the client logs.
 

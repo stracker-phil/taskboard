@@ -30,10 +30,11 @@ stands in Taskboard. The numbers in this table are Taskboard's.
 | [0018](0018-reads-go-through-tanstack-query.md) | Reads go through TanStack Query, invalidated by events | Accepted (2026-10-28) |
 | [0019](0019-two-sqlite-files-through-rusqlite.md) | Two SQLite files through rusqlite: the owner's setup and a disposable Jira cache | Accepted (2026-10-28) |
 | [0020](0020-jira-site-and-atlassian-gateway-are-the-hosts.md) | The app talks to the configured Jira site and api.atlassian.com | Accepted (2026-10-28) |
-| [0021](0021-the-token-lives-in-the-keychain-through-secrets-rs.md) | The API token lives in the Keychain through `secrets.rs` | Accepted (2026-10-28) |
+| [0021](0021-the-token-lives-in-the-keychain-through-secrets-rs.md) | The API token lives in the Keychain through `secrets.rs` | Amended by 0026 |
 | [0022](0022-the-debug-build-syncs-from-a-built-in-fake-jira.md) | The debug build syncs from a built-in fake Jira | Accepted (2026-10-28) |
 | [0023](0023-one-sync-task-full-sync-per-project-changes-by-diffing.md) | One sync task; the full sync runs per tracked project; changes are recorded by diffing | Accepted (2026-10-28) |
 | [0024](0024-filters-run-locally-in-sql-views-never-filter.md) | Filters run locally in SQL; views never filter | Accepted (2026-10-28) |
 | [0025](0025-all-jira-traffic-goes-through-one-allowlisted-gateway.md) | All Jira traffic goes through one allowlisted gateway | Accepted (2026-10-28) |
+| [0026](0026-the-debug-build-keeps-its-demo-token-in-memory.md) | The debug build keeps its demo token in memory | Accepted (2026-10-28) |
 
 Open: integrations with Daybook and TimeTracker.
