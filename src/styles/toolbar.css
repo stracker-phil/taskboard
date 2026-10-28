@@ -1,14 +1,16 @@
 /* The view toolbar and its popovers (docs/ux.md → Toolbar). */
 .toolbar { display: flex; flex: none; align-items: center; gap: 8px; height: 50px; padding: 0 24px; }
 .toolbar__spacer { flex: 1; }
-.toolbar__anchor { position: relative; display: flex; }
+.toolbar__anchor, .toolbar__item { position: relative; display: flex; flex: none; }
 
 .toolbar-btn {
   display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 11px; box-sizing: border-box;
   border: 1px solid var(--border); border-radius: 8px; background: var(--panel-bg); color: var(--text-secondary);
-  font: inherit; font-size: 13px; cursor: default;
+  font: inherit; font-size: 13px; white-space: nowrap; cursor: default; flex: none;
+  transition: background-color var(--motion-fast) var(--ease-out), border-color var(--motion-fast) var(--ease-out);
 }
-.toolbar-btn:hover { background: var(--fill-hover); }
+.toolbar-btn:hover { background: var(--hover-bg); border-color: var(--border-strong); }
+.toolbar-btn--icon { justify-content: center; width: 30px; padding: 0; }
 .toolbar-btn--open { background: var(--accent-soft-bg); }
 .toolbar-btn--filter { padding: 0 9px 0 11px; }
 .toolbar-btn--active { background: var(--accent-soft-bg); border-color: var(--accent-soft-border); }
@@ -20,14 +22,16 @@
 .me-chip {
   display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px 0 4px; box-sizing: border-box;
   border: 1px solid var(--accent-soft-border); border-radius: 15px; background: var(--accent-soft-bg); color: var(--accent-text);
-  font: inherit; font-size: 13px; cursor: default;
+  font: inherit; font-size: 13px; white-space: nowrap; cursor: default;
 }
 .me-chip__avatar { width: 22px; height: 22px; }
 
 .text-filter {
-  display: flex; align-items: center; gap: 6px; width: 190px; height: 30px; padding: 0 10px; box-sizing: border-box;
+  display: flex; flex: 0 1 190px; align-items: center; gap: 6px; min-width: 96px; height: 30px; padding: 0 10px; box-sizing: border-box;
   border: 1px solid var(--border); border-radius: 8px; color: var(--text-muted);
+  transition: border-color var(--motion-fast) var(--ease-out);
 }
+.text-filter:hover { border-color: var(--border-strong); }
 .text-filter input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text); font: inherit; font-size: 13px; }
 
 /* Popovers: under their button, over the view. */

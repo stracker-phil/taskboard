@@ -63,7 +63,7 @@
   border-radius: 999px;
   background: var(--settings-fill-strong);
   box-shadow: inset 0 0 0 0.5px var(--settings-fill);
-  transition: background 0.15s;
+  transition: background var(--motion-base) var(--ease-out);
 }
 .switch::after {
   content: "";
@@ -75,7 +75,7 @@
   border-radius: 50%;
   background: var(--settings-knob);
   box-shadow: var(--settings-knob-shadow);
-  transition: transform 0.15s;
+  transition: transform var(--motion-base) var(--ease-out);
 }
 .switch:checked { background: var(--accent); }
 .switch:checked::after { transform: translateX(14px); }

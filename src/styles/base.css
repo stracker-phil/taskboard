@@ -50,6 +50,18 @@ button {
   cursor: default;
 }
 
+/* Controls never wrap (docs/ux.md → Text and controls never wrap); a long label truncates instead. Only
+   descriptions, comment bodies, pin reasons and empty-state text may wrap. */
+button,
+[role="tab"],
+[role="columnheader"],
+[role="gridcell"],
+.status-pill,
+.epic-chip,
+.label-chip {
+  white-space: nowrap;
+}
+
 code,
 kbd,
 .mono {

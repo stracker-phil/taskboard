@@ -93,7 +93,8 @@ describe("MainBody", () => {
 
       renderBody();
 
-      expect(await screen.findByText("Name")).toBeInTheDocument();
+      expect(await screen.findByRole("button", { name: /^(Collapse|Expand) / })).toBeInTheDocument();
+      expect(screen.getByText("Redesign the pricing page")).toBeInTheDocument();
       expect(screen.queryByText("Key")).not.toBeInTheDocument();
     });
   });

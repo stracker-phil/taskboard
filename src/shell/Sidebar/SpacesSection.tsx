@@ -1,4 +1,5 @@
 import { api, type Nav, type SpaceNode } from "../../api";
+import { Disclosure } from "../../components/Disclosure";
 import { attempt, runBusCommand } from "../../state/requests";
 import { DropLine } from "./DropLine";
 import { FilterListTree } from "./FilterListTree";
@@ -56,7 +57,9 @@ export function SpacesSection({ spaces, nav, activeSpace, open, setExpanded, ren
               onEdit={(focus) => onEdit(space, focus)}
               dragHandle={handle(index)}
             />
-            {expanded && <FilterListTree space={space} activeId={currentId} renamingId={renamingId} setRenamingId={setRenamingId} open={open} />}
+            <Disclosure open={expanded}>
+              <FilterListTree space={space} activeId={currentId} renamingId={renamingId} setRenamingId={setRenamingId} open={open} />
+            </Disclosure>
           </div>
         );
       })}

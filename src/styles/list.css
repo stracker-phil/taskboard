@@ -1,38 +1,70 @@
-/* The List layout (artboard 1): column header 34, group header 44, rows 46 (docs/ux.md → List view). */
-.list-view { display: flex; flex-direction: column; height: 100%; }
-
-/* 50 = the panel's 24 plus the row's 26 indent, so "Name" lines up with the rings. */
-.list-columns {
-  display: flex; flex: none; align-items: center; height: 34px; padding: 0 24px 0 50px;
-  border-bottom: 1px solid var(--hairline); font-size: 12px; color: var(--text-muted);
+/* The List layout (artboard 1, docs/ux.md → List view): each group a white card under its status tab, on the
+   faint list canvas. Virtualised items draw the card piece by piece: the header row, then each row with its
+   card edges by position. Columns share one grid, measured per view (`--list-columns`). */
+.list-scroll {
+  height: 100%; min-height: 0; overflow: auto; box-sizing: border-box;
+  padding: 0 24px 0 52px; border-top: 1px solid var(--hairline); background: var(--list-bg);
 }
-.list-columns > span { flex: none; }
-.list-columns > .list-columns__name { flex: 1; }
-
-.list-scroll { flex: 1; min-height: 0; overflow: auto; padding: 0 24px; }
 .list-scroll__space { position: relative; width: 100%; }
 .list-item { position: absolute; top: 0; left: 0; width: 100%; box-sizing: border-box; }
-.list-item--gap { padding-top: 14px; }
+.list-item--gap { padding-top: 44px; }
 
-.list-group { display: flex; align-items: center; gap: 10px; height: 44px; }
-.list-group__chevron { width: 22px; height: 22px; padding: 0; border: 0; background: transparent; color: var(--text-muted); font-size: 10px; cursor: pointer; }
-.list-group__label { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--text); }
-.list-group__count { font-size: 13px; color: var(--text-muted); }
-
-.list-row {
-  display: flex; align-items: center; height: 46px; padding-left: 26px; box-sizing: border-box;
-  border-bottom: 1px solid var(--row-hairline); border-radius: 6px; color: var(--text); cursor: default;
+.list-group, .list-row {
+  display: grid; grid-template-columns: var(--list-columns, minmax(0, 1fr)); column-gap: 20px; padding: 0 16px;
 }
-.list-row--changed { background: var(--changed-bg); }
-.list-row--selected { background: var(--selection-bg); }
-.list-row__name { display: flex; flex: 1; align-items: center; gap: 10px; min-width: 0; padding-right: 12px; }
-.list-row__key { flex: none; font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); }
-.list-row__summary { overflow: hidden; font-size: 14px; white-space: nowrap; text-overflow: ellipsis; }
+
+/* Tab row: the tab sits on the card (its left edge is the card's), headers bottom-aligned beside it. */
+.list-group { position: relative; align-items: end; height: 30px; }
+.list-group__title { display: flex; align-items: flex-end; gap: 8px; min-width: 0; margin-left: -16px; }
+.list-group__title .status-pill--tab { display: inline-flex; align-items: center; gap: 6px; cursor: default; }
+.list-group__count { padding-bottom: 8px; font-size: 12px; font-weight: 600; color: var(--text-muted); white-space: nowrap; }
+.list-group__header {
+  overflow: hidden; padding-bottom: 8px; font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--text-muted); white-space: nowrap; text-overflow: ellipsis;
+}
+.list-group__epic { width: 10px; height: 10px; border-radius: 3px; }
+
+/* The chevron lives in the 30px gutter and shows only while the group has the pointer or focus. */
+.list-group__chevron {
+  position: absolute; left: -30px; top: 4px; display: flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--text-muted);
+  opacity: 0; transition: opacity var(--motion-base) var(--ease-out), background-color var(--motion-fast) var(--ease-out);
+}
+.list-group__chevron svg { transition: transform var(--motion-base) var(--ease-out); }
+.list-group__chevron[aria-expanded="false"] svg { transform: rotate(-90deg); }
+.list-group--active .list-group__chevron, .list-group__chevron:focus-visible { opacity: 1; }
+.list-group__chevron:hover { background: var(--hover-bg); }
+
+/* Rows: white card pieces. The shadow is clipped to the sides except at the card's top and bottom edge. */
+.list-row {
+  align-items: center; height: 44px; box-sizing: border-box; background: var(--panel-bg);
+  border-top: 1px solid var(--row-hairline); box-shadow: var(--shadow-group-card); color: var(--text);
+  clip-path: inset(0 -4px); transition: background-color var(--motion-fast) var(--ease-out);
+}
+.list-row--first { border-top-color: transparent; border-radius: 0 10px 0 0; clip-path: inset(-4px -4px 0 -4px); }
+.list-row--last { border-radius: 0 0 10px 10px; clip-path: inset(0 -4px -4px -4px); }
+.list-row--only { border-top-color: transparent; border-radius: 0 10px 10px 10px; clip-path: none; }
+.list-row:hover { background: var(--row-hover-bg); }
+.list-row--changed, .list-row--changed:hover { background: var(--changed-bg); }
+.list-row--selected, .list-row--selected:hover { background: var(--selection-bg); }
+
+/* An ungrouped view's card has no tab, so its top corners are both round. */
+.list-item--tabless + .list-item .list-row--first { border-radius: 10px 10px 0 0; }
+.list-item--tabless + .list-item .list-row--only { border-radius: 10px; }
+
+.list-row__name { position: relative; display: flex; align-items: center; gap: 10px; min-width: 0; }
+.list-row__key { flex: none; font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+.list-row__summary { min-width: 0; overflow: hidden; font-size: 14px; white-space: nowrap; text-overflow: ellipsis; }
 .list-row--changed .list-row__summary { font-weight: 600; }
-.list-row__cell { display: flex; flex: none; align-items: center; min-width: 0; }
+.list-row__cell { display: flex; align-items: center; min-width: 0; white-space: nowrap; }
 
 .list-cell--mono { font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary); }
 .list-cell--secondary { font-size: 13px; color: var(--text-secondary); }
 .list-cell--tertiary { font-size: 13px; color: var(--text-tertiary); }
-.list-cell--priority { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--text-secondary); }
-.list-cell--labels { display: flex; gap: 4px; overflow: hidden; }
+.list-cell--priority { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-secondary); }
+.list-cell--labels { display: flex; gap: 4px; }
+
+/* The Table reuses the group header without the List's grid and gutter. */
+.table-item .list-group { display: flex; gap: 4px; padding: 0; }
+.table-item .list-group__chevron { position: static; opacity: 1; }
+.table-item .list-group__title { margin-left: 0; }

@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../../test/apiMock")).createApiMock() }));
 
@@ -10,6 +10,7 @@ import { createQueryClient } from "../../queries/queryClient";
 import { narrowingKey } from "../../state/slices/narrowing";
 import { resetStore, useStore } from "../../state/store";
 import { connectionView } from "../../test/jira";
+import { startMotionTimers, stubMotion } from "../../test/motion";
 import { space } from "../../test/spaces";
 import { listNode, view } from "../../test/views";
 import type { Level } from "../levels";
@@ -49,7 +50,144 @@ beforeEach(() => {
   mocked.listMatchCount.mockResolvedValue({ open: 5, total: 7 });
 });
 
+/** Every collapsible item measures 100px; the bar is `barWidth` wide (its 48px padding included). */
+function sizeBar(barWidth: number) {
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      constructor(private readonly callback: () => void) {}
+      observe() {
+        this.callback();
+      }
+      unobserve() {}
+      disconnect() {}
+    },
+  );
+  spies.push(
+    vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(barWidth),
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
+      x: 0, y: 0, top: 0, left: 0, right: 100, bottom: 20, width: 100, height: 20, toJSON: () => ({}),
+    }),
+  );
+}
+
+const MORE = { name: "More toolbar items" };
+const spies: { mockRestore(): void }[] = [];
+
+afterEach(() => {
+  spies.splice(0).forEach((spy) => spy.mockRestore());
+  vi.unstubAllGlobals();
+});
+
 describe("Toolbar", () => {
+  describe("when the bar is narrow", () => {
+    const KEY = narrowingKey(11, 101);
+    /** Room for Group, Me and the text filter only. */
+    const NO_COLUMNS_OR_FILTER = 48 + 250;
+    /** Room for the text filter only. */
+    const NOTHING_BUT_TEXT = 48 + 200;
+
+    it("has no More button when the bar is wide", () => {
+      sizeBar(1200);
+
+      renderToolbar();
+
+      expect(screen.queryByRole("button", MORE)).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Columns" })).toBeInTheDocument();
+    });
+
+    it("moves Columns, Filter and Group into the More button and keeps Me and the text filter", () => {
+      sizeBar(NO_COLUMNS_OR_FILTER);
+
+      renderToolbar();
+
+      expect(screen.getByRole("button", MORE)).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Columns" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Filter" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Group: Status" })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Me" })).toBeInTheDocument();
+      expect(screen.getByRole("textbox", { name: "Filter this view" })).toBeInTheDocument();
+    });
+
+    it("hides only Columns when the bar is just too narrow", () => {
+      sizeBar(48 + 500);
+
+      renderToolbar();
+
+      expect(screen.queryByRole("button", { name: "Columns" })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Filter" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Group: Status" })).toBeInTheDocument();
+    });
+
+    it("lists the hidden items in the menu in the order they moved", async () => {
+      sizeBar(NOTHING_BUT_TEXT);
+      renderToolbar();
+
+      await userEvent.click(screen.getByRole("button", MORE));
+
+      expect(entriesOf(mocked.popupMenu.mock.lastCall![0]).map((e) => e.text)).toEqual([
+        "Columns…",
+        "Filter…",
+        "Group: Status",
+        "Only my issues",
+      ]);
+      expect(screen.queryByRole("button", { name: "Me" })).not.toBeInTheDocument();
+    });
+
+    it("names the Columns entry Card fields on a board", async () => {
+      sizeBar(NO_COLUMNS_OR_FILTER);
+      renderToolbar(SPACE, view({ layout: "board" }));
+
+      await userEvent.click(screen.getByRole("button", MORE));
+
+      expect(entriesOf(mocked.popupMenu.mock.lastCall![0]).map((e) => e.text)).toContain("Card fields…");
+    });
+
+    it("opens the Columns popover when its menu entry is chosen", async () => {
+      sizeBar(NO_COLUMNS_OR_FILTER);
+      renderToolbar();
+      await userEvent.click(screen.getByRole("button", MORE));
+
+      await choose("Columns…");
+
+      expect(await screen.findByRole("dialog", { name: "Columns for this view" })).toBeInTheDocument();
+    });
+
+    it("shows the own condition count in the Filter entry and opens the Filter popover", async () => {
+      sizeBar(NO_COLUMNS_OR_FILTER);
+      renderToolbar(FILTER_LIST);
+      await userEvent.click(screen.getByRole("button", MORE));
+
+      await choose("Filter · 2…");
+
+      expect(await screen.findByRole("dialog", { name: "Filter" })).toBeInTheDocument();
+    });
+
+    it("turns the Me narrowing on from the menu and shows it checked afterwards", async () => {
+      sizeBar(NOTHING_BUT_TEXT);
+      renderToolbar();
+      await userEvent.click(screen.getByRole("button", MORE));
+      expect(entriesOf(mocked.popupMenu.mock.lastCall![0]).find((e) => e.text === "Only my issues")?.checked).toBe(false);
+
+      await choose("Only my issues");
+      await userEvent.click(screen.getByRole("button", MORE));
+
+      expect(useStore.getState().narrowings[KEY]).toMatchObject({ me: true });
+      expect(entriesOf(mocked.popupMenu.mock.lastCall![0]).find((e) => e.text === "Only my issues")?.checked).toBe(true);
+    });
+
+    it("saves the grouping chosen from the Group submenu", async () => {
+      mocked.viewSetGroup.mockResolvedValue(view({ groupBy: "epic" }));
+      sizeBar(NO_COLUMNS_OR_FILTER);
+      renderToolbar();
+      await userEvent.click(screen.getByRole("button", MORE));
+
+      await choose("Epic", "Group: Status");
+
+      expect(mocked.viewSetGroup).toHaveBeenCalledWith(101, "epic");
+    });
+  });
+
   describe("Group button", () => {
     it("names the view's current grouping", () => {
       renderToolbar(SPACE, view({ groupBy: "status" }));
@@ -157,6 +295,29 @@ describe("Toolbar", () => {
       expect(screen.queryByRole("dialog", { name: "Columns for this view" })).not.toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Filter" })).toHaveAttribute("aria-expanded", "true");
       expect(screen.getByRole("button", { name: "Columns" })).toHaveAttribute("aria-expanded", "false");
+    });
+  });
+
+  describe("popovers with motion", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("keeps the Columns popover on Escape inside an inert wrapper, and removes it once the time has passed", async () => {
+      spies.push(stubMotion({ "--motion-base": "200ms" }));
+      startMotionTimers();
+      renderToolbar();
+      await userEvent.click(screen.getByRole("button", { name: "Columns" }));
+      const dialog = await screen.findByRole("dialog", { name: "Columns for this view" });
+      expect(dialog.closest("[inert]")).toBeNull();
+
+      await userEvent.keyboard("{Escape}");
+
+      const leaving = screen.getByRole("dialog", { name: "Columns for this view", hidden: true });
+      expect(leaving.closest("[inert]")).not.toBeNull();
+      expect(screen.getByRole("button", { name: "Columns" })).toHaveAttribute("aria-expanded", "false");
+      await act(() => vi.advanceTimersByTimeAsync(400));
+      expect(screen.queryByRole("dialog", { hidden: true })).not.toBeInTheDocument();
     });
   });
 

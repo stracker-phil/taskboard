@@ -37,7 +37,7 @@ const TABLE = view({ layout: "table", sort: { by: "key", descending: false } });
 const OPEN = row({ id: "1", key: "NW-1042", summary: "Redesign the pricing page" });
 const DONE = row({ id: "2", key: "NW-1001", summary: "Publish the launch notes", style: "done", statusName: "Done" });
 
-async function renderTable(data: ViewData = viewData([groupOf([OPEN, DONE])], [OPEN, DONE], { columns: ["assignee", "priority"] }), current: View = TABLE) {
+async function renderTable(data: ViewData = viewData([groupOf([OPEN, DONE])], [OPEN, DONE], { columns: ["assignee", "priority"], groupBy: "none" }), current: View = TABLE) {
   mocked.viewRows.mockResolvedValue(data);
   render(
     <QueryClientProvider client={createQueryClient()}>
@@ -230,14 +230,21 @@ describe("TableView", () => {
       await renderTable(viewData(groups(), [OPEN, DONE]));
 
       expect(await screen.findByText("12")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Expand group" })).toHaveAttribute("aria-expanded", "false");
+      expect(screen.getByRole("button", { name: "Expand Done" })).toHaveAttribute("aria-expanded", "false");
       expect(screen.queryByText("Publish the launch notes")).not.toBeInTheDocument();
+    });
+
+    it("shows no group header when the table is not grouped", async () => {
+      await renderTable(viewData([groupOf([OPEN])], [OPEN], { groupBy: "none" }));
+
+      expect(await screen.findByText("Redesign the pricing page")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /^(Collapse|Expand) / })).not.toBeInTheDocument();
     });
 
     it("shows the rows of a group once it is expanded", async () => {
       await renderTable(viewData(groups(), [OPEN, DONE]));
 
-      await userEvent.click(await screen.findByRole("button", { name: "Expand group" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Expand Done" }));
 
       expect(await screen.findByText("Publish the launch notes")).toBeInTheDocument();
     });
@@ -246,7 +253,7 @@ describe("TableView", () => {
       await renderTable(viewData(groups(), [OPEN, DONE]));
       expect(await screen.findByText("Redesign the pricing page")).toBeInTheDocument();
 
-      await userEvent.click(screen.getByRole("button", { name: "Collapse group" }));
+      await userEvent.click(screen.getByRole("button", { name: "Collapse In Progress" }));
 
       expect(screen.queryByText("Redesign the pricing page")).not.toBeInTheDocument();
     });

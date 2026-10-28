@@ -2,7 +2,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { useMemo, useRef, useState } from "react";
 import type { Group, Narrowing, View, ViewData } from "../../api";
 import { useViewRows } from "../../queries/views";
-import { flatten, GROUP_GAP, GROUP_HEIGHT, type Item } from "../list/flatten";
+import { flatten, GROUP_HEIGHT, type Item } from "../list/flatten";
 import { GroupHeader } from "../list/GroupHeader";
 import { nextSort } from "./sortable";
 import { TableHeader } from "./TableHeader";
@@ -15,7 +15,9 @@ const TABLE_ROW_HEIGHT = 36;
 const HEADER_HEIGHT = 34;
 const SIDE_PADDING = 24;
 
-const itemHeight = (item: Item) => (item.kind === "row" ? TABLE_ROW_HEIGHT : item.first ? GROUP_HEIGHT : GROUP_HEIGHT + GROUP_GAP);
+const TABLE_GROUP_GAP = 14;
+
+const itemHeight = (item: Item) => (item.kind === "row" ? TABLE_ROW_HEIGHT : item.first ? GROUP_HEIGHT : GROUP_HEIGHT + TABLE_GROUP_GAP);
 
 interface Props {
   view: View;
@@ -41,7 +43,11 @@ function Table({ view, data }: { view: View; data: ViewData }) {
   const headerColumns = ["key", "summary", "status", ...data.columns];
   const minWidth = headerColumns.reduce((sum, id) => sum + (id === "summary" ? SUMMARY_MIN_WIDTH : widthOf(id)), 2 * SIDE_PADDING);
 
-  const items = useMemo(() => flatten(data, (group: Group) => toggled[group.key] ?? !group.collapsedByDefault), [data, toggled]);
+  // The Table's own header names the columns, so an ungrouped view needs no group header.
+  const items = useMemo(
+    () => flatten(data, (group: Group) => toggled[group.key] ?? !group.collapsedByDefault).filter((item) => item.kind === "row" || item.tab),
+    [data, toggled],
+  );
   const virtualizer = useVirtualizer({
     count: items.length,
     getScrollElement: () => scrollRef.current,
@@ -71,7 +77,14 @@ function Table({ view, data }: { view: View; data: ViewData }) {
                 style={{ height: virtual.size, transform: `translateY(${virtual.start - HEADER_HEIGHT}px)` }}
               >
                 {item.kind === "group" ? (
-                  <GroupHeader group={item.group} open={item.open} onToggle={() => setToggled((all) => ({ ...all, [item.group.key]: !item.open }))} />
+                  <GroupHeader
+                    group={item.group}
+                    open={item.open}
+                    tab
+                    active
+                    headers={[]}
+                    onToggle={() => setToggled((all) => ({ ...all, [item.group.key]: !item.open }))}
+                  />
                 ) : (
                   <TableRow row={item.row} columns={data.columns} widthOf={widthOf} selected={selected === item.row.id} onSelect={setSelected} />
                 )}

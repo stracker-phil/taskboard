@@ -101,10 +101,12 @@ review, Blocked and Done. Jira's category decides To do (`new`) and Done (`done`
 "review" is In review, one containing "block" is Blocked, everything else In progress. Settings → Statuses
 overrides it per status.
 
-- **StatusRing** (`components/issue/StatusRing.tsx`): a 2px circle in `--status-*-ring`, dashed for To do;
-  15 in list rows, 12 inside pills, where it takes the pill's text colour.
-- **StatusPill**: caps 12/700 (0.03em), 26 high, 7 radius, `--status-*-bg/fg/border`, the ring inside.
-- **EpicChip** (22, 12/500, at most 164 wide, `--epic-N-*`): Jira's epic colour (`ghx-label-N`) maps to the
+- **StatusSquare** (`components/issue/StatusSquare.tsx`): the only status marker, a filled 10 × 10 square,
+  radius 3, in `--status-*-square` (To do grey). No rings or outlines anywhere.
+- **StatusPill**: caps, text only, symmetric padding, `--status-*-bg/fg/border`. Variants: default (26 high,
+  12/700, 7 radius, 1px border), `peek` (24, 11/700, no border), `activity` (20, 10/700), `tab` (the List's
+  group tab: 30, 0.04em, top corners 8, all corners when closed; To do uses `--status-todo-tab-*`).
+- **EpicChip** (22, 12/500, `--epic-N-*`): Jira's epic colour (`ghx-label-N`) maps to the
   nearest of the five tints; an epic without one gets a tint from its id.
 - **Avatar** (26, white 9/700 initials on `--avatar-N`): the connected account is always `--avatar-1`, other
   people one of the rest by a stable hash of their account id. In a stack each has a 2px `--avatar-ring` border
@@ -116,15 +118,42 @@ overrides it per status.
 
 `src/views/list/`, fed by `view_rows` (`views/query.rs`): Rust filters, groups and sorts, the page only draws.
 
-- Column header 34 (`--hairline` below, 12px `--text-muted`), padded 50 on the left so "Name" lines up with
-  the rings; then each visible column at its width: Assignee 96, Epic 176, Release 96, Priority 104, Labels
-  120, Sprint 100, Due 80, custom fields 90.
-- Groups 14 apart: a 44px header with a 22px chevron (▼ open, ▶ closed), the group's label (a status pill
-  when grouped by status; a Space tile, an avatar, an epic chip or a flag for the other groupings) and its
-  count. Done groups start closed. Without grouping there are no headers.
-- Rows 46, 26 indent, `--row-hairline` between, 6 radius: ring, mono key, summary (600 when changed, on
-  `--changed-bg`), change chip, comment count, then the cells. A clicked row is selected (`--selection-bg`).
-- Rows are virtualised (`@tanstack/react-virtual`), so a 5,000-issue view renders only what is on screen.
+- The list canvas is `--list-bg` under a `--hairline`; padding 22 24 40 52 (a 30px chevron gutter).
+- Each group is a white card (radius 10, top-left 0, `--shadow-group-card`, `--row-hairline` between rows)
+  with its **tab** sitting on it: a status pill (`tab` variant; for other groupings a neutral tab with the
+  Space tile, avatar, epic colour or flag) and the count. Clicking the tab toggles the group; a closed group is
+  the tab alone. Groups are 44 apart; Done starts closed.
+- **Column headers** sit in each group's tab row (11/600 caps, 0.05em, `--text-muted`), bottom-aligned with
+  the tab; there is no global header row. Without grouping the one card has the headers and no tab.
+- The **chevron** lives in the gutter, hidden until the pointer or focus is in its group, and turns −90° when
+  closed.
+- **Columns** share one grid (`--list-columns`): the title takes the rest, every other column is as wide as
+  its header or its widest cell across all loaded rows of the view (`measure.ts`, canvas text metrics,
+  cached), so columns line up across groups. Gap 20, rows padded 16.
+- Rows 44: square, mono key, summary (600 when changed, on `--changed-bg`), change chip, comment count, then
+  the cells. A clicked row is selected (`--selection-bg`).
+- Rows are virtualised (`@tanstack/react-virtual`): a card is drawn from its pieces (the header item, then
+  rows that know whether they are first, middle, last or the only one).
+
+## Text and controls never wrap
+
+Buttons, tabs, chips, pills, column headers and table cells stay on one line (`base.css`); long text
+truncates with an ellipsis. When space runs out the flexible element shrinks (the text filter, a title), never
+a button. Only descriptions, comment bodies, pin reasons and empty-state text may wrap.
+
+## Motion
+
+Nothing jumps from one state to another (`styles/motion.css`). Tokens: `--motion-fast` 120ms (hover, press),
+`--motion-base` 150ms (fades, chevrons, toggles, popover exit), `--motion-slow` 200ms (expand/collapse,
+popover entry), `--ease-out`, `--ease-in-out`; no literal durations elsewhere. Under `prefers-reduced-motion`
+movement is instant and fades are short.
+
+- Show and hide fade: popovers rise in and fade out (`lib/motion.ts` `usePresence` keeps them mounted for the
+  exit, inert), chevrons fade in with their group, a view's content fades in when it changes.
+- Hover gives a short response: a `--hover-bg` tint, a `--border-strong` border on outlined controls,
+  `--row-hover-bg` on rows.
+- Expand and collapse animate: a List group's rows shrink and fade while the groups below glide up
+  (`useGroupMotion`, which scales the virtual rows' heights), sidebar Spaces grow open (`components/Disclosure`).
 
 ## Toolbar
 
@@ -146,6 +175,8 @@ button, Escape and a press outside close it, focus goes back to the button).
   Everything they are a draft that "Save as filter list" turns into a new list and opens.
 - **Me** chip (on: `--accent-soft-*` pill with the `--avatar-1` avatar and "Me ×") and **Filter this view**
   (190 wide, filters by key or summary as you type). Both narrow only the current view and are never saved.
+- When the bar is narrow, the text filter shrinks to 96 first; then Columns, Filter, Group and finally the Me
+  chip move into a "…" menu (`fit.ts`, `useToolbarFit`), and come back as soon as they fit.
 
 ## Table view
 
@@ -167,10 +198,11 @@ One palette per macOS mode in `src/styles/palettes/` (`light.css`; the dark pale
 | Lines | `--border` (controls, the tree guide), `--border-strong` (selects, dashed adds), `--hairline` (section edges), `--row-hairline` (between rows), `--card-border` | `#E4E4E7`, `#D4D4D8`, `#EDEDF0`, `#F1F1F3`, `#E9E9EC` |
 | Accent | `--accent`, `--accent-text`, `--selection-bg`/`--selection-text`, `--accent-soft-bg`/`-border`/`-text`, `--button-primary-bg`/`-text`, `--spinner-track`, `--focus-ring` | blue 600, blue 700, `#E3EBFD`, … |
 | Changed | `--changed-bg`, `--changed-border`, `--changed-chip-bg`/`-text`, `--changed-dot` | light blues |
-| Status | `--status-{todo,progress,review,blocked,done}-{bg,fg,border,ring,tint,count}` | grey, blue, violet, red, green |
+| Status | `--status-{todo,progress,review,blocked,done}-{bg,fg,border,square,tint,count}`, `--status-todo-tab-{bg,fg}` | grey, blue, violet, red, green |
 | Data | `--flag-*`, `--epic-{1..5}-{bg,fg}`, `--label-{1,2,neutral}-{bg,fg}`, `--avatar-{1..4}`, `--avatar-ring`, `--space-tile-{1..5}`, `--view-{list,board,table}` | |
 | Messages | `--banner-{info,warn,error}-*`, `--notice-neutral-*`, `--pin-*`, `--pr-open-*`, `--sync-*`, `--progress-done` | |
-| Shadows | `--shadow-{panel,popover,palette,peek,raised,card,knob}` | |
+| Shadows | `--shadow-{panel,popover,palette,peek,raised,card,knob,group-card,hover,hover-toolbar}` | |
+| Hover, list | `--hover-bg`, `--row-hover-bg`, `--list-bg` | `#F4F4F5`, `#FAFAFB`, `#F7F7F8` |
 
 The mockup's near-duplicates are merged: the palette's own greys map to the zinc scale, the palette's active
 row uses `--selection-bg`, the PR chip uses the Checkout epic's purple, the warning banner text uses the amber
@@ -199,9 +231,10 @@ bundled fonts. Weights 400, 500, 600, 700, 750 (titles) and 800 (tile letters).
 ## Metrics
 
 Radii: 6 (tiles, chips, row hover), 7 (pills, small buttons, popover rows), 8 (sidebar rows, toolbar
-buttons), 9 (search, sync chip), 10 (cards), 12 (panel, popovers, board columns), 16 (palette), 50% (avatars,
-rings, dots). Heights: sidebar search and home rows 34, Space rows 36, filter-list rows 32; view tabs 42,
-toolbar 50 (controls 30), column header 34, group header 44, list row 46, board column 300 wide.
+buttons, group tabs), 9 (search, sync chip), 10 (cards, list group cards), 12 (panel, popovers, board
+columns), 16 (palette), 3 (status squares), 50% (avatars, dots). Heights: sidebar search and home rows 34, Space
+rows 36, filter-list rows 32; view tabs 42, toolbar 50 (controls 30), group tab 30, list row 44, board column
+300 wide.
 
 ## Scrollbars
 

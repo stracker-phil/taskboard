@@ -1,0 +1,55 @@
+/* Motion (docs/ux.md → Motion): nothing jumps between states. Components use only these tokens. */
+:root {
+  --motion-fast: 120ms;
+  --motion-base: 150ms;
+  --motion-slow: 200ms;
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Movement and size changes become instant; fades stay, short. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-base: var(--motion-fast);
+    --motion-slow: 0ms;
+  }
+}
+
+/* Popovers rise in and fade out (`usePresence` keeps them mounted for the exit). */
+.fading { display: contents; }
+.fading > .popover { animation: rise-in var(--motion-slow) var(--ease-out); transform-origin: top center; }
+.fading--leaving > .popover {
+  opacity: 0; transform: translateY(-4px) scale(0.98);
+  transition: opacity var(--motion-base) var(--ease-out), transform var(--motion-base) var(--ease-out);
+}
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+}
+
+/* Disclosures (sidebar Spaces) grow open and shrink closed. */
+.disclosure { display: grid; grid-template-rows: 1fr; animation: grow-in var(--motion-slow) var(--ease-in-out); }
+.disclosure__inner { min-height: 0; overflow: hidden; }
+.disclosure--leaving {
+  grid-template-rows: 0fr; opacity: 0;
+  transition: grid-template-rows var(--motion-slow) var(--ease-in-out), opacity var(--motion-slow) var(--ease-in-out);
+}
+@keyframes grow-in {
+  from { grid-template-rows: 0fr; opacity: 0; }
+}
+
+.sb-space__glyph { display: inline-block; transition: transform var(--motion-base) var(--ease-out); }
+.sb-space__chevron[aria-expanded="false"] .sb-space__glyph { transform: rotate(-90deg); }
+
+/* Hover and press: a short tint or border change on every interactive element. */
+.sb-row, .sb-new-list, .sb-sync, .sb-settings, .sb-spaces__add, .view-tab, .view-tabs__add,
+.content-header__jira, .content-header__crumb, .icon-btn, .btn-primary-dark {
+  transition: background-color var(--motion-fast) var(--ease-out), color var(--motion-fast) var(--ease-out),
+    border-color var(--motion-fast) var(--ease-out), box-shadow var(--motion-fast) var(--ease-out);
+}
+
+/* A view's content fades in when the view, level or layout changes. */
+.list-scroll, .table-scroll { animation: fade-in var(--motion-base) var(--ease-out); }

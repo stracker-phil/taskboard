@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -8,6 +8,7 @@ vi.mock("../../api", async (orig) => ({ ...(await orig<object>()), api: (await i
 import { api, type Row, type ViewData } from "../../api";
 import { createQueryClient } from "../../queries/queryClient";
 import { ALEX, COLUMNS, groupOf, row, SAM, viewData } from "../../test/issues";
+import { startMotionTimers, stubMotion } from "../../test/motion";
 import { ListView } from "./ListView";
 
 const mocked = vi.mocked(api, true);
@@ -105,10 +106,10 @@ describe("ListView", () => {
     });
 
     it("shows headers and cells for the view's chosen columns only", async () => {
-      await renderList(viewData([groupOf([withEpic])], [withEpic], { columns: ["assignee", "priority"] }));
+      await renderList(viewData([groupOf([withEpic])], [withEpic], { columns: ["assignee", "priority"], groupBy: "none" }));
 
       const headers = (await screen.findAllByRole("columnheader")).map((h) => h.textContent);
-      expect(headers).toEqual(["Name", "Assignee", "Priority"]);
+      expect(headers).toEqual(["", "Assignee", "Priority"]);
       const issue = screen.getByRole("row", { name: /NW-1004/ });
       expect(within(issue).getByRole("img", { name: "Alex Morgan" })).toBeInTheDocument();
       expect(within(issue).getByText("High")).toBeInTheDocument();
@@ -119,6 +120,24 @@ describe("ListView", () => {
       await renderList(viewData([groupOf([withEpic])], [withEpic], { columns: ["epic"] }));
 
       expect(await screen.findByText("Launch Q4")).toBeInTheDocument();
+    });
+
+    it("sets the scroller's column template with the title taking the remaining space", async () => {
+      await renderList(viewData([groupOf([withEpic])], [withEpic], { columns: ["assignee", "priority"] }));
+
+      const template = (await screen.findByRole("grid")).style.getPropertyValue("--list-columns");
+      expect(template).toMatch(/^minmax\(0, 1fr\) \d+px \d+px$/);
+    });
+
+    it("sizes a column wider for a longer value, across all groups", async () => {
+      const short = row({ id: "6", key: "NW-1006", priority: { name: "Low", level: 1 } });
+      const long = row({ id: "7", key: "NW-1007", priority: { name: "Highest priority of all", level: 3 } });
+      const groups = [groupOf([short], { key: "a", label: "Alpha" }), groupOf([long], { key: "b", label: "Beta", collapsedByDefault: true })];
+      await renderList(viewData(groups, [short, long], { columns: ["priority"] }));
+
+      const template = (await screen.findByRole("grid")).style.getPropertyValue("--list-columns");
+      // 14 + 6 + 23 chars at the 7px estimate, though the longest value sits in a collapsed group
+      expect(template).toBe("minmax(0, 1fr) 181px");
     });
 
     it("shows a person custom field as an avatar under the field's name", async () => {
@@ -136,37 +155,191 @@ describe("ListView", () => {
       groupOf([DONE], { key: "status:done", label: "Done", count: 12, collapsedByDefault: true, mark: { kind: "status", style: "done" } }),
     ];
 
+    const groupRow = (label: string) => screen.getByRole("button", { name: new RegExp(`^(Collapse|Expand) ${label}$`) }).closest<HTMLElement>('[role="row"]')!;
+
     it("shows a collapsed-by-default group with its header and count but not its rows", async () => {
       await renderList(viewData(groups(), [OPEN, DONE]));
 
-      expect(await screen.findByText("Done")).toBeInTheDocument();
+      expect(await screen.findByRole("button", { name: "Done" })).toBeInTheDocument();
       expect(screen.getByText("12")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Expand group" })).toHaveAttribute("aria-expanded", "false");
+      expect(screen.getByRole("button", { name: "Expand Done" })).toHaveAttribute("aria-expanded", "false");
       expect(screen.queryByText("Publish the launch notes")).not.toBeInTheDocument();
     });
 
-    it("shows the rows of a collapsed group once it is expanded", async () => {
+    it("labels the chevron of an open group as collapsing it", async () => {
       await renderList(viewData(groups(), [OPEN, DONE]));
 
-      await userEvent.click(await screen.findByRole("button", { name: "Expand group" }));
-
-      expect(await screen.findByText("Publish the launch notes")).toBeInTheDocument();
+      expect(await screen.findByRole("button", { name: "Collapse In Progress" })).toHaveAttribute("aria-expanded", "true");
     });
 
-    it("hides the rows of an open group when it is collapsed", async () => {
+    it("shows the rows of a collapsed group once its chevron is clicked", async () => {
+      await renderList(viewData(groups(), [OPEN, DONE]));
+
+      await userEvent.click(await screen.findByRole("button", { name: "Expand Done" }));
+
+      expect(await screen.findByText("Publish the launch notes")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Collapse Done" })).toHaveAttribute("aria-expanded", "true");
+    });
+
+    it("hides the rows of an open group when its chevron is clicked", async () => {
       await renderList(viewData(groups(), [OPEN, DONE]));
       expect(await screen.findByText("Redesign the pricing page")).toBeInTheDocument();
 
-      await userEvent.click(screen.getByRole("button", { name: "Collapse group" }));
+      await userEvent.click(screen.getByRole("button", { name: "Collapse In Progress" }));
 
       expect(screen.queryByText("Redesign the pricing page")).not.toBeInTheDocument();
     });
 
-    it("shows no group headers when the view is not grouped", async () => {
-      await renderList(viewData([groupOf([OPEN])], [OPEN], { groupBy: "none" }));
+    it("toggles the group when its tab is clicked, keeping the tab and the count", async () => {
+      await renderList(viewData([groupOf([OPEN], { label: "In Progress", count: 7 })], [OPEN]));
+
+      await userEvent.click(await screen.findByRole("button", { name: "In Progress" }));
+
+      expect(screen.queryByText("Redesign the pricing page")).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Expand In Progress" })).toHaveAttribute("aria-expanded", "false");
+      expect(screen.getByRole("button", { name: "In Progress" })).toBeInTheDocument();
+      expect(screen.getByText("7")).toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole("button", { name: "In Progress" }));
 
       expect(await screen.findByText("Redesign the pricing page")).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: /group/ })).not.toBeInTheDocument();
+    });
+
+    it("lists the visible columns' names in every group header", async () => {
+      await renderList(viewData(groups(), [OPEN, DONE], { columns: ["assignee", "priority"] }));
+
+      await screen.findByRole("button", { name: "Collapse In Progress" });
+      for (const label of ["In Progress", "Done"]) {
+        const names = within(groupRow(label)).getAllByRole("columnheader").map((h) => h.textContent);
+        expect(names.slice(1)).toEqual(["Assignee", "Priority"]);
+      }
+    });
+
+    it("shows one tabless header with the column names and no chevron when the view is not grouped", async () => {
+      await renderList(viewData([groupOf([OPEN])], [OPEN], { groupBy: "none", columns: ["epic"] }));
+
+      expect(await screen.findByText("Redesign the pricing page")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /^(Collapse|Expand) / })).not.toBeInTheDocument();
+      expect(screen.getByRole("columnheader", { name: "Epic" })).toBeInTheDocument();
+    });
+
+    describe("card positions", () => {
+      const second = row({ id: "8", key: "NW-1008", summary: "Update the footer" });
+      const third = row({ id: "9", key: "NW-1009", summary: "Archive the old blog" });
+
+      it("marks the first row of a card first and the last row last, with the rows between in the middle", async () => {
+        await renderList(viewData([groupOf([OPEN, second, third])], [OPEN, second, third]));
+
+        expect(await screen.findByRole("row", { name: /NW-1042/ })).toHaveClass("list-row--first");
+        expect(screen.getByRole("row", { name: /NW-1008/ })).toHaveClass("list-row--middle");
+        expect(screen.getByRole("row", { name: /NW-1009/ })).toHaveClass("list-row--last");
+      });
+
+      it("marks the only row of a card only", async () => {
+        await renderList(viewData([groupOf([OPEN])], [OPEN]));
+
+        expect(await screen.findByRole("row", { name: /NW-1042/ })).toHaveClass("list-row--only");
+      });
+
+      it("positions the rows of each group within its own card", async () => {
+        await renderList(viewData([groupOf([OPEN, second], { key: "a", label: "Alpha" }), groupOf([third], { key: "b", label: "Beta" })], [OPEN, second, third]));
+
+        expect(await screen.findByRole("row", { name: /NW-1008/ })).toHaveClass("list-row--last");
+        expect(screen.getByRole("row", { name: /NW-1009/ })).toHaveClass("list-row--only");
+      });
+    });
+
+    describe("active header", () => {
+      it("marks the header of the group the pointer is over and clears it when the pointer leaves the grid", async () => {
+        await renderList(viewData(groups(), [OPEN, DONE]));
+        const issue = await screen.findByRole("row", { name: /NW-1042/ });
+
+        await userEvent.hover(issue);
+
+        expect(groupRow("In Progress")).toHaveClass("list-group--active");
+        expect(groupRow("Done")).not.toHaveClass("list-group--active");
+
+        await userEvent.unhover(issue);
+
+        expect(groupRow("In Progress")).not.toHaveClass("list-group--active");
+      });
+
+      it("moves the mark to another group when the pointer moves there", async () => {
+        await renderList(viewData(groups(), [OPEN, DONE]));
+        await screen.findByRole("row", { name: /NW-1042/ });
+
+        await userEvent.hover(groupRow("In Progress"));
+        await userEvent.hover(groupRow("Done"));
+
+        expect(groupRow("Done")).toHaveClass("list-group--active");
+        expect(groupRow("In Progress")).not.toHaveClass("list-group--active");
+      });
+
+      it("marks the header of the group that has focus and follows the focus", async () => {
+        await renderList(viewData(groups(), [OPEN, DONE]));
+        await screen.findByRole("button", { name: "Collapse In Progress" });
+
+        await userEvent.tab();
+
+        expect(groupRow("In Progress")).toHaveClass("list-group--active");
+        expect(groupRow("Done")).not.toHaveClass("list-group--active");
+
+        await userEvent.tab();
+
+        expect(groupRow("Done")).toHaveClass("list-group--active");
+        expect(groupRow("In Progress")).not.toHaveClass("list-group--active");
+      });
+
+      it("clears the mark when focus leaves the grid", async () => {
+        await renderList(viewData(groups(), [OPEN, DONE]));
+        await screen.findByRole("button", { name: "Collapse In Progress" });
+
+        await userEvent.tab();
+        await userEvent.tab();
+        await userEvent.tab();
+
+        expect(groupRow("Done")).not.toHaveClass("list-group--active");
+      });
+    });
+  });
+
+  describe("with motion", () => {
+    const groups = () => [
+      groupOf([OPEN], { key: "status:progress", label: "In Progress" }),
+      groupOf([DONE], { key: "status:done", label: "Done", collapsedByDefault: true }),
+    ];
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    async function renderWithMotion() {
+      spies.push(stubMotion({ "--motion-slow": "200ms" }));
+      await renderList(viewData(groups(), [OPEN, DONE]));
+      await screen.findByText("Redesign the pricing page");
+      startMotionTimers();
+    }
+
+    it("keeps the rows of a collapsing group until the motion time has passed, with the chevron already collapsed", async () => {
+      await renderWithMotion();
+
+      await userEvent.click(screen.getByRole("button", { name: "Collapse In Progress" }));
+
+      expect(screen.getByText("Redesign the pricing page")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Expand In Progress" })).toHaveAttribute("aria-expanded", "false");
+      await act(() => vi.advanceTimersByTimeAsync(400));
+      expect(screen.queryByText("Redesign the pricing page")).not.toBeInTheDocument();
+    });
+
+    it("renders the rows of an expanding group at once", async () => {
+      await renderWithMotion();
+
+      await userEvent.click(screen.getByRole("button", { name: "Expand Done" }));
+
+      expect(screen.getByText("Publish the launch notes")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Collapse Done" })).toHaveAttribute("aria-expanded", "true");
+      await act(() => vi.advanceTimersByTimeAsync(400));
+      expect(screen.getByText("Publish the launch notes")).toBeInTheDocument();
     });
   });
 

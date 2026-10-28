@@ -53,7 +53,7 @@ export function SpaceRow({ space, active, holdsActive, expanded, renaming, onOpe
         aria-expanded={expanded}
         onClick={(e) => onToggle(e.altKey)}
       >
-        <span aria-hidden="true">{expanded ? "▾" : "▸"}</span>
+        <span className="sb-space__glyph" aria-hidden="true">▾</span>
       </button>
       {renaming ? (
         <div className="sb-space__main">

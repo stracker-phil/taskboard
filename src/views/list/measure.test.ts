@@ -1,0 +1,125 @@
+import { describe, expect, it } from "vitest";
+import { ALEX, row, SAM } from "../../test/issues";
+import { columnDef } from "./columns";
+import { canvasMeasure, FONT, listColumns, type MeasuredColumn, type MeasureText, widthOf } from "./measure";
+
+/** Seven pixels per character, whatever the font. */
+const chars7: MeasureText = (text) => text.length * 7;
+
+const column = (id: string, header: string): MeasuredColumn => ({ id, header, cellWidth: columnDef(id).measure });
+/** The pixel widths after the title's `minmax(0, 1fr)`. */
+const widths = (template: string) => template.split(" ").slice(2);
+
+describe("listColumns", () => {
+  it("gives the title the remaining space and no columns nothing else", () => {
+    expect(listColumns([row()], [], chars7)).toBe("minmax(0, 1fr)");
+  });
+
+  it("starts with the title column, then one pixel width per column in order", () => {
+    const template = listColumns([row()], [column("assignee", "Assignee"), column("priority", "Priority")], chars7);
+
+    expect(template).toMatch(/^minmax\(0, 1fr\) \d+px \d+px$/);
+  });
+
+  it("sizes a column to its uppercased header plus tracking when the cells are narrower", () => {
+    const low = row({ priority: { name: "Low", level: 1 } });
+
+    // 8 chars * 7 + 0.55 * 8 = 60.4, rounded up; the cell is 14 + 6 + 21 = 41.
+    expect(listColumns([low], [column("priority", "Priority")], chars7)).toBe("minmax(0, 1fr) 61px");
+  });
+
+  it("sizes a column to its widest cell when that is wider than the header", () => {
+    const highest = row({ priority: { name: "Highest", level: 3 } });
+
+    // 14 + 6 + 7 * 7 = 69
+    expect(listColumns([highest], [column("priority", "Priority")], chars7)).toBe("minmax(0, 1fr) 69px");
+  });
+
+  it("measures the header in capitals", () => {
+    const seen: string[] = [];
+    const spy: MeasureText = (text, font) => {
+      if (font === FONT.header) seen.push(text);
+      return text.length * 7;
+    };
+
+    listColumns([], [column("due", "Due date")], spy);
+
+    expect(seen).toEqual(["DUE DATE"]);
+  });
+
+  it("uses the widest cell over all rows, including rows of collapsed groups and off-screen rows", () => {
+    const rows = [
+      row({ id: "1", priority: { name: "Low", level: 1 } }),
+      row({ id: "2", priority: { name: "Medium", level: 2 } }),
+      row({ id: "3", priority: { name: "Highest priority", level: 3 } }),
+    ];
+
+    // 14 + 6 + 16 * 7 = 132
+    expect(listColumns(rows, [column("priority", "Priority")], chars7)).toBe("minmax(0, 1fr) 132px");
+  });
+
+  it("falls back to the header width when no row has a value", () => {
+    expect(listColumns([row(), row({ id: "2" })], [column("epic", "Epic")], chars7)).toBe("minmax(0, 1fr) 31px");
+  });
+
+  it("changes the template when the columns change", () => {
+    // Five avatars are 26 + 4 * 18 = 98px, wider than the Assignee header (61px); Priority stays at its header's 61px.
+    const rows = [row({ assignees: [ALEX, SAM, ALEX, SAM, ALEX], priority: { name: "High", level: 2 } })];
+
+    const one = listColumns(rows, [column("assignee", "Assignee")], chars7);
+    const two = listColumns(rows, [column("assignee", "Assignee"), column("priority", "Priority")], chars7);
+    const swapped = listColumns(rows, [column("priority", "Priority"), column("assignee", "Assignee")], chars7);
+
+    expect(one.split(" ")).toHaveLength(3);
+    expect(two.split(" ")).toHaveLength(4);
+    expect(swapped).not.toBe(two);
+    expect(widths(two)).toEqual(["98px", "61px"]);
+    expect(widths(swapped)).toEqual(["61px", "98px"]);
+  });
+
+  describe("avatar column", () => {
+    it.each([
+      [1, "Who", 26],
+      [2, "Who", 44],
+      [4, "Who", 80],
+    ])("is as wide as a stack of %i avatars when that is wider than the header", (count, header, expected) => {
+      const people = Array.from({ length: count }, () => ALEX);
+
+      expect(listColumns([row({ assignees: people })], [column("assignee", header)], chars7)).toBe(`minmax(0, 1fr) ${expected}px`);
+    });
+
+    it("is as wide as its header when nobody is assigned", () => {
+      // 8 * 7 + 0.55 * 8 = 60.4
+      expect(listColumns([row()], [column("assignee", "Assignee")], chars7)).toBe("minmax(0, 1fr) 61px");
+    });
+  });
+
+  it("sizes an epic column to its chip: the name plus 16px of padding", () => {
+    const epic = row({ epic: { id: "9", name: "Launch", color: 2 } });
+
+    expect(listColumns([epic], [column("epic", "Epic")], chars7)).toBe("minmax(0, 1fr) 58px");
+  });
+
+  it("sizes a person custom field to one avatar", () => {
+    const reviewed = row({ custom: { customfield_10071: { kind: "person", value: SAM } } });
+
+    expect(listColumns([reviewed], [column("customfield_10071", "RV")], chars7)).toBe("minmax(0, 1fr) 26px");
+  });
+});
+
+describe("widthOf", () => {
+  it("adds the labels' chip padding and a gap between them", () => {
+    // (3 * 7 + 16) + 4 + (2 * 7 + 16)
+    expect(widthOf.labels(chars7, ["abc", "de"])).toBe(71);
+  });
+
+  it("gives no width to a missing value", () => {
+    expect([widthOf.text(chars7, null), widthOf.chip(chars7, null), widthOf.priority(chars7, null), widthOf.avatars(0), widthOf.labels(chars7, [])]).toEqual([0, 0, 0, 0, 0]);
+  });
+});
+
+describe("canvasMeasure", () => {
+  it("estimates seven pixels per character where there is no canvas", () => {
+    expect(canvasMeasure()("abcd", FONT.cell)).toBe(28);
+  });
+});
