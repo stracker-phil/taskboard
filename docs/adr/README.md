@@ -1,0 +1,31 @@
+# Architecture decision records
+
+Each record (`NNNN-<slug>.md`, Nygard format: Status, Context, Decision, Consequences) explains why, in at
+most a page; the docs pages explain how. A Decision names the alternatives it rejected. An accepted decision
+is never edited: a new record supersedes it, and a dated amendment under Status only corrects facts that
+changed.
+
+Records inherited from Daybook, TimeTracker or DataBee say so under Status; they state the decision as it
+stands in Taskboard. The numbers in this table are Taskboard's.
+
+| No. | Title | Status |
+|---|---|---|
+| [0001](0001-rust-owns-the-logic.md) | Rust owns the logic, React only renders | Accepted (2026-10-28) |
+| [0002](0002-ipc-in-api-files.md) | IPC only through `api.ts` files | Accepted (2026-10-28) |
+| [0003](0003-errors-as-kinds.md) | Errors cross IPC as `{kind, message}` | Accepted (2026-10-28) |
+| [0004](0004-generated-ipc-types.md) | TypeScript IPC types are generated from Rust with ts-rs | Accepted (2026-10-28) |
+| [0005](0005-panic-unwind.md) | Keep `panic = "unwind"` | Accepted (2026-10-28) |
+| [0006](0006-test-doubles-behind-test-util.md) | Test doubles and the demo seed ship behind a `test-util` feature | Accepted (2026-10-28) |
+| [0007](0007-color-palettes.md) | Color palettes are complete token sets; no color literal outside a palette | Accepted (2026-10-28) |
+| [0008](0008-cli-asks-the-running-app.md) | The CLI is a second process that asks the running app over the socket | Accepted (2026-10-28) |
+| [0009](0009-a-scheme-per-system-mode.md) | Appearance follows macOS, with one of three schemes per mode | Accepted (2026-10-28) |
+| [0010](0010-native-macos-look.md) | The app looks native and light | Accepted (2026-10-28) |
+| [0011](0011-debug-build-is-a-separate-app-with-demo-data.md) | The debug build is a separate app with demo data | Accepted (2026-10-28) |
+| [0012](0012-commands-live-in-rust.md) | Commands live in Rust | Accepted (2026-10-28) |
+| [0013](0013-network-only-to-listed-hosts.md) | The app talks only to listed hosts | Accepted (2026-10-28) |
+| [0014](0014-small-feature-modules.md) | Small feature modules with narrow seams | Accepted (2026-10-28) |
+| [0015](0015-signed-with-a-local-certificate.md) | Builds are signed with a local certificate | Accepted (2026-10-28) |
+
+Open, decided once the app's scope is known: where the data lives (SQLite through sqlx with migrations, as
+TimeTracker; or plain files, as Daybook), the window model (a regular window, a menu-bar app, overlays) and
+integrations with Daybook and TimeTracker.
