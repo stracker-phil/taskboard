@@ -57,9 +57,7 @@ pub async fn full_sync(
     if scope.is_empty() || tracked.is_empty() {
         return Ok(());
     }
-    let mut fields: Vec<String> = SEARCH_FIELDS.iter().map(|f| f.to_string()).collect();
-    fields.extend(ids.sprint.iter().chain(&ids.epic_color).cloned());
-    fields.extend(ctx.db.read(shown_fields).await?);
+    let fields = search_fields(ctx, &ids).await?;
     let run = Run {
         ctx,
         client,
@@ -77,6 +75,31 @@ pub async fn full_sync(
     ctx.db
         .write(move |tx, _| record_scope_sync(tx, &scope, &now, newest.as_deref()))
         .await
+}
+
+/// What a search asks for: the mapped fields, the site's sprint and epic colour fields, and the custom fields
+/// shown in the field grid or as a column.
+pub(super) async fn search_fields(ctx: &SyncContext, ids: &FieldIds) -> AppResult<Vec<String>> {
+    let mut fields: Vec<String> = SEARCH_FIELDS.iter().map(|f| f.to_string()).collect();
+    fields.extend(ids.sprint.iter().chain(&ids.epic_color).cloned());
+    fields.extend(ctx.db.read(shown_fields).await?);
+    Ok(fields)
+}
+
+/// The site's field list, stored; returns its sprint and epic colour fields.
+pub(super) async fn refresh_fields(ctx: &SyncContext, client: &JiraClient) -> AppResult<FieldIds> {
+    let fields = client.fields().await?;
+    ctx.db.write(move |tx, _| store_fields(tx, &fields)).await
+}
+
+/// The scope JQL over the tracked projects; empty when nothing is tracked.
+pub(super) async fn current_scope(ctx: &SyncContext) -> AppResult<String> {
+    let tracked = tracked_projects(&ctx.db).await?;
+    if tracked.is_empty() {
+        return Ok(String::new());
+    }
+    let keys: Vec<String> = tracked.iter().map(|p| p.key.clone()).collect();
+    Ok(effective_scope(&ctx.settings.get().sync, &keys).jql)
 }
 
 /// Fields, projects, statuses, versions of the tracked projects, and who the user is.

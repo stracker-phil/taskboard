@@ -6,8 +6,10 @@ use std::sync::{Arc, Mutex};
 use chrono::Utc;
 use tokio::sync::mpsc;
 
+use super::delta::delta_sync;
 use super::full::full_sync;
 use super::map::format_utc;
+use super::reconcile::reconcile;
 use super::store::last_full_at;
 use super::{Job, SyncContext, SyncEvent, SyncState};
 use crate::error::{AppError, AppResult};
@@ -21,6 +23,7 @@ enum Command {
 }
 
 /// The handle to the sync task; cheap to share through Tauri state.
+#[derive(Clone)]
 pub struct SyncEngine {
     commands: mpsc::UnboundedSender<Command>,
     state: Arc<Mutex<SyncState>>,
@@ -135,7 +138,13 @@ pub async fn run_job(
     }
     emit(SyncEvent::State(SyncState::Running { job }));
     let result = match job {
-        Job::Full => full_sync(ctx, emit).await,
+        // A full sync ends with a reconciliation: it catches what the full sync can't see (deletions).
+        Job::Full => match full_sync(ctx, emit).await {
+            Ok(()) => reconcile(ctx, emit).await,
+            failed => failed,
+        },
+        Job::Delta => delta_sync(ctx, emit).await,
+        Job::Reconcile => reconcile(ctx, emit).await,
     };
     let now = format_utc(Utc::now());
     match result {

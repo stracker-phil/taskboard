@@ -94,6 +94,96 @@ pub fn last_full_at(conn: &Connection) -> AppResult<Option<String>> {
         .flatten())
 }
 
+/// Where the next delta sync starts: the newest `updated` seen.
+pub fn last_delta_at(conn: &Connection) -> AppResult<Option<String>> {
+    Ok(conn
+        .query_row(
+            "SELECT last_delta_at FROM cache.sync_state WHERE scope_id = ?1",
+            [SCOPE_ROW],
+            |row| row.get(0),
+        )
+        .optional()?
+        .flatten())
+}
+
+/// Moves the delta cursor forward (never back) once a delta finished.
+pub fn record_delta(conn: &Connection, newest: Option<&str>) -> AppResult<()> {
+    conn.execute(
+        "UPDATE cache.sync_state SET last_delta_at = MAX(COALESCE(last_delta_at, ''), COALESCE(?2, '')), last_error = NULL
+         WHERE scope_id = ?1",
+        params![SCOPE_ROW, newest],
+    )?;
+    Ok(())
+}
+
+pub fn record_reconcile(conn: &Connection, now: &str) -> AppResult<()> {
+    conn.execute(
+        "UPDATE cache.sync_state SET last_reconcile_at = ?2 WHERE scope_id = ?1",
+        params![SCOPE_ROW, now],
+    )?;
+    Ok(())
+}
+
+/// Marks issues Jira no longer returns as gone and records when; they leave every list at once.
+pub fn mark_gone(
+    conn: &Connection,
+    changes: &mut Changes,
+    ids: &[String],
+    now: &str,
+) -> AppResult<()> {
+    for id in ids {
+        let marked = conn.execute(
+            "UPDATE cache.issue SET gone = 1 WHERE id = ?1 AND gone = 0",
+            [id],
+        )?;
+        if marked > 0 {
+            conn.execute(
+                "INSERT INTO cache.issue_change (issue_id, field, old_value, new_value, changed_at)
+                 VALUES (?1, 'gone', NULL, NULL, ?2)",
+                params![id, now],
+            )?;
+            changes.issue_changed(id.clone());
+        }
+    }
+    Ok(())
+}
+
+/// Deletes issues gone for longer than `before` (with their comments, changes and seen rows).
+pub fn purge_gone(conn: &Connection, before: &str) -> AppResult<usize> {
+    let ids: Vec<String> = {
+        let mut query = conn.prepare(
+            "SELECT i.id FROM cache.issue i WHERE i.gone = 1 AND NOT EXISTS (
+               SELECT 1 FROM cache.issue_change c WHERE c.issue_id = i.id AND c.field = 'gone' AND c.changed_at >= ?1)",
+        )?;
+        query
+            .query_map([before], |r| r.get(0))?
+            .collect::<Result<_, _>>()?
+    };
+    for id in &ids {
+        conn.execute(
+            "DELETE FROM cache.issue_fts WHERE rowid = ?1",
+            [id.parse::<i64>().unwrap_or_default()],
+        )?;
+        conn.execute("DELETE FROM cache.issue WHERE id = ?1", [id])?;
+    }
+    Ok(ids.len())
+}
+
+/// The cached issues that aren't gone, by id.
+pub fn live_issue_ids(conn: &Connection) -> AppResult<Vec<String>> {
+    let mut query = conn.prepare("SELECT id FROM cache.issue WHERE gone = 0")?;
+    let ids = query.query_map([], |r| r.get(0))?;
+    Ok(ids.collect::<Result<_, _>>()?)
+}
+
+/// The most recently updated live issues, for the comment prefetch after a delta.
+pub fn recently_updated(conn: &Connection, limit: usize) -> AppResult<Vec<String>> {
+    let mut query = conn
+        .prepare("SELECT id FROM cache.issue WHERE gone = 0 ORDER BY updated_at DESC LIMIT ?1")?;
+    let ids = query.query_map([limit as i64], |r| r.get(0))?;
+    Ok(ids.collect::<Result<_, _>>()?)
+}
+
 pub fn has_project_sync(conn: &Connection, project_id: &str) -> AppResult<bool> {
     let found: i64 = conn.query_row(
         "SELECT COUNT(*) FROM cache.sync_state WHERE scope_id = ?1 || ?2 AND last_full_at IS NOT NULL",

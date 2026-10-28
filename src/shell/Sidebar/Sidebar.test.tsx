@@ -384,7 +384,7 @@ describe("Sidebar", () => {
 
       await userEvent.click(await screen.findByRole("button", { name: "Not synced yet" }));
 
-      expect(mocked.syncRun).toHaveBeenCalled();
+      expect(mocked.runCommand).toHaveBeenCalledWith("sync:refresh");
     });
   });
 

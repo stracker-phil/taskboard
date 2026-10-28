@@ -1,11 +1,14 @@
 //! The sync engine (`docs/sync.md`): one task owns all network work and mirrors the sync scope into the cache.
 
 pub mod commands;
+mod delta;
 pub mod diff;
 mod engine;
 mod full;
 pub mod map;
 mod overview;
+mod reconcile;
+pub mod schedule;
 pub mod store;
 
 use serde::{Deserialize, Serialize};
@@ -33,6 +36,8 @@ pub struct SyncContext {
 #[serde(rename_all = "camelCase")]
 pub enum Job {
     Full,
+    Delta,
+    Reconcile,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, TS)]
@@ -64,7 +69,7 @@ pub enum SyncState {
     },
 }
 
-/// After every page of a full sync.
+/// After every page of a full or delta sync; a delta counts changed issues in `fetched` and has no project.
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
 #[ts(export, export_to = "src/api/types.gen.ts")]
 #[serde(rename_all = "camelCase")]

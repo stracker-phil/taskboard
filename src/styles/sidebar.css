@@ -178,3 +178,15 @@
   color: var(--text-tertiary);
 }
 .sb-sync:hover, .sb-settings:hover { background: var(--fill-hover); }
+
+/* The chip's states (artboard 8, panel 5): offline on white, paused and failed in red. */
+.sb-sync[data-state="offline"] { background: var(--panel-bg); }
+.sb-sync[data-state="paused"], .sb-sync[data-state="error"] { background: var(--sync-error-bg); color: var(--sync-error-text); }
+.sb-sync[data-state="running"] { color: var(--sync-busy); }
+.sb-sync__spin { animation: spin 1s linear infinite; }
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sb-sync__spin { animation: none; }
+}

@@ -14,10 +14,12 @@ use taskboard_lib::connection::{
 };
 use taskboard_lib::db::{Changes, Db};
 use taskboard_lib::error::ErrorKind;
-use taskboard_lib::jira::jql::default_scope;
+use taskboard_lib::jira::jql::{date_literal, default_scope};
 use taskboard_lib::jira::{Limiter, TokenKind};
+use taskboard_lib::lists::{Viewer, sidebar_tree};
 use taskboard_lib::store::settings::SettingsStore;
 use taskboard_lib::sync::map::utc;
+use taskboard_lib::sync::store::last_delta_at;
 use taskboard_lib::sync::{
     Emit, Job, SyncContext, SyncEngine, SyncEvent, SyncProgress, SyncState, full_sync, overview,
     run_job,
@@ -129,8 +131,38 @@ impl Rig {
     }
 
     async fn run(&self, last_ok: Option<String>) -> SyncState {
+        self.job(Job::Full, last_ok).await
+    }
+
+    async fn job(&self, job: Job, last_ok: Option<String>) -> SyncState {
         let emit = self.emit();
-        run_job(&self.ctx, Job::Full, &*emit, last_ok).await
+        run_job(&self.ctx, job, &*emit, last_ok).await
+    }
+
+    async fn cursor(&self) -> Option<String> {
+        self.ctx.db.read(last_delta_at).await.unwrap()
+    }
+
+    /// `(Everything's open count, the NW Space's open count)` as the sidebar shows them.
+    async fn open_counts(&self) -> (Option<i64>, i64) {
+        let viewer = Viewer {
+            me: None,
+            time_zone: Some("Europe/Vienna".into()),
+            now: DEMO_NOW.parse::<DateTime<Utc>>().unwrap(),
+        };
+        let tree = sidebar_tree(&self.ctx.db, viewer).await.unwrap();
+        let nw = tree.spaces.iter().find(|s| s.key == "NW").unwrap();
+        (tree.everything.count, nw.open_count)
+    }
+
+    /// The search requests the fake received, oldest first.
+    fn search_jqls(&self) -> Vec<String> {
+        self.fake
+            .requests()
+            .into_iter()
+            .filter(|request| request.path == SEARCH_PATH)
+            .map(|request| request.body["jql"].as_str().unwrap().to_string())
+            .collect()
     }
 
     fn progress(&self) -> Vec<SyncProgress> {
@@ -1086,5 +1118,381 @@ mod the_engine {
         wait_until("the sync after the pause", || is_synced(&engine.state())).await;
 
         assert_eq!(issues_per_project(&rig.ctx.db).await, expected_counts());
+    }
+}
+
+fn low_priority(fields: &mut Value) {
+    fields["priority"] = json!({ "id": "4", "name": "Low" });
+}
+
+async fn priority_of(db: &Db, key: &str) -> String {
+    let key = key.to_string();
+    db.read(move |conn| {
+        Ok(conn.query_row(
+            "SELECT priority FROM cache.issue WHERE key = ?1",
+            [key],
+            |row| row.get::<_, String>(0),
+        )?)
+    })
+    .await
+    .unwrap()
+}
+
+mod the_delta_sync {
+    use super::*;
+
+    fn idle_after_a_sync(state: &SyncState) -> bool {
+        matches!(state, SyncState::Idle { last_ok: Some(_) })
+    }
+
+    #[tokio::test]
+    async fn without_changes_on_the_site_nothing_changes_and_nothing_is_announced() {
+        let rig = Rig::connected().await;
+        rig.full_sync().await;
+        let cursor = rig.cursor().await;
+        rig.forget_announcements();
+
+        let state = rig.job(Job::Delta, None).await;
+
+        assert!(idle_after_a_sync(&state), "{state:?}");
+        assert_eq!(changes(&rig.ctx.db).await, vec![]);
+        assert_eq!(rig.announced_ids(), BTreeSet::new());
+        assert_eq!(rig.cursor().await, cursor);
+        assert_eq!(
+            count(&rig.ctx.db, "SELECT COUNT(*) FROM cache.issue").await,
+            TOTAL
+        );
+    }
+
+    #[tokio::test]
+    async fn an_edited_issue_arrives_with_its_change_and_moves_the_cursor_to_the_newest_update() {
+        let rig = Rig::connected().await;
+        rig.full_sync().await;
+        rig.forget_announcements();
+        rig.fake.set_now(later());
+        rig.fake.edit_issue("NW-1049", low_priority);
+
+        let state = rig.job(Job::Delta, None).await;
+
+        assert!(idle_after_a_sync(&state), "{state:?}");
+        assert_eq!(
+            changes(&rig.ctx.db).await,
+            vec![(
+                "NW-1049".into(),
+                "priority".into(),
+                Some("Highest".into()),
+                Some("Low".into()),
+                LATER_UTC.into()
+            )]
+        );
+        assert_eq!(priority_of(&rig.ctx.db, "NW-1049").await, "Low");
+        assert_eq!(rig.announced_ids(), BTreeSet::from([NW_1049.to_string()]));
+        assert_eq!(rig.cursor().await.as_deref(), Some(LATER_UTC));
+    }
+
+    #[tokio::test]
+    async fn a_new_issue_on_the_site_arrives_as_created() {
+        let rig = Rig::connected().await;
+        rig.full_sync().await;
+        rig.fake.set_now(later());
+        let key = rig
+            .fake
+            .add_issue("NW-1055", "NW", "Order confirmation email: shipping notice");
+
+        rig.job(Job::Delta, None).await;
+
+        assert_eq!(
+            changes(&rig.ctx.db).await,
+            vec![(
+                key.clone(),
+                "created".into(),
+                None,
+                Some(key),
+                LATER_UTC.into()
+            )]
+        );
+        assert_eq!(
+            count(&rig.ctx.db, "SELECT COUNT(*) FROM cache.issue").await,
+            TOTAL + 1
+        );
+    }
+
+    #[tokio::test]
+    async fn searches_the_scope_updated_since_the_cursor_minus_two_minutes_in_the_users_zone() {
+        let rig = Rig::connected().await;
+        rig.full_sync().await;
+        let cursor = rig.cursor().await.unwrap();
+        let since = cursor.parse::<DateTime<Utc>>().unwrap() - chrono::Duration::minutes(2);
+        let literal = date_literal(since, "Europe/Vienna").unwrap();
+        let scope = default_scope(&tracked_keys(), 90).unwrap();
+
+        rig.job(Job::Delta, None).await;
+
+        let jqls = rig.search_jqls();
+        assert_eq!(
+            jqls.last().unwrap(),
+            &format!("({scope}) AND updated >= \"{literal}\" ORDER BY updated ASC")
+        );
+    }
+
+    #[tokio::test]
+    async fn a_failed_page_keeps_the_cursor_and_the_next_run_fetches_the_change() {
+        let rig = Rig::connected().await;
+        rig.full_sync().await;
+        let cursor = rig.cursor().await;
+        rig.fake.set_now(later());
+        rig.fake.edit_issue("NW-1049", low_priority);
+        rig.fake.set_latency(Duration::from_millis(30));
+        let emit = rig.emit();
+
+        let (state, ()) = tokio::join!(
+            run_job(&rig.ctx, Job::Delta, &*emit, None),
+            after_the_next_search_request(&rig, || rig.fake.fail_next(1, 500, None))
+        );
+
+        match state {
+            SyncState::Error { kind, message } => {
+                assert_eq!(kind, ErrorKind::Internal);
+                assert_eq!(message, format!("Jira answered HTTP 500 to {SEARCH_PATH}"));
+            }
+            other => panic!("expected an error, got {other:?}"),
+        }
+        assert_eq!(rig.cursor().await, cursor);
+        assert_eq!(priority_of(&rig.ctx.db, "NW-1049").await, "Highest");
+
+        let retry = rig.job(Job::Delta, None).await;
+
+        assert!(idle_after_a_sync(&retry), "{retry:?}");
+        assert_eq!(priority_of(&rig.ctx.db, "NW-1049").await, "Low");
+        assert_eq!(rig.cursor().await.as_deref(), Some(LATER_UTC));
+    }
+
+    #[tokio::test]
+    async fn without_a_cursor_it_runs_a_full_sync() {
+        let rig = Rig::connected().await;
+        assert_eq!(rig.cursor().await, None);
+
+        let state = rig.job(Job::Delta, None).await;
+
+        assert!(idle_after_a_sync(&state), "{state:?}");
+        assert_eq!(issues_per_project(&rig.ctx.db).await, expected_counts());
+        assert_eq!(rig.progress(), expected_progress(100));
+        assert_eq!(rig.cursor().await, Some(newest_updated_in_scope()));
+    }
+
+    #[tokio::test]
+    async fn offline_it_reports_offline_and_changes_nothing() {
+        let rig = Rig::connected().await;
+        rig.full_sync().await;
+        let cursor = rig.cursor().await;
+        rig.fake.set_now(later());
+        rig.fake.edit_issue("NW-1049", low_priority);
+        rig.fake.go_offline().await;
+        let before = rig.requests();
+
+        let state = rig.job(Job::Delta, None).await;
+
+        match state {
+            SyncState::Offline { since } => assert!(since.ends_with('Z'), "{since}"),
+            other => panic!("expected offline, got {other:?}"),
+        }
+        assert_eq!(rig.requests(), before);
+        assert_eq!(rig.cursor().await, cursor);
+        assert_eq!(priority_of(&rig.ctx.db, "NW-1049").await, "Highest");
+        assert_eq!(changes(&rig.ctx.db).await, vec![]);
+    }
+}
+
+mod reconciliation {
+    use super::*;
+
+    const FAR_PAST: &str = "2000-01-01T00:00:00.000Z";
+
+    async fn gone_flag(db: &Db, key: &str) -> i64 {
+        let key = key.to_string();
+        db.read(move |conn| {
+            Ok(conn.query_row(
+                "SELECT gone FROM cache.issue WHERE key = ?1",
+                [key],
+                |row| row.get::<_, i64>(0),
+            )?)
+        })
+        .await
+        .unwrap()
+    }
+
+    /// `(issue key, field)` of the gone changes.
+    async fn gone_changes(db: &Db) -> Vec<(String, String)> {
+        changes(db)
+            .await
+            .into_iter()
+            .filter(|change| change.1 == "gone")
+            .map(|change| (change.0, change.1))
+            .collect()
+    }
+
+    async fn assert_issue_leaves_the_cache_views(rig: &Rig, id: &str, key: &str) {
+        let (everything, nw) = rig.open_counts().await;
+        let state = rig.job(Job::Reconcile, None).await;
+
+        assert!(
+            matches!(state, SyncState::Idle { last_ok: Some(_) }),
+            "{state:?}"
+        );
+        assert_eq!(gone_flag(&rig.ctx.db, key).await, 1);
+        assert_eq!(
+            gone_changes(&rig.ctx.db).await,
+            vec![(key.to_string(), "gone".to_string())]
+        );
+        assert_eq!(rig.announced_ids(), BTreeSet::from([id.to_string()]));
+        assert_eq!(rig.open_counts().await, (everything.map(|n| n - 1), nw - 1));
+    }
+
+    #[tokio::test]
+    async fn a_deleted_issue_becomes_gone_and_leaves_the_lists_and_counts() {
+        let rig = Rig::connected().await;
+        rig.full_sync().await;
+        rig.forget_announcements();
+        rig.fake.delete_issue("NW-1044");
+
+        assert_issue_leaves_the_cache_views(&rig, NW_1044, "NW-1044").await;
+    }
+
+    #[tokio::test]
+    async fn an_issue_the_user_lost_access_to_becomes_gone_too() {
+        let rig = Rig::connected().await;
+        rig.full_sync().await;
+        rig.forget_announcements();
+        rig.fake.revoke_access("NW-1044");
+
+        assert_issue_leaves_the_cache_views(&rig, NW_1044, "NW-1044").await;
+    }
+
+    #[tokio::test]
+    async fn without_deletions_nothing_changes_and_the_run_is_recorded() {
+        let rig = Rig::connected().await;
+        rig.full_sync().await;
+        rig.forget_announcements();
+
+        let state = rig.job(Job::Reconcile, None).await;
+
+        assert!(
+            matches!(state, SyncState::Idle { last_ok: Some(_) }),
+            "{state:?}"
+        );
+        assert_eq!(changes(&rig.ctx.db).await, vec![]);
+        assert_eq!(rig.announced_ids(), BTreeSet::new());
+        assert_eq!(
+            count(
+                &rig.ctx.db,
+                "SELECT COUNT(*) FROM cache.issue WHERE gone = 1"
+            )
+            .await,
+            0
+        );
+        assert_eq!(
+            count(
+                &rig.ctx.db,
+                "SELECT COUNT(*) FROM cache.sync_state
+                 WHERE scope_id = 'scope' AND last_reconcile_at IS NOT NULL"
+            )
+            .await,
+            1
+        );
+    }
+
+    #[tokio::test]
+    async fn an_issue_moved_out_of_the_scope_is_stored_with_its_new_key_and_project_and_not_gone() {
+        let rig = Rig::connected().await;
+        rig.full_sync().await;
+        rig.fake.set_now(later());
+        rig.fake.move_issue("NW-1049", "ARC");
+
+        rig.job(Job::Reconcile, None).await;
+
+        let db = &rig.ctx.db;
+        assert_eq!(
+            text_of(
+                db,
+                "SELECT p.key FROM cache.issue i JOIN cache.project p ON p.id = i.project_id
+                 WHERE i.id = '101049'"
+            )
+            .await,
+            "ARC"
+        );
+        let key = text_of(db, "SELECT key FROM cache.issue WHERE id = '101049'").await;
+        assert!(key.starts_with("ARC-"), "{key}");
+        assert_eq!(
+            count(db, "SELECT gone FROM cache.issue WHERE id = '101049'").await,
+            0
+        );
+        assert_eq!(gone_changes(db).await, vec![]);
+    }
+
+    #[tokio::test]
+    async fn purges_issues_gone_for_more_than_a_week_with_their_comments_and_changes() {
+        let rig = Rig::connected().await;
+        rig.full_sync().await;
+        rig.fake.delete_issue("NW-1042");
+        rig.fake.delete_issue("NW-1049");
+        rig.job(Job::Reconcile, None).await;
+        let db = &rig.ctx.db;
+        assert_eq!(gone_flag(db, "NW-1042").await, 1);
+        db.write(|tx, _| {
+            tx.execute(
+                "UPDATE cache.issue_change SET changed_at = ?1
+                 WHERE field = 'gone' AND issue_id = '101042'",
+                [FAR_PAST],
+            )?;
+            Ok(())
+        })
+        .await
+        .unwrap();
+
+        rig.job(Job::Reconcile, None).await;
+
+        for sql in [
+            "SELECT COUNT(*) FROM cache.issue WHERE id = '101042'",
+            "SELECT COUNT(*) FROM cache.comment WHERE issue_id = '101042'",
+            "SELECT COUNT(*) FROM cache.issue_change WHERE issue_id = '101042'",
+            "SELECT COUNT(*) FROM cache.issue_fts WHERE rowid = 101042",
+        ] {
+            assert_eq!(count(db, sql).await, 0, "{sql}");
+        }
+        assert_eq!(gone_flag(db, "NW-1049").await, 1);
+        assert_eq!(
+            count(db, "SELECT COUNT(*) FROM cache.issue").await,
+            TOTAL - 1
+        );
+    }
+
+    #[tokio::test]
+    async fn a_full_sync_ends_with_a_reconcile() {
+        let rig = Rig::connected().await;
+        rig.full_sync().await;
+        rig.fake.delete_issue("NW-1044");
+
+        let state = rig.run(None).await;
+
+        assert!(
+            matches!(state, SyncState::Idle { last_ok: Some(_) }),
+            "{state:?}"
+        );
+        assert_eq!(gone_flag(&rig.ctx.db, "NW-1044").await, 1);
+    }
+
+    #[tokio::test]
+    async fn offline_it_reports_offline_and_changes_nothing() {
+        let rig = Rig::connected().await;
+        rig.full_sync().await;
+        rig.fake.delete_issue("NW-1044");
+        rig.fake.go_offline().await;
+        let before = rig.requests();
+
+        let state = rig.job(Job::Reconcile, None).await;
+
+        assert!(matches!(state, SyncState::Offline { .. }), "{state:?}");
+        assert_eq!(rig.requests(), before);
+        assert_eq!(gone_flag(&rig.ctx.db, "NW-1044").await, 0);
     }
 }

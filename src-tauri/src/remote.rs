@@ -56,9 +56,9 @@ pub async fn handle(app: AppHandle, message: IpcMessage) -> HandlerResult {
             Ok(serde_json::Value::Null)
         }
         IpcMessage::Status => json(status_report(&app).await?),
-        IpcMessage::Sync { .. } => {
-            // Delta syncs don't exist yet; both kinds run the full sync.
-            app.state::<SyncEngine>().queue(Job::Full);
+        IpcMessage::Sync { full } => {
+            app.state::<SyncEngine>()
+                .queue(if full { Job::Full } else { Job::Delta });
             Ok(serde_json::Value::Null)
         }
         #[cfg(debug_assertions)]

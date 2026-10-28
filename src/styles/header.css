@@ -87,3 +87,24 @@
   color: var(--text-muted);
 }
 .view-tabs__add:hover { color: var(--text); }
+
+/* Token banners under the content header (artboard 8, panel 4). */
+.banner {
+  display: flex; flex: none; align-items: center; gap: 10px; margin: 0 24px 10px; padding: 10px 12px; border-radius: 9px;
+  font-size: 13px; animation: fade-in var(--motion-base) var(--ease-out);
+}
+.banner--warn { background: var(--banner-warn-bg); color: var(--banner-warn-text); }
+.banner--error { background: var(--banner-error-bg); color: var(--banner-error-text); }
+.banner__dot { flex: none; width: 8px; height: 8px; border-radius: 50%; }
+.banner--warn .banner__dot { background: var(--banner-warn-dot); }
+.banner--error .banner__dot { background: var(--banner-error-dot); }
+.banner__text { flex: 1; min-width: 0; }
+.banner__secondary {
+  height: 26px; padding: 0 10px; border: 1px solid var(--banner-warn-button-border); border-radius: 7px;
+  background: var(--panel-bg); color: inherit; font-size: 12px; font-weight: 600; white-space: nowrap;
+}
+.banner__primary {
+  height: 26px; padding: 0 10px; border: 0; border-radius: 7px; background: var(--banner-error-button-bg);
+  color: var(--text-on-accent); font-size: 12px; font-weight: 600; white-space: nowrap;
+}
+.banner__close { display: flex; padding: 0 2px; border: 0; background: transparent; color: inherit; }

@@ -165,7 +165,7 @@ export type IssuesChanged = { ids: Array<string>,
  */
 all: boolean, };
 
-export type Job = "full";
+export type Job = "full" | "delta" | "reconcile";
 
 export type Label = { name: string, 
 /**
@@ -394,7 +394,7 @@ export type Style = "progress" | "review" | "blocked" | "todo" | "done";
 export type SyncOverview = { state: SyncState, lastFullAt: string | null, projects: Array<ProjectCounts>, };
 
 /**
- * After every page of a full sync.
+ * After every page of a full or delta sync; a delta counts changed issues in `fetched` and has no project.
  */
 export type SyncProgress = { job: Job, projectId: string, projectKey: string, pagesDone: number, fetched: number, 
 /**

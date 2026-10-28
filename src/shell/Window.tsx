@@ -4,6 +4,7 @@ import { useNav, useSidebar, useViews } from "../queries/sidebar";
 import { useStore } from "../state/store";
 import { CurrentPeek } from "./CurrentPeek";
 import { Header } from "./Header";
+import { TokenBanner } from "./TokenBanner";
 import { findLevel } from "./levels";
 import { Sidebar } from "./Sidebar/Sidebar";
 import { Toolbar } from "./toolbar/Toolbar";
@@ -68,6 +69,7 @@ function LevelChrome() {
   return (
     <>
       <Header level={level} />
+      <TokenBanner />
       <ViewTabs listId={location.listId} viewId={location.viewId} />
       {view && <Toolbar level={level} view={view} />}
     </>

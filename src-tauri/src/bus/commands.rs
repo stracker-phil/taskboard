@@ -49,11 +49,10 @@ pub fn register(bus: &mut Bus) {
             .help("Show or hide the sidebar")
             .run_now(window::toggle_sidebar),
     );
-    // ⌘R and ⌘⇧R: a refresh is a full sync until the delta sync arrives.
     bus.add(
         Command::new("sync:refresh", "Refresh")
             .help("Fetch what changed in Jira")
-            .run_now(|app: &AppHandle| app.state::<SyncEngine>().queue(Job::Full)),
+            .run_now(|app: &AppHandle| app.state::<SyncEngine>().queue(Job::Delta)),
     );
     bus.add(
         Command::new("sync:full", "Full Sync")

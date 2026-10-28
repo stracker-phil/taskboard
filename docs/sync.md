@@ -35,7 +35,29 @@ directly.
    `last_delta_at` = the newest `updated` stored) after all of them. A failed page ends the job before its
    cursors move; the next run repeats it.
 
-Delta, reconciliation and detail syncs arrive in step 14. Until then `taskboard sync` runs a full sync.
+**Delta** (`delta.rs`): `(<scope>) AND updated >= "<cursor − 2 min>" ORDER BY updated ASC`, the date literal in
+the Jira user's time zone from `/myself` (Jira reads JQL dates there, at minute precision). Pages are stored
+like the full sync's (changes recorded); the cursor (`last_delta_at`) moves to the newest `updated` only after
+the whole job succeeded, so a failed page is fetched again next time. Without a cursor the delta runs a full
+sync. Afterwards the comments of the 20 most recently updated issues are fetched when they may be behind.
+Progress counts changed issues (`fetched`).
+
+**Reconciliation** (`reconcile.rs`): the scope's ids only (`fields=updated`); cached live issues missing from it
+are asked for with `issue/bulkfetch` in batches of 100. What comes back is stored as Jira has it (a moved issue
+gets its new key and project and drops out of its old Space); what doesn't is marked `gone` (an `issue_change`
+row `gone`), which takes it out of every list at once. Issues gone for more than 7 days are deleted with their
+comments, changes and seen rows. Runs after every full sync and hourly.
+
+**Detail**: opening an issue fetches its comments when the cached ones are older than the issue
+(`issues::issue_sync_comments`).
+
+## Schedule
+
+`schedule.rs` ticks every 30 s and queues at most one job (`due`, pure): a full sync weekly, a reconciliation
+hourly, a delta every `focused_minutes` while the main window has focus (5 by default) and every
+`background_minutes` otherwise (15), right away after the Mac woke (a tick more than 2 minutes late), and every
+minute while offline, so the cache catches up soon after the network returns. ⌘R (`sync:refresh`, also the
+sync chip and `taskboard sync`) queues a delta, ⌘⇧R (`sync:full`, `taskboard sync --full`) a full sync.
 
 ## Storing a page
 

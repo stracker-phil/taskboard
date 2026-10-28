@@ -147,6 +147,14 @@ columns that no longer fit beside a 240px title, rightmost first, until it close
 - Footer 36: the keys.
 - Hovering a row shows its toolbar at the end of the title: Copy key, Pin, Open in Jira (`RowActions`).
 
+## Sync chip and token banners
+
+The sidebar footer's chip (artboard 8, panel 5) says "Synced 2 min ago" (counting on), "Syncing… 3 changes"
+with a turning icon, "Offline · cache from 14:02" on white, or "Sync paused · token" / "Sync failed" in red; its
+tooltip explains, a click syncs now (⌘R). Under the content header (panel 4) a red banner says Jira rejected
+the token (sync paused) with Update token, and an amber one warns 14 days before the token expires, with
+Replace and × (dismissed for the rest of the day). Nothing blocks: the app keeps working from the cache.
+
 ## Issue view
 
 `src/issue/IssueView.tsx`, shown in place of the view (the sidebar stays) by ↩ on a selected row, the peek's

@@ -15,6 +15,7 @@ use crate::events::{
 use crate::handlers::handlers;
 use crate::ipc::IpcMessage;
 use crate::state::AppState;
+use crate::sync::schedule::{Focus, start_schedule};
 use crate::sync::{SyncContext, SyncEngine, SyncEvent};
 use crate::{bus, ipc, menu, remote, window};
 
@@ -36,6 +37,12 @@ pub fn start(
         .plugin(tauri_plugin_deep_link::init())
         .on_menu_event(|app, event| menu::clicked(app, event.id().as_ref()))
         .on_window_event(|window, event| {
+            if let WindowEvent::Focused(focused) = event
+                && window.label() == "main"
+                && let Some(focus) = window.app_handle().try_state::<Focus>()
+            {
+                focus.set(*focused);
+            }
             if let WindowEvent::CloseRequested { api, .. } = event
                 && window::close_requested(window.app_handle(), window.label())
             {
@@ -113,6 +120,7 @@ fn start_sync(app: &AppHandle, state: &AppState) {
         access: state.jira.clone(),
         db: state.db.clone(),
     };
+    let ctx_for_schedule = ctx.clone();
     let engine = SyncEngine::start(
         ctx,
         Arc::new(move |event| {
@@ -125,6 +133,9 @@ fn start_sync(app: &AppHandle, state: &AppState) {
             }
         }),
     );
+    let focus = Focus::default();
+    start_schedule(ctx_for_schedule, engine.clone(), focus.clone());
+    app.manage(focus);
     app.manage(engine);
 }
 
