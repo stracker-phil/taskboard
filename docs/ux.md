@@ -141,11 +141,31 @@ overrides it per status.
 the content panel's full height; header, tabs, toolbar and view narrow beside it and the List hides the
 columns that no longer fit beside a 240px title, rightmost first, until it closes. It slides in.
 
-- Header 50: mono key · type text, then Pin (with pins), Open in Jira, Full view (with the Issue view), Close.
+- Header 50: mono key · type text, then Pin (with pins), Open in Jira, Full view, Close.
 - Body: title 22/750, one line of chips (status pill `peek`, epic chip, release outline chip, priority,
-  assignee), the description as text (the Issue view shows it as sanitised HTML).
+  assignee), the sanitised description, the latest three activity items with "All activity".
 - Footer 36: the keys.
 - Hovering a row shows its toolbar at the end of the title: Copy key, Pin, Open in Jira (`RowActions`).
+
+## Issue view
+
+`src/issue/IssueView.tsx`, shown in place of the view (the sidebar stays) by ↩ on a selected row, the peek's
+Full view button or E (the selected issue's epic); esc goes back one step (an opened epic or child, then the
+view with its place intact).
+
+- Header 50: back, breadcrumb (Space tile and name / list or view / key), "Updated …", previous and next in the
+  view's order (also J/K), Pin (with pins), **Open in Jira** (primary).
+- Main column: type badge · key · comment count, the 30/750 title, the field grid (Status, Assignee, Epic chip
+  that opens the epic here, Release, Priority, Sprint, then the custom fields shown as columns or marked shown),
+  links ("blocks", "is blocked by"), the description, and Child issues (epics) or Subtasks, when there are any:
+  open first, done behind "Show N done"; "Open as list view" narrows the origin view to the epic (a removable
+  chip in the toolbar, never saved).
+- Activity (400 wide, `--panel-subtle-bg`): All / Comments / Changes, comment cards and change lines (status
+  changes as activity pills), oldest first; the comment box waits for writes. Opening an issue fetches its
+  comments when the cached ones may be behind (`issue_sync_comments`).
+- Jira's HTML is sanitised (`lib/jiraHtml.ts`, [ADR 0027](adr/0027-jira-html-is-sanitised-and-shows-no-remote-content.md)):
+  links open in the browser, images become link chips. The peek shows the same description and the latest
+  three activity items.
 
 **Remember my place:** each view keeps its opened and closed groups, scroll position, selected row and open
 peek (`state/slices/places.ts`, saved by Rust in `places.json` a moment after the last change, at most 200
@@ -330,7 +350,8 @@ palette once it exists.
 - In a List (`commands/issueKeys.ts`, registered by the shown view): J or ↓ and K or ↑ move the selection (the
   peek follows), ← and → close and open the selected row's group, esc closes the peek (after any popover),
   ⌘C copies the key (only with no text field focused and no text selected), ⌘⇧C the issue's URL, ⌘↩ opens it in
-  Jira.
+  Jira, ↩ opens the Issue view and E the issue's epic. In the Issue view J/K move to the neighbours and esc
+  goes back.
 - `app:settings:<page>` opens Settings at a page or section (the Spaces "+" uses `app:settings:projects`).
 
 ## Palette checks

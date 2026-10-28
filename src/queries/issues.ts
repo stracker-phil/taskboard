@@ -5,6 +5,9 @@ import { api } from "../api";
 export const ISSUE_KEY = ["issue"] as const;
 export const issueKey = (id: string) => [...ISSUE_KEY, id] as const;
 
+export const useIssueActivity = (id: string) => useQuery({ queryKey: [...issueKey(id), "activity"], queryFn: () => api.issueActivity(id) });
+export const useIssueRelated = (id: string) => useQuery({ queryKey: [...issueKey(id), "related"], queryFn: () => api.issueRelated(id) });
+
 export const useIssue = (id: string | null) =>
   useQuery({ queryKey: issueKey(id ?? ""), queryFn: () => api.issueGet(id ?? ""), enabled: id !== null });
 

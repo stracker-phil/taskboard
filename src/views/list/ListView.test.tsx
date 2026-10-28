@@ -257,6 +257,43 @@ describe("ListView", () => {
       expect(place()).toMatchObject({ selectedId: "3", peekOpen: false });
     });
 
+    it("opens the selected issue in the Issue view with the view as origin", async () => {
+      await renderList(viewData([groupOf(rows)], rows));
+      await userEvent.click(await screen.findByText("Fix the footer links"));
+
+      await press("issue.open");
+
+      expect(useStore.getState().issueView).toEqual({ origin: { listId: 11, viewId: 101 }, stack: ["3"] });
+    });
+
+    it("opens nothing without a selected issue", async () => {
+      await renderList(viewData([groupOf(rows)], rows));
+      await screen.findByRole("row", { name: /NW-1042/ });
+
+      await press("issue.open");
+
+      expect(useStore.getState().issueView).toBeNull();
+    });
+
+    it("opens the selected issue's epic in the Issue view", async () => {
+      const inEpic = row({ id: "5", key: "NW-1005", summary: "Review the copy", epic: { id: "9", name: "Launch Q4", color: 2 } });
+      await renderList(viewData([groupOf([OPEN, inEpic])], [OPEN, inEpic]));
+      await userEvent.click(await screen.findByText("Review the copy"));
+
+      await press("issue.openEpic");
+
+      expect(useStore.getState().issueView).toEqual({ origin: { listId: 11, viewId: 101 }, stack: ["9"] });
+    });
+
+    it("opens no epic for an issue without one", async () => {
+      await renderList(viewData([groupOf(rows)], rows));
+      await userEvent.click(await screen.findByText("Fix the footer links"));
+
+      await press("issue.openEpic");
+
+      expect(useStore.getState().issueView).toBeNull();
+    });
+
     it("collapses the selected row's group", async () => {
       const groups = [groupOf([OPEN], { key: "a", label: "Alpha" }), groupOf([FOLLOW_UP], { key: "b", label: "Beta" })];
       await renderList(viewData(groups, [OPEN, FOLLOW_UP]));

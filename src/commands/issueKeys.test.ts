@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { installCommands } from ".";
 import { onIssueKeys, type IssueKeyHandlers } from "./issueKeys";
+import { resetStore, useStore } from "../state/store";
 import { getCommand, resolveKeydown, setOverrides } from "./registry";
 
 const SCOPES = ["global", "main"];
@@ -17,6 +18,8 @@ function handlers(patch: Partial<IssueKeyHandlers> = {}) {
     copyKey: vi.fn(),
     copyUrl: vi.fn(),
     openInJira: vi.fn(),
+    open: vi.fn(),
+    openEpic: vi.fn(),
     hasSelection: () => true,
     peekOpen: () => true,
     ...patch,
@@ -32,6 +35,7 @@ function register(h: IssueKeyHandlers) {
 beforeEach(() => {
   installCommands("main");
   setOverrides({});
+  resetStore();
 });
 
 afterEach(() => {
@@ -116,6 +120,61 @@ describe("issue keys", () => {
       document.body.innerHTML = '<div role="dialog">Confirm</div>';
 
       expect(press("Escape")).toBeNull();
+    });
+  });
+
+  describe("opening", () => {
+    it("↵ opens the selected issue", () => {
+      const h = handlers();
+      register(h);
+
+      void press("Enter")?.run();
+
+      expect(h.open).toHaveBeenCalled();
+    });
+
+    it("E opens the selected issue's epic", () => {
+      const h = handlers();
+      register(h);
+
+      void press("e")?.run();
+
+      expect(h.openEpic).toHaveBeenCalled();
+    });
+
+    it.each([
+      ["↵", "Enter"],
+      ["E", "e"],
+    ])("ignore %s without a selected row", (_label, key) => {
+      register(handlers({ hasSelection: () => false }));
+
+      expect(press(key)).toBeNull();
+    });
+  });
+
+  describe("Escape in the Issue view", () => {
+    it("goes back while the Issue view is open", () => {
+      register(handlers({ peekOpen: () => false }));
+      useStore.getState().openIssue("10042", { listId: 1, viewId: 1 });
+
+      expect(press("Escape")?.id).toBe("issue.back");
+    });
+
+    it("does nothing while the Issue view is closed", () => {
+      expect(press("Escape")).toBeNull();
+    });
+
+    it("leaves Escape to an open dialog", () => {
+      useStore.getState().openIssue("10042", { listId: 1, viewId: 1 });
+      document.body.innerHTML = '<div role="dialog">Confirm</div>';
+
+      expect(press("Escape")).toBeNull();
+    });
+
+    it("closes the peek, not the Issue view, while only the peek is open", () => {
+      register(handlers());
+
+      expect(press("Escape")?.id).toBe("peek.close");
     });
   });
 

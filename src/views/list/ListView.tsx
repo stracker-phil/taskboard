@@ -64,6 +64,7 @@ function Rows({ listId, viewId, data }: { listId: number; viewId: number; data: 
   const peekOpen = useStore((s) => s.places[placeKey]?.peekOpen ?? false);
   const loadPlace = useStore((s) => s.loadPlace);
   const updatePlace = useStore((s) => s.updatePlace);
+  const openIssue = useStore((s) => s.openIssue);
   const setPlace = (patch: Partial<ViewPlace>) => updatePlace(listId, viewId, patch);
   const { factors, animate } = useGroupMotion();
   const highlight = useGroupHighlight();
@@ -124,7 +125,8 @@ function Rows({ listId, viewId, data }: { listId: number; viewId: number; data: 
   };
 
   // The keys reach this render's state through a ref the effect below keeps current.
-  const current = { items, rowIds, selected, peekOpen, data, select, toggle, actions, virtualizer, setPlace };
+  const open = (id: string) => openIssue(id, { listId, viewId });
+  const current = { items, rowIds, selected, peekOpen, data, select, toggle, actions, virtualizer, setPlace, open };
   const keyState = useRef(current);
   useEffect(() => {
     keyState.current = current;
@@ -157,6 +159,15 @@ function Rows({ listId, viewId, data }: { listId: number; viewId: number; data: 
       copyKey: () => withSelected((key) => keyState.current.actions.copyKey(key)),
       copyUrl: () => withSelected((key) => keyState.current.actions.copyUrl(key)),
       openInJira: () => withSelected((key) => keyState.current.actions.openInJira?.(key)),
+      open: () => {
+        const { selected, open } = keyState.current;
+        if (selected) open(selected);
+      },
+      openEpic: () => {
+        const { data, selected, open } = keyState.current;
+        const epic = selected ? data.rows[selected]?.epic : undefined;
+        if (epic) open(epic.id);
+      },
       hasSelection: () => keyState.current.selected !== null,
       peekOpen: () => keyState.current.peekOpen,
     });

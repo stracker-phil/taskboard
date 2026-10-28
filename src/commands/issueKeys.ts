@@ -1,3 +1,4 @@
+import { useStore } from "../state/store";
 import type { Command } from "./registry";
 import { isTextInput } from "./registry";
 
@@ -10,6 +11,10 @@ export interface IssueKeyHandlers {
   copyKey: () => void;
   copyUrl: () => void;
   openInJira: () => void;
+  /** ↩: the selected issue in the full Issue view. */
+  open: () => void;
+  /** E: the selected issue's epic in the Issue view. */
+  openEpic: () => void;
   hasSelection: () => boolean;
   peekOpen: () => boolean;
 }
@@ -38,5 +43,15 @@ export const ISSUE_KEY_COMMANDS: Command[] = [
   { id: "peek.close", title: "Close the peek", scope: "main", defaultBinding: "Escape", when: () => (handlers?.peekOpen() ?? false) && !document.querySelector("[role=dialog]"), run: () => handlers?.closePeek() },
   { id: "issue.copyKey", title: "Copy issue key", scope: "main", defaultBinding: "Mod+C", when: () => selected() && nothingElseToCopy(), run: () => handlers?.copyKey() },
   { id: "issue.copyUrl", title: "Copy issue URL", scope: "main", defaultBinding: "Mod+Shift+C", when: selected, run: () => handlers?.copyUrl() },
+  { id: "issue.open", title: "Open the issue", scope: "main", defaultBinding: "Enter", when: selected, run: () => handlers?.open() },
+  { id: "issue.openEpic", title: "Open the issue's epic", scope: "main", defaultBinding: "E", when: selected, run: () => handlers?.openEpic() },
+  {
+    id: "issue.back",
+    title: "Back from the Issue view",
+    scope: "main",
+    defaultBinding: "Escape",
+    when: () => useStore.getState().issueView !== null && !document.querySelector("[role=dialog]"),
+    run: () => useStore.getState().issueBack(),
+  },
   { id: "issue.openInJira", title: "Open issue in Jira", scope: "main", defaultBinding: "Mod+Enter", when: selected, run: () => handlers?.openInJira() },
 ];

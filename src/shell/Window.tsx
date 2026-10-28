@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
+import { IssueView } from "../issue/IssueView";
 import { useNav, useSidebar, useViews } from "../queries/sidebar";
+import { useStore } from "../state/store";
 import { CurrentPeek } from "./CurrentPeek";
 import { Header } from "./Header";
 import { findLevel } from "./levels";
@@ -15,17 +17,24 @@ interface Props {
 
 /** The main window's frame: the sidebar beside the inset content panel. */
 export function Window({ sidebarHidden, children }: Props) {
+  const issueView = useStore((s) => s.issueView);
   return (
     <div className={sidebarHidden ? "shell shell--sidebar-hidden" : "shell"}>
       {!sidebarHidden && <Sidebar />}
       <div className="shell__content">
         {sidebarHidden && <div className="shell__titlebar" data-tauri-drag-region />}
         <main className="content-panel">
-          <div className="content-panel__main">
-            <LevelChrome />
-            <div className="content-panel__body">{children}</div>
-          </div>
-          <CurrentPeek />
+          {issueView ? (
+            <IssueView key={issueView.stack.length} id={issueView.stack[issueView.stack.length - 1]} origin={issueView.origin} />
+          ) : (
+            <>
+              <div className="content-panel__main">
+                <LevelChrome />
+                <div className="content-panel__body">{children}</div>
+              </div>
+              <CurrentPeek />
+            </>
+          )}
         </main>
       </div>
     </div>

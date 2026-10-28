@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { Menu } from "@tauri-apps/api/menu";
 import type {
+  ActivityItem,
   AppError,
   AppInfo,
   ConnectionInput,
@@ -23,6 +24,7 @@ import type {
   Narrowing,
   Nav,
   ProjectRow,
+  Related,
   ScopeView,
   Settings,
   SidebarTree,
@@ -138,6 +140,10 @@ export const api = {
   /** A view's issues, filtered by its level and `narrowing`, grouped and sorted by the view. */
   viewRows: (listId: number, viewId: number, narrowing: Narrowing) => invoke<ViewData>("view_rows", { listId, viewId, narrowing }),
   issueGet: (id: string) => invoke<IssueDetail>("issue_get", { id }),
+  issueActivity: (id: string) => invoke<ActivityItem[]>("issue_activity", { id }),
+  issueRelated: (id: string) => invoke<Related>("issue_related", { id }),
+  /** Fetches the issue's comments from Jira when the cached ones may be behind. */
+  issueSyncComments: (id: string) => invoke<boolean>("issue_sync_comments", { id }),
   placeGet: (listId: number, viewId: number) => invoke<ViewPlace | null>("place_get", { listId, viewId }),
   placeSet: (listId: number, viewId: number, place: ViewPlace) => invoke<void>("place_set", { listId, viewId, place }),
   /** The system clipboard; only text. */

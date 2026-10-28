@@ -6,6 +6,7 @@ import { narrowingKey, NO_NARROWING } from "../../state/slices/narrowing";
 import { fail, useStore } from "../../state/store";
 import { spaceOf, type Level } from "../levels";
 import { ColumnsPopover } from "./ColumnsPopover";
+import { EpicNarrowingChip } from "./EpicChip";
 import { FilterPopover } from "./FilterPopover";
 import type { Collapsible } from "./fit";
 import { GROUP_NAMES, groupMenu } from "./groupMenu";
@@ -125,6 +126,7 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
           <MeChip on={narrowing.me} onChange={(me) => setNarrowing(key, { me })} />
         </span>
       )}
+      {narrowing.epic && <EpicNarrowingChip epicId={narrowing.epic} onClear={() => setNarrowing(key, { epic: null })} />}
       <TextFilter key={key} value={narrowing.text} onChange={setText} />
       {hidden.length > 0 && (
         <span className="toolbar__anchor toolbar__anchor--end">

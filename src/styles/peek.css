@@ -30,7 +30,10 @@
 .peek__title { margin: 0; font-size: 22px; font-weight: 750; line-height: 1.25; color: var(--text); }
 .peek__chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13px; }
 .peek__meta { display: inline-flex; align-items: center; gap: 6px; color: var(--text-secondary); white-space: nowrap; }
-.peek__description { margin: 0; font-size: 14px; line-height: 1.6; color: var(--text-strong-body); white-space: pre-line; }
+.peek__description { font-size: 14px; }
+.peek__activity { display: flex; flex-direction: column; gap: 8px; }
+.peek__activity-header { display: flex; align-items: center; }
+.peek__activity-header h3 { flex: 1; margin: 0; font-size: 13px; font-weight: 700; }
 .peek__empty, .peek__missing { margin: 0; font-size: 13px; color: var(--text-muted); }
 .release-chip {
   display: inline-flex; align-items: center; height: 24px; padding: 0 8px; box-sizing: border-box; border: 1px solid var(--border);

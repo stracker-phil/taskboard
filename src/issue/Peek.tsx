@@ -5,17 +5,14 @@ import { Avatar } from "../components/issue/Avatar";
 import { EpicChip } from "../components/issue/EpicChip";
 import { PriorityFlag } from "../components/issue/PriorityFlag";
 import { StatusPill } from "../components/issue/StatusPill";
-import { useIssue } from "../queries/issues";
+import { useIssue, useIssueActivity } from "../queries/issues";
+import { ActivityEntry } from "./Activity";
+import { hasContent } from "../lib/jiraHtml";
+import { JiraHtml } from "./JiraHtml";
 import { useIssueActions } from "../views/list/useIssueActions";
 
-/** Jira's description as text, a line per paragraph; the Issue view shows it as sanitised HTML. */
-function plainText(html: string): string {
-  const withBreaks = html.replace(/<\/(p|div|li|h[1-6])>|<br\s*\/?>/gi, (tag) => `${tag}\n`);
-  return new DOMParser().parseFromString(withBreaks, "text/html").body.textContent?.trim() ?? "";
-}
-
 /** The 540px panel beside the list (artboard 4): the selected issue at a glance. */
-export function Peek({ id, onClose }: { id: string; onClose: () => void }) {
+export function Peek({ id, onClose, onExpand }: { id: string; onClose: () => void; onExpand: () => void }) {
   const { data: issue, isError } = useIssue(id);
   const actions = useIssueActions();
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -45,7 +42,7 @@ export function Peek({ id, onClose }: { id: string; onClose: () => void }) {
             <ExternalLink size={14} strokeWidth={1.9} aria-hidden="true" />
           </button>
         )}
-        <button type="button" className="peek__btn" aria-label="Full view" title="Full view (↩)" disabled>
+        <button type="button" className="peek__btn" aria-label="Full view" title="Full view (↩)" onClick={onExpand}>
           <Maximize2 size={14} strokeWidth={1.9} aria-hidden="true" />
         </button>
         <button type="button" className="peek__btn" aria-label="Close (esc)" onClick={onClose}>
@@ -53,7 +50,7 @@ export function Peek({ id, onClose }: { id: string; onClose: () => void }) {
         </button>
       </header>
       <div ref={bodyRef} className="peek__body">
-        {issue ? <Body issue={issue} /> : isError ? <p className="peek__missing">This issue is no longer in the cache.</p> : null}
+        {issue ? <Body issue={issue} onExpand={onExpand} /> : isError ? <p className="peek__missing">This issue is no longer in the cache.</p> : null}
       </div>
       <footer className="peek__footer">
         <span>J / K next</span>
@@ -66,8 +63,11 @@ export function Peek({ id, onClose }: { id: string; onClose: () => void }) {
   );
 }
 
-function Body({ issue }: { issue: IssueDetail }) {
-  const description = issue.descriptionHtml ? plainText(issue.descriptionHtml) : "";
+const LATEST = 3;
+
+function Body({ issue, onExpand }: { issue: IssueDetail; onExpand: () => void }) {
+  const { data: activity = [] } = useIssueActivity(issue.id);
+  const latest = activity.slice(-LATEST).reverse();
   return (
     <>
       <h2 className="peek__title">{issue.summary}</h2>
@@ -92,7 +92,24 @@ function Body({ issue }: { issue: IssueDetail }) {
           </span>
         ))}
       </div>
-      {description ? <p className="peek__description">{description}</p> : <p className="peek__empty">No description.</p>}
+      {issue.descriptionHtml && hasContent(issue.descriptionHtml) ? (
+        <JiraHtml html={issue.descriptionHtml} className="peek__description" />
+      ) : (
+        <p className="peek__empty">No description.</p>
+      )}
+      {latest.length > 0 && (
+        <section className="peek__activity" aria-label="Latest activity">
+          <header className="peek__activity-header">
+            <h3>Latest activity</h3>
+            <button type="button" className="link-btn" onClick={onExpand}>
+              All activity
+            </button>
+          </header>
+          {latest.map((item, i) => (
+            <ActivityEntry key={i} item={item} />
+          ))}
+        </section>
+      )}
     </>
   );
 }

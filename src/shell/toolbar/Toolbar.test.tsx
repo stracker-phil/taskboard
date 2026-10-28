@@ -9,6 +9,7 @@ import { api, type MenuEntry, type View } from "../../api";
 import { createQueryClient } from "../../queries/queryClient";
 import { narrowingKey } from "../../state/slices/narrowing";
 import { resetStore, useStore } from "../../state/store";
+import { issueDetail } from "../../test/issues";
 import { connectionView } from "../../test/jira";
 import { startMotionTimers, stubMotion } from "../../test/motion";
 import { space } from "../../test/spaces";
@@ -359,6 +360,40 @@ describe("Toolbar", () => {
       rerenderWith(view({ id: 102, name: "Board" }));
 
       expect(screen.getByRole("button", { name: "Me" })).toHaveAttribute("aria-pressed", "false");
+    });
+  });
+
+  describe("epic chip", () => {
+    const KEY = narrowingKey(11, 101);
+    const CHIP = { name: "Only issues of NW-1001 Checkout, click to show all" };
+
+    beforeEach(() => {
+      mocked.issueGet.mockResolvedValue(issueDetail({ id: "10001", key: "NW-1001", summary: "Checkout", isEpic: true, epic: null }));
+    });
+
+    it("is not shown without an epic narrowing", () => {
+      renderToolbar();
+
+      expect(screen.queryByRole("button", { name: /^Only issues of/ })).not.toBeInTheDocument();
+    });
+
+    it("shows the epic's summary while the view is narrowed to the epic", async () => {
+      useStore.getState().setNarrowing(KEY, { epic: "10001" });
+
+      renderToolbar();
+
+      expect(await screen.findByRole("button", CHIP)).toHaveTextContent("Checkout");
+      expect(mocked.issueGet).toHaveBeenCalledWith("10001");
+    });
+
+    it("clears the epic narrowing when clicked", async () => {
+      useStore.getState().setNarrowing(KEY, { me: true, epic: "10001" });
+      renderToolbar();
+
+      await userEvent.click(await screen.findByRole("button", CHIP));
+
+      expect(useStore.getState().narrowings[KEY]).toMatchObject({ me: true, epic: null });
+      expect(screen.queryByRole("button", { name: /^Only issues of/ })).not.toBeInTheDocument();
     });
   });
 

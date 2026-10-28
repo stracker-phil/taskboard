@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -8,7 +8,7 @@ vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await impo
 import { api, type IssueDetail } from "../api";
 import { createQueryClient } from "../queries/queryClient";
 import { connectionView } from "../test/jira";
-import { ALEX } from "../test/issues";
+import { ALEX, changeItem, commentItem } from "../test/issues";
 import { Peek } from "./Peek";
 
 const mocked = vi.mocked(api, true);
@@ -35,14 +35,15 @@ function detail(patch: Partial<IssueDetail> = {}): IssueDetail {
     commentCount: 0,
     isEpic: false,
     gone: false,
+    custom: [],
     ...patch,
   };
 }
 
-function renderPeek(onClose = vi.fn()) {
+function renderPeek(onClose = vi.fn(), onExpand = vi.fn()) {
   render(
     <QueryClientProvider client={createQueryClient()}>
-      <Peek id="10042" onClose={onClose} />
+      <Peek id="10042" onClose={onClose} onExpand={onExpand} />
     </QueryClientProvider>,
   );
   return onClose;
@@ -51,6 +52,7 @@ function renderPeek(onClose = vi.fn()) {
 beforeEach(() => {
   vi.clearAllMocks();
   mocked.issueGet.mockResolvedValue(detail());
+  mocked.issueActivity.mockResolvedValue([]);
   mocked.connectionGet.mockResolvedValue(connectionView({ siteUrl: "" }));
 });
 
@@ -75,11 +77,20 @@ describe("Peek", () => {
     expect(mocked.issueGet).toHaveBeenCalledWith("10042");
   });
 
-  it("shows the description as plain text without its tags", async () => {
+  it("shows the description without its tags", async () => {
     renderPeek();
 
-    const description = await screen.findByText("Update the pricing table.");
-    expect(description.textContent).not.toContain("<");
+    const emphasised = await screen.findByText("pricing");
+    expect(emphasised.parentElement).toHaveTextContent("Update the pricing table.");
+    expect(emphasised.parentElement?.textContent).not.toContain("<");
+  });
+
+  it("drops scripts from the description", async () => {
+    mocked.issueGet.mockResolvedValue(detail({ descriptionHtml: "<p>Safe text</p><script>alert(1)</script>" }));
+    renderPeek();
+
+    expect(await screen.findByText("Safe text")).toBeInTheDocument();
+    expect(screen.queryByText(/alert/)).not.toBeInTheDocument();
   });
 
   it.each([null, "", "<p> </p>"])("says there is no description when it is %j", async (descriptionHtml) => {
@@ -105,12 +116,59 @@ describe("Peek", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it("shows Pin and Full view disabled", async () => {
+  it("shows Pin disabled", async () => {
     renderPeek();
 
     await screen.findByRole("heading", { name: "Redesign the pricing page" });
     expect(screen.getByRole("button", { name: "Pin" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Full view" })).toBeDisabled();
+  });
+
+  it("calls onExpand when the Full view button is clicked", async () => {
+    const onExpand = vi.fn();
+    renderPeek(vi.fn(), onExpand);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Full view" }));
+
+    expect(onExpand).toHaveBeenCalled();
+  });
+
+  describe("latest activity", () => {
+    const comment = (id: string, text: string) => commentItem({ id, bodyHtml: `<p>${text}</p>` });
+
+    it("shows the latest three items, newest first, under Latest activity", async () => {
+      mocked.issueActivity.mockResolvedValue([comment("1", "First note"), comment("2", "Second note"), comment("3", "Third note"), comment("4", "Fourth note")]);
+      renderPeek();
+
+      const section = within(await screen.findByRole("region", { name: "Latest activity" }));
+      expect(section.queryByText("First note")).not.toBeInTheDocument();
+      const shown = section.getAllByText(/ note$/).map((e) => e.textContent);
+      expect(shown).toEqual(["Fourth note", "Third note", "Second note"]);
+    });
+
+    it("shows recorded changes too", async () => {
+      mocked.issueActivity.mockResolvedValue([changeItem()]);
+      renderPeek();
+
+      expect(await screen.findByText(/Changed status/)).toBeInTheDocument();
+    });
+
+    it("opens the full view from All activity", async () => {
+      mocked.issueActivity.mockResolvedValue([comment("1", "First note")]);
+      const onExpand = vi.fn();
+      renderPeek(vi.fn(), onExpand);
+
+      await userEvent.click(await screen.findByRole("button", { name: "All activity" }));
+
+      expect(onExpand).toHaveBeenCalled();
+    });
+
+    it("is left out when the issue has no activity", async () => {
+      renderPeek();
+
+      await screen.findByRole("heading", { name: "Redesign the pricing page" });
+      await vi.waitFor(() => expect(mocked.issueActivity).toHaveBeenCalled());
+      expect(screen.queryByRole("region", { name: "Latest activity" })).not.toBeInTheDocument();
+    });
   });
 
   describe("Open in Jira", () => {

@@ -37,6 +37,7 @@ const detail = (): IssueDetail => ({
   commentCount: 0,
   isEpic: false,
   gone: false,
+  custom: [],
 });
 
 function renderPeek() {
@@ -94,6 +95,15 @@ describe("CurrentPeek", () => {
 
     expect(await screen.findByRole("heading", { name: "Redesign the pricing page" })).toBeInTheDocument();
     expect(mocked.issueGet).toHaveBeenCalledWith("10042");
+  });
+
+  it("opens the Issue view on the selected issue with the view as origin from Full view", async () => {
+    resetStore({ places: { "11:101": PLACE } });
+    renderPeek();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Full view" }));
+
+    expect(useStore.getState().issueView).toEqual({ origin: { listId: 11, viewId: 101 }, stack: ["10042"] });
   });
 
   it("closes the peek in the view's place when its close button is clicked", async () => {

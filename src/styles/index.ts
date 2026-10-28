@@ -11,6 +11,7 @@ import "./list.css";
 import "./table.css";
 import "./toolbar.css";
 import "./peek.css";
+import "./issue-view.css";
 import "./overlays.css";
 import "./settings.css";
 import "./spaces.css";

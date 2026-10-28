@@ -36,5 +36,6 @@ stands in Taskboard. The numbers in this table are Taskboard's.
 | [0024](0024-filters-run-locally-in-sql-views-never-filter.md) | Filters run locally in SQL; views never filter | Accepted (2026-10-28) |
 | [0025](0025-all-jira-traffic-goes-through-one-allowlisted-gateway.md) | All Jira traffic goes through one allowlisted gateway | Accepted (2026-10-28) |
 | [0026](0026-the-debug-build-keeps-its-demo-token-in-memory.md) | The debug build keeps its demo token in memory | Accepted (2026-10-28) |
+| [0027](0027-jira-html-is-sanitised-and-shows-no-remote-content.md) | Jira HTML is sanitised and shows no remote content | Accepted (2026-10-28) |
 
 Open: integrations with Daybook and TimeTracker.

@@ -1,4 +1,4 @@
-import type { Column, Group, IssueDetail, Person, Row, StatusStyleRow, ViewData } from "../api/types";
+import type { ActivityItem, Column, Group, IssueDetail, Person, Related, RelatedIssue, Row, StatusStyleRow, ViewData } from "../api/types";
 
 export const ALEX: Person = { accountId: "demo-account-1", name: "Alex Morgan", initials: "AM", color: 1 };
 export const SAM: Person = { accountId: "demo-account-2", name: "Sam Lee", initials: "SL", color: 2 };
@@ -49,6 +49,34 @@ export function issueDetail(patch: Partial<IssueDetail> = {}): IssueDetail {
     commentCount: 4,
     isEpic: false,
     gone: false,
+    custom: [],
+    ...patch,
+  };
+}
+
+/** An issue as the Child issues and Links sections list it; override per test. */
+export function relatedIssue(patch: Partial<RelatedIssue> = {}): RelatedIssue {
+  return { id: "10051", key: "NW-1051", summary: "Guest checkout: remember shipping country", style: "todo", issueType: "Story", assignee: ALEX, ...patch };
+}
+
+/** The related issues of an issue: none unless overridden. */
+export function related(patch: Partial<Related> = {}): Related {
+  return { children: { open: [], done: [] }, links: [], ...patch };
+}
+
+/** A comment in an issue's activity; override per test. */
+export function commentItem(patch: Partial<Extract<ActivityItem, { kind: "comment" }>> = {}): ActivityItem {
+  return { kind: "comment", id: "20001", author: SAM, bodyHtml: "<p>Looks good to me.</p>", at: "2026-10-05T10:00:00Z", edited: false, ...patch };
+}
+
+/** A recorded change in an issue's activity (a status change unless overridden). */
+export function changeItem(patch: Partial<Extract<ActivityItem, { kind: "change" }>> = {}): ActivityItem {
+  return {
+    kind: "change",
+    field: "status",
+    from: { kind: "status", value: { name: "In Review", style: "review" } },
+    to: { kind: "status", value: { name: "Done", style: "done" } },
+    at: "2026-10-06T11:00:00Z",
     ...patch,
   };
 }
