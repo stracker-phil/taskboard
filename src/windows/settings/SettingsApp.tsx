@@ -4,6 +4,7 @@ import { api } from "../../api";
 import { useCommandKeys } from "../../commands";
 import { SettingsWindow } from "../../components/settings/SettingsWindow";
 import { Toasts } from "../../components/Toasts";
+import { TooltipHost } from "../../components/TooltipHost";
 import { useErrorToasts } from "../../lib/useErrorToasts";
 import { useAppearance } from "../../lib/theme";
 import { trackWindowFocus } from "../../lib/windowFocus";
@@ -36,6 +37,7 @@ function SettingsRoot() {
     <>
       <SettingsWindow page={page} onPage={setPage} />
       <Toasts />
+      <TooltipHost />
     </>
   );
 }

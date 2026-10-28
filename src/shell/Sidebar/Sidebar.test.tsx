@@ -37,6 +37,7 @@ const list = (id: number, name: string, patch: Partial<ListNode> = {}): ListNode
   ownConditions: 0,
   description: "",
   error: null,
+  icon: null,
   ...patch,
 });
 
@@ -510,6 +511,83 @@ describe("Sidebar", () => {
 
       expect(mocked.listDelete).not.toHaveBeenCalled();
       expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("filter list icon", () => {
+    const changeIcon = (name: string) => screen.findByRole("button", { name: `Change the icon of ${name}` });
+
+    beforeEach(() => {
+      mocked.listSetIcon.mockResolvedValue(undefined);
+    });
+
+    it("opens the Icon dialog from the icon button without opening the list", async () => {
+      await renderSidebar(treeWith(), navAt(null, [NW_ID]));
+
+      await userEvent.click(await changeIcon("Epics"));
+
+      const dialog = screen.getByRole("dialog", { name: "Icon" });
+      expect(within(dialog).getAllByRole("radio").length).toBeGreaterThan(1);
+      expect(mocked.navGo).not.toHaveBeenCalled();
+    });
+
+    it("marks the funnel as the current icon of a list without one", async () => {
+      await renderSidebar(treeWith(), navAt(null, [NW_ID]));
+
+      await userEvent.click(await changeIcon("Epics"));
+
+      expect(screen.getByRole("radio", { name: "funnel", checked: true })).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: "rocket", checked: false })).toBeInTheDocument();
+    });
+
+    it("marks the list's own icon as the current one", async () => {
+      const tree = treeWith({ nw: { lists: [list(21, "Current sprint", { icon: "rocket" }), EPICS] } });
+      await renderSidebar(tree, navAt(null, [NW_ID]));
+
+      await userEvent.click(await changeIcon("Current sprint"));
+
+      expect(screen.getByRole("radio", { name: "rocket", checked: true })).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: "funnel", checked: false })).toBeInTheDocument();
+    });
+
+    it("checks the funnel in the picker for a name this build does not know", async () => {
+      const tree = treeWith({ nw: { lists: [list(21, "Current sprint", { icon: "no-such-icon" }), EPICS] } });
+      await renderSidebar(tree, navAt(null, [NW_ID]));
+
+      await userEvent.click(await changeIcon("Current sprint"));
+
+      expect(screen.getByRole("radio", { name: "funnel", checked: true })).toBeInTheDocument();
+      expect(screen.getAllByRole("radio", { checked: true })).toHaveLength(1);
+    });
+
+    it("saves the picked icon and closes the dialog", async () => {
+      await renderSidebar(treeWith(), navAt(null, [NW_ID]));
+      await userEvent.click(await changeIcon("Epics"));
+
+      await userEvent.click(screen.getByRole("radio", { name: "rocket" }));
+
+      expect(mocked.listSetIcon).toHaveBeenCalledWith(EPICS.id, "rocket");
+      expect(screen.queryByRole("dialog", { name: "Icon" })).not.toBeInTheDocument();
+    });
+
+    it("saves no icon when the funnel is picked", async () => {
+      const tree = treeWith({ nw: { lists: [list(21, "Current sprint", { icon: "rocket" }), EPICS] } });
+      await renderSidebar(tree, navAt(null, [NW_ID]));
+      await userEvent.click(await changeIcon("Current sprint"));
+
+      await userEvent.click(screen.getByRole("radio", { name: "funnel" }));
+
+      expect(mocked.listSetIcon).toHaveBeenCalledWith(21, null);
+    });
+
+    it("shows an error toast when the icon cannot be saved", async () => {
+      mocked.listSetIcon.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
+      await renderSidebar(treeWith(), navAt(null, [NW_ID]));
+      await userEvent.click(await changeIcon("Epics"));
+
+      await userEvent.click(screen.getByRole("radio", { name: "star" }));
+
+      expect(await screen.findByText("Could not change the icon: Disk full")).toBeInTheDocument();
     });
   });
 

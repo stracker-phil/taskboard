@@ -8,7 +8,7 @@ import { EMPTY_PLACE } from "./places";
 
 const mocked = vi.mocked(api, true);
 
-const SAVED: ViewPlace = { scrollTop: 320, toggled: { "status:done": true }, selectedId: "10042", peekOpen: true };
+const SAVED: ViewPlace = { scrollTop: 320, toggled: { "status:done": true }, selectedId: "10042", peekOpen: true, onlyMine: false, text: "" };
 const KEY = "11:101";
 const place = () => useStore.getState().places[KEY];
 const toasts = () => useStore.getState().toasts.map((t) => [t.kind, t.message]);
@@ -70,6 +70,31 @@ describe("loadPlace", () => {
     await loading;
 
     expect(place()).toEqual({ ...EMPTY_PLACE, scrollTop: 50 });
+  });
+
+  it("seeds the view's narrowing from the saved Me chip and text", async () => {
+    mocked.placeGet.mockResolvedValue({ ...SAVED, onlyMine: true, text: "login" });
+
+    await useStore.getState().loadPlace(11, 101);
+
+    expect(useStore.getState().narrowings[KEY]).toEqual({ me: true, text: "login", epic: null });
+  });
+
+  it("seeds an unnarrowed view when Rust has no place", async () => {
+    mocked.placeGet.mockResolvedValue(null);
+
+    await useStore.getState().loadPlace(11, 101);
+
+    expect(useStore.getState().narrowings[KEY]).toEqual({ me: false, text: "", epic: null });
+  });
+
+  it("keeps a narrowing that was set before the place loaded", async () => {
+    mocked.placeGet.mockResolvedValue({ ...SAVED, onlyMine: true, text: "login" });
+    useStore.setState({ narrowings: { [KEY]: { me: false, text: "", epic: "10001" } } });
+
+    await useStore.getState().loadPlace(11, 101);
+
+    expect(useStore.getState().narrowings[KEY]).toEqual({ me: false, text: "", epic: "10001" });
   });
 
   it("shows a toast and starts from the empty place when the load fails", async () => {

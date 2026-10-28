@@ -1,4 +1,5 @@
 import type { ListNode } from "../../api";
+import { listIcon } from "../../components/listIcons";
 import { HOME_ICONS } from "../levels";
 import { ListCount } from "./ListCount";
 
@@ -14,7 +15,7 @@ export function HomeRows({ rows, activeId, open }: Props) {
   return (
     <nav className="sb-home" aria-label="Home">
       {rows.map((node) => {
-        const Icon = HOME_ICONS[node.kind];
+        const Icon = node.kind === "list" ? listIcon(node.icon) : HOME_ICONS[node.kind];
         const active = node.id === activeId;
         const unread = node.kind === "recent" && (node.count ?? 0) > 0;
         return (

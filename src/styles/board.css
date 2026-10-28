@@ -33,9 +33,13 @@
 .board-card {
   position: relative; display: flex; flex: none; flex-direction: column; gap: 10px; padding: 12px 14px; border: 1px solid var(--card-border);
   border-radius: 10px; background: var(--panel-bg); box-shadow: var(--shadow-card); color: var(--text); cursor: default; outline: 0;
-  transition: box-shadow var(--motion-fast) var(--ease-out), border-color var(--motion-fast) var(--ease-out);
+  transition: box-shadow var(--motion-fast) var(--ease-out), border-color var(--motion-fast) var(--ease-out),
+    transform var(--motion-fast) var(--ease-out), background-color var(--motion-fast) var(--ease-out);
+  /* Off-screen cards skip layout and paint, so long columns scroll smoothly. */
+  content-visibility: auto; contain-intrinsic-size: auto 110px;
 }
-.board-card:hover, .board-card:focus-visible { box-shadow: var(--shadow-hover); }
+.board-card:hover, .board-card:focus-visible { box-shadow: var(--shadow-hover); transform: translateY(-1px); }
+.board-card:active { transform: none; box-shadow: var(--shadow-card); }
 .board-card:focus-visible { border-color: var(--accent); }
 .board-card--changed { border-color: var(--changed-border); background: var(--changed-bg); }
 .board-card__top, .board-card__footer { display: flex; align-items: center; gap: 8px; min-width: 0; }
@@ -49,8 +53,10 @@
   font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary);
 }
 .board-card__priority { display: inline-flex; }
-.board-card__actions { position: absolute; top: 8px; right: 8px; }
-.board-card .row-actions { position: static; }
+/* The hover toolbar sits on the card's top line, over the key. */
+.board-card__actions { position: absolute; top: 9px; right: 10px; }
+.board-card .row-actions { position: static; transform: translateY(2px); transition: opacity var(--motion-base) var(--ease-out), transform var(--motion-base) var(--ease-out); }
+.board-card:hover .row-actions, .board-card:focus-within .row-actions { transform: none; }
 .board-card:hover .row-actions, .board-card:focus-within .row-actions { opacity: 1; pointer-events: auto; }
 .board-strip__item { display: flex; flex: none; }
 .board-card--selected { border-color: var(--accent); box-shadow: var(--shadow-hover); }

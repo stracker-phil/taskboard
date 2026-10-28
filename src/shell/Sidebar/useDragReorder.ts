@@ -7,38 +7,45 @@ interface Drag {
   from: number;
   /** The gap the item would land in: 0 above the first item, n below the last. */
   gap: number;
-  /** Where the drop line sits, from the container's top. */
+  /** Where the drop line sits, from the container's top (or left edge, across). */
   lineY: number;
 }
+
+/** Down a list (the sidebar) or across a row (the view tabs). */
+export type DragAxis = "y" | "x";
 
 /** The container's direct children marked as items, in order. */
 function items(container: HTMLElement): HTMLElement[] {
   return [...container.querySelectorAll<HTMLElement>(":scope > [data-drag-index]")];
 }
 
-function gapAt(container: HTMLElement, y: number): Omit<Drag, "from"> {
+function gapAt(container: HTMLElement, at: number, axis: DragAxis): Omit<Drag, "from"> {
   const list = items(container);
+  const box = container.getBoundingClientRect();
   // In content coordinates, so the line stays put in a scrolled list.
-  const top = container.getBoundingClientRect().top - container.scrollTop;
+  const origin = axis === "y" ? box.top - container.scrollTop : box.left - container.scrollLeft;
+  const start = (rect: DOMRect) => (axis === "y" ? rect.top : rect.left);
+  const size = (rect: DOMRect) => (axis === "y" ? rect.height : rect.width);
   const index = list.findIndex((el) => {
     const rect = el.getBoundingClientRect();
-    return y < rect.top + rect.height / 2;
+    return at < start(rect) + size(rect) / 2;
   });
   if (index === -1) {
     const last = list[list.length - 1]?.getBoundingClientRect();
-    return { gap: list.length, lineY: last ? last.bottom - top : 0 };
+    return { gap: list.length, lineY: last ? start(last) + size(last) - origin : 0 };
   }
-  return { gap: index, lineY: list[index].getBoundingClientRect().top - top };
+  return { gap: index, lineY: start(list[index].getBoundingClientRect()) - origin };
 }
 
 /**
- * Drag to reorder a vertical list with pointer events. The container holds the items as direct children
+ * Drag to reorder a list (down, or across with `axis` "x") with pointer events. The container holds the items as direct children
  * (`item(i)`); a press on an item's `handle(i)` that moves starts the drag, a drop line shows the gap, and the
  * release calls `onMove(from, to)` with the item's new index. The click that ends a drag is swallowed.
  */
-export function useDragReorder<T extends HTMLElement>(onMove: (from: number, to: number) => void) {
+export function useDragReorder<T extends HTMLElement>(onMove: (from: number, to: number) => void, axis: DragAxis = "y") {
   const containerRef = useRef<T>(null);
-  const press = useRef<{ index: number; y: number } | null>(null);
+  const press = useRef<{ index: number; at: number } | null>(null);
+  const along = (e: PointerEvent<HTMLElement>) => (axis === "y" ? e.clientY : e.clientX);
   const justDragged = useRef(false);
   const [drag, setDrag] = useState<Drag | null>(null);
 
@@ -50,7 +57,7 @@ export function useDragReorder<T extends HTMLElement>(onMove: (from: number, to:
   const handle = (index: number) => ({
     onPointerDown: (e: PointerEvent<HTMLElement>) => {
       if (e.button !== 0) return;
-      press.current = { index, y: e.clientY };
+      press.current = { index, at: along(e) };
       justDragged.current = false;
     },
     onPointerMove: (e: PointerEvent<HTMLElement>) => {
@@ -59,11 +66,11 @@ export function useDragReorder<T extends HTMLElement>(onMove: (from: number, to:
       // Released outside the row: the press is over.
       if (!(e.buttons & 1)) return end();
       if (!drag) {
-        if (Math.abs(e.clientY - press.current.y) < THRESHOLD) return;
+        if (Math.abs(along(e) - press.current.at) < THRESHOLD) return;
         // Captured only once it drags: a capture from the press would retarget a plain click to the row.
         e.currentTarget.setPointerCapture?.(e.pointerId);
       }
-      setDrag({ from: press.current.index, ...gapAt(container, e.clientY) });
+      setDrag({ from: press.current.index, ...gapAt(container, along(e), axis) });
     },
     onPointerUp: () => {
       if (drag) {

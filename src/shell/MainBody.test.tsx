@@ -26,6 +26,7 @@ beforeEach(() => {
   resetStore();
   mocked.pinsList.mockResolvedValue(pins());
   mocked.viewsOf.mockResolvedValue([]);
+  mocked.placeGet.mockResolvedValue(null);
   mocked.sidebarTree.mockResolvedValue(sidebarTree([]));
   spies = [
     vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(1000),
@@ -210,6 +211,33 @@ describe("MainBody", () => {
 
       await waitFor(() => expect(mocked.viewRows).toHaveBeenCalledWith(11, 101, { me: false, text: "pricing", epic: null }));
       expect(mocked.viewRows).not.toHaveBeenCalledWith(11, 101, expect.objectContaining({ me: true }));
+    });
+  });
+
+  describe("saved place", () => {
+    const SAVED = { scrollTop: 0, toggled: {}, selectedId: null, peekOpen: false, onlyMine: true, text: "pricing" };
+
+    beforeEach(() => {
+      mocked.navCurrent.mockResolvedValue({ location: { listId: 11, viewId: 101 }, expanded: [] });
+      mocked.syncOverview.mockResolvedValue(syncOverview({ projects: [projectCounts()] }));
+      mocked.placeGet.mockResolvedValue(SAVED);
+    });
+
+    it.each(["list", "board", "table"] as const)("loads the place of a %s view", async (layout) => {
+      mocked.viewsOf.mockResolvedValue([view({ layout })]);
+
+      renderBody();
+
+      await waitFor(() => expect(useStore.getState().places[narrowingKey(11, 101)]).toEqual(SAVED));
+      expect(mocked.placeGet).toHaveBeenCalledWith(11, 101);
+    });
+
+    it("narrows the rows by the Me chip and text saved with the view", async () => {
+      mocked.viewsOf.mockResolvedValue([view({ layout: "table" })]);
+
+      renderBody();
+
+      await waitFor(() => expect(mocked.viewRows).toHaveBeenCalledWith(11, 101, { me: true, text: "pricing", epic: null }));
     });
   });
 

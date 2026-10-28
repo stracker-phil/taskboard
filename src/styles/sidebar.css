@@ -197,3 +197,23 @@
 @media (prefers-reduced-motion: reduce) {
   .sb-sync__spin { animation: none; }
 }
+
+/* A filter list row: its icon is its own button over the row's icon slot (it opens the icon picker). */
+.sb-list-row { position: relative; display: flex; flex-direction: column; }
+.sb-list__icon-slot { flex: none; width: 15px; height: 15px; }
+.sb-list__icon {
+  position: absolute; top: 50%; left: 6px; display: grid; place-items: center; width: 23px; height: 23px; padding: 0;
+  border: 0; border-radius: 6px; background: transparent; color: var(--text-secondary); transform: translateY(-50%);
+  cursor: default; transition: background-color var(--motion-fast) var(--ease-out), color var(--motion-fast) var(--ease-out);
+}
+.sb-list__icon:hover, .sb-list__icon[aria-expanded="true"] { background: var(--fill-hover); color: var(--text); }
+.sb-list-row[data-dragging] { opacity: 0.5; }
+.icon-picker { left: 0; top: calc(100% + 4px); width: 252px; padding: 10px; gap: 6px; }
+.icon-picker__grid { display: grid; grid-template-columns: repeat(8, 28px); gap: 2px; }
+.icon-picker__option {
+  display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 7px;
+  background: transparent; color: var(--text-secondary); cursor: default;
+  transition: background-color var(--motion-fast) var(--ease-out), color var(--motion-fast) var(--ease-out);
+}
+.icon-picker__option:hover { background: var(--hover-bg); color: var(--text); }
+.icon-picker__option[aria-checked="true"] { background: var(--accent-soft-bg); color: var(--accent-text); }

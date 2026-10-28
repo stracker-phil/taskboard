@@ -106,5 +106,5 @@ export const COLUMNS: Column[] = [
 ];
 
 export function statusStyle(patch: Partial<StatusStyleRow> = {}): StatusStyleRow {
-  return { id: "3", name: "In Progress", category: "indeterminate", detected: "progress", chosen: null, ...patch };
+  return { id: "3", name: "In Progress", category: "indeterminate", detected: "progress", chosen: null, issues: 0, ...patch };
 }

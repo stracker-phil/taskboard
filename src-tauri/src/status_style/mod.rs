@@ -5,6 +5,7 @@ pub mod commands;
 
 use std::collections::HashMap;
 
+use crate::filter::TRACKED_ISSUES;
 use rusqlite::{Connection, params};
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
@@ -48,6 +49,8 @@ pub struct StatusStyleRow {
     pub detected: Style,
     /// The owner's choice; none = Automatic.
     pub chosen: Option<Style>,
+    /// Issues of the tracked projects in this status.
+    pub issues: i64,
 }
 
 impl StatusStyleRow {
@@ -56,13 +59,18 @@ impl StatusStyleRow {
     }
 }
 
-/// Every cached status, by name.
+/// The statuses the tracked projects' issues are in (the rest of the site's workflows don't matter here), by
+/// Jira category (to do, in progress, done), then name.
 pub fn status_rows(conn: &Connection) -> AppResult<Vec<StatusStyleRow>> {
-    let mut query = conn.prepare(
-        "SELECT s.id, s.name, s.category, o.style
-         FROM cache.status s LEFT JOIN status_style o ON o.status_id = s.id
-         ORDER BY s.name COLLATE NOCASE, s.id",
-    )?;
+    let mut query = conn.prepare(&format!(
+        "SELECT s.id, s.name, s.category, o.style, used.issues
+         FROM cache.status s
+         JOIN (SELECT i.status_id, COUNT(*) AS issues FROM cache.issue i WHERE {TRACKED_ISSUES}
+               GROUP BY i.status_id) used ON used.status_id = s.id
+         LEFT JOIN status_style o ON o.status_id = s.id
+         ORDER BY CASE s.category WHEN 'new' THEN 0 WHEN 'indeterminate' THEN 1 ELSE 2 END,
+                  s.name COLLATE NOCASE, s.id"
+    ))?;
     let rows = query.query_map([], |row| {
         let name: String = row.get(1)?;
         let category: String = row.get(2)?;
@@ -71,6 +79,7 @@ pub fn status_rows(conn: &Connection) -> AppResult<Vec<StatusStyleRow>> {
             id: row.get(0)?,
             detected: detect(&category, &name),
             chosen: chosen.as_deref().and_then(from_text),
+            issues: row.get(4)?,
             name,
             category,
         })
@@ -176,8 +185,158 @@ mod tests {
             category: "indeterminate".into(),
             detected: Style::Review,
             chosen,
+            issues: 0,
         };
         assert_eq!(row(Some(Style::Blocked)).style(), Style::Blocked);
         assert_eq!(row(None).style(), Style::Review);
+    }
+
+    fn issue(id: u32, project: &str, status: &str, category: &str, gone: bool) -> String {
+        format!(
+            "INSERT INTO cache.issue (id, key, project_id, summary, issue_type, status_id,
+               status_category, created_at, updated_at, raw, synced_at, gone)
+             VALUES ('{id}', 'K-{id}', '{project}', 'Summary {id}', 'Task', '{status}', '{category}',
+               '2026-10-20T09:00:00.000Z', '2026-10-20T09:00:00.000Z', '{{}}',
+               '2026-10-20T09:00:00.000Z', {});",
+            gone as i32
+        )
+    }
+
+    /// Website relaunch (`10001`) is tracked, Northwind support (`10002`) is not.
+    async fn lab() -> (tempfile::TempDir, Db) {
+        let dir = crate::test_support::temp_config_dir();
+        let db = Db::open(dir.path()).unwrap();
+        let issues: String = [
+            issue(1, "10001", "s1", "new", false),
+            issue(2, "10001", "s1", "new", false),
+            issue(3, "10001", "s2", "indeterminate", false),
+            issue(4, "10001", "s3", "indeterminate", false),
+            issue(5, "10001", "s3", "indeterminate", false),
+            issue(6, "10001", "s3", "indeterminate", false),
+            issue(7, "10001", "s4", "done", false),
+            issue(8, "10001", "s4", "done", true),
+            issue(9, "10001", "s5", "new", false),
+            issue(10, "10001", "s8", "indeterminate", true),
+            issue(11, "10002", "s6", "done", false),
+            issue(12, "10002", "s1", "new", false),
+        ]
+        .concat();
+        let sql = format!(
+            "INSERT INTO cache.project (id, key, name, raw) VALUES
+               ('10001', 'NW', 'Website relaunch', '{{}}'), ('10002', 'NWS', 'Northwind support', '{{}}');
+             INSERT INTO cache.status (id, name, category) VALUES
+               ('s4', 'Done', 'done'), ('s2', 'Testing', 'indeterminate'), ('s1', 'To Do', 'new'),
+               ('s3', 'in review', 'indeterminate'), ('s5', 'Backlog', 'new'), ('s6', 'Archived', 'done'),
+               ('s7', 'Unused', 'new'), ('s8', 'Withdrawn', 'indeterminate');
+             {issues}"
+        );
+        db.write(move |tx, _| {
+            tx.execute_batch(&sql)?;
+            Ok(())
+        })
+        .await
+        .unwrap();
+        crate::connection::track_project(&db, "10001".into(), true)
+            .await
+            .unwrap();
+        (dir, db)
+    }
+
+    fn named_counts(rows: &[StatusStyleRow]) -> Vec<(&str, i64)> {
+        rows.iter().map(|r| (r.name.as_str(), r.issues)).collect()
+    }
+
+    #[tokio::test]
+    async fn a_status_only_untracked_projects_use_is_not_listed() {
+        let (_dir, db) = lab().await;
+
+        let rows = status_styles_list(&db).await.unwrap();
+
+        assert!(rows.iter().all(|r| r.id != "s6"), "{rows:?}");
+    }
+
+    #[tokio::test]
+    async fn a_status_without_issues_is_not_listed() {
+        let (_dir, db) = lab().await;
+
+        let rows = status_styles_list(&db).await.unwrap();
+
+        assert!(rows.iter().all(|r| r.id != "s7"), "{rows:?}");
+    }
+
+    #[tokio::test]
+    async fn a_status_only_gone_issues_use_is_not_listed_and_gone_issues_do_not_count() {
+        let (_dir, db) = lab().await;
+
+        let rows = status_styles_list(&db).await.unwrap();
+
+        assert!(rows.iter().all(|r| r.id != "s8"), "{rows:?}");
+        let done = rows.iter().find(|r| r.id == "s4").unwrap();
+        assert_eq!(done.issues, 1);
+    }
+
+    #[tokio::test]
+    async fn the_count_is_the_tracked_issues_in_each_status() {
+        let (_dir, db) = lab().await;
+
+        let rows = status_styles_list(&db).await.unwrap();
+
+        let by_id = |id: &str| rows.iter().find(|r| r.id == id).unwrap().issues;
+        assert_eq!(
+            [
+                by_id("s1"),
+                by_id("s2"),
+                by_id("s3"),
+                by_id("s4"),
+                by_id("s5")
+            ],
+            [2, 1, 3, 1, 1]
+        );
+    }
+
+    #[tokio::test]
+    async fn statuses_are_ordered_by_category_then_name_ignoring_case() {
+        let (_dir, db) = lab().await;
+
+        let rows = status_styles_list(&db).await.unwrap();
+
+        assert_eq!(
+            named_counts(&rows),
+            [
+                ("Backlog", 1),
+                ("To Do", 2),
+                ("in review", 3),
+                ("Testing", 1),
+                ("Done", 1),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn setting_a_style_on_a_listed_status_returns_the_list_with_the_choice() {
+        let (_dir, db) = lab().await;
+
+        let rows = status_style_set(&db, "s3".into(), Some(Style::Blocked))
+            .await
+            .unwrap();
+
+        assert_eq!(
+            named_counts(&rows),
+            [
+                ("Backlog", 1),
+                ("To Do", 2),
+                ("in review", 3),
+                ("Testing", 1),
+                ("Done", 1),
+            ]
+        );
+        let chosen: Vec<(&str, Option<Style>)> = rows
+            .iter()
+            .filter(|r| r.chosen.is_some())
+            .map(|r| (r.id.as_str(), r.chosen))
+            .collect();
+        assert_eq!(chosen, [("s3", Some(Style::Blocked))]);
+        let reset = status_style_set(&db, "s3".into(), None).await.unwrap();
+        assert!(reset.iter().all(|r| r.chosen.is_none()));
     }
 }

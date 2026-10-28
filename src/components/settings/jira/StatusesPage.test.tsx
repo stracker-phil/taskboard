@@ -14,6 +14,7 @@ import { StatusesPage } from "./StatusesPage";
 
 const mocked = vi.mocked(api, true);
 
+const TO_DO = statusStyle({ id: "1", name: "Backlog", category: "new", detected: "todo" });
 const IN_PROGRESS = statusStyle();
 const IN_REVIEW = statusStyle({ id: "4", name: "Code Review", category: "indeterminate", detected: "review", chosen: "blocked" });
 const DONE = statusStyle({ id: "5", name: "Shipped", category: "done", detected: "done" });
@@ -48,21 +49,68 @@ describe("StatusesPage", () => {
     expect(screen.getByText("Statuses appear after the first sync.")).toBeInTheDocument();
   });
 
-  it("lists each status as a pill with its Jira category", async () => {
-    await renderPage([IN_PROGRESS, DONE]);
+  it("groups the statuses under their Jira category in the order To do, In progress, Done", async () => {
+    await renderPage([DONE, IN_PROGRESS, TO_DO]);
 
-    expect(await screen.findByText("In Progress")).toBeInTheDocument();
-    expect(screen.getByText("Jira category: In progress")).toBeInTheDocument();
-    expect(screen.getByText("Shipped")).toBeInTheDocument();
-    expect(screen.getByText("Jira category: Done")).toBeInTheDocument();
+    await screen.findByRole("region", { name: "Done" });
+    const names = screen.getAllByRole("region").map((r) => r.getAttribute("aria-label"));
+    expect(names.filter((n) => n === "To do" || n === "In progress" || n === "Done")).toEqual(["To do", "In progress", "Done"]);
+    expect(within(screen.getByRole("region", { name: "Done" })).getByText("Shipped")).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "In progress" })).getByText("In Progress")).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "To do" })).getByText("Backlog")).toBeInTheDocument();
     expect(screen.queryByText("Statuses appear after the first sync.")).not.toBeInTheDocument();
   });
 
-  it("labels the button Automatic without a choice and with the style's name otherwise", async () => {
+  it("leaves out a category without statuses", async () => {
+    await renderPage([IN_PROGRESS]);
+
+    await screen.findByRole("region", { name: "In progress" });
+    expect(screen.queryByRole("region", { name: "Done" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "To do" })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    [0, "0 issues"],
+    [1, "1 issue"],
+    [12, "12 issues"],
+  ])("shows %i issues in a status as %s", async (issues, text) => {
+    await renderPage([statusStyle({ issues })]);
+
+    expect(await screen.findByText(text)).toBeInTheDocument();
+  });
+
+  it("labels the button with the detected style without a choice and with the chosen style's name otherwise", async () => {
     await renderPage([IN_PROGRESS, IN_REVIEW]);
 
-    expect(await screen.findByRole("button", { name: "Style of In Progress" })).toHaveTextContent("Automatic");
-    expect(screen.getByRole("button", { name: "Style of Code Review" })).toHaveTextContent("Blocked");
+    expect(await screen.findByRole("button", { name: "Style of In Progress" })).toHaveTextContent("Automatic · In progress");
+    expect(screen.getByRole("button", { name: "Style of Code Review" })).toHaveTextContent(/^Blocked$/);
+  });
+
+  describe("search", () => {
+    it("keeps only the statuses whose name contains the text, ignoring case", async () => {
+      await renderPage([IN_PROGRESS, IN_REVIEW, DONE]);
+
+      await userEvent.type(await screen.findByRole("textbox", { name: "Search statuses" }), "REVIEW");
+
+      expect(screen.getByText("Code Review")).toBeInTheDocument();
+      expect(screen.queryByText("In Progress")).not.toBeInTheDocument();
+      expect(screen.queryByText("Shipped")).not.toBeInTheDocument();
+    });
+
+    it("says no status matches when nothing does", async () => {
+      await renderPage([IN_PROGRESS]);
+
+      await userEvent.type(await screen.findByRole("textbox", { name: "Search statuses" }), "zzz");
+
+      expect(screen.getByText("No status matches “zzz”.")).toBeInTheDocument();
+      expect(screen.queryByText("In Progress")).not.toBeInTheDocument();
+    });
+
+    it("has no search field without statuses", async () => {
+      await renderPage([]);
+
+      expect(screen.queryByRole("textbox", { name: "Search statuses" })).not.toBeInTheDocument();
+    });
   });
 
   it("offers Automatic with the detected style, then the five styles", async () => {
@@ -100,7 +148,7 @@ describe("StatusesPage", () => {
     await runEntry("Automatic (In review)");
 
     expect(mocked.statusStyleSet).toHaveBeenCalledWith("4", null);
-    expect(await within(screen.getByRole("region", { name: "Statuses" })).findByText("Automatic")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Style of Code Review" })).toHaveTextContent("Automatic · In review");
   });
 
   it("reports a failed change and keeps the old choice", async () => {

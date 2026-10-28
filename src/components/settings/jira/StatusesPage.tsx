@@ -1,5 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { ChevronsUpDown } from "lucide-react";
+import { ChevronsUpDown, Search } from "lucide-react";
+import { useState } from "react";
 import { api, type StatusStyleRow, type Style } from "../../../api";
 import { STATUS_STYLES_KEY, useStatusStyles } from "../../../queries/views";
 import { fail } from "../../../state/store";
@@ -15,8 +16,9 @@ const STYLE_NAMES: Record<Style, string> = {
 };
 const STYLE_ORDER = Object.keys(STYLE_NAMES) as Style[];
 const CATEGORY_NAMES: Record<string, string> = { new: "To do", indeterminate: "In progress", done: "Done" };
+const CATEGORY_ORDER = ["new", "indeterminate", "done"];
 
-/** Every cached Jira status with the style it shows in; Automatic follows its category and name. */
+/** The tracked projects' statuses by Jira category, searchable, each with its issue count and style. */
 export function StatusesPage() {
   const client = useQueryClient();
   const { data: statuses = [] } = useStatusStyles();
@@ -36,30 +38,50 @@ export function StatusesPage() {
       ])
       .catch((e: unknown) => fail(e, "Could not open the menu"));
 
+  const [search, setSearch] = useState("");
+  const needle = search.trim().toLowerCase();
+  const shown = statuses.filter((status) => !needle || status.name.toLowerCase().includes(needle));
+  const sections = CATEGORY_ORDER.map((category) => ({ category, rows: shown.filter((s) => s.category === category) })).filter((s) => s.rows.length > 0);
+
   return (
-    <Group title="Statuses" anchor="statuses" description="Every Jira status shows in one of five styles. Automatic picks one from the status's category and name.">
-      {statuses.length === 0 && (
+    <Group title="Statuses" anchor="statuses" description="The statuses your tracked projects use, in the style each one shows in. Automatic picks a style from the Jira category and the name.">
+      {statuses.length === 0 ? (
         <div className="settings-row">
           <span className="settings-empty">Statuses appear after the first sync.</span>
         </div>
+      ) : (
+        <div className="settings-row status-search">
+          <label className="columns-popover__search status-search__field">
+            <Search size={13} strokeWidth={2} aria-hidden="true" />
+            <input aria-label="Search statuses" placeholder="Search statuses" value={search} onChange={(e) => setSearch(e.target.value)} />
+          </label>
+        </div>
       )}
-      {statuses.map((status) => {
-        const style = status.chosen ?? status.detected;
-        return (
-          <div key={status.id} className="settings-row">
-            <div className="settings-row-text">
-              <StatusPill style={style} name={status.name} />
-              <div className="settings-row-desc">Jira category: {CATEGORY_NAMES[status.category] ?? status.category}</div>
-            </div>
-            <div className="settings-row-control">
-              <button type="button" className="btn" aria-label={`Style of ${status.name}`} onClick={() => openMenu(status)}>
-                {status.chosen ? STYLE_NAMES[status.chosen] : "Automatic"}
-                <ChevronsUpDown size={12} aria-hidden="true" />
-              </button>
-            </div>
-          </div>
-        );
-      })}
+      {needle && shown.length === 0 && (
+        <div className="settings-row">
+          <span className="settings-empty">No status matches “{search.trim()}”.</span>
+        </div>
+      )}
+      {sections.map(({ category, rows }) => (
+        <section key={category} className="status-section" aria-label={CATEGORY_NAMES[category] ?? category}>
+          <h3 className="status-section__title">{CATEGORY_NAMES[category] ?? category}</h3>
+          {rows.map((status) => {
+            const style = status.chosen ?? status.detected;
+            return (
+              <div key={status.id} className="settings-row status-row">
+                <StatusPill style={style} name={status.name} />
+                <span className="status-row__count">{status.issues === 1 ? "1 issue" : `${status.issues} issues`}</span>
+                <span className="status-row__spacer" />
+                <button type="button" className="btn status-row__style" aria-label={`Style of ${status.name}`} onClick={() => openMenu(status)}>
+                  <span className={`status-square status-square--${style}`} aria-hidden="true" />
+                  {status.chosen ? STYLE_NAMES[status.chosen] : `Automatic · ${STYLE_NAMES[status.detected]}`}
+                  <ChevronsUpDown size={12} aria-hidden="true" />
+                </button>
+              </div>
+            );
+          })}
+        </section>
+      ))}
     </Group>
   );
 }

@@ -250,7 +250,14 @@ fn options(conn: &Connection) -> AppResult<FilterOptions> {
     let tracked = "SELECT project_id FROM space WHERE tracked = 1";
     Ok(FilterOptions {
         fields: fields(conn)?,
-        statuses: choices(conn, "SELECT id, name FROM cache.status ORDER BY name COLLATE NOCASE")?,
+        statuses: choices(
+            conn,
+            &format!(
+                "SELECT id, name FROM cache.status
+                 WHERE id IN (SELECT status_id FROM cache.issue WHERE gone = 0 AND project_id IN ({tracked}))
+                 ORDER BY name COLLATE NOCASE"
+            ),
+        )?,
         types: choices(
             conn,
             &format!(

@@ -131,6 +131,8 @@ export const api = {
   navGo: (listId: number, viewId: number | null) => invoke<Nav>("nav_go", { listId, viewId }),
   /** The Space nodes the owner expanded in the sidebar. */
   navSetExpanded: (expanded: number[]) => invoke<Nav>("nav_set_expanded", { expanded }),
+  /** A filter list's icon by name; null goes back to the funnel. */
+  listSetIcon: (id: number, icon: string | null) => invoke<void>("list_set_icon", { id, icon }),
   viewsOf: (listId: number) => invoke<View[]>("views_of", { listId }),
   viewCreate: (listId: number, name: string, layout: Layout) => invoke<View>("view_create", { listId, name, layout }),
   viewRename: (id: number, name: string) => invoke<View>("view_rename", { id, name }),

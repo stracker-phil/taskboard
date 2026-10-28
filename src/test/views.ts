@@ -21,5 +21,5 @@ export function view(patch: Partial<View> = {}): View {
 
 /** A filter list or Home list as the sidebar tree holds it; override per test. */
 export function listNode(patch: Partial<ListNode> = {}): ListNode {
-  return { id: 21, kind: "list", name: "My open issues", count: 4, ownConditions: 1, description: "", error: null, ...patch };
+  return { id: 21, kind: "list", name: "My open issues", count: 4, ownConditions: 1, description: "", error: null, icon: null, ...patch };
 }

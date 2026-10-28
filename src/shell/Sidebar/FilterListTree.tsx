@@ -1,7 +1,8 @@
-import type { HTMLAttributes, MouseEvent } from "react";
-import { Funnel } from "lucide-react";
+import { type HTMLAttributes, type MouseEvent, useRef, useState } from "react";
 import { api, type ListNode, type SpaceNode } from "../../api";
+import { IconPicker } from "../../components/IconPicker";
 import { InlineRename } from "../../components/InlineRename";
+import { listIcon } from "../../components/listIcons";
 import { usePinOf } from "../../queries/pins";
 import { attempt } from "../../state/requests";
 import { useStore } from "../../state/store";
@@ -82,7 +83,10 @@ function FilterListRow({ list, active, renaming, onOpen, onRename, onRenameDone,
       { text: "Delete", run: () => void deleteList(list) },
     ]);
   };
-  const icon = <Funnel size={15} strokeWidth={2} aria-hidden="true" />;
+  const Icon = listIcon(list.icon);
+  const icon = <Icon size={15} strokeWidth={2} aria-hidden="true" />;
+  const [picking, setPicking] = useState(false);
+  const iconRef = useRef<HTMLButtonElement>(null);
   if (renaming) {
     return (
       <div className="sb-row sb-list" {...dragProps}>
@@ -97,19 +101,40 @@ function FilterListRow({ list, active, renaming, onOpen, onRename, onRenameDone,
     );
   }
   return (
-    <button
-      type="button"
-      className="sb-row sb-list"
-      data-state={active ? "active" : undefined}
-      aria-current={active ? "page" : undefined}
-      onClick={onOpen}
-      onContextMenu={openMenu}
-      {...dragProps}
-    >
-      {icon}
-      <span className="sb-row__label">{list.name}</span>
-      <ListCount list={list} />
-    </button>
+    <div className="sb-list-row" {...dragProps}>
+      <button
+        type="button"
+        className="sb-row sb-list"
+        data-state={active ? "active" : undefined}
+        aria-current={active ? "page" : undefined}
+        onClick={onOpen}
+        onContextMenu={openMenu}
+      >
+        <span className="sb-list__icon-slot" aria-hidden="true" />
+        <span className="sb-row__label">{list.name}</span>
+        <ListCount list={list} />
+      </button>
+      {/* The icon sits over the row's icon slot: a click on it picks another icon (ClickUp style). */}
+      <button
+        ref={iconRef}
+        type="button"
+        className="sb-list__icon"
+        title="Change icon"
+        aria-label={`Change the icon of ${list.name}`}
+        aria-expanded={picking}
+        onClick={() => setPicking((was) => !was)}
+      >
+        {icon}
+      </button>
+      {picking && (
+        <IconPicker
+          value={list.icon}
+          anchor={iconRef}
+          onPick={(name) => void attempt(api.listSetIcon(list.id, name), "Could not change the icon")}
+          onClose={() => setPicking(false)}
+        />
+      )}
+    </div>
   );
 }
 

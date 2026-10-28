@@ -33,6 +33,16 @@ pub async fn list_rename(state: State<'_, AppState>, id: i64, name: String) -> A
     super::list_rename(&state.db, id, name).await
 }
 
+/// The filter list's icon by name; none goes back to the funnel.
+#[tauri::command]
+pub async fn list_set_icon(
+    state: State<'_, AppState>,
+    id: i64,
+    icon: Option<String>,
+) -> AppResult<()> {
+    super::list_set_icon(&state.db, id, icon).await
+}
+
 #[tauri::command]
 pub async fn list_duplicate(state: State<'_, AppState>, id: i64) -> AppResult<i64> {
     super::list_duplicate(&state.db, id).await

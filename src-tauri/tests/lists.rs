@@ -821,6 +821,39 @@ mod the_tree_on_the_demo_site {
     }
 }
 
+mod filter_status_choices {
+    use super::*;
+
+    #[tokio::test]
+    async fn only_statuses_of_tracked_projects_issues_are_offered() {
+        let (_dir, db) = tracked_lab().await;
+        execute(
+            &db,
+            "INSERT INTO cache.status (id, name, category) VALUES
+               ('s1', 'To Do', 'new'), ('s2', 'Done', 'done'),
+               ('s3', 'Archived', 'done'), ('s4', 'Unused', 'new');
+             INSERT INTO cache.issue (id, key, project_id, summary, issue_type, status_id,
+               status_category, created_at, updated_at, raw, synced_at) VALUES
+               ('1', 'NW-1', '10001', 'One', 'Task', 's1', 'new', '2026-10-20T09:00:00.000Z',
+                '2026-10-20T09:00:00.000Z', '{}', '2026-10-20T09:00:00.000Z'),
+               ('2', 'NW-2', '10001', 'Two', 'Task', 's2', 'done', '2026-10-20T09:00:00.000Z',
+                '2026-10-20T09:00:00.000Z', '{}', '2026-10-20T09:00:00.000Z'),
+               ('3', 'NWS-1', '10002', 'Three', 'Task', 's3', 'done', '2026-10-20T09:00:00.000Z',
+                '2026-10-20T09:00:00.000Z', '{}', '2026-10-20T09:00:00.000Z')",
+        )
+        .await;
+
+        let options = filter_options(&db).await.unwrap();
+
+        let statuses: Vec<(&str, &str)> = options
+            .statuses
+            .iter()
+            .map(|c| (c.id.as_str(), c.name.as_str()))
+            .collect();
+        assert_eq!(statuses, [("s2", "Done"), ("s1", "To Do")]);
+    }
+}
+
 mod the_conditions_a_level_shows {
     use super::*;
 

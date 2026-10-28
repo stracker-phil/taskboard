@@ -154,3 +154,17 @@
 .shortcut-field--unbound { color: var(--settings-text-tertiary); font-style: italic; }
 .shortcut-fixed { font-size: 12px; color: var(--settings-text-secondary); }
 .shortcut-conflicts { margin-bottom: 12px; padding: 8px 10px; border-radius: 7px; background: var(--banner-warn-bg); color: var(--banner-warn-text); font-size: 12px; }
+
+/* Settings → Statuses: compact rows per Jira category, the pill at its own width. */
+.status-search { padding: 8px 0; }
+.status-search__field { flex: 1; margin: 0; }
+.status-section + .status-section { margin-top: 6px; }
+.status-section__title {
+  margin: 12px 0 2px; font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--settings-text-tertiary);
+}
+.status-row { gap: 10px; min-height: 40px; padding: 6px 0; }
+.status-row .status-pill { flex: none; }
+.status-row__count { font-size: 12px; color: var(--settings-text-tertiary); white-space: nowrap; }
+.status-row__spacer { flex: 1; }
+.status-row__style { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }

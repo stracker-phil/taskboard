@@ -8,6 +8,7 @@ const listNode = (patch: Partial<ListNode> = {}): ListNode => ({
   ownConditions: 0,
   description: "",
   error: null,
+  icon: null,
   ...patch,
 });
 

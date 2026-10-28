@@ -120,7 +120,7 @@ case and accents, `epic`).
 project), `due`, `summary`, `status`; empty priorities and due dates sort last either way; ties keep the
 issue id order. Columns are standard ids (`assignee`, `epic`, `release`, `priority`, `labels`, `sprint`,
 `due`) or a Jira custom field id (`columns_catalogue` lists them; Jira's internal `any` fields and the sprint
-field are left out). `view.widths` (migration `local/0003`) holds the Table layout's column widths by column id; `view.wrap_titles` (`local/0004`, default on) whether the List wraps long titles; `view.collapsed` (`local/0005`) a Board's collapsed or expanded columns by status id (the rest: Done collapsed). `view_board` returns one column per status shown, in the Board order (To do, In progress, Blocked, In review, Done, then Jira's status order).
+field are left out). `view.widths` (migration `local/0003`) holds the Table layout's column widths by column id; `view.wrap_titles` (`local/0004`, default on) whether the List wraps long titles; `filter_list.icon` (`local/0006`) the list's icon name (null: the funnel); `view.collapsed` (`local/0005`) a Board's collapsed or expanded columns by status id (the rest: Done collapsed). `view_board` returns one column per status shown, in the Board order (To do, In progress, Blocked, In review, Done, then Jira's status order).
 `status_style` holds the owner's style per status (`status_style_set`).
 
 ## Rules

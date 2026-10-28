@@ -53,3 +53,20 @@
 
 /* A view's content fades in when the view, level or layout changes. */
 .list-scroll, .table-scroll { animation: fade-in var(--motion-base) var(--ease-out); }
+
+/* The app's tooltip (components/TooltipHost.tsx): small, dark on light and light on dark, rising in. */
+.tooltip {
+  position: fixed; z-index: 100; max-width: 280px; padding: 4px 8px; border-radius: 6px; transform: translateX(-50%);
+  background: var(--tooltip-bg); color: var(--tooltip-text); box-shadow: var(--shadow-raised);
+  font-size: 12px; font-weight: 500; line-height: 1.35; pointer-events: none; white-space: pre-line;
+  animation: tooltip-in var(--motion-fast) var(--ease-out);
+}
+@keyframes tooltip-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(-2px); }
+  to { opacity: 1; transform: translateX(-50%); }
+}
+.tooltip--above { animation-name: tooltip-in-above; }
+@keyframes tooltip-in-above {
+  from { opacity: 0; transform: translateX(-50%) translateY(2px); }
+  to { opacity: 1; transform: translateX(-50%); }
+}

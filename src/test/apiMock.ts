@@ -47,7 +47,7 @@ const emptyConnection = (): Connection => ({
 
 /** A sidebar with Everything only: nothing tracked yet. */
 const emptySidebar = (): SidebarTree => ({
-  everything: { id: 1, kind: "everything", name: "Everything", count: 0, ownConditions: 0, description: "", error: null },
+  everything: { id: 1, kind: "everything", name: "Everything", count: 0, ownConditions: 0, description: "", error: null, icon: null },
   home: [],
   pinnedLists: [],
   spaces: [],
@@ -96,6 +96,7 @@ export function createApiMock(): Api {
     listDelete: vi.fn(),
     listMove: vi.fn(),
     listSetFilter: vi.fn(),
+    listSetIcon: vi.fn(),
     listConditions: vi.fn(async (): Promise<ListConditions> => ({ kind: "everything", locked: [], own: [], error: null, projectFixed: false })),
     filterOptions: vi.fn(async (): Promise<FilterOptions> => filterOptions()),
     listMatchCount: vi.fn(),

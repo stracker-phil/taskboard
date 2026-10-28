@@ -1,7 +1,7 @@
 import { api, type ViewPlace } from "../../api";
 import { fail } from "../requests";
 import type { Slice } from "../store";
-import { narrowingKey } from "./narrowing";
+import { narrowingKey, NO_NARROWING } from "./narrowing";
 
 /** Where the owner left each view: open groups, scroll, the selected row and its peek. Rust keeps it across
  *  restarts (`places.json`); changes save a moment after the last one. */
@@ -12,7 +12,7 @@ export interface PlacesSlice {
   updatePlace: (listId: number, viewId: number, patch: Partial<ViewPlace>) => void;
 }
 
-export const EMPTY_PLACE: ViewPlace = { scrollTop: 0, toggled: {}, selectedId: null, peekOpen: false };
+export const EMPTY_PLACE: ViewPlace = { scrollTop: 0, toggled: {}, selectedId: null, peekOpen: false, onlyMine: false, text: "" };
 
 const SAVE_DELAY_MS = 300;
 const pending = new Map<string, ReturnType<typeof setTimeout>>();
@@ -29,8 +29,13 @@ export const placesSlice: Slice<PlacesSlice> = {
       } catch (e) {
         fail(e, "Could not restore where you were in this view");
       }
-      // A change made while loading wins over the saved place.
-      set((s) => (key in s.places ? s : { places: { ...s.places, [key]: saved ?? EMPTY_PLACE } }));
+      // A change made while loading wins over the saved place; the view's Me chip and text come back with it.
+      set((s) => {
+        if (key in s.places) return s;
+        const place = saved ?? EMPTY_PLACE;
+        const narrowing = s.narrowings[key] ?? { ...NO_NARROWING, me: place.onlyMine, text: place.text };
+        return { places: { ...s.places, [key]: place }, narrowings: { ...s.narrowings, [key]: narrowing } };
+      });
     },
     updatePlace(listId, viewId, patch) {
       const key = narrowingKey(listId, viewId);

@@ -54,10 +54,11 @@ an item.
 - **Expanding**: the chevron toggles a Space (saved with `nav_set_expanded`); ⌥-click keeps only that Space
   expanded. The Space holding the current level always shows expanded.
 - **Filter lists** (`FilterListTree`): indented 34px behind a 1px `--border` guide with 12px padding; 32px
-  rows, 9px gap, `--text-secondary`, funnel 15/2, name and count (`ListCount`; a list whose filter can't be
+  rows, 9px gap, `--text-secondary`, the list's icon 15/2 (the funnel unless one was picked), name and count (`ListCount`; a list whose filter can't be
   used shows a muted `CircleAlert` with the reason as its tooltip instead). The current list is selected like
   a Space, 600. "+ New filter list" (30px, 13px, `--text-muted`) creates "New filter list", opens it and
-  starts renaming it.
+  starts renaming it. A click on a list's icon opens `IconPicker` (a grid of `components/listIcons.ts`; the
+  funnel resets), saved with `list_set_icon`; the header and Home show the same icon.
 - **Footer** (`SidebarFooter`): the sync chip (34px, 13px `--text-tertiary`; a 7px dot in `--sync-ok`,
   `--sync-busy`, `--sync-offline` or `--sync-error-dot` by state; the state in words from
   `describeSyncState`; a refresh icon 14/2; a click syncs now) and Settings (34px, gear 17/1.8).
@@ -92,8 +93,11 @@ padding, 2px gap, a `--hairline` bottom line.
 - A tab: 8px padding, 7px gap, `--text-tertiary`; an 18px tile (5px radius) in `--view-list`,
   `--view-board` or `--view-table` with the white `List`, `Kanban` or `Table2` glyph (11/2.8), then the name.
   The current tab is `--text`, 600, with a 2px `--text` underline over the bar's line.
-- After the tabs a 1px `--border` separator (10px inset) and "+ View" (`--text-muted`), a native menu of List,
-  Board and Table that adds a view of that layout named after it and opens it.
+- After the tabs a 1px `--border` separator (10px inset) and "+ View" (`--text-muted`, also ⌘T): a "New view"
+  popover with a tile per layout (its glyph, name and a one-line hint) that adds a view of that layout named
+  after it and opens it.
+- Double-click a tab to rename it in place; drag a tab sideways to reorder (`useDragReorder` on the x axis,
+  `view_move`), with a 2px `--accent` line where it lands.
 - Right-click a tab: Rename (in place), Duplicate, Change layout ▸ (the other layouts), Delete (disabled for
   the only view; deleting the current view opens the level's default).
 - ⌘1–⌘9 open the nth tab.
@@ -246,8 +250,8 @@ view with its place intact).
   links open in the browser, images become link chips. The peek shows the same description and the latest
   three activity items.
 
-**Remember my place:** each view keeps its opened and closed groups, scroll position, selected row and open
-peek (`state/slices/places.ts`, saved by Rust in `places.json` a moment after the last change, at most 200
+**Remember my place:** each view keeps its opened and closed groups, scroll position, selected row, open
+peek, and the toolbar's Me chip and text filter (`state/slices/places.ts`, saved by Rust in `places.json` a moment after the last change, at most 200
 views), also across restarts.
 
 ## Text and controls never wrap
@@ -255,6 +259,13 @@ views), also across restarts.
 Buttons, tabs, chips, pills, column headers and table cells stay on one line (`base.css`); long text
 truncates with an ellipsis. When space runs out the flexible element shrinks (the text filter, a title), never
 a button. Only descriptions, comment bodies, pin reasons and empty-state text may wrap.
+
+## Tooltips
+
+`components/TooltipHost.tsx`, mounted once per window, replaces the native tooltip: it takes any `title` over
+as `data-tooltip` (an icon-only control keeps it as its `aria-label`) and shows a `--tooltip-bg` bubble below
+the control (above when there's no room) after 450 ms, at once while moving between controls within 600 ms,
+and on keyboard focus. A press, a key, the wheel or leaving hides it.
 
 ## Motion
 
@@ -316,7 +327,8 @@ button, Escape and a press outside close it, focus goes back to the button).
 
 ## Table view
 
-`src/views/table/`: the same rows as the list, 36 high, with a sticky 34px header: Key, Summary (flexible),
+`src/views/table/`: the same rows as the list, every row 30 high (a group heading too: its 22px tab sits at
+the row's bottom), with a sticky 34px header: Key, Summary (flexible),
 Status, then the view's columns. A sortable header (Key, Summary, Status, Priority, Due) sorts on click and
 again flips the direction (`aria-sort`, ↑/↓); a 6px handle at each header's right edge resizes the column
 (48–800), saved on the view. Grouped tables keep the list's group headers; the table scrolls sideways when the
@@ -427,8 +439,9 @@ owner's own Settings design replaces it. Its colours are the `--settings-*` toke
     is tracked. The sidebar's "Colour and icon…" and "Client label…" items open `SpacePopover` (300px, 12px
     radius, `--shadow-popover`, at the top left of the content panel) with the same fields; Esc, Done or a
     click outside close it.
-  - **Statuses**: every cached Jira status as its pill with its Jira category, and a button with a native menu
-    of Automatic (naming the detected style) and the five styles.
+  - **Statuses**: only the statuses the tracked projects' issues are in, under a section per Jira category,
+    with a search field. A row: the pill, "N issues", and a button (the style's square and "Automatic · X" or
+    the style's name) with a native menu of Automatic and the five styles.
   - **Sync**: *Scope* (the effective JQL in a monospaced field; Validate, Save, Reset to Default), *Intervals*
     (minutes in front and in the background, days to keep done issues) and *Cache* (the sync state line with
     Sync Now, one row per tracked project with its key, last full sync and "N issues · M open", then Reset

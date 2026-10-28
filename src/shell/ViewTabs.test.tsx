@@ -1,7 +1,7 @@
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
 
@@ -16,6 +16,11 @@ import { view } from "../test/views";
 import { ViewTabs } from "./ViewTabs";
 
 const mocked = vi.mocked(api, true);
+
+// jsdom may lack PointerEvent; the stub keeps the mouse fields (clientX, buttons) that the drag reads.
+window.PointerEvent ??= class extends MouseEvent {
+  pointerId = 1;
+} as unknown as typeof PointerEvent;
 
 const LIST = view({ id: 101, name: "List", layout: "list" });
 const BOARD = view({ id: 102, name: "Sprint board", layout: "board", position: 1 });
@@ -59,6 +64,7 @@ beforeEach(() => {
   resetStore();
   installCommands("main");
   mocked.viewSetLayout.mockResolvedValue(LIST);
+  mocked.viewMove.mockResolvedValue([]);
 });
 
 describe("ViewTabs", () => {
@@ -98,12 +104,27 @@ describe("ViewTabs", () => {
   });
 
   describe("+ View", () => {
-    it("offers the three layouts", async () => {
+    it("opens a New view dialog offering the three layouts, without a native menu", async () => {
       await renderTabs();
 
       await userEvent.click(screen.getByRole("button", { name: "+ View" }));
 
-      expect(entriesOf(mocked.popupMenu.mock.lastCall![0]).map((e) => e.text)).toEqual(["List", "Board", "Table"]);
+      const dialog = screen.getByRole("dialog", { name: "New view" });
+      expect(within(dialog).getAllByRole("button").map((b) => b.textContent)).toEqual([
+        "ListGroups of rows",
+        "BoardStatus columns",
+        "TableA dense grid",
+      ]);
+      expect(mocked.popupMenu).not.toHaveBeenCalled();
+    });
+
+    it("closes the dialog on Escape", async () => {
+      await renderTabs();
+      await userEvent.click(screen.getByRole("button", { name: "+ View" }));
+
+      await userEvent.keyboard("{Escape}");
+
+      expect(screen.queryByRole("dialog", { name: "New view" })).not.toBeInTheDocument();
     });
 
     it.each([
@@ -115,10 +136,11 @@ describe("ViewTabs", () => {
       await renderTabs();
       await userEvent.click(screen.getByRole("button", { name: "+ View" }));
 
-      await choose(name);
+      await userEvent.click(within(screen.getByRole("dialog", { name: "New view" })).getByRole("button", { name: new RegExp(`^${name}`) }));
 
       expect(mocked.viewCreate).toHaveBeenCalledWith(11, name, layout);
       await waitFor(() => expect(mocked.navGo).toHaveBeenCalledWith(11, 200));
+      expect(screen.queryByRole("dialog", { name: "New view" })).not.toBeInTheDocument();
     });
 
     it("shows an error toast and stays put when the view cannot be added", async () => {
@@ -126,10 +148,98 @@ describe("ViewTabs", () => {
       await renderTabs();
       await userEvent.click(screen.getByRole("button", { name: "+ View" }));
 
-      await choose("Board");
+      await userEvent.click(within(screen.getByRole("dialog", { name: "New view" })).getByRole("button", { name: /^Board/ }));
 
       await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not add the view: Disk full"));
       expect(mocked.navGo).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("double-click", () => {
+    it("shows the inline rename field and saves the new name", async () => {
+      mocked.viewRename.mockResolvedValue({ ...BOARD, name: "Release board" });
+      await renderTabs();
+
+      await userEvent.dblClick(screen.getByRole("tab", { name: "Sprint board" }));
+      const field = await screen.findByRole("textbox", { name: "View name" });
+      expect(field).toHaveValue("Sprint board");
+      await userEvent.clear(field);
+      await userEvent.type(field, "Release board{Enter}");
+
+      expect(mocked.viewRename).toHaveBeenCalledWith(102, "Release board");
+      expect(screen.queryByRole("textbox", { name: "View name" })).not.toBeInTheDocument();
+    });
+  });
+
+  describe("drag to reorder", () => {
+    let rects: { mockRestore: () => void };
+
+    // Tabs are 100px wide, side by side from the left by their drag index.
+    beforeEach(() => {
+      rects = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+        const index = this.getAttribute("data-drag-index");
+        const left = index === null ? 0 : Number(index) * 100;
+        const width = index === null ? 0 : 100;
+        return { left, right: left + width, width, top: 0, bottom: 30, height: 30, x: left, y: 0, toJSON: () => ({}) };
+      });
+    });
+
+    afterEach(() => rects.mockRestore());
+
+    function drag(target: HTMLElement, from: number, to: number) {
+      fireEvent.pointerDown(target, { button: 0, clientX: from });
+      fireEvent.pointerMove(target, { buttons: 1, clientX: to });
+      fireEvent.pointerUp(target);
+    }
+
+    it.each([
+      ["the first tab past the second", "List", 10, 160, 101, 1],
+      ["the first tab to the end", "List", 10, 290, 101, 2],
+      ["the last tab to the front", "Overview", 210, 10, 103, 0],
+    ])("moves %s", async (_name, tab, from, to, id, index) => {
+      await renderTabs([LIST, BOARD, TABLE]);
+
+      drag(screen.getByRole("tab", { name: tab }), from, to);
+
+      expect(mocked.viewMove).toHaveBeenCalledWith(id, index);
+    });
+
+    it("moves nothing when dropped where it already is", async () => {
+      await renderTabs([LIST, BOARD, TABLE]);
+
+      drag(screen.getByRole("tab", { name: "Sprint board" }), 110, 130);
+
+      expect(mocked.viewMove).not.toHaveBeenCalled();
+    });
+
+    it("treats a press that barely moves as a click", async () => {
+      await renderTabs([LIST, BOARD]);
+      const tab = screen.getByRole("tab", { name: "Sprint board" });
+
+      drag(tab, 110, 112);
+      fireEvent.click(tab);
+
+      expect(mocked.viewMove).not.toHaveBeenCalled();
+      expect(mocked.navGo).toHaveBeenCalledWith(11, 102);
+    });
+
+    it("swallows the click that ends a drag", async () => {
+      await renderTabs([LIST, BOARD, TABLE]);
+      const tab = screen.getByRole("tab", { name: "List" });
+
+      drag(tab, 10, 290);
+      fireEvent.click(tab);
+
+      expect(mocked.navGo).not.toHaveBeenCalled();
+    });
+
+    it("shows an error toast when the view cannot be moved", async () => {
+      mocked.viewMove.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
+      await renderTabs([LIST, BOARD, TABLE]);
+
+      drag(screen.getByRole("tab", { name: "List" }), 10, 290);
+
+      await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not move the view: Disk full"));
     });
   });
 
@@ -253,20 +363,20 @@ describe("ViewTabs", () => {
     };
 
     describe("view.new", () => {
-      it("opens the add-view menu with the three layouts", async () => {
+      it("opens the New view dialog", async () => {
         await renderTabs();
 
         run("view.new");
 
-        expect(entriesOf(mocked.popupMenu.mock.lastCall![0]).map((e) => e.text)).toEqual(["List", "Board", "Table"]);
+        expect(await screen.findByRole("dialog", { name: "New view" })).toBeInTheDocument();
       });
 
-      it("opens the add-view menu on ⌘T", async () => {
+      it("opens the New view dialog on ⌘T", async () => {
         await renderTabs();
 
         await userEvent.keyboard("{Meta>}t{/Meta}");
 
-        expect(entriesOf(mocked.popupMenu.mock.lastCall![0]).map((e) => e.text)).toEqual(["List", "Board", "Table"]);
+        expect(await screen.findByRole("dialog", { name: "New view" })).toBeInTheDocument();
       });
     });
 

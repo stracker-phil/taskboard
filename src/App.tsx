@@ -8,6 +8,7 @@ import { trackWindowFocus } from "./lib/windowFocus";
 import { queryClient } from "./queries/queryClient";
 import { useAppearance } from "./lib/theme";
 import { CommandPalette } from "./palette/CommandPalette";
+import { TooltipHost } from "./components/TooltipHost";
 import { usePinExpiry } from "./queries/pins";
 import { useEvents } from "./queries/useEvents";
 import { MainBody } from "./shell/MainBody";
@@ -38,6 +39,7 @@ function MainWindow() {
         <MainBody />
       </Window>
       <CommandPalette />
+      <TooltipHost />
       <ConfirmHost />
       <Toasts />
     </>

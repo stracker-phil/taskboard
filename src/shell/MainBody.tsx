@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { PinnedView } from "../pins/PinnedView";
 import { useNav, useSidebar, useViews } from "../queries/sidebar";
 import { useSyncOverview } from "../queries/sync";
@@ -16,6 +17,11 @@ export function MainBody() {
   const location = nav?.location;
   const { data: views } = useViews(location?.listId ?? null);
   const { data: tree } = useSidebar();
+  const loadPlace = useStore((s) => s.loadPlace);
+  // Every layout's place, the narrowing among it, loads here; the List also restores its scroll from it.
+  useEffect(() => {
+    if (location) void loadPlace(location.listId, location.viewId);
+  }, [loadPlace, location]);
   const narrowing = useStore((s) => (location ? s.narrowings[narrowingKey(location.listId, location.viewId)] : undefined));
   const hasIssues = overview?.projects.some((p) => p.cached > 0) ?? false;
   if (!hasIssues || !location) return <SyncStatusView />;

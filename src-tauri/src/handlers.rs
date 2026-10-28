@@ -49,6 +49,7 @@ pub fn handlers() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
         lists::sidebar_tree,
         lists::list_create,
         lists::list_rename,
+        lists::list_set_icon,
         lists::list_duplicate,
         lists::list_delete,
         lists::list_move,

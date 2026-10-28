@@ -14,6 +14,8 @@
   --hover-bg: #2e2e33;
   --row-hover-bg: #29292d;
   --scrim: rgba(0, 0, 0, 0.55);
+  --tooltip-bg: #f4f4f5;
+  --tooltip-text: #18181b;
 
   /* Text */
   --text: #f4f4f5;

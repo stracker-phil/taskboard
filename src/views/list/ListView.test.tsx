@@ -182,7 +182,7 @@ describe("ListView", () => {
       groupOf([OPEN], { key: "status:progress", label: "In Progress" }),
       groupOf([DONE], { key: "status:done", label: "Done", collapsedByDefault: true }),
     ];
-    const saved: ViewPlace = { scrollTop: 0, toggled: { "status:done": true, "status:progress": false }, selectedId: "2", peekOpen: false };
+    const saved: ViewPlace = { scrollTop: 0, toggled: { "status:done": true, "status:progress": false }, selectedId: "2", peekOpen: false, onlyMine: false, text: "" };
 
     it("restores the selection and the opened and closed groups", async () => {
       mocked.placeGet.mockResolvedValue(saved);

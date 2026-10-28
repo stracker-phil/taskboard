@@ -106,6 +106,35 @@ pub async fn list_rename(db: &Db, id: i64, name: String) -> AppResult<()> {
     .await
 }
 
+/// The longest icon name the app's icon set uses, with room to spare.
+const ICON_MAX: usize = 40;
+
+/// A filter list's icon, by name (lowercase letters, digits and dashes); `None` goes back to the funnel.
+pub async fn list_set_icon(db: &Db, id: i64, icon: Option<String>) -> AppResult<()> {
+    if let Some(name) = &icon {
+        let valid = !name.is_empty()
+            && name.len() <= ICON_MAX
+            && name
+                .chars()
+                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-');
+        if !valid {
+            return Err(AppError::InvalidInput(format!(
+                "“{name}” isn't an icon name"
+            )));
+        }
+    }
+    db.write(move |tx, changes| {
+        filter_list(tx, id)?;
+        tx.execute(
+            "UPDATE filter_list SET icon = ?2 WHERE id = ?1",
+            params![id, icon],
+        )?;
+        changes.local_changed(LocalPart::Lists);
+        Ok(())
+    })
+    .await
+}
+
 /// A copy with its views right after the original, named "<name> copy".
 pub async fn list_duplicate(db: &Db, id: i64) -> AppResult<i64> {
     db.write(move |tx, changes| {

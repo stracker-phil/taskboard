@@ -42,6 +42,8 @@ pub struct ListNode {
     pub description: String,
     /// Why its filter can't be used.
     pub error: Option<String>,
+    /// The icon the owner picked for a filter list; none shows the funnel.
+    pub icon: Option<String>,
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
@@ -114,6 +116,7 @@ fn build(conn: &Connection, viewer: &Viewer) -> AppResult<SidebarTree> {
             own_conditions: 0,
             description: String::new(),
             error: None,
+            icon: None,
         },
     };
     let home = nodes
@@ -241,6 +244,7 @@ fn list_node(
         own_conditions: own.len(),
         description: describe(&own, names),
         error,
+        icon: node.icon.clone(),
     }
 }
 

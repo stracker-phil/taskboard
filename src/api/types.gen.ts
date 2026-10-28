@@ -288,7 +288,11 @@ description: string,
 /**
  * Why its filter can't be used.
  */
-error: string | null, };
+error: string | null, 
+/**
+ * The icon the owner picked for a filter list; none shows the funnel.
+ */
+icon: string | null, };
 
 /**
  * Payload of `local_changed`.
@@ -510,7 +514,11 @@ category: string, detected: Style,
 /**
  * The owner's choice; none = Automatic.
  */
-chosen: Style | null, };
+chosen: Style | null, 
+/**
+ * Issues of the tracked projects in this status.
+ */
+issues: number, };
 
 /**
  * Stored as its name; the `--status-{style}-*` tokens draw it. Ordered as the list's status groups.
@@ -594,4 +602,12 @@ export type ViewPlace = { scrollTop: number,
 /**
  * Groups the owner opened (`true`) or closed (`false`); the others keep their default.
  */
-toggled: { [key in string]: boolean }, selectedId: string | null, peekOpen: boolean, };
+toggled: { [key in string]: boolean }, selectedId: string | null, peekOpen: boolean, 
+/**
+ * The toolbar's Me chip, kept per view.
+ */
+onlyMine: boolean, 
+/**
+ * The toolbar's "Filter this view" text, kept per view.
+ */
+text: string, };

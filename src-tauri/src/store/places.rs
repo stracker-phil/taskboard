@@ -22,6 +22,10 @@ pub struct ViewPlace {
     pub toggled: BTreeMap<String, bool>,
     pub selected_id: Option<String>,
     pub peek_open: bool,
+    /// The toolbar's Me chip, kept per view.
+    pub only_mine: bool,
+    /// The toolbar's "Filter this view" text, kept per view.
+    pub text: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
@@ -90,6 +94,7 @@ mod tests {
             toggled: BTreeMap::from([("review".to_string(), true), ("done".to_string(), false)]),
             selected_id: Some(selected.to_string()),
             peek_open: true,
+            ..ViewPlace::default()
         }
     }
 
@@ -187,7 +192,12 @@ mod tests {
 
     #[test]
     fn a_place_serializes_with_camel_case_keys() {
-        let value = serde_json::to_value(place(12.5, "10042")).unwrap();
+        let value = serde_json::to_value(ViewPlace {
+            only_mine: true,
+            text: "invoice".to_string(),
+            ..place(12.5, "10042")
+        })
+        .unwrap();
 
         assert_eq!(
             value,
@@ -196,6 +206,8 @@ mod tests {
                 "toggled": { "done": false, "review": true },
                 "selectedId": "10042",
                 "peekOpen": true,
+                "onlyMine": true,
+                "text": "invoice",
             })
         );
     }
@@ -210,6 +222,57 @@ mod tests {
                 scroll_top: 5.0,
                 ..ViewPlace::default()
             }
+        );
+    }
+
+    #[tokio::test]
+    async fn the_me_chip_and_filter_text_persist_across_reopen() {
+        let dir = temp_config_dir();
+        let saved = ViewPlace {
+            only_mine: true,
+            text: "invoice".to_string(),
+            ..place(7.0, "10042")
+        };
+        PlaceStore::open(dir.path())
+            .set(1, 2, saved.clone())
+            .await
+            .unwrap();
+
+        assert_eq!(PlaceStore::open(dir.path()).get(1, 2), Some(saved));
+    }
+
+    #[test]
+    fn a_place_serializes_the_me_chip_and_filter_text_in_camel_case() {
+        let value = serde_json::to_value(ViewPlace {
+            only_mine: true,
+            text: "invoice".to_string(),
+            ..ViewPlace::default()
+        })
+        .unwrap();
+
+        assert_eq!(value["onlyMine"], serde_json::json!(true));
+        assert_eq!(value["text"], serde_json::json!("invoice"));
+    }
+
+    #[test]
+    fn a_file_written_before_the_me_chip_and_text_existed_loads_them_as_off() {
+        let dir = temp_config_dir();
+        fs::write(
+            dir.path().join("places.json"),
+            r#"{"views": {"1:2": [0, {"scrollTop": 42.5, "toggled": {"done": false}, "selectedId": "10042", "peekOpen": true}]}, "next": 1}"#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            PlaceStore::open(dir.path()).get(1, 2),
+            Some(ViewPlace {
+                scroll_top: 42.5,
+                toggled: BTreeMap::from([("done".to_string(), false)]),
+                selected_id: Some("10042".to_string()),
+                peek_open: true,
+                only_mine: false,
+                text: String::new(),
+            })
         );
     }
 

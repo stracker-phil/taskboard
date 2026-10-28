@@ -11,6 +11,7 @@ pub const LOCAL: &[&str] = &[
     include_str!("../../migrations/local/0003_view_widths.sql"),
     include_str!("../../migrations/local/0004_view_wrap.sql"),
     include_str!("../../migrations/local/0005_view_collapsed.sql"),
+    include_str!("../../migrations/local/0006_list_icon.sql"),
 ];
 pub const CACHE: &[&str] = &[include_str!("../../migrations/cache/0001_init.sql")];
 

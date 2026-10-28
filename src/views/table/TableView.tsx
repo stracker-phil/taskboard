@@ -3,7 +3,7 @@ import { useMemo, useRef, useState } from "react";
 import type { Group, Narrowing, View, ViewData } from "../../api";
 import { useViewRows } from "../../queries/views";
 import { EmptyLevel } from "../../shell/EmptyLevel";
-import { flatten, GROUP_HEIGHT, type Item } from "../list/flatten";
+import { flatten } from "../list/flatten";
 import { GroupHeader } from "../list/GroupHeader";
 import { nextSort } from "./sortable";
 import { TableHeader } from "./TableHeader";
@@ -12,13 +12,12 @@ import { useColumnResize } from "./useColumnResize";
 import { useViewSettings } from "./useViewSettings";
 import { columnWidth, SUMMARY_MIN_WIDTH } from "./widths";
 
-const TABLE_ROW_HEIGHT = 36;
+/** Every row, a group's heading row too: the Table never changes its rhythm. */
+const TABLE_ROW_HEIGHT = 30;
 const HEADER_HEIGHT = 34;
 const SIDE_PADDING = 24;
 
-const TABLE_GROUP_GAP = 14;
-
-const itemHeight = (item: Item) => (item.kind === "row" ? TABLE_ROW_HEIGHT : item.first ? GROUP_HEIGHT : GROUP_HEIGHT + TABLE_GROUP_GAP);
+const itemHeight = () => TABLE_ROW_HEIGHT;
 
 interface Props {
   view: View;
@@ -55,7 +54,7 @@ function Table({ view, data }: { view: View; data: ViewData }) {
   const virtualizer = useVirtualizer({
     count: items.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: (index) => itemHeight(items[index]),
+    estimateSize: itemHeight,
     scrollMargin: HEADER_HEIGHT,
     paddingEnd: 24,
     overscan: 12,
@@ -77,7 +76,7 @@ function Table({ view, data }: { view: View; data: ViewData }) {
             return (
               <div
                 key={item.kind === "row" ? `row:${item.row.id}` : `group:${item.group.key}`}
-                className={item.kind === "group" && !item.first ? "table-item table-item--gap" : "table-item"}
+                className={item.kind === "group" ? "table-item table-item--group" : "table-item"}
                 style={{ height: virtual.size, transform: `translateY(${virtual.start - HEADER_HEIGHT}px)` }}
               >
                 {item.kind === "group" ? (

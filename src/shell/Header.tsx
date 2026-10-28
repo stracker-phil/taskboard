@@ -1,4 +1,4 @@
-import { Funnel } from "lucide-react";
+import { listIcon } from "../components/listIcons";
 import { usePageAction } from "../commands/pageActions";
 import { browseUrl } from "../lib/jiraLinks";
 import { api, type SpaceNode } from "../api";
@@ -41,7 +41,7 @@ function Title({ level }: { level: Level }) {
           <span className="content-header__slash" aria-hidden="true">
             /
           </span>
-          <Funnel className="content-header__icon" size={15} strokeWidth={2} aria-hidden="true" />
+          <ListIcon name={level.node.icon} />
           <h1 className="content-header__title">{level.node.name}</h1>
         </>
       );
@@ -66,6 +66,11 @@ function MarkAllSeen({ listId, unseen }: { listId: number; unseen: number }) {
       Mark all seen
     </button>
   );
+}
+
+function ListIcon({ name }: { name: string | null }) {
+  const Icon = listIcon(name);
+  return <Icon className="content-header__icon" size={15} strokeWidth={2} aria-hidden="true" />;
 }
 
 /** Jira's page of the Space's project (`/browse/KEY` redirects to it); hidden without a Space or a site. */
