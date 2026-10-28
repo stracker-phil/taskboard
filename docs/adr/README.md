@@ -25,7 +25,7 @@ stands in Taskboard. The numbers in this table are Taskboard's.
 | [0013](0013-network-only-to-listed-hosts.md) | The app talks only to listed hosts | Accepted (2026-10-28) |
 | [0014](0014-small-feature-modules.md) | Small feature modules with narrow seams | Accepted (2026-10-28) |
 | [0015](0015-signed-with-a-local-certificate.md) | Builds are signed with a local certificate | Accepted (2026-10-28) |
+| [0016](0016-closing-the-window-keeps-the-app-running.md) | Closing the window keeps the app running | Accepted (2026-10-28) |
 
 Open, decided once the app's scope is known: where the data lives (SQLite through sqlx with migrations, as
-TimeTracker; or plain files, as Daybook), the window model (a regular window, a menu-bar app, overlays) and
-integrations with Daybook and TimeTracker.
+TimeTracker; or plain files, as Daybook), integrations with Daybook and TimeTracker.

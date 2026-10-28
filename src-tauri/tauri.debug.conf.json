@@ -1,0 +1,13 @@
+{
+  "productName": "Taskboard (Debug)",
+  "identifier": "com.philippstracker.taskboard.debug",
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": [
+          "taskboard-debug"
+        ]
+      }
+    }
+  }
+}

@@ -46,7 +46,7 @@ These rules hold everywhere in the code. Keep them when you change things.
 │  │ commands/ (keys)     │ ◀───────── │ AppState, store/, data layer    │  │
 │  │ api/index.ts         │   events   └─────────────────────────────────┘  │
 │  └──────────────────────┘                                                 │
-│  Native menu, tray ◀──────────────────────────▶ Rust                      │
+│  Native menu ◀────────────────────────────────▶ Rust                      │
 └───────────────────────────────────────────────┬───────────────────────────┘
                      Unix socket (ipc.rs)       │
   `taskboard …` (2nd process, CLI) ─────────────┘
@@ -58,7 +58,12 @@ These rules hold everywhere in the code. Keep them when you change things.
 - **Launch requests are pulled, not pushed.** Rust queues launch events and emits a bare `launch` event; the
   page calls `take_launch_events`, so it can't miss the request that started the app.
 - **The window** is declared `visible: false` and shown by Rust, so `--hidden` never flashes it. Closing it
-  hides it; the app keeps running until Quit.
+  hides it; the app keeps running (and syncing) until Quit, and the Dock icon brings it back
+  ([ADR 0016](adr/0016-closing-the-window-keeps-the-app-running.md)). There is no tray, LaunchAgent or global
+  shortcut.
+- **The CLI**: `taskboard` starts or activates the app; `status [--json]`, `show`, `focus`, `hide`,
+  `open <KEY>` and `quit` ask the running app (`cli/`, `remote.rs`). `show` and `focus` start it when it
+  isn't running; the others exit 2 with "Taskboard isn't running".
 - **Settings** is a window of its own ([ux.md](ux.md#settings)).
 
 ## Data
@@ -69,8 +74,7 @@ The config dir is `~/Library/Application Support/com.philippstracker.taskboard/`
 loads as defaults, unknown keys are ignored and a file that cannot be parsed is moved aside as
 `<name>.<timestamp>.corrupt`. A store saves a changed copy before it swaps it in.
 
-Where the tasks themselves live is decided with the first feature (an ADR): SQLite through sqlx with
-migrations that are never edited once shipped (TimeTracker), or plain files (Daybook).
+The Jira mirror and the owner's own lists and views live in SQLite (rusqlite); its ADR comes with the database.
 
 ## Repository map
 
@@ -80,14 +84,15 @@ Target layout; folders appear with the code that needs them.
 src-tauri/
   src/main.rs lib.rs         entry; identity (IDENTIFIER, APP_NAME, LINK_SCHEME), argv, then app::start
   src/app.rs handlers.rs     Tauri builder; every registered command (the install list)
+  src/commands.rs launch.rs  settings, key bindings, UI state, links, logs; launch events pulled by the page
   src/instance.rs ipc.rs     socket handoff to the running app, instance lock; the socket protocol
-  src/cli/                   command tree, human replies
+  src/cli/ remote.rs         the clap command line and its replies; the app's side of each request
   src/events.rs state.rs     every event name; AppState
   src/error.rs lock.rs       AppError (+ ErrorKind); poison-tolerant lock helpers
   src/store/                 JsonFile, JsonStore, settings/, keybindings, ui_state
   src/bus/                   the command bus
   src/<feature>/             one folder per feature: types, pure logic, commands.rs, tests
-  src/window/ menu/ tray.rs  windows, the native menu, the menu-bar item
+  src/window/ menu/          the main and Settings windows, the native app menu
   src/dev.rs                 debug builds only: window frame, background launch, eval
   src/test_support/          fixtures, fakes, the demo seed (cfg test, test-util, debug)
   tauri.conf.json tauri.debug.conf.json

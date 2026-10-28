@@ -34,7 +34,7 @@ None. A host is added with an ADR ([0013](adr/0013-network-only-to-listed-hosts.
 ## Platform-specific code
 
 macOS on Apple Silicon only: the config path, Unix sockets, window vibrancy and the overlay title bar, the
-tray, the LaunchAgent, codesigning, and the dev scripts (zsh, Swift, `screencapture`).
+Dock app model (ADR 0016), codesigning, and the dev scripts (zsh, Swift, `screencapture`).
 
 ## Conventions to keep
 

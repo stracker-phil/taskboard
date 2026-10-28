@@ -1,0 +1,49 @@
+[package]
+name = "taskboard"
+version = "0.1.0"
+description = "A local-first Jira Cloud client for macOS"
+authors = ["Philipp Stracker <info@philippstracker.com>"]
+edition = "2024"
+license = "MIT"
+
+[lib]
+name = "taskboard_lib"
+crate-type = ["rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-log = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-deep-link = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+thiserror = "2"
+log = "0.4"
+clap = { version = "4", features = ["derive"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync", "io-util", "net"] }
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4"] }
+url = "2"
+ts-rs = { version = "12", features = ["serde-compat", "serde-json-impl", "no-serde-warnings"] }
+libc = "0.2"
+tempfile = { version = "3", optional = true }
+
+[features]
+# Exposes test helpers to integration tests in tests/.
+test-util = ["dep:tempfile"]
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+strip = true
+# Panics unwind (ADR 0005): a bug fails one command, not the app.
+panic = "unwind"
+
+[dev-dependencies]
+# Itself with test helpers, so integration tests in tests/ can use them (ADR 0006).
+taskboard = { path = ".", features = ["test-util"] }
+tempfile = "3"
