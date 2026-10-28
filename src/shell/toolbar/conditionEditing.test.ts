@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { Condition, FilterField, FilterOptions, ValueKind } from "../../api";
-import { choicesFor, isComplete, newCondition, opsFor, startValue, takesDays, takesNoValue } from "./conditionEditing";
+import type { Condition, FilterField, FilterOptions, Op, ValueKind } from "../../api";
+import { choicesFor, isComplete, newCondition, opsFor, pickedValues, shownOp, startValue, takesDays, takesNoValue, withValues } from "./conditionEditing";
 
 const OPTIONS: FilterOptions = {
   fields: [],
@@ -90,6 +90,46 @@ describe("startValue", () => {
 describe("newCondition", () => {
   it("uses the field's first operator and its start value", () => {
     expect(newCondition(field("priority", "priority"), OPTIONS)).toEqual({ field: "priority", op: "is", value: "High" });
+  });
+});
+
+describe("pickedValues", () => {
+  it.each<[string, Condition, string[]]>([
+    ["a single string", { field: "status", op: "is", value: "3" }, ["3"]],
+    ["a list", { field: "status", op: "in", value: ["3", "4"] }, ["3", "4"]],
+    ["an empty string", { field: "status", op: "is", value: "" }, []],
+    ["a missing value", { field: "status", op: "is" }, []],
+    ["a number", { field: "updated", op: "withinLastDays", value: 7 }, []],
+  ])("lists the values of %s", (_, condition, expected) => {
+    expect(pickedValues(condition)).toEqual(expected);
+  });
+});
+
+describe("shownOp", () => {
+  it.each<[Op, Op]>([
+    ["in", "is"],
+    ["notIn", "isNot"],
+    ["is", "is"],
+    ["isNot", "isNot"],
+    ["contains", "contains"],
+  ])("shows %s as %s", (op, shown) => {
+    expect(shownOp(op)).toBe(shown);
+  });
+});
+
+describe("withValues", () => {
+  it.each<[string, Op, string[], Condition]>([
+    ["one value as is", "is", ["3"], { field: "status", op: "is", value: "3" }],
+    ["one value as is not", "isNot", ["3"], { field: "status", op: "isNot", value: "3" }],
+    ["several values as in", "is", ["3", "4"], { field: "status", op: "in", value: ["3", "4"] }],
+    ["several values as not in", "isNot", ["3", "4"], { field: "status", op: "notIn", value: ["3", "4"] }],
+    ["no value as is", "is", [], { field: "status", op: "is", value: "" }],
+    ["no value as is not", "isNot", [], { field: "status", op: "isNot", value: "" }],
+    ["one value back from in", "in", ["3"], { field: "status", op: "is", value: "3" }],
+    ["one value back from not in", "notIn", ["3"], { field: "status", op: "isNot", value: "3" }],
+    ["several values staying not in", "notIn", ["3", "4"], { field: "status", op: "notIn", value: ["3", "4"] }],
+  ])("sets %s", (_, op, values, expected) => {
+    expect(withValues({ field: "status", op, value: "x" }, values)).toEqual(expected);
   });
 });
 

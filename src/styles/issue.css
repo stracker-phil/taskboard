@@ -23,9 +23,10 @@
 .status-pill--tab.status-pill--todo { background: var(--status-todo-tab-bg); color: var(--status-todo-tab-fg); }
 
 .epic-chip {
-  display: inline-flex; align-items: center; height: 22px; padding: 0 8px; box-sizing: border-box; overflow: hidden;
-  border-radius: 6px; font-size: 12px; font-weight: 500; white-space: nowrap; text-overflow: ellipsis;
+  display: inline-flex; align-items: center; max-width: 100%; height: 22px; padding: 0 8px; box-sizing: border-box; overflow: hidden;
+  border-radius: 6px; font-size: 12px; font-weight: 500; white-space: nowrap;
 }
+.epic-chip__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .epic-chip--1 { background: var(--epic-1-bg); color: var(--epic-1-fg); }
 .epic-chip--2 { background: var(--epic-2-bg); color: var(--epic-2-fg); }
 .epic-chip--3 { background: var(--epic-3-bg); color: var(--epic-3-fg); }

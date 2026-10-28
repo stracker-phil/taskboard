@@ -46,13 +46,16 @@ export interface MeasuredColumn {
   cellWidth: (row: Row, measure: MeasureText) => number;
 }
 
+/** No column takes more than this; a longer value (an epic's long name) truncates, so the title keeps room. */
+export const MAX_COLUMN_WIDTH = 200;
+
 /** Each column's width: as wide as its header or its widest cell among all loaded rows, so columns line up
- *  across groups. */
+ *  across groups, but at most `MAX_COLUMN_WIDTH`. */
 export function columnWidths(rows: Row[], columns: MeasuredColumn[], measure: MeasureText): number[] {
   return columns.map((column) => {
     const header = measure(column.header.toUpperCase(), FONT.header) + HEADER_TRACKING * column.header.length;
     const widest = rows.reduce((max, row) => Math.max(max, column.cellWidth(row, measure)), 0);
-    return Math.ceil(Math.max(header, widest));
+    return Math.min(MAX_COLUMN_WIDTH, Math.ceil(Math.max(header, widest)));
   });
 }
 

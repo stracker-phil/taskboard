@@ -1,7 +1,8 @@
 import { X } from "lucide-react";
 import { useId } from "react";
 import type { Condition, FilterField, FilterOptions, Op } from "../../api";
-import { choicesFor, DEFAULT_DAYS, newCondition, OP_NAMES, opsFor, startValue, takesDays, takesNoValue } from "./conditionEditing";
+import { choicesFor, DEFAULT_DAYS, newCondition, OP_NAMES, opsFor, pickedValues, shownOp, startValue, takesDays, takesNoValue, withValues } from "./conditionEditing";
+import { ValuePicker } from "./ValuePicker";
 
 interface Props {
   condition: Condition;
@@ -21,6 +22,11 @@ export function ConditionRow({ condition, options, onChange, onRemove }: Props) 
     if (next) onChange(newCondition(next, options));
   };
   const setOp = (op: Op) => {
+    // Picked values survive switching between "is" and "is not".
+    if ((op === "is" || op === "isNot") && choicesFor(field.kind, options) && !takesNoValue(condition.op)) {
+      onChange(withValues({ ...condition, op }, pickedValues(condition)));
+      return;
+    }
     const keepsValue = takesDays(op) === takesDays(condition.op) && !takesNoValue(condition.op);
     let value = keepsValue ? condition.value : startValue(field, op, options);
     if (takesNoValue(op)) value = undefined;
@@ -42,7 +48,7 @@ export function ConditionRow({ condition, options, onChange, onRemove }: Props) 
       <label className="visually-hidden" htmlFor={`${id}-op`}>
         Operator
       </label>
-      <select id={`${id}-op`} className="condition-row__op" value={condition.op} onChange={(e) => setOp(e.target.value as Op)}>
+      <select id={`${id}-op`} className="condition-row__op" value={shownOp(condition.op)} onChange={(e) => setOp(e.target.value as Op)}>
         {ops.map((op) => (
           <option key={op} value={op}>
             {OP_NAMES[op]}
@@ -78,13 +84,7 @@ function ValueEditor({ id, condition, field, options, onChange }: { id: string; 
     return (
       <>
         {label}
-        <select id={id} className="condition-row__value" value={text} onChange={(e) => onChange({ ...condition, value: e.target.value })}>
-          {choices.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
+        <ValuePicker id={id} choices={choices} selected={pickedValues(condition)} onChange={(values) => onChange(withValues(condition, values))} />
       </>
     );
   }

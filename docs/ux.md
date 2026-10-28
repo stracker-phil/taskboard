@@ -129,7 +129,8 @@ overrides it per status.
   closed.
 - **Columns** share one grid (`--list-columns`): the title takes the rest, every other column is as wide as
   its header or its widest cell across all loaded rows of the view (`measure.ts`, canvas text metrics,
-  cached), so columns line up across groups. Gap 20, rows padded 16.
+  cached), so columns line up across groups, but no column is wider than 200 (`MAX_COLUMN_WIDTH`); a longer
+  value, such as a long epic name, truncates and shows in full on hover. Gap 20, rows padded 16.
 - Rows 44: square, mono key, summary (600 when changed, on `--changed-bg`), change chip, comment count, then
   the cells. A clicked row is selected (`--selection-bg`).
 - Rows are virtualised (`@tanstack/react-virtual`): a card is drawn from its pieces (the header item, then
@@ -217,7 +218,9 @@ button, Escape and a press outside close it, focus goes back to the button).
   issues" on a Space before any condition); inherited conditions locked on `--fill-subtle` with a lock, "this Space" / "from Space"; own
   conditions as field / operator / value selects (value pickers from the cache, dates, days, text) with ×;
   "+ Add condition". On a filter list changes save as you edit ("Changes save to “Name”."); on a Space or
-  Everything they are a draft that "Save as filter list" turns into a new list and opens.
+  Everything they are a draft that "Save as filter list" turns into a new list and opens. A picked field's value opens a list
+  with a search box and a checkbox per value (`ValuePicker`); every tick applies at once, and several values
+  are stored as `in` / `not in` (shown as "is" / "is not").
 - **Me** chip (on: `--accent-soft-*` pill with the `--avatar-1` avatar and "Me ×") and **Filter this view**
   (190 wide, filters by key or summary as you type). Both narrow only the current view and are never saved.
 - When the bar is narrow, the text filter shrinks to 96 first; then Columns, Filter, Group and finally the Me

@@ -56,7 +56,14 @@ async function openFilter(conditions: ListConditions, listId = 21, name = "My op
   return screen.getByRole("dialog", { name: "Filter" });
 }
 
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+/** Unticks High and ticks Low in the open value picker. */
+async function swapPriority(popover: HTMLElement) {
+  await userEvent.click(within(popover).getByLabelText("Value"));
+  await userEvent.click(screen.getByRole("option", { name: "High" }));
+  await userEvent.click(screen.getByRole("option", { name: "Low" }));
+}
+
+const wait =(ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -94,7 +101,55 @@ describe("FilterPopover", () => {
 
       expect(within(popover).getByLabelText("Field")).toHaveDisplayValue("Priority");
       expect(within(popover).getByLabelText("Operator")).toHaveDisplayValue("is");
-      expect(within(popover).getByLabelText("Value")).toHaveDisplayValue("High");
+      expect(within(popover).getByLabelText("Value")).toHaveTextContent("High");
+    });
+
+    it("shows a stored in condition as is, with all its values in the field", async () => {
+      const popover = await openFilter(listConditions({ kind: "list", own: [{ field: "status", op: "in", value: ["3", "4"] }] }));
+
+      expect(within(popover).getByLabelText("Operator")).toHaveDisplayValue("is");
+      expect(within(popover).getByLabelText("Value")).toHaveTextContent("In Progress, Done");
+    });
+
+    it("shows a stored not in condition as is not", async () => {
+      const popover = await openFilter(listConditions({ kind: "list", own: [{ field: "status", op: "notIn", value: ["3", "4"] }] }));
+
+      expect(within(popover).getByLabelText("Operator")).toHaveDisplayValue("is not");
+    });
+
+    it("saves one condition with a list when a second status is ticked for is not", async () => {
+      const popover = await openFilter(listConditions({ kind: "list", own: [{ field: "status", op: "isNot", value: "3" }] }));
+      await userEvent.click(within(popover).getByLabelText("Value"));
+
+      await userEvent.click(screen.getByRole("option", { name: "Done" }));
+
+      await waitFor(() => expect(mocked.listSetFilter).toHaveBeenLastCalledWith(21, { conditions: [{ field: "status", op: "notIn", value: ["3", "4"] }] }));
+    });
+
+    it("saves is not with a single value again when the list is unticked back to one", async () => {
+      const popover = await openFilter(listConditions({ kind: "list", own: [{ field: "status", op: "notIn", value: ["3", "4"] }] }));
+      await userEvent.click(within(popover).getByLabelText("Value"));
+
+      await userEvent.click(screen.getByRole("option", { name: "Done" }));
+
+      await waitFor(() => expect(mocked.listSetFilter).toHaveBeenLastCalledWith(21, { conditions: [{ field: "status", op: "isNot", value: "3" }] }));
+    });
+
+    it("keeps the picked values when the operator switches between is and is not", async () => {
+      const popover = await openFilter(listConditions({ kind: "list", own: [{ field: "status", op: "in", value: ["3", "4"] }] }));
+
+      await userEvent.selectOptions(within(popover).getByLabelText("Operator"), "is not");
+
+      expect(within(popover).getByLabelText("Value")).toHaveTextContent("In Progress, Done");
+      await waitFor(() => expect(mocked.listSetFilter).toHaveBeenLastCalledWith(21, { conditions: [{ field: "status", op: "notIn", value: ["3", "4"] }] }));
+    });
+
+    it("keeps a single picked value when the operator switches to is not", async () => {
+      const popover = await openFilter(FILTER_LIST);
+
+      await userEvent.selectOptions(within(popover).getByLabelText("Operator"), "is not");
+
+      await waitFor(() => expect(mocked.listSetFilter).toHaveBeenLastCalledWith(21, { conditions: [{ field: "priority", op: "isNot", value: "High" }] }));
     });
 
     it("counts the matching issues in the header and names the list in the footer", async () => {
@@ -113,7 +168,7 @@ describe("FilterPopover", () => {
     it("saves a changed value to the list after a short delay", async () => {
       const popover = await openFilter(FILTER_LIST);
 
-      await userEvent.selectOptions(within(popover).getByLabelText("Value"), "Low");
+      await swapPriority(popover);
 
       await waitFor(() => expect(mocked.listSetFilter).toHaveBeenCalledWith(21, { conditions: [{ field: "priority", op: "is", value: "Low" }] }));
     });
@@ -121,7 +176,7 @@ describe("FilterPopover", () => {
     it("does not save before the delay has passed", async () => {
       const popover = await openFilter(FILTER_LIST);
 
-      await userEvent.selectOptions(within(popover).getByLabelText("Value"), "Low");
+      await swapPriority(popover);
 
       expect(mocked.listSetFilter).not.toHaveBeenCalled();
     });

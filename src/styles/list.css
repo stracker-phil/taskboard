@@ -58,6 +58,9 @@
 .list-row--changed .list-row__summary { font-weight: 600; }
 .list-row__cell { display: flex; align-items: center; min-width: 0; white-space: nowrap; }
 
+/* A cell's content never widens its column past the cap; long text ends in an ellipsis. */
+.list-row__cell > * { min-width: 0; max-width: 100%; }
+.list-cell--mono, .list-cell--secondary, .list-cell--tertiary { overflow: hidden; text-overflow: ellipsis; }
 .list-cell--mono { font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary); }
 .list-cell--secondary { font-size: 13px; color: var(--text-secondary); }
 .list-cell--tertiary { font-size: 13px; color: var(--text-tertiary); }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ALEX, row, SAM } from "../../test/issues";
 import { columnDef } from "./columns";
-import { canvasMeasure, columnWidths, FONT, fittingColumns, gridTemplate, listColumns, type MeasuredColumn, type MeasureText, widthOf } from "./measure";
+import { canvasMeasure, columnWidths, FONT, fittingColumns, gridTemplate, listColumns, MAX_COLUMN_WIDTH, type MeasuredColumn, type MeasureText, widthOf } from "./measure";
 
 /** Seven pixels per character, whatever the font. */
 const chars7: MeasureText = (text) => text.length * 7;
@@ -123,6 +123,26 @@ describe("columnWidths", () => {
 
   it("returns nothing for no columns", () => {
     expect(columnWidths([row()], [], chars7)).toEqual([]);
+  });
+
+  it("never returns more than the maximum, even for a very long epic name", () => {
+    const long = row({ epic: { id: "9", name: "Security Vulnerabilities (reported during August 2026)", color: 2 } });
+
+    expect(columnWidths([long], [column("epic", "Epic")], chars7)).toEqual([MAX_COLUMN_WIDTH]);
+    expect(MAX_COLUMN_WIDTH).toBe(200);
+  });
+
+  it("caps only the columns that are too wide", () => {
+    const rows = [row({ epic: { id: "9", name: "Security Vulnerabilities (reported during August 2026)", color: 2 }, priority: { name: "Low", level: 1 } })];
+
+    expect(columnWidths(rows, [column("epic", "Epic"), column("priority", "Priority")], chars7)).toEqual([200, 61]);
+  });
+
+  it("leaves a column just under the maximum at its natural width", () => {
+    // 26 * 7 = 182, + 16 padding = 198: under the cap.
+    const fits = row({ epic: { id: "9", name: "a".repeat(26), color: 2 } });
+
+    expect(columnWidths([fits], [column("epic", "Epic")], chars7)).toEqual([198]);
   });
 });
 

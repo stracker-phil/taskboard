@@ -121,3 +121,46 @@
   height: 30px; padding: 0 14px; border: 0; border-radius: 8px; background: var(--button-primary-bg);
   color: var(--button-primary-text); font: inherit; font-size: 13px; font-weight: 600; cursor: default;
 }
+
+/* The Filter popover lets a value picker's list hang over its edge; its footer keeps the round corners. */
+.filter-popover { overflow: visible; }
+.filter-popover .popover__footer { border-radius: 0 0 12px 12px; }
+
+/* A condition's values: the field lists the picked names; the panel searches and ticks (artboard 3 extended). */
+.value-picker { position: relative; display: flex; flex: 1; min-width: 0; }
+.value-picker__field {
+  display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 8px; box-sizing: border-box;
+  border: 1px solid var(--border-strong); border-radius: 7px; background: var(--panel-bg); color: var(--text);
+  font: inherit; font-size: 13px; text-align: left; transition: border-color var(--motion-fast) var(--ease-out);
+}
+.value-picker__field:hover, .value-picker__field[aria-expanded="true"] { border-color: var(--text-faint); }
+.value-picker__names { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.value-picker__count {
+  display: grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box;
+  border-radius: 9px; background: var(--accent-soft-bg); color: var(--accent-text); font-size: 11px; font-weight: 700;
+}
+.value-picker__panel {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 6; display: flex; flex-direction: column;
+  min-width: 220px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel-bg); box-shadow: var(--shadow-popover);
+  animation: rise-in var(--motion-base) var(--ease-out); transform-origin: top center;
+}
+.value-picker__search {
+  display: flex; align-items: center; gap: 6px; margin: 8px 8px 4px; padding: 0 8px; height: 28px;
+  border: 1px solid var(--border); border-radius: 7px; color: var(--text-muted);
+}
+.value-picker__search input { flex: 1; min-width: 0; height: auto; padding: 0; border: 0; outline: 0; background: transparent; color: var(--text); font: inherit; font-size: 13px; }
+.value-picker__list { display: flex; flex-direction: column; max-height: 240px; overflow-y: auto; padding: 2px 4px 6px; }
+.value-picker__option {
+  display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 0 8px; border: 0; border-radius: 6px;
+  background: transparent; color: var(--text-strong-body); font: inherit; font-size: 13px; text-align: left;
+  transition: background-color var(--motion-fast) var(--ease-out);
+}
+.value-picker__option:hover { background: var(--hover-bg); }
+.value-picker__box {
+  display: grid; flex: none; place-items: center; width: 15px; height: 15px; box-sizing: border-box;
+  border: 1.5px solid var(--border-strong); border-radius: 4px; color: var(--text-on-accent);
+  transition: background-color var(--motion-fast) var(--ease-out), border-color var(--motion-fast) var(--ease-out);
+}
+.value-picker__box--on { border-color: var(--accent); background: var(--accent); }
+.value-picker__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.value-picker__empty { margin: 6px 8px; font-size: 12px; color: var(--text-muted); }

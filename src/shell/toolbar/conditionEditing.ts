@@ -92,3 +92,24 @@ export function isComplete(condition: Condition): boolean {
   if (typeof value === "string") return value.trim() !== "";
   return Array.isArray(value) && value.length > 0;
 }
+
+/** A picked field's values as a list: one value, several (`in`/`not in`), or none yet. */
+export function pickedValues(condition: Condition): string[] {
+  const value = condition.value;
+  if (Array.isArray(value)) return value;
+  return typeof value === "string" && value !== "" ? [value] : [];
+}
+
+/** How the operator menu shows it: `in` reads as "is" and `not in` as "is not"; the values say "any of". */
+export function shownOp(op: Op): Op {
+  if (op === "in") return "is";
+  if (op === "notIn") return "isNot";
+  return op;
+}
+
+/** The condition for these picked values: one keeps `is`/`is not`, several become `in`/`not in`. */
+export function withValues(condition: Condition, values: string[]): Condition {
+  const negated = shownOp(condition.op) === "isNot";
+  if (values.length > 1) return { ...condition, op: negated ? "notIn" : "in", value: values };
+  return { ...condition, op: negated ? "isNot" : "is", value: values[0] ?? "" };
+}
