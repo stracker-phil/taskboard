@@ -1,5 +1,5 @@
 import { Columns3, Ellipsis, Layers, ListFilter } from "lucide-react";
-import { type ReactNode, useCallback, useRef, useState } from "react";
+import { type ReactNode, type RefObject, useCallback, useRef, useState } from "react";
 import { type Presence, usePresence } from "../../lib/motion";
 import { api, type MenuEntry, type View } from "../../api";
 import { narrowingKey, NO_NARROWING } from "../../state/slices/narrowing";
@@ -16,8 +16,7 @@ import { useViewEdit } from "./useViewEdit";
 
 type Open = "columns" | "filter" | null;
 
-/** Group and Columns on the left; Filter, the Me chip and the text filter on the right. One popover at a time.
- *  When the bar is too narrow, the text filter shrinks and then items move into a "…" menu. */
+/** One popover at a time; when the bar is too narrow, the text filter shrinks and then items move into a "…" menu. */
 export function Toolbar({ level, view }: { level: Level; view: View }) {
   const [open, setOpen] = useState<Open>(null);
   const barRef = useRef<HTMLDivElement>(null);
@@ -34,7 +33,7 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
   const columnsShown = usePresence(open === "columns");
   const filterShown = usePresence(open === "filter");
   const toggle = (which: Exclude<Open, null>) => setOpen((current) => (current === which ? null : which));
-  const close = useCallback(() => setOpen(null), []);
+  const close = () => setOpen(null);
   const groupEntries = () =>
     groupMenu(
       view.groupBy,
@@ -64,13 +63,13 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
       }
     });
 
-  const columnsPopover = (anchor: typeof columnsRef) =>
+  const columnsPopover = (anchor: RefObject<HTMLButtonElement | null>) =>
     columnsShown.mounted && (
       <Fading state={columnsShown.state}>
         <ColumnsPopover view={view} spaceProjectId={space?.projectId ?? null} anchor={anchor} onClose={close} />
       </Fading>
     );
-  const filterPopover = (anchor: typeof filterRef) =>
+  const filterPopover = (anchor: RefObject<HTMLButtonElement | null>) =>
     filterShown.mounted && (
       <Fading state={filterShown.state}>
         <FilterPopover listId={view.listId} listName={listName} anchor={anchor} onClose={close} />
