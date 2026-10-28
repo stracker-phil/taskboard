@@ -92,3 +92,47 @@
 .settings-pane .btn { height: 28px; border-radius: 8px; }
 
 :root.window-blurred .settings-nav { opacity: 0.6; }
+
+/* A row whose control sits below its label (the scope query). */
+.settings-row.stacked { flex-direction: column; align-items: stretch; gap: 8px; }
+.settings-row.stacked .settings-row-control { flex-direction: column; align-items: stretch; }
+/* Controls without a label: a form's buttons and its result line. */
+.settings-row.control-row { gap: 8px; }
+.button-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.settings-actions { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+
+/* Fields (Daybook's sizes): 28px, an 8px radius; numbers line up right-aligned. */
+.settings-pane .input { height: 28px; padding: 0 8px; border-radius: 8px; }
+.settings-pane .input:disabled { opacity: 0.5; }
+.settings-pane textarea.input { height: auto; padding: 6px 8px; line-height: 1.45; resize: vertical; }
+.input.mono { font-family: var(--font-mono); font-size: 12px; }
+.settings-field { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.settings-input { display: flex; align-items: center; gap: 8px; }
+.settings-input .input { width: 180px; }
+.settings-input .input.wide { width: 260px; }
+.settings-input .input.number { width: 84px; text-align: right; }
+.settings-suffix { color: var(--settings-text-secondary); }
+.settings-field-error { max-width: 260px; font-size: 11px; line-height: 1.35; color: var(--sync-error-text); user-select: text; -webkit-user-select: text; }
+.settings-row.stacked .settings-field-error { max-width: none; }
+.settings-result { margin: 0; font-size: 11px; line-height: 1.35; user-select: text; -webkit-user-select: text; }
+.settings-result.ok { color: var(--progress-done); }
+.settings-result.error { color: var(--sync-error-text); }
+.settings-empty { color: var(--settings-text-tertiary); }
+
+/* The segmented control (Daybook's `SegmentedControl`): a fill track; the pressed segment a raised tile. */
+.segmented { display: inline-flex; gap: 2px; padding: 2px; border-radius: 8px; background: var(--settings-fill); }
+.segmented button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--settings-text);
+  white-space: nowrap;
+}
+.segmented button:active:not([aria-pressed="true"]) { background: var(--settings-fill); }
+.segmented button[aria-pressed="true"] { background: var(--settings-control); box-shadow: var(--settings-control-shadow); color: var(--settings-text-strong); }
+.segmented button:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--settings-focus-ring); }

@@ -18,6 +18,8 @@
 .btn:disabled { opacity: 0.45; }
 .btn:focus-visible { outline: none; box-shadow: var(--settings-control-shadow), 0 0 0 3px var(--settings-focus-ring); }
 .btn-primary { background: var(--accent); color: var(--text-on-accent); font-weight: 500; }
+/* Deletes or resets something: red text on the plain bezel. */
+.btn-danger { color: var(--banner-error-dot); font-weight: 500; }
 
 .icon-btn {
   display: inline-grid;

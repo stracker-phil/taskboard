@@ -22,7 +22,7 @@ interface SettingsPage {
 }
 
 /** Nav order of the known groups; any other group follows them, by name. */
-const GROUP_ORDER = ["System"];
+const GROUP_ORDER = ["Jira", "System"];
 
 const pages = new Map<string, SettingsPage>();
 const listeners = new Set<() => void>();

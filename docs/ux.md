@@ -99,14 +99,28 @@ owner's own Settings design replaces it. Its colours are the `--settings-*` toke
 - **Page list** on `--settings-chrome` (190px): a drag strip for the window buttons and a search field that
   stay put (it narrows by page, group or section title), then rows under small group headings; the current
   page a `--settings-fill-strong` fill. Only the list scrolls.
-- **Page** on `--settings-bg`: the title in the strip beside the window buttons, then groups 24px apart. Every
-  change applies at once; there is no Save. Esc, ⌘W and the close button hide the window; it reopens on the
-  page it showed.
+- **Page** on `--settings-bg`: the title in the strip beside the window buttons, then groups 24px apart. A
+  change applies at once (fields on blur or ↵); only small forms whose fields belong together (the Jira site,
+  the scope query) save with their own Save button. Esc, ⌘W and the close button hide the window; it reopens
+  on the page it showed.
 - **Group** (`Group` in `components/settings/controls.tsx`): a 13px semibold heading over its inset group
   (`--settings-fill-quiet`, 12px radius). **Row** (`Row`): label and an optional description on the left, the
   control on the right, hairlines between rows.
-- Pages register in `registry/settingsPages.ts`, in groups. The System group holds General (About, logs);
-  Connection, Sync, Spaces, Statuses, Shortcuts and Appearance join with their features.
+- **Controls** are Daybook's: `TextField`, `NumberField` (commit on blur or ↵, numbers only within their
+  bounds) and `DraftField` (a form's field) in `components/settings/fields.tsx`, with Rust's message for the
+  field (`invalid_input` with `field`) in red under it; `Segmented` and `ControlRow` (a form's buttons and its
+  result line) in `controls.tsx`. A destructive action (`.btn-danger`) asks first in a sheet
+  (`components/Modal.tsx`, an `alertdialog` over `--scrim`). Other failures are error toasts.
+- Pages register in `registry/settingsPages.ts`, in groups: **Jira** first, then **System**.
+  - **Connection** (`components/settings/jira/`): *Jira site* (site URL, email, the API token as a password
+    field that never shows a saved token, Classic or Scoped token kind, the cloud ID for Scoped; Save and
+    Test Connection, with "Connected as …" or the error below), *Token* (the expiry date and how soon it runs
+    out) and *Projects* (Refresh after a successful test; a Track switch per project).
+  - **Sync**: *Scope* (the effective JQL in a monospaced field; Validate, Save, Reset to Default), *Intervals*
+    (minutes in front and in the background, days to keep done issues) and *Cache* (Reset Cache, confirmed in
+    a sheet).
+  - **General** (System): About and logs. Spaces, Statuses, Shortcuts and Appearance join with their features.
+- The layout stays Daybook's until the owner's own Settings design arrives.
 
 ## Keys
 

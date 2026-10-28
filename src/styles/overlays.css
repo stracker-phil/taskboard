@@ -1,4 +1,24 @@
-/* Toasts and the crash screen, in every window. */
+/* Sheets, toasts and the crash screen, in every window. */
+/* A sheet (`Modal`) over the scrim: a padded panel for messages and confirmations (Daybook's). */
+.overlay { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: var(--scrim); }
+.dialog.sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(420px, calc(100vw - 32px));
+  max-height: calc(100vh - 60px);
+  overflow: auto;
+  padding: 20px;
+  border-radius: 12px;
+  background: var(--panel-bg);
+  box-shadow: var(--shadow-popover);
+  color: var(--text);
+  font-size: 13px;
+}
+.dialog.sheet h2 { margin: 0; font-size: 13px; font-weight: 700; color: var(--settings-text-strong); }
+.dialog.sheet p { margin: 0; line-height: 1.4; }
+.dialog .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+.dialog .actions .btn { min-width: 70px; height: 28px; border-radius: 8px; }
 .toasts {
   position: fixed;
   right: 16px;

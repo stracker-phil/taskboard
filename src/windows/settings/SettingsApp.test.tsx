@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Puzzle } from "lucide-react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -30,12 +30,24 @@ afterEach(() => {
 });
 
 describe("SettingsApp", () => {
-  it("lists General in the page list and shows it first", async () => {
+  it("lists the Jira pages before General and opens on Connection", async () => {
     await renderSettings();
 
     const nav = screen.getByRole("navigation", { name: "Settings pages" });
-    expect(nav).toHaveTextContent("General");
-    expect(screen.getByRole("heading", { name: "General" })).toBeInTheDocument();
+    const entries = within(nav).getAllByRole("button").map((b) => b.textContent?.trim());
+    expect(entries).toEqual(["Connection", "Sync", "General"]);
+    expect(nav.textContent).toMatch(/Jira.*Connection.*Sync.*System.*General/);
+    expect(screen.getByRole("heading", { name: "Connection" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Connection/ })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("shows the Sync page when chosen in the page list", async () => {
+    await renderSettings();
+
+    await userEvent.click(screen.getByRole("button", { name: /Sync/ }));
+
+    expect(screen.getByRole("heading", { name: "Sync" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Reset Cache" })).toBeInTheDocument();
   });
 
   describe("search", () => {
@@ -59,6 +71,10 @@ describe("SettingsApp", () => {
   });
 
   describe("General page", () => {
+    beforeEach(() => {
+      window.history.replaceState({}, "", "/?page=general");
+    });
+
     it("shows the app version in the About group", async () => {
       await renderSettings();
 
