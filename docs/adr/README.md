@@ -28,6 +28,6 @@ stands in Taskboard. The numbers in this table are Taskboard's.
 | [0016](0016-closing-the-window-keeps-the-app-running.md) | Closing the window keeps the app running | Accepted (2026-10-28) |
 | [0017](0017-the-main-window-follows-the-taskboard-mockup.md) | The main window follows the Taskboard mockup | Accepted (2026-10-28) |
 | [0018](0018-reads-go-through-tanstack-query.md) | Reads go through TanStack Query, invalidated by events | Accepted (2026-10-28) |
+| [0019](0019-two-sqlite-files-through-rusqlite.md) | Two SQLite files through rusqlite: the owner's setup and a disposable Jira cache | Accepted (2026-10-28) |
 
-Open, decided once the app's scope is known: where the data lives (SQLite through sqlx with migrations, as
-TimeTracker; or plain files, as Daybook), integrations with Daybook and TimeTracker.
+Open: integrations with Daybook and TimeTracker.

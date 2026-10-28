@@ -2,11 +2,13 @@
 
 use std::path::{Path, PathBuf};
 
-use tauri::{AppHandle, Manager, RunEvent, WindowEvent};
+use tauri::{AppHandle, Emitter, Manager, RunEvent, WindowEvent};
 use tauri_plugin_deep_link::DeepLinkExt;
 use tauri_plugin_log::{RotationStrategy, Target, TargetKind, TimezoneStrategy};
 
 use crate::cli::LogLevel;
+use crate::db::Db;
+use crate::events::{ISSUES_CHANGED_EVENT, LOCAL_CHANGED_EVENT};
 use crate::handlers::handlers;
 use crate::ipc::IpcMessage;
 use crate::state::AppState;
@@ -39,7 +41,9 @@ pub fn start(
         .setup(move |app| {
             log::info!("Taskboard {} started", env!("CARGO_PKG_VERSION"));
             app.set_menu(menu::build(app.handle())?)?;
-            app.state::<AppState>().launches.push(initial);
+            let state = app.state::<AppState>();
+            state.launches.push(initial);
+            announce_db_changes(app.handle(), &state.db);
             #[cfg(debug_assertions)]
             apply_dev_frame(app);
             start_ipc(app.handle().clone(), &socket);
@@ -61,6 +65,26 @@ pub fn start(
             RunEvent::Reopen { .. } => window::show_main(app),
             _ => {}
         });
+}
+
+fn announce_db_changes(app: &AppHandle, db: &Db) {
+    let app = app.clone();
+    db.set_notifier(Box::new(move |changes| {
+        let sent = changes
+            .issues_event()
+            .map(|event| app.emit(ISSUES_CHANGED_EVENT, event))
+            .into_iter()
+            .chain(
+                changes
+                    .local_event()
+                    .map(|event| app.emit(LOCAL_CHANGED_EVENT, event)),
+            );
+        for result in sent {
+            if let Err(e) = result {
+                log::warn!("Couldn't announce a data change: {e}");
+            }
+        }
+    }));
 }
 
 fn commands_bus() -> bus::Commands {

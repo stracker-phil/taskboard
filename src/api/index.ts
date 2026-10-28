@@ -35,6 +35,7 @@ const ERROR_KINDS: Record<ErrorKind, true> = {
   invalid_input: true,
   not_found: true,
   not_connected: true,
+  db: true,
   internal: true,
 };
 

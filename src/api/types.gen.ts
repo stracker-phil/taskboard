@@ -14,13 +14,32 @@ field?: AppErrorField, };
  */
 export type AppErrorField = { path: string, message: string, };
 
-export type ErrorKind = "io" | "invalid_input" | "not_found" | "not_connected" | "internal";
+export type ErrorKind = "io" | "invalid_input" | "not_found" | "not_connected" | "db" | "internal";
+
+/**
+ * Payload of `issues_changed`.
+ */
+export type IssuesChanged = { ids: Array<string>, 
+/**
+ * Every issue may have changed; `ids` is empty then.
+ */
+all: boolean, };
 
 /**
  * Something the page acts on once it listens: from the launch that started the app, a later launch,
  * or a deep link.
  */
 export type LaunchEvent = { "type": "error", message: string, } | { "type": "activate" };
+
+/**
+ * Payload of `local_changed`.
+ */
+export type LocalChanged = { parts: Array<LocalPart>, };
+
+/**
+ * A part of the owner's own setup (the local file).
+ */
+export type LocalPart = "spaces" | "lists" | "views" | "pins" | "styles";
 
 export type Settings = Record<symbol, never>;
 

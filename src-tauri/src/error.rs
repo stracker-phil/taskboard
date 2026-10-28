@@ -21,6 +21,9 @@ pub enum AppError {
     /// Needs a Jira connection that isn't set up yet.
     #[error("{0}")]
     NotConnected(String),
+    /// The database failed or is from a newer Taskboard.
+    #[error("Database error: {0}")]
+    Db(String),
     /// A bug or a broken invariant; the message is for the log and a bug report.
     #[error("{0}")]
     Internal(String),
@@ -33,6 +36,7 @@ impl AppError {
             AppError::InvalidInput(_) | AppError::InvalidField { .. } => ErrorKind::InvalidInput,
             AppError::NotFound(_) => ErrorKind::NotFound,
             AppError::NotConnected(_) => ErrorKind::NotConnected,
+            AppError::Db(_) => ErrorKind::Db,
             AppError::Internal(_) => ErrorKind::Internal,
         }
     }
@@ -87,6 +91,7 @@ pub enum ErrorKind {
     InvalidInput,
     NotFound,
     NotConnected,
+    Db,
     Internal,
 }
 
@@ -159,6 +164,7 @@ mod tests {
                 AppError::NotConnected(String::new()),
                 ErrorKind::NotConnected,
             ),
+            (AppError::Db(String::new()), ErrorKind::Db),
             (AppError::Internal(String::new()), ErrorKind::Internal),
         ];
         for (err, kind) in cases {
@@ -171,6 +177,14 @@ mod tests {
         assert_eq!(
             serde_json::to_value(AppError::NotConnected("Connect to Jira first".into())).unwrap(),
             json!({ "kind": "not_connected", "message": "Connect to Jira first" })
+        );
+    }
+
+    #[test]
+    fn db_errors_serialize_with_the_db_kind() {
+        assert_eq!(
+            serde_json::to_value(AppError::Db("disk full".into())).unwrap(),
+            json!({ "kind": "db", "message": "Database error: disk full" })
         );
     }
 

@@ -10,5 +10,9 @@ pub const SETTINGS_CHANGED_EVENT: &str = "settings_changed";
 pub const KEYBINDINGS_CHANGED_EVENT: &str = "keybindings_changed";
 /// To the Settings window. Payload: the id of the page to show.
 pub const OPEN_SETTINGS_EVENT: &str = "open_settings";
+/// Payload: an `IssuesChanged`; issues in the cache changed (`db::Db::write`).
+pub const ISSUES_CHANGED_EVENT: &str = "issues_changed";
+/// Payload: a `LocalChanged`; parts of the owner's own setup changed.
+pub const LOCAL_CHANGED_EVENT: &str = "local_changed";
 /// To the main window. No payload; shows or hides the sidebar.
 pub const TOGGLE_SIDEBAR_EVENT: &str = "toggle_sidebar";

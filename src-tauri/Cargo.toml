@@ -30,6 +30,7 @@ url = "2"
 ts-rs = { version = "12", features = ["serde-compat", "serde-json-impl", "no-serde-warnings"] }
 libc = "0.2"
 tempfile = { version = "3", optional = true }
+rusqlite = { version = "0.37", features = ["bundled"] }
 
 [features]
 # Exposes test helpers to integration tests in tests/.

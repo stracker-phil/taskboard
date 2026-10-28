@@ -74,7 +74,10 @@ The config dir is `~/Library/Application Support/com.philippstracker.taskboard/`
 loads as defaults, unknown keys are ignored and a file that cannot be parsed is moved aside as
 `<name>.<timestamp>.corrupt`. A store saves a changed copy before it swaps it in.
 
-The Jira mirror and the owner's own lists and views live in SQLite (rusqlite); its ADR comes with the database.
+Taskboard's data is two SQLite files ([data.md](data.md), [ADR 0019](adr/0019-two-sqlite-files-through-rusqlite.md)):
+`local.sqlite` holds the owner's setup (Spaces, filter lists, views, pins), `cache.sqlite` the Jira mirror,
+attached as `cache`. Every change goes through `Db::write`, which emits `issues_changed` or `local_changed`
+after the commit. Reset cache deletes only the cache file.
 
 ## Repository map
 
@@ -91,6 +94,8 @@ src-tauri/
   src/error.rs lock.rs       AppError (+ ErrorKind); poison-tolerant lock helpers
   src/store/                 JsonFile, JsonStore, settings/, keybindings, ui_state
   src/bus/                   the command bus
+  src/db/                    the two SQLite files: open, migrate, read, the one write path
+  migrations/local/ cache/   numbered SQL migrations per file
   src/<feature>/             one folder per feature: types, pure logic, commands.rs, tests
   src/window/ menu/          the main and Settings windows, the native app menu
   src/dev.rs                 debug builds only: window frame, background launch, eval

@@ -1,5 +1,5 @@
 // Re-exports the IPC types generated from Rust (`bun run types`); everything defined below is frontend-only.
-import type { Settings, UiState } from "./types.gen";
+import type { IssuesChanged, LocalChanged, Settings, UiState } from "./types.gen";
 
 export type * from "./types.gen";
 
@@ -29,6 +29,10 @@ export interface EventPayloads {
   open_settings: string;
   /** To the main window: show or hide the sidebar. */
   toggle_sidebar: null;
+  /** Issues in the cache changed. */
+  issues_changed: IssuesChanged;
+  /** Parts of the owner's own setup changed. */
+  local_changed: LocalChanged;
 }
 
 export type EventName = keyof EventPayloads;

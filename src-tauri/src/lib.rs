@@ -5,6 +5,7 @@ mod app;
 pub mod bus;
 pub mod cli;
 mod commands;
+pub mod db;
 #[cfg(debug_assertions)]
 mod dev;
 pub mod error;
@@ -97,8 +98,10 @@ pub fn run() {
     };
 
     let _instance_lock = instance::forward_or_lock(&config_dir, &socket, &message);
+    let state = AppState::open(&config_dir)
+        .unwrap_or_else(|e| fail(&format!("Taskboard can't open its data: {e}")));
     app::start(
-        AppState::open(&config_dir),
+        state,
         socket,
         message,
         log_level.unwrap_or_default(),

@@ -6,12 +6,13 @@ use it, see the [project README](../README.md).
 | Page | Covers |
 |---|---|
 | [architecture.md](architecture.md) | Design rules, process model, data, repository map |
-| [ux.md](ux.md) | Design language: principles, surfaces, tokens, type, controls, rows, Settings, keys |
+| [ux.md](ux.md) | Design language: the mockup's window, tokens, type, metrics, Settings, keys |
+| [data.md](data.md) | The two SQLite files, their tables, the write path, migration rules |
 | [testing.md](testing.md) | Unit and integration tests, the test agents, the demo seed, scripts that drive the app, signing |
 | [adapting.md](adapting.md) | Identity (names, ids, paths), platform-specific code, conventions to keep |
 | [adr/](adr/README.md) | Architecture decision records: why the design is the way it is |
 
-Pages for the layers (`backend.md`, `frontend.md`, `data.md`) and for each feature are added with the code
+Pages for the other layers (`backend.md`, `frontend.md`) and for each feature are added with the code
 they describe, in the same commit.
 
 Suggested reading order: architecture, then the layer you are changing, then adapting.
