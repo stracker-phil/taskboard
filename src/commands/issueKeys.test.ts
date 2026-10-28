@@ -21,6 +21,8 @@ function handlers(patch: Partial<IssueKeyHandlers> = {}) {
     open: vi.fn(),
     openEpic: vi.fn(),
     togglePin: vi.fn(),
+    markSeen: vi.fn(),
+    togglePeek: vi.fn(),
     hasSelection: () => true,
     peekOpen: () => true,
     ...patch,
@@ -168,6 +170,65 @@ describe("issue keys", () => {
       register(handlers({ hasSelection: () => false }));
 
       expect(press("p")).toBeNull();
+    });
+  });
+
+  describe("marking seen", () => {
+    it("M marks the selected issue seen", () => {
+      const h = handlers();
+      register(h);
+
+      void press("m")?.run();
+
+      expect(h.markSeen).toHaveBeenCalled();
+    });
+
+    it("ignores M without a selected row", () => {
+      register(handlers({ hasSelection: () => false }));
+
+      expect(press("m")).toBeNull();
+    });
+
+    it("leaves M alone without a view that handles the issue keys", () => {
+      expect(press("m")).toBeNull();
+    });
+  });
+
+  describe("peek (Space)", () => {
+    it("toggles the selected issue's peek", () => {
+      const h = handlers();
+      register(h);
+
+      void press(" ")?.run();
+
+      expect(h.togglePeek).toHaveBeenCalled();
+    });
+
+    it("ignores Space without a selected row", () => {
+      register(handlers({ hasSelection: () => false }));
+
+      expect(press(" ")).toBeNull();
+    });
+
+    it("leaves Space alone without a view that handles the issue keys", () => {
+      expect(press(" ")).toBeNull();
+    });
+  });
+
+  describe("a view without open or peek handlers", () => {
+    it.each([
+      ["↩", "Enter"],
+      ["Space", " "],
+    ])("leaves %s unclaimed even with a selection", (_label, key) => {
+      register(handlers({ open: undefined, togglePeek: undefined }));
+
+      expect(press(key)).toBeNull();
+    });
+
+    it("still claims the other issue keys", () => {
+      register(handlers({ open: undefined, togglePeek: undefined }));
+
+      expect(press("m")?.id).toBe("issue.markSeen");
     });
   });
 

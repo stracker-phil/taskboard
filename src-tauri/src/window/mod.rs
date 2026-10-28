@@ -5,7 +5,7 @@ pub mod settings;
 
 use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
 
-use crate::events::{TOGGLE_SIDEBAR_EVENT, WINDOW_OPENED_EVENT};
+use crate::events::{PAGE_COMMAND_EVENT, TOGGLE_SIDEBAR_EVENT, WINDOW_OPENED_EVENT};
 
 /// The main window's label.
 pub const MAIN: &str = "main";
@@ -89,6 +89,14 @@ pub fn close_focused(app: &AppHandle) {
 }
 
 /// Shows the main window and shows or hides its sidebar.
+/// Shows the main window and asks its page to run one of its own commands (`page:<id>` from the menus).
+pub fn run_page_command(app: &AppHandle, id: &str) {
+    show_main(app);
+    if let Err(e) = app.emit_to(MAIN, PAGE_COMMAND_EVENT, id) {
+        log::warn!("Couldn't ask the window to run {id}: {e}");
+    }
+}
+
 pub fn toggle_sidebar(app: &AppHandle) {
     show_main(app);
     if let Err(e) = app.emit_to(MAIN, TOGGLE_SIDEBAR_EVENT, ()) {

@@ -24,6 +24,16 @@ pub fn register(bus: &mut Bus) {
                 Ok(())
             }),
     );
+    bus.add_family(
+        Command::new("page:", "Window Action")
+            .help("Run one of the main window's own commands (the menus' items for what the page does)")
+            .hidden()
+            .family("<command>")
+            .run(|app, id| async move {
+                window::run_page_command(&app, &id);
+                Ok(())
+            }),
+    );
     bus.add(
         Command::new("app:quit", "Quit Taskboard")
             .quits()
@@ -98,6 +108,33 @@ mod tests {
     fn the_settings_page_family_takes_a_page_argument() {
         let bus = registered();
         assert_eq!(bus.family("app:settings:").unwrap().arg, "<page>");
+    }
+
+    #[test]
+    fn page_command_ids_resolve_to_the_hidden_window_action_family() {
+        let bus = registered();
+
+        for id in [
+            "page:toolbar.me",
+            "page:view.layout.board",
+            "page:issue.copyKey",
+        ] {
+            assert!(bus.knows(id), "{id}");
+            let info = bus.info(id).unwrap();
+            assert_eq!(info.title, "Window Action", "{id}");
+            assert_eq!(
+                info.help,
+                "Run one of the main window's own commands (the menus' items for what the page does)",
+                "{id}"
+            );
+            assert!(info.hidden, "{id}");
+        }
+    }
+
+    #[test]
+    fn the_page_family_takes_a_command_argument() {
+        let bus = registered();
+        assert_eq!(bus.family("page:").unwrap().arg, "<command>");
     }
 
     #[test]

@@ -153,6 +153,14 @@ function Rows({ listId, viewId, data, wrapTitles }: { listId: number; viewId: nu
         const { selected, actions } = keyState.current;
         if (selected) actions.togglePin(selected);
       },
+      markSeen: () => {
+        const { selected, actions } = keyState.current;
+        if (selected) actions.markSeen(selected);
+      },
+      togglePeek: () => {
+        const { selected, peekOpen, setPlace } = keyState.current;
+        if (selected) setPlace({ peekOpen: !peekOpen });
+      },
       hasSelection: () => keyState.current.selected !== null,
       peekOpen: () => keyState.current.peekOpen,
     });

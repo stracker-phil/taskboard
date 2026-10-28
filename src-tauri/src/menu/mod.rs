@@ -1,5 +1,7 @@
-//! The app menu (Taskboard, Edit, View, Window, Help). Every custom item's id is the command it runs; the
-//! standard items (About, Services, Hide, the Edit items, Minimize) are macOS's own.
+//! The app menu (Taskboard, File, Edit, View, Go, Issue, Window, Help). Every custom item's id is the command
+//! it runs; `page:<id>` items run the main window's own commands (the same ids its keys run). The standard
+//! items (About, Services, Hide, the Edit items, Minimize) are macOS's own. Plain-letter keys (J, K, P, M) stay
+//! off the menu items, so they never take a typed letter from a text field.
 
 use tauri::menu::{AboutMetadata, Menu, MenuItem, MenuItemBuilder, Submenu, SubmenuBuilder};
 use tauri::{AppHandle, Manager, Wry};
@@ -31,6 +33,22 @@ const fn plain(label: &'static str, command: &'static str) -> Item {
 
 pub const SETTINGS: Item = item("Settings…", "app:settings", "CmdOrCtrl+,");
 pub const QUIT: Item = item("Quit Taskboard", "app:quit", "CmdOrCtrl+Q");
+pub const FILE: &[Item] = &[
+    item("New Filter List", "page:list.new", "CmdOrCtrl+N"),
+    item("New View", "page:view.new", "CmdOrCtrl+T"),
+];
+pub const VIEW_LAYOUTS: &[Item] = &[
+    item("as List", "page:view.layout.list", "CmdOrCtrl+Ctrl+1"),
+    item("as Board", "page:view.layout.board", "CmdOrCtrl+Ctrl+2"),
+    item("as Table", "page:view.layout.table", "CmdOrCtrl+Ctrl+3"),
+];
+pub const VIEW_TOOLBAR: &[Item] = &[
+    item("Group and Sort…", "page:toolbar.group", "CmdOrCtrl+Alt+G"),
+    item("Columns…", "page:toolbar.columns", "CmdOrCtrl+Alt+C"),
+    item("Edit Filter…", "page:toolbar.filter", "CmdOrCtrl+Alt+F"),
+    item("Only My Issues", "page:toolbar.me", "CmdOrCtrl+Shift+M"),
+    item("Filter This View", "page:toolbar.search", "CmdOrCtrl+F"),
+];
 pub const VIEW: &[Item] = &[
     item(
         "Toggle Sidebar",
@@ -39,6 +57,34 @@ pub const VIEW: &[Item] = &[
     ),
     item("Refresh", "sync:refresh", "CmdOrCtrl+R"),
     item("Full Sync", "sync:full", "CmdOrCtrl+Shift+R"),
+];
+pub const GO_LEVELS: &[Item] = &[
+    item("Command Palette…", "page:palette.open", "CmdOrCtrl+K"),
+    item("Everything", "page:go.everything", "CmdOrCtrl+Shift+E"),
+    item("Recently Changed", "page:go.recent", "CmdOrCtrl+Shift+U"),
+    item("Pinned", "page:go.pinned", "CmdOrCtrl+Shift+P"),
+];
+pub const GO_MOVES: &[Item] = &[
+    item("Previous Space", "nav:previousSpace", "CmdOrCtrl+Alt+Up"),
+    item("Next Space", "nav:nextSpace", "CmdOrCtrl+Alt+Down"),
+    item("Previous View", "page:view.previous", "Ctrl+Shift+Tab"),
+    item("Next View", "page:view.next", "Ctrl+Tab"),
+];
+/// The issue keys are plain letters or shared with Edit (⌘C), so most items show no key here.
+pub const ISSUE: &[Item] = &[
+    plain("Open", "page:issue.open"),
+    plain("Open or Close Peek", "page:issue.togglePeek"),
+    plain("Open Epic", "page:issue.openEpic"),
+    item("Open in Jira", "page:issue.openInJira", "CmdOrCtrl+Enter"),
+    plain("Copy Key", "page:issue.copyKey"),
+    item("Copy Link", "page:issue.copyUrl", "CmdOrCtrl+Shift+C"),
+    plain("Pin or Unpin", "page:issue.togglePin"),
+    plain("Mark Seen", "page:issue.markSeen"),
+    item(
+        "Mark All Seen",
+        "page:recent.markAllSeen",
+        "CmdOrCtrl+Shift+A",
+    ),
 ];
 /// Debug builds only; ⌘⇧R is the full sync.
 pub const RELOAD: Item = item("Reload", "app:reload", "CmdOrCtrl+Alt+R");
@@ -104,15 +150,30 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         .paste()
         .select_all()
         .build()?;
-    let view = with_items(app, &commands, SubmenuBuilder::new(app, "View"), VIEW)?;
+    let file = with_items(app, &commands, SubmenuBuilder::new(app, "File"), FILE)?.build()?;
+    let view = with_items(
+        app,
+        &commands,
+        SubmenuBuilder::new(app, "View"),
+        VIEW_LAYOUTS,
+    )?
+    .separator();
+    let view = with_items(app, &commands, view, VIEW_TOOLBAR)?.separator();
+    let view = with_items(app, &commands, view, VIEW)?;
     let view = with_items(app, &commands, view, &[RELOAD])?.build()?;
+    let go = with_items(app, &commands, SubmenuBuilder::new(app, "Go"), GO_LEVELS)?.separator();
+    let go = with_items(app, &commands, go, GO_MOVES)?.build()?;
+    let issue = with_items(app, &commands, SubmenuBuilder::new(app, "Issue"), ISSUE)?.build()?;
     let window = SubmenuBuilder::new(app, "Window").minimize().maximize();
     let window = with_items(app, &commands, window.separator(), &[CLOSE])?
         .separator()
         .bring_all_to_front()
         .build()?;
     let help = with_items(app, &commands, SubmenuBuilder::new(app, "Help"), HELP)?.build()?;
-    Menu::with_items(app, &[&taskboard, &edit, &view, &window, &help])
+    Menu::with_items(
+        app,
+        &[&taskboard, &file, &edit, &view, &go, &issue, &window, &help],
+    )
 }
 
 /// A click on any menu item runs the command of its id.
@@ -130,21 +191,106 @@ mod tests {
     fn registered() -> CommandBus<AppHandle> {
         let mut bus = CommandBus::<AppHandle>::default();
         bus::register(&mut bus);
+        crate::nav::commands::register(&mut bus);
         bus
+    }
+
+    fn all_items() -> Vec<&'static Item> {
+        let mut items: Vec<&Item> = vec![&SETTINGS, &QUIT, &CLOSE, &RELOAD];
+        for list in [
+            FILE,
+            VIEW_LAYOUTS,
+            VIEW_TOOLBAR,
+            VIEW,
+            GO_LEVELS,
+            GO_MOVES,
+            ISSUE,
+            HELP,
+        ] {
+            items.extend(list);
+        }
+        items
     }
 
     #[test]
     fn every_menu_item_runs_a_registered_command() {
         let bus = registered();
-        let mut items: Vec<&Item> = vec![&SETTINGS, &QUIT, &CLOSE];
-        items.extend(VIEW);
-        items.extend(HELP);
-        if cfg!(debug_assertions) {
-            items.push(&RELOAD);
+        let mut items = all_items();
+        if !cfg!(debug_assertions) {
+            items.retain(|item| item.command != RELOAD.command);
         }
         for item in items {
             assert!(bus.knows(item.command), "{}", item.command);
         }
+    }
+
+    #[test]
+    fn page_items_use_the_ids_the_page_registers() {
+        let page_ids: Vec<&str> = [FILE, VIEW_LAYOUTS, VIEW_TOOLBAR, GO_LEVELS, GO_MOVES, ISSUE]
+            .into_iter()
+            .flatten()
+            .filter_map(|item| item.command.strip_prefix("page:"))
+            .collect();
+        assert_eq!(
+            page_ids,
+            [
+                "list.new",
+                "view.new",
+                "view.layout.list",
+                "view.layout.board",
+                "view.layout.table",
+                "toolbar.group",
+                "toolbar.columns",
+                "toolbar.filter",
+                "toolbar.me",
+                "toolbar.search",
+                "palette.open",
+                "go.everything",
+                "go.recent",
+                "go.pinned",
+                "view.previous",
+                "view.next",
+                "issue.open",
+                "issue.togglePeek",
+                "issue.openEpic",
+                "issue.openInJira",
+                "issue.copyKey",
+                "issue.copyUrl",
+                "issue.togglePin",
+                "issue.markSeen",
+                "recent.markAllSeen",
+            ]
+        );
+    }
+
+    #[test]
+    fn the_space_moves_run_the_nav_commands() {
+        let commands: Vec<&str> = GO_MOVES
+            .iter()
+            .filter(|item| !item.command.starts_with("page:"))
+            .map(|item| item.command)
+            .collect();
+        assert_eq!(commands, ["nav:previousSpace", "nav:nextSpace"]);
+    }
+
+    #[test]
+    fn no_item_binds_a_plain_letter_or_the_copy_key() {
+        for item in all_items() {
+            let Some(accelerator) = item.accelerator else {
+                continue;
+            };
+            assert_ne!(accelerator, "CmdOrCtrl+C", "{}", item.command);
+            let last = accelerator.rsplit('+').next().unwrap_or(accelerator);
+            let plain_letter = last.len() == 1
+                && last.chars().all(|c| c.is_ascii_alphabetic())
+                && accelerator == last;
+            assert!(!plain_letter, "{}", item.command);
+        }
+        let copy_key = ISSUE
+            .iter()
+            .find(|item| item.command == "page:issue.copyKey")
+            .unwrap();
+        assert_eq!(copy_key.accelerator, None);
     }
 
     #[test]
@@ -188,11 +334,8 @@ mod tests {
 
     #[test]
     fn no_two_menu_items_share_an_accelerator() {
-        let mut items: Vec<&Item> = vec![&SETTINGS, &QUIT, &CLOSE, &RELOAD];
-        items.extend(VIEW);
-        items.extend(HELP);
         let mut seen: Vec<&str> = Vec::new();
-        for accelerator in items.iter().filter_map(|item| item.accelerator) {
+        for accelerator in all_items().iter().filter_map(|item| item.accelerator) {
             assert!(!seen.contains(&accelerator), "{accelerator}");
             seen.push(accelerator);
         }

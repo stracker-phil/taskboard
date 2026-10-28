@@ -29,6 +29,8 @@ export interface EventPayloads {
   open_settings: string;
   /** To the main window: show or hide the sidebar. */
   toggle_sidebar: null;
+  /** A menu item for something the page does: the id of the page command to run. */
+  page_command: string;
   /** Issues in the cache changed. */
   issues_changed: IssuesChanged;
   /** Parts of the owner's own setup changed. */

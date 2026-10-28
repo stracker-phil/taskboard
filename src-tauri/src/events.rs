@@ -27,5 +27,7 @@ pub const SYNC_STATE_EVENT: &str = "sync_state";
 pub const SYNC_PROGRESS_EVENT: &str = "sync_progress";
 /// To the main window. No payload; shows or hides the sidebar.
 pub const TOGGLE_SIDEBAR_EVENT: &str = "toggle_sidebar";
+/// To the main window. Payload: the id of a page command to run (a menu item for something the page does).
+pub const PAGE_COMMAND_EVENT: &str = "page_command";
 /// Payload: the `Nav` after a command outside the page moved the main window (previous/next Space).
 pub const NAV_CHANGED_EVENT: &str = "nav_changed";

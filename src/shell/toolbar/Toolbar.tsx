@@ -1,5 +1,6 @@
 import { Columns3, Ellipsis, Layers, ListFilter } from "lucide-react";
 import { type ReactNode, type RefObject, useCallback, useEffect, useRef, useState } from "react";
+import { usePageAction } from "../../commands/pageActions";
 import { type Presence, usePresence } from "../../lib/motion";
 import { api, type MenuEntry, type View } from "../../api";
 import { narrowingKey, NO_NARROWING } from "../../state/slices/narrowing";
@@ -24,6 +25,7 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
   const columnsRef = useRef<HTMLButtonElement>(null);
   const filterRef = useRef<HTMLButtonElement>(null);
   const moreRef = useRef<HTMLButtonElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const { hidden, measure } = useToolbarFit(barRef);
   const edit = useViewEdit();
   const key = narrowingKey(view.listId, view.id);
@@ -61,6 +63,15 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
   const columnsLabel = view.layout === "board" ? "Card fields" : "Columns";
   const offered = (item: Collapsible) => item !== "filter" || filterable;
   const shows = (item: Collapsible) => offered(item) && !hidden.includes(item);
+
+  usePageAction("toolbar.me", () => setNarrowing(key, { me: !narrowing.me }));
+  usePageAction("toolbar.search", () => {
+    searchRef.current?.focus();
+    searchRef.current?.select();
+  });
+  usePageAction("toolbar.filter", filterable ? () => setOpen("filter") : null);
+  usePageAction("toolbar.columns", () => setOpen("columns"));
+  usePageAction("toolbar.group", () => popup(groupEntries()));
 
   const moreEntries = (): MenuEntry[] =>
     hidden.filter(offered).map((item): MenuEntry => {
@@ -139,7 +150,7 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
         </span>
       )}
       {narrowing.epic && <EpicNarrowingChip epicId={narrowing.epic} onClear={() => setNarrowing(key, { epic: null })} />}
-      <TextFilter key={key} value={narrowing.text} onChange={setText} />
+      <TextFilter key={key} value={narrowing.text} onChange={setText} inputRef={searchRef} />
       {hidden.some(offered) && (
         <span className="toolbar__anchor toolbar__anchor--end">
           <button ref={moreRef} type="button" className="toolbar-btn toolbar-btn--icon" aria-label="More toolbar items" onClick={() => popup(moreEntries())}>

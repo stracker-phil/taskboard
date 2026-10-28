@@ -438,24 +438,29 @@ owner's own Settings design replaces it. Its colours are the `--settings-*` toke
 
 ## Keys
 
-App-level actions are Rust commands ([ADR 0012](adr/0012-commands-live-in-rust.md)); the app menu gives them
-their keys (⌘, Settings, ⌘\ Toggle Sidebar, ⌘R Refresh, ⌘⇧R Full Sync, ⌘W, ⌘Q; the debug build's Reload is
-⌥⌘R). Settings → Shortcuts lists every key: the window's own, rebindable with a recorder (conflicts are
-flagged), and the menu's, fixed. There are no global shortcuts. The page's registry
-(`src/commands/`) has only the keys inside a window, rebindable through `keybindings.json`; ⌘K opens the
-palette once it exists.
+The app is fully keyboard controllable, and every action is also a menu item (owner, 2026-10-29). App-level
+actions are Rust commands ([ADR 0012](adr/0012-commands-live-in-rust.md)); what the page does is in the page's
+registry (`src/commands/`), and the menus reach it through the bus family `page:<id>`, which shows the main
+window and emits `page_command` (`state/useAppEvents.ts` runs the command when it can). Components offer
+their actions while on screen with `usePageAction(id, run)` (`commands/pageActions.ts`). Settings → Shortcuts
+lists and rebinds the page's keys (conflicts are flagged); the menu shows the default keys. There are no
+global shortcuts.
 
+- **Menus** (`src-tauri/src/menu/`): File (New Filter List ⌘N, New View ⌘T), View (as List / Board / Table
+  ⌃⌘1–3; Group and Sort… ⌥⌘G, Columns… ⌥⌘C, Edit Filter… ⌥⌘F, Only My Issues ⇧⌘M, Filter This View ⌘F;
+  Toggle Sidebar ⌘\, Refresh ⌘R, Full Sync ⇧⌘R), Go (Command Palette ⌘K, Everything ⇧⌘E, Recently Changed
+  ⇧⌘U, Pinned ⇧⌘P, Previous/Next Space ⌥⌘↑/↓, Previous/Next View ⌃⇧⇥/⌃⇥), Issue (Open, Open or Close Peek,
+  Open Epic, Open in Jira ⌘↩, Copy Key, Copy Link ⇧⌘C, Pin or Unpin, Mark Seen, Mark All Seen ⇧⌘A), plus
+  ⌘, Settings, ⌘W, ⌘Q (the debug build's Reload is ⌥⌘R). Plain-letter keys stay off menu items so they never
+  take a typed letter; Copy Key has no ⌘C there because Edit → Copy owns it.
 - Bare keys never fire in text fields; there only ⌘ and ⌃ combinations and Escape do.
-- While a dialog is open, only `?` and the text size keys run.
-- ↵ and Space on a focused button or link activate it. `Tab` is never bound.
-- A command has one binding.
-- In the Taskboard window: ⌥⌘↑ and ⌥⌘↓ open the previous and next Space (the bus commands `nav:previousSpace`
-  and `nav:nextSpace`, which wrap), ⌘1–⌘9 the nth view tab.
-- In a List (`commands/issueKeys.ts`, registered by the shown view): J or ↓ and K or ↑ move the selection (the
-  peek follows), ← and → close and open the selected row's group, esc closes the peek (after any popover),
-  ⌘C copies the key (only with no text field focused and no text selected), ⌘⇧C the issue's URL, ⌘↩ opens it in
-  Jira, ↩ opens the Issue view and E the issue's epic. In the Issue view J/K move to the neighbours and esc
-  goes back.
+- ↵ and Space on a focused button or link activate it. `Tab` moves focus (sidebar, tabs, toolbar, content).
+- A command has one binding; ⌘1–⌘9 open the nth view tab.
+- **Issues** (`commands/issueKeys.ts`, registered by the shown List, Board or Issue view): J or ↓ and K or ↑
+  move (on the Board through a column's cards, ← and → to the neighbouring column; in a List ← and → close and
+  open the row's group), Space opens or closes the peek (the Board opens the Issue view), ↩ opens the Issue
+  view, E the epic, P pins or unpins (default duration), M marks seen, ⌘C copies the key (only with no text
+  field focused and no text selected), ⌘⇧C the URL, ⌘↩ opens it in Jira, esc closes the peek or goes back.
 - `app:settings:<page>` opens Settings at a page or section (the Spaces "+" uses `app:settings:projects`).
 
 ## Palette checks

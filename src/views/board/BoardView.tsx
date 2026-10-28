@@ -7,6 +7,7 @@ import { attempt } from "../../state/requests";
 import { useStore } from "../../state/store";
 import { useIssueActions } from "../list/useIssueActions";
 import { BoardCard } from "./BoardCard";
+import { useBoardKeys } from "./useBoardKeys";
 
 interface Props {
   view: View;
@@ -26,6 +27,7 @@ function Board({ view, data }: { view: View; data: BoardData }) {
   const setCollapsed = (column: BoardColumn, collapsed: boolean) =>
     void attempt(api.viewSetColumnCollapsed(view.id, column.statusId, collapsed), "Could not change the column");
   const open = (id: string) => openIssue(id, { listId: view.listId, viewId: view.id });
+  const selected = useBoardKeys(data, open, actions);
   if (data.columns.length === 0) return <EmptyLevel listId={view.listId} viewId={view.id} />;
   return (
     <div className="board" role="list" aria-label="Board">
@@ -55,7 +57,7 @@ function Board({ view, data }: { view: View; data: BoardData }) {
             <div className="board-column__cards">
               {column.ids.map((id) => {
                 const row = data.rows[id];
-                return row ? <BoardCard key={id} row={row} fields={data.cardFields} onOpen={open} actions={actions} /> : null;
+                return row ? <BoardCard key={id} row={row} fields={data.cardFields} selected={id === selected} onOpen={open} actions={actions} /> : null;
               })}
             </div>
           </section>

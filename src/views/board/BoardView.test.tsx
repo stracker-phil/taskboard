@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../../test/apiMock")).createApiMock() }));
 
 import { api, type BoardData } from "../../api";
+import { installCommands, useCommandKeys } from "../../commands";
 import { createQueryClient } from "../../queries/queryClient";
 import { resetStore, useStore } from "../../state/store";
 import { boardColumn, boardData } from "../../test/board";
@@ -243,6 +244,223 @@ describe("BoardView", () => {
       await userEvent.keyboard("{Enter}");
 
       expect(useStore.getState().issueView).toBeNull();
+    });
+  });
+
+  describe("keys", () => {
+    const todo = [row({ id: "1", key: "NW-101", summary: "Draft the sitemap" }), row({ id: "2", key: "NW-102", summary: "Write the footer copy" }), row({ id: "3", key: "NW-103", summary: "Pick the typefaces" })];
+    const progress = [row({ id: "4", key: "NW-104", summary: "Build the header" }), row({ id: "5", key: "NW-105", summary: "Wire up the search" })];
+    const review = [row({ id: "7", key: "NW-107", summary: "Check the contrast" })];
+    const done = [row({ id: "6", key: "NW-106", summary: "Register the domain" })];
+    const rows = [...todo, ...progress, ...review, ...done];
+
+    const BACKLOG = boardColumn({ statusId: "10", name: "Backlog", style: "todo", ids: [] });
+    const TODO_COLUMN = boardColumn({ statusId: "1", name: "To Do", style: "todo", ids: ["1", "2", "3"] });
+    const REVIEW_COLUMN = boardColumn({ statusId: "4", name: "In Review", style: "progress", ids: ["7"], collapsed: true });
+    const PROGRESS_COLUMN = boardColumn({ statusId: "3", name: "In Progress", style: "progress", ids: ["4", "5"] });
+    const DONE_COLUMN = boardColumn({ statusId: "5", name: "Done", style: "done", ids: ["6"] });
+    const FULL_BOARD = boardData([BACKLOG, TODO_COLUMN, REVIEW_COLUMN, PROGRESS_COLUMN, DONE_COLUMN], rows);
+
+    function Keys() {
+      useCommandKeys();
+      return null;
+    }
+
+    async function renderKeyed(data: BoardData = FULL_BOARD) {
+      mocked.viewBoard.mockResolvedValue(data);
+      render(
+        <QueryClientProvider client={createQueryClient()}>
+          <Keys />
+          <BoardView view={BOARD} />
+        </QueryClientProvider>,
+      );
+      await screen.findByRole("list", { name: "Board" });
+    }
+
+    const currentKeys = () => screen.queryAllByRole("article", { current: true }).map((card) => within(card).getByText(/^NW-\d+$/).textContent);
+
+    beforeEach(() => {
+      installCommands("main");
+    });
+
+    describe("moving down and up", () => {
+      it.each(["j", "{ArrowDown}"])("%s selects the first card of the first open column, skipping empty ones", async (key) => {
+        await renderKeyed();
+
+        await userEvent.keyboard(key);
+
+        expect(currentKeys()).toEqual(["NW-101"]);
+      });
+
+      it.each(["k", "{ArrowUp}"])("%s with no card selected also starts on the first card", async (key) => {
+        await renderKeyed();
+
+        await userEvent.keyboard(key);
+
+        expect(currentKeys()).toEqual(["NW-101"]);
+      });
+
+      it.each([
+        ["j", "NW-102"],
+        ["{ArrowDown}", "NW-102"],
+      ])("%s moves to the next card in the column", async (key, expected) => {
+        await renderKeyed();
+        await userEvent.keyboard("j");
+
+        await userEvent.keyboard(key);
+
+        expect(currentKeys()).toEqual([expected]);
+      });
+
+      it.each(["k", "{ArrowUp}"])("%s moves to the previous card in the column", async (key) => {
+        await renderKeyed();
+        await userEvent.keyboard("jj");
+
+        await userEvent.keyboard(key);
+
+        expect(currentKeys()).toEqual(["NW-101"]);
+      });
+
+      it("stops at the last card of the column", async () => {
+        await renderKeyed();
+
+        await userEvent.keyboard("jjjjj");
+
+        expect(currentKeys()).toEqual(["NW-103"]);
+      });
+
+      it("stops at the first card of the column", async () => {
+        await renderKeyed();
+        await userEvent.keyboard("j");
+
+        await userEvent.keyboard("kk");
+
+        expect(currentKeys()).toEqual(["NW-101"]);
+      });
+
+      it("selects nothing on a board whose columns are all collapsed or empty", async () => {
+        await renderKeyed(boardData([BACKLOG, REVIEW_COLUMN], review));
+
+        await userEvent.keyboard("j");
+
+        expect(currentKeys()).toEqual([]);
+      });
+    });
+
+    describe("moving between columns", () => {
+      it("→ goes to the card at the same place in the next open column, skipping a collapsed column", async () => {
+        await renderKeyed();
+        await userEvent.keyboard("jj");
+
+        await userEvent.keyboard("{ArrowRight}");
+
+        expect(currentKeys()).toEqual(["NW-105"]);
+      });
+
+      it("→ lands on the last card when the next column is shorter", async () => {
+        await renderKeyed();
+        await userEvent.keyboard("jjj");
+
+        await userEvent.keyboard("{ArrowRight}");
+
+        expect(currentKeys()).toEqual(["NW-105"]);
+      });
+
+      it("→ stays in the last column", async () => {
+        await renderKeyed();
+        await userEvent.keyboard("j{ArrowRight}{ArrowRight}");
+
+        await userEvent.keyboard("{ArrowRight}");
+
+        expect(currentKeys()).toEqual(["NW-106"]);
+      });
+
+      it("← goes back to the same place in the previous open column", async () => {
+        await renderKeyed();
+        await userEvent.keyboard("j{ArrowRight}j");
+        expect(currentKeys()).toEqual(["NW-105"]);
+
+        await userEvent.keyboard("{ArrowLeft}");
+
+        expect(currentKeys()).toEqual(["NW-102"]);
+      });
+
+      it("← stays in the first column", async () => {
+        await renderKeyed();
+        await userEvent.keyboard("j");
+
+        await userEvent.keyboard("{ArrowLeft}");
+
+        expect(currentKeys()).toEqual(["NW-101"]);
+      });
+
+      it("ignores ← and → while no card is selected", async () => {
+        await renderKeyed();
+
+        await userEvent.keyboard("{ArrowRight}{ArrowLeft}");
+
+        expect(currentKeys()).toEqual([]);
+      });
+    });
+
+    describe("acting on the selected card", () => {
+      const ORIGIN = { listId: BOARD.listId, viewId: BOARD.id };
+
+      it.each([
+        ["↩", "{Enter}"],
+        ["Space", " "],
+      ])("%s opens the Issue view for the card", async (_name, key) => {
+        await renderKeyed();
+        await userEvent.keyboard("jj");
+
+        await userEvent.keyboard(key);
+
+        expect(useStore.getState().issueView).toEqual({ origin: ORIGIN, stack: ["2"] });
+      });
+
+      it("P pins the card's issue", async () => {
+        await renderKeyed();
+        await userEvent.keyboard("jj");
+
+        await userEvent.keyboard("p");
+
+        expect(mocked.pinToggleIssue).toHaveBeenCalledWith("2");
+      });
+
+      it("M marks the card's issue seen", async () => {
+        await renderKeyed();
+        await userEvent.keyboard("j");
+
+        await userEvent.keyboard("m");
+
+        expect(mocked.issuesMarkSeen).toHaveBeenCalledWith(["1"]);
+      });
+
+      it("⌘C copies the card's key", async () => {
+        await renderKeyed();
+        await userEvent.keyboard("jj");
+
+        await userEvent.keyboard("{Meta>}c{/Meta}");
+
+        expect(mocked.copyText).toHaveBeenCalledWith("NW-102");
+      });
+
+      it.each([
+        ["↩", "{Enter}"],
+        ["Space", " "],
+        ["P", "p"],
+        ["M", "m"],
+        ["⌘C", "{Meta>}c{/Meta}"],
+      ])("%s does nothing while no card is selected", async (_name, key) => {
+        await renderKeyed();
+
+        await userEvent.keyboard(key);
+
+        expect(useStore.getState().issueView).toBeNull();
+        expect(mocked.pinToggleIssue).not.toHaveBeenCalled();
+        expect(mocked.issuesMarkSeen).not.toHaveBeenCalled();
+        expect(mocked.copyText).not.toHaveBeenCalled();
+      });
     });
   });
 

@@ -9,7 +9,7 @@ import { DropLine } from "./DropLine";
 import { ListCount } from "./ListCount";
 import { useDragReorder } from "./useDragReorder";
 
-const NEW_LIST_NAME = "New filter list";
+export const NEW_LIST_NAME = "New filter list";
 
 interface Props {
   space: SpaceNode;

@@ -9,17 +9,23 @@ interface Props {
   row: Row;
   /** The view's card fields: which of epic, assignee, release and priority show. */
   fields: string[];
+  /** The keyboard's current card. */
+  selected?: boolean;
   onOpen: (id: string) => void;
   actions: RowActionHandlers;
 }
 
 /** A Board card: epic and key, the summary (always wrapped, never cut), then people, release, comments and
  *  priority; changed cards are tinted. */
-export function BoardCard({ row, fields, onOpen, actions }: Props) {
+export function BoardCard({ row, fields, selected = false, onOpen, actions }: Props) {
   const shows = (field: string) => fields.includes(field);
   return (
     <article
-      className={row.changed ? "board-card board-card--changed" : "board-card"}
+      className={["board-card", row.changed && "board-card--changed", selected && "board-card--selected"].filter(Boolean).join(" ")}
+      aria-current={selected || undefined}
+      ref={(element) => {
+        if (selected) element?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+      }}
       tabIndex={0}
       aria-label={`${row.key} ${row.summary}`}
       onClick={() => onOpen(row.id)}

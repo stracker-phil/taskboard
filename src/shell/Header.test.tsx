@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
 
 import { api } from "../api";
+import { runPageAction } from "../commands/pageActions";
 import { createQueryClient } from "../queries/queryClient";
 import { resetStore, useStore } from "../state/store";
 import { connectionView } from "../test/jira";
@@ -39,6 +40,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
   mocked.connectionGet.mockResolvedValue(connectionView());
+  mocked.listMarkAllSeen.mockResolvedValue(undefined);
+  mocked.openUrl.mockResolvedValue(undefined);
 });
 
 describe("Header", () => {
@@ -106,6 +109,66 @@ describe("Header", () => {
       await userEvent.click(screen.getByRole("button", { name: "Mark all seen" }));
 
       await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not mark them seen: Disk full"));
+    });
+
+    describe("as a page action (recent.markAllSeen)", () => {
+      const run = () => {
+        let offered = false;
+        act(() => {
+          offered = runPageAction("recent.markAllSeen");
+        });
+        return offered;
+      };
+
+      it("marks every issue of Recently changed seen", async () => {
+        await renderHeader(recent(3));
+
+        expect(run()).toBe(true);
+
+        expect(mocked.listMarkAllSeen).toHaveBeenCalledWith(2);
+      });
+
+      it.each([0, null])("is not offered when the unseen count is %s", async (count) => {
+        await renderHeader(recent(count));
+
+        expect(run()).toBe(false);
+        expect(mocked.listMarkAllSeen).not.toHaveBeenCalled();
+      });
+
+      it.each([
+        ["Everything", EVERYTHING],
+        ["a Space", SPACE_LEVEL],
+      ])("is not offered on %s", async (_name, level) => {
+        await renderHeader(level);
+
+        expect(run()).toBe(false);
+      });
+
+      it("is withdrawn once every issue is seen", async () => {
+        const view = render(
+          <QueryClientProvider client={createQueryClient()}>
+            <Header level={recent(3)} />
+          </QueryClientProvider>,
+        );
+        expect(run()).toBe(true);
+
+        view.rerender(
+          <QueryClientProvider client={createQueryClient()}>
+            <Header level={recent(0)} />
+          </QueryClientProvider>,
+        );
+
+        expect(run()).toBe(false);
+      });
+
+      it("shows an error toast when marking fails", async () => {
+        mocked.listMarkAllSeen.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
+        await renderHeader(recent(3));
+
+        run();
+
+        await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not mark them seen: Disk full"));
+      });
     });
   });
 

@@ -1,13 +1,15 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
 
-import { api, type MenuEntry } from "../api";
+import { api, type Layout, type MenuEntry } from "../api";
 import { ConfirmHost } from "../components/ConfirmSheet";
 import { installCommands, useCommandKeys } from "../commands";
+import { runPageAction } from "../commands/pageActions";
+import { getCommand } from "../commands/registry";
 import { createQueryClient } from "../queries/queryClient";
 import { resetStore, useStore } from "../state/store";
 import { view } from "../test/views";
@@ -56,6 +58,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
   installCommands("main");
+  mocked.viewSetLayout.mockResolvedValue(LIST);
 });
 
 describe("ViewTabs", () => {
@@ -237,6 +240,130 @@ describe("ViewTabs", () => {
 
       await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not delete the view: Disk full"));
       expect(mocked.navGo).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("page actions", () => {
+    const run = (id: string) => {
+      let offered = false;
+      act(() => {
+        offered = runPageAction(id);
+      });
+      return offered;
+    };
+
+    describe("view.new", () => {
+      it("opens the add-view menu with the three layouts", async () => {
+        await renderTabs();
+
+        run("view.new");
+
+        expect(entriesOf(mocked.popupMenu.mock.lastCall![0]).map((e) => e.text)).toEqual(["List", "Board", "Table"]);
+      });
+
+      it("opens the add-view menu on ⌘T", async () => {
+        await renderTabs();
+
+        await userEvent.keyboard("{Meta>}t{/Meta}");
+
+        expect(entriesOf(mocked.popupMenu.mock.lastCall![0]).map((e) => e.text)).toEqual(["List", "Board", "Table"]);
+      });
+    });
+
+    describe("view.next and view.previous", () => {
+      it.each([
+        ["view.next", 101, 102],
+        ["view.next", 103, 101],
+        ["view.previous", 102, 101],
+        ["view.previous", 101, 103],
+      ])("%s from view %i opens view %i", async (id, from, to) => {
+        await renderTabs([LIST, BOARD, TABLE], from);
+
+        run(id);
+
+        expect(mocked.navGo).toHaveBeenCalledWith(11, to);
+      });
+
+      it("moves to the next view on ⌃⇥ and the previous on ⌃⇧⇥", async () => {
+        await renderTabs([LIST, BOARD, TABLE], 102);
+
+        await userEvent.keyboard("{Control>}{Tab}{/Control}");
+        expect(mocked.navGo).toHaveBeenLastCalledWith(11, 103);
+
+        await userEvent.keyboard("{Control>}{Shift>}{Tab}{/Shift}{/Control}");
+        expect(mocked.navGo).toHaveBeenLastCalledWith(11, 101);
+      });
+
+      it.each(["view.next", "view.previous"])("%s is not offered with a single view", async (id) => {
+        await renderTabs([LIST]);
+
+        expect(run(id)).toBe(false);
+        expect(getCommand(id)?.when?.()).toBe(false);
+        expect(mocked.navGo).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("view.layout", () => {
+      it.each([
+        ["view.layout.board", "board"],
+        ["view.layout.table", "table"],
+      ])("%s changes the current list view to %s", async (id, layout) => {
+        mocked.viewSetLayout.mockResolvedValue({ ...LIST, layout: layout as Layout });
+        await renderTabs([LIST, BOARD], 101);
+
+        run(id);
+
+        expect(mocked.viewSetLayout).toHaveBeenCalledWith(101, layout);
+      });
+
+      it("changes the layout of the current view, not of the first", async () => {
+        mocked.viewSetLayout.mockResolvedValue({ ...BOARD, layout: "list" });
+        await renderTabs([LIST, BOARD], 102);
+
+        run("view.layout.list");
+
+        expect(mocked.viewSetLayout).toHaveBeenCalledWith(102, "list");
+      });
+
+      it("does nothing when the view already has that layout", async () => {
+        await renderTabs([LIST, BOARD], 102);
+
+        run("view.layout.board");
+
+        expect(mocked.viewSetLayout).not.toHaveBeenCalled();
+      });
+
+      it("changes the layout on ⌃⌘2", async () => {
+        mocked.viewSetLayout.mockResolvedValue({ ...LIST, layout: "board" });
+        await renderTabs([LIST, BOARD], 101);
+
+        await userEvent.keyboard("{Meta>}{Control>}2{/Control}{/Meta}");
+
+        expect(mocked.viewSetLayout).toHaveBeenCalledWith(101, "board");
+      });
+
+      it("shows an error toast when the layout cannot be changed", async () => {
+        mocked.viewSetLayout.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
+        await renderTabs([LIST, BOARD], 101);
+
+        run("view.layout.table");
+
+        await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not change the layout: Disk full"));
+      });
+
+      it.each(["view.layout.list", "view.layout.board", "view.layout.table"])("%s is not offered when the current view is not among the tabs", async (id) => {
+        await renderTabs([LIST, BOARD], 999);
+
+        expect(run(id)).toBe(false);
+      });
+    });
+
+    it("withdraws every view action when the tabs unmount", async () => {
+      await renderTabs([LIST, BOARD]);
+
+      cleanup();
+
+      expect(["view.new", "view.next", "view.previous", "view.layout.list"].map(run)).toEqual([false, false, false, false]);
     });
   });
 });

@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -6,6 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../../test/apiMock")).createApiMock() }));
 
 import { api, type ListNode, type MenuEntry, type Nav, type SidebarTree, type SpaceNode } from "../../api";
+import { installCommands, useCommandKeys } from "../../commands";
+import { runPageAction } from "../../commands/pageActions";
 import { createQueryClient } from "../../queries/queryClient";
 import { SIDEBAR_KEY } from "../../queries/sidebar";
 import { resetStore, useStore } from "../../state/store";
@@ -16,6 +18,11 @@ import { Toasts } from "../../components/Toasts";
 import { Sidebar } from "./Sidebar";
 
 const mocked = vi.mocked(api, true);
+
+function Keys() {
+  useCommandKeys();
+  return null;
+}
 
 // jsdom may lack PointerEvent; the stub keeps the mouse fields (clientY, buttons) that the drag reads.
 window.PointerEvent ??= class extends MouseEvent {
@@ -271,6 +278,124 @@ describe("Sidebar", () => {
       await userEvent.clear(field);
       await userEvent.type(field, "Roadmap{Enter}");
       expect(mocked.listRename).toHaveBeenCalledWith(30, "Roadmap");
+    });
+  });
+
+  describe("page actions", () => {
+    const run = (id: string) => {
+      let offered = false;
+      act(() => {
+        offered = runPageAction(id);
+      });
+      return offered;
+    };
+
+    /** Makes the created list appear in the refetched tree, as Rust's answer would. */
+    function createsListInto(client: Awaited<ReturnType<typeof renderSidebar>>, patch: Parameters<typeof treeWith>[0]) {
+      mocked.listCreate.mockImplementation(async () => {
+        mocked.sidebarTree.mockResolvedValue(treeWith(patch));
+        await client.invalidateQueries({ queryKey: SIDEBAR_KEY });
+        return 30;
+      });
+    }
+
+    it.each([
+      ["go.everything", 1],
+      ["go.recent", 2],
+      ["go.pinned", 3],
+    ])("%s opens its Home level", async (id, listId) => {
+      await renderSidebar();
+
+      run(id);
+
+      expect(mocked.navGo).toHaveBeenCalledWith(listId, null);
+    });
+
+    it("offers no Go to Recently changed or Pinned when the tree has no such Home rows", async () => {
+      const tree = treeWith();
+      tree.home = [];
+      await renderSidebar(tree);
+
+      expect(run("go.recent")).toBe(false);
+      expect(run("go.pinned")).toBe(false);
+      expect(run("go.everything")).toBe(true);
+    });
+
+    it("opens Pinned on ⌘⇧P", async () => {
+      installCommands("main");
+      await renderSidebar();
+      render(<Keys />);
+
+      await userEvent.keyboard("{Meta>}{Shift>}p{/Shift}{/Meta}");
+
+      expect(mocked.navGo).toHaveBeenCalledWith(3, null);
+    });
+
+    describe("list.new", () => {
+      it("creates the list under the current Space, opens it and lets it be named in place", async () => {
+        const client = await renderSidebar(treeWith(), navAt(SPRINT.id, [NW_ID]));
+        createsListInto(client, { nw: { lists: [SPRINT, EPICS, list(30, "New filter list")] } });
+
+        run("list.new");
+
+        const field = await screen.findByRole("textbox", { name: "Filter list name" });
+        expect(mocked.listCreate).toHaveBeenCalledWith(NW_ID, "New filter list", null);
+        expect(mocked.navGo).toHaveBeenCalledWith(30, null);
+        expect(mocked.navSetExpanded).not.toHaveBeenCalled();
+        await userEvent.clear(field);
+        await userEvent.type(field, "Roadmap{Enter}");
+        expect(mocked.listRename).toHaveBeenCalledWith(30, "Roadmap");
+      });
+
+      it("expands the current Space first when it is collapsed", async () => {
+        const client = await renderSidebar(treeWith(), navAt(SPRINT.id, [LUM_ID]));
+        createsListInto(client, { nw: { lists: [SPRINT, EPICS, list(30, "New filter list")] } });
+
+        run("list.new");
+
+        await screen.findByRole("textbox", { name: "Filter list name" });
+        expect(mocked.listCreate).toHaveBeenCalledWith(NW_ID, "New filter list", null);
+        expect(mocked.navSetExpanded).toHaveBeenCalledWith([LUM_ID, NW_ID]);
+      });
+
+      it("creates the list under Everything outside a Space, and opens it without renaming", async () => {
+        await renderSidebar(treeWith(), navAt(1));
+
+        run("list.new");
+
+        await waitFor(() => expect(mocked.navGo).toHaveBeenCalledWith(30, null));
+        expect(mocked.listCreate).toHaveBeenCalledWith(1, "New filter list", null);
+        expect(mocked.navSetExpanded).not.toHaveBeenCalled();
+        expect(screen.queryByRole("textbox", { name: "Filter list name" })).not.toBeInTheDocument();
+      });
+
+      it("shows an error toast and opens nothing when the list cannot be created", async () => {
+        mocked.listCreate.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
+        await renderSidebar(treeWith(), navAt(1));
+
+        run("list.new");
+
+        expect(await screen.findByText("Could not create the filter list: Disk full")).toBeInTheDocument();
+        expect(mocked.navGo).not.toHaveBeenCalled();
+      });
+
+      it("runs on ⌘N", async () => {
+        installCommands("main");
+        await renderSidebar(treeWith(), navAt(1));
+        render(<Keys />);
+
+        await userEvent.keyboard("{Meta>}n{/Meta}");
+
+        await waitFor(() => expect(mocked.listCreate).toHaveBeenCalledWith(1, "New filter list", null));
+      });
+    });
+
+    it("withdraws every sidebar action when the sidebar unmounts", async () => {
+      await renderSidebar();
+
+      cleanup();
+
+      expect(["go.everything", "go.recent", "go.pinned", "list.new"].map(run)).toEqual([false, false, false, false]);
     });
   });
 

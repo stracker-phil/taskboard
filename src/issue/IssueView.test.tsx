@@ -6,6 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
 
 import { api, type IssueDetail, type Row } from "../api";
+import { installCommands } from "../commands";
+import { getCommand, resolveKeydown } from "../commands/registry";
 import { createQueryClient } from "../queries/queryClient";
 import type { IssueOrigin } from "../state/slices/issueView";
 import { narrowingKey } from "../state/slices/narrowing";
@@ -49,6 +51,7 @@ beforeEach(() => {
   mocked.pinsList.mockResolvedValue(pins());
   mocked.getSettings.mockResolvedValue(settings());
   mocked.issueForget.mockResolvedValue(undefined);
+  mocked.issuesMarkSeen.mockResolvedValue(undefined);
   mocked.pinRemove.mockResolvedValue(undefined);
   serve(issueDetail(), EPIC);
   mocked.issueRelated.mockResolvedValue(related());
@@ -536,6 +539,54 @@ describe("IssueView", () => {
       await waitFor(() => expect(mocked.issueRelated).toHaveBeenCalled());
       expect(screen.queryByRole("region", { name: "Child issues" })).not.toBeInTheDocument();
       expect(screen.queryByRole("region", { name: "Subtasks" })).not.toBeInTheDocument();
+    });
+  });
+
+  describe("issue keys", () => {
+    const press = (id: string) => act(async () => void (await getCommand(id)?.run()));
+
+    beforeEach(() => {
+      installCommands("main");
+    });
+
+    it("M marks the shown issue seen", async () => {
+      renderIssue("10042");
+      await title("Checkout: address validation for DACH postcodes");
+
+      await press("issue.markSeen");
+
+      expect(mocked.issuesMarkSeen).toHaveBeenCalledWith(["10042"]);
+    });
+
+    it("shows an error toast when M cannot mark the issue seen", async () => {
+      mocked.issuesMarkSeen.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
+      renderIssue("10042");
+      await title("Checkout: address validation for DACH postcodes");
+
+      await press("issue.markSeen");
+
+      await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not mark it seen: Disk full"));
+    });
+
+    it.each([
+      ["↩", "Enter"],
+      ["Space", " "],
+    ])("leaves %s to the page, which has no command for it", async (_name, key) => {
+      renderIssue("10042");
+      await title("Checkout: address validation for DACH postcodes");
+
+      const command = resolveKeydown({ key, metaKey: false, ctrlKey: false, altKey: false, shiftKey: false }, ["global", "main"]);
+
+      expect(command).toBeNull();
+    });
+
+    it("still resolves M to its command, so the page really has the issue keys", async () => {
+      renderIssue("10042");
+      await title("Checkout: address validation for DACH postcodes");
+
+      const command = resolveKeydown({ key: "m", metaKey: false, ctrlKey: false, altKey: false, shiftKey: false }, ["global", "main"]);
+
+      expect(command?.id).toBe("issue.markSeen");
     });
   });
 });

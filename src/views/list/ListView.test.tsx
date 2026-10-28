@@ -340,6 +340,46 @@ describe("ListView", () => {
       expect(useStore.getState().issueView).toEqual({ origin: { listId: 11, viewId: 101 }, stack: ["3"] });
     });
 
+    it("marks the selected issue seen", async () => {
+      await renderList(viewData([groupOf(rows)], rows));
+      await userEvent.click(await screen.findByText("Fix the footer links"));
+
+      await press("issue.markSeen");
+
+      expect(mocked.issuesMarkSeen).toHaveBeenCalledWith(["3"]);
+    });
+
+    it("marks nothing seen without a selected issue", async () => {
+      await renderList(viewData([groupOf(rows)], rows));
+      await screen.findByRole("row", { name: /NW-1042/ });
+
+      await press("issue.markSeen");
+
+      expect(mocked.issuesMarkSeen).not.toHaveBeenCalled();
+    });
+
+    it("closes the selected issue's peek and opens it again", async () => {
+      await renderList(viewData([groupOf(rows)], rows));
+      await userEvent.click(await screen.findByText("Fix the footer links"));
+      expect(place()).toMatchObject({ selectedId: "3", peekOpen: true });
+
+      await press("issue.togglePeek");
+      expect(place()).toMatchObject({ selectedId: "3", peekOpen: false });
+
+      await press("issue.togglePeek");
+      expect(place()).toMatchObject({ selectedId: "3", peekOpen: true });
+    });
+
+    it("opens no peek without a selected issue", async () => {
+      await renderList(viewData([groupOf(rows)], rows));
+      await screen.findByRole("row", { name: /NW-1042/ });
+
+      await press("issue.togglePeek");
+
+      expect(place().peekOpen).toBe(false);
+      expect(place().selectedId).toBeNull();
+    });
+
     it("opens nothing without a selected issue", async () => {
       await renderList(viewData([groupOf(rows)], rows));
       await screen.findByRole("row", { name: /NW-1042/ });

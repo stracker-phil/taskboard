@@ -6,6 +6,7 @@ import { isRecordingTarget, registerCommands, resolveKeydown, setOverrides, type
 import { activeScopes, registerScope } from "./scopes";
 import { ISSUE_KEY_COMMANDS } from "./issueKeys";
 import { VIEW_KEY_COMMANDS } from "./viewKeys";
+import { PAGE_ACTION_COMMANDS } from "./pageActions";
 
 /** The window this page runs in: the Taskboard window (`main`) or Settings. */
 export type WindowName = "main" | "settings";
@@ -27,6 +28,7 @@ const APP_COMMANDS: Command[] = [
   { id: "palette.open", title: "Command palette", scope: "main", defaultBinding: "Mod+K", run: () => useStore.getState().setPaletteOpen(true) },
   { id: "space.next", title: "Next Space", scope: "main", defaultBinding: "Mod+Alt+ArrowDown", run: () => runBusCommand("nav:nextSpace", "Could not open the Space") },
   ...VIEW_KEY_COMMANDS,
+  ...PAGE_ACTION_COMMANDS,
   ...ISSUE_KEY_COMMANDS,
 ];
 

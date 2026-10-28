@@ -53,3 +53,4 @@
 .board-card .row-actions { position: static; }
 .board-card:hover .row-actions, .board-card:focus-within .row-actions { opacity: 1; pointer-events: auto; }
 .board-strip__item { display: flex; flex: none; }
+.board-card--selected { border-color: var(--accent); box-shadow: var(--shadow-hover); }

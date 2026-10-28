@@ -1,6 +1,7 @@
 import { useEffect, useState, type MouseEvent } from "react";
 import { Kanban, List, Table2, type LucideIcon } from "lucide-react";
 import { api, type Layout, type MenuEntry, type View } from "../api";
+import { usePageAction } from "../commands/pageActions";
 import { onSelectView } from "../commands/viewKeys";
 import { InlineRename } from "../components/InlineRename";
 import { useNavGo, useViews } from "../queries/sidebar";
@@ -63,6 +64,22 @@ export function ViewTabs({ listId, viewId }: { listId: number; viewId: number })
 
   const addMenu = () =>
     void api.popupMenu(LAYOUT_ORDER.map((layout) => ({ text: LAYOUTS[layout].name, run: () => void create(layout) })));
+
+  const current = views.findIndex((view) => view.id === viewId);
+  const step = (by: 1 | -1) => {
+    const next = views[(current + by + views.length) % views.length];
+    if (next) void open(listId, next.id);
+  };
+  const setLayout = (layout: Layout) => {
+    const view = views[current];
+    if (view && view.layout !== layout) void attempt(api.viewSetLayout(view.id, layout), "Could not change the layout");
+  };
+  usePageAction("view.new", addMenu);
+  usePageAction("view.next", views.length > 1 ? () => step(1) : null);
+  usePageAction("view.previous", views.length > 1 ? () => step(-1) : null);
+  usePageAction("view.layout.list", current >= 0 ? () => setLayout("list") : null);
+  usePageAction("view.layout.board", current >= 0 ? () => setLayout("board") : null);
+  usePageAction("view.layout.table", current >= 0 ? () => setLayout("table") : null);
 
   return (
     <div className="view-tabs" role="tablist" aria-label="Views">

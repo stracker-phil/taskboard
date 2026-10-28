@@ -1,4 +1,5 @@
 import { Funnel } from "lucide-react";
+import { usePageAction } from "../commands/pageActions";
 import { browseUrl } from "../lib/jiraLinks";
 import { api, type SpaceNode } from "../api";
 import { SpaceTile } from "../components/SpaceTile";
@@ -58,8 +59,10 @@ function Title({ level }: { level: Level }) {
 
 /** Recently changed's header action; disabled while nothing is unseen. */
 function MarkAllSeen({ listId, unseen }: { listId: number; unseen: number }) {
+  const markAll = () => void attempt(api.listMarkAllSeen(listId), "Could not mark them seen");
+  usePageAction("recent.markAllSeen", unseen > 0 ? markAll : null);
   return (
-    <button type="button" className="content-header__action" disabled={unseen === 0} onClick={() => void attempt(api.listMarkAllSeen(listId), "Could not mark them seen")}>
+    <button type="button" className="content-header__action" disabled={unseen === 0} onClick={markAll}>
       Mark all seen
     </button>
   );

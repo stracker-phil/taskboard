@@ -183,7 +183,6 @@ function IssueKeys({ issue, neighbours }: { issue: IssueDetail | undefined; neig
       copyKey: () => withKey((key) => state.current.actions.copyKey(key)),
       copyUrl: () => withKey((key) => state.current.actions.copyUrl(key)),
       openInJira: () => withKey((key) => state.current.actions.openInJira?.(key)),
-      open: () => {},
       openEpic: () => {
         const epic = state.current.issue?.epic;
         if (epic) state.current.openRelated(epic.id);
@@ -191,6 +190,10 @@ function IssueKeys({ issue, neighbours }: { issue: IssueDetail | undefined; neig
       togglePin: () => {
         const id = state.current.issue?.id;
         if (id) state.current.actions.togglePin(id);
+      },
+      markSeen: () => {
+        const id = state.current.issue?.id;
+        if (id) state.current.actions.markSeen(id);
       },
       hasSelection: () => state.current.issue !== undefined,
       peekOpen: () => false,

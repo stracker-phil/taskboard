@@ -11,12 +11,16 @@ export interface IssueKeyHandlers {
   copyKey: () => void;
   copyUrl: () => void;
   openInJira: () => void;
-  /** ↩: the selected issue in the full Issue view. */
-  open: () => void;
+  /** ↩: the selected issue in the full Issue view; absent where the issue is already open. */
+  open?: () => void;
   /** E: the selected issue's epic in the Issue view. */
   openEpic: () => void;
-  /** P: pins the selected issue until unpinned, or unpins it. */
+  /** P: pins the selected issue for the default duration, or unpins it. */
   togglePin: () => void;
+  /** M: the selected issue counts as seen. */
+  markSeen: () => void;
+  /** Space: opens or closes the selected issue's peek; absent where there is none, so Space scrolls. */
+  togglePeek?: () => void;
   hasSelection: () => boolean;
   peekOpen: () => boolean;
 }
@@ -45,9 +49,11 @@ export const ISSUE_KEY_COMMANDS: Command[] = [
   { id: "peek.close", title: "Close the peek", scope: "main", defaultBinding: "Escape", when: () => (handlers?.peekOpen() ?? false) && !document.querySelector("[role=dialog]"), run: () => handlers?.closePeek() },
   { id: "issue.copyKey", title: "Copy issue key", scope: "main", defaultBinding: "Mod+C", when: () => selected() && nothingElseToCopy(), run: () => handlers?.copyKey() },
   { id: "issue.copyUrl", title: "Copy issue URL", scope: "main", defaultBinding: "Mod+Shift+C", when: selected, run: () => handlers?.copyUrl() },
-  { id: "issue.open", title: "Open the issue", scope: "main", defaultBinding: "Enter", when: selected, run: () => handlers?.open() },
+  { id: "issue.open", title: "Open the issue", scope: "main", defaultBinding: "Enter", when: () => selected() && handlers?.open !== undefined, run: () => handlers?.open?.() },
   { id: "issue.openEpic", title: "Open the issue's epic", scope: "main", defaultBinding: "E", when: selected, run: () => handlers?.openEpic() },
   { id: "issue.togglePin", title: "Pin or unpin the issue", scope: "main", defaultBinding: "P", when: selected, run: () => handlers?.togglePin() },
+  { id: "issue.markSeen", title: "Mark the issue seen", scope: "main", defaultBinding: "M", when: selected, run: () => handlers?.markSeen() },
+  { id: "issue.togglePeek", title: "Open or close the peek", scope: "main", defaultBinding: "Space", when: () => selected() && handlers?.togglePeek !== undefined, run: () => handlers?.togglePeek?.() },
   {
     id: "issue.back",
     title: "Back from the Issue view",
