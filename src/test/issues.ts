@@ -95,6 +95,7 @@ export function viewData(groups: Group[], rows: Row[], patch: Partial<ViewData> 
 }
 
 export const COLUMNS: Column[] = [
+  { id: "status", name: "Status", custom: false },
   { id: "assignee", name: "Assignee", custom: false },
   { id: "epic", name: "Epic", custom: false },
   { id: "priority", name: "Priority", custom: false },

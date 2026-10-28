@@ -207,9 +207,10 @@ button, Escape and a press outside close it, focus goes back to the button).
 - **Group: Status** (30 high, `--border`, 8 radius): a native menu of the groupings (Status, Space, Client,
   Assignee, Epic, Release, Priority, Due date, None) with Sort by ▸ (Updated, Created, Priority, Key, Due date,
   Summary, Status; Ascending, Descending). Saves to the view.
-- **Columns** ("Card fields" on a board): the *Columns for this view* popover (340 wide): Jira fields, then
-  "Custom fields · this project" with the field id as `cf_N`; a row per field with a drag handle (⋮⋮) to reorder
-  and a 30 × 18 switch (`components/Toggle.tsx`). Each change saves to the view; "Use as Space default" sets
+- **Columns** ("Card fields" on a board): the *Columns for this view* popover (340 wide): a "Search fields" box
+  (name, Jira id or hint; while it filters, the order can't be dragged), Jira fields (Status first: a text pill
+  beside the row's own square), then "Custom fields · this project" with the field id as `cf_N`; a row per field
+  with a drag handle (⋮⋮) to reorder and a 30 × 18 switch (`components/Toggle.tsx`). A long list scrolls. Each change saves to the view; "Use as Space default" sets
   the columns new views in the Space start with.
 - **Filter** (badge: the filter list's own conditions): the *Filter* popover (440 wide, right-aligned): "Show
   issues where" and the live count of open issues ("N issues match" on a filter list or with a draft, "N open

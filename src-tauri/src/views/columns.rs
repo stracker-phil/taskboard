@@ -8,7 +8,8 @@ use crate::db::Db;
 use crate::error::AppResult;
 
 /// Standard column ids with their names, in the Columns popover's order.
-const STANDARD: [(&str, &str); 7] = [
+const STANDARD: [(&str, &str); 8] = [
+    ("status", "Status"),
     ("assignee", "Assignee"),
     ("epic", "Epic"),
     ("release", "Release"),

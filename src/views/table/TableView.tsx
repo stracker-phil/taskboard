@@ -40,7 +40,9 @@ function Table({ view, data }: { view: View; data: ViewData }) {
   const resize = useColumnResize((id, width) => void settings.setWidth(id, width));
 
   const widthOf = (id: string) => resize.liveWidth(id) ?? columnWidth(id, view.widths);
-  const headerColumns = ["key", "summary", "status", ...data.columns];
+  // The Table always has its own Status column; a view's Status column would repeat it.
+  const columns = data.columns.filter((id) => id !== "status");
+  const headerColumns = ["key", "summary", "status", ...columns];
   const minWidth = headerColumns.reduce((sum, id) => sum + (id === "summary" ? SUMMARY_MIN_WIDTH : widthOf(id)), 2 * SIDE_PADDING);
 
   // The Table's own header names the columns, so an ungrouped view needs no group header.
@@ -87,7 +89,7 @@ function Table({ view, data }: { view: View; data: ViewData }) {
                     onToggle={() => setToggled((all) => ({ ...all, [item.group.key]: !item.open }))}
                   />
                 ) : (
-                  <TableRow row={item.row} columns={data.columns} widthOf={widthOf} selected={selected === item.row.id} onSelect={setSelected} />
+                  <TableRow row={item.row} columns={columns} widthOf={widthOf} selected={selected === item.row.id} onSelect={setSelected} />
                 )}
               </div>
             );

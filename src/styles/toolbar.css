@@ -55,7 +55,17 @@
 }
 
 .columns-popover { left: -8px; width: 340px; }
-.columns-popover__body { padding: 4px 8px 8px; }
+/* Long custom-field lists scroll; the header, search and footer stay. */
+.columns-popover__body { max-height: min(460px, calc(100vh - 300px)); overflow-y: auto; padding: 4px 8px 8px; }
+.columns-popover__search {
+  display: flex; align-items: center; gap: 6px; height: 30px; margin: 4px 16px 6px; padding: 0 10px;
+  border: 1px solid var(--border); border-radius: 8px; color: var(--text-muted);
+  transition: border-color var(--motion-fast) var(--ease-out);
+}
+.columns-popover__search:focus-within { border-color: var(--border-strong); }
+.columns-popover__search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text); font: inherit; font-size: 13px; }
+.columns-popover__empty { margin: 10px 8px; font-size: 13px; color: var(--text-muted); }
+.column-row__handle--off { visibility: hidden; }
 .columns-popover__section { position: relative; display: flex; flex-direction: column; }
 .column-row {
   display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 8px; border: 0; border-radius: 7px;

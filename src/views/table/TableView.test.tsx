@@ -69,6 +69,12 @@ describe("TableView", () => {
       await waitFor(() => expect(screen.getAllByRole("columnheader").map((h) => h.textContent?.replace(/[↑↓]/, ""))).toEqual(["Key", "Summary", "Status", "Assignee", "Priority"]));
     });
 
+    it("shows one Status header when the view also has the status column", async () => {
+      await renderTable(viewData([groupOf([OPEN, DONE])], [OPEN, DONE], { columns: ["status", "assignee"], groupBy: "none" }));
+
+      await waitFor(() => expect(screen.getAllByRole("columnheader").map((h) => h.textContent?.replace(/[↑↓]/, ""))).toEqual(["Key", "Summary", "Status", "Assignee"]));
+    });
+
     it("marks only the sorted column with aria-sort", async () => {
       await renderTable();
 

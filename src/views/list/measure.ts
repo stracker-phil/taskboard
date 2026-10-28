@@ -11,6 +11,7 @@ export const FONT = {
   chip: `500 12px ${UI}`,
   label: `400 12px ${UI}`,
   mono: `400 12px ${MONO}`,
+  pill: `700 10px ${UI}`,
 } as const;
 
 /** Header letter-spacing (0.05em of 11px) per character. */
@@ -29,6 +30,8 @@ export const widthOf = {
   avatars: (count: number) => (count > 0 ? AVATAR + AVATAR_STEP * (count - 1) : 0),
   chip: (measure: MeasureText, text: string | null) => (text ? measure(text, FONT.chip) + CHIP_PADDING : 0),
   priority: (measure: MeasureText, name: string | null) => (name ? FLAG + FLAG_GAP + measure(name, FONT.cell) : 0),
+  /** The `activity` status pill: caps, 0.03em tracking, 10px padding and a 1px border on each side. */
+  pill: (measure: MeasureText, name: string) => measure(name.toUpperCase(), FONT.pill) + 0.3 * name.length + 2 * 10 + 2,
   labels: (measure: MeasureText, names: string[]) =>
     names.reduce((sum, name, index) => sum + measure(name, FONT.label) + CHIP_PADDING + (index > 0 ? LABEL_GAP : 0), 0),
   custom: (measure: MeasureText, cell: Cell | undefined) => {

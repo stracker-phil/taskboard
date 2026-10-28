@@ -356,6 +356,23 @@ describe("ListView", () => {
       expect(screen.queryByText("Launch Q4")).not.toBeInTheDocument();
     });
 
+    it("shows the status as a pill in the row when the view has the Status column, beside the title's status square", async () => {
+      await renderList(viewData([groupOf([OPEN])], [OPEN], { columns: ["status"], groupBy: "none" }));
+
+      expect(await screen.findByRole("columnheader", { name: "Status" })).toBeInTheDocument();
+      const issue = screen.getByRole("row", { name: /NW-1042/ });
+      expect(within(issue).getByText("In Progress")).toBeInTheDocument();
+      expect(issue.querySelector(".status-square")).not.toBeNull();
+    });
+
+    it("shows the status square but no pill when the view lacks the Status column", async () => {
+      await renderList(viewData([groupOf([OPEN])], [OPEN], { columns: ["assignee"], groupBy: "none" }));
+
+      const issue = await screen.findByRole("row", { name: /NW-1042/ });
+      expect(within(issue).queryByText("In Progress")).not.toBeInTheDocument();
+      expect(issue.querySelector(".status-square")).not.toBeNull();
+    });
+
     it("shows the epic chip when the view has the Epic column", async () => {
       await renderList(viewData([groupOf([withEpic])], [withEpic], { columns: ["epic"] }));
 

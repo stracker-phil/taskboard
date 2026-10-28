@@ -100,6 +100,13 @@ describe("listColumns", () => {
     expect(listColumns([epic], [column("epic", "Epic")], chars7)).toBe("minmax(0, 1fr) 58px");
   });
 
+  it("sizes a status column to the widest status pill, rounded up", () => {
+    const rows = [row({ id: "1", statusName: "Done" }), row({ id: "2", statusName: "In Progress" })];
+
+    // 11 * 7 + 3.3 + 22 = 102.3 beats the header: 6 * 7 + 3.3 = 45.3
+    expect(listColumns(rows, [column("status", "Status")], chars7)).toBe("minmax(0, 1fr) 103px");
+  });
+
   it("sizes a person custom field to one avatar", () => {
     const reviewed = row({ custom: { customfield_10071: { kind: "person", value: SAM } } });
 
@@ -158,6 +165,25 @@ describe("widthOf", () => {
   it("adds the labels' chip padding and a gap between them", () => {
     // (3 * 7 + 16) + 4 + (2 * 7 + 16)
     expect(widthOf.labels(chars7, ["abc", "de"])).toBe(71);
+  });
+
+  describe("pill", () => {
+    it("is the capitalised name plus tracking, 10px padding and a border on each side", () => {
+      // 11 * 7 + 0.3 * 11 + 20 + 2
+      expect(widthOf.pill(chars7, "In Progress")).toBeCloseTo(102.3);
+    });
+
+    it("measures the name in capitals in the pill font", () => {
+      const seen: [string, string][] = [];
+      const spy: MeasureText = (text, font) => {
+        seen.push([text, font]);
+        return text.length * 7;
+      };
+
+      widthOf.pill(spy, "In Progress");
+
+      expect(seen).toEqual([["IN PROGRESS", FONT.pill]]);
+    });
   });
 
   it("gives no width to a missing value", () => {

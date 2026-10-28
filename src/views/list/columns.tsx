@@ -3,6 +3,7 @@ import type { Cell, Row } from "../../api";
 import { Avatar, AvatarStack } from "../../components/issue/Avatar";
 import { EpicChip } from "../../components/issue/EpicChip";
 import { PriorityFlag } from "../../components/issue/PriorityFlag";
+import { StatusPill } from "../../components/issue/StatusPill";
 import { EMPTY, FONT, type MeasureText, widthOf } from "./measure";
 
 /** A view column: how a row fills it, how wide that draws (the List sizes columns to their content), and the
@@ -14,6 +15,11 @@ interface ColumnDef {
 }
 
 const STANDARD: Record<string, ColumnDef> = {
+  status: {
+    width: 130,
+    cell: (row) => <StatusPill style={row.style} name={row.statusName} variant="activity" />,
+    measure: (row, m) => widthOf.pill(m, row.statusName),
+  },
   assignee: {
     width: 96,
     cell: (row) => <AvatarStack people={row.assignees} />,

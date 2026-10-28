@@ -859,13 +859,13 @@ mod catalogue {
 
         let ids: Vec<&str> = columns.iter().map(|c| c.id.as_str()).collect();
         assert_eq!(
-            ids[..7],
+            ids[..8],
             [
-                "assignee", "epic", "release", "priority", "labels", "sprint", "due"
+                "status", "assignee", "epic", "release", "priority", "labels", "sprint", "due"
             ]
         );
-        assert!(columns[..7].iter().all(|c| !c.custom));
-        assert!(columns[7..].iter().all(|c| c.custom));
+        assert!(columns[..8].iter().all(|c| !c.custom));
+        assert!(columns[8..].iter().all(|c| c.custom));
         let reviewer = columns.iter().find(|c| c.id == REVIEWER).unwrap();
         assert_eq!(reviewer.name, "Reviewer");
         assert!(reviewer.custom);
