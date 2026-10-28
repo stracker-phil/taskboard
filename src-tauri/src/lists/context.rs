@@ -28,12 +28,16 @@ impl Viewer {
         }
     }
 
-    pub fn ctx(&self, conn: &Connection) -> AppResult<Ctx> {
-        let tz: Tz = self
-            .time_zone
+    /// The owner's time zone; UTC when unknown.
+    pub fn tz(&self) -> Tz {
+        self.time_zone
             .as_deref()
             .and_then(|name| name.parse().ok())
-            .unwrap_or(Tz::UTC);
+            .unwrap_or(Tz::UTC)
+    }
+
+    pub fn ctx(&self, conn: &Connection) -> AppResult<Ctx> {
+        let tz = self.tz();
         Ok(Ctx {
             me: self.me.clone(),
             today: self.now.with_timezone(&tz).date_naive(),

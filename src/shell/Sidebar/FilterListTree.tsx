@@ -2,6 +2,7 @@ import type { HTMLAttributes, MouseEvent } from "react";
 import { Funnel } from "lucide-react";
 import { api, type ListNode, type SpaceNode } from "../../api";
 import { InlineRename } from "../../components/InlineRename";
+import { usePinOf } from "../../queries/pins";
 import { attempt } from "../../state/requests";
 import { useStore } from "../../state/store";
 import { DropLine } from "./DropLine";
@@ -68,12 +69,15 @@ interface RowProps {
 }
 
 function FilterListRow({ list, active, renaming, onOpen, onRename, onRenameDone, dragProps }: RowProps) {
+  const pin = usePinOf("filterList", String(list.id));
   const openMenu = (e: MouseEvent) => {
     e.preventDefault();
     void api.popupMenu([
       { text: "Rename", run: onRename },
       { text: "Duplicate", run: () => void attempt(api.listDuplicate(list.id), "Could not duplicate the filter list") },
-      { text: "Pin to Home", enabled: false },
+      pin
+        ? { text: "Unpin from Home", run: () => void attempt(api.pinRemove(pin.id), "Could not unpin the filter list") }
+        : { text: "Pin to Home", run: () => void attempt(api.pinCreate("filterList", String(list.id), "untilUnpinned", null), "Could not pin the filter list") },
       "separator",
       { text: "Delete", run: () => void deleteList(list) },
     ]);

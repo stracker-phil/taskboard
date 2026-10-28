@@ -10,7 +10,9 @@ import { narrowingKey } from "../state/slices/narrowing";
 import { resetStore, useStore } from "../state/store";
 import { groupOf, row, viewData } from "../test/issues";
 import { projectCounts, syncOverview } from "../test/jira";
-import { view } from "../test/views";
+import { pinItem, pins } from "../test/pins";
+import { sidebarTree } from "../test/spaces";
+import { listNode, view } from "../test/views";
 import { MainBody } from "./MainBody";
 
 const mocked = vi.mocked(api, true);
@@ -21,6 +23,8 @@ let spies: Restorable[] = [];
 beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
+  mocked.pinsList.mockResolvedValue(pins());
+  mocked.sidebarTree.mockResolvedValue(sidebarTree([]));
   spies = [
     vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(1000),
     vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(800),
@@ -69,6 +73,31 @@ describe("MainBody", () => {
 
     expect(await screen.findByText("Redesign the pricing page")).toBeInTheDocument();
     expect(mocked.viewRows).toHaveBeenCalledWith(11, 101, expect.anything());
+  });
+
+  describe("on the Pinned level", () => {
+    beforeEach(() => {
+      mocked.navCurrent.mockResolvedValue({ location: { listId: 3, viewId: 0 }, expanded: [] });
+      mocked.sidebarTree.mockResolvedValue({ ...sidebarTree([]), home: [listNode({ id: 3, kind: "pinned", name: "Pinned", count: null })] });
+      mocked.syncOverview.mockResolvedValue(syncOverview({ projects: [projectCounts()] }));
+    });
+
+    it("shows the pins instead of a list", async () => {
+      mocked.pinsList.mockResolvedValue(pins([pinItem({ reason: "Needs a decision" })]));
+
+      renderBody();
+
+      expect(await screen.findByText("Redesign the pricing page")).toBeInTheDocument();
+      expect(screen.getByText("Needs a decision")).toBeInTheDocument();
+      expect(screen.queryByRole("grid")).not.toBeInTheDocument();
+      expect(mocked.viewRows).not.toHaveBeenCalled();
+    });
+
+    it("says nothing is pinned when there are no pins", async () => {
+      renderBody();
+
+      expect(await screen.findByText(/^Nothing pinned/)).toBeInTheDocument();
+    });
   });
 
   describe("layouts", () => {

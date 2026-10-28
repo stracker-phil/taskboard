@@ -171,6 +171,23 @@ An issue is changed while the sync recorded a change after the owner last saw it
   activity stay while the owner reads and J/K skimming counts too. Mark seen, Mark all seen and the row's
   Mark seen clear it at once.
 
+## Pins
+
+Local only (`src-tauri/src/pins/`, `src/pins/`). Issues, comments and filter lists can be pinned.
+
+- `PinButton` in the peek and Issue view headers ("Pin this issue") and on each comment opens `PinPopover`
+  (340px): "Keep pinned for" chips (Today, 2 days (preselected, as in the mockup), 1 week, Until unpinned;
+  the chosen one `--button-primary-bg`), an optional one-line reason, Cancel and Pin; ↩ pins. ⌥-click pins at
+  once; a pinned target's button is amber and unpins on click.
+- The row toolbar's Pin and P toggle the issue's pin (until unpinned) without the popover; the filter-list
+  context menu has Pin to Home / Unpin from Home, and pinned Space lists appear under Home.
+- Today ends at local midnight, 2 days at the end of tomorrow, 1 week seven midnights on. The page refreshes
+  when the next pin runs out (`usePinExpiry`).
+- A pinned comment shows the amber strip (`--pin-bg`, `--pin-text`): pin icon, the reason, the time left.
+- The Pinned page (`PinnedView`, no tabs or toolbar): one card with the pinned issue (status square, key,
+  summary), comment (author, excerpt, issue key) or list (Space / name), Reason and Time left; hover shows ×
+  to unpin. "Recently unpinned" lists what ended in the last 7 days. The Home row counts the active pins.
+
 ## Sync chip and token banners
 
 The sidebar footer's chip (artboard 8, panel 5) says "Synced 2 min ago" (counting on), "Syncing… 3 changes"

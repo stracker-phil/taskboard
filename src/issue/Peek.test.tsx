@@ -9,6 +9,7 @@ import { api, type IssueDetail } from "../api";
 import { createQueryClient } from "../queries/queryClient";
 import { connectionView } from "../test/jira";
 import { ALEX, changeItem, commentItem } from "../test/issues";
+import { commentTarget, pinItem, pins } from "../test/pins";
 import { Peek } from "./Peek";
 
 const mocked = vi.mocked(api, true);
@@ -52,6 +53,7 @@ function renderPeek(onClose = vi.fn(), onExpand = vi.fn()) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocked.pinsList.mockResolvedValue(pins());
   mocked.issueGet.mockResolvedValue(detail());
   mocked.issueActivity.mockResolvedValue([]);
   mocked.connectionGet.mockResolvedValue(connectionView({ siteUrl: "" }));
@@ -117,11 +119,49 @@ describe("Peek", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it("shows Pin disabled", async () => {
+  it("opens the pin dialog from the Pin this issue button and pins the issue", async () => {
     renderPeek();
 
-    await screen.findByRole("heading", { name: "Redesign the pricing page" });
-    expect(screen.getByRole("button", { name: "Pin" })).toBeDisabled();
+    await userEvent.click(await screen.findByRole("button", { name: "Pin this issue" }));
+    await userEvent.type(screen.getByLabelText(/Reason/), "Needs a decision{Enter}");
+
+    expect(mocked.pinCreate).toHaveBeenCalledWith("issue", "10042", "twoDays", "Needs a decision");
+  });
+
+  it("offers Unpin instead when the issue is pinned", async () => {
+    mocked.pinsList.mockResolvedValue(pins([pinItem({ id: 4 })]));
+    renderPeek();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Unpin" }));
+
+    expect(mocked.pinRemove).toHaveBeenCalledWith(4);
+  });
+
+  it("shows a pinned comment's reason and time left on its card", async () => {
+    mocked.issueActivity.mockResolvedValue([commentItem({ id: "20001" })]);
+    mocked.pinsList.mockResolvedValue(pins([pinItem({ target: commentTarget(), reason: "Rules to follow", timeLeft: "1d left" })]));
+    renderPeek();
+
+    expect(await screen.findByText("Rules to follow")).toBeInTheDocument();
+    expect(screen.getByText("1d left")).toBeInTheDocument();
+  });
+
+  it("shows Pinned on a pinned comment without a reason", async () => {
+    mocked.issueActivity.mockResolvedValue([commentItem({ id: "20001" })]);
+    mocked.pinsList.mockResolvedValue(pins([pinItem({ target: commentTarget(), reason: null, timeLeft: "" })]));
+    renderPeek();
+
+    expect(await screen.findByText("Pinned")).toBeInTheDocument();
+  });
+
+  it("offers Pin comment on a comment and pins it with the comment's id", async () => {
+    mocked.issueActivity.mockResolvedValue([commentItem({ id: "20001" })]);
+    renderPeek();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Pin comment" }));
+    await userEvent.click(screen.getByRole("button", { name: "Pin" }));
+
+    expect(mocked.pinCreate).toHaveBeenCalledWith("comment", "20001", "twoDays", null);
   });
 
   it("calls onExpand when the Full view button is clicked", async () => {

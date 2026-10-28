@@ -22,7 +22,9 @@ use crate::error::{AppError, AppResult};
 use crate::filter::{Ctx, compile};
 use crate::issues::status_names;
 use crate::lists::{Kind, Viewer, all_nodes, scope_of};
+use crate::pins::active;
 use crate::status_style::{Style, detect, styles};
+use crate::sync::map::format_utc;
 
 /// The toolbar's quick narrowing on top of the level's filter.
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, TS)]
@@ -85,7 +87,7 @@ fn build(
         versions: &versions,
         custom: custom_columns(conn, &view.columns)?,
     };
-    let (condition, params) = conditions(conn, &ctx, list_id, narrowing)?;
+    let (condition, params) = conditions(conn, viewer, &ctx, list_id, narrowing)?;
     let mut items = fetch(conn, &source, &condition, params)?;
     mark_changed(conn, ctx.me.as_deref(), &mut items)?;
     let needle = fold(narrowing.text.trim());
@@ -134,7 +136,7 @@ fn mark_changed(conn: &Connection, me: Option<&str>, items: &mut [(Row, Facts)])
 /// The filter list's issues with unseen changes, for Mark all seen.
 pub fn unseen_ids(conn: &Connection, viewer: &Viewer, list_id: i64) -> AppResult<Vec<String>> {
     let ctx = viewer.ctx(conn)?;
-    let (condition, params) = conditions(conn, &ctx, list_id, &Narrowing::default())?;
+    let (condition, params) = conditions(conn, viewer, &ctx, list_id, &Narrowing::default())?;
     let mut query = conn.prepare(&format!(
         "SELECT i.id FROM cache.issue i WHERE {condition} AND {UNSEEN}"
     ))?;
@@ -145,6 +147,7 @@ pub fn unseen_ids(conn: &Connection, viewer: &Viewer, list_id: i64) -> AppResult
 /// The level's conditions with its kind's own rule and the narrowing, as one SQL condition.
 fn conditions(
     conn: &Connection,
+    viewer: &Viewer,
     ctx: &Ctx,
     list_id: i64,
     narrowing: &Narrowing,
@@ -162,9 +165,13 @@ fn conditions(
             condition.push_str(" AND ");
             condition.push_str(UNSEEN);
         }
-        Kind::Pinned => condition.push_str(
-            " AND i.id IN (SELECT target_id FROM pin WHERE target_kind = 'issue' AND unpinned_at IS NULL)",
-        ),
+        Kind::Pinned => {
+            condition.push_str(&format!(
+                " AND i.id IN (SELECT p.target_id FROM pin p WHERE p.target_kind = 'issue' AND {})",
+                active("?")
+            ));
+            params.push(format_utc(viewer.now).into());
+        }
         _ => {}
     }
     if narrowing.me {

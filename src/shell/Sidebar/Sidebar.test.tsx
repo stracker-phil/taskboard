@@ -9,6 +9,7 @@ import { api, type ListNode, type MenuEntry, type Nav, type SidebarTree, type Sp
 import { createQueryClient } from "../../queries/queryClient";
 import { SIDEBAR_KEY } from "../../queries/sidebar";
 import { resetStore } from "../../state/store";
+import { listTarget, pinItem, pins } from "../../test/pins";
 import { lumenSpace, space } from "../../test/spaces";
 import { ConfirmHost } from "../../components/ConfirmSheet";
 import { Toasts } from "../../components/Toasts";
@@ -41,6 +42,7 @@ function treeWith(patch: { nw?: Partial<SpaceNode>; nws?: ListNode[] } = {}): Si
   return {
     everything: list(1, "Everything", { kind: "everything", count: 42 }),
     home: [list(2, "Recently changed", { kind: "recent", count: 8 }), list(3, "Pinned", { kind: "pinned", count: null })],
+    pinnedLists: [],
     spaces: [
       space({ icon: "R", color: "3", client: "Northwind", lists: [SPRINT, EPICS], ...patch.nw }),
       space({ listId: 13, projectId: "10003", key: "NWS", name: "Northwind support", projectName: "Northwind support", icon: null, color: null, openCount: 5, lists: patch.nws ?? [BUGS] }),
@@ -89,6 +91,7 @@ async function chooseFromMenu(text: string) {
 beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
+  mocked.pinsList.mockResolvedValue(pins());
   mocked.listCreate.mockResolvedValue(30);
   mocked.listRename.mockResolvedValue(undefined);
   mocked.listDuplicate.mockResolvedValue(31);
@@ -261,17 +264,71 @@ describe("Sidebar", () => {
     });
   });
 
+  describe("pinned lists", () => {
+    it("show as extra Home rows after the built-in ones", async () => {
+      const tree = treeWith();
+      tree.pinnedLists = [list(22, "Epics", { count: 3 })];
+      await renderSidebar(tree);
+
+      const rows = within(screen.getByRole("navigation", { name: "Home" })).getAllByRole("button");
+      expect(rows.map((r) => r.textContent)).toEqual(["Everything42", "Recently changed8", "Pinned", "Epics3"]);
+    });
+
+    it("open the list's level when clicked", async () => {
+      const tree = treeWith();
+      tree.pinnedLists = [list(22, "Epics", { count: 3 })];
+      await renderSidebar(tree);
+
+      await userEvent.click(within(screen.getByRole("navigation", { name: "Home" })).getByRole("button", { name: named("Epics") }));
+
+      expect(mocked.navGo).toHaveBeenCalledWith(22, null);
+    });
+
+    it("are absent when nothing is pinned", async () => {
+      await renderSidebar();
+
+      expect(within(screen.getByRole("navigation", { name: "Home" })).getAllByRole("button")).toHaveLength(3);
+    });
+  });
+
+  describe("context menu of a pinned filter list", () => {
+    beforeEach(async () => {
+      mocked.pinsList.mockResolvedValue(pins([pinItem({ id: 9, target: listTarget({ id: EPICS.id, name: "Epics" }) })]));
+      await renderSidebar(treeWith(), navAt(null, [NW_ID]));
+      await waitFor(() => expect(mocked.pinsList).toHaveBeenCalled());
+    });
+
+    it("offers Unpin from Home instead of Pin to Home and ends the pin", async () => {
+      await waitFor(() => {
+        mocked.popupMenu.mockClear();
+        fireEvent.contextMenu(screen.getByRole("button", { name: named("Epics") }));
+        expect(menuEntry("Unpin from Home")).toBeDefined();
+      });
+      expect(menuEntry("Pin to Home")).toBeUndefined();
+
+      await chooseFromMenu("Unpin from Home");
+
+      expect(mocked.pinRemove).toHaveBeenCalledWith(9);
+    });
+  });
+
   describe("filter list context menu", () => {
     beforeEach(async () => {
       await renderSidebar(treeWith(), navAt(null, [NW_ID]));
       fireEvent.contextMenu(await screen.findByRole("button", { name: named("Epics") }));
     });
 
-    it("offers Rename, Duplicate, a disabled Pin to Home and Delete", () => {
+    it("offers Rename, Duplicate, Pin to Home and Delete", () => {
       const entries: MenuEntry[] = mocked.popupMenu.mock.calls[0][0];
 
       expect(entries.map((e) => (e === "separator" ? e : e.text))).toEqual(["Rename", "Duplicate", "Pin to Home", "separator", "Delete"]);
-      expect(menuEntry("Pin to Home")).toMatchObject({ enabled: false });
+      expect(menuEntry("Pin to Home")).not.toMatchObject({ enabled: false });
+    });
+
+    it("pins the list to Home until unpinned, without a reason", async () => {
+      await chooseFromMenu("Pin to Home");
+
+      expect(mocked.pinCreate).toHaveBeenCalledWith("filterList", String(EPICS.id), "untilUnpinned", null);
     });
 
     it("renames the list in place and sends the new name on enter", async () => {

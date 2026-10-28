@@ -66,12 +66,14 @@ function LevelChrome() {
   const level = tree && location ? findLevel(tree, location.listId) : null;
   if (!level || !location) return null;
   const view = views?.find((v) => v.id === location.viewId);
+  // The Pinned page is one fixed list: no tabs, no toolbar.
+  const pinned = level.kind === "home" && level.node.kind === "pinned";
   return (
     <>
       <Header level={level} />
       <TokenBanner />
-      <ViewTabs listId={location.listId} viewId={location.viewId} />
-      {view && <Toolbar level={level} view={view} />}
+      {!pinned && <ViewTabs listId={location.listId} viewId={location.viewId} />}
+      {!pinned && view && <Toolbar level={level} view={view} />}
     </>
   );
 }

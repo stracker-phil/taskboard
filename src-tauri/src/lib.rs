@@ -25,6 +25,7 @@ pub mod menu;
 pub mod nav;
 pub mod net;
 mod order;
+pub mod pins;
 mod remote;
 pub mod secrets;
 pub mod state;

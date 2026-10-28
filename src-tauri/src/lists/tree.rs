@@ -10,6 +10,8 @@ use crate::changes::UNSEEN;
 use crate::db::Db;
 use crate::error::AppResult;
 use crate::filter::{Compiled, Ctx, Names, OPEN_ISSUES, TRACKED_ISSUES, compile, describe};
+use crate::pins::active;
+use crate::sync::map::format_utc;
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
 #[ts(export, export_to = "src/api/types.gen.ts")]
@@ -18,6 +20,8 @@ pub struct SidebarTree {
     pub everything: ListNode,
     /// Recently changed, Pinned and global filter lists, in order.
     pub home: Vec<ListNode>,
+    /// Space lists pinned to Home, newest pin first.
+    pub pinned_lists: Vec<ListNode>,
     /// Tracked projects in Space order.
     pub spaces: Vec<SpaceNode>,
 }
@@ -29,8 +33,8 @@ pub struct ListNode {
     pub id: i64,
     pub kind: Kind,
     pub name: String,
-    /// Open issues; for Recently changed its unseen issues (the badge); none for Pinned and for a filter that
-    /// can't be compiled.
+    /// Open issues; for Recently changed its unseen issues (the badge), for Pinned its active pins; none for a
+    /// filter that can't be compiled.
     pub count: Option<i64>,
     /// Conditions of its own, for the Filter button's badge.
     pub own_conditions: usize,
@@ -120,6 +124,14 @@ fn build(conn: &Connection, viewer: &Viewer) -> AppResult<SidebarTree> {
         .map(|n| list_node(n, &nodes, &ctx, &names, &mut counter))
         .collect();
 
+    let pinned_lists = pinned_list_ids(conn, viewer)?
+        .iter()
+        .filter_map(|id| nodes.iter().find(|n| n.id == *id))
+        // A global list already sits under Home.
+        .filter(|n| n.parent_id.is_some())
+        .map(|n| list_node(n, &nodes, &ctx, &names, &mut counter))
+        .collect();
+
     let mut spaces = Vec::new();
     for space in tracked_spaces(conn)? {
         let Some(node) = nodes
@@ -151,6 +163,7 @@ fn build(conn: &Connection, viewer: &Viewer) -> AppResult<SidebarTree> {
     let mut tree = SidebarTree {
         everything,
         home,
+        pinned_lists,
         spaces,
     };
     counter.fill(conn, &mut tree)?;
@@ -161,7 +174,29 @@ fn build(conn: &Connection, viewer: &Viewer) -> AppResult<SidebarTree> {
     {
         node.count = unseen_count(conn, &nodes, node.id, &ctx)?;
     }
+    let pin_count = active_pin_count(conn, viewer)?;
+    for node in tree.home.iter_mut().filter(|n| n.kind == Kind::Pinned) {
+        node.count = Some(pin_count);
+    }
     Ok(tree)
+}
+
+fn pinned_list_ids(conn: &Connection, viewer: &Viewer) -> AppResult<Vec<i64>> {
+    let mut query = conn.prepare(&format!(
+        "SELECT CAST(p.target_id AS INTEGER) FROM pin p WHERE p.target_kind = 'filter_list' AND {}
+         ORDER BY p.created_at DESC, p.id DESC",
+        active("?1")
+    ))?;
+    let ids = query.query_map([format_utc(viewer.now)], |r| r.get(0))?;
+    Ok(ids.collect::<Result<_, _>>()?)
+}
+
+fn active_pin_count(conn: &Connection, viewer: &Viewer) -> AppResult<i64> {
+    Ok(conn.query_row(
+        &format!("SELECT COUNT(*) FROM pin p WHERE {}", active("?1")),
+        [format_utc(viewer.now)],
+        |r| r.get(0),
+    )?)
 }
 
 /// Recently changed counts its unseen issues, open or not.
@@ -246,6 +281,7 @@ impl Counter {
         let mut set = |node: &mut ListNode| node.count = count_of(node.id);
         set(&mut tree.everything);
         tree.home.iter_mut().for_each(&mut set);
+        tree.pinned_lists.iter_mut().for_each(&mut set);
         for space in &mut tree.spaces {
             space.open_count = count_of(space.list_id).unwrap_or(0);
             space.lists.iter_mut().for_each(&mut set);

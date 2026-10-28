@@ -207,8 +207,8 @@ export type ListKind = "everything" | "space" | "list" | "recent" | "pinned";
 
 export type ListNode = { id: number, kind: ListKind, name: string, 
 /**
- * Open issues; for Recently changed its unseen issues (the badge); none for Pinned and for a filter that
- * can't be compiled.
+ * Open issues; for Recently changed its unseen issues (the badge), for Pinned its active pins; none for a
+ * filter that can't be compiled.
  */
 count: number | null, 
 /**
@@ -285,6 +285,32 @@ export type Person = { accountId: string, name: string, initials: string,
  */
 color: number, };
 
+export type PinDuration = "today" | "twoDays" | "week" | "untilUnpinned";
+
+export type PinItem = { id: number, target: Pinned, reason: string | null, 
+/**
+ * "today", "2d left"; empty until unpinned and for ended pins.
+ */
+timeLeft: string, 
+/**
+ * UTC; none until unpinned. The page refreshes when the first one passes.
+ */
+expiresAt: string | null, };
+
+export type PinKind = "issue" | "comment" | "filterList";
+
+export type Pinned = { "kind": "issue", id: string, key: string, summary: string, style: Style, 
+/**
+ * Deleted in Jira or no longer visible; still reachable from here.
+ */
+gone: boolean, } | { "kind": "comment", id: string, issueId: string, issueKey: string, author: Person | null, excerpt: string, } | { "kind": "list", id: number, name: string, 
+/**
+ * The Space it belongs to; none for a global list.
+ */
+space: string | null, };
+
+export type Pins = { active: Array<PinItem>, recentlyUnpinned: Array<PinItem>, };
+
 export type Priority = { name: string, 
 /**
  * 1 Highest … 5 Lowest; an unknown name counts as Medium.
@@ -353,6 +379,10 @@ export type SidebarTree = { everything: ListNode,
  * Recently changed, Pinned and global filter lists, in order.
  */
 home: Array<ListNode>, 
+/**
+ * Space lists pinned to Home, newest pin first.
+ */
+pinnedLists: Array<ListNode>, 
 /**
  * Tracked projects in Space order.
  */

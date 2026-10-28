@@ -13,6 +13,7 @@ import { resetStore, useStore } from "../../state/store";
 import { ALEX, COLUMNS, groupOf, row, SAM, viewData } from "../../test/issues";
 import { connectionView } from "../../test/jira";
 import { startMotionTimers, stubMotion } from "../../test/motion";
+import { issueTarget, pinItem, pins } from "../../test/pins";
 import { ListView } from "./ListView";
 
 const mocked = vi.mocked(api, true);
@@ -25,6 +26,7 @@ const place = () => useStore.getState().places["11:101"];
 beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
+  mocked.pinsList.mockResolvedValue(pins());
   mocked.columnsCatalogue.mockResolvedValue(COLUMNS);
   mocked.placeGet.mockResolvedValue(null);
   mocked.placeSet.mockResolvedValue(undefined);
@@ -221,10 +223,22 @@ describe("ListView", () => {
       expect(screen.queryByRole("button", { name: /in Jira$/ })).not.toBeInTheDocument();
     });
 
-    it("shows Pin disabled", async () => {
+    it("toggles the issue's pin without selecting the row", async () => {
       await renderList(viewData([groupOf([OPEN])], [OPEN]));
 
-      expect(await action("Pin NW-1042")).toBeDisabled();
+      await userEvent.click(await action("Pin NW-1042"));
+
+      expect(mocked.pinToggleIssue).toHaveBeenCalledWith("1");
+      expect(screen.getByRole("row", { name: /NW-1042/ })).toHaveAttribute("aria-selected", "false");
+      expect(place().selectedId).toBeNull();
+    });
+
+    it("reads Unpin for an issue that is pinned", async () => {
+      mocked.pinsList.mockResolvedValue(pins([pinItem({ target: issueTarget({ id: "1", key: "NW-1042" }) })]));
+      await renderList(viewData([groupOf([OPEN])], [OPEN]));
+
+      expect(await action("Unpin NW-1042")).toHaveAttribute("aria-pressed", "true");
+      expect(screen.queryByRole("button", { name: "Pin NW-1042" })).not.toBeInTheDocument();
     });
   });
 

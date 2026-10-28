@@ -15,6 +15,8 @@ export interface IssueKeyHandlers {
   open: () => void;
   /** E: the selected issue's epic in the Issue view. */
   openEpic: () => void;
+  /** P: pins the selected issue until unpinned, or unpins it. */
+  togglePin: () => void;
   hasSelection: () => boolean;
   peekOpen: () => boolean;
 }
@@ -45,6 +47,7 @@ export const ISSUE_KEY_COMMANDS: Command[] = [
   { id: "issue.copyUrl", title: "Copy issue URL", scope: "main", defaultBinding: "Mod+Shift+C", when: selected, run: () => handlers?.copyUrl() },
   { id: "issue.open", title: "Open the issue", scope: "main", defaultBinding: "Enter", when: selected, run: () => handlers?.open() },
   { id: "issue.openEpic", title: "Open the issue's epic", scope: "main", defaultBinding: "E", when: selected, run: () => handlers?.openEpic() },
+  { id: "issue.togglePin", title: "Pin or unpin the issue", scope: "main", defaultBinding: "P", when: selected, run: () => handlers?.togglePin() },
   {
     id: "issue.back",
     title: "Back from the Issue view",

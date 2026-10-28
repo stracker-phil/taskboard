@@ -34,5 +34,5 @@ export const lumenSpace = (patch: Partial<SpaceNode> = {}): SpaceNode =>
 
 /** A sidebar tree with the given Spaces in order. */
 export function sidebarTree(spaces: SpaceNode[]): SidebarTree {
-  return { everything: listNode(), home: [], spaces };
+  return { everything: listNode(), home: [], pinnedLists: [], spaces };
 }

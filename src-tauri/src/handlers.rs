@@ -5,6 +5,7 @@ use tauri::ipc::Invoke;
 use crate::changes::commands as changes;
 use crate::connection::commands as connection;
 use crate::lists::commands as lists;
+use crate::pins::commands as pins;
 use crate::views::commands as views;
 use crate::{bus, commands};
 
@@ -23,6 +24,10 @@ pub fn handlers() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
         commands::log_frontend_error,
         commands::take_launch_events,
         changes::issues_mark_seen,
+        pins::pins_list,
+        pins::pin_create,
+        pins::pin_remove,
+        pins::pin_toggle_issue,
         changes::list_mark_all_seen,
         connection::connection_get,
         connection::connection_save,

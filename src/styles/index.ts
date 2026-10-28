@@ -13,6 +13,7 @@ import "./toolbar.css";
 import "./peek.css";
 import "./issue-view.css";
 import "./changes.css";
+import "./pins.css";
 import "./overlays.css";
 import "./settings.css";
 import "./spaces.css";

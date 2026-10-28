@@ -30,7 +30,7 @@ export function Sidebar() {
         <span className="sb-search__label">Search</span>
         <kbd className="sb-kbd">⌘K</kbd>
       </button>
-      {tree && <HomeRows rows={[tree.everything, ...tree.home]} activeId={currentId} open={(id) => void open(id)} />}
+      {tree && <HomeRows rows={[tree.everything, ...tree.home, ...tree.pinnedLists]} activeId={currentId} open={(id) => void open(id)} />}
       {tree && nav && (
         <SpacesSection
           spaces={tree.spaces}

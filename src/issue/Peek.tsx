@@ -1,4 +1,4 @@
-import { ExternalLink, Maximize2, Pin, X } from "lucide-react";
+import { ExternalLink, Maximize2, X } from "lucide-react";
 import { useEffect, useRef } from "react";
 import type { IssueDetail } from "../api";
 import { Avatar } from "../components/issue/Avatar";
@@ -11,6 +11,7 @@ import { hasContent } from "../lib/jiraHtml";
 import { JiraHtml } from "./JiraHtml";
 import { SinceBanner } from "./SinceBanner";
 import { useSeenOnLeave } from "./useSeenOnLeave";
+import { PinButton } from "../pins/PinButton";
 import { useIssueActions } from "../views/list/useIssueActions";
 
 /** The 540px panel beside the list (artboard 4): the selected issue at a glance. */
@@ -37,9 +38,7 @@ export function Peek({ id, onClose, onExpand }: { id: string; onClose: () => voi
           </>
         )}
         <span className="peek__spacer" />
-        <button type="button" className="peek__btn" aria-label="Pin" title="Pin (P)" disabled>
-          <Pin size={14} strokeWidth={1.9} aria-hidden="true" />
-        </button>
+        {issue && <PinButton kind="issue" target={issue.id} label="Pin this issue" meta={issue.key} className="peek__btn" />}
         {issue && actions.openInJira && (
           <button type="button" className="peek__btn" aria-label="Open in Jira" title="Open in Jira (⌘↩)" onClick={() => actions.openInJira?.(issue.key)}>
             <ExternalLink size={14} strokeWidth={1.9} aria-hidden="true" />

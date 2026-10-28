@@ -20,6 +20,7 @@ function handlers(patch: Partial<IssueKeyHandlers> = {}) {
     openInJira: vi.fn(),
     open: vi.fn(),
     openEpic: vi.fn(),
+    togglePin: vi.fn(),
     hasSelection: () => true,
     peekOpen: () => true,
     ...patch,
@@ -58,6 +59,7 @@ describe("issue keys", () => {
       ["⌘C", "c", { meta: true }],
       ["⌘⇧C", "c", { meta: true, shift: true }],
       ["⌘↵", "Enter", { meta: true }],
+      ["P", "p", {}],
     ])("leaves %s to nobody", (_label, key, mods) => {
       expect(press(key, mods)).toBeNull();
     });
@@ -149,6 +151,23 @@ describe("issue keys", () => {
       register(handlers({ hasSelection: () => false }));
 
       expect(press(key)).toBeNull();
+    });
+  });
+
+  describe("pinning", () => {
+    it("P pins or unpins the selected issue", () => {
+      const h = handlers();
+      register(h);
+
+      void press("p")?.run();
+
+      expect(h.togglePin).toHaveBeenCalled();
+    });
+
+    it("ignores P without a selected row", () => {
+      register(handlers({ hasSelection: () => false }));
+
+      expect(press("p")).toBeNull();
     });
   });
 

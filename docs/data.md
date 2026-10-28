@@ -63,7 +63,7 @@ commands, which validate them. Tracking a project writes `local.space`, not the 
 | `space` | a tracked project as the sidebar shows it: name, icon, colour, client, position, `default_columns` for new views |
 | `filter_list` | WHICH issues: the sidebar tree (`kind` everything, space, list, recent, pinned); a JSON filter ANDed with its ancestors |
 | `view` | HOW to show a list: one tab; layout, columns, grouping, sort; never a filter |
-| `pin` | pinned issues, comments and lists, with an optional reason and expiry |
+| `pin` | pinned issues, comments and lists, with an optional reason and expiry; active while not unpinned and not expired (`pins::active`); ended pins stay in Recently unpinned for 7 days |
 | `status_style` | overrides the detected style of a status |
 
 Project ids in `local` point into `cache`; SQLite can't enforce that across files, so code cleans up.
@@ -101,7 +101,7 @@ views and pins; a level keeps at least one view.
 
 `view_rows(listId, viewId, narrowing)` returns the view's issues as `ViewData { groupBy, groups, rows,
 columns }`: the level's filter, plus the kind's own rule (Recently changed: issues with unseen changes,
-open or done; Pinned: the pinned issues), plus the narrowing (`me`, `text` in the key or summary ignoring
+open or done; Pinned: the actively pinned issues), plus the narrowing (`me`, `text` in the key or summary ignoring
 case and accents, `epic`).
 
 | `groupBy` | Groups, in order |

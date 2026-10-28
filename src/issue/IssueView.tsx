@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowLeft, ArrowUp, ExternalLink, Pin } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, ExternalLink } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { api, type IssueDetail } from "../api";
 import { onIssueKeys } from "../commands/issueKeys";
@@ -13,6 +13,7 @@ import { narrowingKey } from "../state/slices/narrowing";
 import type { IssueOrigin } from "../state/slices/issueView";
 import { attempt } from "../state/requests";
 import { useStore } from "../state/store";
+import { PinButton } from "../pins/PinButton";
 import { useIssueActions } from "../views/list/useIssueActions";
 import { Activity } from "./Activity";
 import { SinceBanner } from "./SinceBanner";
@@ -104,9 +105,7 @@ function IssueHeader({
       <button type="button" className="issue-header__nav" aria-label="Next issue" title="Next (J)" disabled={!neighbours.next} onClick={() => neighbours.next && showIssue(neighbours.next)}>
         <ArrowDown size={14} strokeWidth={2} aria-hidden="true" />
       </button>
-      <button type="button" className="issue-header__nav" aria-label="Pin this issue" title="Pin (P)" disabled>
-        <Pin size={14} strokeWidth={1.9} aria-hidden="true" />
-      </button>
+      {issue && <PinButton kind="issue" target={issue.id} label="Pin this issue" meta={issue.key} className="issue-header__nav" />}
       {issue && actions.openInJira && (
         <button type="button" className="btn-primary-dark issue-header__jira" onClick={() => actions.openInJira?.(issue.key)}>
           Open in Jira
@@ -186,6 +185,10 @@ function IssueKeys({ issue, neighbours }: { issue: IssueDetail | undefined; neig
       openEpic: () => {
         const epic = state.current.issue?.epic;
         if (epic) state.current.openRelated(epic.id);
+      },
+      togglePin: () => {
+        const id = state.current.issue?.id;
+        if (id) state.current.actions.togglePin(id);
       },
       hasSelection: () => state.current.issue !== undefined,
       peekOpen: () => false,

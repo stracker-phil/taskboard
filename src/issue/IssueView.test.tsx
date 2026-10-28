@@ -12,6 +12,7 @@ import { narrowingKey } from "../state/slices/narrowing";
 import { resetStore, useStore } from "../state/store";
 import { groupOf, issueDetail, related, relatedIssue, row, SAM, viewData } from "../test/issues";
 import { connectionView } from "../test/jira";
+import { pinItem, pins } from "../test/pins";
 import { sidebarTree, space } from "../test/spaces";
 import { listNode, view } from "../test/views";
 import { IssueView } from "./IssueView";
@@ -44,6 +45,7 @@ const title = (name: string) => screen.findByRole("heading", { level: 1, name })
 beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
+  mocked.pinsList.mockResolvedValue(pins());
   serve(issueDetail(), EPIC);
   mocked.issueRelated.mockResolvedValue(related());
   mocked.issueActivity.mockResolvedValue([]);
@@ -56,6 +58,25 @@ beforeEach(() => {
 
 describe("IssueView", () => {
   describe("header", () => {
+    it("pins the issue from the Pin this issue button", async () => {
+      renderIssue();
+
+      await userEvent.click(await screen.findByRole("button", { name: "Pin this issue" }));
+      await userEvent.click(screen.getByRole("button", { name: "Until unpinned" }));
+      await userEvent.click(screen.getByRole("button", { name: "Pin" }));
+
+      expect(mocked.pinCreate).toHaveBeenCalledWith("issue", "10042", "untilUnpinned", null);
+    });
+
+    it("unpins a pinned issue from the same button", async () => {
+      mocked.pinsList.mockResolvedValue(pins([pinItem({ id: 6 })]));
+      renderIssue();
+
+      await userEvent.click(await screen.findByRole("button", { name: "Unpin" }));
+
+      expect(mocked.pinRemove).toHaveBeenCalledWith(6);
+    });
+
     it("shows the breadcrumb with the Space, the view the issue was opened from and the key", async () => {
       renderIssue();
 

@@ -1,0 +1,83 @@
+/* Pins (docs/ux.md → Pins): the pin popover, pinned buttons, the comment strip and the Pinned view. */
+.pin-anchor { position: relative; display: inline-flex; flex: none; }
+
+.pin-popover {
+  right: 0; width: 340px; padding: 16px; box-sizing: border-box; overflow: visible;
+  animation: rise-in var(--motion-base) var(--ease-out); transform-origin: top right;
+}
+.pin-popover__form { display: flex; flex-direction: column; gap: 14px; }
+.pin-popover__head { display: flex; align-items: center; gap: 8px; }
+.pin-popover__icon { flex: none; color: var(--pin-icon); }
+.pin-popover__title { flex: 1; font-size: 14px; font-weight: 700; color: var(--text); }
+.pin-popover__meta { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+.pin-popover__caps { font-size: 12px; font-weight: 600; color: var(--text-tertiary); }
+.pin-popover__hint { font-weight: 400; color: var(--text-muted); }
+.pin-popover__chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: -8px; }
+.pin-chip {
+  height: 28px; padding: 0 10px; border: 1px solid var(--border); border-radius: 7px; background: var(--panel-bg);
+  color: var(--text-secondary); font: inherit; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: default;
+  transition: background-color var(--motion-fast) var(--ease-out), border-color var(--motion-fast) var(--ease-out), color var(--motion-fast) var(--ease-out);
+}
+.pin-chip:hover { border-color: var(--border-strong); }
+.pin-chip[aria-pressed="true"] { border-color: var(--button-primary-bg); background: var(--button-primary-bg); color: var(--button-primary-text); }
+.pin-popover__reason { display: flex; flex-direction: column; gap: 6px; }
+.pin-popover__reason input {
+  height: 34px; padding: 0 10px; box-sizing: border-box; border: 1px solid var(--border-strong); border-radius: 8px;
+  background: var(--panel-bg); color: var(--text); font: inherit; font-size: 13px; outline: 0;
+}
+.pin-popover__actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+/* A pinned target's button stays amber. */
+.peek__btn[aria-pressed="true"], .issue-header__nav[aria-pressed="true"], .row-actions__btn[aria-pressed="true"] { color: var(--pin-icon); }
+.row-actions__btn[aria-pressed="true"] { opacity: 1; }
+
+.comment-card__spacer { flex: 1; }
+.comment-card__pin {
+  display: grid; place-items: center; width: 24px; height: 24px; margin-left: 2px; padding: 0; border: 0; border-radius: 6px;
+  background: transparent; color: var(--text-faint); cursor: default;
+  transition: background-color var(--motion-fast) var(--ease-out), color var(--motion-fast) var(--ease-out);
+}
+.comment-card__pin:hover { color: var(--text-tertiary); background: var(--hover-bg); }
+.comment-card__pin[aria-pressed="true"], .comment-card__pin[aria-expanded="true"] { background: var(--pin-bg); color: var(--pin-icon); }
+.pin-strip {
+  display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 7px; background: var(--pin-bg);
+  color: var(--pin-text); font-size: 12px; animation: fade-in var(--motion-base) var(--ease-out);
+}
+.pin-strip__reason { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The Pinned view. */
+.pinned { height: 100%; min-height: 0; overflow-y: auto; box-sizing: border-box; padding: 22px 24px 40px; border-top: 1px solid var(--hairline); background: var(--list-bg); }
+.pinned__empty { margin: 24px 4px; font-size: 13px; color: var(--text-tertiary); }
+.pinned__recent { margin-top: 32px; }
+.pinned__caps { margin: 0 0 8px 4px; font-size: 12px; font-weight: 600; color: var(--text-tertiary); }
+.pin-table {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 260px) 96px; overflow: hidden;
+  border-radius: 10px; background: var(--panel-bg); box-shadow: var(--shadow-group-card);
+}
+.pin-table__head, .pin-table__row { display: contents; }
+.pin-table__head > span {
+  padding: 10px 16px 8px; font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--text-muted); white-space: nowrap;
+}
+.pin-table__row > span {
+  display: flex; align-items: center; gap: 8px; min-width: 0; height: 44px; padding: 0 16px; box-sizing: border-box;
+  border-top: 1px solid var(--row-hairline); font-size: 14px; transition: background-color var(--motion-fast) var(--ease-out);
+}
+.pin-table__row:hover > span, .pin-table__row:focus-visible > span { background: var(--row-hover-bg); }
+.pin-table__row:focus-visible { outline: 0; }
+.pin-table__key { flex: none; font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); }
+.pin-table__text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.pin-table__author { flex: none; font-weight: 600; }
+.pin-table__space { flex: none; color: var(--text-tertiary); }
+.pin-table__icon { flex: none; color: var(--text-tertiary); }
+.pin-table__gone { flex: none; padding: 0 6px; border-radius: 5px; background: var(--fill-subtle); font-size: 11px; color: var(--text-muted); }
+.pin-table__reason { color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.pin-table__left { justify-content: flex-end; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+.pin-table__unpin {
+  display: grid; place-items: center; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 6px;
+  background: transparent; color: var(--text-muted); opacity: 0; cursor: default;
+  transition: opacity var(--motion-fast) var(--ease-out), background-color var(--motion-fast) var(--ease-out);
+}
+.pin-table__row:hover .pin-table__unpin, .pin-table__unpin:focus-visible { opacity: 1; }
+.pin-table__unpin:hover { background: var(--hover-bg); }
+.pin-table--ended .pin-table__text, .pin-table--ended .pin-table__reason { color: var(--text-muted); }

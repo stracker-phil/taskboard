@@ -23,6 +23,9 @@ import type {
   MatchCount,
   Narrowing,
   Nav,
+  PinDuration,
+  PinKind,
+  Pins,
   ProjectRow,
   Related,
   ScopeView,
@@ -145,6 +148,14 @@ export const api = {
   issueRelated: (id: string) => invoke<Related>("issue_related", { id }),
   /** Their highlight and change chip clear. */
   issuesMarkSeen: (ids: string[]) => invoke<void>("issues_mark_seen", { ids }),
+  pinsList: () => invoke<Pins>("pins_list"),
+  /** Pins the target, or changes the duration and reason of its pin. */
+  pinCreate: (kind: PinKind, target: string, duration: PinDuration, reason: string | null) =>
+    invoke<void>("pin_create", { kind, target, duration, reason }),
+  /** Ends the pin now; it moves to Recently unpinned. */
+  pinRemove: (id: number) => invoke<void>("pin_remove", { id }),
+  /** P: unpins the issue, or pins it until unpinned. */
+  pinToggleIssue: (id: string) => invoke<void>("pin_toggle_issue", { id }),
   /** Marks every issue of the filter list with unseen changes seen. */
   listMarkAllSeen: (listId: number) => invoke<void>("list_mark_all_seen", { listId }),
   /** Fetches the issue's comments from Jira when the cached ones may be behind. */

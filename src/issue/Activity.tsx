@@ -1,9 +1,12 @@
+import { Pin } from "lucide-react";
 import { Fragment, useState } from "react";
 import type { ActivityItem, ChangeValue } from "../api";
 import { Avatar } from "../components/issue/Avatar";
 import { StatusPill } from "../components/issue/StatusPill";
 import { formatLocalTime } from "../lib/time";
 import { useIssueActivity } from "../queries/issues";
+import { usePinOf } from "../queries/pins";
+import { PinButton } from "../pins/PinButton";
 import { JiraHtml } from "./JiraHtml";
 
 type Filter = "all" | "comments" | "changes";
@@ -27,22 +30,39 @@ function Value({ value }: { value: ChangeValue | null }) {
   }
 }
 
+type Comment = Extract<ActivityItem, { kind: "comment" }>;
+
+/** A comment with its pin button; a pinned one shows the amber strip with the reason and the time left. */
+function CommentCard({ comment }: { comment: Comment }) {
+  const pin = usePinOf("comment", comment.id);
+  const author = comment.author?.name ?? "Someone";
+  const time = formatLocalTime(comment.at);
+  return (
+    <article className={comment.fresh ? "comment-card comment-card--new" : "comment-card"}>
+      <header className="comment-card__head">
+        {comment.author && <Avatar person={comment.author} size={26} />}
+        <strong>{author}</strong>
+        <time className="comment-card__time" dateTime={comment.at}>
+          {time}
+          {comment.edited && " · edited"}
+        </time>
+        <span className="comment-card__spacer" />
+        <PinButton kind="comment" target={comment.id} label="Pin comment" meta={`${author} · ${time}`} className="comment-card__pin" />
+      </header>
+      {pin && (
+        <div className="pin-strip">
+          <Pin size={12} strokeWidth={2} aria-hidden="true" />
+          <span className="pin-strip__reason">{pin.reason ?? "Pinned"}</span>
+          {pin.timeLeft && <span>{pin.timeLeft}</span>}
+        </div>
+      )}
+      {comment.bodyHtml ? <JiraHtml html={comment.bodyHtml} className="comment-card__body" /> : null}
+    </article>
+  );
+}
+
 export function ActivityEntry({ item }: { item: ActivityItem }) {
-  if (item.kind === "comment") {
-    return (
-      <article className={item.fresh ? "comment-card comment-card--new" : "comment-card"}>
-        <header className="comment-card__head">
-          {item.author && <Avatar person={item.author} size={26} />}
-          <strong>{item.author?.name ?? "Someone"}</strong>
-          <time className="comment-card__time" dateTime={item.at}>
-            {formatLocalTime(item.at)}
-            {item.edited && " · edited"}
-          </time>
-        </header>
-        {item.bodyHtml ? <JiraHtml html={item.bodyHtml} className="comment-card__body" /> : null}
-      </article>
-    );
-  }
+  if (item.kind === "comment") return <CommentCard comment={item} />;
   return (
     <div className={item.fresh ? "change-line change-line--new" : "change-line"}>
       <span className="change-line__text">

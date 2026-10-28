@@ -147,6 +147,10 @@ function Rows({ listId, viewId, data, wrapTitles }: { listId: number; viewId: nu
         const epic = selected ? data.rows[selected]?.epic : undefined;
         if (epic) open(epic.id);
       },
+      togglePin: () => {
+        const { selected, actions } = keyState.current;
+        if (selected) actions.togglePin(selected);
+      },
       hasSelection: () => keyState.current.selected !== null,
       peekOpen: () => keyState.current.peekOpen,
     });

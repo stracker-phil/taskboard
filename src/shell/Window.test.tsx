@@ -79,6 +79,35 @@ describe("Window", () => {
     });
   });
 
+  describe("level chrome", () => {
+    const tree = () => ({ ...sidebarTree([space()]), home: [listNode({ id: 3, kind: "pinned", name: "Pinned", count: null })] });
+
+    it("shows the view tabs on a Space", async () => {
+      mocked.sidebarTree.mockResolvedValue(tree());
+      await renderWindow(false);
+
+      expect(await screen.findByRole("tablist", { name: "Views" })).toBeInTheDocument();
+    });
+
+    it("shows no view tabs and no toolbar on the Pinned level", async () => {
+      mocked.sidebarTree.mockResolvedValue(tree());
+      mocked.navCurrent.mockResolvedValue(nav(3, 0));
+      mocked.viewsOf.mockResolvedValue([view({ id: 0, listId: 3 })]);
+      render(
+        <QueryClientProvider client={client}>
+          <Window sidebarHidden>
+            <p>View body</p>
+          </Window>
+        </QueryClientProvider>,
+      );
+
+      expect(await screen.findByRole("heading", { name: "Pinned" })).toBeInTheDocument();
+      expect(screen.queryByRole("tablist", { name: "Views" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /^Filter/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "More toolbar items" })).not.toBeInTheDocument();
+    });
+  });
+
   describe("without an Issue view", () => {
     it("shows the view body and stays that way when the place changes", async () => {
       await renderWindow(false);

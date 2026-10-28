@@ -13,6 +13,7 @@ import {
   type Keybindings,
   type ListConditions,
   type Nav,
+  type Pins,
   type Related,
   type ScopeView,
   type Settings,
@@ -43,6 +44,7 @@ const emptyConnection = (): Connection => ({
 const emptySidebar = (): SidebarTree => ({
   everything: { id: 1, kind: "everything", name: "Everything", count: 0, ownConditions: 0, description: "", error: null },
   home: [],
+  pinnedLists: [],
   spaces: [],
 });
 
@@ -116,7 +118,11 @@ export function createApiMock(): Api {
     issueSyncComments: vi.fn().mockResolvedValue(false),
     issuesMarkSeen: vi.fn().mockResolvedValue(undefined),
     listMarkAllSeen: vi.fn().mockResolvedValue(undefined),
-    placeGet: vi.fn().mockResolvedValue(null),
+    pinsList: vi.fn(async (): Promise<Pins> => ({ active: [], recentlyUnpinned: [] })),
+    pinCreate: vi.fn().mockResolvedValue(undefined),
+    pinRemove: vi.fn().mockResolvedValue(undefined),
+    pinToggleIssue: vi.fn().mockResolvedValue(undefined),
+    placeGet:vi.fn().mockResolvedValue(null),
     placeSet: vi.fn().mockResolvedValue(undefined),
     copyText: vi.fn().mockResolvedValue(undefined),
     columnsCatalogue: vi.fn().mockResolvedValue([]),
