@@ -65,6 +65,7 @@ async fn connect_to_fake(app: &AppHandle, url: &str) -> AppResult<()> {
     let projects = connection::refresh_projects(&state.db, &client).await?;
     for space in demo::demo_spaces().iter().filter(|s| s.tracked) {
         if let Some(project) = projects.iter().find(|p| p.key == space.key) {
+            connection::fetch_versions(&state.db, &client, project.id.clone()).await?;
             connection::track_project(&state.db, project.id.clone(), true).await?;
         }
     }

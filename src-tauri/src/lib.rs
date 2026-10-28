@@ -11,14 +11,17 @@ pub mod db;
 mod dev;
 pub mod error;
 pub mod events;
+pub mod filter;
 mod handlers;
 mod instance;
 pub mod ipc;
 pub mod jira;
 pub mod launch;
+pub mod lists;
 pub mod lock;
 pub mod menu;
 pub mod net;
+mod order;
 mod remote;
 pub mod secrets;
 pub mod state;
@@ -26,6 +29,7 @@ pub mod store;
 pub mod sync;
 #[cfg(any(test, debug_assertions, feature = "test-util"))]
 pub mod test_support;
+pub mod views;
 pub mod window;
 
 use std::path::PathBuf;

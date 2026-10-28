@@ -10,14 +10,22 @@ import type {
   ErrorKind,
   EventName,
   EventPayloads,
+  Filter,
+  GroupBy,
   Keybindings,
   LaunchEvent,
+  Layout,
+  MatchCount,
   ProjectRow,
   ScopeView,
   Settings,
+  SidebarTree,
+  Sort,
+  SpaceUpdate,
   SyncOverview,
   SyncSettings,
   UiState,
+  View,
 } from "./types";
 
 export * from "./types";
@@ -62,6 +70,33 @@ export const api = {
   syncRun: () => invoke<void>("sync_run"),
   /** Deletes the Jira cache; Spaces, filter lists, views and pins stay. */
   cacheReset: () => invoke<void>("cache_reset"),
+  /** Everything, Home and the tracked Spaces with their filter lists and open counts. */
+  sidebarTree: () => invoke<SidebarTree>("sidebar_tree"),
+  /** `parentId`: a Space's node, or Everything's for a list under Home. Resolves to the new list's id. */
+  listCreate: (parentId: number, name: string, filter: Filter | null) => invoke<number>("list_create", { parentId, name, filter }),
+  listRename: (id: number, name: string) => invoke<void>("list_rename", { id, name }),
+  listDuplicate: (id: number) => invoke<number>("list_duplicate", { id }),
+  /** Also deletes its views and the pins on it. */
+  listDelete: (id: number) => invoke<void>("list_delete", { id }),
+  listMove: (id: number, position: number) => invoke<void>("list_move", { id, position }),
+  listSetFilter: (id: number, filter: Filter) => invoke<void>("list_set_filter", { id, filter }),
+  /** What `id` inherits ANDed with `filter` in place of its own conditions. */
+  listMatchCount: (id: number, filter: Filter) => invoke<MatchCount>("list_match_count", { id, filter }),
+  spaceMove: (projectId: string, position: number) => invoke<void>("space_move", { projectId, position }),
+  spaceUpdate: (projectId: string, update: SpaceUpdate) => invoke<void>("space_update", { projectId, update }),
+  /** "Use as Space default": the columns new views in this Space start with. */
+  spaceDefaultColumns: (projectId: string, columns: string[]) => invoke<void>("space_default_columns", { projectId, columns }),
+  viewsOf: (listId: number) => invoke<View[]>("views_of", { listId }),
+  viewCreate: (listId: number, name: string, layout: Layout) => invoke<View>("view_create", { listId, name, layout }),
+  viewRename: (id: number, name: string) => invoke<View>("view_rename", { id, name }),
+  viewDuplicate: (id: number) => invoke<View>("view_duplicate", { id }),
+  viewSetLayout: (id: number, layout: Layout) => invoke<View>("view_set_layout", { id, layout }),
+  viewSetColumns: (id: number, columns: string[]) => invoke<View>("view_set_columns", { id, columns }),
+  viewSetGroup: (id: number, groupBy: GroupBy) => invoke<View>("view_set_group", { id, groupBy }),
+  viewSetSort: (id: number, sort: Sort) => invoke<View>("view_set_sort", { id, sort }),
+  viewMove: (id: number, position: number) => invoke<View[]>("view_move", { id, position }),
+  /** Rejects with `invalid_input` for the last view of a level. */
+  viewDelete: (id: number) => invoke<View[]>("view_delete", { id }),
   appInfo: async (): Promise<AppInfo> => {
     const [name, version] = await Promise.all([getName(), getVersion()]);
     return { name, version };

@@ -369,13 +369,14 @@ mod tests {
         exec(&db, "INSERT INTO space (project_id) VALUES ('10001')").await;
         exec(
             &db,
-            "INSERT INTO filter_list (id, kind, name) VALUES (1, 'list', 'Open work')",
+            "INSERT INTO filter_list (kind, name) VALUES ('list', 'Open work')",
         )
         .await;
         exec(
             &db,
             "INSERT INTO view (list_id, name, layout, group_by, sort_by, sort_order) \
-             VALUES (1, 'Board', 'board', 'status', 'updated', 0)",
+             VALUES ((SELECT id FROM filter_list WHERE name = 'Open work'), \
+             'Board', 'board', 'status', 'updated', 0)",
         )
         .await;
         exec(
@@ -384,18 +385,23 @@ mod tests {
              VALUES ('issue', '20001', '2026-01-05T09:00:00Z')",
         )
         .await;
+        let tables = [
+            ("space", "SELECT COUNT(*) FROM space"),
+            ("filter_list", "SELECT COUNT(*) FROM filter_list"),
+            ("view", "SELECT COUNT(*) FROM view"),
+            ("pin", "SELECT COUNT(*) FROM pin"),
+        ];
+        let mut before = Vec::new();
+        for (_, sql) in tables {
+            before.push(count(&db, sql).await);
+        }
 
         db.reset_cache().await.unwrap();
 
         assert_eq!(count(&db, "SELECT COUNT(*) FROM cache.project").await, 0);
         assert_eq!(count(&db, "SELECT COUNT(*) FROM cache.issue").await, 0);
-        for (table, sql) in [
-            ("space", "SELECT COUNT(*) FROM space"),
-            ("filter_list", "SELECT COUNT(*) FROM filter_list"),
-            ("view", "SELECT COUNT(*) FROM view"),
-            ("pin", "SELECT COUNT(*) FROM pin"),
-        ] {
-            assert_eq!(count(&db, sql).await, 1, "{table}");
+        for ((table, sql), expected) in tables.into_iter().zip(before) {
+            assert_eq!(count(&db, sql).await, expected, "{table}");
         }
 
         assert_eq!(

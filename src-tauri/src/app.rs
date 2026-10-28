@@ -48,6 +48,7 @@ pub fn start(
             let state = app.state::<AppState>();
             state.launches.push(initial);
             announce_db_changes(app.handle(), &state.db);
+            give_spaces_their_lists(&state.db);
             start_sync(app.handle(), &state);
             #[cfg(debug_assertions)]
             apply_dev_frame(app);
@@ -92,6 +93,16 @@ fn announce_db_changes(app: &AppHandle, db: &Db) {
             }
         }
     }));
+}
+
+/// Spaces tracked before this Taskboard knew filter lists get their defaults.
+fn give_spaces_their_lists(db: &Db) {
+    let db = db.clone();
+    tauri::async_runtime::spawn(async move {
+        if let Err(e) = crate::lists::ensure_tracked_spaces(&db).await {
+            log::warn!("Couldn't create the default filter lists: {e}");
+        }
+    });
 }
 
 /// The one sync task; its state and progress reach every window as events.

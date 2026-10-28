@@ -8,6 +8,8 @@ use crate::db::{Db, LocalPart};
 use crate::error::AppResult;
 use crate::jira::JiraClient;
 use crate::jira::dto::Project;
+use crate::lists::ensure_space;
+use crate::sync::store::store_versions;
 
 /// How many Space tile colours the palette has (`--space-tile-*`).
 const SPACE_COLORS: i64 = 5;
@@ -104,7 +106,8 @@ pub async fn tracked_projects(db: &Db) -> AppResult<Vec<ProjectRow>> {
 }
 
 /// Tracking a project for the first time makes its Space: next position, the name's first letter as
-/// icon, a tile colour by position. Untracking keeps the row, so the settings survive re-tracking.
+/// icon, a tile colour by position, and its default views and filter lists. Untracking keeps all of it, so
+/// the settings survive re-tracking.
 pub async fn track_project(db: &Db, project_id: String, tracked: bool) -> AppResult<()> {
     db.write(move |tx, changes| {
         let updated = tx.execute(
@@ -115,9 +118,34 @@ pub async fn track_project(db: &Db, project_id: String, tracked: bool) -> AppRes
             insert_space(tx, &project_id, tracked)?;
         }
         changes.local_changed(LocalPart::Spaces);
+        if tracked && ensure_space(tx, &project_id)? {
+            changes.local_changed(LocalPart::Lists);
+            changes.local_changed(LocalPart::Views);
+        }
         Ok(())
     })
     .await
+}
+
+/// Caches a project's versions, so tracking it can offer a Release filter list before the first sync.
+pub async fn fetch_versions(db: &Db, client: &JiraClient, project_id: String) -> AppResult<()> {
+    let key: Option<String> = {
+        let id = project_id.clone();
+        db.read(move |conn| {
+            Ok(conn
+                .query_row("SELECT key FROM cache.project WHERE id = ?1", [id], |row| {
+                    row.get(0)
+                })
+                .optional()?)
+        })
+        .await?
+    };
+    let Some(key) = key else {
+        return Ok(());
+    };
+    let versions = client.versions(&key).await?;
+    db.write(move |tx, _| store_versions(tx, &project_id, &versions))
+        .await
 }
 
 fn insert_space(conn: &Connection, project_id: &str, tracked: bool) -> AppResult<()> {

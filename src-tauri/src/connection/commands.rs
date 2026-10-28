@@ -63,6 +63,12 @@ pub async fn project_track(
     project_id: String,
     tracked: bool,
 ) -> AppResult<()> {
+    if tracked && let Ok(client) = state.jira.client(&state.settings.get().connection) {
+        // Without the versions the Space just has no Release list.
+        if let Err(e) = super::fetch_versions(&state.db, &client, project_id.clone()).await {
+            log::warn!("Couldn't fetch the project's versions: {e}");
+        }
+    }
     super::track_project(&state.db, project_id, tracked).await
 }
 

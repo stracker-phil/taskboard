@@ -14,6 +14,8 @@ field?: AppErrorField, };
  */
 export type AppErrorField = { path: string, message: string, };
 
+export type Condition = { field: Field, op: Op, value?: Value, };
+
 export type Connection = { 
 /**
  * Normalised (`https://example.atlassian.net/`); empty until set up.
@@ -51,6 +53,16 @@ export type ConnectionView = { connection: Connection, hasToken: boolean, expiry
 export type ErrorKind = "io" | "invalid_input" | "not_found" | "not_connected" | "db" | "auth" | "offline" | "invalid_jql" | "internal";
 
 /**
+ * An issue field. Jira's custom fields go by their id (`customfield_10071`); a name the cache doesn't know
+ * is reported when the filter is compiled.
+ */
+export type Field = string;
+
+export type Filter = { conditions: Array<Condition>, };
+
+export type GroupBy = "status" | "project" | "client" | "assignee" | "due" | "priority" | "none";
+
+/**
  * Payload of `issues_changed`.
  */
 export type IssuesChanged = { ids: Array<string>, 
@@ -67,6 +79,28 @@ export type Job = "full";
  */
 export type LaunchEvent = { "type": "error", message: string, } | { "type": "activate" };
 
+export type Layout = "list" | "board" | "table";
+
+export type ListKind = "everything" | "space" | "list" | "recent" | "pinned";
+
+export type ListNode = { id: number, kind: ListKind, name: string, 
+/**
+ * Open issues; none for Recently changed and Pinned, and for a filter that can't be compiled.
+ */
+count: number | null, 
+/**
+ * Conditions of its own, for the Filter button's badge.
+ */
+ownConditions: number, 
+/**
+ * Its own conditions in words.
+ */
+description: string, 
+/**
+ * Why its filter can't be used.
+ */
+error: string | null, };
+
 /**
  * Payload of `local_changed`.
  */
@@ -76,6 +110,10 @@ export type LocalChanged = { parts: Array<LocalPart>, };
  * A part of the owner's own setup (the local file).
  */
 export type LocalPart = "spaces" | "lists" | "views" | "pins" | "styles";
+
+export type MatchCount = { open: number, total: number, };
+
+export type Op = "is" | "isNot" | "in" | "notIn" | "isEmpty" | "isNotEmpty" | "contains" | "before" | "after" | "withinLastDays" | "withinNextDays";
 
 export type ProjectCounts = { id: string, key: string, name: string, 
 /**
@@ -100,6 +138,43 @@ connection: Connection,
  * Changed only through the sync commands, which validate it.
  */
 sync: SyncSettings, };
+
+export type SidebarTree = { everything: ListNode, 
+/**
+ * Recently changed, Pinned and global filter lists, in order.
+ */
+home: Array<ListNode>, 
+/**
+ * Tracked projects in Space order.
+ */
+spaces: Array<SpaceNode>, };
+
+export type Sort = { by: SortBy, descending: boolean, };
+
+export type SortBy = "updated" | "created" | "priority" | "due" | "key" | "summary" | "status";
+
+export type SpaceNode = { 
+/**
+ * The Space's own node; its views hang off it.
+ */
+listId: number, projectId: string, key: string, name: string, icon: string | null, 
+/**
+ * A Space tile colour token number.
+ */
+color: string | null, client: string | null, openCount: number, lists: Array<ListNode>, };
+
+/**
+ * The owner's names for a Space; empty values go back to the project's.
+ */
+export type SpaceUpdate = { name: string | null, 
+/**
+ * One letter or digit.
+ */
+icon: string | null, 
+/**
+ * A Space tile colour number (`SPACE_COLORS`).
+ */
+color: string | null, client: string | null, };
 
 export type SyncOverview = { state: SyncState, lastFullAt: string | null, projects: Array<ProjectCounts>, };
 
@@ -136,3 +211,15 @@ export type TokenExpiry = { "state": "fine" } | { "state": "soon", days: number,
 export type TokenKind = "classic" | "scoped";
 
 export type UiState = { sidebarHidden: boolean, };
+
+export type Value = number | string | Array<string>;
+
+export type View = { id: number, listId: number, name: string, layout: Layout, 
+/**
+ * Column ids in order (`assignee`, `customfield_10071`); a board's card fields.
+ */
+columns: Array<string>, groupBy: GroupBy, sort: Sort, position: number, 
+/**
+ * The tab a level opens with.
+ */
+isDefault: boolean, };

@@ -84,6 +84,10 @@ which allows the site and `api.atlassian.com` only. The API token stays in the K
 `connection::JiraAccess` builds clients from the saved connection. The debug build serves the demo site from
 the fake Jira on loopback. The sync engine (`sync/`, [sync.md](sync.md)) is the one task that fetches issues.
 
+Which issues a sidebar level holds is decided locally: `lists/` keeps the tree of Spaces and filter lists,
+`filter/` compiles their conditions to SQL over the cache, and `views/` keeps the tabs that only decide how
+issues show ([ADR 0024](adr/0024-filters-run-locally-in-sql-views-never-filter.md), [data.md](data.md)).
+
 ## Repository map
 
 Target layout; folders appear with the code that needs them.
@@ -105,6 +109,8 @@ src-tauri/
   src/jira/                  Jira Cloud: site, client, limiter, retries, paging, endpoints, DTOs, JQL
   src/connection/            the Jira connection: Keychain access, Test Connection, tracked projects, scope
   src/sync/                  the sync engine: one task, the full sync, Jira JSON to rows, change records
+  src/filter/                filter conditions: the model, SQL compiler, conditions in words
+  src/lists/ views/          the sidebar tree with counts and defaults; the view tabs; order.rs keeps positions
   src/<feature>/             one folder per feature: types, pure logic, commands.rs, tests
   src/window/ menu/          the main and Settings windows, the native app menu
   src/dev.rs                 debug builds only: window frame, background launch, eval

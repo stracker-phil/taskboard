@@ -59,13 +59,42 @@ commands, which validate them. Tracking a project writes `local.space`, not the 
 
 | Table | Notes |
 |---|---|
-| `space` | a tracked project as the sidebar shows it: name, icon, colour, client, position |
-| `filter_list` | WHICH issues: the sidebar tree; a JSON filter ANDed with its ancestors |
+| `space` | a tracked project as the sidebar shows it: name, icon, colour, client, position, `default_columns` for new views |
+| `filter_list` | WHICH issues: the sidebar tree (`kind` everything, space, list, recent, pinned); a JSON filter ANDed with its ancestors |
 | `view` | HOW to show a list: one tab; layout, columns, grouping, sort; never a filter |
 | `pin` | pinned issues, comments and lists, with an optional reason and expiry |
 | `status_style` | overrides the detected style of a status |
 
 Project ids in `local` point into `cache`; SQLite can't enforce that across files, so code cleans up.
+
+## Filter lists and views
+
+A filter (`filter::Filter`, [ADR 0024](adr/0024-filters-run-locally-in-sql-views-never-filter.md)) is stored as
+JSON; no condition is stored as null:
+
+```json
+{ "conditions": [
+  { "field": "status", "op": "is", "value": "10003" },
+  { "field": "customfield_10071", "op": "is", "value": "me" },
+  { "field": "updated", "op": "withinLastDays", "value": 7 }
+] }
+```
+
+- `field`: `status` (id), `statusCategory` (`new`, `indeterminate`, `done`), `type` (name), `assignee`,
+  `reporter` (account id or `me`), `priority` (name), `epic` (the parent's issue id), `release` (fix version id),
+  `sprint` (`active`, `future`, `closed` or a sprint id), `labels`, `due`, `updated`, `created`, `project` (id),
+  or a custom field id (Jira schema types user, option, string, number, date, datetime, array).
+- `op`: `is`, `isNot`, `in`, `notIn`, `isEmpty`, `isNotEmpty`, `contains` (labels and text fields), `before`,
+  `after` (`YYYY-MM-DD`), `withinLastDays`, `withinNextDays` (a number of days; dates are days in the account's
+  time zone).
+- `value`: a string, a list of strings or a number of days, as the operator needs.
+
+Built in (migration `local/0002`): Everything (one "All issues" view grouped by Space), and under Home Recently
+changed and Pinned. Tracking a project (`lists::ensure_space`) adds its Space node with three views (All issues,
+Board, Table; grouped by status; the Space's default columns, else Assignee, Epic, Release, Priority) and the
+filter lists Current sprint, Epics, Release *next unreleased version* (when the project has one), Open bugs, each
+with one List view. Positions among siblings stay 0, 1, 2, … (`order.rs`). Deleting a filter list deletes its
+views and pins; a level keeps at least one view.
 
 ## Rules
 

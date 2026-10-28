@@ -5,7 +5,10 @@ use rusqlite::Connection;
 
 use crate::error::{AppError, AppResult};
 
-pub const LOCAL: &[&str] = &[include_str!("../../migrations/local/0001_init.sql")];
+pub const LOCAL: &[&str] = &[
+    include_str!("../../migrations/local/0001_init.sql"),
+    include_str!("../../migrations/local/0002_tree.sql"),
+];
 pub const CACHE: &[&str] = &[include_str!("../../migrations/cache/0001_init.sql")];
 
 /// Brings the connection's file up to date in one transaction. A file migrated by a newer Taskboard is

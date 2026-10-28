@@ -12,7 +12,8 @@ use std::sync::Arc;
 pub use account::{ConnectionInput, ConnectionTest, ConnectionView, save, test, view};
 pub use expiry::{TokenExpiry, token_expiry};
 pub use projects::{
-    ProjectRow, list_projects, refresh_projects, track_project, tracked_keys, tracked_projects,
+    ProjectRow, fetch_versions, list_projects, refresh_projects, track_project, tracked_keys,
+    tracked_projects,
 };
 pub use scope::{
     ScopeView, effective_scope, save_intervals, save_scope, scope_view, validate_scope,
