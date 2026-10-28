@@ -7,3 +7,10 @@ export function formatLocalTime(iso: string, now: Date = new Date()): string {
   const at = new Date(iso);
   return at.toDateString() === now.toDateString() ? TIME.format(at) : SHORT.format(at);
 }
+
+const DAY = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" });
+
+/** A UTC timestamp from Rust as its local day ("27 Oct"). */
+export function formatLocalDate(iso: string): string {
+  return DAY.format(new Date(iso));
+}

@@ -166,6 +166,10 @@ descriptionHtml: string | null, commentCount: number, isEpic: boolean,
  */
 gone: boolean, 
 /**
+ * When the sync last stored this issue (UTC, RFC 3339): the gone notice's "Last synced".
+ */
+syncedAt: string, 
+/**
  * The custom fields the owner shows (marked shown or used as a view column), with their value if any.
  */
 custom: Array<CustomField>, 

@@ -46,6 +46,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
   mocked.pinsList.mockResolvedValue(pins());
+  mocked.issueForget.mockResolvedValue(undefined);
+  mocked.pinRemove.mockResolvedValue(undefined);
   serve(issueDetail(), EPIC);
   mocked.issueRelated.mockResolvedValue(related());
   mocked.issueActivity.mockResolvedValue([]);
@@ -230,6 +232,56 @@ describe("IssueView", () => {
       renderIssue();
 
       expect(await title("Checkout: address validation for DACH postcodes")).toBeInTheDocument();
+    });
+  });
+
+  describe("an issue Jira deleted", () => {
+    const GONE = issueDetail({ gone: true });
+
+    it("shows the notice about the cached copy", async () => {
+      serve(GONE);
+      renderIssue();
+
+      expect(await screen.findByText(/^Deleted in Jira or you lost access\. Last synced .+\. This is the cached copy\.$/)).toBeInTheDocument();
+      expect(await title("Checkout: address validation for DACH postcodes")).toBeInTheDocument();
+    });
+
+    it("forgets the issue and closes the Issue view from Remove from cache", async () => {
+      serve(GONE);
+      renderIssue();
+
+      await userEvent.click(await screen.findByRole("button", { name: "Remove from cache" }));
+
+      expect(mocked.issueForget).toHaveBeenCalledWith("10042");
+      await waitFor(() => expect(useStore.getState().issueView).toBeNull());
+    });
+
+    it("keeps the Issue view open and shows a toast when forgetting fails", async () => {
+      serve(GONE);
+      mocked.issueForget.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
+      renderIssue();
+
+      await userEvent.click(await screen.findByRole("button", { name: "Remove from cache" }));
+
+      await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not remove it from the cache: Disk full"));
+      expect(useStore.getState().issueView).not.toBeNull();
+    });
+
+    it("offers Unpin in the notice for a pinned issue", async () => {
+      serve(GONE);
+      mocked.pinsList.mockResolvedValue(pins([pinItem({ id: 6 })]));
+      renderIssue();
+
+      await userEvent.click(await screen.findByText("Unpin"));
+
+      expect(mocked.pinRemove).toHaveBeenCalledWith(6);
+    });
+
+    it("shows no notice for a live issue", async () => {
+      renderIssue();
+
+      await title("Checkout: address validation for DACH postcodes");
+      expect(screen.queryByText(/Deleted in Jira/)).not.toBeInTheDocument();
     });
   });
 

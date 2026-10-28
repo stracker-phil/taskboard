@@ -9,6 +9,7 @@ import { api, type View, type ViewData } from "../../api";
 import { createQueryClient } from "../../queries/queryClient";
 import { resetStore, useStore } from "../../state/store";
 import { COLUMNS, groupOf, row, viewData } from "../../test/issues";
+import { sidebarTree, space } from "../../test/spaces";
 import { view } from "../../test/views";
 import { TableView } from "./TableView";
 
@@ -20,6 +21,7 @@ let spies: Restorable[] = [];
 beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
+  mocked.sidebarTree.mockResolvedValue(sidebarTree([]));
   mocked.columnsCatalogue.mockResolvedValue([...COLUMNS, { id: "due", name: "Due", custom: false }]);
   mocked.viewSetSort.mockResolvedValue(view());
   mocked.viewSetWidths.mockResolvedValue(view());
@@ -59,6 +61,20 @@ describe("TableView", () => {
       </QueryClientProvider>,
     );
 
+    expect(screen.queryByRole("grid")).not.toBeInTheDocument();
+  });
+
+  it("shows what the level is missing instead of a grid when the view has no issues", async () => {
+    mocked.sidebarTree.mockResolvedValue(sidebarTree([space()]));
+    mocked.viewRows.mockResolvedValue(viewData([], [], { groupBy: "none" }));
+
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <TableView view={TABLE} />
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByRole("heading", { name: "Nothing in Website relaunch" })).toBeInTheDocument();
     expect(screen.queryByRole("grid")).not.toBeInTheDocument();
   });
 

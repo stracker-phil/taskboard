@@ -119,6 +119,7 @@ export function createApiMock(): Api {
     issueGet: vi.fn(async (id: string): Promise<IssueDetail> => issueDetail({ id })),
     issueActivity: vi.fn().mockResolvedValue([]),
     issueRelated: vi.fn(async (): Promise<Related> => ({ children: { open: [], done: [] }, links: [] })),
+    issueForget: vi.fn().mockResolvedValue(undefined),
     issueSyncComments: vi.fn().mockResolvedValue(false),
     issuesMarkSeen: vi.fn().mockResolvedValue(undefined),
     listMarkAllSeen: vi.fn().mockResolvedValue(undefined),

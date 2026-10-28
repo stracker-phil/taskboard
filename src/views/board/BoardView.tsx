@@ -1,6 +1,7 @@
 import { ChevronLeft } from "lucide-react";
 import { api, type BoardColumn, type BoardData, type Narrowing, type View } from "../../api";
 import { StatusPill } from "../../components/issue/StatusPill";
+import { EmptyLevel } from "../../shell/EmptyLevel";
 import { useViewBoard } from "../../queries/views";
 import { attempt } from "../../state/requests";
 import { useStore } from "../../state/store";
@@ -25,7 +26,7 @@ function Board({ view, data }: { view: View; data: BoardData }) {
   const setCollapsed = (column: BoardColumn, collapsed: boolean) =>
     void attempt(api.viewSetColumnCollapsed(view.id, column.statusId, collapsed), "Could not change the column");
   const open = (id: string) => openIssue(id, { listId: view.listId, viewId: view.id });
-  if (data.columns.length === 0) return <div className="board board--empty" />;
+  if (data.columns.length === 0) return <EmptyLevel listId={view.listId} viewId={view.id} />;
   return (
     <div className="board" role="list" aria-label="Board">
       {data.columns.map((column) =>
@@ -37,7 +38,7 @@ function Board({ view, data }: { view: View; data: BoardData }) {
               aria-label={`Expand ${column.name} (${column.ids.length})`}
               onClick={() => setCollapsed(column, false)}
             >
-              <span className={`board-strip__pill status-pill--${column.style}`}>{column.name}</span>
+              <StatusPill style={column.style} name={column.name} variant="vertical" />
               <span className="board-column__count">{column.ids.length}</span>
             </button>
           </div>

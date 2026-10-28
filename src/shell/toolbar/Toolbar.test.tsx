@@ -274,6 +274,27 @@ describe("Toolbar", () => {
     });
   });
 
+  describe("Edit filter requests", () => {
+    it("opens the Filter popover when a request arrives after mount", async () => {
+      renderToolbar(FILTER_LIST);
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+      act(() => useStore.getState().requestFilter());
+
+      expect(await screen.findByRole("dialog", { name: "Filter" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /^Filter/ })).toHaveAttribute("aria-expanded", "true");
+    });
+
+    it("does not treat the request count a mount starts with as a request", () => {
+      useStore.getState().requestFilter();
+
+      renderToolbar(FILTER_LIST);
+
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /^Filter/ })).toHaveAttribute("aria-expanded", "false");
+    });
+  });
+
   describe("popovers", () => {
     it("labels the columns button Card fields on a board", () => {
       renderToolbar(SPACE, view({ layout: "board" }));

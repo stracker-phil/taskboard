@@ -26,6 +26,12 @@ pub async fn issue_activity(
     super::issue_activity(&state.db, viewer(&state), id).await
 }
 
+/// Removes a gone issue from the cache.
+#[tauri::command]
+pub async fn issue_forget(state: State<'_, AppState>, id: String) -> AppResult<()> {
+    super::issue_forget(&state.db, id).await
+}
+
 /// Children (an epic's issues, a task's subtasks) and links.
 #[tauri::command]
 pub async fn issue_related(state: State<'_, AppState>, id: String) -> AppResult<Related> {

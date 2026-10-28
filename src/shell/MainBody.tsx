@@ -19,6 +19,10 @@ export function MainBody() {
   const narrowing = useStore((s) => (location ? s.narrowings[narrowingKey(location.listId, location.viewId)] : undefined));
   const hasIssues = overview?.projects.some((p) => p.cached > 0) ?? false;
   if (!hasIssues || !location) return <SyncStatusView />;
+  // A Space still in its first sync shows the progress; finished Spaces can be browsed meanwhile.
+  const space = tree?.spaces.find((s) => s.listId === location.listId || s.lists.some((l) => l.id === location.listId));
+  const loading = overview?.state.state === "running" && overview.projects.some((p) => p.id === space?.projectId && !p.lastFullAt);
+  if (loading) return <SyncStatusView />;
   if (tree?.home.some((node) => node.id === location.listId && node.kind === "pinned")) {
     return <PinnedView listId={location.listId} viewId={location.viewId} />;
   }

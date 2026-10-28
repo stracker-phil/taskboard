@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -72,33 +72,51 @@ describe("SyncStatusView", () => {
       mocked.syncOverview.mockResolvedValue(syncOverview({ state: RUNNING, projects: [NW, LUM] }));
     });
 
+    const rows = () => within(screen.getByRole("list")).getAllByRole("listitem");
+
     it("lists each project as waiting until its first progress arrives", async () => {
       await renderView();
 
       expect(await screen.findByText("Loading your Jira issues")).toBeInTheDocument();
-      expect(screen.getAllByText("Waiting")).toHaveLength(2);
+      expect(screen.getAllByText("waiting")).toHaveLength(2);
+      expect(screen.getByText("0 issues so far")).toBeInTheDocument();
     });
 
-    it("shows fetched of total with a progressbar named by the project", async () => {
+    it("shows a running project's next page and the overall fetched of total with a progressbar", async () => {
       await renderView();
       await screen.findByText("Loading your Jira issues");
 
-      act(() => emitEvent(api, "sync_progress", progress()));
+      act(() => {
+        emitEvent(api, "sync_progress", progress());
+        emitEvent(api, "sync_progress", progress({ projectId: LUM.id, projectKey: LUM.key, pagesDone: 0, fetched: 1, approxTotal: 1 }));
+      });
 
-      expect(await screen.findByText("120 of 400")).toBeInTheDocument();
-      const bar = screen.getByRole("progressbar", { name: "Website relaunch" });
-      expect(bar).toHaveAttribute("aria-valuenow", "120");
-      expect(bar).toHaveAttribute("aria-valuemax", "400");
-      expect(screen.getByRole("progressbar", { name: "Lumen iOS app" })).not.toHaveAttribute("aria-valuenow");
+      expect(await screen.findByText("About 121 of 401 issues")).toBeInTheDocument();
+      expect(rows()[0]).toHaveTextContent("page 2");
+      expect(rows()[1]).toHaveTextContent("page 1");
+      const bar = screen.getByRole("progressbar", { name: "Issues loaded" });
+      expect(bar).toHaveAttribute("aria-valuenow", "121");
+      expect(bar).toHaveAttribute("aria-valuemax", "401");
     });
 
-    it("shows only the fetched count when Jira gave no estimate", async () => {
+    it("counts the issues so far, without a bar value, while Jira gave no estimate", async () => {
       await renderView();
       await screen.findByText("Loading your Jira issues");
 
       act(() => emitEvent(api, "sync_progress", progress({ approxTotal: null })));
 
-      expect(await screen.findByText("120 fetched")).toBeInTheDocument();
+      expect(await screen.findByText("120 issues so far")).toBeInTheDocument();
+      expect(screen.getByRole("progressbar", { name: "Issues loaded" })).not.toHaveAttribute("aria-valuenow");
+    });
+
+    it("counts the issues so far while a project has not started", async () => {
+      await renderView();
+      await screen.findByText("Loading your Jira issues");
+
+      act(() => emitEvent(api, "sync_progress", progress()));
+
+      expect(await screen.findByText("120 issues so far")).toBeInTheDocument();
+      expect(rows()[1]).toHaveTextContent("waiting");
     });
 
     it("keeps the latest progress per project", async () => {
@@ -111,9 +129,45 @@ describe("SyncStatusView", () => {
         emitEvent(api, "sync_progress", progress({ projectId: LUM.id, projectKey: LUM.key, fetched: 1, approxTotal: 1 }));
       });
 
-      expect(await screen.findByText("200 of 400")).toBeInTheDocument();
-      expect(screen.getByText("1 of 1")).toBeInTheDocument();
-      expect(screen.queryByText("100 of 400")).not.toBeInTheDocument();
+      expect(await screen.findByText("About 201 of 401 issues")).toBeInTheDocument();
+    });
+
+    describe("with a finished Space", () => {
+      const DONE = projectCounts({ lastFullAt: "2026-10-27T09:00:00Z" });
+
+      beforeEach(() => {
+        mocked.syncOverview.mockResolvedValue(syncOverview({ state: RUNNING, projects: [DONE, LUM] }));
+      });
+
+      it("marks it done with its cached count, counts it into the overall figure and points out it can be browsed", async () => {
+        await renderView();
+        await screen.findByText("Loading your Jira issues");
+
+        act(() => emitEvent(api, "sync_progress", progress({ projectId: LUM.id, projectKey: LUM.key, pagesDone: 2, fetched: 40, approxTotal: 100 })));
+
+        expect(await screen.findByText("About 73 of 133 issues")).toBeInTheDocument();
+        expect(rows()[0]).toHaveTextContent("✓");
+        expect(rows()[0]).toHaveTextContent("33");
+        expect(rows()[1]).toHaveTextContent("page 3");
+        expect(screen.getByText("You can already browse finished Spaces.")).toBeInTheDocument();
+      });
+
+      it("ignores a late progress event of the finished Space", async () => {
+        await renderView();
+        await screen.findByText("Loading your Jira issues");
+
+        act(() => emitEvent(api, "sync_progress", progress({ fetched: 999, approxTotal: 999 })));
+
+        expect(await screen.findByText("33 issues so far")).toBeInTheDocument();
+        expect(rows()[0]).toHaveTextContent("✓");
+      });
+    });
+
+    it("leaves out the note on finished Spaces while none is done", async () => {
+      await renderView();
+      await screen.findByText("Loading your Jira issues");
+
+      expect(screen.queryByText("You can already browse finished Spaces.")).not.toBeInTheDocument();
     });
 
     it("shows the issue count once a sync_state idle event arrives", async () => {

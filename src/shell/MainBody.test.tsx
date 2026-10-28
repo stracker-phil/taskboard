@@ -12,7 +12,7 @@ import { boardColumn, boardData } from "../test/board";
 import { groupOf, row, viewData } from "../test/issues";
 import { projectCounts, syncOverview } from "../test/jira";
 import { pinItem, pins } from "../test/pins";
-import { sidebarTree } from "../test/spaces";
+import { lumenSpace, sidebarTree, space } from "../test/spaces";
 import { listNode, view } from "../test/views";
 import { MainBody } from "./MainBody";
 
@@ -210,6 +210,67 @@ describe("MainBody", () => {
 
       await waitFor(() => expect(mocked.viewRows).toHaveBeenCalledWith(11, 101, { me: false, text: "pricing", epic: null }));
       expect(mocked.viewRows).not.toHaveBeenCalledWith(11, 101, expect.objectContaining({ me: true }));
+    });
+  });
+
+  describe("during the first sync", () => {
+    const RUNNING = { state: "running", job: "full" } as const;
+    const FINISHED = projectCounts({ lastFullAt: "2026-10-27T09:00:00Z" });
+    const UNFINISHED = projectCounts({ id: "10002", key: "LUM", name: "Lumen iOS app", cached: 5, lastFullAt: null });
+    const at = (listId: number) => mocked.navCurrent.mockResolvedValue({ location: { listId, viewId: 101 }, expanded: [] });
+
+    beforeEach(() => {
+      const issue = row({ summary: "Redesign the pricing page" });
+      mocked.sidebarTree.mockResolvedValue(sidebarTree([space({ lists: [listNode({ id: 21 })] }), lumenSpace()]));
+      mocked.viewsOf.mockResolvedValue([view()]);
+      mocked.viewRows.mockResolvedValue(viewData([groupOf([issue])], [issue]));
+    });
+
+    it("shows the progress instead of the view while the current Space is still loading", async () => {
+      at(11);
+      mocked.syncOverview.mockResolvedValue(syncOverview({ state: RUNNING, projects: [projectCounts({ lastFullAt: null })] }));
+
+      renderBody();
+
+      expect(await screen.findByText("Loading your Jira issues")).toBeInTheDocument();
+      expect(screen.queryByText("Redesign the pricing page")).not.toBeInTheDocument();
+    });
+
+    it("shows the progress for a filter list of a Space that is still loading", async () => {
+      at(21);
+      mocked.syncOverview.mockResolvedValue(syncOverview({ state: RUNNING, projects: [projectCounts({ lastFullAt: null })] }));
+
+      renderBody();
+
+      expect(await screen.findByText("Loading your Jira issues")).toBeInTheDocument();
+    });
+
+    it("shows the view of a finished Space while another one is still loading", async () => {
+      at(11);
+      mocked.syncOverview.mockResolvedValue(syncOverview({ state: RUNNING, projects: [FINISHED, UNFINISHED] }));
+
+      renderBody();
+
+      expect(await screen.findByText("Redesign the pricing page")).toBeInTheDocument();
+      expect(screen.queryByText("Loading your Jira issues")).not.toBeInTheDocument();
+    });
+
+    it("shows the progress when the current place is the Space that is still loading", async () => {
+      at(12);
+      mocked.syncOverview.mockResolvedValue(syncOverview({ state: RUNNING, projects: [FINISHED, UNFINISHED] }));
+
+      renderBody();
+
+      expect(await screen.findByText("Loading your Jira issues")).toBeInTheDocument();
+    });
+
+    it("shows the view once the sync is not running, even for a Space never fully synced", async () => {
+      at(11);
+      mocked.syncOverview.mockResolvedValue(syncOverview({ projects: [projectCounts({ lastFullAt: null })] }));
+
+      renderBody();
+
+      expect(await screen.findByText("Redesign the pricing page")).toBeInTheDocument();
     });
   });
 

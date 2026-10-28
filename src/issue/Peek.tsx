@@ -9,6 +9,7 @@ import { useIssue, useIssueActivity } from "../queries/issues";
 import { ActivityEntry } from "./Activity";
 import { hasContent } from "../lib/jiraHtml";
 import { JiraHtml } from "./JiraHtml";
+import { GoneNotice } from "./GoneNotice";
 import { SinceBanner } from "./SinceBanner";
 import { useSeenOnLeave } from "./useSeenOnLeave";
 import { PinButton } from "../pins/PinButton";
@@ -52,7 +53,7 @@ export function Peek({ id, onClose, onExpand }: { id: string; onClose: () => voi
         </button>
       </header>
       <div ref={bodyRef} className="peek__body">
-        {issue ? <Body issue={issue} onExpand={onExpand} /> : isError ? <p className="peek__missing">This issue is no longer in the cache.</p> : null}
+        {issue ? <Body issue={issue} onExpand={onExpand} onClose={onClose} /> : isError ? <p className="peek__missing">This issue is no longer in the cache.</p> : null}
       </div>
       <footer className="peek__footer">
         <span>J / K next</span>
@@ -67,12 +68,13 @@ export function Peek({ id, onClose, onExpand }: { id: string; onClose: () => voi
 
 const LATEST = 3;
 
-function Body({ issue, onExpand }: { issue: IssueDetail; onExpand: () => void }) {
+function Body({ issue, onExpand, onClose }: { issue: IssueDetail; onExpand: () => void; onClose: () => void }) {
   const { data: activity = [] } = useIssueActivity(issue.id);
   const latest = activity.slice(-LATEST).reverse();
   return (
     <>
-      <h2 className="peek__title">{issue.summary}</h2>
+      <h2 className={issue.gone ? "peek__title issue-title--gone" : "peek__title"}>{issue.summary}</h2>
+      {issue.gone && <GoneNotice issue={issue} onRemoved={onClose} />}
       <div className="peek__chips">
         <StatusPill style={issue.style} name={issue.statusName} variant="peek" />
         {issue.epic && <EpicChip epic={issue.epic} />}

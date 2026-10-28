@@ -7,6 +7,9 @@ export interface NarrowingSlice {
   /** By `narrowingKey`. */
   narrowings: Record<string, Narrowing>;
   setNarrowing: (key: string, patch: Partial<Narrowing>) => void;
+  /** Bumped to open the toolbar's Filter popover from elsewhere (an empty list's Edit filter). */
+  filterRequests: number;
+  requestFilter: () => void;
 }
 
 export const NO_NARROWING: Narrowing = { me: false, text: "", epic: null };
@@ -18,5 +21,7 @@ export const narrowingSlice: Slice<NarrowingSlice> = {
     narrowings: {},
     setNarrowing: (key, patch) =>
       set((s) => ({ narrowings: { ...s.narrowings, [key]: { ...(s.narrowings[key] ?? NO_NARROWING), ...patch } } })),
+    filterRequests: 0,
+    requestFilter: () => set((s) => ({ filterRequests: s.filterRequests + 1 })),
   }),
 };

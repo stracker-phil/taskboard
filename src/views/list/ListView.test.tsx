@@ -14,6 +14,7 @@ import { ALEX, COLUMNS, groupOf, row, SAM, viewData } from "../../test/issues";
 import { connectionView } from "../../test/jira";
 import { startMotionTimers, stubMotion } from "../../test/motion";
 import { issueTarget, pinItem, pins } from "../../test/pins";
+import { sidebarTree, space } from "../../test/spaces";
 import { ListView } from "./ListView";
 
 const mocked = vi.mocked(api, true);
@@ -26,6 +27,7 @@ const place = () => useStore.getState().places["11:101"];
 beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
+  mocked.sidebarTree.mockResolvedValue(sidebarTree([]));
   mocked.pinsList.mockResolvedValue(pins());
   mocked.columnsCatalogue.mockResolvedValue(COLUMNS);
   mocked.placeGet.mockResolvedValue(null);
@@ -72,6 +74,21 @@ describe("ListView", () => {
     await renderList(viewData([groupOf([OPEN])], [OPEN]));
 
     expect(mocked.viewRows).toHaveBeenCalledWith(11, 101, { me: false, text: "", epic: null });
+  });
+
+  it("shows what the level is missing instead of a grid when the view has no issues", async () => {
+    mocked.sidebarTree.mockResolvedValue(sidebarTree([space()]));
+    mocked.viewRows.mockResolvedValue(viewData([], []));
+
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <ListView listId={11} viewId={101} />
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByRole("heading", { name: "Nothing in Website relaunch" })).toBeInTheDocument();
+    expect(screen.getByText("No issues here yet.")).toBeInTheDocument();
+    expect(screen.queryByRole("grid")).not.toBeInTheDocument();
   });
 
   describe("rows", () => {

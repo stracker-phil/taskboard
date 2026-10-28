@@ -7,6 +7,7 @@ vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await impo
 
 import { api, type IssueDetail } from "../api";
 import { createQueryClient } from "../queries/queryClient";
+import { resetStore, useStore } from "../state/store";
 import { connectionView } from "../test/jira";
 import { ALEX, changeItem, commentItem } from "../test/issues";
 import { commentTarget, pinItem, pins } from "../test/pins";
@@ -32,6 +33,7 @@ function detail(patch: Partial<IssueDetail> = {}): IssueDetail {
     due: null,
     createdAt: "2026-10-01T09:00:00Z",
     updatedAt: "2026-10-02T09:00:00Z",
+    syncedAt: "2026-10-27T09:00:00.000Z",
     descriptionHtml: "<p>Update the <strong>pricing</strong> table.</p>",
     commentCount: 0,
     isEpic: false,
@@ -53,6 +55,8 @@ function renderPeek(onClose = vi.fn(), onExpand = vi.fn()) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  resetStore();
+  mocked.issueForget.mockResolvedValue(undefined);
   mocked.pinsList.mockResolvedValue(pins());
   mocked.issueGet.mockResolvedValue(detail());
   mocked.issueActivity.mockResolvedValue([]);
@@ -320,6 +324,45 @@ describe("Peek", () => {
       await screen.findByRole("heading", { name: "Redesign the pricing page" });
       await vi.waitFor(() => expect(mocked.connectionGet).toHaveBeenCalled());
       expect(screen.queryByRole("button", { name: "Open in Jira" })).not.toBeInTheDocument();
+    });
+  });
+
+  describe("an issue Jira deleted", () => {
+    it("shows the notice about the cached copy", async () => {
+      mocked.issueGet.mockResolvedValue(detail({ gone: true }));
+      renderPeek();
+
+      expect(await screen.findByText(/^Deleted in Jira or you lost access\. Last synced .+\. This is the cached copy\.$/)).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Redesign the pricing page" })).toBeInTheDocument();
+    });
+
+    it("forgets the issue and closes the peek from Remove from cache", async () => {
+      mocked.issueGet.mockResolvedValue(detail({ gone: true }));
+      const onClose = renderPeek();
+
+      await userEvent.click(await screen.findByRole("button", { name: "Remove from cache" }));
+
+      expect(mocked.issueForget).toHaveBeenCalledWith("10042");
+      await vi.waitFor(() => expect(onClose).toHaveBeenCalled());
+    });
+
+    it("keeps the peek open and shows a toast when forgetting fails", async () => {
+      mocked.issueGet.mockResolvedValue(detail({ gone: true }));
+      mocked.issueForget.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
+      const onClose = renderPeek();
+
+      await userEvent.click(await screen.findByRole("button", { name: "Remove from cache" }));
+
+      await vi.waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not remove it from the cache: Disk full"));
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it("shows no notice for a live issue", async () => {
+      renderPeek();
+
+      await screen.findByRole("heading", { name: "Redesign the pricing page" });
+      expect(screen.queryByText(/Deleted in Jira/)).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Remove from cache" })).not.toBeInTheDocument();
     });
   });
 

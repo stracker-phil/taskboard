@@ -1,5 +1,5 @@
 import { Columns3, Ellipsis, Layers, ListFilter } from "lucide-react";
-import { type ReactNode, type RefObject, useCallback, useRef, useState } from "react";
+import { type ReactNode, type RefObject, useCallback, useEffect, useRef, useState } from "react";
 import { type Presence, usePresence } from "../../lib/motion";
 import { api, type MenuEntry, type View } from "../../api";
 import { narrowingKey, NO_NARROWING } from "../../state/slices/narrowing";
@@ -30,6 +30,15 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
   const narrowing = useStore((s) => s.narrowings[key]) ?? NO_NARROWING;
   const setNarrowing = useStore((s) => s.setNarrowing);
   const setText = useCallback((text: string) => setNarrowing(key, { text }), [key, setNarrowing]);
+
+  // Edit filter in an empty list opens the popover; the count a mount starts with is not a request.
+  const filterRequests = useStore((s) => s.filterRequests);
+  const handledRequests = useRef(filterRequests);
+  useEffect(() => {
+    if (filterRequests === handledRequests.current) return;
+    handledRequests.current = filterRequests;
+    setOpen("filter");
+  }, [filterRequests]);
 
   const columnsShown = usePresence(open === "columns");
   const filterShown = usePresence(open === "filter");

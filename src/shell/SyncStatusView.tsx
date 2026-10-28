@@ -16,7 +16,7 @@ function body(overview: SyncOverview, progress: Record<string, SyncProgress>) {
   if (projects.length === 0) return <ConnectPrompt />;
   switch (state.state) {
     case "running":
-      return <Loading projects={projects} progress={progress} />;
+      return <FirstSync projects={projects} progress={progress} />;
     case "idle": {
       const total = projects.reduce((sum, p) => sum + p.cached, 0);
       const spaces = projects.length === 1 ? "1 Space" : `${projects.length} Spaces`;
@@ -46,38 +46,41 @@ function ConnectPrompt() {
   );
 }
 
-function Loading({ projects, progress }: { projects: ProjectCounts[]; progress: Record<string, SyncProgress> }) {
+/** The first full sync (artboard 8, card 1): an overall bar and every Space done, loading or waiting. */
+export function FirstSync({ projects, progress }: { projects: ProjectCounts[]; progress: Record<string, SyncProgress> }) {
+  const rows = projects.map((project) => ({ project, state: projectState(project, progress[project.id]), progress: progress[project.id] }));
+  // Done Spaces count what they hold; the others what they fetched of Jira's estimate.
+  const fetched = rows.reduce((sum, r) => sum + (r.state === "done" ? r.project.cached : (r.progress?.fetched ?? 0)), 0);
+  const known = rows.every((r) => r.state === "done" || r.progress?.approxTotal != null);
+  const total = rows.reduce((sum, r) => sum + (r.state === "done" ? r.project.cached : (r.progress?.approxTotal ?? 0)), 0);
+  const share = known && total > 0 ? Math.min(1, fetched / total) : 0;
   return (
-    <div className="sync-status">
-      <p>Loading your Jira issues</p>
-      <ul className="sync-status__projects">
-        {projects.map((project) => (
-          <ProjectProgress key={project.id} project={project} progress={progress[project.id]} />
+    <div className="first-sync">
+      <h2 className="first-sync__title">Loading your Jira issues</h2>
+      <p className="first-sync__text">The first sync fetches every issue once; afterwards only changes come in.</p>
+      <div className="first-sync__bar" role="progressbar" aria-label="Issues loaded" aria-valuemin={0} aria-valuemax={known ? total : undefined} aria-valuenow={known ? fetched : undefined}>
+        <div className="first-sync__bar-done" style={{ width: `${share * 100}%` }} />
+      </div>
+      <p className="first-sync__meta">{known ? `About ${fetched.toLocaleString("en")} of ${total.toLocaleString("en")} issues` : `${fetched.toLocaleString("en")} issues so far`}</p>
+      <ul className="first-sync__spaces">
+        {rows.map(({ project, state, progress: p }) => (
+          <li key={project.id} className={`first-sync__space first-sync__space--${state}`}>
+            <span className={`first-sync__icon first-sync__icon--${state}`} aria-hidden="true">
+              {state === "done" ? "✓" : null}
+            </span>
+            <span className="first-sync__name">{project.name}</span>
+            <span className="first-sync__detail">{state === "done" ? project.cached : state === "running" ? `page ${(p?.pagesDone ?? 0) + 1}` : "waiting"}</span>
+          </li>
         ))}
       </ul>
+      {rows.some((r) => r.state === "done") && <p className="first-sync__foot">You can already browse finished Spaces.</p>}
     </div>
   );
 }
 
-function ProjectProgress({ project, progress }: { project: ProjectCounts; progress?: SyncProgress }) {
-  const fetched = progress?.fetched ?? 0;
-  const total = progress?.approxTotal ?? null;
-  const share = total ? Math.min(1, fetched / total) : 0;
-  const label = !progress ? "Waiting" : total === null ? `${fetched} fetched` : `${fetched} of ${total}`;
-  return (
-    <li className="sync-status__project">
-      <span>{project.name}</span>
-      <span className="sync-status__detail">{label}</span>
-      <div
-        className="sync-status__bar"
-        role="progressbar"
-        aria-label={project.name}
-        aria-valuemin={0}
-        aria-valuemax={total ?? undefined}
-        aria-valuenow={total === null ? undefined : fetched}
-      >
-        <div className="sync-status__bar-done" style={{ width: `${share * 100}%` }} />
-      </div>
-    </li>
-  );
+type SpaceState = "done" | "running" | "waiting";
+
+function projectState(project: ProjectCounts, progress: SyncProgress | undefined): SpaceState {
+  if (project.lastFullAt) return "done";
+  return progress ? "running" : "waiting";
 }

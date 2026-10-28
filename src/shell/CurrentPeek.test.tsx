@@ -33,6 +33,7 @@ const detail = (): IssueDetail => ({
   due: null,
   createdAt: "2026-10-01T09:00:00Z",
   updatedAt: "2026-10-02T09:00:00Z",
+  syncedAt: "2026-10-27T09:00:00.000Z",
   descriptionHtml: null,
   commentCount: 0,
   isEpic: false,

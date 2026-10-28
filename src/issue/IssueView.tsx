@@ -16,6 +16,7 @@ import { useStore } from "../state/store";
 import { PinButton } from "../pins/PinButton";
 import { useIssueActions } from "../views/list/useIssueActions";
 import { Activity } from "./Activity";
+import { GoneNotice } from "./GoneNotice";
 import { SinceBanner } from "./SinceBanner";
 import { useSeenOnLeave } from "./useSeenOnLeave";
 import { FieldGrid } from "./FieldGrid";
@@ -139,7 +140,8 @@ function IssueMain({ issue, origin }: { issue: IssueDetail; origin: IssueOrigin 
         <span aria-hidden="true">·</span>
         <span>{comments}</span>
       </div>
-      <h1 className="issue-main__title">{issue.summary}</h1>
+      <h1 className={issue.gone ? "issue-main__title issue-title--gone" : "issue-main__title"}>{issue.summary}</h1>
+      {issue.gone && <GoneNotice issue={issue} onRemoved={closeIssue} />}
       {issue.since && <SinceBanner since={issue.since} onMarkSeen={() => void attempt(api.issuesMarkSeen([issue.id]), "Could not mark it seen")} />}
       <FieldGrid issue={issue} onOpenEpic={openRelated} />
       {related && <Links links={related.links} onOpen={openRelated} />}

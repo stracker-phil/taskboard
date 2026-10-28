@@ -45,6 +45,7 @@ export function issueDetail(patch: Partial<IssueDetail> = {}): IssueDetail {
     due: null,
     createdAt: "2026-10-01T09:00:00Z",
     updatedAt: "2026-10-20T14:30:00Z",
+    syncedAt: "2026-10-27T09:00:00.000Z",
     descriptionHtml: "<p>Validate German, Austrian and Swiss postcodes.</p>",
     commentCount: 4,
     isEpic: false,

@@ -13,7 +13,7 @@ use crate::db::Db;
 use crate::error::{AppError, AppResult};
 use crate::lists::Viewer;
 use crate::status_style::{Style, detect, styles};
-use crate::sync::store::shown_fields;
+use crate::sync::store::{forget_issue, shown_fields};
 use crate::views::columns::custom_columns;
 use crate::views::rows::{self, Cell, EpicChip, Label, Person, Priority};
 
@@ -47,6 +47,8 @@ pub struct IssueDetail {
     pub is_epic: bool,
     /// Deleted in Jira or no longer visible.
     pub gone: bool,
+    /// When the sync last stored this issue (UTC, RFC 3339): the gone notice's "Last synced".
+    pub synced_at: String,
     /// The custom fields the owner shows (marked shown or used as a view column), with their value if any.
     pub custom: Vec<CustomField>,
     /// The banner over an issue with unseen changes.
@@ -69,7 +71,7 @@ pub async fn issue_get(db: &Db, viewer: Viewer, id: String) -> AppResult<IssueDe
 const SELECT: &str = "SELECT i.id, i.key, i.issue_type, i.summary, i.status_id, COALESCE(st.name, ''),
     i.status_category, e.id, e.summary, e.epic_color, i.fix_versions, i.priority, i.assignee_id, a.name,
     i.reporter_id, r.name, i.sprint, i.labels, i.due_date, i.created_at, i.updated_at, i.description_html,
-    i.comment_count, i.is_epic, i.gone, i.raw
+    i.comment_count, i.is_epic, i.gone, i.raw, i.synced_at
     FROM cache.issue i
     LEFT JOIN cache.status st ON st.id = i.status_id
     LEFT JOIN cache.user a ON a.account_id = i.assignee_id
@@ -136,6 +138,7 @@ fn read(conn: &Connection, viewer: &Viewer, id: &str) -> AppResult<IssueDetail> 
             comment_count: r.get(22)?,
             is_epic: r.get::<_, i64>(23)? != 0,
             gone: r.get::<_, i64>(24)? != 0,
+            synced_at: r.get(26)?,
             custom: Vec::new(),
             since: None,
         };
@@ -192,4 +195,27 @@ fn version_names(conn: &Connection) -> AppResult<HashMap<String, String>> {
     let mut query = conn.prepare("SELECT id, name FROM cache.version")?;
     let rows = query.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?;
     Ok(rows.collect::<Result<_, _>>()?)
+}
+
+/// Remove from cache: only a gone issue can go (a live one would come back with the next sync).
+pub async fn issue_forget(db: &Db, id: String) -> AppResult<()> {
+    db.write(move |tx, changes| {
+        let gone: Option<bool> = tx
+            .query_row("SELECT gone FROM cache.issue WHERE id = ?1", [&id], |r| {
+                r.get(0)
+            })
+            .optional()?;
+        match gone {
+            None => Err(AppError::NotFound(format!("Issue {id} isn't in the cache"))),
+            Some(false) => Err(AppError::InvalidInput(
+                "Only an issue that is gone from Jira can be removed from the cache".into(),
+            )),
+            Some(true) => {
+                forget_issue(tx, &id)?;
+                changes.issue_changed(id.as_str());
+                Ok(())
+            }
+        }
+    })
+    .await
 }

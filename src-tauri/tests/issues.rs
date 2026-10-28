@@ -12,7 +12,7 @@ use taskboard_lib::db::Db;
 use taskboard_lib::error::ErrorKind;
 use taskboard_lib::issues::{
     ActivityItem, ChangeValue, CustomField, IssueDetail, IssueLink, RelatedIssue, issue_activity,
-    issue_get, issue_related, issue_sync_comments,
+    issue_forget, issue_get, issue_related, issue_sync_comments,
 };
 use taskboard_lib::jira::{Limiter, TokenKind};
 use taskboard_lib::lists::Viewer;
@@ -176,6 +176,40 @@ impl Site {
             })
             .await
             .unwrap()
+    }
+
+    async fn count_rows(&self, sql: String) -> i64 {
+        self.db()
+            .read(move |conn| Ok(conn.query_row(&sql, [], |r| r.get::<_, i64>(0))?))
+            .await
+            .unwrap()
+    }
+
+    /// Rows of the issue in the tables `issue_forget` clears, as
+    /// `(issue, comments, changes, seen, search)`.
+    async fn rows_of(&self, id: &str) -> (i64, i64, i64, i64, i64) {
+        (
+            self.count_rows(format!(
+                "SELECT COUNT(*) FROM cache.issue WHERE id = '{id}'"
+            ))
+            .await,
+            self.count_rows(format!(
+                "SELECT COUNT(*) FROM cache.comment WHERE issue_id = '{id}'"
+            ))
+            .await,
+            self.count_rows(format!(
+                "SELECT COUNT(*) FROM cache.issue_change WHERE issue_id = '{id}'"
+            ))
+            .await,
+            self.count_rows(format!(
+                "SELECT COUNT(*) FROM cache.issue_seen WHERE issue_id = '{id}'"
+            ))
+            .await,
+            self.count_rows(format!(
+                "SELECT COUNT(*) FROM cache.issue_fts WHERE rowid = {id}"
+            ))
+            .await,
+        )
     }
 
     async fn show_reviewer_column(&self) {
@@ -432,9 +466,104 @@ async fn the_detail_serializes_with_camel_case_keys() {
         "isEpic",
         "createdAt",
         "updatedAt",
+        "syncedAt",
     ] {
         assert!(value.get(key).is_some(), "{key}");
     }
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn the_detail_carries_the_time_the_sync_stored_the_issue() {
+    let site = Site::new().await;
+    site.execute(
+        "UPDATE cache.issue SET synced_at = '2026-10-20T08:15:00.000Z' WHERE key = 'NW-1042'",
+    )
+    .await;
+
+    let detail = site.detail("NW-1042").await;
+
+    assert_eq!(detail.synced_at, "2026-10-20T08:15:00.000Z");
+    assert_eq!(
+        serde_json::to_value(&detail).unwrap()["syncedAt"],
+        serde_json::json!("2026-10-20T08:15:00.000Z")
+    );
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn forgetting_a_gone_issue_removes_it_with_its_comments_changes_seen_row_and_search_row() {
+    let site = Site::new().await;
+    let id = site.id_of("NW-1042").await;
+    site.execute(
+        "INSERT INTO cache.issue_change (issue_id, field, old_value, new_value, changed_at)
+         VALUES ((SELECT id FROM cache.issue WHERE key = 'NW-1042'), 'summary', 'a', 'b',
+                 '2026-10-28T09:00:00.000Z')",
+    )
+    .await;
+    site.execute("UPDATE cache.issue SET gone = 1 WHERE key = 'NW-1042'")
+        .await;
+    let before = site.rows_of(&id).await;
+    assert!(
+        before.0 == 1 && before.1 > 0 && before.2 > 0 && before.3 == 1 && before.4 == 1,
+        "{before:?}"
+    );
+
+    issue_forget(site.db(), id.clone()).await.unwrap();
+
+    assert_eq!(site.rows_of(&id).await, (0, 0, 0, 0, 0));
+    let err = issue_get(site.db(), viewer(), id).await.unwrap_err();
+    assert_eq!(err.kind(), ErrorKind::NotFound);
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn forgetting_a_gone_issue_keeps_the_other_issues() {
+    let site = Site::new().await;
+    let total = site
+        .count_rows("SELECT COUNT(*) FROM cache.issue".into())
+        .await;
+    site.execute("UPDATE cache.issue SET gone = 1 WHERE key = 'NW-1042'")
+        .await;
+
+    issue_forget(site.db(), site.id_of("NW-1042").await)
+        .await
+        .unwrap();
+
+    assert_eq!(
+        site.count_rows("SELECT COUNT(*) FROM cache.issue".into())
+            .await,
+        total - 1
+    );
+    assert!(!site.detail("NW-1049").await.gone);
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn a_live_issue_cannot_be_forgotten_and_stays() {
+    let site = Site::new().await;
+    let id = site.id_of("NW-1042").await;
+    let before = site.rows_of(&id).await;
+
+    let err = issue_forget(site.db(), id.clone()).await.unwrap_err();
+
+    assert_eq!(err.kind(), ErrorKind::InvalidInput);
+    assert_eq!(site.rows_of(&id).await, before);
+    assert_eq!(before.0, 1);
+    assert_eq!(before.4, 1);
+    assert!(!site.detail("NW-1042").await.gone);
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn forgetting_an_unknown_issue_is_not_found() {
+    let site = Site::new().await;
+
+    let err = issue_forget(site.db(), "99999999".into())
+        .await
+        .unwrap_err();
+
+    assert_eq!(err.kind(), ErrorKind::NotFound);
 }
 
 #[tokio::test]

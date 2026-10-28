@@ -18,7 +18,7 @@ describe("StatusPill", () => {
     expect(screen.getByText("Status")).toHaveClass(`status-pill--${style}`);
   });
 
-  it.each<PillVariant>(["peek", "activity", "tab"])("adds the %s variant class", (variant) => {
+  it.each<PillVariant>(["peek", "activity", "tab", "vertical"])("adds the %s variant class", (variant) => {
     render(<StatusPill style="done" name="Status" variant={variant} />);
 
     expect(screen.getByText("Status")).toHaveClass(`status-pill--${variant}`);

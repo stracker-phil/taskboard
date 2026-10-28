@@ -1,6 +1,7 @@
 import type { Style } from "../../api";
 
-export type PillVariant = "default" | "peek" | "activity" | "tab";
+/** `vertical`: the default pill turned 90°, for a collapsed Board column. */
+export type PillVariant = "default" | "peek" | "activity" | "tab" | "vertical";
 
 /** A status name in caps on its style's colour; text only. */
 export function StatusPill({ style, name, variant = "default" }: { style: Style; name: string; variant?: PillVariant }) {

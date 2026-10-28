@@ -16,6 +16,7 @@ import "./changes.css";
 import "./pins.css";
 import "./palette.css";
 import "./board.css";
+import "./states.css";
 import "./overlays.css";
 import "./settings.css";
 import "./spaces.css";

@@ -60,6 +60,7 @@ pub fn handlers() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
         crate::nav::commands::nav_go,
         crate::nav::commands::nav_set_expanded,
         crate::issues::commands::issue_get,
+        crate::issues::commands::issue_forget,
         crate::issues::commands::issue_activity,
         crate::issues::commands::issue_related,
         crate::issues::commands::issue_sync_comments,

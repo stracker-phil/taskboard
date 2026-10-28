@@ -160,13 +160,18 @@ pub fn purge_gone(conn: &Connection, before: &str) -> AppResult<usize> {
             .collect::<Result<_, _>>()?
     };
     for id in &ids {
-        conn.execute(
-            "DELETE FROM cache.issue_fts WHERE rowid = ?1",
-            [id.parse::<i64>().unwrap_or_default()],
-        )?;
-        conn.execute("DELETE FROM cache.issue WHERE id = ?1", [id])?;
+        forget_issue(conn, id)?;
     }
     Ok(ids.len())
+}
+
+/// Removes the issue with its search row; comments, changes and seen rows go with it.
+pub fn forget_issue(conn: &Connection, id: &str) -> AppResult<bool> {
+    conn.execute(
+        "DELETE FROM cache.issue_fts WHERE rowid = CAST(?1 AS INTEGER)",
+        [id],
+    )?;
+    Ok(conn.execute("DELETE FROM cache.issue WHERE id = ?1", [id])? > 0)
 }
 
 /// The cached issues that aren't gone, by id.

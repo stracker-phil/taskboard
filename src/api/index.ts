@@ -149,6 +149,8 @@ export const api = {
   viewBoard: (listId: number, viewId: number, narrowing: Narrowing) => invoke<BoardData>("view_board", { listId, viewId, narrowing }),
   viewSetColumnCollapsed: (id: number, statusId: string, collapsed: boolean) => invoke<View>("view_set_column_collapsed", { id, statusId, collapsed }),
   issueGet: (id: string) => invoke<IssueDetail>("issue_get", { id }),
+  /** Remove from cache: only for an issue gone from Jira. */
+  issueForget: (id: string) => invoke<void>("issue_forget", { id }),
   issueActivity: (id: string) => invoke<ActivityItem[]>("issue_activity", { id }),
   issueRelated: (id: string) => invoke<Related>("issue_related", { id }),
   /** The command palette's issues (by key and full text) and filter lists for the typed text. */

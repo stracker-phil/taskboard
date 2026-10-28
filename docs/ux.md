@@ -203,6 +203,20 @@ Local only (`src-tauri/src/pins/`, `src/pins/`). Issues, comments and filter lis
   summary), comment (author, excerpt, issue key) or list (Space / name), Reason and Time left; hover shows ×
   to unpin. "Recently unpinned" lists what ended in the last 7 days. The Home row counts the active pins.
 
+## States
+
+- **First sync** (`FirstSync` in `shell/SyncStatusView.tsx`): a 360px card on the content panel while the sync
+  runs and the current Space hasn't finished its first full sync: "Loading your Jira issues", a line, a 6px
+  bar ("About X of Y issues"), then each Space done (✓ on `--progress-done`, its count), loading (spinner,
+  600 name, "page n") or waiting (dashed ring, muted); "You can already browse finished Spaces." Finished
+  Spaces open their views meanwhile.
+- **Empty level** (`EmptyLevel`, List, Board and Table): the funnel tile, "Nothing in <name>", the conditions
+  in words plus the Me and text narrowing, "Edit filter" on a filter list (opens the toolbar's Filter) and
+  "Clear Me filter" while Me is on.
+- **Gone issue** (`GoneNotice`, peek and Issue view): the title struck through in `--text-muted`, the notice
+  on `--notice-neutral-*` ("Deleted in Jira or you lost access. Last synced <day>. This is the cached copy."),
+  Remove from cache (`issue_forget`, gone issues only) and Unpin while pinned.
+
 ## Sync chip and token banners
 
 The sidebar footer's chip (artboard 8, panel 5) says "Synced 2 min ago" (counting on), "Syncing… 3 changes"
@@ -289,7 +303,8 @@ button, Escape and a press outside close it, focus goes back to the button).
 
 - Columns scroll sideways (padding 6 20 20 24, gap 12), one per status in the Board order. An open column is
   300 wide, 12px radius, on its status tint (`--status-*-tint`), with the header pill, the count in
-  `--status-*-count` and a collapse button; a collapsed one is a 48 × 300 strip with the vertical pill and the
+  `--status-*-count` and a collapse button; a collapsed one is a 48 × 300 strip with the header pill turned 90° (`status-pill--vertical`: the
+  same 26px and padding, centred; owner, 2026-10-29) and the
   count, and expands on click. Done starts collapsed; the choice is kept per view.
 - Cards (gap 10, padding 12 14, 10px radius, `--card-border`, `--shadow-card`, lifted with `--shadow-hover`
   on hover): epic chip and the mono key on top (a 7px `--changed-dot` before it when changed), the 600 summary

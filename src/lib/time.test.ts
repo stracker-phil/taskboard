@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { formatLocalTime } from "./time";
+import { formatLocalDate, formatLocalTime } from "./time";
+
+describe("formatLocalDate", () => {
+  it("formats a timestamp as its local day and short month", () => {
+    const at = new Date(2026, 9, 27, 12, 0).toISOString();
+
+    const text = formatLocalDate(at);
+
+    expect(text).toContain("27");
+    expect(text).toMatch(/Oct/);
+    expect(text).not.toContain("2026");
+  });
+});
 
 describe("formatLocalTime", () => {
   const now = new Date(2026, 9, 28, 18, 0);

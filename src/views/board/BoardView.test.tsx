@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -11,6 +11,7 @@ import { resetStore, useStore } from "../../state/store";
 import { boardColumn, boardData } from "../../test/board";
 import { ALEX, row, SAM } from "../../test/issues";
 import { issueTarget, pinItem, pins } from "../../test/pins";
+import { sidebarTree, space } from "../../test/spaces";
 import { view } from "../../test/views";
 import { BoardView } from "./BoardView";
 
@@ -26,6 +27,7 @@ const DONE = boardColumn({ statusId: "5", name: "Done", style: "done", ids: ["2"
 beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
+  mocked.sidebarTree.mockResolvedValue(sidebarTree([]));
   mocked.viewSetColumnCollapsed.mockResolvedValue(BOARD);
   mocked.pinsList.mockResolvedValue(pins());
   mocked.copyText.mockResolvedValue(undefined);
@@ -53,16 +55,17 @@ describe("BoardView", () => {
     expect(screen.queryByRole("list", { name: "Board" })).not.toBeInTheDocument();
   });
 
-  it("renders no columns for an empty board", async () => {
+  it("shows what the level is missing instead of columns for an empty board", async () => {
+    mocked.sidebarTree.mockResolvedValue(sidebarTree([space()]));
     mocked.viewBoard.mockResolvedValue(boardData([]));
-    const { container } = render(
+    render(
       <QueryClientProvider client={createQueryClient()}>
         <BoardView view={BOARD} />
       </QueryClientProvider>,
     );
 
-    await waitFor(() => expect(container.firstChild).not.toBeNull());
-    expect(screen.queryByRole("listitem")).not.toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Nothing in Website relaunch" })).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Board" })).not.toBeInTheDocument();
     expect(screen.queryByRole("article")).not.toBeInTheDocument();
   });
 
@@ -99,6 +102,13 @@ describe("BoardView", () => {
       expect(strip).toHaveTextContent("Done");
       expect(strip).toHaveTextContent("1");
       expect(screen.queryByText("Publish the launch notes")).not.toBeInTheDocument();
+    });
+
+    it("writes a collapsed column's name in the vertical status pill of its strip", async () => {
+      await renderBoard(boardData([PROGRESS, { ...DONE, collapsed: true }], [PRICING, NOTES]));
+
+      const pill = within(screen.getByRole("button", { name: "Expand Done (1)" })).getByText("Done");
+      expect(pill).toHaveClass("status-pill", "status-pill--done", "status-pill--vertical");
     });
 
     it("asks to expand a collapsed column when its strip is clicked", async () => {

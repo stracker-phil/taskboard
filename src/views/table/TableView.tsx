@@ -2,6 +2,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { useMemo, useRef, useState } from "react";
 import type { Group, Narrowing, View, ViewData } from "../../api";
 import { useViewRows } from "../../queries/views";
+import { EmptyLevel } from "../../shell/EmptyLevel";
 import { flatten, GROUP_HEIGHT, type Item } from "../list/flatten";
 import { GroupHeader } from "../list/GroupHeader";
 import { nextSort } from "./sortable";
@@ -28,6 +29,7 @@ interface Props {
 export function TableView({ view, narrowing }: Props) {
   const { data } = useViewRows(view.listId, view.id, narrowing);
   if (!data) return null;
+  if (Object.keys(data.rows).length === 0) return <EmptyLevel listId={view.listId} viewId={view.id} />;
   return <Table key={view.id} view={view} data={data} />;
 }
 

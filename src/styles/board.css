@@ -23,19 +23,12 @@
 .board-column__cards { display: flex; flex-direction: column; gap: 8px; min-height: 0; overflow-y: auto; margin: 0 -4px; padding: 0 4px 4px; }
 
 .board-strip {
-  display: flex; flex: none; flex-direction: column; align-items: center; gap: 10px; width: 48px; height: 300px; box-sizing: border-box;
+  display: flex; flex: none; flex-direction: column; align-items: center; justify-content: flex-start; gap: 10px; width: 48px; height: 300px; box-sizing: border-box;
   padding: 10px 0; border: 0; border-radius: 12px; background: var(--column-tint); font: inherit; cursor: default;
   animation: fade-in var(--motion-base) var(--ease-out);
 }
-.board-strip__pill {
-  width: 30px; padding: 12px 0; box-sizing: border-box; border-radius: 8px; font-size: 12px; font-weight: 700; letter-spacing: 0.04em;
-  text-transform: uppercase; writing-mode: vertical-rl; white-space: nowrap;
-}
-.board-strip__pill.status-pill--todo { background: var(--status-todo-bg); color: var(--status-todo-fg); }
-.board-strip__pill.status-pill--progress { background: var(--status-progress-bg); color: var(--status-progress-fg); }
-.board-strip__pill.status-pill--review { background: var(--status-review-bg); color: var(--status-review-fg); }
-.board-strip__pill.status-pill--blocked { background: var(--status-blocked-bg); color: var(--status-blocked-fg); }
-.board-strip__pill.status-pill--done { background: var(--status-done-bg); color: var(--status-done-fg); }
+/* The default pill turned 90°: its height becomes the width and its side padding runs along the length. */
+.status-pill--vertical { justify-content: center; width: 26px; height: auto; padding: 10px 0; writing-mode: vertical-rl; }
 
 .board-card {
   position: relative; display: flex; flex: none; flex-direction: column; gap: 10px; padding: 12px 14px; border: 1px solid var(--card-border);

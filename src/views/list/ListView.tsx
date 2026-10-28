@@ -2,6 +2,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { type CSSProperties, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Column, Group, Narrowing, ViewData, ViewPlace } from "../../api";
 import { onIssueKeys } from "../../commands/issueKeys";
+import { EmptyLevel } from "../../shell/EmptyLevel";
 import { prefetchIssue } from "../../queries/issues";
 import { useColumnsCatalogue, useViewRows } from "../../queries/views";
 import { narrowingKey } from "../../state/slices/narrowing";
@@ -29,6 +30,7 @@ interface Props {
 export function ListView({ listId, viewId, narrowing, wrapTitles = true }: Props) {
   const { data } = useViewRows(listId, viewId, narrowing);
   if (!data) return null;
+  if (Object.keys(data.rows).length === 0) return <EmptyLevel listId={listId} viewId={viewId} />;
   return <Rows key={`${listId}:${viewId}`} listId={listId} viewId={viewId} data={data} wrapTitles={wrapTitles} />;
 }
 
