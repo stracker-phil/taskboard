@@ -10,6 +10,9 @@
   --fill-subtle: #f4f4f5;
   --fill-hover: #ebebee;
   --segmented-bg: #eeeef1;
+  --list-bg: #f7f7f8;
+  --hover-bg: #f4f4f5;
+  --row-hover-bg: #fafafb;
   --scrim: rgba(20, 20, 22, 0.38);
 
   /* Text */
@@ -50,35 +53,37 @@
   --changed-chip-text: #1d4ed8;
   --changed-dot: #2563eb;
 
-  /* Status styles: pill fill, pill text, pill border, row ring, board tint, board count */
+  /* Status styles: pill fill, pill text, pill border, row square, board tint, board count; To do has its own List tab */
   --status-todo-bg: #f4f4f5;
   --status-todo-fg: #52525b;
   --status-todo-border: #e4e4e7;
-  --status-todo-ring: #a1a1aa;
+  --status-todo-square: #a1a1aa;
+  --status-todo-tab-bg: #e4e4e7;
+  --status-todo-tab-fg: #3f3f46;
   --status-todo-tint: #f4f4f5;
   --status-todo-count: #71717a;
   --status-progress-bg: #2563eb;
   --status-progress-fg: #ffffff;
   --status-progress-border: #2563eb;
-  --status-progress-ring: #2563eb;
+  --status-progress-square: #2563eb;
   --status-progress-tint: #eff5ff;
   --status-progress-count: #1d4ed8;
   --status-review-bg: #7c3aed;
   --status-review-fg: #ffffff;
   --status-review-border: #7c3aed;
-  --status-review-ring: #7c3aed;
+  --status-review-square: #7c3aed;
   --status-review-tint: #f5f1fe;
   --status-review-count: #6d28d9;
   --status-blocked-bg: #dc2626;
   --status-blocked-fg: #ffffff;
   --status-blocked-border: #dc2626;
-  --status-blocked-ring: #dc2626;
+  --status-blocked-square: #dc2626;
   --status-blocked-tint: #fef2f2;
   --status-blocked-count: #b91c1c;
   --status-done-bg: #15803d;
   --status-done-fg: #ffffff;
   --status-done-border: #15803d;
-  --status-done-ring: #15803d;
+  --status-done-square: #15803d;
   --status-done-tint: #effaf3;
   --status-done-count: #15803d;
 
@@ -164,6 +169,9 @@
   --shadow-raised: 0 1px 2px rgba(0, 0, 0, 0.06);
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04);
   --shadow-knob: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-group-card: 0 0 0 1px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.05);
+  --shadow-hover: 0 1px 2px rgba(0, 0, 0, 0.06), 0 2px 6px rgba(0, 0, 0, 0.06);
+  --shadow-hover-toolbar: 0 1px 3px rgba(0, 0, 0, 0.08);
 
   /* Settings window and its controls, drawn as System Settings draws them (ADR 0017) */
   /* Settings surfaces: the page, the page list, inset groups */

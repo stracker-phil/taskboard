@@ -1,5 +1,5 @@
 import type { Row } from "../../api";
-import { StatusRing } from "../../components/issue/StatusRing";
+import { StatusSquare } from "../../components/issue/StatusSquare";
 import { columnDef } from "../list/columns";
 
 interface Props {
@@ -22,7 +22,7 @@ export function TableRow({ row, columns, widthOf, selected, onSelect }: Props) {
         {row.summary}
       </span>
       <span className="table-row__cell table-row__status" role="gridcell" style={{ width: widthOf("status") }}>
-        <StatusRing style={row.style} size={13} />
+        <StatusSquare style={row.style} />
         {row.statusName}
       </span>
       {columns.map((id) => (

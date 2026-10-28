@@ -1,35 +1,32 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { Style } from "../../api";
-import { StatusPill } from "./StatusPill";
-import { StatusRing } from "./StatusRing";
+import { type PillVariant, StatusPill } from "./StatusPill";
 
 describe("StatusPill", () => {
-  it("shows the status name with a ring inside", () => {
-    const { container } = render(<StatusPill style="review" name="In Review" />);
+  it("shows the status name as text only, with no marker inside", () => {
+    render(<StatusPill style="review" name="In Review" />);
 
-    expect(screen.getByText("In Review")).toBeInTheDocument();
-    expect(container.querySelector(".status-ring")).not.toBeNull();
-  });
-});
-
-describe("StatusRing", () => {
-  it("is the dashed todo ring for To do", () => {
-    const { container } = render(<StatusRing style="todo" />);
-
-    expect(container.querySelector(".status-ring")).toHaveClass("status-ring--todo");
+    const pill = screen.getByText("In Review");
+    expect(pill).toHaveClass("status-pill");
+    expect(pill.childElementCount).toBe(0);
   });
 
-  it.each<Style>(["progress", "review", "blocked", "done"])("is not the todo ring for %s", (style) => {
-    const { container } = render(<StatusRing style={style} />);
+  it.each<Style>(["todo", "progress", "review", "blocked", "done"])("carries the %s style class", (style) => {
+    render(<StatusPill style={style} name="Status" />);
 
-    expect(container.querySelector(".status-ring")).not.toHaveClass("status-ring--todo");
-    expect(container.querySelector(".status-ring")).toHaveClass(`status-ring--${style}`);
+    expect(screen.getByText("Status")).toHaveClass(`status-pill--${style}`);
   });
 
-  it("is hidden from assistive technology", () => {
-    const { container } = render(<StatusRing style="done" />);
+  it.each<PillVariant>(["peek", "activity", "tab"])("adds the %s variant class", (variant) => {
+    render(<StatusPill style="done" name="Status" variant={variant} />);
 
-    expect(container.querySelector(".status-ring")).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getByText("Status")).toHaveClass(`status-pill--${variant}`);
+  });
+
+  it("adds no variant class for the default variant", () => {
+    render(<StatusPill style="done" name="Status" />);
+
+    expect(screen.getByText("Status").className).toBe("status-pill status-pill--done");
   });
 });

@@ -1,21 +1,26 @@
 /* The status language and the small parts of an issue (docs/ux.md → Status language). */
-.status-ring { display: inline-block; flex: none; box-sizing: border-box; border-radius: 50%; border: 2px solid var(--status-progress-ring); }
-.status-ring--todo { border: 2px dashed var(--status-todo-ring); }
-.status-ring--progress { border-color: var(--status-progress-ring); }
-.status-ring--review { border-color: var(--status-review-ring); }
-.status-ring--blocked { border-color: var(--status-blocked-ring); }
-.status-ring--done { border-color: var(--status-done-ring); }
-.status-ring--on-pill { border-color: currentColor; }
+.status-square { display: inline-block; flex: none; width: 10px; height: 10px; border-radius: 3px; }
+.status-square--todo { background: var(--status-todo-square); }
+.status-square--progress { background: var(--status-progress-square); }
+.status-square--review { background: var(--status-review-square); }
+.status-square--blocked { background: var(--status-blocked-square); }
+.status-square--done { background: var(--status-done-square); }
 
+/* Text only, symmetric padding; the variant sets the size (docs/ux.md → Status language). */
 .status-pill {
-  display: inline-flex; flex: none; align-items: center; gap: 6px; height: 26px; padding: 0 10px 0 8px; box-sizing: border-box;
+  display: inline-flex; flex: none; align-items: center; height: 26px; padding: 0 10px; box-sizing: border-box;
   border: 1px solid; border-radius: 7px; font-size: 12px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; white-space: nowrap;
 }
+.status-pill--peek { height: 24px; padding: 0 9px; border: 0; font-size: 11px; }
+.status-pill--activity { height: 20px; font-size: 10px; }
+.status-pill--tab { height: 30px; padding: 0 12px; border: 0; border-radius: 8px 8px 0 0; letter-spacing: 0.04em; }
+.status-pill--tab.status-pill--closed { border-radius: 8px; }
 .status-pill--todo { background: var(--status-todo-bg); color: var(--status-todo-fg); border-color: var(--status-todo-border); }
 .status-pill--progress { background: var(--status-progress-bg); color: var(--status-progress-fg); border-color: var(--status-progress-border); }
 .status-pill--review { background: var(--status-review-bg); color: var(--status-review-fg); border-color: var(--status-review-border); }
 .status-pill--blocked { background: var(--status-blocked-bg); color: var(--status-blocked-fg); border-color: var(--status-blocked-border); }
 .status-pill--done { background: var(--status-done-bg); color: var(--status-done-fg); border-color: var(--status-done-border); }
+.status-pill--tab.status-pill--todo { background: var(--status-todo-tab-bg); color: var(--status-todo-tab-fg); }
 
 .epic-chip {
   display: inline-flex; align-items: center; max-width: 164px; height: 22px; padding: 0 8px; box-sizing: border-box; overflow: hidden;

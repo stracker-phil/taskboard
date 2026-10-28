@@ -1,12 +1,9 @@
 import type { Style } from "../../api";
-import { StatusRing } from "./StatusRing";
 
-/** A status name in caps on its style's colour, with the ring inside. */
-export function StatusPill({ style, name }: { style: Style; name: string }) {
-  return (
-    <span className={`status-pill status-pill--${style}`}>
-      <StatusRing style={style} size={12} onPill />
-      {name}
-    </span>
-  );
+export type PillVariant = "default" | "peek" | "activity" | "tab";
+
+/** A status name in caps on its style's colour; text only. */
+export function StatusPill({ style, name, variant = "default" }: { style: Style; name: string; variant?: PillVariant }) {
+  const className = ["status-pill", `status-pill--${style}`, variant !== "default" && `status-pill--${variant}`].filter(Boolean).join(" ");
+  return <span className={className}>{name}</span>;
 }

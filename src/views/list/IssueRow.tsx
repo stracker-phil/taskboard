@@ -1,7 +1,7 @@
 import type { Row } from "../../api";
 import { ChangeChip } from "../../components/issue/ChangeChip";
 import { CommentCount } from "../../components/issue/CommentCount";
-import { StatusRing } from "../../components/issue/StatusRing";
+import { StatusSquare } from "../../components/issue/StatusSquare";
 import { columnDef } from "./columns";
 
 interface Props {
@@ -16,7 +16,7 @@ export function IssueRow({ row, columns, selected, onSelect }: Props) {
   return (
     <div className={className} role="row" aria-selected={selected} onClick={() => onSelect(row.id)}>
       <span className="list-row__name" role="gridcell">
-        <StatusRing style={row.style} />
+        <StatusSquare style={row.style} />
         <span className="list-row__key">{row.key}</span>
         <span className="list-row__summary">{row.summary}</span>
         {row.changeNote && <ChangeChip note={row.changeNote} />}
