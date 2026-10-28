@@ -30,8 +30,9 @@ use taskboard_lib::test_support::fake_jira::{DEMO_TOKEN, FakeJira};
 use taskboard_lib::test_support::{FakeSecrets, temp_config_dir};
 use taskboard_lib::views::{
     DEFAULT_COLUMNS, GroupBy, Layout, Sort, SortBy, View, space_default_columns, view_create,
-    view_delete, view_duplicate, view_move, view_rename, view_set_columns, view_set_group,
-    view_set_layout, view_set_sort, view_set_widths, view_set_wrap, views_of,
+    view_delete, view_duplicate, view_move, view_rename, view_set_column_collapsed,
+    view_set_columns, view_set_group, view_set_layout, view_set_sort, view_set_widths,
+    view_set_wrap, views_of,
 };
 
 const ME_ACCOUNT_ID: &str = "712020:5a1e0c3f-8d2b-4f61-9c7e-1b2a3c4d5e01";
@@ -1759,6 +1760,7 @@ mod editing_views {
                 "sort": { "by": "updated", "descending": true },
                 "widths": {},
                 "wrapTitles": true,
+                "collapsed": {},
                 "position": 0,
                 "isDefault": true,
             })
@@ -1811,6 +1813,88 @@ mod editing_views {
 
         assert!(!copy.wrap_titles);
         assert!(!views_of(&db, copied_list).await.unwrap()[0].wrap_titles);
+    }
+
+    fn overrides(pairs: &[(&str, bool)]) -> BTreeMap<String, bool> {
+        pairs.iter().map(|(k, v)| (k.to_string(), *v)).collect()
+    }
+
+    #[tokio::test]
+    async fn a_new_view_has_no_collapsed_overrides() {
+        let (_dir, db) = tracked_lab().await;
+
+        assert!(
+            space_views(&db)
+                .await
+                .iter()
+                .all(|view| view.collapsed.is_empty())
+        );
+    }
+
+    #[tokio::test]
+    async fn collapsing_and_expanding_columns_is_stored_per_status_and_read_back() {
+        let (_dir, db) = tracked_lab().await;
+        let views = space_views(&db).await;
+
+        view_set_column_collapsed(&db, views[0].id, "10001".into(), true)
+            .await
+            .unwrap();
+        let edited = view_set_column_collapsed(&db, views[0].id, "10002".into(), false)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            edited.collapsed,
+            overrides(&[("10001", true), ("10002", false)])
+        );
+        let after = space_views(&db).await;
+        assert_eq!(
+            after[0].collapsed,
+            overrides(&[("10001", true), ("10002", false)])
+        );
+        assert!(after[1].collapsed.is_empty());
+
+        let flipped = view_set_column_collapsed(&db, views[0].id, "10001".into(), false)
+            .await
+            .unwrap();
+        assert_eq!(
+            flipped.collapsed,
+            overrides(&[("10001", false), ("10002", false)])
+        );
+    }
+
+    #[tokio::test]
+    async fn collapsing_a_column_of_an_unknown_view_is_not_found() {
+        let (_dir, db) = tracked_lab().await;
+
+        let err = view_set_column_collapsed(&db, 9999, "10001".into(), true)
+            .await
+            .unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::NotFound);
+    }
+
+    #[tokio::test]
+    async fn a_duplicate_view_and_a_duplicate_list_keep_the_collapsed_columns() {
+        let (_dir, db) = tracked_lab().await;
+        let table = space_views(&db).await[2].id;
+        view_set_column_collapsed(&db, table, "10001".into(), true)
+            .await
+            .unwrap();
+        let epics = list_id(&db, "Epics").await;
+        let epics_view = views_of(&db, epics).await.unwrap()[0].id;
+        view_set_column_collapsed(&db, epics_view, "10002".into(), false)
+            .await
+            .unwrap();
+
+        let copy = view_duplicate(&db, table).await.unwrap();
+        let copied_list = list_duplicate(&db, epics).await.unwrap();
+
+        assert_eq!(copy.collapsed, overrides(&[("10001", true)]));
+        assert_eq!(
+            views_of(&db, copied_list).await.unwrap()[0].collapsed,
+            overrides(&[("10002", false)])
+        );
     }
 }
 

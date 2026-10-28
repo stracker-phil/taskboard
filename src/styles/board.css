@@ -1,0 +1,62 @@
+/* The Board layout (docs/ux.md → Board view; artboard 3). Each column carries its status tint and count colour. */
+.board {
+  display: flex; align-items: flex-start; gap: 12px; height: 100%; min-height: 0; box-sizing: border-box; overflow: auto;
+  padding: 6px 20px 20px 24px; border-top: 1px solid var(--hairline);
+}
+.board--todo { --column-tint: var(--status-todo-tint); --column-count: var(--status-todo-count); }
+.board--progress { --column-tint: var(--status-progress-tint); --column-count: var(--status-progress-count); }
+.board--review { --column-tint: var(--status-review-tint); --column-count: var(--status-review-count); }
+.board--blocked { --column-tint: var(--status-blocked-tint); --column-count: var(--status-blocked-count); }
+.board--done { --column-tint: var(--status-done-tint); --column-count: var(--status-done-count); }
+
+.board-column {
+  display: flex; flex: none; flex-direction: column; gap: 8px; width: 300px; max-height: 100%; box-sizing: border-box;
+  padding: 10px; border-radius: 12px; background: var(--column-tint); animation: fade-in var(--motion-base) var(--ease-out);
+}
+.board-column__header { display: flex; flex: none; align-items: center; gap: 8px; height: 30px; padding: 0 2px; }
+.board-column__count { font-size: 13px; font-weight: 600; color: var(--column-count); }
+.board-column__collapse {
+  display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 7px;
+  background: transparent; color: var(--text-muted); cursor: default; transition: background-color var(--motion-fast) var(--ease-out);
+}
+.board-column__collapse:hover { background: var(--hover-bg); }
+.board-column__cards { display: flex; flex-direction: column; gap: 8px; min-height: 0; overflow-y: auto; margin: 0 -4px; padding: 0 4px 4px; }
+
+.board-strip {
+  display: flex; flex: none; flex-direction: column; align-items: center; gap: 10px; width: 48px; height: 300px; box-sizing: border-box;
+  padding: 10px 0; border: 0; border-radius: 12px; background: var(--column-tint); font: inherit; cursor: default;
+  animation: fade-in var(--motion-base) var(--ease-out);
+}
+.board-strip__pill {
+  width: 30px; padding: 12px 0; box-sizing: border-box; border-radius: 8px; font-size: 12px; font-weight: 700; letter-spacing: 0.04em;
+  text-transform: uppercase; writing-mode: vertical-rl; white-space: nowrap;
+}
+.board-strip__pill.status-pill--todo { background: var(--status-todo-bg); color: var(--status-todo-fg); }
+.board-strip__pill.status-pill--progress { background: var(--status-progress-bg); color: var(--status-progress-fg); }
+.board-strip__pill.status-pill--review { background: var(--status-review-bg); color: var(--status-review-fg); }
+.board-strip__pill.status-pill--blocked { background: var(--status-blocked-bg); color: var(--status-blocked-fg); }
+.board-strip__pill.status-pill--done { background: var(--status-done-bg); color: var(--status-done-fg); }
+
+.board-card {
+  position: relative; display: flex; flex: none; flex-direction: column; gap: 10px; padding: 12px 14px; border: 1px solid var(--card-border);
+  border-radius: 10px; background: var(--panel-bg); box-shadow: var(--shadow-card); color: var(--text); cursor: default; outline: 0;
+  transition: box-shadow var(--motion-fast) var(--ease-out), border-color var(--motion-fast) var(--ease-out);
+}
+.board-card:hover, .board-card:focus-visible { box-shadow: var(--shadow-hover); }
+.board-card:focus-visible { border-color: var(--accent); }
+.board-card--changed { border-color: var(--changed-border); background: var(--changed-bg); }
+.board-card__top, .board-card__footer { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.board-card__footer { gap: 10px; font-size: 12px; color: var(--text-tertiary); }
+.board-card__spacer { flex: 1; }
+.board-card__dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--changed-dot); }
+.board-card__key { flex: none; font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
+.board-card__summary { margin: 0; font-size: 14px; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
+.board-card__release {
+  display: inline-flex; align-items: center; height: 20px; padding: 0 6px; border: 1px solid var(--border); border-radius: 5px;
+  font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary);
+}
+.board-card__priority { display: inline-flex; }
+.board-card__actions { position: absolute; top: 8px; right: 8px; }
+.board-card .row-actions { position: static; }
+.board-card:hover .row-actions, .board-card:focus-within .row-actions { opacity: 1; pointer-events: auto; }
+.board-strip__item { display: flex; flex: none; }

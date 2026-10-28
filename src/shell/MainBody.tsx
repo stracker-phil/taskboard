@@ -3,6 +3,7 @@ import { useNav, useSidebar, useViews } from "../queries/sidebar";
 import { useSyncOverview } from "../queries/sync";
 import { narrowingKey } from "../state/slices/narrowing";
 import { useStore } from "../state/store";
+import { BoardView } from "../views/board/BoardView";
 import { ListView } from "../views/list/ListView";
 import { TableView } from "../views/table/TableView";
 import { SyncStatusView } from "./SyncStatusView";
@@ -22,6 +23,9 @@ export function MainBody() {
     return <PinnedView listId={location.listId} viewId={location.viewId} />;
   }
   const view = views?.find((v) => v.id === location.viewId);
-  if (view?.layout === "table") return <TableView view={view} narrowing={narrowing} />;
-  return <ListView listId={location.listId} viewId={location.viewId} narrowing={narrowing} wrapTitles={view?.wrapTitles} />;
+  // Until the views load the layout is unknown; drawing a List first would flash before a Board or Table.
+  if (!view) return null;
+  if (view.layout === "table") return <TableView view={view} narrowing={narrowing} />;
+  if (view.layout === "board") return <BoardView view={view} narrowing={narrowing} />;
+  return <ListView listId={location.listId} viewId={location.viewId} narrowing={narrowing} wrapTitles={view.wrapTitles} />;
 }

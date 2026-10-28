@@ -11,7 +11,7 @@ use crate::error::{AppError, AppResult};
 use crate::lists::{Kind, node};
 use crate::order::Siblings;
 
-const COLUMNS: &str = "id, list_id, name, layout, columns, group_by, sort_by, sort_order, position, is_default, widths, wrap_titles";
+const COLUMNS: &str = "id, list_id, name, layout, columns, group_by, sort_by, sort_order, position, is_default, widths, wrap_titles, collapsed";
 
 fn siblings(list_id: i64) -> Siblings<'static> {
     Siblings {
@@ -44,6 +44,10 @@ fn from_row(row: &Row) -> rusqlite::Result<View> {
             .and_then(|json| serde_json::from_str(&json).ok())
             .unwrap_or_default(),
         wrap_titles: row.get(11)?,
+        collapsed: row
+            .get::<_, Option<String>>(12)?
+            .and_then(|json| serde_json::from_str(&json).ok())
+            .unwrap_or_default(),
     })
 }
 
@@ -116,6 +120,7 @@ fn copy_view(conn: &Connection, view: &View, list_id: i64, name: &str) -> AppRes
     )?;
     write_sort(conn, id, view.sort)?;
     write_widths(conn, id, &view.widths)?;
+    write_collapsed(conn, id, &view.collapsed)?;
     write_wrap(conn, id, view.wrap_titles)?;
     Ok(id)
 }
@@ -165,6 +170,18 @@ fn write_wrap(conn: &Connection, id: i64, wrap: bool) -> AppResult<()> {
     conn.execute(
         "UPDATE view SET wrap_titles = ?2 WHERE id = ?1",
         params![id, wrap],
+    )?;
+    Ok(())
+}
+
+fn write_collapsed(
+    conn: &Connection,
+    id: i64,
+    collapsed: &BTreeMap<String, bool>,
+) -> AppResult<()> {
+    conn.execute(
+        "UPDATE view SET collapsed = ?2 WHERE id = ?1",
+        params![id, serde_json::to_string(collapsed)?],
     )?;
     Ok(())
 }
@@ -293,6 +310,21 @@ pub async fn view_set_sort(db: &Db, id: i64, sort: Sort) -> AppResult<View> {
 }
 
 /// Clamps each width to the Table column bounds.
+/// Collapses or expands one Board column.
+pub async fn view_set_column_collapsed(
+    db: &Db,
+    id: i64,
+    status_id: String,
+    collapsed: bool,
+) -> AppResult<View> {
+    edit(db, id, move |conn| {
+        let mut all = read_view(conn, id)?.collapsed;
+        all.insert(status_id, collapsed);
+        write_collapsed(conn, id, &all)
+    })
+    .await
+}
+
 pub async fn view_set_widths(db: &Db, id: i64, widths: BTreeMap<String, i64>) -> AppResult<View> {
     let widths: BTreeMap<String, i64> = widths
         .into_iter()

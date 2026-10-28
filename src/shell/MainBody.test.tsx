@@ -8,6 +8,7 @@ import { api } from "../api";
 import { createQueryClient } from "../queries/queryClient";
 import { narrowingKey } from "../state/slices/narrowing";
 import { resetStore, useStore } from "../state/store";
+import { boardColumn, boardData } from "../test/board";
 import { groupOf, row, viewData } from "../test/issues";
 import { projectCounts, syncOverview } from "../test/jira";
 import { pinItem, pins } from "../test/pins";
@@ -24,6 +25,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
   mocked.pinsList.mockResolvedValue(pins());
+  mocked.viewsOf.mockResolvedValue([]);
   mocked.sidebarTree.mockResolvedValue(sidebarTree([]));
   spies = [
     vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(1000),
@@ -67,12 +69,30 @@ describe("MainBody", () => {
     const issue = row({ summary: "Redesign the pricing page" });
     mocked.navCurrent.mockResolvedValue({ location: { listId: 11, viewId: 101 }, expanded: [] });
     mocked.syncOverview.mockResolvedValue(syncOverview({ projects: [projectCounts()] }));
+    mocked.viewsOf.mockResolvedValue([view({ layout: "list" })]);
     mocked.viewRows.mockResolvedValue(viewData([groupOf([issue])], [issue]));
 
     renderBody();
 
     expect(await screen.findByText("Redesign the pricing page")).toBeInTheDocument();
     expect(mocked.viewRows).toHaveBeenCalledWith(11, 101, expect.anything());
+  });
+
+  it("draws nothing while the views of the current place are still loading", async () => {
+    mocked.navCurrent.mockResolvedValue({ location: { listId: 11, viewId: 101 }, expanded: [] });
+    mocked.syncOverview.mockResolvedValue(syncOverview({ projects: [projectCounts()] }));
+    mocked.viewsOf.mockReturnValue(new Promise(() => {}));
+
+    const { container } = render(
+      <QueryClientProvider client={createQueryClient()}>
+        <MainBody />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(mocked.viewsOf).toHaveBeenCalledWith(11));
+    expect(container).toBeEmptyDOMElement();
+    expect(mocked.viewRows).not.toHaveBeenCalled();
+    expect(mocked.viewBoard).not.toHaveBeenCalled();
   });
 
   describe("on the Pinned level", () => {
@@ -117,14 +137,27 @@ describe("MainBody", () => {
       expect(screen.queryByText("Name")).not.toBeInTheDocument();
     });
 
-    it.each(["list", "board"] as const)("shows the list for a view with the %s layout", async (layout) => {
-      mocked.viewsOf.mockResolvedValue([view({ layout })]);
+    it("shows the list for a view with the list layout", async () => {
+      mocked.viewsOf.mockResolvedValue([view({ layout: "list" })]);
 
       renderBody();
 
       expect(await screen.findByRole("button", { name: /^(Collapse|Expand) / })).toBeInTheDocument();
       expect(screen.getByText("Redesign the pricing page")).toBeInTheDocument();
       expect(screen.queryByText("Key")).not.toBeInTheDocument();
+      expect(screen.queryByRole("list", { name: "Board" })).not.toBeInTheDocument();
+    });
+
+    it("shows the board for a view with the board layout", async () => {
+      const issue = row({ summary: "Redesign the pricing page" });
+      mocked.viewsOf.mockResolvedValue([view({ layout: "board" })]);
+      mocked.viewBoard.mockResolvedValue(boardData([boardColumn({ ids: [issue.id] })], [issue]));
+
+      renderBody();
+
+      expect(await screen.findByRole("list", { name: "Board" })).toBeInTheDocument();
+      expect(screen.getByRole("article", { name: /Redesign the pricing page/ })).toBeInTheDocument();
+      expect(mocked.viewRows).not.toHaveBeenCalled();
     });
   });
 

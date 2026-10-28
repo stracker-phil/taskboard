@@ -283,6 +283,21 @@ button, Escape and a press outside close it, focus goes back to the button).
 - When the bar is narrow, the text filter shrinks to 96 first; then Columns, Filter, Group and finally the Me
   chip move into a "…" menu (`fit.ts`, `useToolbarFit`), and come back as soon as they fit.
 
+## Board view
+
+`src/views/board/`, read-only (no drag and drop before writes), styled in `styles/board.css`.
+
+- Columns scroll sideways (padding 6 20 20 24, gap 12), one per status in the Board order. An open column is
+  300 wide, 12px radius, on its status tint (`--status-*-tint`), with the header pill, the count in
+  `--status-*-count` and a collapse button; a collapsed one is a 48 × 300 strip with the vertical pill and the
+  count, and expands on click. Done starts collapsed; the choice is kept per view.
+- Cards (gap 10, padding 12 14, 10px radius, `--card-border`, `--shadow-card`, lifted with `--shadow-hover`
+  on hover): epic chip and the mono key on top (a 7px `--changed-dot` before it when changed), the 600 summary
+  that always wraps and never truncates, then avatars, release chip, comment count and priority flag. Card
+  fields (the Columns button reads "Card fields") choose epic, assignee, release and priority. Changed cards
+  use `--changed-bg` and `--changed-border`. Hover shows the row toolbar in the top-right corner.
+- A card opens the full Issue view (the mockup's behaviour; List rows open the peek).
+
 ## Table view
 
 `src/views/table/`: the same rows as the list, 36 high, with a sticky 34px header: Key, Summary (flexible),

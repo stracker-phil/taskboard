@@ -6,6 +6,7 @@ import type {
   ActivityItem,
   AppError,
   AppInfo,
+  BoardData,
   ConnectionInput,
   ConnectionTest,
   ConnectionView,
@@ -144,6 +145,9 @@ export const api = {
   viewDelete: (id: number) => invoke<View[]>("view_delete", { id }),
   /** A view's issues, filtered by its level and `narrowing`, grouped and sorted by the view. */
   viewRows: (listId: number, viewId: number, narrowing: Narrowing) => invoke<ViewData>("view_rows", { listId, viewId, narrowing }),
+  /** The Board layout: a column per status of the issues shown, with the cards' rows. */
+  viewBoard: (listId: number, viewId: number, narrowing: Narrowing) => invoke<BoardData>("view_board", { listId, viewId, narrowing }),
+  viewSetColumnCollapsed: (id: number, statusId: string, collapsed: boolean) => invoke<View>("view_set_column_collapsed", { id, statusId, collapsed }),
   issueGet: (id: string) => invoke<IssueDetail>("issue_get", { id }),
   issueActivity: (id: string) => invoke<ActivityItem[]>("issue_activity", { id }),
   issueRelated: (id: string) => invoke<Related>("issue_related", { id }),

@@ -19,6 +19,14 @@ export const useViewRows = (listId: number, viewId: number, narrowing: Narrowing
     placeholderData: keepPreviousData,
   });
 
+/** A Board view's columns and cards; under `VIEW_ROWS_KEY`, so it refreshes with the rows. */
+export const useViewBoard = (listId: number, viewId: number, narrowing: Narrowing = NO_NARROWING) =>
+  useQuery({
+    queryKey: [...VIEW_ROWS_KEY, "board", listId, viewId, narrowing],
+    queryFn: () => api.viewBoard(listId, viewId, narrowing),
+    placeholderData: keepPreviousData,
+  });
+
 /** Every column a view can show, for the column names. */
 export const useColumnsCatalogue = () => useQuery({ queryKey: COLUMNS_KEY, queryFn: api.columnsCatalogue });
 

@@ -3,6 +3,7 @@ import type { api as realApi } from "../api";
 // Must not import the store or "../api": they would load the real api module while it is being mocked.
 import {
   EMPTY_UI_STATE,
+  type BoardData,
   type Connection,
   type ConnectionInput,
   type ConnectionView,
@@ -110,9 +111,11 @@ export function createApiMock(): Api {
     viewSetSort: vi.fn(),
     viewSetWidths: vi.fn(),
     viewSetWrap: vi.fn(),
+    viewSetColumnCollapsed: vi.fn(),
     viewMove: vi.fn(),
     viewDelete: vi.fn(),
     viewRows: vi.fn(async (): Promise<ViewData> => ({ groupBy: "none", groups: [], rows: {}, columns: [] })),
+    viewBoard: vi.fn(async (): Promise<BoardData> => ({ columns: [], rows: {}, cardFields: [] })),
     issueGet: vi.fn(async (id: string): Promise<IssueDetail> => issueDetail({ id })),
     issueActivity: vi.fn().mockResolvedValue([]),
     issueRelated: vi.fn(async (): Promise<Related> => ({ children: { open: [], done: [] }, links: [] })),

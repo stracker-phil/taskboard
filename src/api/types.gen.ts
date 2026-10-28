@@ -32,6 +32,22 @@ field?: AppErrorField, };
  */
 export type AppErrorField = { path: string, message: string, };
 
+export type BoardColumn = { statusId: string, name: string, style: Style, 
+/**
+ * Shown as a 48px strip.
+ */
+collapsed: boolean, 
+/**
+ * Row ids in the view's sort order.
+ */
+ids: Array<string>, };
+
+export type BoardData = { columns: Array<BoardColumn>, rows: { [key in string]: Row }, 
+/**
+ * What a card shows besides its key and summary, in order.
+ */
+cardFields: Array<string>, };
+
 export type Cell = { "kind": "text", "value": string } | { "kind": "person", "value": Person };
 
 export type ChangeValue = { "kind": "status", "value": { name: string, style: Style, } } | { "kind": "person", "value": Person } | { "kind": "text", "value": string };
@@ -539,7 +555,12 @@ widths: { [key in string]: number },
 /**
  * The List layout wraps long titles onto more lines; off, it truncates them.
  */
-wrapTitles: boolean, position: number, 
+wrapTitles: boolean, 
+/**
+ * A Board's columns the owner collapsed (true) or expanded (false), by status id; the rest use the
+ * default (Done collapsed).
+ */
+collapsed: { [key in string]: boolean }, position: number, 
 /**
  * The tab a level opens with.
  */

@@ -4,7 +4,7 @@ use tauri::State;
 
 use chrono::Utc;
 
-use super::{Column, GroupBy, Layout, Narrowing, Sort, View, ViewData};
+use super::{BoardData, Column, GroupBy, Layout, Narrowing, Sort, View, ViewData};
 use crate::error::AppResult;
 use crate::lists::Viewer;
 use crate::state::AppState;
@@ -73,6 +73,16 @@ pub async fn view_set_wrap(state: State<'_, AppState>, id: i64, wrap: bool) -> A
 }
 
 #[tauri::command]
+pub async fn view_set_column_collapsed(
+    state: State<'_, AppState>,
+    id: i64,
+    status_id: String,
+    collapsed: bool,
+) -> AppResult<View> {
+    super::view_set_column_collapsed(&state.db, id, status_id, collapsed).await
+}
+
+#[tauri::command]
 pub async fn view_set_widths(
     state: State<'_, AppState>,
     id: i64,
@@ -110,6 +120,18 @@ pub async fn view_rows(
 ) -> AppResult<ViewData> {
     let viewer = Viewer::of(&state.settings.get().connection, Utc::now());
     super::view_rows(&state.db, viewer, list_id, view_id, narrowing).await
+}
+
+/// The Board layout's columns and cards.
+#[tauri::command]
+pub async fn view_board(
+    state: State<'_, AppState>,
+    list_id: i64,
+    view_id: i64,
+    narrowing: Narrowing,
+) -> AppResult<BoardData> {
+    let viewer = Viewer::of(&state.settings.get().connection, Utc::now());
+    super::view_board(&state.db, viewer, list_id, view_id, narrowing).await
 }
 
 #[tauri::command]

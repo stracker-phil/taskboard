@@ -13,7 +13,7 @@ use ts_rs::TS;
 use super::columns::{CustomColumn, custom_columns};
 use super::edit::read_view;
 use super::groups::{Facts, Group, Lookup, SpaceInfo, Version, group};
-use super::model::GroupBy;
+use super::model::{GroupBy, View};
 use super::rows::{self, Row};
 use super::sorting::{fold, sort};
 use crate::changes::{Names, UNSEEN, chip, facts, unseen_changes};
@@ -60,13 +60,20 @@ pub async fn view_rows(
         .await
 }
 
-fn build(
+/// The view and its issues: the level's filter, its kind's rule and the narrowing, highlighted and sorted.
+pub(super) struct Fetched {
+    pub view: View,
+    pub items: Vec<(Row, Facts)>,
+    pub ctx: Ctx,
+}
+
+pub(super) fn fetch_view(
     conn: &Connection,
     viewer: &Viewer,
     list_id: i64,
     view_id: i64,
     narrowing: &Narrowing,
-) -> AppResult<ViewData> {
+) -> AppResult<Fetched> {
     let view = read_view(conn, view_id)?;
     if view.list_id != list_id {
         return Err(AppError::NotFound(format!(
@@ -75,12 +82,6 @@ fn build(
     }
     let ctx = viewer.ctx(conn)?;
     let versions = versions(conn)?;
-    let lookup = Lookup {
-        me: ctx.me.as_deref(),
-        today: ctx.today,
-        spaces: &spaces(conn)?,
-        versions: &versions,
-    };
     let source = Source {
         ctx: &ctx,
         styles: styles(conn)?,
@@ -97,6 +98,24 @@ fn build(
         });
     }
     sort(&mut items, view.sort.by, view.sort.descending);
+    Ok(Fetched { view, items, ctx })
+}
+
+fn build(
+    conn: &Connection,
+    viewer: &Viewer,
+    list_id: i64,
+    view_id: i64,
+    narrowing: &Narrowing,
+) -> AppResult<ViewData> {
+    let Fetched { view, items, ctx } = fetch_view(conn, viewer, list_id, view_id, narrowing)?;
+    let versions = versions(conn)?;
+    let lookup = Lookup {
+        me: ctx.me.as_deref(),
+        today: ctx.today,
+        spaces: &spaces(conn)?,
+        versions: &versions,
+    };
     let groups = group(&items, view.group_by, &lookup);
     Ok(ViewData {
         group_by: view.group_by,

@@ -23,8 +23,9 @@ use taskboard_lib::test_support::{FakeSecrets, temp_config_dir};
 use taskboard_lib::views::groups::{Group, GroupMark};
 use taskboard_lib::views::rows::{Cell, Row};
 use taskboard_lib::views::{
-    GroupBy, Narrowing, Sort, SortBy, ViewData, columns_catalogue, view_rows, view_set_columns,
-    view_set_group, view_set_sort, views_of,
+    BoardColumn, BoardData, GroupBy, Narrowing, Sort, SortBy, ViewData, columns_catalogue,
+    view_board, view_rows, view_set_column_collapsed, view_set_columns, view_set_group,
+    view_set_sort, views_of,
 };
 
 const ME_ACCOUNT_ID: &str = "712020:5a1e0c3f-8d2b-4f61-9c7e-1b2a3c4d5e01";
@@ -844,6 +845,333 @@ mod status_styles {
             .unwrap_err();
 
         assert_eq!(err.kind(), ErrorKind::NotFound);
+    }
+}
+
+mod board {
+    use super::*;
+
+    impl Site {
+        async fn board(&self, list: i64, view: i64, narrowing: Narrowing) -> BoardData {
+            view_board(self.db(), viewer(), list, view, narrowing)
+                .await
+                .unwrap()
+        }
+
+        async fn nw_board(&self, narrowing: Narrowing) -> BoardData {
+            let (space, view) = self.nw().await;
+            self.board(space, view, narrowing).await
+        }
+    }
+
+    fn rank(style: Style) -> u8 {
+        match style {
+            Style::Todo => 0,
+            Style::Progress => 1,
+            Style::Blocked => 2,
+            Style::Review => 3,
+            Style::Done => 4,
+        }
+    }
+
+    fn column<'a>(board: &'a BoardData, status_id: &str) -> &'a BoardColumn {
+        board
+            .columns
+            .iter()
+            .find(|c| c.status_id == status_id)
+            .unwrap_or_else(|| panic!("no column {status_id}"))
+    }
+
+    fn shown(board: &BoardData) -> usize {
+        board.columns.iter().map(|c| c.ids.len()).sum()
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn columns_follow_the_style_order_of_the_board() {
+        let site = Site::new().await;
+
+        let board = site.nw_board(Narrowing::default()).await;
+
+        let mut styles: Vec<Style> = board.columns.iter().map(|c| c.style).collect();
+        styles.dedup();
+        assert_eq!(
+            styles,
+            [
+                Style::Todo,
+                Style::Progress,
+                Style::Blocked,
+                Style::Review,
+                Style::Done
+            ]
+        );
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn columns_of_one_style_follow_the_cached_status_order() {
+        let site = Site::new().await;
+        let positions: HashMap<String, i64> =
+            query(site.db(), "SELECT id, rowid FROM cache.status", |row| {
+                Ok((row.get(0)?, row.get(1)?))
+            })
+            .await
+            .into_iter()
+            .collect();
+
+        let board = site.everything_board().await;
+
+        let keys: Vec<(u8, i64)> = board
+            .columns
+            .iter()
+            .map(|c| (rank(c.style), positions[&c.status_id]))
+            .collect();
+        assert!(keys.windows(2).all(|w| w[0] < w[1]), "{keys:?}");
+        let ids: std::collections::HashSet<&str> =
+            board.columns.iter().map(|c| c.status_id.as_str()).collect();
+        assert_eq!(ids.len(), board.columns.len());
+    }
+
+    impl Site {
+        async fn everything_board(&self) -> BoardData {
+            let everything = self.everything().await;
+            let view = self.first_view(everything).await;
+            self.board(everything, view, Narrowing::default()).await
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn each_column_holds_the_lists_rows_of_its_status_in_the_view_sort() {
+        let site = Site::new().await;
+        let (space, view) = site.nw().await;
+        view_set_sort(
+            site.db(),
+            view,
+            Sort {
+                by: SortBy::Key,
+                descending: false,
+            },
+        )
+        .await
+        .unwrap();
+
+        let board = site.board(space, view, Narrowing::default()).await;
+        let list = site.data(space, view, Narrowing::default()).await;
+
+        assert_eq!(board.columns.len(), list.groups.len());
+        for group in &list.groups {
+            let column = column(&board, &group.key);
+            assert_eq!(column.ids, group.row_ids, "{}", group.label);
+            assert_eq!(column.name, group.label);
+        }
+        assert_eq!(board.rows, list.rows);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn the_column_counts_add_up_to_the_rows() {
+        let site = Site::new().await;
+
+        let board = site.nw_board(Narrowing::default()).await;
+
+        let in_cache = number(
+            site.db(),
+            format!("SELECT COUNT(*) FROM cache.issue WHERE project_id = '{NW}' AND gone = 0"),
+        )
+        .await;
+        assert_eq!(shown(&board) as i64, in_cache);
+        assert_eq!(board.rows.len() as i64, in_cache);
+        for column in &board.columns {
+            assert!(!column.ids.is_empty(), "{}", column.name);
+            assert!(column.ids.iter().all(|id| board.rows.contains_key(id)));
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn me_and_text_narrow_the_cards() {
+        let site = Site::new().await;
+
+        let mine = site
+            .nw_board(Narrowing {
+                me: true,
+                ..Narrowing::default()
+            })
+            .await;
+        let found = site.nw_board(narrowing_text("nw-104")).await;
+
+        assert!(!mine.rows.is_empty());
+        assert_eq!(shown(&mine), mine.rows.len());
+        assert!(
+            mine.rows
+                .values()
+                .all(|row| row.assignees.first().map(|p| p.account_id.as_str())
+                    == Some(ME_ACCOUNT_ID))
+        );
+        let expected = strings(
+            site.db(),
+            format!(
+                "SELECT key FROM cache.issue
+                 WHERE project_id = '{NW}' AND gone = 0 AND key LIKE '%NW-104%' ORDER BY key"
+            ),
+        )
+        .await;
+        let mut keys: Vec<String> = found.rows.values().map(|r| r.key.clone()).collect();
+        keys.sort();
+        assert_eq!(keys, expected);
+        assert_eq!(shown(&found), expected.len());
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn text_that_matches_nothing_gives_no_columns() {
+        let site = Site::new().await;
+
+        let board = site.nw_board(narrowing_text("zzzz-no-such-text")).await;
+
+        assert!(board.columns.is_empty());
+        assert!(board.rows.is_empty());
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn only_done_columns_start_collapsed() {
+        let site = Site::new().await;
+
+        let board = site.nw_board(Narrowing::default()).await;
+
+        assert!(board.columns.iter().any(|c| c.style == Style::Done));
+        for column in &board.columns {
+            assert_eq!(
+                column.collapsed,
+                column.style == Style::Done,
+                "{}",
+                column.name
+            );
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn collapsing_and_expanding_a_column_persists_across_reads() {
+        let site = Site::new().await;
+        let (space, view) = site.nw().await;
+        let before = site.board(space, view, Narrowing::default()).await;
+        let open = before.columns.iter().find(|c| !c.collapsed).unwrap();
+        let done = before
+            .columns
+            .iter()
+            .find(|c| c.style == Style::Done)
+            .unwrap();
+
+        view_set_column_collapsed(site.db(), view, open.status_id.clone(), true)
+            .await
+            .unwrap();
+        view_set_column_collapsed(site.db(), view, done.status_id.clone(), false)
+            .await
+            .unwrap();
+
+        for _ in 0..2 {
+            let after = site.board(space, view, Narrowing::default()).await;
+            for c in &after.columns {
+                let expected = match &c.status_id {
+                    id if *id == open.status_id => true,
+                    id if *id == done.status_id => false,
+                    _ => c.style == Style::Done,
+                };
+                assert_eq!(c.collapsed, expected, "{}", c.name);
+            }
+            assert_eq!(
+                after.columns.iter().map(|c| &c.ids).collect::<Vec<_>>(),
+                before.columns.iter().map(|c| &c.ids).collect::<Vec<_>>()
+            );
+        }
+        view_set_column_collapsed(site.db(), view, open.status_id.clone(), false)
+            .await
+            .unwrap();
+        let reopened = site.board(space, view, Narrowing::default()).await;
+        assert!(!column(&reopened, &open.status_id).collapsed);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn an_override_for_a_status_that_is_not_shown_changes_nothing() {
+        let site = Site::new().await;
+        let (space, view) = site.nw().await;
+        let before = site.board(space, view, Narrowing::default()).await;
+
+        view_set_column_collapsed(site.db(), view, "99999".into(), true)
+            .await
+            .unwrap();
+
+        assert_eq!(site.board(space, view, Narrowing::default()).await, before);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn a_collapsed_override_survives_narrowing_away_its_column() {
+        let site = Site::new().await;
+        let (space, view) = site.nw().await;
+        let all = site.board(space, view, Narrowing::default()).await;
+        let status = all.columns[0].status_id.clone();
+        view_set_column_collapsed(site.db(), view, status.clone(), true)
+            .await
+            .unwrap();
+
+        let none = site
+            .board(space, view, narrowing_text("zzzz-no-such-text"))
+            .await;
+        let back = site.board(space, view, Narrowing::default()).await;
+
+        assert!(none.columns.is_empty());
+        assert!(column(&back, &status).collapsed);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn card_fields_follow_the_views_columns() {
+        let site = Site::new().await;
+        let (space, view) = site.nw().await;
+
+        let default = site.board(space, view, Narrowing::default()).await;
+        let list_columns = site.data(space, view, Narrowing::default()).await.columns;
+        view_set_columns(site.db(), view, vec!["priority".into(), REVIEWER.into()])
+            .await
+            .unwrap();
+        let changed = site.board(space, view, Narrowing::default()).await;
+
+        assert_eq!(default.card_fields, list_columns);
+        assert_eq!(changed.card_fields, ["priority", REVIEWER]);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn a_view_of_another_list_is_not_found() {
+        let site = Site::new().await;
+        let (_, view) = site.nw().await;
+        let everything = site.everything().await;
+
+        let err = view_board(site.db(), viewer(), everything, view, Narrowing::default())
+            .await
+            .unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::NotFound);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn the_board_serializes_for_the_page_in_camel_case() {
+        let site = Site::new().await;
+
+        let board = site.nw_board(narrowing_text("nw-1049")).await;
+
+        let value = serde_json::to_value(&board).unwrap();
+        assert_eq!(value["cardFields"], serde_json::json!(board.card_fields));
+        let first = &value["columns"][0];
+        assert_eq!(first["statusId"], board.columns[0].status_id.as_str());
+        assert_eq!(first["collapsed"], board.columns[0].collapsed);
+        assert_eq!(first["ids"], serde_json::json!(board.columns[0].ids));
     }
 }
 

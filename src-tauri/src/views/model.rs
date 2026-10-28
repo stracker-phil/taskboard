@@ -78,6 +78,9 @@ pub struct View {
     pub widths: BTreeMap<String, i64>,
     /// The List layout wraps long titles onto more lines; off, it truncates them.
     pub wrap_titles: bool,
+    /// A Board's columns the owner collapsed (true) or expanded (false), by status id; the rest use the
+    /// default (Done collapsed).
+    pub collapsed: BTreeMap<String, bool>,
     pub position: i64,
     /// The tab a level opens with.
     pub is_default: bool,
