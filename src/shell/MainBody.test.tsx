@@ -99,6 +99,31 @@ describe("MainBody", () => {
     });
   });
 
+  describe("title wrapping", () => {
+    beforeEach(() => {
+      const issue = row({ key: "NW-1042", summary: "Redesign the pricing page" });
+      mocked.navCurrent.mockResolvedValue({ location: { listId: 11, viewId: 101 }, expanded: [] });
+      mocked.syncOverview.mockResolvedValue(syncOverview({ projects: [projectCounts()] }));
+      mocked.viewRows.mockResolvedValue(viewData([groupOf([issue])], [issue]));
+    });
+
+    it("wraps the titles of a list view that wraps them", async () => {
+      mocked.viewsOf.mockResolvedValue([view({ wrapTitles: true })]);
+
+      renderBody();
+
+      expect(await screen.findByRole("row", { name: /NW-1042/ })).toHaveClass("list-row--wrap");
+    });
+
+    it("truncates the titles of a list view with wrapping turned off", async () => {
+      mocked.viewsOf.mockResolvedValue([view({ wrapTitles: false })]);
+
+      renderBody();
+
+      expect(await screen.findByRole("row", { name: /NW-1042/ })).not.toHaveClass("list-row--wrap");
+    });
+  });
+
   describe("narrowing", () => {
     beforeEach(() => {
       mocked.navCurrent.mockResolvedValue({ location: { listId: 11, viewId: 101 }, expanded: [] });

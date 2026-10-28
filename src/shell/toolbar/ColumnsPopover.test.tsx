@@ -116,6 +116,49 @@ describe("ColumnsPopover", () => {
     expect(within(popover).getByRole("button", { name: "Status" })).toHaveAttribute("aria-pressed", "false");
   });
 
+  describe("Wrap long titles", () => {
+    it("is on, with the hint on, for a list view that wraps", async () => {
+      const popover = await openColumns(view({ wrapTitles: true }));
+
+      const toggle = within(popover).getByRole("button", { name: /^Wrap long titles ?on$/ });
+      expect(toggle).toHaveAttribute("aria-pressed", "true");
+    });
+
+    it("is off, with the hint truncate, for a list view that does not wrap", async () => {
+      const popover = await openColumns(view({ wrapTitles: false }));
+
+      const toggle = within(popover).getByRole("button", { name: /^Wrap long titles ?truncate$/ });
+      expect(toggle).toHaveAttribute("aria-pressed", "false");
+    });
+
+    it.each([
+      [true, false],
+      [false, true],
+    ])("saves the opposite of the current setting (%s -> %s)", async (current, next) => {
+      mocked.viewSetWrap.mockResolvedValue(view({ wrapTitles: next }));
+      const popover = await openColumns(view({ wrapTitles: current }));
+
+      await userEvent.click(within(popover).getByRole("button", { name: /^Wrap long titles/ }));
+
+      expect(mocked.viewSetWrap).toHaveBeenCalledWith(101, next);
+    });
+
+    it("shows a toast when the setting cannot be saved", async () => {
+      mocked.viewSetWrap.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
+      const popover = await openColumns();
+
+      await userEvent.click(within(popover).getByRole("button", { name: /^Wrap long titles/ }));
+
+      await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not change how titles show: Disk full"));
+    });
+
+    it.each(["table", "board"] as const)("is not offered in a %s view", async (layout) => {
+      const popover = await openColumns(view({ layout }));
+
+      expect(within(popover).queryByRole("button", { name: /^Wrap long titles/ })).not.toBeInTheDocument();
+    });
+  });
+
   describe("search", () => {
     const search = async (popover: HTMLElement, text: string) => userEvent.type(within(popover).getByRole("textbox", { name: "Search fields" }), text);
 

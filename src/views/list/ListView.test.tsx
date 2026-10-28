@@ -115,6 +115,32 @@ describe("ListView", () => {
     });
   });
 
+  describe("title wrapping", () => {
+    const renderWith = (wrapTitles?: boolean) => {
+      mocked.viewRows.mockResolvedValue(viewData([groupOf([OPEN])], [OPEN]));
+      return render(
+        <QueryClientProvider client={createQueryClient()}>
+          <ListView listId={11} viewId={101} wrapTitles={wrapTitles} />
+        </QueryClientProvider>,
+      );
+    };
+
+    it.each([
+      ["by default", undefined],
+      ["when wrapping is on", true],
+    ])("lets the rows wrap their titles %s", async (_, wrapTitles) => {
+      renderWith(wrapTitles);
+
+      expect(await screen.findByRole("row", { name: /NW-1042/ })).toHaveClass("list-row--wrap");
+    });
+
+    it("keeps titles on one line when wrapping is off", async () => {
+      renderWith(false);
+
+      expect(await screen.findByRole("row", { name: /NW-1042/ })).not.toHaveClass("list-row--wrap");
+    });
+  });
+
   describe("saved place", () => {
     const groups = () => [
       groupOf([OPEN], { key: "status:progress", label: "In Progress" }),
@@ -316,9 +342,9 @@ describe("ListView", () => {
       vi.stubGlobal(
         "ResizeObserver",
         class {
-          constructor(private callback: () => void) {}
+          constructor(private callback: (entries: unknown[], observer: unknown) => void) {}
           observe() {
-            this.callback();
+            this.callback([], this);
           }
           unobserve() {}
           disconnect() {}

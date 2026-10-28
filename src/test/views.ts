@@ -11,6 +11,7 @@ export function view(patch: Partial<View> = {}): View {
     groupBy: "status",
     sort: { by: "updated", descending: true },
     widths: {},
+    wrapTitles: true,
     position: 0,
     isDefault: false,
     ...patch,

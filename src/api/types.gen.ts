@@ -442,7 +442,11 @@ columns: Array<string>, groupBy: GroupBy, sort: Sort,
 /**
  * The Table layout's column widths in points, by column id; missing ids use their default.
  */
-widths: { [key in string]: number }, position: number, 
+widths: { [key in string]: number }, 
+/**
+ * The List layout wraps long titles onto more lines; off, it truncates them.
+ */
+wrapTitles: boolean, position: number, 
 /**
  * The tab a level opens with.
  */

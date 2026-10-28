@@ -132,7 +132,9 @@ overrides it per status.
   cached), so columns line up across groups, but no column is wider than 200 (`MAX_COLUMN_WIDTH`); a longer
   value, such as a long epic name, truncates and shows in full on hover. Gap 20, rows padded 16.
 - Rows 44: square, mono key, summary (600 when changed, on `--changed-bg`), change chip, comment count, then
-  the cells. A clicked row is selected (`--selection-bg`).
+  the cells. Long titles wrap onto more lines by default and the row grows (each row is measured); "Wrap long
+  titles" in the Columns popover turns that off per view, and titles truncate instead (`view.wrap_titles`). The
+  Table always truncates at a fixed row height; Board cards always wrap. A clicked row is selected (`--selection-bg`).
 - Rows are virtualised (`@tanstack/react-virtual`): a card is drawn from its pieces (the header item, then
   rows that know whether they are first, middle, last or the only one).
 

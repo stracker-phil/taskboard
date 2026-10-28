@@ -66,6 +66,12 @@ pub async fn view_set_sort(state: State<'_, AppState>, id: i64, sort: Sort) -> A
     super::view_set_sort(&state.db, id, sort).await
 }
 
+/// Whether the List wraps long titles.
+#[tauri::command]
+pub async fn view_set_wrap(state: State<'_, AppState>, id: i64, wrap: bool) -> AppResult<View> {
+    super::view_set_wrap(&state.db, id, wrap).await
+}
+
 #[tauri::command]
 pub async fn view_set_widths(
     state: State<'_, AppState>,

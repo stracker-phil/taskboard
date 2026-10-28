@@ -58,6 +58,18 @@ export function ColumnsPopover({ view, spaceProjectId, anchor, onClose }: Props)
         <span className="popover__title">Columns</span>
         <span className="popover__meta">View: {view.name}</span>
       </div>
+      {view.layout === "list" && (
+        <button
+          type="button"
+          className="column-row columns-popover__wrap"
+          aria-pressed={view.wrapTitles}
+          onClick={() => edit(api.viewSetWrap(view.id, !view.wrapTitles), "Could not change how titles show")}
+        >
+          <span className="column-row__label">Wrap long titles</span>
+          <span className="column-row__hint">{view.wrapTitles ? "on" : "truncate"}</span>
+          <Toggle on={view.wrapTitles} />
+        </button>
+      )}
       <label className="columns-popover__search">
         <Search size={13} strokeWidth={2} aria-hidden="true" />
         <input aria-label="Search fields" placeholder="Search fields" value={search} onChange={(e) => setSearch(e.target.value)} />

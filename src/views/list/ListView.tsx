@@ -1,5 +1,4 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useVirtualizer } from "@tanstack/react-virtual";
 import { type CSSProperties, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Column, Group, Narrowing, ViewData, ViewPlace } from "../../api";
 import { onIssueKeys } from "../../commands/issueKeys";
@@ -8,7 +7,7 @@ import { useColumnsCatalogue, useViewRows } from "../../queries/views";
 import { narrowingKey } from "../../state/slices/narrowing";
 import { useStore } from "../../state/store";
 import { columnDef } from "./columns";
-import { flatten, type Item, itemGroupKey, itemHeight } from "./flatten";
+import { flatten, type Item, itemGroupKey } from "./flatten";
 import { GroupHeader } from "./GroupHeader";
 import { IssueRow } from "./IssueRow";
 import { canvasMeasure, columnWidths, fittingColumns, gridTemplate } from "./measure";
@@ -16,18 +15,21 @@ import { useElementWidth } from "./useElementWidth";
 import { useGroupHighlight } from "./useGroupHighlight";
 import { useGroupMotion } from "./useGroupMotion";
 import { useIssueActions } from "./useIssueActions";
+import { useRowSizing } from "./useRowSizing";
 
 interface Props {
   listId: number;
   viewId: number;
   narrowing?: Narrowing;
+  /** Whether long titles wrap instead of truncating. */
+  wrapTitles?: boolean;
 }
 
 /** The List layout: each group a card under its tab, virtualised. */
-export function ListView({ listId, viewId, narrowing }: Props) {
+export function ListView({ listId, viewId, narrowing, wrapTitles = true }: Props) {
   const { data } = useViewRows(listId, viewId, narrowing);
   if (!data) return null;
-  return <Rows key={`${listId}:${viewId}`} listId={listId} viewId={viewId} data={data} />;
+  return <Rows key={`${listId}:${viewId}`} listId={listId} viewId={viewId} data={data} wrapTitles={wrapTitles} />;
 }
 
 const measure = canvasMeasure();
@@ -38,24 +40,13 @@ const GRID_INSET = 52 + 24 + 32;
 
 const isOpen = (group: Group, toggled: Record<string, boolean>) => toggled[group.key] ?? !group.collapsedByDefault;
 
-/** How far a row's group is open while it animates (1 when still). */
-function motionFactor(item: Item, factors: Record<string, number>): number {
-  return item.kind === "row" ? (factors[item.groupKey] ?? 1) : 1;
-}
-
-/** A row of a group in motion fades with its height. */
-function motionStyle(item: Item, factors: Record<string, number>): CSSProperties | undefined {
-  if (item.kind !== "row" || !(item.groupKey in factors)) return undefined;
-  return { opacity: motionFactor(item, factors), overflow: "hidden" };
-}
-
 function itemClass(item: Item): string {
   if (item.kind === "row") return "list-item";
   return ["list-item", !item.first && "list-item--gap", !item.tab && "list-item--tabless"].filter(Boolean).join(" ");
 }
 
 /** Keyed by the view; its open groups, scroll, selection and peek come from the view's remembered place. */
-function Rows({ listId, viewId, data }: { listId: number; viewId: number; data: ViewData }) {
+function Rows({ listId, viewId, data, wrapTitles }: { listId: number; viewId: number; data: ViewData; wrapTitles: boolean }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const placeKey = narrowingKey(listId, viewId);
   const loaded = useStore((s) => placeKey in s.places);
@@ -88,20 +79,7 @@ function Rows({ listId, viewId, data }: { listId: number; viewId: number; data: 
 
   // A collapsing group keeps its rows until they have shrunk away.
   const items = useMemo(() => flatten(data, (group: Group) => isOpen(group, toggled) || group.key in factors), [data, toggled, factors]);
-  const heightOf = (index: number) => itemHeight(items[index]) * motionFactor(items[index], factors);
-  const virtualizer = useVirtualizer({
-    count: items.length,
-    getScrollElement: () => scrollRef.current,
-    estimateSize: heightOf,
-    paddingStart: 22,
-    paddingEnd: 40,
-    overscan: 12,
-  });
-
-  // Sizes already measured are cached; a group in motion changes them every frame.
-  useLayoutEffect(() => {
-    virtualizer.measure();
-  }, [factors, virtualizer]);
+  const { virtualizer, groupStartsMoving, itemProps } = useRowSizing(items, factors, wrapTitles, scrollRef);
 
   // Back to where the owner left this view, once its place has loaded.
   const [restored, setRestored] = useState(false);
@@ -113,6 +91,7 @@ function Rows({ listId, viewId, data }: { listId: number; viewId: number; data: 
 
   const toggle = (group: Group) => {
     const opening = !isOpen(group, toggled);
+    groupStartsMoving(group.key);
     setPlace({ toggled: { ...toggled, [group.key]: opening } });
     animate(group.key, opening);
   };
@@ -190,9 +169,9 @@ function Rows({ listId, viewId, data }: { listId: number; viewId: number; data: 
           return (
             <div
               key={item.kind === "row" ? `row:${item.row.id}` : `group:${item.group.key}`}
+              {...itemProps(virtual, item)}
               className={itemClass(item)}
               data-group={group}
-              style={{ height: virtual.size, transform: `translateY(${virtual.start}px)`, ...motionStyle(item, factors) }}
             >
               {item.kind === "group" ? (
                 <GroupHeader
@@ -209,6 +188,7 @@ function Rows({ listId, viewId, data }: { listId: number; viewId: number; data: 
                   row={item.row}
                   columns={columns}
                   position={item.position}
+                  wrap={wrapTitles}
                   selected={selected === item.row.id}
                   onSelect={(id) => select(id, true)}
                   actions={actions}

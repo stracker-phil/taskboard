@@ -76,6 +76,8 @@ pub struct View {
     pub sort: Sort,
     /// The Table layout's column widths in points, by column id; missing ids use their default.
     pub widths: BTreeMap<String, i64>,
+    /// The List layout wraps long titles onto more lines; off, it truncates them.
+    pub wrap_titles: bool,
     pub position: i64,
     /// The tab a level opens with.
     pub is_default: bool,

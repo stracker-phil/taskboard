@@ -66,6 +66,7 @@
 .columns-popover__search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text); font: inherit; font-size: 13px; }
 .columns-popover__empty { margin: 10px 8px; font-size: 13px; color: var(--text-muted); }
 .column-row__handle--off { visibility: hidden; }
+.columns-popover__wrap { margin: 0 8px; }
 .columns-popover__section { position: relative; display: flex; flex-direction: column; }
 .column-row {
   display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 8px; border: 0; border-radius: 7px;

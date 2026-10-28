@@ -106,6 +106,7 @@ export function createApiMock(): Api {
     viewSetGroup: vi.fn(),
     viewSetSort: vi.fn(),
     viewSetWidths: vi.fn(),
+    viewSetWrap: vi.fn(),
     viewMove: vi.fn(),
     viewDelete: vi.fn(),
     viewRows: vi.fn(async (): Promise<ViewData> => ({ groupBy: "none", groups: [], rows: {}, columns: [] })),

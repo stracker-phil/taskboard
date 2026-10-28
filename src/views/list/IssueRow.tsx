@@ -11,13 +11,15 @@ interface Props {
   columns: string[];
   /** Its place in the group's card: decides the corners, edges and the separator above. */
   position: CardPosition;
+  /** The title wraps onto more lines instead of truncating. */
+  wrap?: boolean;
   selected: boolean;
   onSelect: (id: string) => void;
   actions: RowActionHandlers;
 }
 
-export function IssueRow({ row, columns, position, selected, onSelect, actions }: Props) {
-  const className = ["list-row", `list-row--${position}`, row.changed && "list-row--changed", selected && "list-row--selected"]
+export function IssueRow({ row, columns, position, wrap = false, selected, onSelect, actions }: Props) {
+  const className = ["list-row", `list-row--${position}`, wrap && "list-row--wrap", row.changed && "list-row--changed", selected && "list-row--selected"]
     .filter(Boolean)
     .join(" ");
   return (

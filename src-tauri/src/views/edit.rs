@@ -11,7 +11,7 @@ use crate::error::{AppError, AppResult};
 use crate::lists::{Kind, node};
 use crate::order::Siblings;
 
-const COLUMNS: &str = "id, list_id, name, layout, columns, group_by, sort_by, sort_order, position, is_default, widths";
+const COLUMNS: &str = "id, list_id, name, layout, columns, group_by, sort_by, sort_order, position, is_default, widths, wrap_titles";
 
 fn siblings(list_id: i64) -> Siblings<'static> {
     Siblings {
@@ -43,6 +43,7 @@ fn from_row(row: &Row) -> rusqlite::Result<View> {
             .get::<_, Option<String>>(10)?
             .and_then(|json| serde_json::from_str(&json).ok())
             .unwrap_or_default(),
+        wrap_titles: row.get(11)?,
     })
 }
 
@@ -115,6 +116,7 @@ fn copy_view(conn: &Connection, view: &View, list_id: i64, name: &str) -> AppRes
     )?;
     write_sort(conn, id, view.sort)?;
     write_widths(conn, id, &view.widths)?;
+    write_wrap(conn, id, view.wrap_titles)?;
     Ok(id)
 }
 
@@ -155,6 +157,14 @@ fn write_sort(conn: &Connection, id: i64, sort: Sort) -> AppResult<()> {
     conn.execute(
         "UPDATE view SET sort_by = ?2, sort_order = ?3 WHERE id = ?1",
         params![id, to_text(sort.by), sort_order(sort.descending)],
+    )?;
+    Ok(())
+}
+
+fn write_wrap(conn: &Connection, id: i64, wrap: bool) -> AppResult<()> {
+    conn.execute(
+        "UPDATE view SET wrap_titles = ?2 WHERE id = ?1",
+        params![id, wrap],
     )?;
     Ok(())
 }
@@ -289,6 +299,10 @@ pub async fn view_set_widths(db: &Db, id: i64, widths: BTreeMap<String, i64>) ->
         .map(|(column, width)| (column, width.clamp(MIN_WIDTH, MAX_WIDTH)))
         .collect();
     edit(db, id, move |conn| write_widths(conn, id, &widths)).await
+}
+
+pub async fn view_set_wrap(db: &Db, id: i64, wrap: bool) -> AppResult<View> {
+    edit(db, id, move |conn| write_wrap(conn, id, wrap)).await
 }
 
 pub async fn view_move(db: &Db, id: i64, position: i64) -> AppResult<Vec<View>> {
