@@ -1,6 +1,7 @@
 //! The Jira site a connection talks to and the URLs derived from it.
 
 use serde::{Deserialize, Serialize};
+use ts_rs::TS;
 use url::Url;
 
 use crate::error::{AppError, AppResult};
@@ -10,7 +11,8 @@ const SITE_SUFFIX: &str = ".atlassian.net";
 const SITE_URL_FIELD: &str = "siteUrl";
 
 /// Classic (unscoped) tokens call the site; scoped tokens call the gateway with the site's cloud id.
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default, TS)]
+#[ts(export, export_to = "src/api/types.gen.ts")]
 #[serde(rename_all = "camelCase")]
 pub enum TokenKind {
     #[default]

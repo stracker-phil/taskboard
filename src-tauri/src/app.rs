@@ -46,6 +46,8 @@ pub fn start(
             announce_db_changes(app.handle(), &state.db);
             #[cfg(debug_assertions)]
             apply_dev_frame(app);
+            #[cfg(debug_assertions)]
+            crate::dev::start_fake_jira();
             start_ipc(app.handle().clone(), &socket);
             listen_for_links(app.handle());
             // The window starts invisible (tauri.conf.json), so a hidden start never flashes it.

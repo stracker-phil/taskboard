@@ -6,6 +6,13 @@ pub const LAUNCH_EVENT: &str = "launch";
 pub const WINDOW_OPENED_EVENT: &str = "window_opened";
 /// Payload: the saved `Settings`.
 pub const SETTINGS_CHANGED_EVENT: &str = "settings_changed";
+
+pub fn announce_settings(app: &tauri::AppHandle, settings: &crate::store::settings::Settings) {
+    use tauri::Emitter;
+    if let Err(e) = app.emit(SETTINGS_CHANGED_EVENT, settings) {
+        log::warn!("Couldn't announce the saved settings: {e}");
+    }
+}
 /// Payload: the saved `Keybindings`.
 pub const KEYBINDINGS_CHANGED_EVENT: &str = "keybindings_changed";
 /// To the Settings window. Payload: the id of the page to show.

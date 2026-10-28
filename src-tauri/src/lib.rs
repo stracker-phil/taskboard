@@ -5,6 +5,7 @@ mod app;
 pub mod bus;
 pub mod cli;
 mod commands;
+pub mod connection;
 pub mod db;
 #[cfg(debug_assertions)]
 mod dev;
@@ -22,7 +23,7 @@ mod remote;
 pub mod secrets;
 pub mod state;
 pub mod store;
-#[cfg(any(test, feature = "test-util"))]
+#[cfg(any(test, debug_assertions, feature = "test-util"))]
 pub mod test_support;
 pub mod window;
 

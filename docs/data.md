@@ -16,6 +16,18 @@ All in the config dir (`~/Library/Application Support/com.philippstracker.taskbo
 
 The Jira token is in the Keychain only, never in a file or a log.
 
+## Settings (`settings.json`)
+
+`store/settings/`; missing keys read as defaults, values out of bounds are clamped on load.
+
+| Section | Holds | Changed by |
+|---|---|---|
+| `connection` | site URL (normalised), email, token kind, token expiry date, cloud id, and what Test Connection found: account id, display name, time zone. Never the token (Keychain, service `APP_NAME`, account = email) | `connection_save`, `connection_test` |
+| `sync` | scope override (JQL or none), delta interval in front (1–60 min) and in the background (5–120 min), days to keep done issues (7–365) | `scope_save`, `sync_save` |
+
+`update_settings` replaces only what the page owns; `connection` and `sync` change through their own
+commands, which validate them. Tracking a project writes `local.space`, not the settings.
+
 ## Access (`src-tauri/src/db/`)
 
 - `Db::open` creates or migrates both files, then opens one writer and two readers. Each connection opens

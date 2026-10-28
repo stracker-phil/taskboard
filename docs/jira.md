@@ -4,6 +4,28 @@
 through `net::Http`, which reaches only the hosts of the connection
 ([ADR 0020](adr/0020-jira-site-and-atlassian-gateway-are-the-hosts.md)).
 
+## Setup
+
+Settings → Connection (`connection/`):
+
+1. Site URL and email, an API token from id.atlassian.com (Account settings → Security → API tokens), the
+   token kind and the token's expiry date. **Save** stores the token in the Keychain under the email; the
+   page never gets it back, only `hasToken`. Changing the email moves the token to the new account.
+2. **Test Connection** asks `/myself` and stores the account id, name and time zone. A scoped token first
+   needs the site's cloud id (`/_edge/tenant_info`); when the site doesn't answer it (`not_found`), the page
+   asks for it.
+3. **Projects → Refresh** loads every project into `cache.project`; **Track** creates the project's Space
+   (`local.space`). Untracking keeps the Space's settings.
+
+Scopes a scoped token needs for v1: `read:jira-work`, `read:jira-user` (writes later add `write:jira-work`).
+The expiry date warns 14 days ahead (`connection::token_expiry`).
+
+Settings → Sync sets the scope JQL (validated by Jira's `jql/parse` before it is saved; empty = the default
+over the tracked projects), the intervals and the days done issues stay, and resets the cache.
+
+In the debug build the fake Jira runs at `http://127.0.0.1:47470` (`dev::FAKE_JIRA_PORT`) with the demo site
+dated to today; any email and token connect to it.
+
 ## Site and tokens
 
 `jira/site.rs` `Site` holds the site URL, the email, the token kind and the cloud id.

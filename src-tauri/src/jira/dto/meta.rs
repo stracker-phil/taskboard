@@ -1,6 +1,6 @@
 //! The site's metadata: the user, the cloud id, fields, projects, statuses, versions.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -54,7 +54,7 @@ pub struct FieldSchema {
     pub custom: Option<String>,
 }
 
-#[derive(Deserialize, Debug, Clone, PartialEq)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Project {
     pub id: String,

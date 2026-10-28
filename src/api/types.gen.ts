@@ -14,6 +14,40 @@ field?: AppErrorField, };
  */
 export type AppErrorField = { path: string, message: string, };
 
+export type Connection = { 
+/**
+ * Normalised (`https://example.atlassian.net/`); empty until set up.
+ */
+siteUrl: string, email: string, tokenKind: TokenKind, tokenExpires: string | null, 
+/**
+ * Scoped tokens only: found by Test Connection or typed in.
+ */
+cloudId: string | null, 
+/**
+ * From the last successful Test Connection; cleared when the site, email or token kind change.
+ */
+accountId: string | null, displayName: string | null, 
+/**
+ * IANA name from `/myself`; JQL date literals use it.
+ */
+timeZone: string | null, };
+
+/**
+ * What the Connection page edits.
+ */
+export type ConnectionInput = { siteUrl: string, email: string, tokenKind: TokenKind, tokenExpires: string | null, 
+/**
+ * Typed in when the site doesn't tell it; `None` keeps the one found.
+ */
+cloudId: string | null, };
+
+export type ConnectionTest = { displayName: string, accountId: string, timeZone: string, cloudId: string | null, };
+
+/**
+ * The connection as the page shows it: never the token, only whether there is one.
+ */
+export type ConnectionView = { connection: Connection, hasToken: boolean, expiry: TokenExpiry, };
+
 export type ErrorKind = "io" | "invalid_input" | "not_found" | "not_connected" | "db" | "auth" | "offline" | "invalid_jql" | "internal";
 
 /**
@@ -41,6 +75,43 @@ export type LocalChanged = { parts: Array<LocalPart>, };
  */
 export type LocalPart = "spaces" | "lists" | "views" | "pins" | "styles";
 
-export type Settings = Record<symbol, never>;
+export type ProjectRow = { id: string, key: string, name: string, tracked: boolean, };
+
+export type ScopeView = { 
+/**
+ * Empty while nothing is tracked and there is no override.
+ */
+jql: string, isDefault: boolean, };
+
+export type Settings = { 
+/**
+ * Changed only through the connection commands, which validate it.
+ */
+connection: Connection, 
+/**
+ * Changed only through the sync commands, which validate it.
+ */
+sync: SyncSettings, };
+
+export type SyncSettings = { 
+/**
+ * The owner's own scope JQL; `None` uses the default built from the tracked projects.
+ */
+scopeOverride: string | null, 
+/**
+ * Delta sync interval while the window has focus.
+ */
+focusedMinutes: number, backgroundMinutes: number, 
+/**
+ * How long finished issues stay in the default scope.
+ */
+keepDoneDays: number, };
+
+export type TokenExpiry = { "state": "fine" } | { "state": "soon", days: number, } | { "state": "expired" };
+
+/**
+ * Classic (unscoped) tokens call the site; scoped tokens call the gateway with the site's cloud id.
+ */
+export type TokenKind = "classic" | "scoped";
 
 export type UiState = { sidebarHidden: boolean, };

@@ -80,7 +80,9 @@ attached as `cache`. Every change goes through `Db::write`, which emits `issues_
 after the commit. Reset cache deletes only the cache file.
 
 Jira is reached only through `jira/` ([jira.md](jira.md)): one `JiraClient` per connection over `net::Http`,
-which allows the site and `api.atlassian.com` only. The API token stays in the Keychain (`secrets.rs`).
+which allows the site and `api.atlassian.com` only. The API token stays in the Keychain (`secrets.rs`);
+`connection::JiraAccess` builds clients from the saved connection. The debug build serves the demo site from
+the fake Jira on loopback.
 
 ## Repository map
 
@@ -101,10 +103,11 @@ src-tauri/
   migrations/local/ cache/   numbered SQL migrations per file
   src/net.rs secrets.rs      the only HTTP client and its host check, log redaction; the Keychain
   src/jira/                  Jira Cloud: site, client, limiter, retries, paging, endpoints, DTOs, JQL
+  src/connection/            the Jira connection: Keychain access, Test Connection, tracked projects, scope
   src/<feature>/             one folder per feature: types, pure logic, commands.rs, tests
   src/window/ menu/          the main and Settings windows, the native app menu
   src/dev.rs                 debug builds only: window frame, background launch, eval
-  src/test_support/          fixtures, fakes, the demo Jira site and the fake Jira (cfg test, test-util)
+  src/test_support/          fixtures, fakes (cfg test, test-util); the demo Jira site and the fake Jira (also debug)
   tauri.conf.json tauri.debug.conf.json
 src/
   main.tsx modules.ts App.tsx

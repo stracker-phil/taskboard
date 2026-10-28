@@ -42,12 +42,15 @@ struct Shared {
 }
 
 impl FakeJira {
-    /// Serves `data` with `now` as the clock for relative JQL dates (`-90d`).
+    /// Serves `data` on a free port with `now` as the clock for relative JQL dates (`-90d`).
     pub async fn start(data: JiraData, now: DateTime<Utc>) -> Self {
-        let listener = TcpListener::bind("127.0.0.1:0")
-            .await
-            .expect("bind loopback");
-        let port = listener.local_addr().expect("local address").port();
+        Self::start_on(0, data, now).await.expect("bind loopback")
+    }
+
+    /// Serves on `port` (0: any free one).
+    pub async fn start_on(port: u16, data: JiraData, now: DateTime<Utc>) -> std::io::Result<Self> {
+        let listener = TcpListener::bind(("127.0.0.1", port)).await?;
+        let port = listener.local_addr()?.port();
         let shared = Arc::new(Shared {
             content: Mutex::new(Content {
                 data,
@@ -63,7 +66,7 @@ impl FakeJira {
             listening: watch::channel(true).0,
         });
         tokio::spawn(serve(listener, port, shared.clone()));
-        Self { port, shared }
+        Ok(Self { port, shared })
     }
 
     /// The demo site at its fixed date.

@@ -5,7 +5,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_opener::OpenerExt;
 
 use crate::error::{AppError, AppResult};
-use crate::events::{KEYBINDINGS_CHANGED_EVENT, SETTINGS_CHANGED_EVENT};
+use crate::events::{KEYBINDINGS_CHANGED_EVENT, announce_settings};
 use crate::launch::LaunchEvent;
 use crate::state::AppState;
 use crate::store::keybindings::Keybindings;
@@ -24,9 +24,7 @@ pub async fn update_settings(
     settings: Settings,
 ) -> AppResult<Settings> {
     let (_, saved) = state.settings.update(settings).await?;
-    if let Err(e) = app.emit(SETTINGS_CHANGED_EVENT, &saved) {
-        log::warn!("Couldn't announce the saved settings: {e}");
-    }
+    announce_settings(&app, &saved);
     log::info!("Settings updated");
     Ok(saved)
 }
