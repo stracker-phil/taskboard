@@ -35,8 +35,8 @@ describe("SettingsApp", () => {
 
     const nav = screen.getByRole("navigation", { name: "Settings pages" });
     const entries = within(nav).getAllByRole("button").map((b) => b.textContent?.trim());
-    expect(entries).toEqual(["Connection", "Sync", "General"]);
-    expect(nav.textContent).toMatch(/Jira.*Connection.*Sync.*System.*General/);
+    expect(entries).toEqual(["Connection", "Projects", "Sync", "General"]);
+    expect(nav.textContent).toMatch(/Jira.*Connection.*Projects.*Sync.*System.*General/);
     expect(screen.getByRole("heading", { name: "Connection" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Connection/ })).toHaveAttribute("aria-current", "page");
   });

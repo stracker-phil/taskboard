@@ -225,70 +225,12 @@ describe("ConnectionPage", () => {
   });
 
   describe("Projects", () => {
-    it("disables Refresh and asks to test the connection while not connected", async () => {
-      mocked.connectionGet.mockResolvedValue(connectionView({ accountId: null }));
-      await renderPage();
-
-      expect(screen.getByRole("button", { name: "Refresh" })).toBeDisabled();
-      expect(screen.getByText("Test the connection first.")).toBeInTheDocument();
-    });
-
-    it("asks to refresh when no project is listed", async () => {
-      await renderPage();
-
-      expect(await screen.findByText("Refresh to load your projects.")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Refresh" })).toBeEnabled();
-    });
-
-    it("lists each project with its key and a switch showing whether it is tracked", async () => {
+    it("does not list projects; they live on the Projects page", async () => {
       mocked.projectsList.mockResolvedValue(PROJECTS);
       await renderPage();
 
-      expect(await screen.findByText("Website relaunch")).toBeInTheDocument();
-      expect(screen.getByText("NW")).toBeInTheDocument();
-      expect(screen.getByText("Lumen iOS app")).toBeInTheDocument();
-      expect(screen.getByText("LUM")).toBeInTheDocument();
-      expect(screen.getByRole("switch", { name: "Track Website relaunch" })).toBeChecked();
-      expect(screen.getByRole("switch", { name: "Track Lumen iOS app" })).not.toBeChecked();
-    });
-
-    it("tracks a project when its switch is turned on", async () => {
-      mocked.projectsList.mockResolvedValue(PROJECTS);
-      await renderPage();
-
-      await userEvent.click(await screen.findByRole("switch", { name: "Track Lumen iOS app" }));
-
-      expect(mocked.projectTrack).toHaveBeenCalledWith("10002", true);
-      expect(screen.getByRole("switch", { name: "Track Lumen iOS app" })).toBeChecked();
-    });
-
-    it("stops tracking a project when its switch is turned off", async () => {
-      mocked.projectsList.mockResolvedValue(PROJECTS);
-      await renderPage();
-
-      await userEvent.click(await screen.findByRole("switch", { name: "Track Website relaunch" }));
-
-      expect(mocked.projectTrack).toHaveBeenCalledWith("10001", false);
-    });
-
-    it("shows the projects Jira returns when Refresh is pressed", async () => {
-      mocked.projectsRefresh.mockResolvedValue(PROJECTS);
-      await renderPage();
-
-      await userEvent.click(screen.getByRole("button", { name: "Refresh" }));
-
-      expect(await screen.findByText("Website relaunch")).toBeInTheDocument();
-      expect(mocked.projectsRefresh).toHaveBeenCalled();
-    });
-
-    it("puts the switch back when tracking fails", async () => {
-      mocked.projectsList.mockResolvedValue(PROJECTS);
-      mocked.projectTrack.mockRejectedValueOnce({ kind: "db", message: "Database is locked" });
-      await renderPage();
-
-      await userEvent.click(await screen.findByRole("switch", { name: "Track Lumen iOS app" }));
-
-      await waitFor(() => expect(screen.getByRole("switch", { name: "Track Lumen iOS app" })).not.toBeChecked());
+      expect(screen.queryByRole("button", { name: "Refresh" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("switch", { name: /^Track / })).not.toBeInTheDocument();
     });
   });
 });

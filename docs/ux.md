@@ -118,8 +118,10 @@ owner's own Settings design replaces it. Its colours are the `--settings-*` toke
 - Pages register in `registry/settingsPages.ts`, in groups: **Jira** first, then **System**.
   - **Connection** (`components/settings/jira/`): *Jira site* (site URL, email, the API token as a password
     field that never shows a saved token, Classic or Scoped token kind, the cloud ID for Scoped; Save and
-    Test Connection, with "Connected as …" or the error below), *Token* (the expiry date and how soon it runs
-    out) and *Projects* (Refresh after a successful test; a Track switch per project).
+    Test Connection, with "Connected as …" or the error below) and *Token* (the expiry date and how soon it
+    runs out).
+  - **Projects**: Refresh after a successful test, "N of M tracked", a filter field (every word in the name or
+    key, ignoring case) and a Track switch per project.
   - **Sync**: *Scope* (the effective JQL in a monospaced field; Validate, Save, Reset to Default), *Intervals*
     (minutes in front and in the background, days to keep done issues) and *Cache* (the sync state line with
     Sync Now, one row per tracked project with its key, last full sync and "N issues · M open", then Reset

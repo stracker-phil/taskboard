@@ -118,6 +118,7 @@
 .settings-result.ok { color: var(--progress-done); }
 .settings-result.error { color: var(--sync-error-text); }
 .settings-empty { color: var(--settings-text-tertiary); }
+.settings-filter { flex: 1; min-width: 0; }
 
 /* The segmented control (Daybook's `SegmentedControl`): a fill track; the pressed segment a raised tile. */
 .segmented { display: inline-flex; gap: 2px; padding: 2px; border-radius: 8px; background: var(--settings-fill); }

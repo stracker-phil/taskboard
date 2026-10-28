@@ -6,6 +6,7 @@ vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await impo
 
 import { api } from "../api";
 import { ConnectionPage } from "../components/settings/jira/ConnectionPage";
+import { ProjectsPage } from "../components/settings/jira/ProjectsPage";
 import { SyncPage } from "../components/settings/jira/SyncPage";
 import { emitEvent } from "../test/apiMock";
 import { connectionView, PROJECTS, projectCounts, syncOverview } from "../test/jira";
@@ -19,6 +20,7 @@ function Harness() {
   return (
     <>
       <ConnectionPage />
+      <ProjectsPage />
       <SyncPage />
     </>
   );
