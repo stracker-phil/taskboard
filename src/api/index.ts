@@ -36,6 +36,9 @@ const ERROR_KINDS: Record<ErrorKind, true> = {
   not_found: true,
   not_connected: true,
   db: true,
+  auth: true,
+  offline: true,
+  invalid_jql: true,
   internal: true,
 };
 

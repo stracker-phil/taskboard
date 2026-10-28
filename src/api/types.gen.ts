@@ -14,7 +14,7 @@ field?: AppErrorField, };
  */
 export type AppErrorField = { path: string, message: string, };
 
-export type ErrorKind = "io" | "invalid_input" | "not_found" | "not_connected" | "db" | "internal";
+export type ErrorKind = "io" | "invalid_input" | "not_found" | "not_connected" | "db" | "auth" | "offline" | "invalid_jql" | "internal";
 
 /**
  * Payload of `issues_changed`.

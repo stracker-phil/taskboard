@@ -24,6 +24,15 @@ pub enum AppError {
     /// The database failed or is from a newer Taskboard.
     #[error("Database error: {0}")]
     Db(String),
+    /// Jira refused the credentials (401 or 403).
+    #[error("{0}")]
+    Auth(String),
+    /// Jira can't be reached.
+    #[error("{0}")]
+    Offline(String),
+    /// Jira rejected a JQL query; one message per problem, as Jira words them.
+    #[error("Invalid JQL: {}", .0.join("; "))]
+    InvalidJql(Vec<String>),
     /// A bug or a broken invariant; the message is for the log and a bug report.
     #[error("{0}")]
     Internal(String),
@@ -37,6 +46,9 @@ impl AppError {
             AppError::NotFound(_) => ErrorKind::NotFound,
             AppError::NotConnected(_) => ErrorKind::NotConnected,
             AppError::Db(_) => ErrorKind::Db,
+            AppError::Auth(_) => ErrorKind::Auth,
+            AppError::Offline(_) => ErrorKind::Offline,
+            AppError::InvalidJql(_) => ErrorKind::InvalidJql,
             AppError::Internal(_) => ErrorKind::Internal,
         }
     }
@@ -92,6 +104,9 @@ pub enum ErrorKind {
     NotFound,
     NotConnected,
     Db,
+    Auth,
+    Offline,
+    InvalidJql,
     Internal,
 }
 
@@ -165,6 +180,9 @@ mod tests {
                 ErrorKind::NotConnected,
             ),
             (AppError::Db(String::new()), ErrorKind::Db),
+            (AppError::Auth(String::new()), ErrorKind::Auth),
+            (AppError::Offline(String::new()), ErrorKind::Offline),
+            (AppError::InvalidJql(Vec::new()), ErrorKind::InvalidJql),
             (AppError::Internal(String::new()), ErrorKind::Internal),
         ];
         for (err, kind) in cases {
@@ -185,6 +203,33 @@ mod tests {
         assert_eq!(
             serde_json::to_value(AppError::Db("disk full".into())).unwrap(),
             json!({ "kind": "db", "message": "Database error: disk full" })
+        );
+    }
+
+    #[test]
+    fn auth_and_offline_errors_serialize_with_their_kinds() {
+        assert_eq!(
+            serde_json::to_value(AppError::Auth("Jira refused the token".into())).unwrap(),
+            json!({ "kind": "auth", "message": "Jira refused the token" })
+        );
+        assert_eq!(
+            serde_json::to_value(AppError::Offline("Jira can't be reached".into())).unwrap(),
+            json!({ "kind": "offline", "message": "Jira can't be reached" })
+        );
+    }
+
+    #[test]
+    fn invalid_jql_joins_jiras_messages_after_a_prefix() {
+        assert_eq!(
+            serde_json::to_value(AppError::InvalidJql(vec![
+                "Field 'foo' does not exist".into(),
+                "Unexpected end of query".into(),
+            ]))
+            .unwrap(),
+            json!({
+                "kind": "invalid_jql",
+                "message": "Invalid JQL: Field 'foo' does not exist; Unexpected end of query"
+            })
         );
     }
 

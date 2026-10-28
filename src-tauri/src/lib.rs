@@ -13,10 +13,13 @@ pub mod events;
 mod handlers;
 mod instance;
 pub mod ipc;
+pub mod jira;
 pub mod launch;
 pub mod lock;
 pub mod menu;
+pub mod net;
 mod remote;
+pub mod secrets;
 pub mod state;
 pub mod store;
 #[cfg(any(test, feature = "test-util"))]

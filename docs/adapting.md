@@ -13,9 +13,9 @@ own name, identifier, data, socket and URL scheme
 
 | What | Release | Debug | Where |
 |---|---|---|---|
-| Product name | `Taskboard` | `Taskboard (Debug)` | `tauri.conf.json` `productName` and window `title`; `tauri.debug.conf.json`; `lib.rs` `APP_NAME`; `index.html` |
+| Product name | `Taskboard` | `Taskboard (Debug)` | `tauri.conf.json` `productName` and window `title`; `tauri.debug.conf.json`; `lib.rs` `APP_NAME`, which is also the Keychain service (`secrets.rs`); `index.html` |
 | Bundle | `Taskboard.app` | `Taskboard (Debug).app` | `scripts/install.sh`, `scripts/stop-app.sh`, `scripts/dev/launch.sh`; the window owner in `scripts/dev/screenshot.sh` |
-| Bundle identifier | `com.philippstracker.taskboard` | `com.philippstracker.taskboard.debug` | both Tauri configs; `lib.rs` `IDENTIFIER` (tested against both); `scripts/install.sh`, `scripts/dev/launch.sh`; the socket path in `scripts/dev/js.sh`. It names the config dir, logs and Keychain service |
+| Bundle identifier | `com.philippstracker.taskboard` | `com.philippstracker.taskboard.debug` | both Tauri configs; `lib.rs` `IDENTIFIER` (tested against both); `scripts/install.sh`, `scripts/dev/launch.sh`; the socket path in `scripts/dev/js.sh`. It names the config dir and logs |
 | Binary and CLI | `taskboard` | the same name inside the debug bundle, run by path | Cargo package `name` (also the self dev-dependency); `cli/`; the scripts |
 | Installed links | `~/Applications/Taskboard.app`, `~/.local/bin/taskboard` | none | `scripts/install.sh` |
 | URL scheme | `taskboard://` | `taskboard-debug://` | both Tauri configs; `lib.rs` `LINK_SCHEME` (tested) |
@@ -29,7 +29,14 @@ own name, identifier, data, socket and URL scheme
 
 ## Network hosts
 
-None. A host is added with an ADR ([0013](adr/0013-network-only-to-listed-hosts.md)) and a row here.
+Only `net.rs` talks to the network, and only to the hosts of the current Jira connection
+([ADR 0020](adr/0020-jira-site-and-atlassian-gateway-are-the-hosts.md)). A new host needs an ADR and a row here.
+
+| Host | Why | Where |
+|---|---|---|
+| `<site>.atlassian.net` (the configured site, `https`) | Classic tokens, `_edge/tenant_info`, browse links | `jira/site.rs` `Site::hosts`, `normalize_site_url` |
+| `api.atlassian.com` (`https`) | Scoped tokens: `/ex/jira/<cloudId>/rest/api/3/` | `net.rs` `GATEWAY_HOST` |
+| `127.0.0.1` (`http`, debug builds and tests only) | The fake Jira ([ADR 0022](adr/0022-the-debug-build-syncs-from-a-built-in-fake-jira.md)) | `net.rs` `Http::allows`, `jira/site.rs` |
 
 ## Platform-specific code
 

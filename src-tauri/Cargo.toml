@@ -31,6 +31,13 @@ ts-rs = { version = "12", features = ["serde-compat", "serde-json-impl", "no-ser
 libc = "0.2"
 tempfile = { version = "3", optional = true }
 rusqlite = { version = "0.37", features = ["bundled"] }
+# The only network client (ADR 0013): the Jira site and api.atlassian.com.
+reqwest = { version = "0.13", default-features = false, features = ["rustls", "gzip", "json"] }
+security-framework = "3"
+zeroize = "1"
+chrono-tz = "0.10"
+fastrand = "2"
+base64 = "0.22"
 
 [features]
 # Exposes test helpers to integration tests in tests/.
@@ -48,3 +55,4 @@ panic = "unwind"
 # Itself with test helpers, so integration tests in tests/ can use them (ADR 0006).
 taskboard = { path = ".", features = ["test-util"] }
 tempfile = "3"
+tokio = { version = "1", features = ["test-util", "macros", "rt"] }
