@@ -22,12 +22,15 @@ stands in Taskboard. The numbers in this table are Taskboard's.
 | [0010](0010-native-macos-look.md) | The app looks native and light | Superseded by 0017 for the main window |
 | [0011](0011-debug-build-is-a-separate-app-with-demo-data.md) | The debug build is a separate app with demo data | Accepted (2026-10-28) |
 | [0012](0012-commands-live-in-rust.md) | Commands live in Rust | Accepted (2026-10-28) |
-| [0013](0013-network-only-to-listed-hosts.md) | The app talks only to listed hosts | Accepted (2026-10-28) |
+| [0013](0013-network-only-to-listed-hosts.md) | The app talks only to listed hosts | Amended by 0020 |
 | [0014](0014-small-feature-modules.md) | Small feature modules with narrow seams | Accepted (2026-10-28) |
 | [0015](0015-signed-with-a-local-certificate.md) | Builds are signed with a local certificate | Accepted (2026-10-28) |
 | [0016](0016-closing-the-window-keeps-the-app-running.md) | Closing the window keeps the app running | Accepted (2026-10-28) |
 | [0017](0017-the-main-window-follows-the-taskboard-mockup.md) | The main window follows the Taskboard mockup | Accepted (2026-10-28) |
 | [0018](0018-reads-go-through-tanstack-query.md) | Reads go through TanStack Query, invalidated by events | Accepted (2026-10-28) |
 | [0019](0019-two-sqlite-files-through-rusqlite.md) | Two SQLite files through rusqlite: the owner's setup and a disposable Jira cache | Accepted (2026-10-28) |
+| [0020](0020-jira-site-and-atlassian-gateway-are-the-hosts.md) | The app talks to the configured Jira site and api.atlassian.com | Accepted (2026-10-28) |
+| [0021](0021-the-token-lives-in-the-keychain-through-secrets-rs.md) | The API token lives in the Keychain through `secrets.rs` | Accepted (2026-10-28) |
+| [0022](0022-the-debug-build-syncs-from-a-built-in-fake-jira.md) | The debug build syncs from a built-in fake Jira | Accepted (2026-10-28) |
 
 Open: integrations with Daybook and TimeTracker.

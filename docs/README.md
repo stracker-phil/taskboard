@@ -8,6 +8,7 @@ use it, see the [project README](../README.md).
 | [architecture.md](architecture.md) | Design rules, process model, data, repository map |
 | [ux.md](ux.md) | Design language: the mockup's window, tokens, type, metrics, Settings, keys |
 | [data.md](data.md) | The two SQLite files, their tables, the write path, migration rules |
+| [jira.md](jira.md) | The Jira client: site and tokens, endpoints, limits, retries, errors, JQL, the fake Jira |
 | [testing.md](testing.md) | Unit and integration tests, the test agents, the demo seed, scripts that drive the app, signing |
 | [adapting.md](adapting.md) | Identity (names, ids, paths), platform-specific code, conventions to keep |
 | [adr/](adr/README.md) | Architecture decision records: why the design is the way it is |

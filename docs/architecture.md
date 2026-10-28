@@ -79,6 +79,9 @@ Taskboard's data is two SQLite files ([data.md](data.md), [ADR 0019](adr/0019-tw
 attached as `cache`. Every change goes through `Db::write`, which emits `issues_changed` or `local_changed`
 after the commit. Reset cache deletes only the cache file.
 
+Jira is reached only through `jira/` ([jira.md](jira.md)): one `JiraClient` per connection over `net::Http`,
+which allows the site and `api.atlassian.com` only. The API token stays in the Keychain (`secrets.rs`).
+
 ## Repository map
 
 Target layout; folders appear with the code that needs them.
@@ -96,10 +99,12 @@ src-tauri/
   src/bus/                   the command bus
   src/db/                    the two SQLite files: open, migrate, read, the one write path
   migrations/local/ cache/   numbered SQL migrations per file
+  src/net.rs secrets.rs      the only HTTP client and its host check, log redaction; the Keychain
+  src/jira/                  Jira Cloud: site, client, limiter, retries, paging, endpoints, DTOs, JQL
   src/<feature>/             one folder per feature: types, pure logic, commands.rs, tests
   src/window/ menu/          the main and Settings windows, the native app menu
   src/dev.rs                 debug builds only: window frame, background launch, eval
-  src/test_support/          fixtures, fakes, the demo seed (cfg test, test-util, debug)
+  src/test_support/          fixtures, fakes, the demo Jira site and the fake Jira (cfg test, test-util)
   tauri.conf.json tauri.debug.conf.json
 src/
   main.tsx modules.ts App.tsx
