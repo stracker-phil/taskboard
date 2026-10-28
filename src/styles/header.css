@@ -1,0 +1,89 @@
+/* The content header and the view tabs (docs/ux.md → Header, Tabs). */
+.content-header {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 24px 12px;
+}
+.content-header__title { margin: 0; font-size: 19px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.content-header__spacer { flex: 1; }
+.content-header__icon { flex: none; color: var(--text-tertiary); }
+.content-header__slash { color: var(--text-faint); }
+.content-header__crumb {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-tertiary);
+  font-size: 13px;
+}
+.content-header__crumb:hover { color: var(--text); }
+.content-header__jira {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-bg);
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.content-header__jira:hover { background: var(--fill-subtle); }
+
+.view-tabs {
+  display: flex;
+  flex: none;
+  align-items: stretch;
+  gap: 2px;
+  height: 42px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--hairline);
+}
+.view-tab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 8px;
+  border: none;
+  background: none;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+.view-tab:hover { color: var(--text); }
+.view-tab[data-active] {
+  margin-bottom: -1px;
+  border-bottom: 2px solid var(--text);
+  color: var(--text);
+  font-weight: 600;
+}
+.view-tab .inline-rename { flex: none; width: 140px; font-weight: 400; }
+.view-tab__tile {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  background: var(--view-list);
+  color: var(--text-on-accent);
+}
+.view-tab__tile[data-layout="board"] { background: var(--view-board); }
+.view-tab__tile[data-layout="table"] { background: var(--view-table); }
+.view-tabs__separator { flex: none; width: 1px; margin: 10px 6px; background: var(--border); }
+.view-tabs__add {
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+}
+.view-tabs__add:hover { color: var(--text); }

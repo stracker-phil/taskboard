@@ -9,8 +9,10 @@ import {
   type EventName,
   type EventPayloads,
   type Keybindings,
+  type Nav,
   type ScopeView,
   type Settings,
+  type SidebarTree,
   type SyncOverview,
   type SyncSettings,
   type UiState,
@@ -28,6 +30,13 @@ const emptyConnection = (): Connection => ({
   accountId: null,
   displayName: null,
   timeZone: null,
+});
+
+/** A sidebar with Everything only: nothing tracked yet. */
+const emptySidebar = (): SidebarTree => ({
+  everything: { id: 1, kind: "everything", name: "Everything", count: 0, ownConditions: 0, description: "", error: null },
+  home: [],
+  spaces: [],
 });
 
 const defaultSync = (): SyncSettings => ({ scopeOverride: null, focusedMinutes: 5, backgroundMinutes: 15, keepDoneDays: 90 });
@@ -65,7 +74,7 @@ export function createApiMock(): Api {
     scopeSave: vi.fn(async (jql: string | null): Promise<ScopeView> => ({ jql: jql ?? "", isDefault: jql === null })),
     syncSave: vi.fn(async (sync: SyncSettings) => sync),
     cacheReset: vi.fn().mockResolvedValue(undefined),
-    sidebarTree: vi.fn(),
+    sidebarTree: vi.fn(async () => emptySidebar()),
     listCreate: vi.fn(),
     listRename: vi.fn(),
     listDuplicate: vi.fn(),
@@ -76,7 +85,10 @@ export function createApiMock(): Api {
     spaceMove: vi.fn(),
     spaceUpdate: vi.fn(),
     spaceDefaultColumns: vi.fn(),
-    viewsOf: vi.fn(),
+    navCurrent: vi.fn(async (): Promise<Nav> => ({ location: null, expanded: [] })),
+    navGo: vi.fn(async (listId: number, viewId: number | null): Promise<Nav> => ({ location: { listId, viewId: viewId ?? 0 }, expanded: [] })),
+    navSetExpanded: vi.fn(async (expanded: number[]): Promise<Nav> => ({ location: null, expanded })),
+    viewsOf: vi.fn().mockResolvedValue([]),
     viewCreate: vi.fn(),
     viewRename: vi.fn(),
     viewDuplicate: vi.fn(),
@@ -88,6 +100,7 @@ export function createApiMock(): Api {
     viewDelete: vi.fn(),
     syncOverview: vi.fn(async (): Promise<SyncOverview> => ({ state: { state: "idle", lastOk: null }, lastFullAt: null, projects: [] })),
     syncRun: vi.fn().mockResolvedValue(undefined),
+    popupMenu: vi.fn().mockResolvedValue(undefined),
     appInfo: vi.fn().mockResolvedValue({ name: "Taskboard", version: "1.2.3" }),
     listen: vi.fn(async (event: string, handler: Handler) => {
       const set = byEvent.get(event) ?? new Set<Handler>();

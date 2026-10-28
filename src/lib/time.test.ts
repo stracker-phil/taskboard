@@ -2,10 +2,25 @@ import { describe, expect, it } from "vitest";
 import { formatLocalTime } from "./time";
 
 describe("formatLocalTime", () => {
-  it("formats an ISO timestamp as a non-empty local date and time", () => {
-    const text = formatLocalTime("2026-03-04T09:30:00Z");
+  const now = new Date(2026, 9, 28, 18, 0);
+
+  it("shows the date with the year when the timestamp is from another day", () => {
+    const yesterday = new Date(2026, 9, 27, 9, 30).toISOString();
+
+    expect(formatLocalTime(yesterday, now)).toContain("2026");
+  });
+
+  it("shows only the time when the timestamp is from the same local day", () => {
+    const earlierToday = new Date(2026, 9, 28, 9, 30).toISOString();
+    const text = formatLocalTime(earlierToday, now);
 
     expect(text).not.toBe("");
-    expect(text).toContain("2026");
+    expect(text).not.toContain("2026");
+  });
+
+  it("treats a timestamp just after local midnight as the same day", () => {
+    const justAfterMidnight = new Date(2026, 9, 28, 0, 5).toISOString();
+
+    expect(formatLocalTime(justAfterMidnight, now)).not.toContain("2026");
   });
 });

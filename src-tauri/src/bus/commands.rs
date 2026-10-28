@@ -13,6 +13,16 @@ pub fn register(bus: &mut Bus) {
             .help("Open Settings")
             .run_now(|app: &AppHandle| window::settings::open(app, None)),
     );
+    bus.add_family(
+        Command::new("app:settings:", "Settings Page")
+            .help("Open Settings at a page or section")
+            .hidden()
+            .family("<page>")
+            .run(|app, page| async move {
+                window::settings::open(&app, Some(&page));
+                Ok(())
+            }),
+    );
     bus.add(
         Command::new("app:quit", "Quit Taskboard")
             .quits()
@@ -44,4 +54,61 @@ pub fn register(bus: &mut Bus) {
             .help("Reload the focused window's page")
             .run_now(window::reload_focused),
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn registered() -> Bus {
+        let mut bus = Bus::default();
+        register(&mut bus);
+        bus
+    }
+
+    #[test]
+    fn settings_page_ids_resolve_to_the_hidden_family() {
+        let bus = registered();
+
+        for id in [
+            "app:settings:projects",
+            "app:settings:general",
+            "app:settings:projects:sync",
+        ] {
+            assert!(bus.knows(id), "{id}");
+            let info = bus.info(id).unwrap();
+            assert_eq!(info.title, "Settings Page", "{id}");
+            assert_eq!(info.help, "Open Settings at a page or section", "{id}");
+            assert!(info.hidden, "{id}");
+        }
+    }
+
+    #[test]
+    fn the_settings_page_family_takes_a_page_argument() {
+        let bus = registered();
+        assert_eq!(bus.family("app:settings:").unwrap().arg, "<page>");
+    }
+
+    #[test]
+    fn plain_settings_stays_its_own_visible_command() {
+        let bus = registered();
+
+        let info = bus.info("app:settings").unwrap();
+        assert_eq!(info.title, "Settings…");
+        assert!(!info.hidden);
+        assert!(bus.family("app:settings").is_none());
+    }
+
+    #[test]
+    fn the_settings_page_family_is_the_only_hidden_settings_entry() {
+        let bus = registered();
+
+        let hidden: Vec<&str> = bus
+            .list()
+            .filter(|listed| listed.info().hidden)
+            .map(|listed| listed.id())
+            .filter(|id| id.starts_with("app:settings"))
+            .collect();
+        assert_eq!(hidden, ["app:settings:"]);
+    }
 }

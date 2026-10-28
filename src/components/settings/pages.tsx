@@ -1,9 +1,10 @@
 /** The core settings pages. Modules register their own pages from their install function. */
-import { FolderKanban, PlugZap, RefreshCw, SlidersHorizontal } from "lucide-react";
+import { FolderKanban, LayoutGrid, PlugZap, RefreshCw, SlidersHorizontal } from "lucide-react";
 import { registerSettingsPage } from "../../registry/settingsPages";
 import { GeneralPage } from "./GeneralPage";
 import { ConnectionPage } from "./jira/ConnectionPage";
 import { ProjectsPage } from "./jira/ProjectsPage";
+import { SpacesPage } from "./jira/SpacesPage";
 import { SyncPage } from "./jira/SyncPage";
 
 /** Ids match the pages `settings:open:<page>` and `open_settings` name. */
@@ -30,11 +31,20 @@ export function registerCoreSettingsPages() {
     Body: ProjectsPage,
   });
   registerSettingsPage({
+    id: "spaces",
+    group: "Jira",
+    label: "Spaces",
+    icon: LayoutGrid,
+    order: 2,
+    sections: [{ id: "spaces", title: "Spaces" }],
+    Body: SpacesPage,
+  });
+  registerSettingsPage({
     id: "sync",
     group: "Jira",
     label: "Sync",
     icon: RefreshCw,
-    order: 2,
+    order: 3,
     sections: [
       { id: "scope", title: "Scope" },
       { id: "intervals", title: "Intervals" },

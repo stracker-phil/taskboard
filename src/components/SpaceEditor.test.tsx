@@ -1,0 +1,259 @@
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
+
+import { api, type SpaceNode } from "../api";
+import { createQueryClient } from "../queries/queryClient";
+import { resetStore } from "../state/store";
+import { sidebarTree, space } from "../test/spaces";
+import { Toasts } from "./Toasts";
+import { SpaceFields, SpacePopover, type SpaceFieldsFocus } from "./SpaceEditor";
+
+const mocked = vi.mocked(api, true);
+
+function renderWithClient(ui: React.ReactNode) {
+  return render(
+    <QueryClientProvider client={createQueryClient()}>
+      {ui}
+      <Toasts />
+    </QueryClientProvider>,
+  );
+}
+
+async function renderFields(s: SpaceNode, focus?: SpaceFieldsFocus) {
+  renderWithClient(<SpaceFields space={s} focus={focus} />);
+  await screen.findAllByRole("textbox");
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  resetStore();
+  mocked.spaceUpdate.mockResolvedValue(undefined);
+  mocked.sidebarTree.mockResolvedValue(sidebarTree([space()]));
+});
+
+describe("SpaceFields", () => {
+  it("shows Name, Icon letter, Colour and Client when no focus is given", async () => {
+    await renderFields(space());
+
+    expect(screen.getByLabelText("Name")).toBeInTheDocument();
+    expect(screen.getByLabelText("Icon letter")).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Colour" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Client")).toBeInTheDocument();
+  });
+
+  describe("Name", () => {
+    it("is blank, with the project's name as placeholder, while the Space uses the project's name", async () => {
+      await renderFields(space({ name: "Website relaunch" }));
+
+      const name = await screen.findByLabelText("Name");
+      expect(name).toHaveValue("");
+      expect(name).toHaveAttribute("placeholder", "Website relaunch");
+    });
+
+    it("holds the custom name when it differs from the project's", async () => {
+      await renderFields(space({ name: "Public site", projectName: "Website relaunch" }));
+
+      expect(screen.getByLabelText("Name")).toHaveValue("Public site");
+      expect(screen.getByLabelText("Name")).toHaveAttribute("placeholder", "Website relaunch");
+    });
+
+    it("sends the custom name and leaves the other fields as they are", async () => {
+      await renderFields(space({ icon: "W", color: "3", client: "Northwind" }));
+
+      await userEvent.type(await screen.findByLabelText("Name"), "Public site");
+      await userEvent.tab();
+
+      expect(mocked.spaceUpdate).toHaveBeenCalledWith("10001", { name: "Public site", icon: "W", color: "3", client: "Northwind" });
+    });
+  });
+
+  describe("Client", () => {
+    it("sends the changed client on blur with the other fields unchanged", async () => {
+      await renderFields(space({ icon: "W", color: "2", client: null }));
+
+      await userEvent.type(await screen.findByLabelText("Client"), "Northwind");
+      await userEvent.tab();
+
+      expect(mocked.spaceUpdate).toHaveBeenCalledWith("10001", { name: null, icon: "W", color: "2", client: "Northwind" });
+    });
+
+    it("sends the client on Enter", async () => {
+      await renderFields(space());
+
+      await userEvent.type(await screen.findByLabelText("Client"), "Northwind{Enter}");
+
+      expect(mocked.spaceUpdate).toHaveBeenCalledWith("10001", expect.objectContaining({ client: "Northwind" }));
+    });
+
+    it("sends null when the field is cleared", async () => {
+      await renderFields(space({ client: "Northwind" }));
+
+      await userEvent.clear(await screen.findByLabelText("Client"));
+      await userEvent.tab();
+
+      expect(mocked.spaceUpdate).toHaveBeenCalledWith("10001", { name: null, icon: null, color: "1", client: null });
+    });
+
+    it("sends nothing when the value is unchanged", async () => {
+      await renderFields(space({ client: "Northwind" }));
+
+      await userEvent.click(await screen.findByLabelText("Client"));
+      await userEvent.tab();
+
+      expect(mocked.spaceUpdate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Icon letter", () => {
+    it("sends null when the icon is cleared", async () => {
+      await renderFields(space({ icon: "W" }));
+
+      await userEvent.clear(screen.getByLabelText("Icon letter"));
+      await userEvent.tab();
+
+      expect(mocked.spaceUpdate).toHaveBeenCalledWith("10001", expect.objectContaining({ icon: null }));
+    });
+
+    it("shows the message of Rust's field error and marks the input invalid", async () => {
+      mocked.spaceUpdate.mockRejectedValue({
+        kind: "invalid_input",
+        message: "Invalid input",
+        field: { path: "icon", message: "Use one letter or digit" },
+      });
+      await renderFields(space());
+
+      await userEvent.type(screen.getByLabelText("Icon letter"), "!");
+      await userEvent.tab();
+
+      expect(await screen.findByText("Use one letter or digit")).toBeInTheDocument();
+      expect(screen.getByLabelText("Icon letter")).toHaveAttribute("aria-invalid", "true");
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    });
+
+    it("is not marked invalid without an error", async () => {
+      await renderFields(space());
+
+      expect(screen.getByLabelText("Icon letter")).not.toHaveAttribute("aria-invalid");
+    });
+  });
+
+  describe("Colour", () => {
+    it("sends the colour number of the clicked swatch", async () => {
+      await renderFields(space({ icon: "W", client: "Northwind" }));
+
+      await userEvent.click(screen.getByRole("button", { name: "Teal" }));
+
+      expect(mocked.spaceUpdate).toHaveBeenCalledWith("10001", { name: null, icon: "W", color: "4", client: "Northwind" });
+    });
+
+    it("marks only the current colour's swatch as pressed", async () => {
+      await renderFields(space({ color: "5" }));
+
+      expect(screen.getByRole("button", { name: "Amber" })).toHaveAttribute("aria-pressed", "true");
+      for (const other of ["Blue", "Slate", "Violet", "Teal"]) {
+        expect(screen.getByRole("button", { name: other })).toHaveAttribute("aria-pressed", "false");
+      }
+    });
+  });
+
+  it("shows an error toast naming the Space when a save fails for another reason", async () => {
+    mocked.spaceUpdate.mockRejectedValue({ kind: "db", message: "Database is locked" });
+    await renderFields(space());
+
+    await userEvent.click(screen.getByRole("button", { name: "Teal" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not change Website relaunch: Database is locked");
+  });
+
+  describe("focus", () => {
+    it("appearance shows only Icon letter and Colour", async () => {
+      await renderFields(space(), "appearance");
+
+      expect(screen.getByLabelText("Icon letter")).toBeInTheDocument();
+      expect(screen.getByRole("group", { name: "Colour" })).toBeInTheDocument();
+      expect(screen.queryByLabelText("Name")).not.toBeInTheDocument();
+      expect(screen.queryByLabelText("Client")).not.toBeInTheDocument();
+    });
+
+    it("client shows only Client", async () => {
+      await renderFields(space(), "client");
+
+      expect(screen.getByLabelText("Client")).toBeInTheDocument();
+      expect(screen.queryByLabelText("Name")).not.toBeInTheDocument();
+      expect(screen.queryByLabelText("Icon letter")).not.toBeInTheDocument();
+      expect(screen.queryByRole("group", { name: "Colour" })).not.toBeInTheDocument();
+    });
+  });
+});
+
+describe("SpacePopover", () => {
+  const onClose = vi.fn();
+
+  function renderPopover(focus: SpaceFieldsFocus) {
+    renderWithClient(
+      <>
+        <button type="button">Outside</button>
+        <SpacePopover space={space()} focus={focus} onClose={onClose} />
+      </>,
+    );
+  }
+
+  it.each([
+    ["appearance", "Colour and icon", ["Icon letter"], ["Client", "Name"]],
+    ["client", "Client label", ["Client"], ["Icon letter", "Name"]],
+  ] as const)("with %s focus titles the dialog %j and shows only its fields", (focus, title, shown, hidden) => {
+    renderPopover(focus);
+
+    const dialog = screen.getByRole("dialog", { name: title });
+    expect(dialog).toBeInTheDocument();
+    for (const label of shown) expect(screen.getByLabelText(label)).toBeInTheDocument();
+    for (const label of hidden) expect(screen.queryByLabelText(label)).not.toBeInTheDocument();
+  });
+
+  it("closes on Escape", async () => {
+    renderPopover("client");
+
+    await userEvent.keyboard("{Escape}");
+
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("closes on Done", async () => {
+    renderPopover("client");
+
+    await userEvent.click(screen.getByRole("button", { name: "Done" }));
+
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("closes on a mousedown outside", async () => {
+    renderPopover("client");
+
+    await userEvent.click(screen.getByRole("button", { name: "Outside" }));
+
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("stays open on a mousedown inside", async () => {
+    renderPopover("appearance");
+
+    await userEvent.click(screen.getByRole("heading", { name: "Colour and icon" }));
+    await userEvent.click(screen.getByRole("button", { name: "Teal" }));
+
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("saves the text being typed before closing on Escape", async () => {
+    renderPopover("client");
+
+    await userEvent.type(screen.getByLabelText("Client"), "Northwind");
+    await userEvent.keyboard("{Escape}");
+
+    expect(mocked.spaceUpdate).toHaveBeenCalledWith("10001", expect.objectContaining({ client: "Northwind" }));
+    expect(onClose).toHaveBeenCalled();
+  });
+});

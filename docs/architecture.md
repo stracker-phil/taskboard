@@ -111,6 +111,7 @@ src-tauri/
   src/sync/                  the sync engine: one task, the full sync, Jira JSON to rows, change records
   src/filter/                filter conditions: the model, SQL compiler, conditions in words
   src/lists/ views/          the sidebar tree with counts and defaults; the view tabs; order.rs keeps positions
+  src/nav/                   where the main window is (level and view, nav.json); previous/next Space
   src/<feature>/             one folder per feature: types, pure logic, commands.rs, tests
   src/window/ menu/          the main and Settings windows, the native app menu
   src/dev.rs                 debug builds only: window frame, background launch, eval

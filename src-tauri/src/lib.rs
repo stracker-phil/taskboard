@@ -20,6 +20,7 @@ pub mod launch;
 pub mod lists;
 pub mod lock;
 pub mod menu;
+pub mod nav;
 pub mod net;
 mod order;
 mod remote;

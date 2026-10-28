@@ -8,6 +8,7 @@ use tauri::{AppHandle, Manager};
 use crate::connection::{self, ConnectionInput};
 use crate::error::{AppError, AppResult};
 use crate::jira::TokenKind;
+use crate::lists::{self, SpaceUpdate};
 use crate::state::AppState;
 use crate::sync::{Job, SyncEngine};
 use crate::test_support::demo::{self, ME_EMAIL};
@@ -67,6 +68,15 @@ async fn connect_to_fake(app: &AppHandle, url: &str) -> AppResult<()> {
         if let Some(project) = projects.iter().find(|p| p.key == space.key) {
             connection::fetch_versions(&state.db, &client, project.id.clone()).await?;
             connection::track_project(&state.db, project.id.clone(), true).await?;
+            let look = SpaceUpdate {
+                name: None,
+                icon: Some(space.icon.to_string()),
+                color: space
+                    .color
+                    .map(|token| token.trim_start_matches("space-tile-").to_string()),
+                client: space.client.map(str::to_string),
+            };
+            lists::space_update(&state.db, project.id.clone(), look).await?;
         }
     }
     log::info!("Connected the debug app to the fake Jira");

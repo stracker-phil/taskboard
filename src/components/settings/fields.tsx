@@ -16,7 +16,7 @@ type BufferedInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "value" | 
 
 /** Input that commits on blur or Enter, so half-typed values never reach the backend.
  *  Number spinner steps (input without typing) also commit, debounced. */
-function BufferedInput({ value, onCommit, type = "text", min, max, required, ...input }: BufferedInputProps) {
+export function BufferedInput({ value, onCommit, type = "text", min, max, required, ...input }: BufferedInputProps) {
   const [text, setText] = useState(value);
   const stepTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => setText(value), [value]);

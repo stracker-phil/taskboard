@@ -131,6 +131,7 @@ fn start_sync(app: &AppHandle, state: &AppState) {
 fn commands_bus() -> bus::Commands {
     let mut commands = bus::CommandBus::default();
     bus::register(&mut commands);
+    crate::nav::commands::register(&mut commands);
     bus::Commands(commands)
 }
 

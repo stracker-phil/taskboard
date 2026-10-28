@@ -47,6 +47,8 @@ pub struct SpaceNode {
     pub project_id: String,
     pub key: String,
     pub name: String,
+    /// The Jira project's own name; `name` differs when the owner renamed the Space.
+    pub project_name: String,
     pub icon: Option<String>,
     /// A Space tile colour token number.
     pub color: Option<String>,
@@ -63,6 +65,7 @@ struct SpaceRow {
     project_id: String,
     key: String,
     name: String,
+    project_name: String,
     icon: Option<String>,
     color: Option<String>,
     client: Option<String>,
@@ -70,7 +73,7 @@ struct SpaceRow {
 
 fn tracked_spaces(conn: &Connection) -> AppResult<Vec<SpaceRow>> {
     let mut query = conn.prepare(
-        "SELECT s.project_id, p.key, COALESCE(s.name, p.name), s.icon, s.color, s.client
+        "SELECT s.project_id, p.key, COALESCE(s.name, p.name), p.name, s.icon, s.color, s.client
          FROM space s JOIN cache.project p ON p.id = s.project_id
          WHERE s.tracked = 1 ORDER BY s.position, p.key",
     )?;
@@ -79,9 +82,10 @@ fn tracked_spaces(conn: &Connection) -> AppResult<Vec<SpaceRow>> {
             project_id: row.get(0)?,
             key: row.get(1)?,
             name: row.get(2)?,
-            icon: row.get(3)?,
-            color: row.get(4)?,
-            client: row.get(5)?,
+            project_name: row.get(3)?,
+            icon: row.get(4)?,
+            color: row.get(5)?,
+            client: row.get(6)?,
         })
     })?;
     Ok(rows.collect::<Result<_, _>>()?)
@@ -133,6 +137,7 @@ fn build(conn: &Connection, viewer: &Viewer) -> AppResult<SidebarTree> {
             project_id: space.project_id,
             key: space.key,
             name: space.name,
+            project_name: space.project_name,
             icon: space.icon,
             color: space.color,
             client: space.client,

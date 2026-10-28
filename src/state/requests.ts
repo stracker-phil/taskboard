@@ -12,3 +12,11 @@ export function fail(e: unknown, context: string) {
 export function runBusCommand(id: string, failure: string) {
   void api.runCommand(id).catch((e) => fail(e, failure));
 }
+
+/** Awaits an api call; a failure shows as `failure: <reason>` and resolves to null. */
+export function attempt<T>(call: Promise<T>, failure: string): Promise<T | null> {
+  return call.catch((e: unknown) => {
+    fail(e, failure);
+    return null;
+  });
+}

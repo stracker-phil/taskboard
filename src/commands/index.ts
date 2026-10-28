@@ -3,6 +3,7 @@ import { api } from "../api";
 import { runBusCommand } from "../state/requests";
 import { isRecordingTarget, registerCommands, resolveKeydown, setOverrides, type Command } from "./registry";
 import { activeScopes, registerScope } from "./scopes";
+import { VIEW_KEY_COMMANDS } from "./viewKeys";
 
 /** The window this page runs in: the Taskboard window (`main`) or Settings. */
 export type WindowName = "main" | "settings";
@@ -20,6 +21,9 @@ export function registerCoreScopes() {
  *  sidebar key is the menu item's too; the page claims it so it can be rebound, and runs the same bus command. */
 const APP_COMMANDS: Command[] = [
   { id: "sidebar.toggle", title: "Toggle sidebar", scope: "main", defaultBinding: "Mod+\\", run: () => runBusCommand("view:toggleSidebar", "Could not toggle the sidebar") },
+  { id: "space.previous", title: "Previous Space", scope: "main", defaultBinding: "Mod+Alt+ArrowUp", run: () => runBusCommand("nav:previousSpace", "Could not open the Space") },
+  { id: "space.next", title: "Next Space", scope: "main", defaultBinding: "Mod+Alt+ArrowDown", run: () => runBusCommand("nav:nextSpace", "Could not open the Space") },
+  ...VIEW_KEY_COMMANDS,
 ];
 
 /** Every window registers every command, so Settings can list them; a scope keeps a key to its window. */

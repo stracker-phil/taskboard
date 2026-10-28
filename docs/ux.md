@@ -24,13 +24,75 @@ an item.
   sidebar), 12px radius, `--shadow-panel`. Popovers anchor to the panel.
 - **Traffic lights** are the native ones, inside the sidebar's top 18px strip (`trafficLightPosition` 20, 24);
   the strip and empty chrome drag the window. There is no top bar, icon rail or status bar.
-- **Sidebar** (top to bottom): traffic-light strip, Search (⌘K), home rows (Everything, Recently changed,
-  Pinned), the Spaces tree, the footer with the sync chip and Settings. ⌘\ hides it; the panel then takes the
-  full width under a 42px strip that keeps the traffic lights off it. The state is kept in `ui_state.json`.
-- **Content panel** until the issue list (step 9): `SyncStatusView` (`src/shell/SyncStatusView.tsx`) says
+- **Sidebar** ([below](#sidebar)): ⌘\ hides it; the panel then takes the full width under a 42px strip that
+  keeps the traffic lights off it. The state is kept in `ui_state.json`.
+- **Content panel** (`main`, a flex column): the [header](#content-header), the [view tabs](#view-tabs), then
+  the view body (`.content-panel__body`). Until the issue list the body is `SyncStatusView` (`src/shell/SyncStatusView.tsx`) says
   "Connect Jira in Settings" with an Open Settings button while no project is tracked; during a full sync
   "Loading your Jira issues" with a line and a 4px bar (`--accent` on `--fill-subtle`) per tracked project
   (fetched of Jira's estimate); afterwards "N issues in M Spaces" and the last sync; otherwise the sync state.
+
+## Sidebar
+
+`src/shell/Sidebar/` (`Sidebar.tsx` composes it), styled in `styles/sidebar.css`. The tree comes from
+`useSidebar` (`sidebar_tree`), the place from `useNav` (`nav_current`); a click runs `nav_go` through
+`useNavGo`. Top to bottom, 16px apart:
+
+- **Traffic-light strip** (18px, a drag region) for the native window buttons.
+- **Search**: 34px, 9px radius, a `--border` frame on `--panel-bg`, `--text-muted`; Search icon 15/2, the
+  label, a "⌘K" key hint (11px, `--fill-subtle`, 5px radius). Disabled until the palette exists.
+- **Home** (`HomeRows`): Everything (`Layers2`), then the Home lists in Rust's order: Recently changed
+  (`History`), Pinned (`Pin`) and global filter lists (`Funnel`). 34px rows, 10px padding and gap, 8px radius,
+  `--text-strong-body`; icons 17/1.8; the count 12px `--text-muted`, hidden while Rust has none.
+- **Spaces** (`SpacesSection`, scrolls): the "Spaces" header (12/600 `--text-muted`) with "+" (24px), which
+  opens Settings → Projects (`app:settings:projects`). Each Space (`SpaceRow`): 36px, a 10px ▾/▸ chevron in
+  `--text-faint`, the 22px tile (6px radius, 11/800 letter on `--space-tile-N`), the name and the open count.
+  The current Space has `--selection-bg` with `--selection-text` and a 600 name; the Space of the current
+  filter list keeps no fill but a 600 name in `--text`.
+- **Expanding**: the chevron toggles a Space (saved with `nav_set_expanded`); ⌥-click keeps only that Space
+  expanded. The Space holding the current level always shows expanded.
+- **Filter lists** (`FilterListTree`): indented 34px behind a 1px `--border` guide with 12px padding; 32px
+  rows, 9px gap, `--text-secondary`, funnel 15/2, name and count (`ListCount`; a list whose filter can't be
+  used shows a muted `CircleAlert` with the reason as its tooltip instead). The current list is selected like
+  a Space, 600. "+ New filter list" (30px, 13px, `--text-muted`) creates "New filter list", opens it and
+  starts renaming it.
+- **Footer** (`SidebarFooter`): the sync chip (34px, 13px `--text-tertiary`; a 7px dot in `--sync-ok`,
+  `--sync-busy`, `--sync-offline` or `--sync-error-dot` by state; the state in words from
+  `describeSyncState`; a refresh icon 14/2; a click syncs now) and Settings (34px, gear 17/1.8).
+- **Hover**: rows, "+", the chip and Settings take `--fill-hover`; the selected row keeps its fill.
+- **Context menus** are native (`api.popupMenu`). A filter list: Rename, Duplicate, Pin to Home (disabled
+  until pins), Delete. A Space: Rename, Colour and icon…, Client label…, Stop tracking.
+- **Renaming** (`components/InlineRename.tsx`): the name turns into a field with a 2px `--focus-ring`; ↩ or
+  leaving the field saves a changed, non-empty name, esc cancels.
+- **Reordering** (`useDragReorder`): drag a Space, or a filter list within its Space, with the mouse; after
+  4px a 2px `--accent` line shows where it lands, and the drop runs `space_move` or `list_move` with the new
+  index. The dragged row dims to half.
+
+## Content header
+
+`src/shell/Header.tsx`, styled in `styles/header.css`: 14px 24px 12px padding, a row with a 10px gap.
+
+- A Space: the 28px tile (8px radius, 14/800) and the name (19/700).
+- A filter list: a breadcrumb button with the 20px tile (6px radius, 10/800) and the Space name (13px
+  `--text-tertiary`, opens the Space), "/" in `--text-faint`, the funnel 15/2 in `--text-tertiary`, then the
+  list name (19/700).
+- Everything and the Home lists: their sidebar icon (20/1.8, `--text-tertiary`) and name.
+- **Open in Jira ↗** on the right for a Space and its lists: 32px, 12px padding, 8px radius, a `--border`
+  frame, 13px `--text-secondary`; opens `<site>/browse/<KEY>`. Hidden elsewhere and without a site.
+
+## View tabs
+
+`src/shell/ViewTabs.tsx`, a `tablist` of the current level's views (`useViews`, `views_of`): 42px, 20px
+padding, 2px gap, a `--hairline` bottom line.
+
+- A tab: 8px padding, 7px gap, `--text-tertiary`; an 18px tile (5px radius) in `--view-list`,
+  `--view-board` or `--view-table` with the white `List`, `Kanban` or `Table2` glyph (11/2.8), then the name.
+  The current tab is `--text`, 600, with a 2px `--text` underline over the bar's line.
+- After the tabs a 1px `--border` separator (10px inset) and "+ View" (`--text-muted`), a native menu of List,
+  Board and Table that adds a view of that layout named after it and opens it.
+- Right-click a tab: Rename (in place), Duplicate, Change layout ▸ (the other layouts), Delete (disabled for
+  the only view; deleting the current view opens the level's default).
+- ⌘1–⌘9 open the nth tab.
 
 ## Tokens
 
@@ -122,11 +184,19 @@ owner's own Settings design replaces it. Its colours are the `--settings-*` toke
     runs out).
   - **Projects**: Refresh after a successful test, "N of M tracked", a filter field (every word in the name or
     key, ignoring case) and a Track switch per project.
+  - **Spaces** (`SpacesPage`): the tracked Spaces in sidebar order, each a row with its tile, name, key and
+    client and Move Up / Move Down buttons; clicking the row opens its fields below it (`SpaceFields` in
+    `components/SpaceEditor.tsx`): Name (empty uses the project's), Icon letter (one letter or digit), Colour
+    (five swatches of `--space-tile-1..5` beside a preview tile) and Client (empty means internal). Each field
+    saves on its own with Rust's field error under it. "Track projects under Projects to get Spaces." when none
+    is tracked. The sidebar's "Colour and icon…" and "Client label…" items open `SpacePopover` (300px, 12px
+    radius, `--shadow-popover`, at the top left of the content panel) with the same fields; Esc, Done or a
+    click outside close it.
   - **Sync**: *Scope* (the effective JQL in a monospaced field; Validate, Save, Reset to Default), *Intervals*
     (minutes in front and in the background, days to keep done issues) and *Cache* (the sync state line with
     Sync Now, one row per tracked project with its key, last full sync and "N issues · M open", then Reset
     Cache, confirmed in a sheet). It stays as the diagnostics view of the cache.
-  - **General** (System): About and logs. Spaces, Statuses, Shortcuts and Appearance join with their features.
+  - **General** (System): About and logs. Statuses, Shortcuts and Appearance join with their features.
 - The layout stays Daybook's until the owner's own Settings design arrives.
 
 ## Keys
@@ -140,6 +210,9 @@ palette once it exists.
 - While a dialog is open, only `?` and the text size keys run.
 - ↵ and Space on a focused button or link activate it. `Tab` is never bound.
 - A command has one binding.
+- In the Taskboard window: ⌥⌘↑ and ⌥⌘↓ open the previous and next Space (the bus commands `nav:previousSpace`
+  and `nav:nextSpace`, which wrap), ⌘1–⌘9 the nth view tab.
+- `app:settings:<page>` opens Settings at a page or section (the Spaces "+" uses `app:settings:projects`).
 
 ## Palette checks
 

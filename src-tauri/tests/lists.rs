@@ -1493,6 +1493,52 @@ mod editing_spaces {
     }
 
     #[tokio::test]
+    async fn a_name_equal_to_the_project_name_is_stored_as_null() {
+        let (_dir, db) = tracked_lab().await;
+        let name_is_null = || {
+            rows(
+                &db,
+                "SELECT name IS NULL FROM space WHERE project_id = '10001'",
+                |row| row.get::<_, i64>(0),
+            )
+        };
+
+        space_update(
+            &db,
+            NW.into(),
+            SpaceUpdate {
+                name: Some("Website relaunch".into()),
+                ..SpaceUpdate::default()
+            },
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(name_is_null().await, [1]);
+        let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
+        let space = find_space(&tree, "NW");
+        assert_eq!(space.name, "Website relaunch");
+        assert_eq!(space.project_name, "Website relaunch");
+
+        space_update(
+            &db,
+            NW.into(),
+            SpaceUpdate {
+                name: Some("Storefront".into()),
+                ..SpaceUpdate::default()
+            },
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(name_is_null().await, [0]);
+        let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
+        let space = find_space(&tree, "NW");
+        assert_eq!(space.name, "Storefront");
+        assert_eq!(space.project_name, "Website relaunch");
+    }
+
+    #[tokio::test]
     async fn an_icon_must_be_one_letter_or_digit() {
         let (_dir, db) = tracked_lab().await;
 
@@ -1637,5 +1683,44 @@ mod editing_spaces {
                 .collect::<Vec<_>>(),
             ["NW", "NWS"]
         );
+    }
+
+    #[tokio::test]
+    async fn moving_a_space_orders_only_tracked_spaces() {
+        const LUM: &str = "10003";
+        let spaces = |tree: &SidebarTree| {
+            tree.spaces
+                .iter()
+                .map(|s| s.key.clone())
+                .collect::<Vec<_>>()
+        };
+        let (_dir, db) = two_spaces().await;
+        execute(
+            &db,
+            "INSERT INTO cache.project (id, key, name, raw) VALUES ('10003', 'LUM', 'Lumen iOS app', '{}')",
+        )
+        .await;
+        track_project(&db, LUM.into(), true).await.unwrap();
+        track_project(&db, NWS.into(), false).await.unwrap();
+
+        space_move(&db, LUM.into(), 0).await.unwrap();
+
+        let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
+        assert_eq!(spaces(&tree), ["LUM", "NW"]);
+
+        space_move(&db, NW.into(), 0).await.unwrap();
+        space_move(&db, NW.into(), 1).await.unwrap();
+
+        let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
+        assert_eq!(spaces(&tree), ["LUM", "NW"]);
+
+        space_move(&db, LUM.into(), 0).await.unwrap();
+        track_project(&db, NWS.into(), true).await.unwrap();
+
+        let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
+        let keys = spaces(&tree);
+        let position = |key: &str| keys.iter().position(|k| k == key).unwrap();
+        assert_eq!(keys.len(), 3);
+        assert!(position("LUM") < position("NW"), "{keys:?}");
     }
 }

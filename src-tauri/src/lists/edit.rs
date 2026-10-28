@@ -1,7 +1,7 @@
 //! Creating and changing filter lists and Spaces. Every change keeps positions dense.
 
 use rusqlite::types::Value as SqlValue;
-use rusqlite::{Connection, params, params_from_iter};
+use rusqlite::{Connection, OptionalExtension, params, params_from_iter};
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
@@ -216,7 +216,7 @@ pub async fn space_move(db: &Db, project_id: String, position: i64) -> AppResult
         let spaces = Siblings {
             table: "space",
             key: "project_id",
-            of: "1",
+            of: "tracked = 1",
             params: Vec::new(),
         };
         spaces.move_to(tx, SqlValue::Text(project_id), position)?;
@@ -257,6 +257,15 @@ pub async fn space_update(db: &Db, project_id: String, update: SpaceUpdate) -> A
     let client = blank_is_none(update.client);
     db.write(move |tx, changes| {
         require_space(tx, &project_id)?;
+        // A name equal to the project's isn't the owner's own, so a renamed project renames the Space too.
+        let project_name: Option<String> = tx
+            .query_row(
+                "SELECT name FROM cache.project WHERE id = ?1",
+                [&project_id],
+                |row| row.get(0),
+            )
+            .optional()?;
+        let name = name.filter(|name| Some(name) != project_name.as_ref());
         tx.execute(
             "UPDATE space SET name = ?2, icon = ?3, color = ?4, client = ?5 WHERE project_id = ?1",
             params![project_id, name, icon, color, client],

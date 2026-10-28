@@ -8,6 +8,7 @@ use crate::db::Db;
 use crate::error::AppResult;
 use crate::jira::Limiter;
 use crate::launch::LaunchQueue;
+use crate::nav::NavStore;
 use crate::secrets::Keychain;
 use crate::store::keybindings::KeybindingsStore;
 use crate::store::settings::SettingsStore;
@@ -20,6 +21,7 @@ pub struct AppState {
     pub launches: LaunchQueue,
     pub db: Db,
     pub jira: JiraAccess,
+    pub nav: NavStore,
 }
 
 impl AppState {
@@ -34,6 +36,7 @@ impl AppState {
                 Arc::new(Keychain::new(crate::APP_NAME)),
                 Arc::new(Limiter::default()),
             ),
+            nav: NavStore::open(config_dir),
         })
     }
 }

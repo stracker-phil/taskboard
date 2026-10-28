@@ -111,7 +111,25 @@ export type LocalChanged = { parts: Array<LocalPart>, };
  */
 export type LocalPart = "spaces" | "lists" | "views" | "pins" | "styles";
 
+/**
+ * A sidebar level (a `filter_list` id: Everything, a Home list, a Space or a filter list) and its view.
+ */
+export type Location = { listId: number, viewId: number, };
+
 export type MatchCount = { open: number, total: number, };
+
+/**
+ * What the page needs to draw the sidebar's place.
+ */
+export type Nav = { 
+/**
+ * None only while no level exists (a broken local file).
+ */
+location: Location | null, 
+/**
+ * Space nodes the owner expanded; the active Space shows expanded regardless.
+ */
+expanded: Array<number>, };
 
 export type Op = "is" | "isNot" | "in" | "notIn" | "isEmpty" | "isNotEmpty" | "contains" | "before" | "after" | "withinLastDays" | "withinNextDays";
 
@@ -157,7 +175,11 @@ export type SpaceNode = {
 /**
  * The Space's own node; its views hang off it.
  */
-listId: number, projectId: string, key: string, name: string, icon: string | null, 
+listId: number, projectId: string, key: string, name: string, 
+/**
+ * The Jira project's own name; `name` differs when the owner renamed the Space.
+ */
+projectName: string, icon: string | null, 
 /**
  * A Space tile colour token number.
  */

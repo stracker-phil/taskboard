@@ -13,6 +13,7 @@ All in the config dir (`~/Library/Application Support/com.philippstracker.taskbo
 | `local.sqlite` | The owner's setup: Spaces, filter lists, views, pins, status style overrides | kept |
 | `cache.sqlite` | The Jira mirror: projects, issues, comments, people, versions, fields, change log, seen marks, sync state, search index | deleted and recreated empty |
 | `settings.json`, `keybindings.json`, `ui_state.json` | Settings, key overrides, window layout (`store/`) | kept |
+| `nav.json` | The main window's place: the open level and view, each level's last view, the expanded Spaces (`nav/`). A place that no longer exists falls back to the level's default view, then to Everything | kept |
 
 The Jira token is in the Keychain only, never in a file or a log.
 

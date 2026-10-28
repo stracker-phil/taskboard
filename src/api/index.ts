@@ -1,6 +1,7 @@
 import { getName, getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { Menu } from "@tauri-apps/api/menu";
 import type {
   AppError,
   AppInfo,
@@ -16,6 +17,7 @@ import type {
   LaunchEvent,
   Layout,
   MatchCount,
+  Nav,
   ProjectRow,
   ScopeView,
   Settings,
@@ -29,6 +31,17 @@ import type {
 } from "./types";
 
 export * from "./types";
+
+/** An item of a native context menu: runs `run` when chosen, or opens `items` as a submenu. */
+export type MenuEntry = { text: string; enabled?: boolean; run?: () => void; items?: MenuEntry[] } | "separator";
+
+type NativeEntry = { item: "Separator" } | { text: string; enabled?: boolean; action?: () => void; items?: NativeEntry[] };
+
+function nativeEntry(entry: MenuEntry): NativeEntry {
+  if (entry === "separator") return { item: "Separator" };
+  if (entry.items) return { text: entry.text, enabled: entry.enabled, items: entry.items.map(nativeEntry) };
+  return { text: entry.text, enabled: entry.enabled, action: entry.run };
+}
 
 /** The app's IPC entry point (ADR 0002). Tests mock this module. */
 export const api = {
@@ -86,6 +99,12 @@ export const api = {
   spaceUpdate: (projectId: string, update: SpaceUpdate) => invoke<void>("space_update", { projectId, update }),
   /** "Use as Space default": the columns new views in this Space start with. */
   spaceDefaultColumns: (projectId: string, columns: string[]) => invoke<void>("space_default_columns", { projectId, columns }),
+  /** Where the main window is; Everything when the saved place is gone. */
+  navCurrent: () => invoke<Nav>("nav_current"),
+  /** Opens a level at `viewId`, or at its last or default view when `viewId` is null. */
+  navGo: (listId: number, viewId: number | null) => invoke<Nav>("nav_go", { listId, viewId }),
+  /** The Space nodes the owner expanded in the sidebar. */
+  navSetExpanded: (expanded: number[]) => invoke<Nav>("nav_set_expanded", { expanded }),
   viewsOf: (listId: number) => invoke<View[]>("views_of", { listId }),
   viewCreate: (listId: number, name: string, layout: Layout) => invoke<View>("view_create", { listId, name, layout }),
   viewRename: (id: number, name: string) => invoke<View>("view_rename", { id, name }),
@@ -97,6 +116,11 @@ export const api = {
   viewMove: (id: number, position: number) => invoke<View[]>("view_move", { id, position }),
   /** Rejects with `invalid_input` for the last view of a level. */
   viewDelete: (id: number) => invoke<View[]>("view_delete", { id }),
+  /** Shows a native context menu at the mouse; the chosen entry's `run` is called. */
+  popupMenu: async (entries: MenuEntry[]): Promise<void> => {
+    const menu = await Menu.new({ items: entries.map(nativeEntry) });
+    await menu.popup();
+  },
   appInfo: async (): Promise<AppInfo> => {
     const [name, version] = await Promise.all([getName(), getVersion()]);
     return { name, version };
