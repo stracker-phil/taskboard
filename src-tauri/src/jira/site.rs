@@ -53,12 +53,16 @@ impl Site {
         let base = match self.token_kind {
             TokenKind::Classic => self.base_url.clone(),
             TokenKind::Scoped => {
-                let cloud_id = self.cloud_id.as_deref().ok_or_else(|| {
-                    AppError::NotConnected(
-                        "A scoped token needs the site's cloud id; test the connection again"
-                            .into(),
-                    )
-                })?;
+                let cloud_id = self
+                    .cloud_id
+                    .as_deref()
+                    .filter(|id| is_cloud_id(id))
+                    .ok_or_else(|| {
+                        AppError::NotConnected(
+                            "A scoped token needs the site's cloud id; test the connection again"
+                                .into(),
+                        )
+                    })?;
                 join(&self.gateway(), &format!("ex/jira/{cloud_id}/"))
             }
         };
@@ -88,6 +92,11 @@ impl Site {
             Url::parse(&format!("https://{GATEWAY_HOST}/")).expect("a valid gateway URL")
         }
     }
+}
+
+/// Atlassian's cloud ids are UUIDs; anything else could change the gateway path it is placed in.
+fn is_cloud_id(id: &str) -> bool {
+    (1..=64).contains(&id.len()) && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
 }
 
 fn join(base: &Url, path: &str) -> Url {
@@ -242,6 +251,44 @@ mod tests {
     fn a_scoped_token_without_a_cloud_id_is_not_connected() {
         let site = site("example", TokenKind::Scoped, None);
         assert!(matches!(site.api_base(), Err(AppError::NotConnected(_))));
+    }
+
+    #[test]
+    fn a_scoped_cloud_id_that_could_change_the_gateway_path_is_not_connected() {
+        let too_long = "a".repeat(65);
+        for id in [
+            "../x",
+            "a/b",
+            "a?b",
+            "a#b",
+            "a b",
+            "a%2Fb",
+            "a\\b",
+            "a:b",
+            "..",
+            "",
+            "é",
+            too_long.as_str(),
+        ] {
+            let site = site("example", TokenKind::Scoped, Some(id));
+            assert!(
+                matches!(site.api_base(), Err(AppError::NotConnected(_))),
+                "{id:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_cloud_id_of_letters_digits_and_dashes_up_to_64_characters_is_accepted() {
+        let longest = "a".repeat(64);
+        for id in [CLOUD_ID, "ABC-123", "x", longest.as_str()] {
+            let site = site("example", TokenKind::Scoped, Some(id));
+            assert_eq!(
+                site.api_base().unwrap().as_str(),
+                format!("https://api.atlassian.com/ex/jira/{id}/rest/api/3/"),
+                "{id}"
+            );
+        }
     }
 
     #[test]

@@ -1,7 +1,8 @@
 # Jira client
 
-`src-tauri/src/jira/` talks to Jira Cloud's REST API v3. It reads only; writes arrive in M4. Everything goes
-through `net::Http`, which reaches only the hosts of the connection
+`src-tauri/src/jira/` talks to Jira Cloud's REST API v3. It reads only; writes arrive in M4. Every request goes
+through `jira/gateway/`, which sends only the operations on its allowlist
+([ADR 0025](adr/0025-all-jira-traffic-goes-through-one-allowlisted-gateway.md)) to the hosts of the connection
 ([ADR 0020](adr/0020-jira-site-and-atlassian-gateway-are-the-hosts.md)).
 
 ## Setup
@@ -40,12 +41,37 @@ dated to today; any email and token connect to it.
 
 The token lives in the Keychain (`secrets.rs`, service `APP_NAME`, account = the email;
 [ADR 0021](adr/0021-the-token-lives-in-the-keychain-through-secrets-rs.md)). `JiraClient` reads it for every
-request and sends `Authorization: Basic base64(email:token)`. No command returns it; `net::redact` removes
+request and sends `Authorization: Basic base64(email:token)` (never to `_edge/tenant_info`). No command returns it; `net::redact` removes
 `Authorization` values, `Basic`/`Bearer` tokens and the email from the lines the client logs.
+
+## Gateway and allowlist
+
+`Gateway::send(Endpoint)` (`jira/gateway/mod.rs`) is the only way a request leaves the app:
+
+1. `endpoint.rs` `Endpoint::plan` turns one allowlisted operation into method, URL, body and whether it is
+   authenticated. Path segments are pushed one by one, so a value can't add a segment, a query or a fragment.
+2. `params.rs` validates every value first: `ProjectKey` (`[A-Z][A-Z0-9_]*`), `IssueRef` (digits, or a key),
+   `IssueRefs` (1 to `BULK_FETCH_MAX`), `Jql` (non-empty, at most 10,000 characters, body only), `FieldIds`
+   (explicit ids, never `*all`), `Expand` (`renderedFields`), `PageToken`. A refused value fails as
+   `invalid_input` and nothing is sent.
+3. `guard.rs` `check` compares the planned request with `RULES` (method, path under the REST base, allowed
+   query keys) and the unauthenticated `GET /_edge/tenant_info`. Anything else, a fragment, credentials in the
+   URL, a body on a GET, or a write while `WRITES_ENABLED` is `false`, fails as `internal` ("Taskboard doesn't
+   call …").
+4. `http.rs` `Http` sends it: listed hosts only, no redirects (a 3xx fails), JSON only on success, answers capped
+   at `MAX_ANSWER_BYTES` (32 MB). It is the only place `reqwest` may be used (`src-tauri/clippy.toml`).
+
+**Not API traffic:** the webview has no HTTP, shell or opener permission (`capabilities/default.json`). Links
+("Open in Jira", links in descriptions) go through the `open_url` command, which hands an `https` URL without
+credentials to the default browser; the app sends nothing itself and the token never leaves the gateway.
+
+**Adding an endpoint:** a variant in `Endpoint` with its plan, a row in `RULES`, a method in `api.rs`, tests for
+the exact request and its refusals, and a row in the table below. A write also flips `Access::Write` for that
+row and needs the owner's go-ahead (M4).
 
 ## Endpoints
 
-One method on `JiraClient` each (`jira/api.rs`); the answers are typed in `jira/dto/`.
+One method on `JiraClient` each (`jira/api.rs`), one `Endpoint` each; the answers are typed in `jira/dto/`.
 
 | Method | Endpoint | Answer |
 |---|---|---|
@@ -78,7 +104,7 @@ ends; the caller decides whether to repeat the job.
 
 ## Errors
 
-`JiraClient` maps answers to `AppError` ([ADR 0003](adr/0003-errors-as-kinds.md)):
+The gateway maps answers to `AppError` ([ADR 0003](adr/0003-errors-as-kinds.md)):
 
 | Answer | Kind |
 |---|---|
@@ -87,6 +113,9 @@ ends; the caller decides whether to repeat the job.
 | no connection, DNS failure, timeout | `offline` |
 | 400 on `search/jql`, `approximate-count`, `jql/parse` | `invalid_jql`, with Jira's messages |
 | 404 | `not_found` |
+| a redirect, a success that isn't JSON, an answer over 32 MB | `internal` |
+| a request outside the allowlist | `internal` ("Taskboard doesn't call …"), nothing sent |
+| a value that fails validation (key, JQL, field id) | `invalid_input`, nothing sent |
 | anything else, or an answer that doesn't decode | `internal`, with the status |
 
 ## JQL

@@ -140,6 +140,22 @@ impl FakeJira {
             .push_back(Response::json(status, body));
     }
 
+    /// The next request gets exactly this answer: any status, headers, content type and body.
+    pub fn answer_raw(
+        &self,
+        status: u16,
+        headers: &[(&str, &str)],
+        content_type: &str,
+        body: String,
+    ) {
+        let mut response = Response::raw(status, content_type, body);
+        response.headers = headers
+            .iter()
+            .map(|(name, value)| ((*name).into(), (*value).into()))
+            .collect();
+        self.shared.canned.lock().unwrap().push_back(response);
+    }
+
     pub fn set_latency(&self, latency: Duration) {
         *self.shared.latency.lock().unwrap() = latency;
     }

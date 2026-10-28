@@ -56,4 +56,5 @@ panic = "unwind"
 # Itself with test helpers, so integration tests in tests/ can use them (ADR 0006).
 taskboard = { path = ".", features = ["test-util"] }
 tempfile = "3"
+proptest = "1"
 tokio = { version = "1", features = ["test-util", "macros", "rt"] }

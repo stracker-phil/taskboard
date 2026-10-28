@@ -27,14 +27,20 @@ impl Recorded {
 pub struct Response {
     pub status: u16,
     pub headers: Vec<(String, String)>,
-    pub body: Value,
+    pub content_type: String,
+    pub body: String,
 }
 
 impl Response {
     pub fn json(status: u16, body: Value) -> Self {
+        Self::raw(status, "application/json", body.to_string())
+    }
+
+    pub fn raw(status: u16, content_type: &str, body: String) -> Self {
         Self {
             status,
             headers: Vec::new(),
+            content_type: content_type.into(),
             body,
         }
     }
@@ -85,10 +91,11 @@ pub async fn read_request(socket: &mut TcpStream) -> Option<Recorded> {
 }
 
 pub async fn write_response(socket: &mut TcpStream, response: Response) {
-    let body = response.body.to_string();
+    let body = response.body;
     let mut head = format!(
-        "HTTP/1.1 {} X\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n",
+        "HTTP/1.1 {} X\r\nContent-Type: {}\r\nContent-Length: {}\r\nConnection: close\r\n",
         response.status,
+        response.content_type,
         body.len()
     );
     for (name, value) in &response.headers {

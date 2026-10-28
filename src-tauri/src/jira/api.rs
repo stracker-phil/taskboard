@@ -1,38 +1,36 @@
-//! The Jira endpoints Taskboard uses, one method each.
+//! The Jira operations Taskboard uses, one method each, each one `Endpoint` of the gateway's allowlist.
 
-use serde_json::json;
-
-use super::client::{BadRequest, JiraClient};
+use super::client::JiraClient;
 use super::dto::{
     ApproximateCount, BulkFetch, Comment, CommentPage, Field, Myself, ParsedQueries, Project,
     ProjectPage, Status, TenantInfo, Version,
 };
-use super::paging::{PAGE_SIZE, SearchPages, SearchRequest};
+use super::gateway::{Endpoint, FieldIds, IssueRef, IssueRefs, Jql, ProjectKey};
+use super::paging::{SearchPages, SearchRequest};
 use crate::error::AppResult;
-
-/// Jira's limit for `issue/bulkfetch`.
-pub const BULK_FETCH_MAX: usize = 100;
 
 impl JiraClient {
     pub async fn myself(&self) -> AppResult<Myself> {
-        self.get("myself", &[]).await
+        self.gateway().send(Endpoint::Myself).await
     }
 
     /// The site's cloud id, which scoped tokens need; asked without credentials.
     pub async fn tenant_info(&self) -> AppResult<TenantInfo> {
-        self.get_public(&self.site().tenant_info_url()).await
+        self.gateway().send(Endpoint::TenantInfo).await
     }
 
     pub async fn fields(&self) -> AppResult<Vec<Field>> {
-        self.get("field", &[]).await
+        self.gateway().send(Endpoint::Fields).await
     }
 
     pub async fn statuses(&self) -> AppResult<Vec<Status>> {
-        self.get("status", &[]).await
+        self.gateway().send(Endpoint::Statuses).await
     }
 
     pub async fn versions(&self, project_key: &str) -> AppResult<Vec<Version>> {
-        self.get(&format!("project/{project_key}/versions"), &[])
+        let project = ProjectKey::parse(project_key)?;
+        self.gateway()
+            .send(Endpoint::ProjectVersions { project })
             .await
     }
 
@@ -40,12 +38,10 @@ impl JiraClient {
     pub async fn projects(&self) -> AppResult<Vec<Project>> {
         let mut projects = Vec::new();
         loop {
-            let start_at = projects.len().to_string();
+            let start_at = u32::try_from(projects.len()).unwrap_or(u32::MAX);
             let page: ProjectPage = self
-                .get(
-                    "project/search",
-                    &[("startAt", &start_at), ("maxResults", "50")],
-                )
+                .gateway()
+                .send(Endpoint::ProjectSearch { start_at })
                 .await?;
             let empty = page.values.is_empty();
             projects.extend(page.values);
@@ -62,36 +58,34 @@ impl JiraClient {
 
     /// Up to `BULK_FETCH_MAX` issues by id or key; missing ones are left out of `issues`.
     pub async fn bulk_fetch(&self, ids: &[String], fields: &[String]) -> AppResult<BulkFetch> {
-        let body = json!({ "issueIdsOrKeys": ids, "fields": fields });
-        self.post("issue/bulkfetch", &[], &body, BadRequest::Plain)
-            .await
+        let endpoint = Endpoint::BulkFetch {
+            issues: IssueRefs::parse(ids)?,
+            fields: FieldIds::parse(fields)?,
+        };
+        self.gateway().send(endpoint).await
     }
 
     pub async fn approximate_count(&self, jql: &str) -> AppResult<u64> {
-        let body = json!({ "jql": jql });
+        let jql = Jql::parse(jql)?;
         let answer: ApproximateCount = self
-            .post("search/approximate-count", &[], &body, BadRequest::Jql)
+            .gateway()
+            .send(Endpoint::ApproximateCount { jql })
             .await?;
         Ok(answer.count)
     }
 
     /// Every comment on an issue, oldest first, with Jira's rendered HTML.
     pub async fn comments(&self, issue_key: &str) -> AppResult<Vec<Comment>> {
-        let path = format!("issue/{issue_key}/comment");
-        let page_size = PAGE_SIZE.to_string();
+        let issue = IssueRef::parse(issue_key)?;
         let mut comments = Vec::new();
         loop {
-            let start_at = comments.len().to_string();
+            let start_at = u32::try_from(comments.len()).unwrap_or(u32::MAX);
             let page: CommentPage = self
-                .get(
-                    &path,
-                    &[
-                        ("startAt", &start_at),
-                        ("maxResults", &page_size),
-                        ("orderBy", "created"),
-                        ("expand", "renderedBody"),
-                    ],
-                )
+                .gateway()
+                .send(Endpoint::IssueComments {
+                    issue: issue.clone(),
+                    start_at,
+                })
                 .await?;
             let empty = page.comments.is_empty();
             comments.extend(page.comments);
@@ -103,15 +97,8 @@ impl JiraClient {
 
     /// Jira's problems with a query, strictly validated; empty when the query is valid.
     pub async fn check_jql(&self, jql: &str) -> AppResult<Vec<String>> {
-        let body = json!({ "queries": [jql] });
-        let parsed: ParsedQueries = self
-            .post(
-                "jql/parse",
-                &[("validation", "strict")],
-                &body,
-                BadRequest::Jql,
-            )
-            .await?;
+        let jql = Jql::parse(jql)?;
+        let parsed: ParsedQueries = self.gateway().send(Endpoint::JqlParse { jql }).await?;
         Ok(parsed
             .queries
             .into_iter()

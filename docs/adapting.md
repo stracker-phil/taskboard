@@ -29,14 +29,14 @@ own name, identifier, data, socket and URL scheme
 
 ## Network hosts
 
-Only `net.rs` talks to the network, and only to the hosts of the current Jira connection
+Only `jira/gateway/http.rs` talks to the network, and only to the hosts of the current Jira connection
 ([ADR 0020](adr/0020-jira-site-and-atlassian-gateway-are-the-hosts.md)). A new host needs an ADR and a row here.
 
 | Host | Why | Where |
 |---|---|---|
 | `<site>.atlassian.net` (the configured site, `https`) | Classic tokens, `_edge/tenant_info`, browse links | `jira/site.rs` `Site::hosts`, `normalize_site_url` |
 | `api.atlassian.com` (`https`) | Scoped tokens: `/ex/jira/<cloudId>/rest/api/3/` | `net.rs` `GATEWAY_HOST` |
-| `127.0.0.1` (`http`, debug builds and tests only) | The fake Jira ([ADR 0022](adr/0022-the-debug-build-syncs-from-a-built-in-fake-jira.md)) | `net.rs` `Http::allows`, `jira/site.rs` |
+| `127.0.0.1` (`http`, debug builds and tests only) | The fake Jira ([ADR 0022](adr/0022-the-debug-build-syncs-from-a-built-in-fake-jira.md)) | `net.rs` `is_fake_jira`, `jira/gateway/http.rs` `Http::allows`, `jira/site.rs` |
 
 ## Platform-specific code
 

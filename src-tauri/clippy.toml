@@ -1,0 +1,9 @@
+# Every HTTP request goes through jira::gateway (ADR 0025); its http.rs is the one place allowed to use reqwest.
+disallowed-types = [
+    { path = "reqwest::Client", reason = "send Jira requests through jira::gateway (ADR 0025)" },
+    { path = "reqwest::ClientBuilder", reason = "send Jira requests through jira::gateway (ADR 0025)" },
+    { path = "reqwest::RequestBuilder", reason = "send Jira requests through jira::gateway (ADR 0025)" },
+]
+disallowed-methods = [
+    { path = "reqwest::get", reason = "send Jira requests through jira::gateway (ADR 0025)" },
+]

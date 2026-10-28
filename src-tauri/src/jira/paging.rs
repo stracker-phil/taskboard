@@ -1,13 +1,12 @@
 //! Issue search, page by page. Jira's `nextPageToken` pages must be fetched one after another, so this is
 //! a pull-based cursor rather than a parallel fetch.
 
-use serde_json::{Value, json};
-
-use super::client::{BadRequest, JiraClient};
+use super::client::JiraClient;
 use super::dto::SearchPage;
+use super::gateway::{Endpoint, Expand, FieldIds, Jql, PageToken};
 use crate::error::AppResult;
 
-pub const PAGE_SIZE: u32 = 100;
+pub use super::gateway::PAGE_SIZE;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct SearchRequest {
@@ -40,10 +39,10 @@ impl<'a> SearchPages<'a> {
         if self.done {
             return None;
         }
-        let answer = self
-            .client
-            .post::<SearchPage>("search/jql", &[], &self.body(), BadRequest::Jql)
-            .await;
+        let answer = match self.endpoint() {
+            Ok(endpoint) => self.client.gateway().send::<SearchPage>(endpoint).await,
+            Err(refused) => Err(refused),
+        };
         match &answer {
             Ok(page) if !page.is_final() => self.next_token = page.next_page_token.clone(),
             _ => self.done = true,
@@ -51,18 +50,21 @@ impl<'a> SearchPages<'a> {
         Some(answer)
     }
 
-    fn body(&self) -> Value {
-        let mut body = json!({
-            "jql": self.request.jql,
-            "maxResults": PAGE_SIZE,
-            "fields": self.request.fields,
-        });
-        if let Some(expand) = &self.request.expand {
-            body["expand"] = json!(expand);
-        }
-        if let Some(token) = &self.next_token {
-            body["nextPageToken"] = json!(token);
-        }
-        body
+    fn endpoint(&self) -> AppResult<Endpoint> {
+        Ok(Endpoint::SearchJql {
+            jql: Jql::parse(&self.request.jql)?,
+            fields: FieldIds::parse(&self.request.fields)?,
+            expand: self
+                .request
+                .expand
+                .as_deref()
+                .map(Expand::parse)
+                .transpose()?,
+            page_token: self
+                .next_token
+                .as_deref()
+                .map(PageToken::parse)
+                .transpose()?,
+        })
     }
 }
