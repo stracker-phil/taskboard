@@ -1,0 +1,195 @@
+/* The light palette: every colour of the main window (docs/ux.md → Tokens). Values follow the Taskboard
+   mockup; near-duplicates in the mockup are merged into one token per role. */
+:root[data-scheme="light"] {
+  color-scheme: light;
+
+  /* Surfaces */
+  --window-bg: #f4f4f5;
+  --panel-bg: #ffffff;
+  --panel-subtle-bg: #fafafa;
+  --fill-subtle: #f4f4f5;
+  --fill-hover: #ebebee;
+  --segmented-bg: #eeeef1;
+  --scrim: rgba(20, 20, 22, 0.38);
+
+  /* Text */
+  --text: #18181b;
+  --text-strong-body: #27272a;
+  --text-secondary: #3f3f46;
+  --text-tertiary: #52525b;
+  --text-muted: #71717a;
+  --text-faint: #a1a1aa;
+  --text-on-accent: #ffffff;
+  --link: #1d4ed8;
+  --link-hover: #1e3a8a;
+
+  /* Lines */
+  --border: #e4e4e7;
+  --border-strong: #d4d4d8;
+  --hairline: #ededf0;
+  --row-hairline: #f1f1f3;
+  --card-border: #e9e9ec;
+
+  /* Accent and selection */
+  --accent: #2563eb;
+  --accent-text: #1d4ed8;
+  --selection-bg: #e3ebfd;
+  --selection-text: #1d4ed8;
+  --accent-soft-bg: #eff6ff;
+  --accent-soft-border: #bfdbfe;
+  --accent-soft-text: #1e3a8a;
+  --button-primary-bg: #18181b;
+  --button-primary-text: #ffffff;
+  --spinner-track: #bfdbfe;
+  --focus-ring: #2563eb;
+
+  /* Changed since the owner last looked */
+  --changed-bg: #eff5ff;
+  --changed-border: #bfdbfe;
+  --changed-chip-bg: #dbeafe;
+  --changed-chip-text: #1d4ed8;
+  --changed-dot: #2563eb;
+
+  /* Status styles: pill fill, pill text, pill border, row ring, board tint, board count */
+  --status-todo-bg: #f4f4f5;
+  --status-todo-fg: #52525b;
+  --status-todo-border: #e4e4e7;
+  --status-todo-ring: #a1a1aa;
+  --status-todo-tint: #f4f4f5;
+  --status-todo-count: #71717a;
+  --status-progress-bg: #2563eb;
+  --status-progress-fg: #ffffff;
+  --status-progress-border: #2563eb;
+  --status-progress-ring: #2563eb;
+  --status-progress-tint: #eff5ff;
+  --status-progress-count: #1d4ed8;
+  --status-review-bg: #7c3aed;
+  --status-review-fg: #ffffff;
+  --status-review-border: #7c3aed;
+  --status-review-ring: #7c3aed;
+  --status-review-tint: #f5f1fe;
+  --status-review-count: #6d28d9;
+  --status-blocked-bg: #dc2626;
+  --status-blocked-fg: #ffffff;
+  --status-blocked-border: #dc2626;
+  --status-blocked-ring: #dc2626;
+  --status-blocked-tint: #fef2f2;
+  --status-blocked-count: #b91c1c;
+  --status-done-bg: #15803d;
+  --status-done-fg: #ffffff;
+  --status-done-border: #15803d;
+  --status-done-ring: #15803d;
+  --status-done-tint: #effaf3;
+  --status-done-count: #15803d;
+
+  /* Priority flags */
+  --flag-highest: #dc2626;
+  --flag-high: #f59e0b;
+  --flag-medium: #3b82f6;
+  --flag-low: #a1a1aa;
+
+  /* Epic tints, assigned per epic in turn */
+  --epic-1-bg: #f3e8ff;
+  --epic-1-fg: #6b21a8;
+  --epic-2-bg: #fef3c7;
+  --epic-2-fg: #92400e;
+  --epic-3-bg: #dbeafe;
+  --epic-3-fg: #1e40af;
+  --epic-4-bg: #dcfce7;
+  --epic-4-fg: #166534;
+  --epic-5-bg: #ffe4e6;
+  --epic-5-fg: #9f1239;
+
+  /* Label tints */
+  --label-1-bg: #e0f2fe;
+  --label-1-fg: #075985;
+  --label-2-bg: #ffedd5;
+  --label-2-fg: #9a3412;
+  --label-neutral-bg: #f4f4f5;
+  --label-neutral-fg: #3f3f46;
+
+  /* Avatars (white initials) and Space tiles (white letter) */
+  --avatar-1: #f59e0b;
+  --avatar-2: #0ea5e9;
+  --avatar-3: #ec4899;
+  --avatar-4: #10b981;
+  --avatar-ring: #ffffff;
+  --space-tile-1: #2563eb;
+  --space-tile-2: #475569;
+  --space-tile-3: #7c3aed;
+  --space-tile-4: #0d9488;
+  --space-tile-5: #d97706;
+
+  /* View-tab tiles */
+  --view-list: #2563eb;
+  --view-board: #0ea5e9;
+  --view-table: #16a34a;
+
+  /* Banners and notices */
+  --banner-info-bg: #eff6ff;
+  --banner-info-text: #1e3a8a;
+  --banner-info-dot: #2563eb;
+  --banner-warn-bg: #fff7e6;
+  --banner-warn-text: #92400e;
+  --banner-warn-dot: #f59e0b;
+  --banner-warn-button-border: #f5d9a8;
+  --banner-error-bg: #fef2f2;
+  --banner-error-text: #7f1d1d;
+  --banner-error-dot: #dc2626;
+  --banner-error-button-bg: #dc2626;
+  --notice-neutral-bg: #f4f4f5;
+  --notice-neutral-text: #3f3f46;
+
+  /* Pins and pull requests */
+  --pin-icon: #b45309;
+  --pin-bg: #fef3c7;
+  --pin-text: #92400e;
+  --pr-open-bg: #f3e8ff;
+  --pr-open-fg: #6b21a8;
+
+  /* Sync chip */
+  --sync-ok: #22c55e;
+  --sync-busy: #1d4ed8;
+  --sync-offline: #a1a1aa;
+  --sync-error-bg: #fef2f2;
+  --sync-error-text: #b91c1c;
+  --sync-error-dot: #dc2626;
+  --progress-done: #15803d;
+
+  /* Shadows */
+  --shadow-panel: 0 0 0 1px rgba(0, 0, 0, 0.04), 0 2px 8px rgba(0, 0, 0, 0.05);
+  --shadow-popover: 0 16px 40px rgba(0, 0, 0, 0.16);
+  --shadow-palette: 0 24px 60px rgba(0, 0, 0, 0.28);
+  --shadow-peek: -8px 0 24px rgba(0, 0, 0, 0.06);
+  --shadow-raised: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-knob: 0 1px 2px rgba(0, 0, 0, 0.2);
+
+  /* Settings window and its controls, drawn as System Settings draws them (ADR 0017) */
+  /* Settings surfaces: the page, the page list, inset groups */
+  --settings-bg: #ffffff;
+  --settings-chrome: #f5f5f5;
+  --settings-fill-quiet: rgba(0, 0, 0, 0.035);
+  --settings-fill: rgba(0, 0, 0, 0.055);
+  --settings-fill-strong: rgba(0, 0, 0, 0.1);
+  --settings-line: rgba(0, 0, 0, 0.12);
+  --settings-hairline: rgba(38, 38, 38, 0.06);
+
+  /* text: primary, titles, secondary (68%) and tertiary (52%) */
+  --settings-text: #262626;
+  --settings-text-strong: #000000;
+  --settings-text-secondary: rgba(38, 38, 38, 0.68);
+  --settings-text-tertiary: rgba(38, 38, 38, 0.52);
+
+  /* controls: push buttons, fields, switches */
+  --settings-control: #ffffff;
+  --settings-control-pressed: #ebebeb;
+  --settings-control-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.2), 0 1px 2px rgba(0, 0, 0, 0.12);
+  --settings-field: #ffffff;
+  --settings-field-line: rgba(0, 0, 0, 0.16);
+  --settings-knob: #ffffff;
+  --settings-knob-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.06), 0 0.5px 2px rgba(0, 0, 0, 0.2);
+  --settings-focus-ring: rgba(37, 99, 235, 0.45);
+  /* accent fills of an inactive window turn grey */
+  --settings-blurred-fill: rgba(38, 38, 38, 0.2);
+}

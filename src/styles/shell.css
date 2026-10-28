@@ -1,0 +1,77 @@
+/* The main window's frame: the sidebar on the window background beside the inset content panel. */
+.shell {
+  display: grid;
+  grid-template-columns: 264px 1fr;
+  height: 100%;
+  background: var(--window-bg);
+}
+
+.shell--sidebar-hidden {
+  grid-template-columns: 1fr;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+  padding: 16px 12px 12px;
+}
+
+/* The native traffic lights sit here (tauri.conf.json `trafficLightPosition`). */
+.sidebar__traffic-lights {
+  flex: none;
+  height: 18px;
+}
+
+.sidebar__home,
+.sidebar__spaces {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.sidebar__spaces {
+  flex: 1;
+  min-height: 0;
+}
+
+.sidebar__footer {
+  display: flex;
+  gap: 6px;
+}
+
+.shell__content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Without the sidebar a window-coloured strip keeps the traffic lights off the panel. */
+.shell__titlebar {
+  flex: none;
+  height: 42px;
+}
+
+.content-panel {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  margin: 8px 8px 8px 0;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--panel-bg);
+  box-shadow: var(--shadow-panel);
+}
+
+.shell--sidebar-hidden .content-panel {
+  margin: 0 8px 8px;
+}
+
+.content-panel__placeholder {
+  display: grid;
+  height: 100%;
+  place-items: center;
+  color: var(--text-muted);
+}

@@ -18,14 +18,16 @@ stands in Taskboard. The numbers in this table are Taskboard's.
 | [0006](0006-test-doubles-behind-test-util.md) | Test doubles and the demo seed ship behind a `test-util` feature | Accepted (2026-10-28) |
 | [0007](0007-color-palettes.md) | Color palettes are complete token sets; no color literal outside a palette | Accepted (2026-10-28) |
 | [0008](0008-cli-asks-the-running-app.md) | The CLI is a second process that asks the running app over the socket | Accepted (2026-10-28) |
-| [0009](0009-a-scheme-per-system-mode.md) | Appearance follows macOS, with one of three schemes per mode | Accepted (2026-10-28) |
-| [0010](0010-native-macos-look.md) | The app looks native and light | Accepted (2026-10-28) |
+| [0009](0009-a-scheme-per-system-mode.md) | Appearance follows macOS, with one of three schemes per mode | Superseded in part by 0017 |
+| [0010](0010-native-macos-look.md) | The app looks native and light | Superseded by 0017 for the main window |
 | [0011](0011-debug-build-is-a-separate-app-with-demo-data.md) | The debug build is a separate app with demo data | Accepted (2026-10-28) |
 | [0012](0012-commands-live-in-rust.md) | Commands live in Rust | Accepted (2026-10-28) |
 | [0013](0013-network-only-to-listed-hosts.md) | The app talks only to listed hosts | Accepted (2026-10-28) |
 | [0014](0014-small-feature-modules.md) | Small feature modules with narrow seams | Accepted (2026-10-28) |
 | [0015](0015-signed-with-a-local-certificate.md) | Builds are signed with a local certificate | Accepted (2026-10-28) |
 | [0016](0016-closing-the-window-keeps-the-app-running.md) | Closing the window keeps the app running | Accepted (2026-10-28) |
+| [0017](0017-the-main-window-follows-the-taskboard-mockup.md) | The main window follows the Taskboard mockup | Accepted (2026-10-28) |
+| [0018](0018-reads-go-through-tanstack-query.md) | Reads go through TanStack Query, invalidated by events | Accepted (2026-10-28) |
 
 Open, decided once the app's scope is known: where the data lives (SQLite through sqlx with migrations, as
 TimeTracker; or plain files, as Daybook), integrations with Daybook and TimeTracker.

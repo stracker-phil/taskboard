@@ -1,0 +1,81 @@
+/* AppKit-sized controls shared by every window (Daybook's controls.css, in px of its 13px UI size). */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 6px;
+  background: var(--settings-control);
+  box-shadow: var(--settings-control-shadow);
+  color: var(--settings-text);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.btn:active:not(:disabled) { background: var(--settings-control-pressed); }
+.btn:disabled { opacity: 0.45; }
+.btn:focus-visible { outline: none; box-shadow: var(--settings-control-shadow), 0 0 0 3px var(--settings-focus-ring); }
+.btn-primary { background: var(--accent); color: var(--text-on-accent); font-weight: 500; }
+
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--settings-text-secondary);
+}
+.icon-btn:hover:not(:disabled) { background: var(--settings-fill); color: var(--settings-text); }
+.icon-btn:active:not(:disabled) { background: var(--settings-fill-strong); }
+.icon-btn.tiny { width: 18px; height: 18px; }
+
+/* An inline text button in the accent (toast details). */
+.link-btn { margin: 0; padding: 0; border: none; border-radius: 4px; background: none; color: var(--accent-text); font-size: inherit; }
+
+.input {
+  width: 100%;
+  height: 22px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 6px;
+  outline: none;
+  background: var(--settings-field);
+  box-shadow: inset 0 0 0 1px var(--settings-field-line);
+}
+.input::placeholder { color: var(--settings-text-tertiary); }
+.input:focus { box-shadow: inset 0 0 0 1px var(--settings-field-line), 0 0 0 3px var(--settings-focus-ring); }
+
+.switch {
+  appearance: none;
+  position: relative;
+  flex: none;
+  width: 32px;
+  height: 18px;
+  margin: 0;
+  border-radius: 999px;
+  background: var(--settings-fill-strong);
+  box-shadow: inset 0 0 0 0.5px var(--settings-fill);
+  transition: background 0.15s;
+}
+.switch::after {
+  content: "";
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--settings-knob);
+  box-shadow: var(--settings-knob-shadow);
+  transition: transform 0.15s;
+}
+.switch:checked { background: var(--accent); }
+.switch:checked::after { transform: translateX(14px); }
+.switch:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--settings-focus-ring); }
+:root.window-blurred .switch:checked { background: var(--settings-blurred-fill); }

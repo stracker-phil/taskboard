@@ -1,0 +1,94 @@
+/* The Settings window (Daybook's layout, ADR 0017): the page list on the left, the page of inset groups on the
+   right. Sizes are Daybook's at its 13px UI size. */
+.settings-window {
+  display: flex;
+  height: 100%;
+  font-size: 13px;
+  color: var(--settings-text);
+  background: var(--settings-bg);
+}
+/* The strip under the window buttons, a drag region. */
+.settings-titlebar { flex: none; height: 36px; }
+
+/* The title-bar strip and the search stay put; only the list below them scrolls, so its overlay scrollbar never
+   reaches the window buttons. */
+.settings-nav {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 12px;
+  width: 190px;
+  min-height: 0;
+  padding: 0 8px;
+  background: var(--settings-chrome);
+  box-shadow: inset -1px 0 0 var(--settings-line);
+}
+.settings-nav-search {
+  flex: none;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--settings-fill);
+  box-shadow: none;
+}
+.settings-nav-search:focus { background: var(--settings-field); box-shadow: inset 0 0 0 1px var(--settings-field-line); }
+.settings-nav-list {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  margin: 0 -8px;
+  padding: 0 8px 16px;
+}
+.settings-nav-group { display: flex; flex-direction: column; gap: 2px; }
+.settings-nav-heading { padding: 0 8px 2px; font-size: 11px; font-weight: 600; color: var(--settings-text-tertiary); }
+.settings-nav button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--settings-text);
+  text-align: left;
+}
+.settings-nav button svg { flex: none; color: var(--settings-text-secondary); }
+.settings-nav button:active:not([aria-current="page"]) { background: var(--settings-fill); }
+.settings-nav button[aria-current="page"] { background: var(--settings-fill-strong); color: var(--settings-text-strong); }
+.settings-nav-section { margin-left: auto; font-size: 11px; color: var(--settings-text-secondary); }
+.settings-nav-empty { margin: 0; padding: 0 8px; color: var(--settings-text-tertiary); }
+
+/* The title sits in the strip beside the window buttons; only the page below it scrolls. */
+.settings-pane { display: flex; flex: 1; flex-direction: column; min-width: 0; background: var(--settings-bg); }
+.settings-pane > header { display: flex; flex: none; align-items: center; height: 36px; padding: 4px 12px 0 20px; }
+.settings-pane h2 { margin: 0; font-size: 15px; font-weight: 600; color: var(--settings-text-strong); }
+.settings-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 24px;
+  min-height: 0;
+  padding: 8px 20px 24px;
+  scrollbar-gutter: stable;
+}
+.settings-intro { margin: 0; line-height: 1.45; text-wrap: pretty; }
+
+/* An inset group (docs/ux.md, Surfaces): heading above, a quiet fill, no border, hairlines between rows. */
+.settings-group { display: flex; flex-direction: column; gap: 4px; scroll-margin-top: 8px; }
+.settings-group h3 { margin: 0 0 0 16px; font-size: 13px; font-weight: 600; }
+.settings-group-desc { margin: 0 0 0 16px; font-size: 11px; line-height: 1.35; color: var(--settings-text-secondary); text-wrap: pretty; }
+.settings-card { margin-top: 4px; padding: 0 16px; border-radius: 12px; background: var(--settings-fill-quiet); }
+.settings-row { display: flex; align-items: center; gap: 16px; min-height: 48px; padding: 14px 0; }
+.settings-row + .settings-row { border-top: 1px solid var(--settings-hairline); }
+.settings-row-text { display: flex; flex: 1; flex-direction: column; gap: 4px; min-width: 0; }
+.settings-row-desc { max-width: 350px; font-size: 11px; line-height: 1.35; color: var(--settings-text-secondary); text-wrap: balance; }
+.settings-row-control { display: flex; flex: none; align-items: center; gap: 8px; }
+.settings-row.disabled :is(.settings-row-text, .settings-row-control) { opacity: 0.45; }
+/* A read-only value, e.g. the version. */
+.settings-value { color: var(--settings-text-secondary); user-select: text; -webkit-user-select: text; }
+/* System Settings' push buttons: 28px, an 8px radius. */
+.settings-pane .btn { height: 28px; border-radius: 8px; }
+
+:root.window-blurred .settings-nav { opacity: 0.6; }

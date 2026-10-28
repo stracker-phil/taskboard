@@ -98,9 +98,12 @@ src-tauri/
   tauri.conf.json tauri.debug.conf.json
 src/
   main.tsx modules.ts App.tsx
-  api/index.ts types.gen.ts types.ts
-  state/store.ts slices/
-  commands/ components/ registry/ windows/<name>/ lib/ styles/ test/
+  api/index.ts types.gen.ts types.ts   the only IPC; generated and hand-written types
+  queries/                   TanStack Query hooks and the event → query-key map (ADR 0018)
+  state/store.ts slices/     UI-only state (zustand)
+  shell/                     the main window frame: sidebar and content panel
+  commands/ registry/        in-window keys; Settings page registry
+  components/ windows/<name>/ lib/ styles/ test/
 docs/                        this folder; adr/ holds the decision records; plan/ (gitignored) the steps
 scripts/*.sh scripts/dev/    install, stop, signing; the dev loop
 .claude/                     rules, agents, skills, settings

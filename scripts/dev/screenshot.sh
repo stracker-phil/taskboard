@@ -7,11 +7,12 @@ WID=$(swift - "$MODE" <<'SWIFT' 2>/dev/null
 import CoreGraphics
 let overlay = CommandLine.arguments[1] == "--overlay"
 let all = CGWindowListCopyWindowInfo(.optionAll, kCGNullWindowID) as! [[String: Any]]
+// macOS reports a window on another Space as not on screen; then any window of the app counts.
+let ownWindows = all.filter { ($0["kCGWindowOwnerName"] as? String) == "Taskboard (Debug)" }
+let onscreen = ownWindows.filter { ($0["kCGWindowIsOnscreen"] as? Bool) == true }
 var best: (id: Int, layer: Int, area: Double) = (0, -1, 0)
-for w in all where (w["kCGWindowIsOnscreen"] as? Bool) == true {
-  let owner = w["kCGWindowOwnerName"] as? String ?? ""
+for w in (onscreen.isEmpty ? ownWindows : onscreen) {
   let layer = w["kCGWindowLayer"] as? Int ?? 0
-  guard owner == "Taskboard (Debug)" else { continue }
   if overlay {
     guard layer > 0, (w["kCGWindowAlpha"] as? Double ?? 0) > 0.5 else { continue }
   } else if layer != 0 {

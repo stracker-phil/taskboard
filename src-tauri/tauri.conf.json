@@ -4,6 +4,8 @@
   "version": "0.1.0",
   "identifier": "com.philippstracker.taskboard",
   "build": {
+    "beforeDevCommand": "bun run dev",
+    "devUrl": "http://localhost:1420",
     "beforeBuildCommand": "bun run build",
     "frontendDist": "../dist"
   },
