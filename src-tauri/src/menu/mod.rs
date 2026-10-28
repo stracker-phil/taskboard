@@ -31,12 +31,17 @@ const fn plain(label: &'static str, command: &'static str) -> Item {
 
 pub const SETTINGS: Item = item("Settings…", "app:settings", "CmdOrCtrl+,");
 pub const QUIT: Item = item("Quit Taskboard", "app:quit", "CmdOrCtrl+Q");
-pub const VIEW: &[Item] = &[item(
-    "Toggle Sidebar",
-    "view:toggleSidebar",
-    "CmdOrCtrl+Backslash",
-)];
-pub const RELOAD: Item = item("Reload", "app:reload", "CmdOrCtrl+Shift+R");
+pub const VIEW: &[Item] = &[
+    item(
+        "Toggle Sidebar",
+        "view:toggleSidebar",
+        "CmdOrCtrl+Backslash",
+    ),
+    item("Refresh", "sync:refresh", "CmdOrCtrl+R"),
+    item("Full Sync", "sync:full", "CmdOrCtrl+Shift+R"),
+];
+/// Debug builds only; ⌘⇧R is the full sync.
+pub const RELOAD: Item = item("Reload", "app:reload", "CmdOrCtrl+Alt+R");
 pub const CLOSE: Item = item("Close Window", "window:close", "CmdOrCtrl+W");
 pub const HELP: &[Item] = &[plain("Open Log Folder", "app:logs")];
 
@@ -158,5 +163,38 @@ mod tests {
             .unwrap();
         assert_eq!(toggle.label, "Toggle Sidebar");
         assert_eq!(toggle.accelerator, Some("CmdOrCtrl+Backslash"));
+    }
+
+    #[test]
+    fn the_view_menu_carries_the_sync_items_with_their_accelerators() {
+        let found: Vec<(&str, &str, Option<&str>)> = VIEW
+            .iter()
+            .map(|item| (item.label, item.command, item.accelerator))
+            .collect();
+        assert_eq!(
+            found,
+            [
+                (
+                    "Toggle Sidebar",
+                    "view:toggleSidebar",
+                    Some("CmdOrCtrl+Backslash")
+                ),
+                ("Refresh", "sync:refresh", Some("CmdOrCtrl+R")),
+                ("Full Sync", "sync:full", Some("CmdOrCtrl+Shift+R")),
+            ]
+        );
+        assert_eq!(RELOAD.accelerator, Some("CmdOrCtrl+Alt+R"));
+    }
+
+    #[test]
+    fn no_two_menu_items_share_an_accelerator() {
+        let mut items: Vec<&Item> = vec![&SETTINGS, &QUIT, &CLOSE, &RELOAD];
+        items.extend(VIEW);
+        items.extend(HELP);
+        let mut seen: Vec<&str> = Vec::new();
+        for accelerator in items.iter().filter_map(|item| item.accelerator) {
+            assert!(!seen.contains(&accelerator), "{accelerator}");
+            seen.push(accelerator);
+        }
     }
 }

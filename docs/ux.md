@@ -337,7 +337,9 @@ owner's own Settings design replaces it. Its colours are the `--settings-*` toke
 ## Keys
 
 App-level actions are Rust commands ([ADR 0012](adr/0012-commands-live-in-rust.md)); the app menu gives them
-their keys (⌘, Settings, ⌘\ Toggle Sidebar, ⌘W, ⌘Q). There are no global shortcuts. The page's registry
+their keys (⌘, Settings, ⌘\ Toggle Sidebar, ⌘R Refresh, ⌘⇧R Full Sync, ⌘W, ⌘Q; the debug build's Reload is
+⌥⌘R). Settings → Shortcuts lists every key: the window's own, rebindable with a recorder (conflicts are
+flagged), and the menu's, fixed. There are no global shortcuts. The page's registry
 (`src/commands/`) has only the keys inside a window, rebindable through `keybindings.json`; ⌘K opens the
 palette once it exists.
 

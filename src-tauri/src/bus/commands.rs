@@ -1,8 +1,9 @@
 //! The app's own commands; features add theirs with their own `register`.
 
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 
 use super::{Command, CommandBus};
+use crate::sync::{Job, SyncEngine};
 use crate::window;
 
 type Bus = CommandBus<AppHandle>;
@@ -47,6 +48,17 @@ pub fn register(bus: &mut Bus) {
         Command::new("view:toggleSidebar", "Toggle Sidebar")
             .help("Show or hide the sidebar")
             .run_now(window::toggle_sidebar),
+    );
+    // ⌘R and ⌘⇧R: a refresh is a full sync until the delta sync arrives.
+    bus.add(
+        Command::new("sync:refresh", "Refresh")
+            .help("Fetch what changed in Jira")
+            .run_now(|app: &AppHandle| app.state::<SyncEngine>().queue(Job::Full)),
+    );
+    bus.add(
+        Command::new("sync:full", "Full Sync")
+            .help("Fetch every issue of the sync scope again")
+            .run_now(|app: &AppHandle| app.state::<SyncEngine>().queue(Job::Full)),
     );
     #[cfg(debug_assertions)]
     bus.add(
@@ -97,6 +109,18 @@ mod tests {
         assert_eq!(info.title, "Settings…");
         assert!(!info.hidden);
         assert!(bus.family("app:settings").is_none());
+    }
+
+    #[test]
+    fn both_sync_commands_are_registered_visible_with_their_titles() {
+        let bus = registered();
+
+        for (id, title) in [("sync:refresh", "Refresh"), ("sync:full", "Full Sync")] {
+            assert!(bus.knows(id), "{id}");
+            let info = bus.info(id).unwrap();
+            assert_eq!(info.title, title, "{id}");
+            assert!(!info.hidden, "{id}");
+        }
     }
 
     #[test]

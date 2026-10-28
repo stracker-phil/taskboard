@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect } from "react";
 import { IssueView } from "../issue/IssueView";
 import { useNav, useSidebar, useViews } from "../queries/sidebar";
 import { useStore } from "../state/store";
@@ -18,6 +18,7 @@ interface Props {
 /** The main window's frame: the sidebar beside the inset content panel. */
 export function Window({ sidebarHidden, children }: Props) {
   const issueView = useStore((s) => s.issueView);
+  useCloseIssueOnNavigation();
   return (
     <div className={sidebarHidden ? "shell shell--sidebar-hidden" : "shell"}>
       {!sidebarHidden && <Sidebar />}
@@ -39,6 +40,20 @@ export function Window({ sidebarHidden, children }: Props) {
       </div>
     </div>
   );
+}
+
+/** Going to another level or view (sidebar, tabs, keys) leaves the Issue view. */
+function useCloseIssueOnNavigation() {
+  const { data: nav } = useNav();
+  const closeIssue = useStore((s) => s.closeIssue);
+  const listId = nav?.location?.listId;
+  const viewId = nav?.location?.viewId;
+  useEffect(() => {
+    const open = useStore.getState().issueView;
+    // Before the place has loaded nothing has moved yet.
+    if (listId === undefined) return;
+    if (open && (open.origin.listId !== listId || open.origin.viewId !== viewId)) closeIssue();
+  }, [listId, viewId, closeIssue]);
 }
 
 /** The current level's header, view tabs and toolbar, once the tree and the place are known. */

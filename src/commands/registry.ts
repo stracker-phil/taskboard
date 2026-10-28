@@ -1,4 +1,4 @@
-import { scopeDef, specificity } from "./scopes";
+import { isAncestor, scopeDef, specificity } from "./scopes";
 
 export type Scope = string;
 
@@ -191,4 +191,30 @@ export function resolveKeydown(e: KeyLike & { target?: EventTarget | null }, act
     .filter((c) => bindingFor(c.id) === binding && activeScopes.includes(c.scope) && (c.when?.() ?? true))
     .sort((a, b) => specificity(b.scope) - specificity(a.scope));
   return matches[0] ?? null;
+}
+
+export interface Conflict {
+  binding: string;
+  a: Command;
+  b: Command;
+}
+
+function scopesOverlap(a: Scope, b: Scope): boolean {
+  return a === b || isAncestor(a, b) || isAncestor(b, a);
+}
+
+/** Pairs of commands that share a binding in overlapping scopes; the Shortcuts page warns about them. */
+export function conflicts(custom: Overrides = overrides): Conflict[] {
+  const list = allCommands();
+  const out: Conflict[] = [];
+  for (let i = 0; i < list.length; i++) {
+    const binding = bindingFor(list[i].id, custom);
+    if (!binding) continue;
+    for (let j = i + 1; j < list.length; j++) {
+      if (bindingFor(list[j].id, custom) === binding && scopesOverlap(list[i].scope, list[j].scope)) {
+        out.push({ binding, a: list[i], b: list[j] });
+      }
+    }
+  }
+  return out;
 }

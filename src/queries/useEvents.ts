@@ -16,6 +16,7 @@ export const INVALIDATIONS: Partial<Record<EventName, QueryKey[]>> = {
   local_changed: [SETTINGS_KEYS.projects, SETTINGS_KEYS.scope, SIDEBAR_KEY, VIEWS_KEY, NAV_KEY, VIEW_ROWS_KEY, STATUS_STYLES_KEY, LIST_CONDITIONS_KEY, FILTER_OPTIONS_KEY, ISSUE_KEY],
   issues_changed: [SETTINGS_KEYS.projects, SETTINGS_KEYS.scope, SYNC_KEY, SIDEBAR_KEY, VIEW_ROWS_KEY, COLUMNS_KEY, STATUS_STYLES_KEY, LIST_CONDITIONS_KEY, FILTER_OPTIONS_KEY, ISSUE_KEY],
   sync_state: [SYNC_KEY],
+  keybindings_changed: [SETTINGS_KEYS.keybindings],
 };
 
 /** Subscribes to every event of `INVALIDATIONS` while mounted and refetches the queries it names; `nav_changed`
