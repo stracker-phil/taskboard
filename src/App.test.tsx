@@ -7,6 +7,7 @@ vi.mock("./api", async (orig) => ({ ...(await orig<object>()), api: (await impor
 import App from "./App";
 import { api } from "./api";
 import { installCommands } from "./commands";
+import { queryClient } from "./queries/queryClient";
 import { resetStore } from "./state/store";
 import { emitEvent } from "./test/apiMock";
 
@@ -20,6 +21,7 @@ async function renderApp() {
 beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
+  queryClient.clear();
   installCommands("main");
 });
 
@@ -28,7 +30,8 @@ describe("App", () => {
     await renderApp();
 
     expect(screen.getByRole("complementary", { name: "Sidebar" })).toBeInTheDocument();
-    expect(screen.getByRole("main")).toHaveTextContent("Connect Jira in Settings");
+    expect(await screen.findByText("Connect Jira in Settings")).toBeInTheDocument();
+    expect(screen.getByRole("main")).toContainElement(screen.getByText("Connect Jira in Settings"));
   });
 
   describe("sidebar", () => {
@@ -38,7 +41,7 @@ describe("App", () => {
       act(() => emitEvent(api, "toggle_sidebar", null));
       expect(screen.queryByRole("complementary", { name: "Sidebar" })).not.toBeInTheDocument();
       expect(mocked.setUiState).toHaveBeenLastCalledWith({ sidebarHidden: true });
-      expect(screen.getByRole("main")).toHaveTextContent("Connect Jira in Settings");
+      expect(await screen.findByText("Connect Jira in Settings")).toBeInTheDocument();
 
       act(() => emitEvent(api, "toggle_sidebar", null));
       expect(screen.getByRole("complementary", { name: "Sidebar" })).toBeInTheDocument();

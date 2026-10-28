@@ -1,5 +1,5 @@
 // Re-exports the IPC types generated from Rust (`bun run types`); everything defined below is frontend-only.
-import type { IssuesChanged, LocalChanged, Settings, UiState } from "./types.gen";
+import type { IssuesChanged, LocalChanged, Settings, SyncProgress, SyncState, UiState } from "./types.gen";
 
 export type * from "./types.gen";
 
@@ -33,6 +33,10 @@ export interface EventPayloads {
   issues_changed: IssuesChanged;
   /** Parts of the owner's own setup changed. */
   local_changed: LocalChanged;
+  /** The sync engine's state changed. */
+  sync_state: SyncState;
+  /** A page of a full sync was stored. */
+  sync_progress: SyncProgress;
 }
 
 export type EventName = keyof EventPayloads;

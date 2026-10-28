@@ -6,6 +6,7 @@ import { useErrorToasts } from "./lib/useErrorToasts";
 import { trackWindowFocus } from "./lib/windowFocus";
 import { queryClient } from "./queries/queryClient";
 import { useEvents } from "./queries/useEvents";
+import { SyncStatusView } from "./shell/SyncStatusView";
 import { Window } from "./shell/Window";
 import { useAppEvents } from "./state/useAppEvents";
 import { useStore } from "./state/store";
@@ -28,7 +29,7 @@ function MainWindow() {
   return (
     <>
       <Window sidebarHidden={sidebarHidden}>
-        <div className="content-panel__placeholder">Connect Jira in Settings</div>
+        <SyncStatusView />
       </Window>
       <Toasts />
     </>

@@ -11,6 +11,7 @@ import {
   type Keybindings,
   type ScopeView,
   type Settings,
+  type SyncOverview,
   type SyncSettings,
   type UiState,
 } from "../api/types";
@@ -64,6 +65,8 @@ export function createApiMock(): Api {
     scopeSave: vi.fn(async (jql: string | null): Promise<ScopeView> => ({ jql: jql ?? "", isDefault: jql === null })),
     syncSave: vi.fn(async (sync: SyncSettings) => sync),
     cacheReset: vi.fn().mockResolvedValue(undefined),
+    syncOverview: vi.fn(async (): Promise<SyncOverview> => ({ state: { state: "idle", lastOk: null }, lastFullAt: null, projects: [] })),
+    syncRun: vi.fn().mockResolvedValue(undefined),
     appInfo: vi.fn().mockResolvedValue({ name: "Taskboard", version: "1.2.3" }),
     listen: vi.fn(async (event: string, handler: Handler) => {
       const set = byEvent.get(event) ?? new Set<Handler>();

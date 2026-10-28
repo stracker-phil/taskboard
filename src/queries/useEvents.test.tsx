@@ -8,7 +8,7 @@ import { api } from "../api";
 import { ConnectionPage } from "../components/settings/jira/ConnectionPage";
 import { SyncPage } from "../components/settings/jira/SyncPage";
 import { emitEvent } from "../test/apiMock";
-import { connectionView, PROJECTS } from "../test/jira";
+import { connectionView, PROJECTS, projectCounts, syncOverview } from "../test/jira";
 import { createQueryClient } from "./queryClient";
 import { useEvents } from "./useEvents";
 
@@ -39,6 +39,7 @@ beforeEach(() => {
   mocked.connectionGet.mockResolvedValue(connectionView());
   mocked.projectsList.mockResolvedValue([]);
   mocked.scopeGet.mockResolvedValue({ jql: "", isDefault: true });
+  mocked.syncOverview.mockResolvedValue(syncOverview());
 });
 
 describe("useEvents", () => {
@@ -60,6 +61,26 @@ describe("useEvents", () => {
 
     expect(await screen.findByText("Website relaunch")).toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole("textbox", { name: "Query" })).toHaveValue("project = NW"));
+  });
+
+  it("refetches the sync overview when sync_state arrives", async () => {
+    await renderHarness();
+    await screen.findByText("Not synced yet");
+    mocked.syncOverview.mockResolvedValue(syncOverview({ state: { state: "running", job: "full" } }));
+
+    act(() => emitEvent(api, "sync_state", { state: "running", job: "full" }));
+
+    expect(await screen.findByText("Syncing…")).toBeInTheDocument();
+  });
+
+  it("refetches the sync overview when issues_changed arrives", async () => {
+    await renderHarness();
+    await screen.findByText("Not synced yet");
+    mocked.syncOverview.mockResolvedValue(syncOverview({ projects: [projectCounts()] }));
+
+    act(() => emitEvent(api, "issues_changed", { ids: [], all: true }));
+
+    expect(await screen.findByText("33 issues · 21 open")).toBeInTheDocument();
   });
 
   it("refetches the connection when settings_changed arrives", async () => {

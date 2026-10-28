@@ -2,13 +2,15 @@ import { useEffect } from "react";
 import { useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { api, type EventName } from "../api";
 import { SETTINGS_KEYS } from "./settings";
+import { SYNC_KEY } from "./sync";
 
 /** The query keys each Rust event makes stale. Features add their events and keys here. */
 export const INVALIDATIONS: Partial<Record<EventName, QueryKey[]>> = {
   settings_changed: [SETTINGS_KEYS.settings, SETTINGS_KEYS.connection, SETTINGS_KEYS.scope],
   // Tracking a project changes the Spaces; a cache reset (issues_changed with all) empties the project list.
   local_changed: [SETTINGS_KEYS.projects, SETTINGS_KEYS.scope],
-  issues_changed: [SETTINGS_KEYS.projects, SETTINGS_KEYS.scope],
+  issues_changed: [SETTINGS_KEYS.projects, SETTINGS_KEYS.scope, SYNC_KEY],
+  sync_state: [SYNC_KEY],
 };
 
 /** Subscribes to every event of `INVALIDATIONS` while mounted and refetches the queries it names. */

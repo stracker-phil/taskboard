@@ -27,6 +27,10 @@ an item.
 - **Sidebar** (top to bottom): traffic-light strip, Search (⌘K), home rows (Everything, Recently changed,
   Pinned), the Spaces tree, the footer with the sync chip and Settings. ⌘\ hides it; the panel then takes the
   full width under a 42px strip that keeps the traffic lights off it. The state is kept in `ui_state.json`.
+- **Content panel** until the issue list (step 9): `SyncStatusView` (`src/shell/SyncStatusView.tsx`) says
+  "Connect Jira in Settings" with an Open Settings button while no project is tracked; during a full sync
+  "Loading your Jira issues" with a line and a 4px bar (`--accent` on `--fill-subtle`) per tracked project
+  (fetched of Jira's estimate); afterwards "N issues in M Spaces" and the last sync; otherwise the sync state.
 
 ## Tokens
 
@@ -117,8 +121,9 @@ owner's own Settings design replaces it. Its colours are the `--settings-*` toke
     Test Connection, with "Connected as …" or the error below), *Token* (the expiry date and how soon it runs
     out) and *Projects* (Refresh after a successful test; a Track switch per project).
   - **Sync**: *Scope* (the effective JQL in a monospaced field; Validate, Save, Reset to Default), *Intervals*
-    (minutes in front and in the background, days to keep done issues) and *Cache* (Reset Cache, confirmed in
-    a sheet).
+    (minutes in front and in the background, days to keep done issues) and *Cache* (the sync state line with
+    Sync Now, one row per tracked project with its key, last full sync and "N issues · M open", then Reset
+    Cache, confirmed in a sheet). It stays as the diagnostics view of the cache.
   - **General** (System): About and logs. Spaces, Statuses, Shortcuts and Appearance join with their features.
 - The layout stays Daybook's until the owner's own Settings design arrives.
 

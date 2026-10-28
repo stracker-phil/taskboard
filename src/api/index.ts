@@ -15,6 +15,7 @@ import type {
   ProjectRow,
   ScopeView,
   Settings,
+  SyncOverview,
   SyncSettings,
   UiState,
 } from "./types";
@@ -55,6 +56,10 @@ export const api = {
   scopeSave: (jql: string | null) => invoke<ScopeView>("scope_save", { jql }),
   /** Saves the intervals and days to keep; the scope changes through `scopeSave`. */
   syncSave: (sync: SyncSettings) => invoke<SyncSettings>("sync_save", { sync }),
+  /** The sync state and what the cache holds per tracked project. */
+  syncOverview: () => invoke<SyncOverview>("sync_overview"),
+  /** Queues a full sync and returns at once; progress arrives as `sync_progress` and `sync_state` events. */
+  syncRun: () => invoke<void>("sync_run"),
   /** Deletes the Jira cache; Spaces, filter lists, views and pins stay. */
   cacheReset: () => invoke<void>("cache_reset"),
   appInfo: async (): Promise<AppInfo> => {
