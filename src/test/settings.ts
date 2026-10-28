@@ -18,5 +18,6 @@ export const settings = (patch: Partial<Settings> = {}): Settings => ({
   connection: emptyConnection(),
   sync: defaultSync(),
   appearance: "system",
+  behaviour: { seenAfterSeconds: 2, pinDefault: "untilUnpinned" },
   ...patch,
 });

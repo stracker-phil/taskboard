@@ -135,21 +135,18 @@ pub async fn pin_remove(db: &Db, viewer: Viewer, id: i64) -> AppResult<()> {
         .await
 }
 
-/// Unpins the issue if it is pinned, otherwise pins it until unpinned.
-pub async fn pin_toggle_issue(db: &Db, viewer: Viewer, id: String) -> AppResult<()> {
+/// Unpins the issue if it is pinned, otherwise pins it for `duration` (the owner's default).
+pub async fn pin_toggle_issue(
+    db: &Db,
+    viewer: Viewer,
+    id: String,
+    duration: PinDuration,
+) -> AppResult<()> {
     db.write(move |tx, changes| {
         let now = format_utc(viewer.now);
         match active_pin(tx, PinKind::Issue, &id, &now)? {
             Some(pin_id) => unpin(tx, changes, pin_id, &now),
-            None => pin(
-                tx,
-                changes,
-                &viewer,
-                PinKind::Issue,
-                &id,
-                PinDuration::UntilUnpinned,
-                None,
-            ),
+            None => pin(tx, changes, &viewer, PinKind::Issue, &id, duration, None),
         }
     })
     .await

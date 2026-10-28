@@ -441,13 +441,18 @@ mod creating_pins {
     async fn toggling_an_issue_pins_it_until_unpinned_and_toggling_again_unpins_it() {
         let (_dir, db) = lab().await;
 
-        pin_toggle_issue(&db, viewer(NOW), "1001".into())
+        pin_toggle_issue(&db, viewer(NOW), "1001".into(), PinDuration::UntilUnpinned)
             .await
             .unwrap();
         let pinned = pins_at(&db, NOW).await;
-        pin_toggle_issue(&db, viewer("2026-10-28T10:05:00Z"), "1001".into())
-            .await
-            .unwrap();
+        pin_toggle_issue(
+            &db,
+            viewer("2026-10-28T10:05:00Z"),
+            "1001".into(),
+            PinDuration::UntilUnpinned,
+        )
+        .await
+        .unwrap();
         let unpinned = pins_at(&db, "2026-10-28T10:10:00Z").await;
 
         assert_eq!(pinned.active.len(), 1);
@@ -463,6 +468,27 @@ mod creating_pins {
                 Style::Todo,
                 false
             )]
+        );
+    }
+}
+
+mod toggling_with_a_duration {
+    use super::*;
+
+    #[tokio::test]
+    async fn toggling_an_issue_with_a_week_pins_it_for_seven_days() {
+        let (_dir, db) = lab().await;
+
+        pin_toggle_issue(&db, viewer(NOW), "1001".into(), PinDuration::Week)
+            .await
+            .unwrap();
+
+        let pins = pins_at(&db, NOW).await;
+        assert_eq!(pins.active.len(), 1);
+        assert_eq!(pins.active[0].time_left, "7d left");
+        assert_eq!(
+            pins.active[0].expires_at.as_deref(),
+            Some("2026-11-03T23:00:00.000Z")
         );
     }
 }

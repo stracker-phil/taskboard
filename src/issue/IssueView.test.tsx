@@ -13,6 +13,7 @@ import { resetStore, useStore } from "../state/store";
 import { groupOf, issueDetail, related, relatedIssue, row, SAM, viewData } from "../test/issues";
 import { connectionView } from "../test/jira";
 import { pinItem, pins } from "../test/pins";
+import { settings } from "../test/settings";
 import { sidebarTree, space } from "../test/spaces";
 import { listNode, view } from "../test/views";
 import { IssueView } from "./IssueView";
@@ -46,6 +47,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
   mocked.pinsList.mockResolvedValue(pins());
+  mocked.getSettings.mockResolvedValue(settings());
   mocked.issueForget.mockResolvedValue(undefined);
   mocked.pinRemove.mockResolvedValue(undefined);
   serve(issueDetail(), EPIC);
@@ -319,25 +321,50 @@ describe("IssueView", () => {
       expect(screen.queryByRole("status")).not.toBeInTheDocument();
     });
 
-    it("marks the issue seen when the view is left after a second", async () => {
-      vi.useFakeTimers({ toFake: ["Date"] });
+    async function openUnseen() {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
       serve(issueDetail({ since: SINCE }));
-      const { unmount } = renderIssue();
+      const view = renderIssue();
       await screen.findByRole("status");
+      await vi.advanceTimersByTimeAsync(0);
+      return view;
+    }
 
-      vi.setSystemTime(Date.now() + 1500);
-      unmount();
+    it("marks the issue seen once it has been open for the default two seconds", async () => {
+      await openUnseen();
+
+      await vi.advanceTimersByTimeAsync(1500);
+      expect(mocked.issuesMarkSeen).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(700);
 
       expect(mocked.issuesMarkSeen).toHaveBeenCalledWith(["10042"]);
     });
 
-    it("does not mark the issue seen when the view is left within a second", async () => {
-      vi.useFakeTimers({ toFake: ["Date"] });
-      serve(issueDetail({ since: SINCE }));
-      const { unmount } = renderIssue();
-      await screen.findByRole("status");
+    it("marks the issue seen at once when the delay in the settings is 0", async () => {
+      mocked.getSettings.mockResolvedValue(settings({ behaviour: { seenAfterSeconds: 0, pinDefault: "untilUnpinned" } }));
 
+      await openUnseen();
+      await vi.advanceTimersByTimeAsync(50);
+
+      expect(mocked.issuesMarkSeen).toHaveBeenCalledWith(["10042"]);
+    });
+
+    it("does not mark the issue seen when the view is left before the delay", async () => {
+      const { unmount } = await openUnseen();
+
+      await vi.advanceTimersByTimeAsync(1000);
       unmount();
+      await vi.advanceTimersByTimeAsync(5000);
+
+      expect(mocked.issuesMarkSeen).not.toHaveBeenCalled();
+    });
+
+    it("never marks an issue without unseen changes", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      renderIssue();
+      await title("Checkout: address validation for DACH postcodes");
+
+      await vi.advanceTimersByTimeAsync(5000);
 
       expect(mocked.issuesMarkSeen).not.toHaveBeenCalled();
     });

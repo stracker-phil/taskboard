@@ -4,6 +4,7 @@ import type { api as realApi } from "../api";
 import {
   EMPTY_UI_STATE,
   type Appearance,
+  type Behaviour,
   type BoardData,
   type Connection,
   type ConnectionInput,
@@ -63,7 +64,8 @@ export function createApiMock(): Api {
     getSettings: vi.fn(async (): Promise<Settings> => settings()),
     updateSettings: vi.fn(async (s: Settings) => s),
     appearanceSet: vi.fn(async (appearance: Appearance): Promise<Settings> => settings({ appearance })),
-    getKeybindings: vi.fn().mockResolvedValue({}),
+    behaviourSet: vi.fn(async (behaviour: Behaviour): Promise<Settings> => settings({ behaviour })),
+    getKeybindings:vi.fn().mockResolvedValue({}),
     setKeybindings: vi.fn(async (bindings: Keybindings) => bindings),
     getUiState: vi.fn().mockResolvedValue(EMPTY_UI_STATE),
     setUiState: vi.fn(async (ui: UiState) => ui),

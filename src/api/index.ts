@@ -7,6 +7,7 @@ import type {
   AppError,
   AppInfo,
   Appearance,
+  Behaviour,
   BoardData,
   ConnectionInput,
   ConnectionTest,
@@ -149,6 +150,8 @@ export const api = {
   /** The Board layout: a column per status of the issues shown, with the cards' rows. */
   viewBoard: (listId: number, viewId: number, narrowing: Narrowing) => invoke<BoardData>("view_board", { listId, viewId, narrowing }),
   viewSetColumnCollapsed: (id: number, statusId: string, collapsed: boolean) => invoke<View>("view_set_column_collapsed", { id, statusId, collapsed }),
+  /** How long an open issue takes to count as seen, and the default pin duration. */
+  behaviourSet: (behaviour: Behaviour) => invoke<Settings>("behaviour_set", { behaviour }),
   /** Light, dark or following macOS; every window repaints. */
   appearanceSet: (appearance: Appearance) => invoke<Settings>("appearance_set", { appearance }),
   issueGet: (id: string) => invoke<IssueDetail>("issue_get", { id }),

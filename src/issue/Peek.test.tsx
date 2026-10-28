@@ -11,6 +11,7 @@ import { resetStore, useStore } from "../state/store";
 import { connectionView } from "../test/jira";
 import { ALEX, changeItem, commentItem } from "../test/issues";
 import { commentTarget, pinItem, pins } from "../test/pins";
+import { settings } from "../test/settings";
 import { Peek } from "./Peek";
 
 const mocked = vi.mocked(api, true);
@@ -58,6 +59,7 @@ beforeEach(() => {
   resetStore();
   mocked.issueForget.mockResolvedValue(undefined);
   mocked.pinsList.mockResolvedValue(pins());
+  mocked.getSettings.mockResolvedValue(settings());
   mocked.issueGet.mockResolvedValue(detail());
   mocked.issueActivity.mockResolvedValue([]);
   mocked.connectionGet.mockResolvedValue(connectionView({ siteUrl: "" }));
@@ -129,7 +131,7 @@ describe("Peek", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Pin this issue" }));
     await userEvent.type(screen.getByLabelText(/Reason/), "Needs a decision{Enter}");
 
-    expect(mocked.pinCreate).toHaveBeenCalledWith("issue", "10042", "twoDays", "Needs a decision");
+    expect(mocked.pinCreate).toHaveBeenCalledWith("issue", "10042", "untilUnpinned", "Needs a decision");
   });
 
   it("offers Unpin instead when the issue is pinned", async () => {
@@ -165,7 +167,7 @@ describe("Peek", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Pin comment" }));
     await userEvent.click(screen.getByRole("button", { name: "Pin" }));
 
-    expect(mocked.pinCreate).toHaveBeenCalledWith("comment", "20001", "twoDays", null);
+    expect(mocked.pinCreate).toHaveBeenCalledWith("comment", "20001", "untilUnpinned", null);
   });
 
   it("calls onExpand when the Full view button is clicked", async () => {
@@ -196,12 +198,25 @@ describe("Peek", () => {
     });
   });
 
-  describe("marking seen on leave", () => {
+  describe("marking seen after a delay", () => {
     const SINCE = { label: "Since yesterday", text: "1 new comment." };
+
+    beforeEach(() => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+    });
 
     afterEach(() => {
       vi.useRealTimers();
     });
+
+    async function showUnseen(seenAfterSeconds?: number) {
+      if (seenAfterSeconds !== undefined) mocked.getSettings.mockResolvedValue(settings({ behaviour: { seenAfterSeconds, pinDefault: "untilUnpinned" } }));
+      serveByKey();
+      const view = renderSwitchable("10042");
+      await screen.findByRole("status");
+      await vi.advanceTimersByTimeAsync(0);
+      return view;
+    }
 
     function renderSwitchable(id: string) {
       const client = createQueryClient();
@@ -218,54 +233,63 @@ describe("Peek", () => {
       mocked.issueGet.mockImplementation(async (id) => detail({ id, key: id === "10042" ? "NW-1042" : "NW-1043", summary: `Issue ${id}`, since: id === "10042" ? SINCE : null }));
     }
 
-    it("marks the issue seen when it is unmounted after being open for a second", async () => {
-      vi.useFakeTimers({ toFake: ["Date"] });
-      serveByKey();
-      const { unmount } = renderSwitchable("10042");
-      await screen.findByRole("status");
+    it("marks the issue seen once it has been open for the default two seconds", async () => {
+      await showUnseen();
 
-      vi.setSystemTime(Date.now() + 1500);
-      unmount();
+      await vi.advanceTimersByTimeAsync(1500);
+      expect(mocked.issuesMarkSeen).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(700);
 
       expect(mocked.issuesMarkSeen).toHaveBeenCalledWith(["10042"]);
     });
 
-    it("marks the issue seen when another issue is shown after a second", async () => {
-      vi.useFakeTimers({ toFake: ["Date"] });
-      serveByKey();
-      const { show } = renderSwitchable("10042");
-      await screen.findByRole("status");
+    it("waits for the delay set in the settings", async () => {
+      await showUnseen(5);
 
-      vi.setSystemTime(Date.now() + 1500);
+      await vi.advanceTimersByTimeAsync(4500);
+      expect(mocked.issuesMarkSeen).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(700);
+
+      expect(mocked.issuesMarkSeen).toHaveBeenCalledWith(["10042"]);
+    });
+
+    it("marks the issue seen at once when the delay is 0", async () => {
+      await showUnseen(0);
+
+      await vi.advanceTimersByTimeAsync(50);
+
+      expect(mocked.issuesMarkSeen).toHaveBeenCalledWith(["10042"]);
+    });
+
+    it("does not mark an issue that is closed before the delay", async () => {
+      const { unmount } = await showUnseen();
+
+      await vi.advanceTimersByTimeAsync(1000);
+      unmount();
+      await vi.advanceTimersByTimeAsync(5000);
+
+      expect(mocked.issuesMarkSeen).not.toHaveBeenCalled();
+    });
+
+    it("does not mark an issue when another one is shown before the delay", async () => {
+      const { show } = await showUnseen();
+
+      await vi.advanceTimersByTimeAsync(1000);
       show("10043");
-
-      expect(mocked.issuesMarkSeen).toHaveBeenCalledWith(["10042"]);
-    });
-
-    it("does not mark an issue left within a second", async () => {
-      vi.useFakeTimers({ toFake: ["Date"] });
-      serveByKey();
-      const { unmount } = renderSwitchable("10042");
-      await screen.findByRole("status");
-
-      vi.setSystemTime(Date.now() + 500);
-      unmount();
+      await screen.findByRole("heading", { name: "Issue 10043" });
+      await vi.advanceTimersByTimeAsync(5000);
 
       expect(mocked.issuesMarkSeen).not.toHaveBeenCalled();
     });
 
     it("does not mark an issue without unseen changes", async () => {
-      vi.useFakeTimers({ toFake: ["Date"] });
       serveByKey();
-      const { show, unmount } = renderSwitchable("10043");
+      renderSwitchable("10043");
       await screen.findByRole("heading", { name: "Issue 10043" });
 
-      vi.setSystemTime(Date.now() + 5000);
-      show("10042");
-      await screen.findByRole("status");
-      unmount();
+      await vi.advanceTimersByTimeAsync(5000);
 
-      expect(mocked.issuesMarkSeen).not.toHaveBeenCalledWith(["10043"]);
+      expect(mocked.issuesMarkSeen).not.toHaveBeenCalled();
     });
   });
 

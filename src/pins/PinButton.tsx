@@ -3,7 +3,7 @@ import { useRef, useState, type MouseEvent } from "react";
 import { api, type PinKind } from "../api";
 import { usePinOf } from "../queries/pins";
 import { attempt } from "../state/requests";
-import { DEFAULT_DURATION, PinPopover } from "./PinPopover";
+import { PinPopover, usePinDefault } from "./PinPopover";
 
 interface Props {
   kind: PinKind;
@@ -18,12 +18,13 @@ interface Props {
 /** Opens the pin popover; ⌥-click pins at once, and a pinned target unpins on click. */
 export function PinButton({ kind, target, label, meta, className, iconSize = 14 }: Props) {
   const pin = usePinOf(kind, target);
+  const pinDefault = usePinDefault();
   const [open, setOpen] = useState(false);
   const anchor = useRef<HTMLButtonElement>(null);
   const press = (e: MouseEvent) => {
     e.stopPropagation();
     if (pin) void attempt(api.pinRemove(pin.id), "Could not unpin it");
-    else if (e.altKey) void attempt(api.pinCreate(kind, target, DEFAULT_DURATION, null), "Could not pin it");
+    else if (e.altKey) void attempt(api.pinCreate(kind, target, pinDefault, null), "Could not pin it");
     else setOpen((was) => !was);
   };
   return (

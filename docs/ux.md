@@ -167,8 +167,8 @@ An issue is changed while the sync recorded a change after the owner last saw it
   view adds Mark seen.
 - Activity after the last look (`fresh`, decided in Rust) sits under a "New since yesterday" divider
   (`--accent-text`, `--changed-border` lines); new comments and changes have `--changed-bg`.
-- Leaving an issue that was open for a second marks it seen (`useSeenOnLeave`), so the banner and the new
-  activity stay while the owner reads and J/K skimming counts too. Mark seen, Mark all seen and the row's
+- An issue open in the peek or the Issue view for the owner's delay (Settings → General → Behaviour, 0–10 s,
+  default 2) counts as seen (`useSeenAfter`); leaving sooner doesn't. Mark seen, Mark all seen and the row's
   Mark seen clear it at once.
 
 ## Command palette
@@ -191,10 +191,11 @@ An issue is changed while the sync recorded a change after the owner last saw it
 Local only (`src-tauri/src/pins/`, `src/pins/`). Issues, comments and filter lists can be pinned.
 
 - `PinButton` in the peek and Issue view headers ("Pin this issue") and on each comment opens `PinPopover`
-  (340px): "Keep pinned for" chips (Today, 2 days (preselected, as in the mockup), 1 week, Until unpinned;
-  the chosen one `--button-primary-bg`), an optional one-line reason, Cancel and Pin; ↩ pins. ⌥-click pins at
-  once; a pinned target's button is amber and unpins on click.
-- The row toolbar's Pin and P toggle the issue's pin (until unpinned) without the popover; the filter-list
+  (340px): "Keep pinned for" chips (Today, 2 days, 1 week, Until unpinned; the owner's default from Settings
+  → General preselected, Until unpinned unless changed; the chosen one `--button-primary-bg`), an optional
+  one-line reason, Cancel and Pin; ↩ pins. ⌥-click pins at once with the default; a pinned target's button is
+  amber and unpins on click.
+- The row toolbar's Pin and P toggle the issue's pin (with the default duration) without the popover; the filter-list
   context menu has Pin to Home / Unpin from Home, and pinned Space lists appear under Home.
 - Today ends at local midnight, 2 days at the end of tomorrow, 1 week seven midnights on. The page refreshes
   when the next pin runs out (`usePinExpiry`).

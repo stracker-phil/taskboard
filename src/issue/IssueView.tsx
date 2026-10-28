@@ -18,7 +18,7 @@ import { useIssueActions } from "../views/list/useIssueActions";
 import { Activity } from "./Activity";
 import { GoneNotice } from "./GoneNotice";
 import { SinceBanner } from "./SinceBanner";
-import { useSeenOnLeave } from "./useSeenOnLeave";
+import { useSeenAfter } from "./useSeenAfter";
 import { FieldGrid } from "./FieldGrid";
 import { JiraHtml } from "./JiraHtml";
 import { Children, Links } from "./Related";
@@ -38,7 +38,7 @@ export function IssueView({ id, origin }: { id: string; origin: IssueOrigin }) {
   const { data: issue, isError } = useIssue(id);
   const back = useStore((s) => s.issueBack);
   const neighbours = useNeighbours(origin, id);
-  useSeenOnLeave(id, Boolean(issue?.since));
+  useSeenAfter(id, Boolean(issue?.since));
 
   useEffect(() => {
     // Comments may be newer in Jira than in the cache; a failure (offline) leaves the cached ones.

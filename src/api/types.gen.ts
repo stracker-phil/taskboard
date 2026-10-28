@@ -37,6 +37,19 @@ export type AppErrorField = { path: string, message: string, };
  */
 export type Appearance = "light" | "dark" | "system";
 
+/**
+ * How issues and pins behave by default (Settings → General).
+ */
+export type Behaviour = { 
+/**
+ * An issue open in the peek or Issue view this long counts as seen; 0 at once.
+ */
+seenAfterSeconds: number, 
+/**
+ * What a new pin starts with.
+ */
+pinDefault: PinDuration, };
+
 export type BoardColumn = { statusId: string, name: string, style: Style, 
 /**
  * Shown as a 48px strip.
@@ -429,7 +442,7 @@ connection: Connection,
 /**
  * Changed only through the sync commands, which validate it.
  */
-sync: SyncSettings, appearance: Appearance, };
+sync: SyncSettings, appearance: Appearance, behaviour: Behaviour, };
 
 export type SidebarTree = { everything: ListNode, 
 /**

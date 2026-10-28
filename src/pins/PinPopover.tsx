@@ -2,6 +2,7 @@ import { Pin } from "lucide-react";
 import { useState, type RefObject } from "react";
 import { api, type PinDuration, type PinKind } from "../api";
 import { Popover } from "../components/Popover";
+import { useSettings } from "../queries/settings";
 import { attempt } from "../state/requests";
 
 const DURATIONS: { id: PinDuration; label: string }[] = [
@@ -11,8 +12,11 @@ const DURATIONS: { id: PinDuration; label: string }[] = [
   { id: "untilUnpinned", label: "Until unpinned" },
 ];
 
-/** The mockup's preselected duration; ⌥-click pins with it too. */
-export const DEFAULT_DURATION: PinDuration = "twoDays";
+/** The owner's default duration (Settings → General); the popover starts on it and ⌥-click pins with it. */
+export function usePinDefault(): PinDuration {
+  const { data: settings } = useSettings();
+  return settings?.behaviour.pinDefault ?? "untilUnpinned";
+}
 
 interface Props {
   title: string;
@@ -26,7 +30,7 @@ interface Props {
 
 /** "Keep pinned for" and an optional reason; ↩ pins. */
 export function PinPopover({ title, meta, kind, target, anchor, onClose }: Props) {
-  const [duration, setDuration] = useState<PinDuration>(DEFAULT_DURATION);
+  const [duration, setDuration] = useState<PinDuration>(usePinDefault());
   const [reason, setReason] = useState("");
   const pin = () => {
     void attempt(api.pinCreate(kind, target, duration, reason.trim() || null), "Could not pin it");

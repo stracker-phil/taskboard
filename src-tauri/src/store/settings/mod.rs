@@ -8,6 +8,8 @@ mod sync;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
+use crate::pins::PinDuration;
+
 pub use connection::Connection;
 pub use store::{FILE_NAME as SETTINGS_FILE, SettingsStore};
 pub use sync::SyncSettings;
@@ -21,6 +23,30 @@ pub struct Settings {
     /// Changed only through the sync commands, which validate it.
     pub sync: SyncSettings,
     pub appearance: Appearance,
+    pub behaviour: Behaviour,
+}
+
+/// How long an open issue takes to count as seen, the most a delay can be.
+pub const MAX_SEEN_AFTER_SECONDS: u8 = 10;
+
+/// How issues and pins behave by default (Settings → General).
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, TS)]
+#[ts(export, export_to = "src/api/types.gen.ts")]
+#[serde(default, rename_all = "camelCase")]
+pub struct Behaviour {
+    /// An issue open in the peek or Issue view this long counts as seen; 0 at once.
+    pub seen_after_seconds: u8,
+    /// What a new pin starts with.
+    pub pin_default: PinDuration,
+}
+
+impl Default for Behaviour {
+    fn default() -> Self {
+        Self {
+            seen_after_seconds: 2,
+            pin_default: PinDuration::UntilUnpinned,
+        }
+    }
 }
 
 /// Light or dark: following macOS (the default) or fixed.
@@ -40,6 +66,13 @@ impl Settings {
     fn repaired(self) -> Self {
         Self {
             sync: self.sync.clamped(),
+            behaviour: Behaviour {
+                seen_after_seconds: self
+                    .behaviour
+                    .seen_after_seconds
+                    .min(MAX_SEEN_AFTER_SECONDS),
+                ..self.behaviour
+            },
             ..self
         }
     }

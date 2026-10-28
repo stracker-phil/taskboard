@@ -12,6 +12,8 @@ pub enum PinDuration {
     Today,
     TwoDays,
     Week,
+    /// Also what an unknown value in the settings file reads as.
+    #[serde(other)]
     UntilUnpinned,
 }
 

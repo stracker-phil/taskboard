@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -9,6 +9,7 @@ import { api } from "../api";
 import { createQueryClient } from "../queries/queryClient";
 import { resetStore } from "../state/store";
 import { pinItem, pins } from "../test/pins";
+import { settings } from "../test/settings";
 import { PinButton } from "./PinButton";
 
 const mocked = vi.mocked(api, true);
@@ -26,15 +27,18 @@ const open = async () => {
   return screen.findByRole("dialog", { name: "Pin this issue" });
 };
 
+const settingsLoaded = () => act(async () => void (await mocked.getSettings.mock.results[0]?.value));
+
 beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
   mocked.pinsList.mockResolvedValue(pins());
+  mocked.getSettings.mockResolvedValue(settings());
 });
 
 describe("PinButton", () => {
   describe("on an unpinned target", () => {
-    it("opens a dialog with the title, the durations (2 days chosen) and a reason field", async () => {
+    it("opens a dialog with the title, the durations (Until unpinned chosen) and a reason field", async () => {
       renderButton();
 
       const dialog = await open();
@@ -43,9 +47,31 @@ describe("PinButton", () => {
       expect(dialog).toHaveTextContent("NW-1042");
       expect(dialog).toHaveTextContent("Keep pinned for");
       for (const name of ["Today", "2 days", "1 week", "Until unpinned"]) {
-        expect(screen.getByRole("button", { name })).toHaveAttribute("aria-pressed", name === "2 days" ? "true" : "false");
+        expect(screen.getByRole("button", { name })).toHaveAttribute("aria-pressed", name === "Until unpinned" ? "true" : "false");
       }
       expect(screen.getByLabelText(/Reason/)).toHaveValue("");
+    });
+
+    it("preselects the duration set in the settings", async () => {
+      mocked.getSettings.mockResolvedValue(settings({ behaviour: { seenAfterSeconds: 2, pinDefault: "week" } }));
+      renderButton();
+      await settingsLoaded();
+
+      await open();
+
+      expect(screen.getByRole("button", { name: "1 week" })).toHaveAttribute("aria-pressed", "true");
+      expect(screen.getByRole("button", { name: "Until unpinned" })).toHaveAttribute("aria-pressed", "false");
+    });
+
+    it("pins with the duration set in the settings when the durations are left alone", async () => {
+      mocked.getSettings.mockResolvedValue(settings({ behaviour: { seenAfterSeconds: 2, pinDefault: "today" } }));
+      renderButton();
+      await settingsLoaded();
+      await open();
+
+      await userEvent.click(screen.getByRole("button", { name: "Pin" }));
+
+      expect(mocked.pinCreate).toHaveBeenCalledWith("issue", "10042", "today", null);
     });
 
     it("pins with the chosen duration and the typed reason", async () => {
@@ -66,7 +92,7 @@ describe("PinButton", () => {
 
       await userEvent.click(screen.getByRole("button", { name: "Pin" }));
 
-      expect(mocked.pinCreate).toHaveBeenCalledWith("issue", "10042", "twoDays", null);
+      expect(mocked.pinCreate).toHaveBeenCalledWith("issue", "10042", "untilUnpinned", null);
     });
 
     it("pins on enter in the reason field", async () => {
@@ -75,7 +101,7 @@ describe("PinButton", () => {
 
       await userEvent.type(screen.getByLabelText(/Reason/), "Check Monday{Enter}");
 
-      expect(mocked.pinCreate).toHaveBeenCalledWith("issue", "10042", "twoDays", "Check Monday");
+      expect(mocked.pinCreate).toHaveBeenCalledWith("issue", "10042", "untilUnpinned", "Check Monday");
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     });
 
@@ -85,7 +111,7 @@ describe("PinButton", () => {
 
       await userEvent.type(screen.getByLabelText(/Reason/), "   {Enter}");
 
-      expect(mocked.pinCreate).toHaveBeenCalledWith("issue", "10042", "twoDays", null);
+      expect(mocked.pinCreate).toHaveBeenCalledWith("issue", "10042", "untilUnpinned", null);
     });
 
     it("closes without pinning on Cancel", async () => {
@@ -108,13 +134,24 @@ describe("PinButton", () => {
       expect(mocked.pinCreate).not.toHaveBeenCalled();
     });
 
-    it("pins at once for 2 days without a dialog on an alt-click", async () => {
+    it("pins at once until unpinned without a dialog on an alt-click", async () => {
       renderButton();
+      await settingsLoaded();
+
+      fireEvent.click(await screen.findByRole("button", { name: "Pin this issue" }), { altKey: true });
+
+      expect(mocked.pinCreate).toHaveBeenCalledWith("issue", "10042", "untilUnpinned", null);
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+
+    it("pins at once with the duration set in the settings on an alt-click", async () => {
+      mocked.getSettings.mockResolvedValue(settings({ behaviour: { seenAfterSeconds: 2, pinDefault: "twoDays" } }));
+      renderButton();
+      await settingsLoaded();
 
       fireEvent.click(await screen.findByRole("button", { name: "Pin this issue" }), { altKey: true });
 
       expect(mocked.pinCreate).toHaveBeenCalledWith("issue", "10042", "twoDays", null);
-      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     });
   });
 

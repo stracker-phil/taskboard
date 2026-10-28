@@ -64,7 +64,7 @@ export function registerCoreSettingsPages() {
     ],
     Body: SyncPage,
   });
-  registerSettingsPage({ id: "general", group: "System", label: "General", icon: SlidersHorizontal, order: 0, sections: [{ id: "about", title: "About" }], Body: GeneralPage });
+  registerSettingsPage({ id: "general", group: "System", label: "General", icon: SlidersHorizontal, order: 0, sections: [{ id: "behaviour", title: "Behaviour" }, { id: "about", title: "About" }], Body: GeneralPage });
   registerSettingsPage({ id: "appearance", group: "System", label: "Appearance", icon: Palette, order: 1, sections: [{ id: "appearance", title: "Appearance" }], Body: AppearancePage });
   registerSettingsPage({ id: "shortcuts", group: "System", label: "Shortcuts", icon: Keyboard, order: 2, sections: [{ id: "shortcuts", title: "Shortcuts" }], Body: ShortcutsPage });
 }

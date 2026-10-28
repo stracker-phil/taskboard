@@ -36,5 +36,6 @@ pub async fn pin_remove(state: State<'_, AppState>, id: i64) -> AppResult<()> {
 
 #[tauri::command]
 pub async fn pin_toggle_issue(state: State<'_, AppState>, id: String) -> AppResult<()> {
-    super::pin_toggle_issue(&state.db, viewer(&state), id).await
+    let duration = state.settings.get().behaviour.pin_default;
+    super::pin_toggle_issue(&state.db, viewer(&state), id, duration).await
 }

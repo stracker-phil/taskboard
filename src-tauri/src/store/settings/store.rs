@@ -55,7 +55,10 @@ impl SettingsStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::store::settings::{Appearance, Connection, SyncSettings};
+    use crate::pins::PinDuration;
+    use crate::store::settings::{
+        Appearance, Behaviour, Connection, MAX_SEEN_AFTER_SECONDS, SyncSettings,
+    };
     use crate::test_support::temp_config_dir;
     use std::fs;
 
@@ -281,6 +284,97 @@ mod tests {
             serde_json::to_value(&settings).unwrap()["appearance"],
             serde_json::json!("light")
         );
+    }
+
+    #[test]
+    fn a_file_without_behaviour_reads_as_two_seconds_and_until_unpinned() {
+        let dir = temp_config_dir();
+        fs::write(
+            dir.path().join(FILE_NAME),
+            r#"{"sync":{"focusedMinutes":10}}"#,
+        )
+        .unwrap();
+
+        let settings = SettingsStore::open(dir.path()).get();
+
+        assert_eq!(
+            settings.behaviour,
+            Behaviour {
+                seen_after_seconds: 2,
+                pin_default: PinDuration::UntilUnpinned,
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn the_behaviour_round_trips_through_the_store_and_the_file() {
+        let dir = temp_config_dir();
+        let store = SettingsStore::open(dir.path());
+        let behaviour = Behaviour {
+            seen_after_seconds: 5,
+            pin_default: PinDuration::TwoDays,
+        };
+
+        let saved = store.edit(move |s| s.behaviour = behaviour).await.unwrap();
+
+        assert_eq!(saved.behaviour, behaviour);
+        assert_eq!(store.get().behaviour, behaviour);
+        assert_eq!(SettingsStore::open(dir.path()).get().behaviour, behaviour);
+        let file: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(dir.path().join(FILE_NAME)).unwrap()).unwrap();
+        assert_eq!(
+            file["behaviour"],
+            serde_json::json!({"seenAfterSeconds": 5, "pinDefault": "twoDays"})
+        );
+    }
+
+    #[test]
+    fn a_seen_delay_above_the_maximum_in_the_file_loads_as_the_maximum() {
+        let dir = temp_config_dir();
+        fs::write(
+            dir.path().join(FILE_NAME),
+            r#"{"behaviour":{"seenAfterSeconds":99,"pinDefault":"week"}}"#,
+        )
+        .unwrap();
+
+        let behaviour = SettingsStore::open(dir.path()).get().behaviour;
+
+        assert_eq!(
+            behaviour,
+            Behaviour {
+                seen_after_seconds: MAX_SEEN_AFTER_SECONDS,
+                pin_default: PinDuration::Week,
+            }
+        );
+        assert_eq!(MAX_SEEN_AFTER_SECONDS, 10);
+    }
+
+    #[test]
+    fn an_unknown_pin_default_in_the_file_reads_as_until_unpinned_and_keeps_the_rest() {
+        let dir = temp_config_dir();
+        fs::write(
+            dir.path().join(FILE_NAME),
+            r#"{"behaviour":{"seenAfterSeconds":4,"pinDefault":"fortnight"},"sync":{"focusedMinutes":10}}"#,
+        )
+        .unwrap();
+
+        let settings = SettingsStore::open(dir.path()).get();
+
+        assert_eq!(
+            settings,
+            Settings {
+                behaviour: Behaviour {
+                    seen_after_seconds: 4,
+                    pin_default: PinDuration::UntilUnpinned,
+                },
+                sync: SyncSettings {
+                    focused_minutes: 10,
+                    ..SyncSettings::default()
+                },
+                ..Settings::default()
+            }
+        );
+        assert_eq!(file_names(dir.path()), vec![FILE_NAME.to_string()]);
     }
 
     #[test]

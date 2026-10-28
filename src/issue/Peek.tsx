@@ -11,7 +11,7 @@ import { hasContent } from "../lib/jiraHtml";
 import { JiraHtml } from "./JiraHtml";
 import { GoneNotice } from "./GoneNotice";
 import { SinceBanner } from "./SinceBanner";
-import { useSeenOnLeave } from "./useSeenOnLeave";
+import { useSeenAfter } from "./useSeenAfter";
 import { PinButton } from "../pins/PinButton";
 import { useIssueActions } from "../views/list/useIssueActions";
 
@@ -20,7 +20,7 @@ export function Peek({ id, onClose, onExpand }: { id: string; onClose: () => voi
   const { data: issue, isError } = useIssue(id);
   const actions = useIssueActions();
   const bodyRef = useRef<HTMLDivElement>(null);
-  useSeenOnLeave(id, Boolean(issue?.since));
+  useSeenAfter(id, Boolean(issue?.since));
 
   useEffect(() => {
     if (bodyRef.current) bodyRef.current.scrollTop = 0;

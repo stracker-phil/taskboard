@@ -10,7 +10,7 @@ use crate::launch::LaunchEvent;
 use crate::state::AppState;
 use crate::store::keybindings::Keybindings;
 use crate::store::places::ViewPlace;
-use crate::store::settings::{Appearance, Settings};
+use crate::store::settings::{Appearance, Behaviour, MAX_SEEN_AFTER_SECONDS, Settings};
 use crate::store::ui_state::UiState;
 
 #[tauri::command]
@@ -40,6 +40,25 @@ pub async fn appearance_set(
     let saved = state
         .settings
         .edit(move |s| s.appearance = appearance)
+        .await?;
+    announce_settings(&app, &saved);
+    Ok(saved)
+}
+
+/// Settings → General's defaults for seeing issues and pinning; the delay is clamped to 0–10 seconds.
+#[tauri::command]
+pub async fn behaviour_set(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    behaviour: Behaviour,
+) -> AppResult<Settings> {
+    let behaviour = Behaviour {
+        seen_after_seconds: behaviour.seen_after_seconds.min(MAX_SEEN_AFTER_SECONDS),
+        ..behaviour
+    };
+    let saved = state
+        .settings
+        .edit(move |s| s.behaviour = behaviour)
         .await?;
     announce_settings(&app, &saved);
     Ok(saved)
