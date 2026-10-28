@@ -11,7 +11,7 @@ use crate::error::{AppError, AppResult};
 use crate::lock::{MutexExt, RwLockExt};
 
 /// Changes are saved before they are committed to memory, so a failed save never leaves a change
-/// that vanishes on restart.
+/// that vanishes on restart. Clones share the value.
 pub struct JsonStore<T> {
     inner: Arc<Inner<T>>,
 }
@@ -21,6 +21,14 @@ struct Inner<T> {
     value: RwLock<T>,
     /// Serializes writers. Readers only wait for the clone and the swap, never for the disk.
     gate: Mutex<()>,
+}
+
+impl<T> Clone for JsonStore<T> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: Arc::clone(&self.inner),
+        }
+    }
 }
 
 impl<T> JsonStore<T>

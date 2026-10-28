@@ -21,5 +21,9 @@ pub const OPEN_SETTINGS_EVENT: &str = "open_settings";
 pub const ISSUES_CHANGED_EVENT: &str = "issues_changed";
 /// Payload: a `LocalChanged`; parts of the owner's own setup changed.
 pub const LOCAL_CHANGED_EVENT: &str = "local_changed";
+/// Payload: the `SyncState` after it changed.
+pub const SYNC_STATE_EVENT: &str = "sync_state";
+/// Payload: a `SyncProgress`, after every page of a full sync.
+pub const SYNC_PROGRESS_EVENT: &str = "sync_progress";
 /// To the main window. No payload; shows or hides the sidebar.
 pub const TOGGLE_SIDEBAR_EVENT: &str = "toggle_sidebar";

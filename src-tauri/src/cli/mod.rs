@@ -71,6 +71,23 @@ enum Command {
     },
     /// Quit the running app
     Quit,
+    /// Ask the running app to sync with Jira now; returns at once
+    Sync {
+        /// A full sync of the whole scope (the default until delta syncs exist)
+        #[arg(long)]
+        full: bool,
+    },
+    /// Debug builds only: drive the fake Jira
+    #[cfg(debug_assertions)]
+    #[command(subcommand)]
+    Dev(DevCommand),
+}
+
+#[cfg(debug_assertions)]
+#[derive(Subcommand, Debug)]
+enum DevCommand {
+    /// Change the demo site (a comment, a status, a priority, a new and a deleted issue)
+    Drift,
 }
 
 /// A message for the running app and how to print its reply.
@@ -128,6 +145,9 @@ where
         Some(Command::Hide) => ask(IpcMessage::Hide, false),
         Some(Command::Open { key }) => ask(IpcMessage::Open { key }, false),
         Some(Command::Quit) => ask(IpcMessage::Quit, false),
+        Some(Command::Sync { full }) => ask(IpcMessage::Sync { full }, false),
+        #[cfg(debug_assertions)]
+        Some(Command::Dev(DevCommand::Drift)) => ask(IpcMessage::DevDrift, false),
     }
 }
 
@@ -261,7 +281,7 @@ mod tests {
             CliOutcome::Exit { message, code } => {
                 assert_eq!(code, 0);
                 for word in [
-                    "status", "show", "focus", "hide", "open", "quit", "--hidden",
+                    "status", "show", "focus", "hide", "open", "quit", "sync", "--hidden",
                 ] {
                     assert!(message.contains(word), "{word}");
                 }
@@ -305,6 +325,40 @@ mod tests {
     fn hide_and_quit_ask_the_running_app() {
         assert_eq!(parse_args(&["hide"]), ask(IpcMessage::Hide, false));
         assert_eq!(parse_args(&["quit"]), ask(IpcMessage::Quit, false));
+    }
+
+    #[test]
+    fn sync_asks_the_running_app_for_a_sync_and_full_asks_for_the_whole_scope() {
+        assert_eq!(
+            parse_args(&["sync"]),
+            ask(IpcMessage::Sync { full: false }, false)
+        );
+        assert_eq!(
+            parse_args(&["sync", "--full"]),
+            ask(IpcMessage::Sync { full: true }, false)
+        );
+    }
+
+    #[test]
+    fn sync_rejects_unknown_flags() {
+        assert_eq!(exit_code(parse_args(&["sync", "--fully"])), 2);
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    fn dev_drift_asks_the_running_app_to_change_the_demo_site() {
+        assert_eq!(
+            parse_args(&["dev", "drift"]),
+            ask(IpcMessage::DevDrift, false)
+        );
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    fn dev_without_a_known_subcommand_is_a_usage_error() {
+        for args in [&["dev"][..], &["dev", "explode"]] {
+            assert_eq!(exit_code(parse_args(args)), 2, "{args:?}");
+        }
     }
 
     #[test]

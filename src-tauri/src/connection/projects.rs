@@ -83,6 +83,26 @@ pub async fn list_projects(db: &Db) -> AppResult<Vec<ProjectRow>> {
     .await
 }
 
+/// The tracked projects in Space order.
+pub async fn tracked_projects(db: &Db) -> AppResult<Vec<ProjectRow>> {
+    db.read(|conn| {
+        let mut query = conn.prepare(
+            "SELECT p.id, p.key, p.name FROM space s JOIN cache.project p ON p.id = s.project_id
+             WHERE s.tracked = 1 ORDER BY s.position",
+        )?;
+        let rows = query.query_map([], |row| {
+            Ok(ProjectRow {
+                id: row.get(0)?,
+                key: row.get(1)?,
+                name: row.get(2)?,
+                tracked: true,
+            })
+        })?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    })
+    .await
+}
+
 /// Tracking a project for the first time makes its Space: next position, the name's first letter as
 /// icon, a tile colour by position. Untracking keeps the row, so the settings survive re-tracking.
 pub async fn track_project(db: &Db, project_id: String, tracked: bool) -> AppResult<()> {

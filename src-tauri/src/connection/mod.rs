@@ -11,7 +11,9 @@ use std::sync::Arc;
 
 pub use account::{ConnectionInput, ConnectionTest, ConnectionView, save, test, view};
 pub use expiry::{TokenExpiry, token_expiry};
-pub use projects::{ProjectRow, list_projects, refresh_projects, track_project, tracked_keys};
+pub use projects::{
+    ProjectRow, list_projects, refresh_projects, track_project, tracked_keys, tracked_projects,
+};
 pub use scope::{
     ScopeView, effective_scope, save_intervals, save_scope, scope_view, validate_scope,
 };
@@ -22,6 +24,7 @@ use crate::secrets::{Secret, SecretStore};
 use crate::store::settings::Connection;
 
 /// What every Jira request needs besides the settings: the Keychain and the shared rate limit.
+#[derive(Clone)]
 pub struct JiraAccess {
     secrets: Arc<dyn SecretStore>,
     limiter: Arc<Limiter>,

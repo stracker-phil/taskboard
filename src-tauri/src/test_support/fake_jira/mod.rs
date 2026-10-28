@@ -161,13 +161,70 @@ impl FakeJira {
         content.now += chrono::Duration::from_std(by).expect("a short duration");
     }
 
+    /// Sets the fake's clock.
+    pub fn set_now(&self, now: DateTime<Utc>) {
+        self.content().now = now;
+    }
+
+    /// Adds a comment by `author` (a user object) and stamps `updated`.
+    pub fn add_comment(&self, id_or_key: &str, author: Value, text: &str) {
+        let mut content = self.content();
+        let now = content.now;
+        let stamp = jira_time(now);
+        let next_id = content.data.comments.values().flatten().count() + 900_000;
+        let issue = issue_mut(&mut content.data, id_or_key);
+        let comment = json!({
+            "id": next_id.to_string(),
+            "author": author,
+            "body": { "type": "doc", "version": 1, "content": [
+                { "type": "paragraph", "content": [{ "type": "text", "text": text }] }
+            ] },
+            "renderedBody": format!("<p>{text}</p>"),
+            "created": stamp,
+            "updated": stamp,
+        });
+        push_comment(&mut issue["fields"]["comment"], comment.clone());
+        let mut rendered = comment.clone();
+        rendered["body"] = json!(format!("<p>{text}</p>"));
+        push_comment(&mut issue["renderedFields"]["comment"], rendered);
+        stamp_issue(issue, now);
+        let id = issue["id"].as_str().unwrap_or_default().to_string();
+        content.data.comments.entry(id).or_default().push(comment);
+    }
+
+    /// Adds an issue to `project_key`, shaped like `template`, with a new id, key and summary.
+    pub fn add_issue(&self, template: &str, project_key: &str, summary: &str) -> String {
+        let mut content = self.content();
+        let now = content.now;
+        let mut issue = issue_mut(&mut content.data, template).clone();
+        let id = content
+            .data
+            .issues
+            .iter()
+            .filter_map(|i| i["id"].as_str()?.parse::<u64>().ok())
+            .max()
+            .unwrap_or(0)
+            + 1;
+        let key = next_key(&content.data.issues, project_key);
+        issue["id"] = json!(id.to_string());
+        issue["key"] = json!(key);
+        issue["fields"]["summary"] = json!(summary);
+        issue["fields"]["created"] = json!(jira_time(now));
+        issue["fields"]["comment"] =
+            json!({ "comments": [], "maxResults": 0, "total": 0, "startAt": 0 });
+        issue["renderedFields"]["comment"] = json!({ "comments": [] });
+        stamp_issue(&mut issue, now);
+        content.data.issues.push(issue);
+        key
+    }
+
     /// Changes an issue's fields and stamps `updated` with the fake's clock.
     pub fn edit_issue(&self, id_or_key: &str, edit: impl FnOnce(&mut Value)) {
         let mut content = self.content();
         let now = content.now;
         let issue = issue_mut(&mut content.data, id_or_key);
         edit(&mut issue["fields"]);
-        stamp(issue, now);
+        stamp_issue(issue, now);
     }
 
     /// Moves an issue to another project: same id, a new key there.
@@ -185,7 +242,7 @@ impl FakeJira {
         let issue = issue_mut(&mut content.data, id_or_key);
         issue["key"] = json!(key);
         issue["fields"]["project"] = project;
-        stamp(issue, now);
+        stamp_issue(issue, now);
     }
 
     pub fn delete_issue(&self, id_or_key: &str) {
@@ -233,9 +290,25 @@ fn next_key(issues: &[Value], project_key: &str) -> String {
     format!("{prefix}{}", highest + 1)
 }
 
+fn jira_time(at: DateTime<Utc>) -> String {
+    at.format("%Y-%m-%dT%H:%M:%S%.3f+0000").to_string()
+}
+
+fn push_comment(list: &mut Value, comment: Value) {
+    if !list["comments"].is_array() {
+        *list = json!({ "comments": [], "maxResults": 0, "total": 0, "startAt": 0 });
+    }
+    if let Some(comments) = list["comments"].as_array_mut() {
+        comments.push(comment);
+    }
+    let total = list["comments"].as_array().map_or(0, Vec::len);
+    list["total"] = json!(total);
+    list["maxResults"] = json!(total);
+}
+
 /// Sets `updated` the way Jira writes it.
-fn stamp(issue: &mut Value, now: DateTime<Utc>) {
-    issue["fields"]["updated"] = json!(now.format("%Y-%m-%dT%H:%M:%S%.3f+0000").to_string());
+fn stamp_issue(issue: &mut Value, now: DateTime<Utc>) {
+    issue["fields"]["updated"] = json!(jira_time(now));
 }
 
 /// Accepts while online; going offline drops the listener so the port refuses connections.

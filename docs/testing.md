@@ -52,8 +52,15 @@ step.
 
 The debug app, the tests and the README screenshots share one made-up data set in `src-tauri/src/test_support/`
 ([ADR 0011](adr/0011-debug-build-is-a-separate-app-with-demo-data.md),
-[`demo-data.md`](../.claude/rules/demo-data.md)). The debug app loads it on its first launch, into its own
-data folder. To start over, quit the debug app and delete
+[`demo-data.md`](../.claude/rules/demo-data.md)): `test_support::demo`, a made-up Jira site shaped like Jira's
+answers. The fake Jira (`test_support::fake_jira`, [jira.md](jira.md#the-fake-jira)) serves it.
+
+The debug app never seeds its database directly ([ADR 0022](adr/0022-the-debug-build-syncs-from-a-built-in-fake-jira.md)):
+it starts the fake at `http://127.0.0.1:47470` with the demo site dated to today, connects to it on its first
+launch (`alex.morgan@example.com`, a demo token in the debug Keychain service), tracks the five demo Spaces and
+runs a full sync, so every screen goes through the real sync. `taskboard dev drift` (the debug binary) changes
+the demo site the way a working day would (a comment, a status, a priority, a new and a deleted issue); the
+next sync picks it up. To start over, quit the debug app and delete
 `~/Library/Application Support/com.philippstracker.taskboard.debug/`.
 
 ## Driving the app

@@ -28,6 +28,8 @@ pub fn handlers() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
         connection::scope_save,
         connection::sync_save,
         connection::cache_reset,
+        crate::sync::commands::sync_overview,
+        crate::sync::commands::sync_run,
         bus::app::run_command,
     ]
 }

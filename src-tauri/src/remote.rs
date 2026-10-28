@@ -3,11 +3,13 @@
 use std::time::Duration;
 
 use serde::Serialize;
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 
 use crate::cli::reply::StatusReport;
 use crate::error::AppError;
 use crate::ipc::{HandlerResult, IpcMessage};
+use crate::state::AppState;
+use crate::sync::{Job, SyncEngine, overview};
 use crate::{launch, window};
 
 /// Lets the reply to `quit` reach the sender before the app exits.
@@ -17,11 +19,13 @@ fn json(value: impl Serialize) -> HandlerResult {
     serde_json::to_value(value).map_err(|e| AppError::from(e).into())
 }
 
-fn status_report(app: &AppHandle) -> StatusReport {
-    StatusReport {
+async fn status_report(app: &AppHandle) -> Result<StatusReport, AppError> {
+    let sync = app.state::<SyncEngine>().state();
+    Ok(StatusReport {
         version: app.package_info().version.to_string(),
         window_visible: window::main_visible(app),
-    }
+        sync: overview(&app.state::<AppState>().db, sync).await?,
+    })
 }
 
 fn quit_after_reply(app: AppHandle) {
@@ -51,7 +55,14 @@ pub async fn handle(app: AppHandle, message: IpcMessage) -> HandlerResult {
             quit_after_reply(app);
             Ok(serde_json::Value::Null)
         }
-        IpcMessage::Status => json(status_report(&app)),
+        IpcMessage::Status => json(status_report(&app).await?),
+        IpcMessage::Sync { .. } => {
+            // Delta syncs don't exist yet; both kinds run the full sync.
+            app.state::<SyncEngine>().queue(Job::Full);
+            Ok(serde_json::Value::Null)
+        }
+        #[cfg(debug_assertions)]
+        IpcMessage::DevDrift => json(crate::dev::drift()?),
         IpcMessage::Open { .. } => Err(AppError::NotConnected(
             "Taskboard isn't connected to Jira yet; set up the connection in Settings".into(),
         )

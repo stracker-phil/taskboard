@@ -23,6 +23,7 @@ mod remote;
 pub mod secrets;
 pub mod state;
 pub mod store;
+pub mod sync;
 #[cfg(any(test, debug_assertions, feature = "test-util"))]
 pub mod test_support;
 pub mod window;

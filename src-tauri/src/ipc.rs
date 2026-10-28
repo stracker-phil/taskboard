@@ -42,6 +42,14 @@ pub enum IpcMessage {
     Open {
         key: String,
     },
+    /// Queues a sync (`taskboard sync [--full]`).
+    Sync {
+        #[serde(default)]
+        full: bool,
+    },
+    /// Changes the fake Jira's demo site (`taskboard dev drift`).
+    #[cfg(debug_assertions)]
+    DevDrift,
     /// Runs JavaScript in the window (used by scripts/dev to drive the UI).
     #[cfg(debug_assertions)]
     Eval {
@@ -60,6 +68,9 @@ impl IpcMessage {
             IpcMessage::Quit => "Quit",
             IpcMessage::Status => "Status",
             IpcMessage::Open { .. } => "Open",
+            IpcMessage::Sync { .. } => "Sync",
+            #[cfg(debug_assertions)]
+            IpcMessage::DevDrift => "DevDrift",
             #[cfg(debug_assertions)]
             IpcMessage::Eval { .. } => "Eval",
         }
@@ -470,11 +481,24 @@ mod tests {
                 },
                 serde_json::json!({ "type": "open", "key": "NW-12" }),
             ),
+            (
+                IpcMessage::Sync { full: true },
+                serde_json::json!({ "type": "sync", "full": true }),
+            ),
+            (
+                IpcMessage::Sync { full: false },
+                serde_json::json!({ "type": "sync", "full": false }),
+            ),
         ];
         #[cfg(debug_assertions)]
         cases.push((
             IpcMessage::Eval { js: "1 + 1".into() },
             serde_json::json!({ "type": "eval", "js": "1 + 1" }),
+        ));
+        #[cfg(debug_assertions)]
+        cases.push((
+            IpcMessage::DevDrift,
+            serde_json::json!({ "type": "devDrift" }),
         ));
         for (message, wire) in cases {
             assert_eq!(serde_json::to_value(&message).unwrap(), wire, "{wire}");
@@ -661,6 +685,23 @@ mod tests {
     fn activate_without_hidden_deserializes_as_not_hidden() {
         let message: IpcMessage = serde_json::from_str(r#"{"type":"activate"}"#).unwrap();
         assert_eq!(message, IpcMessage::Activate { hidden: false });
+    }
+
+    #[test]
+    fn sync_without_full_deserializes_as_not_full() {
+        let message: IpcMessage = serde_json::from_str(r#"{"type":"sync"}"#).unwrap();
+        assert_eq!(message, IpcMessage::Sync { full: false });
+    }
+
+    #[tokio::test]
+    async fn a_sync_request_reaches_the_handler_with_its_flag() {
+        let dir = temp_config_dir();
+        let socket = dir.path().join("tb.sock");
+        let mut rx = serve_into_channel(&socket);
+
+        let message = IpcMessage::Sync { full: true };
+        assert_eq!(forward(&socket, message.clone()).await, Forward::Delivered);
+        assert_eq!(rx.recv().await.unwrap(), message);
     }
 
     #[test]

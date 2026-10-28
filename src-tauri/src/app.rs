@@ -1,6 +1,7 @@
 //! The Tauri app: managed state, plugins, window and menu events, setup and the run loop.
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use tauri::{AppHandle, Emitter, Manager, RunEvent, WindowEvent};
 use tauri_plugin_deep_link::DeepLinkExt;
@@ -8,10 +9,13 @@ use tauri_plugin_log::{RotationStrategy, Target, TargetKind, TimezoneStrategy};
 
 use crate::cli::LogLevel;
 use crate::db::Db;
-use crate::events::{ISSUES_CHANGED_EVENT, LOCAL_CHANGED_EVENT};
+use crate::events::{
+    ISSUES_CHANGED_EVENT, LOCAL_CHANGED_EVENT, SYNC_PROGRESS_EVENT, SYNC_STATE_EVENT,
+};
 use crate::handlers::handlers;
 use crate::ipc::IpcMessage;
 use crate::state::AppState;
+use crate::sync::{SyncContext, SyncEngine, SyncEvent};
 use crate::{bus, ipc, menu, remote, window};
 
 const MAX_LOG_BYTES: u128 = 5 * 1024 * 1024;
@@ -44,10 +48,11 @@ pub fn start(
             let state = app.state::<AppState>();
             state.launches.push(initial);
             announce_db_changes(app.handle(), &state.db);
+            start_sync(app.handle(), &state);
             #[cfg(debug_assertions)]
             apply_dev_frame(app);
             #[cfg(debug_assertions)]
-            crate::dev::start_fake_jira();
+            crate::dev::start_fake_jira(app.handle().clone());
             start_ipc(app.handle().clone(), &socket);
             listen_for_links(app.handle());
             // The window starts invisible (tauri.conf.json), so a hidden start never flashes it.
@@ -87,6 +92,29 @@ fn announce_db_changes(app: &AppHandle, db: &Db) {
             }
         }
     }));
+}
+
+/// The one sync task; its state and progress reach every window as events.
+fn start_sync(app: &AppHandle, state: &AppState) {
+    let handle = app.clone();
+    let ctx = SyncContext {
+        settings: state.settings.clone(),
+        access: state.jira.clone(),
+        db: state.db.clone(),
+    };
+    let engine = SyncEngine::start(
+        ctx,
+        Arc::new(move |event| {
+            let sent = match event {
+                SyncEvent::State(state) => handle.emit(SYNC_STATE_EVENT, state),
+                SyncEvent::Progress(progress) => handle.emit(SYNC_PROGRESS_EVENT, progress),
+            };
+            if let Err(e) = sent {
+                log::warn!("Couldn't announce the sync: {e}");
+            }
+        }),
+    );
+    app.manage(engine);
 }
 
 fn commands_bus() -> bus::Commands {

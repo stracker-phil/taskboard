@@ -8,6 +8,7 @@ use crate::error::AppResult;
 use crate::events::announce_settings;
 use crate::state::AppState;
 use crate::store::settings::SyncSettings;
+use crate::sync::SyncEngine;
 
 fn today() -> NaiveDate {
     Local::now().date_naive()
@@ -23,10 +24,12 @@ pub fn connection_get(state: State<'_, AppState>) -> ConnectionView {
 pub async fn connection_save(
     app: AppHandle,
     state: State<'_, AppState>,
+    sync: State<'_, SyncEngine>,
     input: ConnectionInput,
     token: Option<String>,
 ) -> AppResult<ConnectionView> {
     let saved = super::save(&state.settings, &state.jira, input, token, today()).await?;
+    sync.connection_changed();
     announce_settings(&app, &state.settings.get());
     log::info!("Jira connection saved");
     Ok(saved)

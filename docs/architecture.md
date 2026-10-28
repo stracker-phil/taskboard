@@ -62,7 +62,7 @@ These rules hold everywhere in the code. Keep them when you change things.
   ([ADR 0016](adr/0016-closing-the-window-keeps-the-app-running.md)). There is no tray, LaunchAgent or global
   shortcut.
 - **The CLI**: `taskboard` starts or activates the app; `status [--json]`, `show`, `focus`, `hide`,
-  `open <KEY>` and `quit` ask the running app (`cli/`, `remote.rs`). `show` and `focus` start it when it
+  `open <KEY>`, `sync [--full]` and `quit` (debug builds also `dev drift`) ask the running app (`cli/`, `remote.rs`). `show` and `focus` start it when it
   isn't running; the others exit 2 with "Taskboard isn't running".
 - **Settings** is a window of its own ([ux.md](ux.md#settings)).
 
@@ -82,7 +82,7 @@ after the commit. Reset cache deletes only the cache file.
 Jira is reached only through `jira/` ([jira.md](jira.md)): one `JiraClient` per connection over `net::Http`,
 which allows the site and `api.atlassian.com` only. The API token stays in the Keychain (`secrets.rs`);
 `connection::JiraAccess` builds clients from the saved connection. The debug build serves the demo site from
-the fake Jira on loopback.
+the fake Jira on loopback. The sync engine (`sync/`, [sync.md](sync.md)) is the one task that fetches issues.
 
 ## Repository map
 
@@ -104,6 +104,7 @@ src-tauri/
   src/net.rs secrets.rs      the only HTTP client and its host check, log redaction; the Keychain
   src/jira/                  Jira Cloud: site, client, limiter, retries, paging, endpoints, DTOs, JQL
   src/connection/            the Jira connection: Keychain access, Test Connection, tracked projects, scope
+  src/sync/                  the sync engine: one task, the full sync, Jira JSON to rows, change records
   src/<feature>/             one folder per feature: types, pure logic, commands.rs, tests
   src/window/ menu/          the main and Settings windows, the native app menu
   src/dev.rs                 debug builds only: window frame, background launch, eval

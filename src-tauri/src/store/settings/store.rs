@@ -8,6 +8,7 @@ use crate::store::json_store::JsonStore;
 
 pub const FILE_NAME: &str = "settings.json";
 
+#[derive(Clone)]
 pub struct SettingsStore {
     store: JsonStore<Settings>,
 }

@@ -1,21 +1,10 @@
 //! Debug-build conveniences for driving the app from scripts/dev without disturbing the user: window
-//! placement, background launches and running JavaScript. Only compiled into debug builds
+//! placement, background launches, running JavaScript, and the fake Jira (`fake.rs`). Only compiled into debug builds
 //! (`#[cfg(debug_assertions)]` on the module and its call sites).
 
-/// Where the debug build serves the demo Jira site; type it into Settings → Connection.
-pub const FAKE_JIRA_PORT: u16 = 47_470;
+mod fake;
 
-/// Starts the fake Jira (ADR 0022) with the demo site dated to today; it runs until the app quits.
-pub fn start_fake_jira() {
-    tauri::async_runtime::spawn(async {
-        let now = chrono::Utc::now();
-        let data = crate::test_support::demo::demo_at(now);
-        match crate::test_support::fake_jira::FakeJira::start_on(FAKE_JIRA_PORT, data, now).await {
-            Ok(fake) => log::info!("Fake Jira serves the demo site at {}", fake.url()),
-            Err(e) => log::warn!("The fake Jira couldn't start on port {FAKE_JIRA_PORT}: {e}"),
-        }
-    });
-}
+pub use fake::{drift, start_fake_jira};
 
 /// `TASKBOARD_WINDOW_FRAME="x,y,width,height"` (logical points) places the main window.
 pub fn window_frame() -> Option<(f64, f64, f64, f64)> {

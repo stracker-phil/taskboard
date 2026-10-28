@@ -59,6 +59,8 @@ export type IssuesChanged = { ids: Array<string>,
  */
 all: boolean, };
 
+export type Job = "full";
+
 /**
  * Something the page acts on once it listens: from the launch that started the app, a later launch,
  * or a deep link.
@@ -74,6 +76,12 @@ export type LocalChanged = { parts: Array<LocalPart>, };
  * A part of the owner's own setup (the local file).
  */
 export type LocalPart = "spaces" | "lists" | "views" | "pins" | "styles";
+
+export type ProjectCounts = { id: string, key: string, name: string, 
+/**
+ * Issues in the cache, open or done.
+ */
+cached: number, open: number, lastFullAt: string | null, };
 
 export type ProjectRow = { id: string, key: string, name: string, tracked: boolean, };
 
@@ -93,6 +101,17 @@ connection: Connection,
  */
 sync: SyncSettings, };
 
+export type SyncOverview = { state: SyncState, lastFullAt: string | null, projects: Array<ProjectCounts>, };
+
+/**
+ * After every page of a full sync.
+ */
+export type SyncProgress = { job: Job, projectId: string, projectKey: string, pagesDone: number, fetched: number, 
+/**
+ * Jira's estimate for this project; `None` when it didn't give one.
+ */
+approxTotal: number | null, };
+
 export type SyncSettings = { 
 /**
  * The owner's own scope JQL; `None` uses the default built from the tracked projects.
@@ -106,6 +125,8 @@ focusedMinutes: number, backgroundMinutes: number,
  * How long finished issues stay in the default scope.
  */
 keepDoneDays: number, };
+
+export type SyncState = { "state": "idle", lastOk: string | null, } | { "state": "running", job: Job, } | { "state": "error", kind: ErrorKind, message: string, } | { "state": "offline", since: string, } | { "state": "paused", message: string, };
 
 export type TokenExpiry = { "state": "fine" } | { "state": "soon", days: number, } | { "state": "expired" };
 
