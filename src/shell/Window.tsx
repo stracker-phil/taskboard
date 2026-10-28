@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { useNav, useSidebar, useViews } from "../queries/sidebar";
+import { CurrentPeek } from "./CurrentPeek";
 import { Header } from "./Header";
 import { findLevel } from "./levels";
 import { Sidebar } from "./Sidebar/Sidebar";
@@ -20,8 +21,11 @@ export function Window({ sidebarHidden, children }: Props) {
       <div className="shell__content">
         {sidebarHidden && <div className="shell__titlebar" data-tauri-drag-region />}
         <main className="content-panel">
-          <LevelChrome />
-          <div className="content-panel__body">{children}</div>
+          <div className="content-panel__main">
+            <LevelChrome />
+            <div className="content-panel__body">{children}</div>
+          </div>
+          <CurrentPeek />
         </main>
       </div>
     </div>

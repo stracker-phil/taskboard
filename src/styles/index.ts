@@ -10,6 +10,7 @@ import "./issue.css";
 import "./list.css";
 import "./table.css";
 import "./toolbar.css";
+import "./peek.css";
 import "./overlays.css";
 import "./settings.css";
 import "./spaces.css";

@@ -1,6 +1,7 @@
 import { create, type StoreApi } from "zustand";
 import { confirmSlice, type ConfirmSlice } from "./slices/confirm";
 import { narrowingSlice, type NarrowingSlice } from "./slices/narrowing";
+import { placesSlice, type PlacesSlice } from "./slices/places";
 import { uiSlice, type UiSlice } from "./slices/ui";
 
 export { fail } from "./requests";
@@ -8,7 +9,7 @@ export type { Toast, ToastAction } from "./slices/ui";
 export type { Confirmation } from "./slices/confirm";
 
 /** Every slice's members; modules add theirs with `declare module "../state/store" { interface Store { … } }`. */
-export interface Store extends UiSlice, ConfirmSlice, NarrowingSlice {}
+export interface Store extends UiSlice, ConfirmSlice, NarrowingSlice, PlacesSlice {}
 
 type SetStore = StoreApi<Store>["setState"];
 type GetStore = StoreApi<Store>["getState"];
@@ -38,3 +39,4 @@ export function resetStore(patch: Partial<Store> = {}) {
 registerSlice(uiSlice);
 registerSlice(confirmSlice);
 registerSlice(narrowingSlice);
+registerSlice(placesSlice);

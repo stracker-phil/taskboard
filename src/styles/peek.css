@@ -1,0 +1,43 @@
+/* The issue peek (docs/ux.md → Issue peek): 540 wide, the content panel's full height; header, tabs, toolbar
+   and view narrow beside it. */
+.content-panel__main { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; }
+
+.peek {
+  display: flex; flex: none; flex-direction: column; width: 540px; height: 100%; box-sizing: border-box;
+  border-left: 1px solid var(--border); background: var(--panel-bg); box-shadow: var(--shadow-peek);
+  animation: peek-in var(--motion-slow) var(--ease-out);
+}
+@keyframes peek-in {
+  from { opacity: 0; transform: translateX(24px); }
+}
+.peek__header {
+  display: flex; flex: none; align-items: center; gap: 8px; height: 50px; padding: 0 14px 0 20px; box-sizing: border-box;
+  border-bottom: 1px solid var(--hairline); font-size: 13px; color: var(--text-tertiary); white-space: nowrap;
+}
+.peek__key { font-family: var(--font-mono); color: var(--text); }
+.peek__dot { color: var(--text-faint); }
+.peek__spacer { flex: 1; }
+.peek__btn {
+  display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border: 0;
+  border-radius: 7px; background: transparent; color: var(--text-tertiary);
+  transition: background-color var(--motion-fast) var(--ease-out), color var(--motion-fast) var(--ease-out);
+}
+.peek__btn:hover:not(:disabled) { background: var(--hover-bg); color: var(--text); }
+.peek__btn:disabled { opacity: 0.45; }
+
+.peek__body { display: flex; flex: 1; flex-direction: column; gap: 16px; min-height: 0; overflow: auto; padding: 20px 24px; }
+.peek__body > * { animation: fade-in var(--motion-base) var(--ease-out); }
+.peek__title { margin: 0; font-size: 22px; font-weight: 750; line-height: 1.25; color: var(--text); }
+.peek__chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13px; }
+.peek__meta { display: inline-flex; align-items: center; gap: 6px; color: var(--text-secondary); white-space: nowrap; }
+.peek__description { margin: 0; font-size: 14px; line-height: 1.6; color: var(--text-strong-body); white-space: pre-line; }
+.peek__empty, .peek__missing { margin: 0; font-size: 13px; color: var(--text-muted); }
+.release-chip {
+  display: inline-flex; align-items: center; height: 24px; padding: 0 8px; box-sizing: border-box; border: 1px solid var(--border);
+  border-radius: 6px; font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary); white-space: nowrap;
+}
+
+.peek__footer {
+  display: flex; flex: none; align-items: center; gap: 16px; height: 36px; padding: 0 20px; box-sizing: border-box;
+  border-top: 1px solid var(--hairline); font-size: 12px; color: var(--text-muted); white-space: nowrap;
+}

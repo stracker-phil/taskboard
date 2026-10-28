@@ -135,6 +135,22 @@ overrides it per status.
 - Rows are virtualised (`@tanstack/react-virtual`): a card is drawn from its pieces (the header item, then
   rows that know whether they are first, middle, last or the only one).
 
+## Issue peek
+
+`src/issue/Peek.tsx`, shown by `shell/CurrentPeek.tsx`: clicking a row selects it and opens a 540px panel at
+the content panel's full height; header, tabs, toolbar and view narrow beside it and the List hides the
+columns that no longer fit beside a 240px title, rightmost first, until it closes. It slides in.
+
+- Header 50: mono key · type text, then Pin (with pins), Open in Jira, Full view (with the Issue view), Close.
+- Body: title 22/750, one line of chips (status pill `peek`, epic chip, release outline chip, priority,
+  assignee), the description as text (the Issue view shows it as sanitised HTML).
+- Footer 36: the keys.
+- Hovering a row shows its toolbar at the end of the title: Copy key, Pin, Open in Jira (`RowActions`).
+
+**Remember my place:** each view keeps its opened and closed groups, scroll position, selected row and open
+peek (`state/slices/places.ts`, saved by Rust in `places.json` a moment after the last change, at most 200
+views), also across restarts.
+
 ## Text and controls never wrap
 
 Buttons, tabs, chips, pills, column headers and table cells stay on one line (`base.css`); long text
@@ -311,6 +327,10 @@ palette once it exists.
 - A command has one binding.
 - In the Taskboard window: ⌥⌘↑ and ⌥⌘↓ open the previous and next Space (the bus commands `nav:previousSpace`
   and `nav:nextSpace`, which wrap), ⌘1–⌘9 the nth view tab.
+- In a List (`commands/issueKeys.ts`, registered by the shown view): J or ↓ and K or ↑ move the selection (the
+  peek follows), ← and → close and open the selected row's group, esc closes the peek (after any popover),
+  ⌘C copies the key (only with no text field focused and no text selected), ⌘⇧C the issue's URL, ⌘↩ opens it in
+  Jira.
 - `app:settings:<page>` opens Settings at a page or section (the Spaces "+" uses `app:settings:projects`).
 
 ## Palette checks

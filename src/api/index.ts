@@ -17,6 +17,7 @@ import type {
   LaunchEvent,
   Layout,
   FilterOptions,
+  IssueDetail,
   ListConditions,
   MatchCount,
   Narrowing,
@@ -35,6 +36,7 @@ import type {
   UiState,
   View,
   ViewData,
+  ViewPlace,
 } from "./types";
 
 export * from "./types";
@@ -135,6 +137,11 @@ export const api = {
   viewDelete: (id: number) => invoke<View[]>("view_delete", { id }),
   /** A view's issues, filtered by its level and `narrowing`, grouped and sorted by the view. */
   viewRows: (listId: number, viewId: number, narrowing: Narrowing) => invoke<ViewData>("view_rows", { listId, viewId, narrowing }),
+  issueGet: (id: string) => invoke<IssueDetail>("issue_get", { id }),
+  placeGet: (listId: number, viewId: number) => invoke<ViewPlace | null>("place_get", { listId, viewId }),
+  placeSet: (listId: number, viewId: number, place: ViewPlace) => invoke<void>("place_set", { listId, viewId, place }),
+  /** The system clipboard; only text. */
+  copyText: (text: string) => navigator.clipboard.writeText(text),
   /** Every column a view can show: the standard ones, then the site's custom fields. */
   columnsCatalogue: () => invoke<Column[]>("columns_catalogue"),
   statusStylesList: () => invoke<StatusStyleRow[]>("status_styles_list"),

@@ -9,6 +9,7 @@ import {
   type EventName,
   type EventPayloads,
   type FilterOptions,
+  type IssueDetail,
   type Keybindings,
   type ListConditions,
   type Nav,
@@ -21,6 +22,7 @@ import {
   type ViewData,
 } from "../api/types";
 import { filterOptions } from "./filters";
+import { issueDetail } from "./issues";
 
 type Api = typeof realApi;
 
@@ -106,6 +108,10 @@ export function createApiMock(): Api {
     viewMove: vi.fn(),
     viewDelete: vi.fn(),
     viewRows: vi.fn(async (): Promise<ViewData> => ({ groupBy: "none", groups: [], rows: {}, columns: [] })),
+    issueGet: vi.fn(async (id: string): Promise<IssueDetail> => issueDetail({ id })),
+    placeGet: vi.fn().mockResolvedValue(null),
+    placeSet: vi.fn().mockResolvedValue(undefined),
+    copyText: vi.fn().mockResolvedValue(undefined),
     columnsCatalogue: vi.fn().mockResolvedValue([]),
     statusStylesList: vi.fn().mockResolvedValue([]),
     statusStyleSet: vi.fn().mockResolvedValue([]),

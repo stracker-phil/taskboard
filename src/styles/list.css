@@ -68,3 +68,18 @@
 .table-item .list-group { display: flex; gap: 4px; padding: 0; }
 .table-item .list-group__chevron { position: static; opacity: 1; }
 .table-item .list-group__title { margin-left: 0; }
+
+/* The row's hover toolbar overlays the end of the title cell and fades in. */
+.row-actions {
+  position: absolute; right: 0; top: 50%; display: flex; gap: 2px; padding: 2px; transform: translateY(-50%);
+  border: 1px solid var(--border); border-radius: 7px; background: var(--panel-bg); box-shadow: var(--shadow-hover-toolbar);
+  opacity: 0; pointer-events: none; transition: opacity var(--motion-base) var(--ease-out);
+}
+.list-row:hover .row-actions, .row-actions:focus-within { opacity: 1; pointer-events: auto; }
+.row-actions__btn {
+  display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: 0;
+  border-radius: 5px; background: transparent; color: var(--text-tertiary);
+  transition: background-color var(--motion-fast) var(--ease-out), color var(--motion-fast) var(--ease-out);
+}
+.row-actions__btn:hover:not(:disabled) { background: var(--hover-bg); color: var(--text); }
+.row-actions__btn:disabled { opacity: 0.45; }

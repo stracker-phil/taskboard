@@ -40,7 +40,7 @@
 .content-panel {
   position: relative;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   flex: 1;
   min-height: 0;
   margin: 8px 8px 8px 0;

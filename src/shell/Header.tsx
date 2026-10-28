@@ -1,4 +1,5 @@
 import { Funnel } from "lucide-react";
+import { browseUrl } from "../lib/jiraLinks";
 import { api, type SpaceNode } from "../api";
 import { SpaceTile } from "../components/SpaceTile";
 import { useConnection } from "../queries/settings";
@@ -57,9 +58,8 @@ function Title({ level }: { level: Level }) {
 /** Jira's page of the Space's project (`/browse/KEY` redirects to it); hidden without a Space or a site. */
 function OpenInJira({ space }: { space: SpaceNode | null }) {
   const { data: connection } = useConnection();
-  const site = connection?.connection.siteUrl.replace(/\/+$/, "");
-  if (!space || !site) return null;
-  const url = `${site}/browse/${encodeURIComponent(space.key)}`;
+  const url = space ? browseUrl(connection?.connection.siteUrl, space.key) : null;
+  if (!url) return null;
   return (
     <button type="button" className="content-header__jira" onClick={() => void attempt(api.openUrl(url), "Could not open Jira")}>
       Open in Jira <span aria-hidden="true">↗</span>

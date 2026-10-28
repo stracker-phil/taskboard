@@ -43,15 +43,37 @@ export interface MeasuredColumn {
   cellWidth: (row: Row, measure: MeasureText) => number;
 }
 
-/** The grid template shared by every group header and row: the title takes what is left, every other column
- *  is as wide as its header or its widest cell among all loaded rows, so columns line up across groups. */
-export function listColumns(rows: Row[], columns: MeasuredColumn[], measure: MeasureText): string {
-  const widths = columns.map((column) => {
+/** Each column's width: as wide as its header or its widest cell among all loaded rows, so columns line up
+ *  across groups. */
+export function columnWidths(rows: Row[], columns: MeasuredColumn[], measure: MeasureText): number[] {
+  return columns.map((column) => {
     const header = measure(column.header.toUpperCase(), FONT.header) + HEADER_TRACKING * column.header.length;
     const widest = rows.reduce((max, row) => Math.max(max, column.cellWidth(row, measure)), 0);
     return Math.ceil(Math.max(header, widest));
   });
+}
+
+/** The grid template shared by every group header and row: the title takes what is left. */
+export function gridTemplate(widths: number[]): string {
   return ["minmax(0, 1fr)", ...widths.map((w) => `${w}px`)].join(" ");
+}
+
+export function listColumns(rows: Row[], columns: MeasuredColumn[], measure: MeasureText): string {
+  return gridTemplate(columnWidths(rows, columns, measure));
+}
+
+const TITLE_MIN = 240;
+const COLUMN_GAP = 20;
+
+/** How many columns, from the left, fit beside a title of at least `TITLE_MIN` in `available` px; the others
+ *  hide (the peek narrows the list) and come back when there is room. */
+export function fittingColumns(widths: number[], available: number): number {
+  let used = TITLE_MIN;
+  for (let index = 0; index < widths.length; index++) {
+    used += widths[index] + COLUMN_GAP;
+    if (used > available) return index;
+  }
+  return widths.length;
 }
 
 /** Measures with a 2D canvas and remembers each font and text; without a canvas (tests), estimates. */

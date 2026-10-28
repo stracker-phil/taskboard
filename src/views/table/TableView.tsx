@@ -82,6 +82,7 @@ function Table({ view, data }: { view: View; data: ViewData }) {
                     open={item.open}
                     tab
                     active
+                    namesColumns={false}
                     headers={[]}
                     onToggle={() => setToggled((all) => ({ ...all, [item.group.key]: !item.open }))}
                   />

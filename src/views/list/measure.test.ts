@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ALEX, row, SAM } from "../../test/issues";
 import { columnDef } from "./columns";
-import { canvasMeasure, FONT, listColumns, type MeasuredColumn, type MeasureText, widthOf } from "./measure";
+import { canvasMeasure, columnWidths, FONT, fittingColumns, gridTemplate, listColumns, type MeasuredColumn, type MeasureText, widthOf } from "./measure";
 
 /** Seven pixels per character, whatever the font. */
 const chars7: MeasureText = (text) => text.length * 7;
@@ -104,6 +104,53 @@ describe("listColumns", () => {
     const reviewed = row({ custom: { customfield_10071: { kind: "person", value: SAM } } });
 
     expect(listColumns([reviewed], [column("customfield_10071", "RV")], chars7)).toBe("minmax(0, 1fr) 26px");
+  });
+});
+
+describe("columnWidths", () => {
+  it("returns one rounded-up pixel width per column, in order", () => {
+    const rows = [row({ priority: { name: "Highest", level: 3 } })];
+
+    expect(columnWidths(rows, [column("priority", "Priority"), column("epic", "Epic")], chars7)).toEqual([69, 31]);
+  });
+
+  it("returns nothing for no columns", () => {
+    expect(columnWidths([row()], [], chars7)).toEqual([]);
+  });
+});
+
+describe("gridTemplate", () => {
+  it("gives the title the flexible track, then each width in px", () => {
+    expect(gridTemplate([61, 98])).toBe("minmax(0, 1fr) 61px 98px");
+  });
+
+  it("is only the title track without widths", () => {
+    expect(gridTemplate([])).toBe("minmax(0, 1fr)");
+  });
+});
+
+describe("fittingColumns", () => {
+  it("keeps every column when they fit beside the title", () => {
+    // 240 + (100 + 20) + (60 + 20) = 440
+    expect(fittingColumns([100, 60], 440)).toBe(2);
+  });
+
+  it("cuts the first column that overflows by a pixel, and everything after it", () => {
+    expect(fittingColumns([100, 60, 10], 439)).toBe(1);
+    expect(fittingColumns([100, 60, 10], 119 + 240)).toBe(0);
+  });
+
+  it("does not bring back a narrow column behind one that was cut", () => {
+    expect(fittingColumns([300, 10], 240 + 100)).toBe(0);
+  });
+
+  it("reserves at least 240px for the title", () => {
+    expect(fittingColumns([10], 269)).toBe(0);
+    expect(fittingColumns([10], 270)).toBe(1);
+  });
+
+  it("returns zero without columns, however narrow the list", () => {
+    expect(fittingColumns([], 0)).toBe(0);
   });
 });
 

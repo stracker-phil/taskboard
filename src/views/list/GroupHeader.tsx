@@ -10,12 +10,14 @@ interface Props {
   tab: boolean;
   /** The pointer or focus is in this group, which shows its chevron. */
   active: boolean;
+  /** The List's header rows name the columns; the Table has its own header. */
+  namesColumns: boolean;
   headers: string[];
   onToggle: () => void;
 }
 
 /** The row above a group's card: the tab with the count, then the column headers on the shared grid. */
-export function GroupHeader({ group, open, tab, active, headers, onToggle }: Props) {
+export function GroupHeader({ group, open, tab, active, namesColumns, headers, onToggle }: Props) {
   const className = ["list-group", active && "list-group--active"].filter(Boolean).join(" ");
   return (
     <div className={className} role="row">
@@ -30,8 +32,7 @@ export function GroupHeader({ group, open, tab, active, headers, onToggle }: Pro
           <ChevronDown size={12} strokeWidth={2.6} aria-hidden="true" />
         </button>
       )}
-      {/* Only the List's header row names columns; the Table has its own header. */}
-      <span className="list-group__title" role={headers.length > 0 ? "columnheader" : undefined}>
+      <span className="list-group__title" role={namesColumns ? "columnheader" : undefined}>
         {tab && (
           <>
             <button type="button" className={tabClass(group.mark, open)} onClick={onToggle} tabIndex={-1}>
