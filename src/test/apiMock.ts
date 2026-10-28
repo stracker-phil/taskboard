@@ -90,7 +90,7 @@ export function createApiMock(): Api {
     listDelete: vi.fn(),
     listMove: vi.fn(),
     listSetFilter: vi.fn(),
-    listConditions: vi.fn(async (): Promise<ListConditions> => ({ kind: "everything", locked: [], own: [], error: null })),
+    listConditions: vi.fn(async (): Promise<ListConditions> => ({ kind: "everything", locked: [], own: [], error: null, projectFixed: false })),
     filterOptions: vi.fn(async (): Promise<FilterOptions> => filterOptions()),
     listMatchCount: vi.fn(),
     spaceMove: vi.fn(),

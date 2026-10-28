@@ -32,8 +32,9 @@ export function FilterPopover({ listId, listName, anchor, onClose }: Props) {
   );
 }
 
-function Editor({ listId, listName, conditions, options, onClose }: { listId: number; listName: string; conditions: ListConditions; options: FilterOptions; onClose: () => void }) {
+function Editor({ listId, listName, conditions, options: allOptions, onClose }: { listId: number; listName: string; conditions: ListConditions; options: FilterOptions; onClose: () => void }) {
   const editsList = conditions.kind === "list";
+  const options = conditions.projectFixed ? { ...allOptions, fields: allOptions.fields.filter((f) => f.id !== "project") } : allOptions;
   const builtIn = conditions.kind === "recent" || conditions.kind === "pinned";
   const [draft, setDraft] = useState<Condition[]>(conditions.own);
   const complete = draft.filter(isComplete);

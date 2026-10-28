@@ -100,11 +100,11 @@ describe("Toolbar", () => {
     it("moves Columns, Filter and Group into the More button and keeps Me and the text filter", () => {
       sizeBar(NO_COLUMNS_OR_FILTER);
 
-      renderToolbar();
+      renderToolbar(FILTER_LIST);
 
       expect(screen.getByRole("button", MORE)).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Columns" })).not.toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Filter" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /^Filter/ })).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Group: Status" })).not.toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Me" })).toBeInTheDocument();
       expect(screen.getByRole("textbox", { name: "Filter this view" })).toBeInTheDocument();
@@ -113,26 +113,35 @@ describe("Toolbar", () => {
     it("hides only Columns when the bar is just too narrow", () => {
       sizeBar(48 + 500);
 
-      renderToolbar();
+      renderToolbar(FILTER_LIST);
 
       expect(screen.queryByRole("button", { name: "Columns" })).not.toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Filter" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /^Filter/ })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Group: Status" })).toBeInTheDocument();
     });
 
     it("lists the hidden items in the menu in the order they moved", async () => {
       sizeBar(NOTHING_BUT_TEXT);
-      renderToolbar();
+      renderToolbar(FILTER_LIST);
 
       await userEvent.click(screen.getByRole("button", MORE));
 
       expect(entriesOf(mocked.popupMenu.mock.lastCall![0]).map((e) => e.text)).toEqual([
         "Columns…",
-        "Filter…",
+        "Filter · 2…",
         "Group: Status",
         "Only my issues",
       ]);
       expect(screen.queryByRole("button", { name: "Me" })).not.toBeInTheDocument();
+    });
+
+    it("leaves Filter out of the menu on a Space", async () => {
+      sizeBar(NOTHING_BUT_TEXT);
+      renderToolbar(SPACE);
+
+      await userEvent.click(screen.getByRole("button", MORE));
+
+      expect(entriesOf(mocked.popupMenu.mock.lastCall![0]).map((e) => e.text)).toEqual(["Columns…", "Group: Status", "Only my issues"]);
     });
 
     it("names the Columns entry Card fields on a board", async () => {
@@ -251,10 +260,17 @@ describe("Toolbar", () => {
       expect(screen.getByLabelText("1 condition")).toBeInTheDocument();
     });
 
-    it("shows no badge on a Space", () => {
+    it("is not offered on a Space, whose filters live in its filter lists", () => {
       renderToolbar(SPACE);
 
+      expect(screen.queryByRole("button", { name: /^Filter/ })).not.toBeInTheDocument();
       expect(screen.queryByLabelText(/condition/)).not.toBeInTheDocument();
+    });
+
+    it("is offered on Everything", () => {
+      renderToolbar({ kind: "home", node: listNode({ id: 1, name: "Everything" }) });
+
+      expect(screen.getByRole("button", { name: /^Filter/ })).toBeInTheDocument();
     });
   });
 
@@ -287,14 +303,14 @@ describe("Toolbar", () => {
     });
 
     it("keeps only one popover open: Filter replaces Columns", async () => {
-      renderToolbar();
+      renderToolbar(FILTER_LIST);
       await userEvent.click(screen.getByRole("button", { name: "Columns" }));
 
-      await userEvent.click(screen.getByRole("button", { name: "Filter" }));
+      await userEvent.click(screen.getByRole("button", { name: /^Filter/ }));
 
       expect(await screen.findByRole("dialog", { name: "Filter" })).toBeInTheDocument();
       expect(screen.queryByRole("dialog", { name: "Columns for this view" })).not.toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Filter" })).toHaveAttribute("aria-expanded", "true");
+      expect(screen.getByRole("button", { name: /^Filter/ })).toHaveAttribute("aria-expanded", "true");
       expect(screen.getByRole("button", { name: "Columns" })).toHaveAttribute("aria-expanded", "false");
     });
   });

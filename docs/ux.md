@@ -253,13 +253,15 @@ button, Escape and a press outside close it, focus goes back to the button).
   beside the row's own square), then "Custom fields · this project" with the field id as `cf_N`; a row per field
   with a drag handle (⋮⋮) to reorder and a 30 × 18 switch (`components/Toggle.tsx`). A long list scrolls. Each change saves to the view; "Use as Space default" sets
   the columns new views in the Space start with.
-- **Filter** (badge: the filter list's own conditions): the *Filter* popover (440 wide, right-aligned): "Show
-  issues where" and the live count of open issues ("N issues match" on a filter list or with a draft, "N open
-  issues" on a Space before any condition); inherited conditions locked on `--fill-subtle` with a lock, "this Space" / "from Space"; own
-  conditions as field / operator / value selects (value pickers from the cache, dates, days, text) with ×;
-  "+ Add condition". On a filter list changes save as you edit ("Changes save to “Name”."); on a Space or
-  Everything they are a draft that "Save as filter list" turns into a new list and opens. A picked field's value opens a list
-  with a search box and a checkbox per value (`ValuePicker`); every tick applies at once, and several values
+- **Filter** (badge: the filter list's own conditions; not on a Space, which is its project and passes it to
+  its filter lists): the *Filter* popover (440 wide, right-aligned): "Show issues where" and the live count of
+  open issues ("N issues match" on a filter list or with a draft, "N open issues" before any condition);
+  inherited conditions locked on `--fill-subtle` with a lock, "from Space"; own conditions as field /
+  operator / value selects (value pickers from the cache, dates, days, text) with ×; "+ Add condition". Inside
+  a Space the Project field isn't offered (`projectFixed`). On a filter list changes save as you edit
+  ("Changes save to “Name”."); on Everything they are a draft that "Save as filter list" turns into a new list
+  and opens. A picked field's value opens a list with a search box and a checkbox per value (`ValuePicker`);
+  every tick applies at once, and several values
   are stored as `in` / `not in` (shown as "is" / "is not").
 - **Me** chip (on: `--accent-soft-*` pill with the `--avatar-1` avatar and "Me ×") and **Filter this view**
   (190 wide, filters by key or summary as you type). Both narrow only the current view and are never saved.

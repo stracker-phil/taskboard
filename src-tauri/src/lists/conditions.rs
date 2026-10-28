@@ -21,6 +21,8 @@ pub struct ListConditions {
     pub own: Vec<Condition>,
     /// Why the stored filter can't be read.
     pub error: Option<String>,
+    /// A filter list in a Space: the Space gives the project, so a condition can't pick one.
+    pub project_fixed: bool,
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
@@ -58,11 +60,15 @@ fn conditions_of(conn: &Connection, id: i64) -> AppResult<ListConditions> {
         (_, Ok(_)) => (Vec::new(), None),
         (_, Err(message)) => (Vec::new(), Some(message)),
     };
+    let project_fixed = ancestors(&nodes, &target)
+        .iter()
+        .any(|a| a.kind == Kind::Space);
     Ok(ListConditions {
         kind: target.kind,
         locked,
         own,
         error,
+        project_fixed,
     })
 }
 

@@ -320,6 +320,32 @@ describe("FilterPopover", () => {
     });
   });
 
+  describe("the Project field", () => {
+    const fieldNames = (popover: HTMLElement) => within(within(popover).getByLabelText("Field")).getAllByRole("option").map((o) => o.textContent);
+
+    it("is offered on a global filter list", async () => {
+      const popover = await openFilter(FILTER_LIST);
+
+      expect(fieldNames(popover)).toContain("Project");
+    });
+
+    it("is not offered in a condition of a filter list inside a Space", async () => {
+      const popover = await openFilter({ ...FILTER_LIST, projectFixed: true });
+
+      expect(fieldNames(popover)).toContain("Priority");
+      expect(fieldNames(popover)).not.toContain("Project");
+    });
+
+    it("is not the field of a condition added inside a Space", async () => {
+      const popover = await openFilter(listConditions({ kind: "list", projectFixed: true }));
+
+      await userEvent.click(within(popover).getByRole("button", { name: "+ Add condition" }));
+
+      expect(within(popover).getByLabelText("Field")).toHaveDisplayValue("Status");
+      expect(fieldNames(popover)).not.toContain("Project");
+    });
+  });
+
   describe("built-in lists", () => {
     it.each<ListConditions["kind"]>(["recent", "pinned"])("says a %s list is built in and offers no editing", async (kind) => {
       const popover = await openFilter(listConditions({ kind }));

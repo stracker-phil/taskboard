@@ -201,7 +201,11 @@ own: Array<Condition>,
 /**
  * Why the stored filter can't be read.
  */
-error: string | null, };
+error: string | null, 
+/**
+ * A filter list in a Space: the Space gives the project, so a condition can't pick one.
+ */
+projectFixed: boolean, };
 
 export type ListKind = "everything" | "space" | "list" | "recent" | "pinned";
 

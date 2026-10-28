@@ -837,6 +837,7 @@ mod the_conditions_a_level_shows {
                 locked: vec![],
                 own: vec![],
                 error: None,
+                project_fixed: false,
             }
         );
     }
@@ -856,7 +857,64 @@ mod the_conditions_a_level_shows {
                 locked: vec![locked("this Space")],
                 own: vec![],
                 error: None,
+                project_fixed: false,
             }
+        );
+    }
+
+    #[tokio::test]
+    async fn a_list_in_a_space_has_a_fixed_project() {
+        let (_dir, db) = tracked_lab().await;
+
+        let shown = list_conditions(&db, list_id(&db, "Open bugs").await)
+            .await
+            .unwrap();
+
+        assert!(shown.project_fixed);
+    }
+
+    #[tokio::test]
+    async fn a_global_list_under_everything_leaves_the_project_free() {
+        let (_dir, db) = tracked_lab().await;
+        let everything = node_id(&db, "everything").await;
+        list_create(&db, viewer(None), everything, "My bugs".into(), None)
+            .await
+            .unwrap();
+
+        let shown = list_conditions(&db, list_id(&db, "My bugs").await)
+            .await
+            .unwrap();
+
+        assert_eq!(shown.kind, Kind::List);
+        assert!(!shown.project_fixed);
+    }
+
+    #[tokio::test]
+    async fn the_home_lists_leave_the_project_free() {
+        let (_dir, db) = tracked_lab().await;
+
+        for kind in ["recent", "pinned"] {
+            let shown = list_conditions(&db, node_id(&db, kind).await)
+                .await
+                .unwrap();
+
+            assert!(!shown.project_fixed, "{kind}");
+        }
+    }
+
+    #[test]
+    fn the_fixed_project_flag_is_sent_as_project_fixed() {
+        let shown = ListConditions {
+            kind: Kind::List,
+            locked: vec![],
+            own: vec![],
+            error: None,
+            project_fixed: true,
+        };
+
+        assert_eq!(
+            serde_json::to_value(&shown).unwrap()["projectFixed"],
+            serde_json::json!(true)
         );
     }
 

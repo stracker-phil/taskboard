@@ -73,7 +73,7 @@ function LevelChrome() {
       <Header level={level} />
       <TokenBanner />
       {!pinned && <ViewTabs listId={location.listId} viewId={location.viewId} />}
-      {!pinned && view && <Toolbar level={level} view={view} />}
+      {!pinned && view && <Toolbar key={location.listId} level={level} view={view} />}
     </>
   );
 }

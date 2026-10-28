@@ -45,13 +45,16 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
   const popup = (entries: MenuEntry[]) => void api.popupMenu(entries).catch((e: unknown) => fail(e, "Could not open the menu"));
 
   const space = spaceOf(level);
+  // A Space is its project; filters live in its filter lists, which inherit the project.
+  const filterable = level.kind !== "space";
   const own = level.kind === "space" ? 0 : level.node.ownConditions;
   const listName = level.kind === "space" ? level.space.name : level.node.name;
   const columnsLabel = view.layout === "board" ? "Card fields" : "Columns";
-  const shows = (item: Collapsible) => !hidden.includes(item);
+  const offered = (item: Collapsible) => item !== "filter" || filterable;
+  const shows = (item: Collapsible) => offered(item) && !hidden.includes(item);
 
   const moreEntries = (): MenuEntry[] =>
-    hidden.map((item): MenuEntry => {
+    hidden.filter(offered).map((item): MenuEntry => {
       switch (item) {
         case "columns":
           return { text: `${columnsLabel}…`, run: () => setOpen("columns") };
@@ -128,7 +131,7 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
       )}
       {narrowing.epic && <EpicNarrowingChip epicId={narrowing.epic} onClear={() => setNarrowing(key, { epic: null })} />}
       <TextFilter key={key} value={narrowing.text} onChange={setText} />
-      {hidden.length > 0 && (
+      {hidden.some(offered) && (
         <span className="toolbar__anchor toolbar__anchor--end">
           <button ref={moreRef} type="button" className="toolbar-btn toolbar-btn--icon" aria-label="More toolbar items" onClick={() => popup(moreEntries())}>
             <Ellipsis size={14} strokeWidth={2} aria-hidden="true" />
