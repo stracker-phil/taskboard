@@ -63,7 +63,7 @@ mod tests {
         text.parse().unwrap()
     }
 
-    fn vienna() -> Tz {
+    fn berlin() -> Tz {
         "Europe/Berlin".parse().unwrap()
     }
 
@@ -72,7 +72,7 @@ mod tests {
     }
 
     fn left(duration: PinDuration, created: &str, viewed: &str) -> String {
-        let tz = vienna();
+        let tz = berlin();
         time_left(expires_at(duration, utc(created), tz), utc(viewed), tz)
     }
 
@@ -85,7 +85,7 @@ mod tests {
             (PinDuration::Week, "2026-11-03T23:00:00Z"),
         ] {
             assert_eq!(
-                ends(duration, now, vienna()),
+                ends(duration, now, berlin()),
                 Some(utc(expected)),
                 "{duration:?}"
             );
@@ -95,7 +95,7 @@ mod tests {
     #[test]
     fn until_unpinned_never_ends() {
         assert_eq!(
-            ends(PinDuration::UntilUnpinned, "2026-10-28T10:00:00Z", vienna()),
+            ends(PinDuration::UntilUnpinned, "2026-10-28T10:00:00Z", berlin()),
             None
         );
     }
@@ -107,7 +107,7 @@ mod tests {
             ("2026-10-28T23:10:00Z", "2026-10-29T23:00:00Z"),
         ] {
             assert_eq!(
-                ends(PinDuration::Today, now, vienna()),
+                ends(PinDuration::Today, now, berlin()),
                 Some(utc(expected)),
                 "{now}"
             );
@@ -123,7 +123,7 @@ mod tests {
             Some(utc("2026-10-29T00:00:00Z"))
         );
         assert_eq!(
-            ends(PinDuration::Today, now, vienna()),
+            ends(PinDuration::Today, now, berlin()),
             Some(utc("2026-10-29T23:00:00Z"))
         );
     }
@@ -153,7 +153,7 @@ mod tests {
             ),
         ] {
             assert_eq!(
-                ends(duration, now, vienna()),
+                ends(duration, now, berlin()),
                 Some(utc(expected)),
                 "{duration:?} from {now}"
             );
@@ -180,7 +180,7 @@ mod tests {
             ),
         ] {
             assert_eq!(
-                ends(duration, now, vienna()),
+                ends(duration, now, berlin()),
                 Some(utc(expected)),
                 "{duration:?} from {now}"
             );
@@ -211,7 +211,7 @@ mod tests {
 
     #[test]
     fn a_pin_without_an_end_has_no_time_left() {
-        assert_eq!(time_left(None, utc("2026-10-28T10:00:00Z"), vienna()), "");
+        assert_eq!(time_left(None, utc("2026-10-28T10:00:00Z"), berlin()), "");
     }
 
     #[test]

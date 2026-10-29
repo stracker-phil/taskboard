@@ -1,7 +1,8 @@
 #!/bin/zsh
 # Captures the README screenshots from the debug app on a fresh demo seed: screens.sh [dir] (default docs/screens).
 # Moves the debug data folder aside, starts the debug build at a fixed size, drives it with its own CLI and
-# restores the folder afterwards. Build first: bun run build:app.
+# restores the folder afterwards. The window comes to the front: macOS doesn't draw a covered web view, so a
+# capture of it is blank. Build first: bun run build:app.
 set -e
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 OUT=${1:-$ROOT/docs/screens}
@@ -24,7 +25,7 @@ restore() {
 trap restore EXIT
 
 "$ROOT/scripts/sign-app.sh" "$APP" com.philippstracker.taskboard.debug
-TASKBOARD_WINDOW_FRAME="80,60,1440,900" TASKBOARD_BACKGROUND=1 nohup "$BIN" >/dev/null 2>&1 &
+TASKBOARD_WINDOW_FRAME="80,60,1440,900" nohup "$BIN" >/dev/null 2>&1 &
 disown
 
 # The first sync fills the cache from the fake Jira.
@@ -32,6 +33,7 @@ for _ in {1..60}; do
   sleep 1
   "$BIN" status 2>/dev/null | grep -q "sync: idle" && "$BIN" status | grep -qE ": [1-9][0-9]* cached" && break
 done
+"$BIN" focus >/dev/null
 sleep 2
 
 shot() { sleep 1.5; "$HERE/screenshot.sh" "$OUT/$1.png"; echo "$OUT/$1.png"; }
@@ -53,3 +55,11 @@ shot issue
 sleep 0.5
 "$HERE/js.sh" '(() => { const input = document.querySelector(".palette input"); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set; set.call(input, "cart"); input.dispatchEvent(new Event("input", { bubbles: true })); })()'
 shot palette
+"$HERE/js.sh" 'window.taskboard.getState().setPaletteOpen(false)'
+"$BIN" go NW Table >/dev/null
+shot table
+# The Settings window, alone on screen so the capture picks it.
+"$HERE/js.sh" 'window.__TAURI_INTERNALS__.invoke("run_command", { id: "app:settings:space:10001" })'
+sleep 1
+"$BIN" hide >/dev/null
+shot space-settings

@@ -26,7 +26,7 @@ impl Clock {
 
     /// `"2026-10-28 11:42"` (Berlin) as Jira's `2026-10-28T11:42:00.000+0100`, shifted exactly.
     pub fn stamp(&self, local: &str) -> String {
-        let at = vienna(parse(local)) + self.shift;
+        let at = berlin_to_utc(parse(local)) + self.shift;
         at.with_timezone(&Berlin)
             .format("%Y-%m-%dT%H:%M:%S%.3f%z")
             .to_string()
@@ -35,7 +35,7 @@ impl Clock {
     /// A planned time (sprint start and end) in UTC as the agile API writes it, shifted by whole
     /// days so it keeps its time of day.
     pub fn planned_utc(&self, local: &str) -> String {
-        vienna(parse(local) + self.days())
+        berlin_to_utc(parse(local) + self.days())
             .format("%Y-%m-%dT%H:%M:%S%.3fZ")
             .to_string()
     }
@@ -55,7 +55,7 @@ fn parse(local: &str) -> NaiveDateTime {
     NaiveDateTime::parse_from_str(local, LOCAL_FORMAT).expect("demo time")
 }
 
-fn vienna(naive: NaiveDateTime) -> DateTime<Utc> {
+fn berlin_to_utc(naive: NaiveDateTime) -> DateTime<Utc> {
     Berlin
         .from_local_datetime(&naive)
         .earliest()
