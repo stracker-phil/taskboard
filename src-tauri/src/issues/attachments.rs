@@ -1,6 +1,5 @@
-//! An issue's attachments, read from the `attachment` field the sync stores with the issue. The app never
-//! downloads them: a tile opens its address on the Jira site in the default browser, where the owner is
-//! signed in.
+//! An issue's attachments, read from the `attachment` field the sync stores with the issue. Quick Look shows
+//! a downloaded copy (`preview`); the browser opens the address on the Jira site, where the owner is signed in.
 
 use serde::Serialize;
 use serde_json::Value;
@@ -52,6 +51,16 @@ pub fn attachments_of(raw: &str) -> Vec<Attachment> {
             id: a.id,
         })
         .collect()
+}
+
+/// The attachment with this id, as Jira listed it.
+pub fn find_attachment(raw: &str, id: &str) -> Option<dto::Attachment> {
+    let raw: Value = serde_json::from_str(raw).ok()?;
+    raw["fields"]["attachment"]
+        .as_array()?
+        .iter()
+        .filter_map(|item| serde_json::from_value::<dto::Attachment>(item.clone()).ok())
+        .find(|a| a.id == id)
 }
 
 /// Only links to the connected site reach the page.
@@ -254,6 +263,39 @@ mod tests {
     fn unparsable_raw_json_has_no_attachments() {
         assert_eq!(attachments_of("not json"), []);
         assert_eq!(attachments_of(""), []);
+    }
+
+    #[test]
+    fn an_attachment_is_found_by_its_id_as_jira_listed_it() {
+        let raw = raw_with(json!([
+            item("a.txt", None),
+            {
+                "id": "80002",
+                "filename": "release-notes.pdf",
+                "size": 1_240_000,
+                "mimeType": "application/pdf",
+            },
+        ]));
+
+        let found = find_attachment(&raw, "80002").unwrap();
+
+        assert_eq!(found.id, "80002");
+        assert_eq!(found.filename, "release-notes.pdf");
+        assert_eq!(found.size, Some(1_240_000));
+        assert_eq!(found.mime_type.as_deref(), Some("application/pdf"));
+        assert_eq!(find_attachment(&raw, "80001").unwrap().filename, "a.txt");
+    }
+
+    #[test]
+    fn no_attachment_is_found_for_an_unknown_id_or_unusable_raw_json() {
+        let raw = raw_with(json!([item("a.txt", None)]));
+
+        assert_eq!(find_attachment(&raw, "99999"), None);
+        assert_eq!(find_attachment(&raw, ""), None);
+        assert_eq!(find_attachment(&raw_with(json!([])), "80001"), None);
+        assert_eq!(find_attachment("{}", "80001"), None);
+        assert_eq!(find_attachment("not json", "80001"), None);
+        assert_eq!(find_attachment("", "80001"), None);
     }
 
     #[test]

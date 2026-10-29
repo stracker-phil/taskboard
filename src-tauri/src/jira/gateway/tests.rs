@@ -6,8 +6,8 @@ use serde_json::{Value, json};
 use url::Url;
 
 use super::{
-    Access, BadRequest, Endpoint, Expand, FieldIds, IssueRef, IssueRefs, Jql, PageToken, Planned,
-    ProjectKey, check,
+    Access, AttachmentId, BadRequest, Endpoint, Expand, FieldIds, IssueRef, IssueRefs, Jql,
+    PageToken, Planned, ProjectKey, check,
 };
 use crate::error::AppError;
 use crate::jira::site::{Site, TokenKind};
@@ -185,6 +185,14 @@ fn allowlist() -> Vec<(Endpoint, Method, &'static str, Option<Value>)> {
             None,
         ),
         (
+            Endpoint::AttachmentContent {
+                attachment: AttachmentId::parse("80001").unwrap(),
+            },
+            Method::GET,
+            "attachment/content/80001?redirect=false",
+            None,
+        ),
+        (
             Endpoint::JqlParse { jql: jql(QUERY) },
             Method::POST,
             "jql/parse?validation=strict",
@@ -340,6 +348,19 @@ fn a_project_key_that_could_change_the_sampling_query_is_refused_before_planning
 }
 
 #[test]
+fn only_digits_are_an_attachment_id() {
+    assert_eq!(AttachmentId::parse("80001").unwrap().as_str(), "80001");
+    for text in [
+        "", "NW-1", "1/2", "..", "12a", " 1", "1 ", "-1", "1?x=1", "%31",
+    ] {
+        assert!(
+            matches!(AttachmentId::parse(text), Err(AppError::InvalidInput(_))),
+            "{text:?}"
+        );
+    }
+}
+
+#[test]
 fn a_scoped_site_without_a_usable_cloud_id_plans_nothing_on_the_rest_api() {
     for cloud_id in [None, Some("../x"), Some("a/b"), Some("a?b")] {
         let site = Site::new(
@@ -383,6 +404,11 @@ fn the_guard_accepts_the_allowed_requests_when_built_by_hand() {
             (
                 Method::GET,
                 "rest/api/3/issue/NW-1/changelog?startAt=0&maxResults=100",
+            ),
+            (Method::GET, "rest/api/3/attachment/content/80001"),
+            (
+                Method::GET,
+                "rest/api/3/attachment/content/80001?redirect=false",
             ),
             (Method::POST, "rest/api/3/search/jql"),
             (Method::POST, "rest/api/3/jql/parse"),
@@ -496,6 +522,48 @@ fn paths_methods_and_queries_outside_the_table_are_refused() {
         (Method::GET, "rest/api/3/issue//changelog"),
         (Method::GET, "rest/api/3/issue/-1/changelog"),
         (Method::POST, "rest/api/3/changelog/bulkfetch"),
+        (
+            Method::POST,
+            "rest/api/3/attachment/content/80001?redirect=false",
+        ),
+        (
+            Method::DELETE,
+            "rest/api/3/attachment/content/80001?redirect=false",
+        ),
+        (
+            Method::GET,
+            "rest/api/3/attachment/content/80001?other=false",
+        ),
+        (
+            Method::GET,
+            "rest/api/3/attachment/content/80001?redirect=false&redirect=false",
+        ),
+        (
+            Method::GET,
+            "rest/api/3/attachment/content/80001?redirect=false&x=1",
+        ),
+        (
+            Method::GET,
+            "rest/api/3/attachment/content/NW-1?redirect=false",
+        ),
+        (
+            Method::GET,
+            "rest/api/3/attachment/content/abc?redirect=false",
+        ),
+        (
+            Method::GET,
+            "rest/api/3/attachment/content/%2e%2e?redirect=false",
+        ),
+        (
+            Method::GET,
+            "rest/api/3/attachment/content/1%2F2?redirect=false",
+        ),
+        (Method::GET, "rest/api/3/attachment/content/?redirect=false"),
+        (
+            Method::GET,
+            "rest/api/3/attachment/content/80001/extra?redirect=false",
+        ),
+        (Method::GET, "rest/api/3/attachment/80001?redirect=false"),
     ];
     for (label, site) in sites() {
         for (method, relative) in &cases {

@@ -2,6 +2,7 @@
 //! responses. The fake Jira serves it to tests and to the debug build.
 
 mod adf;
+mod attachment_files;
 mod attachments;
 mod catalog;
 mod clock;
@@ -58,6 +59,8 @@ pub struct JiraData {
     pub remote_links: BTreeMap<String, Vec<Value>>,
     /// Issue id to `GET /issue/{id}/changelog` `values`, oldest first
     pub changelogs: BTreeMap<String, Vec<Value>>,
+    /// Attachment id to the MIME type and bytes of `GET /attachment/content/{id}`
+    pub attachment_files: BTreeMap<String, (String, Vec<u8>)>,
 }
 
 /// The mockup's site, with every time as it was at [`DEMO_NOW`].
@@ -73,8 +76,8 @@ pub fn demo_at(now: DateTime<Utc>) -> JiraData {
     comments.extend(issues_more::comments());
     let clock = Clock::new(now);
     let mut data = site(&specs, &comments, &clock);
-    attachments::attach(&mut data.issues, &clock);
     JiraData {
+        attachment_files: attachments::attach(&mut data.issues, &clock),
         remote_links: web_links::remote_links(),
         changelogs: history::changelogs(&clock),
         ..data
@@ -106,5 +109,6 @@ fn site(specs: &[IssueSpec], comments: &[CommentSpec], clock: &Clock) -> JiraDat
         comments,
         remote_links: BTreeMap::new(),
         changelogs: BTreeMap::new(),
+        attachment_files: BTreeMap::new(),
     }
 }

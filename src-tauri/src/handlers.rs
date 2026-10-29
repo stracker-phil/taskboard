@@ -25,6 +25,7 @@ pub fn handlers() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
         commands::open_log_folder,
         crate::diagnostics::diagnostics_get,
         commands::open_url,
+        crate::issues::commands::attachment_preview,
         commands::log_frontend_error,
         commands::take_launch_events,
         changes::issues_mark_seen,

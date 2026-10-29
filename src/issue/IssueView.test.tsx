@@ -255,6 +255,15 @@ describe("IssueView", () => {
       expect(section.getByRole("button", { name: /wireframes\.png/ })).toBeInTheDocument();
     });
 
+    it("previews an attachment of the issue when its tile is clicked", async () => {
+      serve(issueDetail({ attachments: [attachment({ id: "30002", filename: "wireframes.png", badge: "PNG" })] }));
+      renderIssue();
+
+      await userEvent.click(await screen.findByRole("button", { name: /wireframes\.png/ }));
+
+      expect(mocked.attachmentPreview).toHaveBeenCalledWith("10042", "30002");
+    });
+
     it("uses the singular for one attachment", async () => {
       serve(issueDetail({ attachments: [attachment()] }));
       renderIssue();

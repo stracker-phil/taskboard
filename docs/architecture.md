@@ -125,7 +125,9 @@ src-tauri/
   src/pins/                  local pins (Bookmarks in the UI): durations to local midnights, the Bookmarks view, Add to Home
   src/changes/               unseen (unread) changes: the change chip and Since-yesterday words, read and unread
   src/issues/                one issue: detail, custom fields, related issues, activity, comments, web links,
-                             attachments, history (fetched.rs: how often details are fetched)
+                             attachments (preview.rs: the downloaded copies for Quick Look), history (fetched.rs:
+                             how often details are fetched)
+  src/quicklook.rs           macOS only: the Quick Look panel on one file (ADR 0035)
   src/status_style/          the six status styles (status types): detection and the owner's overrides per Space
   src/space_config/          a Space's own settings: offered layouts, new views' layout and grouping, field visibility
   src/avatars/               people's profile pictures: freshness, the `cache.avatar` rows, `user_avatar` (data URLs)

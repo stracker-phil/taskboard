@@ -15,6 +15,10 @@ use crate::net::{Answer, AvatarUrl, NetError, is_fake_jira};
 const TIMEOUT: Duration = Duration::from_secs(30);
 /// Far above the largest page Taskboard asks for (100 issues with rendered fields).
 pub const MAX_ANSWER_BYTES: usize = 32 * 1024 * 1024;
+/// The largest attachment Quick Look gets.
+pub const MAX_ATTACHMENT_BYTES: usize = 50 * 1024 * 1024;
+/// A large file on a slow line takes longer than an API answer.
+const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(300);
 
 #[derive(Clone)]
 pub(super) struct Http {
@@ -61,13 +65,38 @@ impl Http {
         authorization: Option<&str>,
         json: Option<&serde_json::Value>,
     ) -> Result<Answer, NetError> {
+        self.exchange(method, url, authorization, json, Expect::Json)
+            .await
+    }
+
+    /// GETs a file in any format, up to `MAX_ATTACHMENT_BYTES`; a redirect fails.
+    pub(super) async fn download(
+        &self,
+        url: &Url,
+        authorization: Option<&str>,
+    ) -> Result<Answer, NetError> {
+        self.exchange(Method::GET, url, authorization, None, Expect::File)
+            .await
+    }
+
+    async fn exchange(
+        &self,
+        method: Method,
+        url: &Url,
+        authorization: Option<&str>,
+        json: Option<&serde_json::Value>,
+        expect: Expect,
+    ) -> Result<Answer, NetError> {
         if !self.allows(url) {
             return Err(NetError::NotAllowed(url.host_str().unwrap_or("").into()));
         }
         let mut request = self
             .client
             .request(method, url.clone())
-            .header(ACCEPT, "application/json");
+            .header(ACCEPT, expect.accept());
+        if expect == Expect::File {
+            request = request.timeout(DOWNLOAD_TIMEOUT);
+        }
         if let Some(value) = authorization {
             let mut header =
                 HeaderValue::from_str(value).map_err(|e| NetError::Request(e.to_string()))?;
@@ -93,20 +122,21 @@ impl Http {
         }
         let is_json = header(CONTENT_TYPE.as_str())
             .is_some_and(|value| value.to_ascii_lowercase().starts_with("application/json"));
-        if (200..300).contains(&status) && !is_json {
+        if expect == Expect::Json && (200..300).contains(&status) && !is_json {
             return Err(NetError::Unexpected(
                 "Jira answered with something other than JSON".into(),
             ));
         }
         let retry_after = header("retry-after");
         let rate_limit_reason = header("ratelimit-reason");
+        let cap = expect.cap();
         if response
             .content_length()
-            .is_some_and(|length| length > MAX_ANSWER_BYTES as u64)
+            .is_some_and(|length| length > cap as u64)
         {
-            return Err(too_large());
+            return Err(expect.too_large()());
         }
-        let body = read_capped(&mut response, MAX_ANSWER_BYTES, too_large).await?;
+        let body = read_capped(&mut response, cap, expect.too_large()).await?;
         Ok(Answer {
             status,
             retry_after,
@@ -174,6 +204,43 @@ async fn read_capped(
         body.extend_from_slice(&chunk);
     }
     Ok(body)
+}
+
+/// What an answer must be.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Expect {
+    Json,
+    File,
+}
+
+impl Expect {
+    fn accept(self) -> &'static str {
+        match self {
+            Self::Json => "application/json",
+            Self::File => "*/*",
+        }
+    }
+
+    fn cap(self) -> usize {
+        match self {
+            Self::Json => MAX_ANSWER_BYTES,
+            Self::File => MAX_ATTACHMENT_BYTES,
+        }
+    }
+
+    fn too_large(self) -> fn() -> NetError {
+        match self {
+            Self::Json => too_large,
+            Self::File => attachment_too_large,
+        }
+    }
+}
+
+fn attachment_too_large() -> NetError {
+    NetError::Unexpected(format!(
+        "The attachment is larger than {} MB",
+        MAX_ATTACHMENT_BYTES / (1024 * 1024)
+    ))
 }
 
 fn too_large() -> NetError {

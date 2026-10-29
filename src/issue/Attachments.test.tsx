@@ -17,7 +17,7 @@ const URL = "https://example.com/secure/attachment/30001/release-notes.pdf";
 function renderAttachments(...attachments: ReturnType<typeof attachment>[]) {
   return render(
     <>
-      <Attachments attachments={attachments} />
+      <Attachments issueId="10042" attachments={attachments} />
       <MenuHost />
     </>,
   );
@@ -70,54 +70,128 @@ describe("Attachments", () => {
     });
   });
 
-  describe("opening", () => {
-    it("opens the file's address when its tile is clicked", async () => {
+  describe("previewing", () => {
+    const tile = () => screen.getByRole("button", { name: /release-notes\.pdf/ });
+
+    it("previews the file of the issue in Quick Look when its tile is clicked, without opening the browser", async () => {
       renderAttachments(attachment());
 
-      await userEvent.click(screen.getByRole("button", { name: /release-notes\.pdf/ }));
+      await userEvent.click(tile());
 
-      expect(mocked.openUrl).toHaveBeenCalledWith(URL);
-    });
-
-    it("is inert without an address: not a button, and clicking does nothing", async () => {
-      renderAttachments(attachment({ url: null }));
-
-      expect(screen.queryByRole("button")).not.toBeInTheDocument();
-      await userEvent.click(screen.getByText("release-notes.pdf"));
-
+      expect(mocked.attachmentPreview).toHaveBeenCalledWith("10042", "30001");
       expect(mocked.openUrl).not.toHaveBeenCalled();
     });
 
-    it("shows an error toast when the file cannot be opened", async () => {
-      mocked.openUrl.mockRejectedValue({ kind: "invalid", message: "Only https links open", code: null });
+    it("previews a file without an address too", async () => {
+      renderAttachments(attachment({ url: null }));
+
+      await userEvent.click(tile());
+
+      expect(mocked.attachmentPreview).toHaveBeenCalledWith("10042", "30001");
+    });
+
+    it("marks the tile busy and reads Loading… while the preview is pending, then restores the meta line", async () => {
+      let finish: () => void = () => {};
+      mocked.attachmentPreview.mockReturnValue(new Promise<void>((resolve) => (finish = resolve)));
       renderAttachments(attachment());
 
-      await userEvent.click(screen.getByRole("button", { name: /release-notes\.pdf/ }));
+      await userEvent.click(tile());
 
-      await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not open the attachment: Only https links open"));
+      expect(tile()).toHaveAttribute("aria-busy", "true");
+      expect(tile()).toHaveTextContent("Loading…");
+      expect(tile()).not.toHaveTextContent("1.2 MB");
+
+      finish();
+
+      await waitFor(() => expect(tile()).toHaveAttribute("aria-busy", "false"));
+      expect(tile()).toHaveTextContent("1.2 MB · Ada Example");
+    });
+
+    it("ignores a second click while the preview is pending", async () => {
+      let finish: () => void = () => {};
+      mocked.attachmentPreview.mockReturnValue(new Promise<void>((resolve) => (finish = resolve)));
+      renderAttachments(attachment());
+
+      await userEvent.click(tile());
+      await userEvent.click(tile());
+
+      expect(mocked.attachmentPreview).toHaveBeenCalledTimes(1);
+      finish();
+      await waitFor(() => expect(tile()).toHaveAttribute("aria-busy", "false"));
+    });
+
+    it("shows an error toast when the file cannot be previewed", async () => {
+      mocked.attachmentPreview.mockRejectedValue({ kind: "network", message: "Download failed", code: null });
+      renderAttachments(attachment());
+
+      await userEvent.click(tile());
+
+      await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not show the attachment: Download failed"));
+      expect(tile()).toHaveAttribute("aria-busy", "false");
     });
   });
 
   describe("context menu", () => {
     const rightClick = () => userEvent.pointer({ keys: "[MouseRight]", target: screen.getByRole("button", { name: /release-notes\.pdf/ }) });
 
-    it("offers Open and Copy link on right-click", async () => {
+    it("offers Quick Look, Open in Browser and Copy link on right-click", async () => {
       renderAttachments(attachment());
 
       await rightClick();
 
       const menu = within(screen.getByRole("menu"));
-      expect(menu.getByRole("menuitem", { name: "Open" })).toBeInTheDocument();
-      expect(menu.getByRole("menuitem", { name: "Copy link" })).toBeInTheDocument();
+      expect(menu.getAllByRole("menuitem").map((item) => item.textContent)).toEqual([
+        expect.stringContaining("Quick Look"),
+        expect.stringContaining("Open in Browser"),
+        expect.stringContaining("Copy link"),
+      ]);
+      expect(menu.getByRole("menuitem", { name: "Open in Browser" })).not.toHaveAttribute("aria-disabled");
+      expect(menu.getByRole("menuitem", { name: "Copy link" })).not.toHaveAttribute("aria-disabled");
     });
 
-    it("opens the file's address from Open", async () => {
+    it("previews the file from Quick Look", async () => {
       renderAttachments(attachment());
 
       await rightClick();
-      await userEvent.click(screen.getByRole("menuitem", { name: "Open" }));
+      await userEvent.click(screen.getByRole("menuitem", { name: "Quick Look" }));
+
+      expect(mocked.attachmentPreview).toHaveBeenCalledWith("10042", "30001");
+    });
+
+    it("opens the file's address from Open in Browser", async () => {
+      renderAttachments(attachment());
+
+      await rightClick();
+      await userEvent.click(screen.getByRole("menuitem", { name: "Open in Browser" }));
 
       expect(mocked.openUrl).toHaveBeenCalledWith(URL);
+    });
+
+    it("shows an error toast when the address cannot be opened", async () => {
+      mocked.openUrl.mockRejectedValue({ kind: "invalid", message: "Only https links open", code: null });
+      renderAttachments(attachment());
+
+      await rightClick();
+      await userEvent.click(screen.getByRole("menuitem", { name: "Open in Browser" }));
+
+      await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not open the attachment: Only https links open"));
+    });
+
+    it("disables Open in Browser and Copy link without an address and does nothing when they are chosen", async () => {
+      renderAttachments(attachment({ url: null }));
+
+      await rightClick();
+      const open = screen.getByRole("menuitem", { name: "Open in Browser" });
+      const copy = screen.getByRole("menuitem", { name: "Copy link" });
+      expect(open).toHaveAttribute("aria-disabled", "true");
+      expect(copy).toHaveAttribute("aria-disabled", "true");
+      expect(screen.getByRole("menuitem", { name: "Quick Look" })).not.toHaveAttribute("aria-disabled");
+
+      await userEvent.click(open);
+      await userEvent.click(copy);
+
+      expect(mocked.openUrl).not.toHaveBeenCalled();
+      expect(mocked.copyText).not.toHaveBeenCalled();
     });
 
     it("copies the address from Copy link and confirms it in a toast", async () => {

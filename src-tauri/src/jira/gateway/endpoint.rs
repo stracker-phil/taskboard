@@ -4,7 +4,9 @@ use reqwest::Method;
 use serde_json::{Value, json};
 use url::Url;
 
-use super::params::{Expand, FieldIds, IssueRef, IssueRefs, Jql, PageToken, ProjectKey};
+use super::params::{
+    AttachmentId, Expand, FieldIds, IssueRef, IssueRefs, Jql, PageToken, ProjectKey,
+};
 use crate::error::{AppError, AppResult};
 use crate::jira::site::Site;
 
@@ -76,6 +78,10 @@ pub enum Endpoint {
     IssueChangelog {
         issue: IssueRef,
         start_at: u32,
+    },
+    /// An attachment's bytes, served by the site itself rather than redirected to Atlassian's media host.
+    AttachmentContent {
+        attachment: AttachmentId,
     },
     /// Strict validation of a query.
     JqlParse {
@@ -156,6 +162,11 @@ impl Endpoint {
                 Rest::get(&["issue", issue.as_str(), "changelog"])
                     .query("startAt", start_at)
                     .query("maxResults", PAGE_SIZE)
+                    .plan(site)
+            }
+            Self::AttachmentContent { attachment } => {
+                Rest::get(&["attachment", "content", attachment.as_str()])
+                    .query("redirect", "false")
                     .plan(site)
             }
             Self::FieldUsage { project } => Rest::read_post(

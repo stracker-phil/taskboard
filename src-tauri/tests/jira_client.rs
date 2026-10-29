@@ -852,6 +852,206 @@ mod demo_answers {
     }
 }
 
+mod attachment_downloads {
+    use super::*;
+    use taskboard_lib::jira::gateway::MAX_ATTACHMENT_BYTES;
+
+    const PDF_ID: &str = "80001";
+    const ZIP_ID: &str = "80004";
+
+    fn demo_bytes(id: &str) -> Vec<u8> {
+        demo::demo().attachment_files[id].1.clone()
+    }
+
+    #[tokio::test]
+    async fn an_attachment_comes_back_with_the_demo_bytes() {
+        let fake = FakeJira::start_demo().await;
+
+        let bytes = fake
+            .client(TokenKind::Classic)
+            .attachment_content(PDF_ID)
+            .await
+            .unwrap();
+
+        assert!(bytes.starts_with(b"%PDF-"));
+        assert_eq!(bytes, demo_bytes(PDF_ID));
+    }
+
+    #[tokio::test]
+    async fn the_request_asks_the_site_to_serve_the_file_itself_with_credentials() {
+        let fake = FakeJira::start_demo().await;
+        let expected = format!(
+            "Basic {}",
+            base64::engine::general_purpose::STANDARD.encode(format!("{ME_EMAIL}:{DEMO_TOKEN}"))
+        );
+
+        fake.client(TokenKind::Classic)
+            .attachment_content(PDF_ID)
+            .await
+            .unwrap();
+
+        let requests = fake.requests();
+        assert_eq!(requests.len(), 1);
+        assert_eq!(requests[0].method, "GET");
+        assert_eq!(
+            requests[0].path,
+            format!("/rest/api/3/attachment/content/{PDF_ID}")
+        );
+        assert_eq!(requests[0].query_value("redirect"), Some("false"));
+        assert_eq!(
+            requests[0].authorization.as_deref(),
+            Some(expected.as_str())
+        );
+    }
+
+    #[tokio::test]
+    async fn a_scoped_token_downloads_through_the_gateway_path() {
+        let fake = FakeJira::start_demo().await;
+
+        let bytes = fake
+            .client(TokenKind::Scoped)
+            .attachment_content(ZIP_ID)
+            .await
+            .unwrap();
+
+        assert_eq!(bytes, demo_bytes(ZIP_ID));
+        assert_eq!(
+            fake.paths(),
+            [format!(
+                "/ex/jira/{CLOUD_ID}/rest/api/3/attachment/content/{ZIP_ID}"
+            )]
+        );
+    }
+
+    #[tokio::test]
+    async fn a_file_that_is_not_json_is_accepted_whatever_its_type() {
+        let fake = FakeJira::start_demo().await;
+        let client = fake.client(TokenKind::Classic);
+
+        let zip = client.attachment_content(ZIP_ID).await.unwrap();
+        fake.answer_raw(200, &[], "application/octet-stream", "plain bytes".into());
+        let raw = client.attachment_content(PDF_ID).await.unwrap();
+
+        assert!(zip.starts_with(b"PK"));
+        assert_eq!(zip, demo_bytes(ZIP_ID));
+        assert_eq!(raw, b"plain bytes");
+    }
+
+    #[tokio::test]
+    async fn an_empty_file_is_an_empty_download() {
+        let fake = FakeJira::start_demo().await;
+        fake.answer_raw(200, &[], "text/plain", String::new());
+
+        let bytes = fake
+            .client(TokenKind::Classic)
+            .attachment_content(PDF_ID)
+            .await
+            .unwrap();
+
+        assert_eq!(bytes, Vec::<u8>::new());
+    }
+
+    #[tokio::test]
+    async fn a_redirect_fails_instead_of_being_followed() {
+        let fake = FakeJira::start_demo().await;
+        fake.answer_raw(
+            303,
+            &[("Location", "https://media.example.com/file/80001")],
+            "text/plain",
+            String::new(),
+        );
+
+        let err = fake
+            .client(TokenKind::Classic)
+            .attachment_content(PDF_ID)
+            .await
+            .unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::Internal);
+        assert_eq!(fake.paths().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn an_answer_over_the_attachment_limit_fails() {
+        let fake = FakeJira::start_demo().await;
+        fake.answer_raw(
+            200,
+            &[],
+            "application/octet-stream",
+            "a".repeat(MAX_ATTACHMENT_BYTES + 1),
+        );
+
+        let err = fake
+            .client(TokenKind::Classic)
+            .attachment_content(PDF_ID)
+            .await
+            .unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::Internal);
+    }
+
+    #[tokio::test]
+    async fn an_unknown_attachment_is_not_found() {
+        let fake = FakeJira::start_demo().await;
+
+        let err = fake
+            .client(TokenKind::Classic)
+            .attachment_content("99999")
+            .await
+            .unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::NotFound);
+    }
+
+    #[tokio::test]
+    async fn an_id_that_is_not_digits_is_refused_before_anything_is_sent() {
+        let fake = FakeJira::start_demo().await;
+        let client = fake.client(TokenKind::Classic);
+
+        for id in ["NW-1", "1/2", "", "..", "80001?redirect=true"] {
+            let err = client.attachment_content(id).await.unwrap_err();
+
+            assert_eq!(err.kind(), ErrorKind::InvalidInput, "{id:?}");
+        }
+        assert!(fake.requests().is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_failing_download_maps_the_status_to_an_error_kind() {
+        for (status, expected) in [
+            (401, ErrorKind::Auth),
+            (403, ErrorKind::Auth),
+            (500, ErrorKind::Internal),
+        ] {
+            let fake = FakeJira::start_demo().await;
+            fake.fail_next(1, status, None);
+
+            let err = fake
+                .client(TokenKind::Classic)
+                .attachment_content(PDF_ID)
+                .await
+                .unwrap_err();
+
+            assert_eq!(err.kind(), expected, "HTTP {status}");
+        }
+    }
+
+    #[tokio::test]
+    async fn without_a_token_nothing_is_downloaded() {
+        let fake = FakeJira::start_demo().await;
+        let client = JiraClient::new(
+            fake.site(TokenKind::Classic),
+            Arc::new(FakeSecrets::default()),
+            Arc::new(Limiter::new(1000, 1000)),
+        );
+
+        let err = client.attachment_content(PDF_ID).await.unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::NotConnected);
+        assert!(fake.requests().is_empty());
+    }
+}
+
 mod fake_knobs {
     use super::*;
 

@@ -1,10 +1,12 @@
 //! The Tauri commands for one issue.
 
+use std::path::PathBuf;
+
 use chrono::Utc;
-use tauri::State;
+use tauri::{AppHandle, Manager, State};
 
 use super::{ActivityItem, IssueDetail, Related, WebLink};
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 use crate::lists::Viewer;
 use crate::state::AppState;
 
@@ -71,4 +73,46 @@ pub async fn issue_sync_history(state: State<'_, AppState>, id: String) -> AppRe
     let connection = state.settings.get().connection;
     let source = crate::sync::source_for(&state.jira, &connection)?;
     super::issue_sync_history(&state.db, source.as_ref(), id, Utc::now()).await
+}
+
+/// Downloads the attachment unless it already is, then shows it in Quick Look.
+#[tauri::command]
+pub async fn attachment_preview(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    issue_id: String,
+    attachment_id: String,
+) -> AppResult<()> {
+    let connection = state.settings.get().connection;
+    let source = crate::sync::source_for(&state.jira, &connection)?;
+    let root = attachment_cache(&app)?;
+    let path =
+        super::attachment_file(&state.db, source.as_ref(), &root, issue_id, attachment_id).await?;
+    quick_look(&app, path).await
+}
+
+/// `<app cache>/attachments`.
+pub fn attachment_cache(app: &AppHandle) -> AppResult<PathBuf> {
+    let dir = app
+        .path()
+        .app_cache_dir()
+        .map_err(|e| AppError::Io(e.to_string()))?;
+    Ok(super::cache_root(&dir))
+}
+
+#[cfg(target_os = "macos")]
+async fn quick_look(app: &AppHandle, path: PathBuf) -> AppResult<()> {
+    let (done, shown) = tokio::sync::oneshot::channel();
+    app.run_on_main_thread(move || {
+        let _ = done.send(crate::quicklook::show(&path));
+    })
+    .map_err(|e| AppError::Internal(format!("Quick Look couldn't start: {e}")))?;
+    shown
+        .await
+        .map_err(|_| AppError::Internal("Quick Look didn't answer".into()))?
+}
+
+#[cfg(not(target_os = "macos"))]
+async fn quick_look(_app: &AppHandle, _path: PathBuf) -> AppResult<()> {
+    Err(AppError::Internal("Quick Look is macOS only".into()))
 }

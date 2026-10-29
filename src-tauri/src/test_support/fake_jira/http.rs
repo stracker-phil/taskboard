@@ -28,7 +28,7 @@ pub struct Response {
     pub status: u16,
     pub headers: Vec<(String, String)>,
     pub content_type: String,
-    pub body: String,
+    pub body: Vec<u8>,
 }
 
 impl Response {
@@ -36,12 +36,12 @@ impl Response {
         Self::raw(status, "application/json", body.to_string())
     }
 
-    pub fn raw(status: u16, content_type: &str, body: String) -> Self {
+    pub fn raw(status: u16, content_type: &str, body: impl Into<Vec<u8>>) -> Self {
         Self {
             status,
             headers: Vec::new(),
             content_type: content_type.into(),
-            body,
+            body: body.into(),
         }
     }
 }
@@ -103,6 +103,6 @@ pub async fn write_response(socket: &mut TcpStream, response: Response) {
     }
     head.push_str("\r\n");
     let _ = socket.write_all(head.as_bytes()).await;
-    let _ = socket.write_all(body.as_bytes()).await;
+    let _ = socket.write_all(&body).await;
     let _ = socket.shutdown().await;
 }

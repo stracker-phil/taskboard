@@ -44,7 +44,9 @@ ADR and a row here.
 ## Platform-specific code
 
 macOS on Apple Silicon only: the config path, Unix sockets, window vibrancy and the overlay title bar, the
-Dock app model (ADR 0016), codesigning, and the dev scripts (zsh, Swift, `screencapture`).
+Dock app model (ADR 0016), codesigning, the Quick Look panel for attachments (`quicklook.rs`, `objc2-quick-look-ui`,
+ADR 0035; the app cache folder `~/Library/Caches/<bundle identifier>/attachments/`), and the dev scripts (zsh,
+Swift, `screencapture`).
 
 ## Conventions to keep
 

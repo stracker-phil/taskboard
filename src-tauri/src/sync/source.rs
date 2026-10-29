@@ -61,6 +61,8 @@ pub trait Source: Send + Sync {
     fn remote_links<'a>(&'a self, issue_id: &'a str) -> Answer<'a, Vec<RemoteLink>>;
     /// Every change to an issue's fields, oldest first, by its id.
     fn changelog<'a>(&'a self, issue_id: &'a str) -> Answer<'a, Vec<Changelog>>;
+    /// An attachment's bytes, by its id.
+    fn attachment_content<'a>(&'a self, attachment_id: &'a str) -> Answer<'a, Vec<u8>>;
     /// The custom fields a space's recent issues fill.
     fn used_custom_fields<'a>(&'a self, space_key: &'a str) -> Answer<'a, BTreeSet<String>>;
 }

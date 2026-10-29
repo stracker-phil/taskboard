@@ -1,5 +1,7 @@
 //! An issue as the peek shows it, on the demo site synced from the in-process fake Jira into a temp database.
 
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};
 
@@ -13,8 +15,8 @@ use taskboard_lib::db::Db;
 use taskboard_lib::error::{AppResult, ErrorKind};
 use taskboard_lib::issues::{
     ActivityItem, ChangeValue, CustomField, IssueDetail, IssueLink, RelatedIssue, WebLink,
-    WebLinkKind, issue_activity, issue_forget, issue_get, issue_related, issue_sync_comments,
-    issue_sync_history, issue_sync_web_links, issue_web_links,
+    WebLinkKind, attachment_file, issue_activity, issue_forget, issue_get, issue_related,
+    issue_sync_comments, issue_sync_history, issue_sync_web_links, issue_web_links,
 };
 use taskboard_lib::jira::{Limiter, TokenKind};
 use taskboard_lib::lists::Viewer;
@@ -195,6 +197,42 @@ impl Site {
 
     async fn sync_history(&self, key: &str) -> bool {
         self.try_sync_history(key).await.unwrap()
+    }
+
+    async fn attachment_id(&self, key: &str, filename: &str) -> String {
+        self.detail(key)
+            .await
+            .attachments
+            .into_iter()
+            .find(|a| a.filename == filename)
+            .unwrap_or_else(|| panic!("{filename} on {key}"))
+            .id
+    }
+
+    async fn open_attachment(
+        &self,
+        root: &Path,
+        issue_id: &str,
+        attachment_id: &str,
+    ) -> AppResult<PathBuf> {
+        let connection = self.ctx.settings.get().connection;
+        let source = source_for(&self.ctx.access, &connection).unwrap();
+        attachment_file(
+            self.db(),
+            source.as_ref(),
+            root,
+            issue_id.into(),
+            attachment_id.into(),
+        )
+        .await
+    }
+
+    fn attachment_downloads(&self) -> usize {
+        self.fake
+            .paths()
+            .iter()
+            .filter(|p| p.contains("attachment/content"))
+            .count()
     }
 
     async fn history_fetches(&self, key: &str) -> usize {
@@ -1997,4 +2035,118 @@ async fn a_custom_field_without_a_value_is_listed_with_no_value() {
             html: None,
         }
     );
+}
+
+const LISTED_PDF_BYTES: usize = 1_240_000;
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn an_attachment_is_downloaded_into_its_id_folder_under_its_name() {
+    let site = Site::new().await;
+    let root = tempfile::tempdir().unwrap();
+    let issue = site.id_of("NW-1020").await;
+    let id = site.attachment_id("NW-1020", "release-notes.pdf").await;
+
+    let path = site
+        .open_attachment(root.path(), &issue, &id)
+        .await
+        .unwrap();
+
+    assert_eq!(path, root.path().join(&id).join("release-notes.pdf"));
+    let bytes = fs::read(&path).unwrap();
+    assert!(bytes.starts_with(b"%PDF-"));
+    assert_eq!(bytes, demo::demo().attachment_files[&id].1);
+    assert_eq!(site.attachment_downloads(), 1);
+    let download = site
+        .fake
+        .requests()
+        .into_iter()
+        .find(|r| r.path.contains("attachment/content"))
+        .unwrap();
+    assert_eq!(
+        download.path,
+        format!("/rest/api/3/attachment/content/{id}")
+    );
+    assert_eq!(download.query_value("redirect"), Some("false"));
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn a_file_of_the_listed_size_is_returned_without_asking_the_site_again() {
+    let site = Site::new().await;
+    let root = tempfile::tempdir().unwrap();
+    let issue = site.id_of("NW-1020").await;
+    let id = site.attachment_id("NW-1020", "release-notes.pdf").await;
+    let expected = root.path().join(&id).join("release-notes.pdf");
+    fs::create_dir_all(expected.parent().unwrap()).unwrap();
+    fs::write(&expected, vec![0u8; LISTED_PDF_BYTES]).unwrap();
+
+    let path = site
+        .open_attachment(root.path(), &issue, &id)
+        .await
+        .unwrap();
+
+    assert_eq!(path, expected);
+    assert_eq!(site.attachment_downloads(), 0);
+    assert_eq!(fs::read(&path).unwrap(), vec![0u8; LISTED_PDF_BYTES]);
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn a_file_of_another_size_is_downloaded_again_and_replaced() {
+    let site = Site::new().await;
+    let root = tempfile::tempdir().unwrap();
+    let issue = site.id_of("NW-1020").await;
+    let id = site.attachment_id("NW-1020", "release-notes.pdf").await;
+    let stale = root.path().join(&id).join("release-notes.pdf");
+    fs::create_dir_all(stale.parent().unwrap()).unwrap();
+    fs::write(&stale, b"half a down").unwrap();
+
+    let path = site
+        .open_attachment(root.path(), &issue, &id)
+        .await
+        .unwrap();
+
+    assert_eq!(path, stale);
+    assert_eq!(
+        fs::read(&path).unwrap(),
+        demo::demo().attachment_files[&id].1
+    );
+    assert_eq!(site.attachment_downloads(), 1);
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn an_attachment_the_issue_does_not_list_is_not_found_and_not_downloaded() {
+    let site = Site::new().await;
+    let root = tempfile::tempdir().unwrap();
+    let issue = site.id_of("NW-1020").await;
+    let other_issue_attachment = site.attachment_id("NW-1042", "screenshot-login.png").await;
+
+    for id in ["99999", "", "..", other_issue_attachment.as_str()] {
+        let err = site
+            .open_attachment(root.path(), &issue, id)
+            .await
+            .unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::NotFound, "{id:?}");
+    }
+    assert_eq!(site.attachment_downloads(), 0);
+    assert_eq!(fs::read_dir(root.path()).unwrap().count(), 0);
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn an_attachment_of_an_unknown_issue_is_not_found() {
+    let site = Site::new().await;
+    let root = tempfile::tempdir().unwrap();
+    let id = site.attachment_id("NW-1020", "release-notes.pdf").await;
+
+    let err = site
+        .open_attachment(root.path(), "99999999", &id)
+        .await
+        .unwrap_err();
+
+    assert_eq!(err.kind(), ErrorKind::NotFound);
+    assert_eq!(site.attachment_downloads(), 0);
 }

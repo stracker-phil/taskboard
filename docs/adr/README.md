@@ -44,5 +44,6 @@ stands in Taskboard. The numbers in this table are Taskboard's.
 | [0032](0032-avatars-come-from-atlassians-avatar-host-through-rust.md) | Avatars come from Atlassian's avatar host, through Rust | Accepted (2026-10-29) |
 | [0033](0033-views-can-hold-their-own-filter.md) | Views can hold their own filter | Accepted (2026-10-29) |
 | [0034](0034-menus-are-drawn-in-the-page.md) | Menus are drawn in the page | Accepted (2026-10-29) |
+| [0035](0035-attachments-preview-in-quick-look.md) | Attachments preview in Quick Look | Accepted (2026-10-29) |
 
 Open: integrations with Daybook and TimeTracker.

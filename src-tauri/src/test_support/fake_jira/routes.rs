@@ -52,6 +52,7 @@ pub fn route(site: &Content, request: &Recorded) -> Response {
         ("GET", ["issue", key, "comment"]) => comments(site, key, request),
         ("GET", ["issue", key, "remotelink"]) => remote_links(site, key),
         ("GET", ["issue", key, "changelog"]) => changelog(site, key, request),
+        ("GET", ["attachment", "content", id]) => attachment_content(site, id, request),
         ("POST", ["jql", "parse"]) => parse_jql(&request.body),
         _ => not_found(),
     }
@@ -64,6 +65,22 @@ fn api_path<'a>(path: &'a str, cloud_id: &str) -> Option<&'a str> {
             .strip_prefix(cloud_id)?
             .strip_prefix("/rest/api/3/")
     })
+}
+
+/// Only with `redirect=false`; without it Jira answers with a redirect to its media host.
+fn attachment_content(site: &Content, id: &str, request: &Recorded) -> Response {
+    let Some((mime_type, bytes)) = site.data.attachment_files.get(id) else {
+        return not_found();
+    };
+    if request.query_value("redirect") != Some("false") {
+        let mut response = Response::raw(303, "text/plain", "");
+        response.headers.push((
+            "Location".into(),
+            format!("https://media.example.com/file/{id}"),
+        ));
+        return response;
+    }
+    Response::raw(200, mime_type, bytes.clone())
 }
 
 fn not_found() -> Response {

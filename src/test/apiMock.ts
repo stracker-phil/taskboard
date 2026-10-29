@@ -76,6 +76,7 @@ export function createApiMock(): Api {
     setUiState: vi.fn(async (ui: UiState) => ui),
     openLogFolder: vi.fn().mockResolvedValue(undefined),
     openUrl: vi.fn().mockResolvedValue(undefined),
+    attachmentPreview: vi.fn().mockResolvedValue(undefined),
     logError: vi.fn().mockResolvedValue(undefined),
     takeLaunchEvents: vi.fn().mockResolvedValue([]),
     runCommand: vi.fn().mockResolvedValue(undefined),

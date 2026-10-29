@@ -15,6 +15,10 @@ All in the config dir (`~/Library/Application Support/com.philippstracker.taskbo
 | `settings.json`, `keybindings.json`, `ui_state.json`, `places.json` | Settings, key overrides, window layout, each view's remembered place (`store/`) | kept |
 | `nav.json` | The main window's place: the open level and view, each level's last view, the expanded Spaces (`nav/`). A place that no longer exists falls back to the level's default view, then to Everything | kept |
 
+Attachments shown in Quick Look are downloaded to `~/Library/Caches/<bundle identifier>/attachments/<id>/<name>`
+(`issues::preview`, [ADR 0035](adr/0035-attachments-preview-in-quick-look.md)); the folder is removed when the app
+starts and quits, and a file already there with the size Jira lists is reused.
+
 The Jira token is in the Keychain only, never in a file or a log.
 
 ## Settings (`settings.json`)

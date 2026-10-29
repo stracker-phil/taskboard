@@ -18,9 +18,9 @@ use serde_json::Value;
 pub use avatar::{AvatarClient, Image, ImageKind, MAX_AVATAR_BYTES, check_image};
 pub use endpoint::{Access, BadRequest, Endpoint, PAGE_SIZE, Planned};
 pub use guard::check;
-pub use http::MAX_ANSWER_BYTES;
+pub use http::{MAX_ANSWER_BYTES, MAX_ATTACHMENT_BYTES};
 pub use params::{
-    BULK_FETCH_MAX, Expand, FieldIds, IssueRef, IssueRefs, Jql, PageToken, ProjectKey,
+    AttachmentId, BULK_FETCH_MAX, Expand, FieldIds, IssueRef, IssueRefs, Jql, PageToken, ProjectKey,
 };
 
 use super::limiter::Limiter;
@@ -74,6 +74,28 @@ impl Gateway {
         serde_json::from_slice(&answer.body).map_err(|e| {
             AppError::Internal(format!("Jira sent an unexpected answer to {path}: {e}"))
         })
+    }
+
+    /// A file's bytes (an attachment), checked like `send` but in any format, up to `MAX_ATTACHMENT_BYTES`.
+    pub async fn download(&self, endpoint: Endpoint) -> AppResult<Vec<u8>> {
+        let planned = endpoint.plan(&self.site)?;
+        if let Err(refused) = check(&planned, &self.site) {
+            self.log(&refused.to_string());
+            return Err(refused);
+        }
+        let authorization = self.authorization()?;
+        let answer = send_with_retries(Retry::Allowed, &self.rng, || async {
+            self.limiter.acquire().await;
+            self.http.download(&planned.url, Some(&authorization)).await
+        })
+        .await
+        .map_err(|e| self.net_error(e))?;
+        let path = planned.url.path();
+        self.log(&format!("GET {path} → {}", answer.status));
+        if !(200..300).contains(&answer.status) {
+            return Err(status_error(&answer, planned.bad_request, path));
+        }
+        Ok(answer.body)
     }
 
     /// Rate-limited; a read is retried on `429`/`503`, a write never.

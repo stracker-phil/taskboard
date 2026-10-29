@@ -1,8 +1,11 @@
 //! Files attached to a few demo issues, shaped like the `attachment` field of `POST /search/jql`.
 
+use std::collections::BTreeMap;
+
 use serde_json::{Value, json};
 
 use super::SITE_URL;
+use super::attachment_files::demo_file;
 use super::clock::Clock;
 use super::people::{AM, JR, MK, Person, SB, user};
 use super::render::issue_id;
@@ -53,8 +56,9 @@ const ATTACHMENTS: &[AttachmentSpec] = &[
     },
 ];
 
-/// Adds the demo attachments to their issues' fields.
-pub fn attach(issues: &mut [Value], clock: &Clock) {
+/// Adds the demo attachments to their issues' fields; returns each one's MIME type and made-up bytes by id.
+pub fn attach(issues: &mut [Value], clock: &Clock) -> BTreeMap<String, (String, Vec<u8>)> {
+    let mut files = BTreeMap::new();
     for (offset, spec) in (0_u64..).zip(ATTACHMENTS) {
         let id = FIRST_ATTACHMENT_ID + offset;
         let issue_id = issue_id(spec.issue);
@@ -76,5 +80,10 @@ pub fn attach(issues: &mut [Value], clock: &Clock) {
             Some(list) => list.push(item),
             None => issue["fields"]["attachment"] = json!([item]),
         }
+        files.insert(
+            id.to_string(),
+            (spec.mime_type.to_owned(), demo_file(spec.mime_type)),
+        );
     }
+    files
 }

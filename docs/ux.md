@@ -304,9 +304,10 @@ view with its place intact).
   chip in the toolbar, never saved). Last, Attachments when there are any (`Attachments`): a 16/700 heading over
   a two-column grid (gap 8) of tiles (h 44, r 9, `--hairline` border): a 28 × 28 badge with the extension in caps
   (`--fill-subtle`; "FILE" without one), the file name (13/500, ellipsis) and "1.2 MB · Marta Klein" (11, muted).
-  A click opens the file on the Jira site in the browser through `open_url`; the context menu has Open and Copy
-  link ("Copied the link to …"). Only addresses on the connected https site open; any other tile is plain text.
-  Names are plain text; nothing is downloaded or previewed.
+  A click or Space shows the file in Quick Look ([ADR 0035](adr/0035-attachments-preview-in-quick-look.md)): Rust
+  downloads it first, while the badge spins and the meta line reads "Loading…"; a failure shows the error toast.
+  The context menu has Quick Look, Open in Browser and Copy link ("Copied the link to …"); the last two only for
+  an address on the connected https site (`open_url`). Names are plain text.
 - The breadcrumb's Space and list are buttons that go there. Going to the place already shown (sidebar, tabs,
   breadcrumb) closes the Issue view and the preview (`useNavGo`).
 - Activity (400 wide by default, 300–720 by dragging its left edge or ←/→ on the focused edge; saved in

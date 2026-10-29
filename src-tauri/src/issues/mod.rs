@@ -8,6 +8,7 @@ mod comments;
 mod detail;
 mod fetched;
 mod history;
+mod preview;
 mod related;
 mod web_links;
 
@@ -17,5 +18,9 @@ pub use attachments::{Attachment, attachments_of, is_on_site, keep_site_urls};
 pub use comments::issue_sync_comments;
 pub use detail::{CustomField, IssueDetail, issue_forget, issue_get};
 pub use history::issue_sync_history;
+pub use preview::{
+    attachment_file, cache_root, cached_path, clear as clear_attachment_cache, is_reusable,
+    safe_filename,
+};
 pub use related::{Children, IssueLink, Related, RelatedIssue, issue_related};
 pub use web_links::{WebLink, WebLinkKind, issue_sync_web_links, issue_web_links};

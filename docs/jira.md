@@ -99,6 +99,7 @@ One method on `JiraClient` each (`jira/api.rs`), one `Endpoint` each; the answer
 | `comments` | `GET issue/{key}/comment`, every page, `expand=renderedBody` | `Comment` with ADF and HTML |
 | `remote_links` | `GET issue/{id}/remotelink` | `RemoteLink`: web links (url, title, application, relationship; the icon is read but never loaded) |
 | `changelog` | `GET issue/{id}/changelog`, every page by `startAt` (`maxResults=100`; only these two query keys are allowed) | `Changelog`, oldest first: id, author, time and the changed fields (`ChangeItem`: field name and id, `from`/`to` ids, `fromString`/`toString` texts). Asked when an issue is opened, at most every 5 minutes ([ADR 0031](adr/0031-issue-history-comes-from-the-changelog-on-demand.md)) |
+| `attachment_content` | `GET attachment/content/{id}?redirect=false` (the id digits only; `redirect` is the only query key) | the file's bytes in any format, through `Gateway::download` and `Http::download`: no redirect followed, at most `MAX_ATTACHMENT_BYTES` (50 MB, by `Content-Length` and while reading), a 5-minute timeout. For Quick Look ([ADR 0035](adr/0035-attachments-preview-in-quick-look.md)) |
 | `check_jql` | `POST jql/parse?validation=strict` | Jira's messages; empty when valid |
 | `used_custom_fields` | `POST search/jql`: `project = "KEY" ORDER BY updated DESC`, one page of 100, `*all` without the large system fields | the custom field ids with a value |
 
@@ -108,7 +109,8 @@ One method on `JiraClient` each (`jira/api.rs`), one `Endpoint` each; the answer
 MIME type, created, author and the `content` address; `dto::Attachment`), plus the shown custom fields.
 `issues::attachments_of` reads the attachments from the stored issue; `issue_get` keeps an attachment's address
 only when it is `https` on the connected site's host and port (`issues::is_on_site`), and the page opens it with
-`open_url`. The app never fetches attachment bytes. `parse_jira_time` reads Jira's `2026-10-20T09:14:03.120+0200`.
+`open_url`. Quick Look shows a downloaded copy (`attachment_content`, below;
+[ADR 0035](adr/0035-attachments-preview-in-quick-look.md)). `parse_jira_time` reads Jira's `2026-10-20T09:14:03.120+0200`.
 
 **Search pages** come one after another: `SearchPages::next_page` sends the previous page's `nextPageToken`
 and stops after a page with `isLast` (or without a token). A failed page is returned once, then the cursor
@@ -161,7 +163,8 @@ but answers `401` without one.
   a search and is an error in `jql/parse`.
 - Knobs: `set_page_size`, `cap_max_results`, `fail_next(count, status, retry_after)`, `answer_next`,
   `set_latency`, `go_offline` / `go_online` (the port refuses connections), `advance` (the clock), and data
-  changes: `edit_issue`, `move_issue` (same id, new key), `delete_issue`, `revoke_access`, `set_remote_links`, `set_changelog`. `set_page_size` pages the changelog too.
+  changes: `edit_issue`, `move_issue` (same id, new key), `delete_issue`, `revoke_access`, `set_remote_links`, `set_changelog`. It serves the demo attachments' made-up bytes (`demo/attachment_files.rs`: a
+  1×1 PNG, a one-page PDF, a zip with one note) at `attachment/content/{id}`, and a 303 without `redirect=false`. `set_page_size` pages the changelog too.
 - `requests()` and `paths()` return what it was asked, with the `Authorization` header and the JSON body.
 
 The demo site (`test_support/demo/`) is made up and matches the mockup (`demo/web_links.rs` gives a few issues

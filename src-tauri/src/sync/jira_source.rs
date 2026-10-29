@@ -80,6 +80,10 @@ impl Source for JiraSource {
         Box::pin(self.client.changelog(issue_id))
     }
 
+    fn attachment_content<'a>(&'a self, attachment_id: &'a str) -> Answer<'a, Vec<u8>> {
+        Box::pin(self.client.attachment_content(attachment_id))
+    }
+
     fn used_custom_fields<'a>(&'a self, space_key: &'a str) -> Answer<'a, BTreeSet<String>> {
         Box::pin(self.client.used_custom_fields(space_key))
     }

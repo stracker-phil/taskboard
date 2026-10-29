@@ -29,6 +29,8 @@ pub mod nav;
 pub mod net;
 mod order;
 pub mod pins;
+#[cfg(target_os = "macos")]
+mod quicklook;
 mod remote;
 pub mod search;
 pub mod secrets;

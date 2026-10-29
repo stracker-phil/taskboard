@@ -6,7 +6,7 @@ use super::dto::{
     Myself, ParsedQueries, Project, ProjectPage, RemoteLink, SearchPage, Status, TenantInfo,
     Version,
 };
-use super::gateway::{Endpoint, FieldIds, IssueRef, IssueRefs, Jql, ProjectKey};
+use super::gateway::{AttachmentId, Endpoint, FieldIds, IssueRef, IssueRefs, Jql, ProjectKey};
 use super::paging::{SearchPages, SearchRequest};
 use crate::error::AppResult;
 use serde_json::Value;
@@ -125,6 +125,14 @@ impl JiraClient {
                 return Ok(entries);
             }
         }
+    }
+
+    /// An attachment's bytes, up to `MAX_ATTACHMENT_BYTES`.
+    pub async fn attachment_content(&self, attachment_id: &str) -> AppResult<Vec<u8>> {
+        let attachment = AttachmentId::parse(attachment_id)?;
+        self.gateway()
+            .download(Endpoint::AttachmentContent { attachment })
+            .await
     }
 
     /// The custom fields the project's most recently updated issues have a value in.

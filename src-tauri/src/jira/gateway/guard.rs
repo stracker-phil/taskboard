@@ -7,7 +7,7 @@ use super::endpoint::{Access, Planned};
 use super::params::{is_issue_id, is_issue_key, is_project_key};
 use crate::error::{AppError, AppResult};
 use crate::jira::site::Site;
-use Part::{IssueIdOrKey, Literal, ProjectKey};
+use Part::{AttachmentId, IssueIdOrKey, Literal, ProjectKey};
 use Verb::{Get, Post};
 
 /// Keeps write requests refused; flip only together with the first write rule.
@@ -18,6 +18,7 @@ enum Part {
     Literal(&'static str),
     ProjectKey,
     IssueIdOrKey,
+    AttachmentId,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -65,6 +66,11 @@ const RULES: &[Rule] = &[
         Get,
         &[Literal("issue"), IssueIdOrKey, Literal("changelog")],
         &["startAt", "maxResults"],
+    ),
+    read(
+        Get,
+        &[Literal("attachment"), Literal("content"), AttachmentId],
+        &["redirect"],
     ),
     read(Post, &[Literal("search"), Literal("jql")], &[]),
     read(
@@ -133,6 +139,7 @@ fn path_matches(parts: &[Part], segments: &[&str]) -> bool {
                 Literal(text) => text == segment,
                 ProjectKey => is_project_key(segment),
                 IssueIdOrKey => is_issue_id(segment) || is_issue_key(segment),
+                AttachmentId => is_issue_id(segment),
             })
 }
 

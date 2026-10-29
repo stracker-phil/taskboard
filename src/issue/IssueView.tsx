@@ -178,7 +178,7 @@ function IssueMain({ issue, origin }: { issue: IssueDetail; origin: IssueOrigin 
       <RichFields fields={issue.custom} variant="issue" />
       <WebLinks id={issue.id} variant="issue" />
       {related && <Children related={related} isEpic={issue.isEpic} onOpen={openRelated} onOpenAsList={openAsList} />}
-      <Attachments attachments={issue.attachments} />
+      <Attachments issueId={issue.id} attachments={issue.attachments} />
     </div>
   );
 }

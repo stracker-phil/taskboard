@@ -51,6 +51,7 @@ pub fn start(
         })
         .setup(move |app| {
             log::info!("Taskboard {} started", env!("CARGO_PKG_VERSION"));
+            clear_attachments(app.handle());
             app.set_menu(menu::build(app.handle())?)?;
             let state = app.state::<AppState>();
             announce_db_changes(app.handle(), &state.db);
@@ -78,8 +79,17 @@ pub fn start(
                 code: None, api, ..
             } => api.prevent_exit(),
             RunEvent::Reopen { .. } => window::show_main(app),
+            RunEvent::Exit => clear_attachments(app),
             _ => {}
         });
+}
+
+/// Downloaded attachments live only while the app runs.
+fn clear_attachments(app: &AppHandle) {
+    match crate::issues::commands::attachment_cache(app) {
+        Ok(root) => crate::issues::clear_attachment_cache(&root),
+        Err(e) => log::warn!("The attachment cache wasn't found: {e}"),
+    }
 }
 
 /// A launch for the page waits for it; a request (`taskboard open`, `go`) that started the app runs now, and

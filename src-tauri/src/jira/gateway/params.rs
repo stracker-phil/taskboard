@@ -67,6 +67,24 @@ impl IssueRef {
     }
 }
 
+/// An attachment's numeric id.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AttachmentId(String);
+
+impl AttachmentId {
+    pub fn parse(text: &str) -> AppResult<Self> {
+        if is_issue_id(text) {
+            Ok(Self(text.into()))
+        } else {
+            Err(refused("attachment id", text))
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
 /// 1 to `BULK_FETCH_MAX` issues.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IssueRefs(Vec<IssueRef>);
