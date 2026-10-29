@@ -6,9 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../../test/apiMock")).createApiMock() }));
 
-import { api, type Column, type View } from "../../api";
+import { api, type Column, type IssueOpening, type View } from "../../api";
 import { createQueryClient } from "../../queries/queryClient";
 import { resetStore, useStore } from "../../state/store";
+import { settings } from "../../test/settings";
 import { view } from "../../test/views";
 import { ColumnsPopover } from "./ColumnsPopover";
 
@@ -52,6 +53,7 @@ async function openColumns(current: View = view({ columns: ["assignee", "priorit
 beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
+  mocked.getSettings.mockResolvedValue(settings());
   mocked.columnsCatalogue.mockResolvedValue(CATALOGUE);
   mocked.viewSetColumns.mockResolvedValue(view());
 });
@@ -156,6 +158,61 @@ describe("ColumnsPopover", () => {
       const popover = await openColumns(view({ layout }));
 
       expect(within(popover).queryByRole("button", { name: /^Wrap long titles/ })).not.toBeInTheDocument();
+    });
+  });
+
+  describe("Open issues in", () => {
+    const group = (popover: HTMLElement) => within(popover).getByRole("group", { name: "Open issues in" });
+
+    it.each(["list", "table"] as const)("offers Default, Preview and Full view in a %s view", async (layout) => {
+      const popover = await openColumns(view({ layout }));
+
+      expect(within(group(popover)).getAllByRole("button").map((b) => b.textContent)).toEqual(["Default (Preview)", "Preview", "Full view"]);
+    });
+
+    it("is not offered in a board view", async () => {
+      const popover = await openColumns(view({ layout: "board" }));
+
+      expect(within(popover).queryByRole("group", { name: "Open issues in" })).not.toBeInTheDocument();
+    });
+
+    it("names the app setting in the Default button", async () => {
+      mocked.getSettings.mockResolvedValue(settings({ behaviour: { seenAfterSeconds: 2, pinDefault: "untilUnpinned", openIssuesIn: "full" } }));
+      const popover = await openColumns();
+
+      expect(await within(group(popover)).findByRole("button", { name: "Default (Full view)" })).toBeInTheDocument();
+    });
+
+    it.each<[IssueOpening | null, string]>([
+      [null, "Default (Preview)"],
+      ["preview", "Preview"],
+      ["full", "Full view"],
+    ])("presses the button of the view's choice %s", async (openWith, name) => {
+      const popover = await openColumns(view({ openWith }));
+
+      expect(within(group(popover)).getByRole("button", { pressed: true })).toHaveAccessibleName(name);
+    });
+
+    it.each<[string, IssueOpening | null, IssueOpening | null]>([
+      ["Default (Preview)", "full", null],
+      ["Preview", null, "preview"],
+      ["Full view", null, "full"],
+    ])("saves %s as the view's choice", async (name, current, saved) => {
+      mocked.viewSetOpenWith.mockResolvedValue(view({ openWith: saved }));
+      const popover = await openColumns(view({ openWith: current }));
+
+      await userEvent.click(within(group(popover)).getByRole("button", { name }));
+
+      expect(mocked.viewSetOpenWith).toHaveBeenCalledWith(101, saved);
+    });
+
+    it("shows a toast when the choice cannot be saved", async () => {
+      mocked.viewSetOpenWith.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
+      const popover = await openColumns();
+
+      await userEvent.click(within(group(popover)).getByRole("button", { name: "Full view" }));
+
+      await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not change how issues open: Disk full"));
     });
   });
 

@@ -29,10 +29,10 @@ use taskboard_lib::test_support::demo::{DEMO_NOW, ME_EMAIL};
 use taskboard_lib::test_support::fake_jira::{DEMO_TOKEN, FakeJira};
 use taskboard_lib::test_support::{FakeSecrets, temp_config_dir};
 use taskboard_lib::views::{
-    DEFAULT_COLUMNS, GroupBy, Layout, Sort, SortBy, View, space_default_columns, view_create,
-    view_delete, view_duplicate, view_move, view_rename, view_set_column_collapsed,
-    view_set_columns, view_set_group, view_set_layout, view_set_sort, view_set_widths,
-    view_set_wrap, views_of,
+    DEFAULT_COLUMNS, GroupBy, IssueOpening, Layout, Sort, SortBy, View, space_default_columns,
+    view_create, view_delete, view_duplicate, view_move, view_rename, view_set_column_collapsed,
+    view_set_columns, view_set_group, view_set_layout, view_set_open_with, view_set_sort,
+    view_set_widths, view_set_wrap, views_of,
 };
 
 const ME_ACCOUNT_ID: &str = "712020:5a1e0c3f-8d2b-4f61-9c7e-1b2a3c4d5e01";
@@ -1795,6 +1795,7 @@ mod editing_views {
                 "widths": {},
                 "wrapTitles": true,
                 "collapsed": {},
+                "openWith": null,
                 "position": 0,
                 "isDefault": true,
             })
@@ -1847,6 +1848,67 @@ mod editing_views {
 
         assert!(!copy.wrap_titles);
         assert!(!views_of(&db, copied_list).await.unwrap()[0].wrap_titles);
+    }
+
+    #[tokio::test]
+    async fn a_new_view_follows_the_settings_for_opening_issues() {
+        let (_dir, db) = tracked_lab().await;
+
+        assert!(
+            space_views(&db)
+                .await
+                .iter()
+                .all(|view| view.open_with.is_none())
+        );
+    }
+
+    #[tokio::test]
+    async fn the_opening_choice_is_stored_per_view_and_can_be_cleared() {
+        let (_dir, db) = tracked_lab().await;
+        let views = space_views(&db).await;
+        let id = views[2].id;
+
+        for choice in [Some(IssueOpening::Full), Some(IssueOpening::Preview), None] {
+            let saved = view_set_open_with(&db, id, choice).await.unwrap();
+
+            assert_eq!(saved.open_with, choice, "{choice:?}");
+            assert_eq!(space_views(&db).await[2].open_with, choice, "{choice:?}");
+            assert_eq!(space_views(&db).await[0].open_with, None, "{choice:?}");
+        }
+    }
+
+    #[tokio::test]
+    async fn opening_of_an_unknown_view_is_not_found() {
+        let (_dir, db) = tracked_lab().await;
+
+        let err = view_set_open_with(&db, 9999, Some(IssueOpening::Full))
+            .await
+            .unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::NotFound);
+    }
+
+    #[tokio::test]
+    async fn a_duplicate_view_and_a_duplicate_list_keep_the_opening_choice() {
+        let (_dir, db) = tracked_lab().await;
+        let table = space_views(&db).await[2].id;
+        view_set_open_with(&db, table, Some(IssueOpening::Full))
+            .await
+            .unwrap();
+        let epics = list_id(&db, "Epics").await;
+        let epics_view = views_of(&db, epics).await.unwrap()[0].id;
+        view_set_open_with(&db, epics_view, Some(IssueOpening::Preview))
+            .await
+            .unwrap();
+
+        let copy = view_duplicate(&db, table).await.unwrap();
+        let copied_list = list_duplicate(&db, epics).await.unwrap();
+
+        assert_eq!(copy.open_with, Some(IssueOpening::Full));
+        assert_eq!(
+            views_of(&db, copied_list).await.unwrap()[0].open_with,
+            Some(IssueOpening::Preview)
+        );
     }
 
     fn overrides(pairs: &[(&str, bool)]) -> BTreeMap<String, bool> {

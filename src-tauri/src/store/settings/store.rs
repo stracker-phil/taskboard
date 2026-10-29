@@ -60,6 +60,7 @@ mod tests {
         Appearance, Behaviour, Connection, MAX_SEEN_AFTER_SECONDS, SyncSettings,
     };
     use crate::test_support::temp_config_dir;
+    use crate::views::IssueOpening;
     use std::fs;
 
     fn file_names(dir: &Path) -> Vec<String> {
@@ -302,8 +303,74 @@ mod tests {
             Behaviour {
                 seen_after_seconds: 2,
                 pin_default: PinDuration::UntilUnpinned,
+                open_issues_in: IssueOpening::Preview,
             }
         );
+    }
+
+    #[test]
+    fn the_default_behaviour_opens_issues_in_the_preview() {
+        assert_eq!(Behaviour::default().open_issues_in, IssueOpening::Preview);
+    }
+
+    #[test]
+    fn a_behaviour_serializes_the_opening_choice_as_open_issues_in() {
+        for (opening, text) in [
+            (IssueOpening::Preview, "preview"),
+            (IssueOpening::Full, "full"),
+        ] {
+            let behaviour = Behaviour {
+                open_issues_in: opening,
+                ..Behaviour::default()
+            };
+
+            assert_eq!(
+                serde_json::to_value(behaviour).unwrap()["openIssuesIn"],
+                serde_json::json!(text),
+                "{text}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_behaviour_in_the_file_without_the_opening_choice_reads_as_preview() {
+        let dir = temp_config_dir();
+        fs::write(
+            dir.path().join(FILE_NAME),
+            r#"{"behaviour":{"seenAfterSeconds":4,"pinDefault":"week"}}"#,
+        )
+        .unwrap();
+
+        let behaviour = SettingsStore::open(dir.path()).get().behaviour;
+
+        assert_eq!(
+            behaviour,
+            Behaviour {
+                seen_after_seconds: 4,
+                pin_default: PinDuration::Week,
+                open_issues_in: IssueOpening::Preview,
+            }
+        );
+    }
+
+    #[test]
+    fn the_opening_choice_in_the_file_is_read_and_an_unknown_one_reads_as_preview() {
+        for (text, expected) in [
+            ("full", IssueOpening::Full),
+            ("preview", IssueOpening::Preview),
+            ("sidebar", IssueOpening::Preview),
+        ] {
+            let dir = temp_config_dir();
+            fs::write(
+                dir.path().join(FILE_NAME),
+                format!(r#"{{"behaviour":{{"openIssuesIn":"{text}"}}}}"#),
+            )
+            .unwrap();
+
+            let behaviour = SettingsStore::open(dir.path()).get().behaviour;
+
+            assert_eq!(behaviour.open_issues_in, expected, "{text}");
+        }
     }
 
     #[tokio::test]
@@ -313,6 +380,7 @@ mod tests {
         let behaviour = Behaviour {
             seen_after_seconds: 5,
             pin_default: PinDuration::TwoDays,
+            open_issues_in: IssueOpening::Full,
         };
 
         let saved = store.edit(move |s| s.behaviour = behaviour).await.unwrap();
@@ -324,7 +392,7 @@ mod tests {
             serde_json::from_str(&fs::read_to_string(dir.path().join(FILE_NAME)).unwrap()).unwrap();
         assert_eq!(
             file["behaviour"],
-            serde_json::json!({"seenAfterSeconds": 5, "pinDefault": "twoDays"})
+            serde_json::json!({"seenAfterSeconds": 5, "pinDefault": "twoDays", "openIssuesIn": "full"})
         );
     }
 
@@ -344,6 +412,7 @@ mod tests {
             Behaviour {
                 seen_after_seconds: MAX_SEEN_AFTER_SECONDS,
                 pin_default: PinDuration::Week,
+                open_issues_in: IssueOpening::Preview,
             }
         );
         assert_eq!(MAX_SEEN_AFTER_SECONDS, 10);
@@ -366,6 +435,7 @@ mod tests {
                 behaviour: Behaviour {
                     seen_after_seconds: 4,
                     pin_default: PinDuration::UntilUnpinned,
+                    open_issues_in: IssueOpening::Preview,
                 },
                 sync: SyncSettings {
                     focused_minutes: 10,

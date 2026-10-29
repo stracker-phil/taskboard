@@ -149,11 +149,17 @@ one group, Board column or pill per style, whatever the status is called; the Bo
 - Rows are virtualised (`@tanstack/react-virtual`): a card is drawn from its pieces (the header item, then
   rows that know whether they are first, middle, last or the only one).
 
-## Issue peek
+## Issue preview
 
-`src/issue/Peek.tsx`, shown by `shell/CurrentPeek.tsx`: clicking a row selects it and opens a 540px panel at
+`src/issue/Peek.tsx` (the code still calls it peek), shown by `shell/CurrentPeek.tsx`: clicking a row in a List
+or Table view selects it and opens a 540px panel at
 the content panel's full height; header, tabs, toolbar and view narrow beside it and the List hides the
 columns that no longer fit beside a 240px title, rightmost first, until it closes. It slides in.
+
+What a click opens is the view's choice (Columns → Open issues in: Default, Preview, Full view; `view.open_with`,
+null for Default) or else Settings → General → Open issues in (`behaviour.openIssuesIn`, Preview unless changed;
+`useIssueOpening`). Full view opens the Issue view at once, the row still selected. A Board always opens the
+Issue view.
 
 - Header 50: mono key · type text, then Bookmark (with bookmarks), Open in Jira, Full view, Close.
 - Body: title 22/750, one line of chips (status pill `peek`, epic chip, release outline chip, priority,
@@ -170,12 +176,12 @@ unread (`src-tauri/src/changes/`). The UI says read and unread; the code says se
 - Changed rows: `--changed-bg`, a 600 summary and the change chip with the most important change ("New",
   "2 new comments", "Moved to Review", "Priority raised", "Assigned to you", "Due date changed"; "+N" for
   more kinds). Changed epic children in the Issue view get the same background.
-- The Since-yesterday banner (`SinceBanner`, `--banner-info-*`) in the peek and the Issue view: "Since
+- The Since-yesterday banner (`SinceBanner`, `--banner-info-*`) in the preview and the Issue view: "Since
   yesterday:" (or "Since you last looked:" when that was over a day ago) and every change in words; the Issue
   view adds Mark as read.
 - Activity after the last look (`fresh`, decided in Rust) sits under a "New since yesterday" divider
   (`--accent-text`, `--changed-border` lines); new comments and changes have `--changed-bg`.
-- An issue open in the peek or the Issue view for the owner's delay (Settings → General → Behavior, 0–10 s,
+- An issue open in the preview or the Issue view for the owner's delay (Settings → General → Behavior, 0–10 s,
   default 2) counts as read (`useSeenAfter`); leaving sooner doesn't. Mark as read, Mark all as read and M
   clear it at once.
 - Mark as unread (row toolbar, the Issue view header, M on a read issue) makes the issue unread
@@ -205,7 +211,7 @@ unread (`src-tauri/src/changes/`). The UI says read and unread; the code says se
 Local only (`src-tauri/src/pins/`, `src/pins/`; the code calls them pins). Issues, comments and filter lists can be
 bookmarked; a filter list's bookmark puts it under Home.
 
-- `PinButton` (the `Bookmark` icon) in the peek and Issue view headers ("Bookmark this issue") and on each
+- `PinButton` (the `Bookmark` icon) in the preview and Issue view headers ("Bookmark this issue") and on each
   comment (on hover) opens `PinPopover` (340px): "Keep bookmarked for" chips (Today, 2 days, 1 week, Until
   removed; the owner's default from Settings → General preselected, Until removed unless changed; the chosen one
   `--button-primary-bg`), an optional one-line reason, Cancel and Bookmark; ↩ bookmarks. ⌥-click bookmarks at
@@ -230,7 +236,7 @@ bookmarked; a filter list's bookmark puts it under Home.
 - **Empty level** (`EmptyLevel`, List, Board and Table): the funnel tile, "Nothing in <name>", the conditions
   in words plus the Me and text narrowing, "Edit filter" on a filter list (opens the toolbar's Filter) and
   "Clear Me filter" while Me is on.
-- **Gone issue** (`GoneNotice`, peek and Issue view): the title struck through in `--text-muted`, the notice
+- **Gone issue** (`GoneNotice`, preview and Issue view): the title struck through in `--text-muted`, the notice
   on `--notice-neutral-*` ("Deleted in Jira or you lost access. Last synced <day>. This is the cached copy."),
   Remove from cache (`issue_forget`, gone issues only) and Remove bookmark while bookmarked.
 
@@ -244,7 +250,7 @@ Replace and × (dismissed for the rest of the day). Nothing blocks: the app keep
 
 ## Issue view
 
-`src/issue/IssueView.tsx`, shown in place of the view (the sidebar stays) by ↩ on a selected row, the peek's
+`src/issue/IssueView.tsx`, shown in place of the view (the sidebar stays) by ↩ on a selected row, the preview's
 Full view button or E (the selected issue's epic); esc goes back one step (an opened epic or child, then the
 view with its place intact).
 
@@ -254,20 +260,20 @@ view with its place intact).
   that opens the epic here, Release, Priority, Sprint, then the custom fields shown as columns or marked shown,
   then every other custom field the issue fills, by name), links ("blocks", "is blocked by"), the description,
   then each rich text custom field with content (acceptance criteria, steps to reproduce) as its own section
-  under its Jira name (`RichFields`; the peek shows them under its description too), Web links when there are
-  any (`WebLinks`, also in the peek: a pull request icon and `repo#481` for GitHub, GitLab and Bitbucket pull or
+  under its Jira name (`RichFields`; the preview shows them under its description too), Web links when there are
+  any (`WebLinks`, also in the preview: a pull request icon and `repo#481` for GitHub, GitLab and Bitbucket pull or
   merge requests, else a link icon and the host; a row opens its address in the browser through `open_url`, only
   when it is https, otherwise it is plain text; no remote icon loads), and Child issues (epics) or Subtasks, when there are any:
   open first, done behind "Show N done"; "Open as list view" narrows the origin view to the epic (a removable
   chip in the toolbar, never saved).
 - The breadcrumb's Space and list are buttons that go there. Going to the place already shown (sidebar, tabs,
-  breadcrumb) closes the Issue view and the peek (`useNavGo`).
+  breadcrumb) closes the Issue view and the preview (`useNavGo`).
 - Activity (400 wide by default, 300–720 by dragging its left edge or ←/→ on the focused edge; saved in
   `ui_state.json` `activityWidth` for every issue, `useActivityWidth`; `--panel-subtle-bg`): All / Comments / Changes, comment cards and change lines (status
   changes as activity pills), newest first; the comment box waits for writes. Opening an issue fetches its
   comments when the cached ones may be behind (`issue_sync_comments`).
 - Jira's HTML is sanitised (`lib/jiraHtml.ts`, [ADR 0027](adr/0027-jira-html-is-sanitised-and-shows-no-remote-content.md)):
-  links open in the browser, images become link chips. The peek shows the same description and the latest
+  links open in the browser, images become link chips. The preview shows the same description and the latest
   three activity items.
 
 **Remember my place:** each view keeps its opened and closed groups, scroll position, selected row, open
@@ -345,8 +351,8 @@ button, Escape and a press outside close it, focus goes back to the button).
   that always wraps and never truncates, then avatars, release chip, comment count and priority flag. Card
   fields (the Columns button reads "Card fields") choose epic, assignee, release and priority. Changed cards
   use `--changed-bg` and `--changed-border`. Hover shows the row toolbar in the top-right corner.
-- A card opens the full Issue view (the mockup's behaviour; List rows open the peek). A Board never shows the
-  peek (`CurrentPeek`), whatever opened it.
+- A card opens the full Issue view (the mockup's behaviour; List rows open the preview). A Board never shows the
+  preview (`CurrentPeek`), whatever opened it.
 - Each column virtualises its cards (`BoardColumnCards`, measured heights), so a Space with thousands of
   issues mounts only the cards on screen; the keyboard's card scrolls into view.
 
@@ -392,7 +398,7 @@ bundled fonts. Weights 400, 500, 600, 700, 750 (titles) and 800 (tile letters).
 | Role | Size / weight | Used for |
 |---|---|---|
 | Issue title | 30 / 750 | Issue view heading |
-| Peek title | 22 / 750 | peek heading, page headings |
+| Preview title | 22 / 750 | preview heading, page headings |
 | Space title | 19 / 700 | content header |
 | Card title, palette field | 17 / 700, 17 / 400 | state cards, the palette's query |
 | Section | 16 / 700 | Description, Child issues, empty states |
@@ -476,7 +482,7 @@ no separate Settings design; owner, 2026-10-28). Its colours are the `--settings
     (minutes in front and in the background, days to keep done issues) and *Cache* (the sync state line with
     Sync Now, one row per tracked project with its key, last full sync and "N issues · M open", then Reset
     Cache, confirmed in a sheet). It stays as the diagnostics view of the cache.
-  - **General** (System): *Behavior* (read delay, default bookmark duration) and *About* (version, log folder).
+  - **General** (System): *Behavior* (read delay, where a click opens issues, default bookmark duration) and *About* (version, log folder).
   - **Appearance**: Automatic, Light or Dark. **Shortcuts**: every command and its key, rebindable.
   - **Status** (`components/settings/status/`, Daybook's Status page): `diagnostics_get` reports groups of
     rows, each a value with a tone icon (ok, warning, error, info) and maybe a bus command as a button: *Jira*
@@ -509,9 +515,9 @@ global shortcuts.
 - A command has one binding; ⌘1–⌘9 open the nth view tab.
 - **Issues** (`commands/issueKeys.ts`, registered by the shown List, Board or Issue view): J or ↓ and K or ↑
   move (on the Board through a column's cards, ← and → to the neighbouring column; in a List ← and → close and
-  open the row's group), Space opens or closes the peek (the Board opens the Issue view), ↩ opens the Issue
+  open the row's group), Space opens or closes the preview (the Board opens the Issue view), ↩ opens the Issue
   view, E the epic, P adds or removes a bookmark (default duration), M marks read or unread, ⌘C copies the key (only with no text
-  field focused and no text selected), ⌘⇧C the URL, ⌘↩ opens it in Jira, esc closes the peek or goes back.
+  field focused and no text selected), ⌘⇧C the URL, ⌘↩ opens it in Jira, esc closes the preview or goes back.
 - `app:settings:<page>` opens Settings at a page or section (Settings → Projects is `app:settings:projects`).
 
 ## Palette checks

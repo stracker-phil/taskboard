@@ -53,7 +53,7 @@ describe("PinButton", () => {
     });
 
     it("preselects the duration set in the settings", async () => {
-      mocked.getSettings.mockResolvedValue(settings({ behaviour: { seenAfterSeconds: 2, pinDefault: "week" } }));
+      mocked.getSettings.mockResolvedValue(settings({ behaviour: { seenAfterSeconds: 2, pinDefault: "week", openIssuesIn: "preview" } }));
       renderButton();
       await settingsLoaded();
 
@@ -64,7 +64,7 @@ describe("PinButton", () => {
     });
 
     it("pins with the duration set in the settings when the durations are left alone", async () => {
-      mocked.getSettings.mockResolvedValue(settings({ behaviour: { seenAfterSeconds: 2, pinDefault: "today" } }));
+      mocked.getSettings.mockResolvedValue(settings({ behaviour: { seenAfterSeconds: 2, pinDefault: "today", openIssuesIn: "preview" } }));
       renderButton();
       await settingsLoaded();
       await open();
@@ -145,7 +145,7 @@ describe("PinButton", () => {
     });
 
     it("pins at once with the duration set in the settings on an alt-click", async () => {
-      mocked.getSettings.mockResolvedValue(settings({ behaviour: { seenAfterSeconds: 2, pinDefault: "twoDays" } }));
+      mocked.getSettings.mockResolvedValue(settings({ behaviour: { seenAfterSeconds: 2, pinDefault: "twoDays", openIssuesIn: "preview" } }));
       renderButton();
       await settingsLoaded();
 

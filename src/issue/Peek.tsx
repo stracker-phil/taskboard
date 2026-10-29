@@ -29,7 +29,7 @@ export function Peek({ id, onClose, onExpand }: { id: string; onClose: () => voi
   }, [id]);
 
   return (
-    <aside className="peek" aria-label="Issue peek">
+    <aside className="peek" aria-label="Issue preview">
       <header className="peek__header">
         {issue && (
           <>

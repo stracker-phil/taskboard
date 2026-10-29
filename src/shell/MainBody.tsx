@@ -37,5 +37,5 @@ export function MainBody() {
   if (!view) return null;
   if (view.layout === "table") return <TableView view={view} narrowing={narrowing} />;
   if (view.layout === "board") return <BoardView view={view} narrowing={narrowing} />;
-  return <ListView listId={location.listId} viewId={location.viewId} narrowing={narrowing} wrapTitles={view.wrapTitles} />;
+  return <ListView listId={location.listId} viewId={location.viewId} narrowing={narrowing} wrapTitles={view.wrapTitles} openWith={view.openWith} />;
 }

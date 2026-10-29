@@ -489,7 +489,7 @@ describe("IssueView", () => {
     });
 
     it("marks the issue read at once when the delay in the settings is 0", async () => {
-      mocked.getSettings.mockResolvedValue(settings({ behaviour: { seenAfterSeconds: 0, pinDefault: "untilUnpinned" } }));
+      mocked.getSettings.mockResolvedValue(settings({ behaviour: { seenAfterSeconds: 0, pinDefault: "untilUnpinned", openIssuesIn: "preview" } }));
 
       await openUnseen();
       await vi.advanceTimersByTimeAsync(50);

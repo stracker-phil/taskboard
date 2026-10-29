@@ -24,6 +24,7 @@ import type {
   Layout,
   FilterOptions,
   IssueDetail,
+  IssueOpening,
   ListConditions,
   MatchCount,
   Narrowing,
@@ -149,6 +150,8 @@ export const api = {
   viewSetGroup: (id: number, groupBy: GroupBy) => invoke<View>("view_set_group", { id, groupBy }),
   viewSetSort: (id: number, sort: Sort) => invoke<View>("view_set_sort", { id, sort }),
   viewSetWrap: (id: number, wrap: boolean) => invoke<View>("view_set_wrap", { id, wrap }),
+  /** Null follows Settings → General. */
+  viewSetOpenWith: (id: number, openWith: IssueOpening | null) => invoke<View>("view_set_open_with", { id, openWith }),
   /** The Table layout's column widths by column id; Rust clamps them to 48–800. */
   viewSetWidths: (id: number, widths: Record<string, number>) => invoke<View>("view_set_widths", { id, widths }),
   viewMove: (id: number, position: number) => invoke<View[]>("view_move", { id, position }),

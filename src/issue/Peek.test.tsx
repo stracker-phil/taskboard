@@ -240,7 +240,7 @@ describe("Peek", () => {
     });
 
     async function showUnseen(seenAfterSeconds?: number) {
-      if (seenAfterSeconds !== undefined) mocked.getSettings.mockResolvedValue(settings({ behaviour: { seenAfterSeconds, pinDefault: "untilUnpinned" } }));
+      if (seenAfterSeconds !== undefined) mocked.getSettings.mockResolvedValue(settings({ behaviour: { seenAfterSeconds, pinDefault: "untilUnpinned", openIssuesIn: "preview" } }));
       serveByKey();
       const view = renderSwitchable("10042");
       await screen.findByRole("status");

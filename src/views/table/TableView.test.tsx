@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -9,6 +9,7 @@ import { api, type View, type ViewData } from "../../api";
 import { createQueryClient } from "../../queries/queryClient";
 import { resetStore, useStore } from "../../state/store";
 import { COLUMNS, groupOf, row, viewData } from "../../test/issues";
+import { settings } from "../../test/settings";
 import { sidebarTree, space } from "../../test/spaces";
 import { view } from "../../test/views";
 import { TableView } from "./TableView";
@@ -21,6 +22,7 @@ let spies: Restorable[] = [];
 beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
+  mocked.getSettings.mockResolvedValue(settings());
   mocked.sidebarTree.mockResolvedValue(sidebarTree([]));
   mocked.columnsCatalogue.mockResolvedValue([...COLUMNS, { id: "due", name: "Due", custom: false }]);
   mocked.viewSetSort.mockResolvedValue(view());
@@ -229,6 +231,35 @@ describe("TableView", () => {
 
       expect(screen.getByRole("row", { name: /NW-1001/ })).toHaveAttribute("aria-selected", "true");
       expect(screen.getByRole("row", { name: /NW-1042/ })).toHaveAttribute("aria-selected", "false");
+    });
+
+    it("opens the preview of the clicked row when the view opens with the preview", async () => {
+      await renderTable(undefined, { ...TABLE, openWith: "preview" });
+
+      await userEvent.click(await screen.findByText("Publish the launch notes"));
+
+      expect(useStore.getState().places["11:101"]).toMatchObject({ selectedId: "2", peekOpen: true });
+      expect(useStore.getState().issueView).toBeNull();
+    });
+
+    it("opens the Issue view over the view when the view opens in full", async () => {
+      await renderTable(undefined, { ...TABLE, openWith: "full" });
+
+      await userEvent.click(await screen.findByText("Publish the launch notes"));
+
+      expect(useStore.getState().issueView).toEqual({ origin: { listId: 11, viewId: 101 }, stack: ["2"] });
+      expect(screen.getByRole("row", { name: /NW-1001/ })).toHaveAttribute("aria-selected", "true");
+    });
+
+    it("follows the app setting when the view has no choice", async () => {
+      mocked.getSettings.mockResolvedValue(settings({ behaviour: { seenAfterSeconds: 2, pinDefault: "untilUnpinned", openIssuesIn: "full" } }));
+      await renderTable();
+      await waitFor(() => expect(mocked.getSettings).toHaveBeenCalled());
+      await act(async () => {});
+
+      await userEvent.click(await screen.findByText("Publish the launch notes"));
+
+      expect(useStore.getState().issueView).toEqual({ origin: { listId: 11, viewId: 101 }, stack: ["2"] });
     });
 
     it("renders only the visible part of 5,000 rows", async () => {

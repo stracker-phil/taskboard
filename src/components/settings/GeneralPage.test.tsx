@@ -13,7 +13,7 @@ import { GeneralPage } from "./GeneralPage";
 
 const mocked = vi.mocked(api, true);
 
-const behaviour = (patch: Partial<Behaviour> = {}): Behaviour => ({ seenAfterSeconds: 2, pinDefault: "untilUnpinned", ...patch });
+const behaviour = (patch: Partial<Behaviour> = {}): Behaviour => ({ seenAfterSeconds: 2, pinDefault: "untilUnpinned", openIssuesIn: "preview", ...patch });
 
 async function renderPage(current: Behaviour = behaviour()) {
   mocked.getSettings.mockResolvedValue(settings({ behaviour: current }));
@@ -47,7 +47,7 @@ describe("GeneralPage", () => {
       await userEvent.clear(field);
       await userEvent.type(field, "5{Enter}");
 
-      expect(mocked.behaviourSet).toHaveBeenCalledWith({ seenAfterSeconds: 5, pinDefault: "week" });
+      expect(mocked.behaviourSet).toHaveBeenCalledWith({ seenAfterSeconds: 5, pinDefault: "week", openIssuesIn: "preview" });
     });
 
     it("accepts 0 to count an issue as read at once", async () => {
@@ -56,7 +56,7 @@ describe("GeneralPage", () => {
       await userEvent.clear(field);
       await userEvent.type(field, "0{Enter}");
 
-      expect(mocked.behaviourSet).toHaveBeenCalledWith({ seenAfterSeconds: 0, pinDefault: "untilUnpinned" });
+      expect(mocked.behaviourSet).toHaveBeenCalledWith({ seenAfterSeconds: 0, pinDefault: "untilUnpinned", openIssuesIn: "preview" });
     });
 
     it.each(["11", "-1", "1.5"])("does not send %s and shows the saved delay again", async (typed) => {
@@ -86,7 +86,29 @@ describe("GeneralPage", () => {
 
       await userEvent.click(within(screen.getByRole("group", { name: "Bookmark for" })).getByRole("button", { name: label }));
 
-      expect(mocked.behaviourSet).toHaveBeenCalledWith({ seenAfterSeconds: 7, pinDefault });
+      expect(mocked.behaviourSet).toHaveBeenCalledWith({ seenAfterSeconds: 7, pinDefault, openIssuesIn: "preview" });
+    });
+
+    it("describes the delay as counting in the preview or the Issue view", async () => {
+      await renderPage();
+
+      expect(screen.getByText("How long it stays open in the preview or the Issue view; 0 marks it at once.")).toBeInTheDocument();
+    });
+
+    it("offers Preview and Full view with the saved one pressed", async () => {
+      await renderPage(behaviour({ openIssuesIn: "full" }));
+
+      const group = screen.getByRole("group", { name: "Open issues in" });
+      expect(within(group).getAllByRole("button").map((b) => b.textContent)).toEqual(["Preview", "Full view"]);
+      expect(within(group).getByRole("button", { pressed: true })).toHaveTextContent("Full view");
+    });
+
+    it("sends the chosen way to open issues together with the current delay and pin default", async () => {
+      await renderPage(behaviour({ seenAfterSeconds: 7, pinDefault: "week" }));
+
+      await userEvent.click(within(screen.getByRole("group", { name: "Open issues in" })).getByRole("button", { name: "Full view" }));
+
+      expect(mocked.behaviourSet).toHaveBeenCalledWith({ seenAfterSeconds: 7, pinDefault: "week", openIssuesIn: "full" });
     });
 
     it("shows an error toast when the setting cannot be saved", async () => {

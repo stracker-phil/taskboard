@@ -4,7 +4,7 @@ use tauri::State;
 
 use chrono::Utc;
 
-use super::{BoardData, Column, GroupBy, Layout, Narrowing, Sort, View, ViewData};
+use super::{BoardData, Column, GroupBy, IssueOpening, Layout, Narrowing, Sort, View, ViewData};
 use crate::error::AppResult;
 use crate::lists::Viewer;
 use crate::state::AppState;
@@ -70,6 +70,15 @@ pub async fn view_set_sort(state: State<'_, AppState>, id: i64, sort: Sort) -> A
 #[tauri::command]
 pub async fn view_set_wrap(state: State<'_, AppState>, id: i64, wrap: bool) -> AppResult<View> {
     super::view_set_wrap(&state.db, id, wrap).await
+}
+
+#[tauri::command]
+pub async fn view_set_open_with(
+    state: State<'_, AppState>,
+    id: i64,
+    open_with: Option<IssueOpening>,
+) -> AppResult<View> {
+    super::view_set_open_with(&state.db, id, open_with).await
 }
 
 #[tauri::command]

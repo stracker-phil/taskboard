@@ -48,7 +48,11 @@ seenAfterSeconds: number,
 /**
  * What a new pin starts with.
  */
-pinDefault: PinDuration, };
+pinDefault: PinDuration, 
+/**
+ * What a click on an issue opens in views that don't choose.
+ */
+openIssuesIn: IssueOpening, };
 
 export type BoardColumn = { 
 /**
@@ -254,6 +258,11 @@ export type IssueLink = {
  * Jira's words for this side of the link ("blocks", "is blocked by").
  */
 relation: string, issue: RelatedIssue, };
+
+/**
+ * What a click on an issue opens: the preview beside the view, or the full Issue view.
+ */
+export type IssueOpening = "full" | "preview";
 
 /**
  * Payload of `issues_changed`.
@@ -663,7 +672,11 @@ wrapTitles: boolean,
  * A Board's columns the owner collapsed (true) or expanded (false), by status id; the rest use the
  * default (Done collapsed).
  */
-collapsed: { [key in string]: boolean }, position: number, 
+collapsed: { [key in string]: boolean }, 
+/**
+ * What a click on an issue opens here; none follows Settings → General.
+ */
+openWith: IssueOpening | null, position: number, 
 /**
  * The tab a level opens with.
  */

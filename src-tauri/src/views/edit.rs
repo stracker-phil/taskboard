@@ -5,6 +5,7 @@ use std::collections::{BTreeMap, HashSet};
 use rusqlite::types::Value as SqlValue;
 use rusqlite::{Connection, OptionalExtension, Row, params};
 
+use super::display::{write_open_with, write_wrap};
 use super::model::{DEFAULT_COLUMNS, GroupBy, Layout, Sort, SortBy, View, from_text, to_text};
 use crate::db::{Db, LocalPart};
 use crate::error::{AppError, AppResult};
@@ -12,7 +13,7 @@ use crate::lists::{Kind, node};
 use crate::order::Siblings;
 use crate::space_config::{ALL_LAYOUTS, SpaceLayouts, hidden_columns, level_layouts};
 
-const COLUMNS: &str = "id, list_id, name, layout, columns, group_by, sort_by, sort_order, position, is_default, widths, wrap_titles, collapsed";
+const COLUMNS: &str = "id, list_id, name, layout, columns, group_by, sort_by, sort_order, position, is_default, widths, wrap_titles, collapsed, open_with";
 
 fn siblings(list_id: i64) -> Siblings<'static> {
     Siblings {
@@ -50,6 +51,9 @@ fn from_row(row: &Row) -> rusqlite::Result<View> {
             .get::<_, Option<String>>(12)?
             .and_then(|json| serde_json::from_str(&json).ok())
             .unwrap_or_default(),
+        open_with: row
+            .get::<_, Option<String>>(13)?
+            .and_then(|text| from_text(&text)),
     })
 }
 
@@ -140,6 +144,7 @@ fn copy_view(conn: &Connection, view: &View, list_id: i64, name: &str) -> AppRes
     write_widths(conn, id, &view.widths)?;
     write_collapsed(conn, id, &view.collapsed)?;
     write_wrap(conn, id, view.wrap_titles)?;
+    write_open_with(conn, id, view.open_with)?;
     Ok(id)
 }
 
@@ -180,14 +185,6 @@ fn write_sort(conn: &Connection, id: i64, sort: Sort) -> AppResult<()> {
     conn.execute(
         "UPDATE view SET sort_by = ?2, sort_order = ?3 WHERE id = ?1",
         params![id, to_text(sort.by), sort_order(sort.descending)],
-    )?;
-    Ok(())
-}
-
-fn write_wrap(conn: &Connection, id: i64, wrap: bool) -> AppResult<()> {
-    conn.execute(
-        "UPDATE view SET wrap_titles = ?2 WHERE id = ?1",
-        params![id, wrap],
     )?;
     Ok(())
 }
@@ -256,7 +253,7 @@ pub async fn view_create(db: &Db, list_id: i64, name: String, layout: Layout) ->
 }
 
 /// Errors with NotFound when the view doesn't exist.
-async fn edit<F>(db: &Db, id: i64, change: F) -> AppResult<View>
+pub(super) async fn edit<F>(db: &Db, id: i64, change: F) -> AppResult<View>
 where
     F: FnOnce(&Connection) -> AppResult<()> + Send + 'static,
 {
@@ -356,10 +353,6 @@ pub async fn view_set_widths(db: &Db, id: i64, widths: BTreeMap<String, i64>) ->
         .map(|(column, width)| (column, width.clamp(MIN_WIDTH, MAX_WIDTH)))
         .collect();
     edit(db, id, move |conn| write_widths(conn, id, &widths)).await
-}
-
-pub async fn view_set_wrap(db: &Db, id: i64, wrap: bool) -> AppResult<View> {
-    edit(db, id, move |conn| write_wrap(conn, id, wrap)).await
 }
 
 pub async fn view_move(db: &Db, id: i64, position: i64) -> AppResult<Vec<View>> {

@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 use crate::pins::PinDuration;
+use crate::views::IssueOpening;
 
 pub use connection::Connection;
 pub use store::{FILE_NAME as SETTINGS_FILE, SettingsStore};
@@ -38,6 +39,8 @@ pub struct Behaviour {
     pub seen_after_seconds: u8,
     /// What a new pin starts with.
     pub pin_default: PinDuration,
+    /// What a click on an issue opens in views that don't choose.
+    pub open_issues_in: IssueOpening,
 }
 
 impl Default for Behaviour {
@@ -45,6 +48,7 @@ impl Default for Behaviour {
         Self {
             seen_after_seconds: 2,
             pin_default: PinDuration::UntilUnpinned,
+            open_issues_in: IssueOpening::Preview,
         }
     }
 }

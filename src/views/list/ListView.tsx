@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { type CSSProperties, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { Column, Group, Narrowing, ViewData, ViewPlace } from "../../api";
+import type { Column, Group, IssueOpening, Narrowing, ViewData, ViewPlace } from "../../api";
 import { onIssueKeys } from "../../commands/issueKeys";
 import { EmptyLevel } from "../../shell/EmptyLevel";
 import { prefetchIssue } from "../../queries/issues";
@@ -15,6 +15,7 @@ import { canvasMeasure, columnWidths, fittingColumns, gridTemplate } from "./mea
 import { useElementWidth } from "./useElementWidth";
 import { useGroupHighlight } from "./useGroupHighlight";
 import { useGroupMotion } from "./useGroupMotion";
+import { useIssueOpening } from "../useIssueOpening";
 import { useIssueActions } from "./useIssueActions";
 import { useRowSizing } from "./useRowSizing";
 
@@ -24,14 +25,17 @@ interface Props {
   narrowing?: Narrowing;
   /** Whether long titles wrap instead of truncating. */
   wrapTitles?: boolean;
+  /** What a click opens; none follows Settings → General. */
+  openWith?: IssueOpening | null;
 }
 
 /** The List layout: each group a card under its tab, virtualised. */
-export function ListView({ listId, viewId, narrowing, wrapTitles = true }: Props) {
+export function ListView({ listId, viewId, narrowing, wrapTitles = true, openWith = null }: Props) {
   const { data } = useViewRows(listId, viewId, narrowing);
+  const opening = useIssueOpening(openWith);
   if (!data) return null;
   if (Object.keys(data.rows).length === 0) return <EmptyLevel listId={listId} viewId={viewId} />;
-  return <Rows key={`${listId}:${viewId}`} listId={listId} viewId={viewId} data={data} wrapTitles={wrapTitles} />;
+  return <Rows key={`${listId}:${viewId}`} listId={listId} viewId={viewId} data={data} wrapTitles={wrapTitles} opening={opening} />;
 }
 
 const measure = canvasMeasure();
@@ -48,7 +52,7 @@ function itemClass(item: Item): string {
 }
 
 /** Keyed by the view; its open groups, scroll, selection and peek come from the view's remembered place. */
-function Rows({ listId, viewId, data, wrapTitles }: { listId: number; viewId: number; data: ViewData; wrapTitles: boolean }) {
+function Rows({ listId, viewId, data, wrapTitles, opening }: { listId: number; viewId: number; data: ViewData; wrapTitles: boolean; opening: IssueOpening }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const placeKey = narrowingKey(listId, viewId);
   const loaded = useStore((s) => placeKey in s.places);
@@ -206,7 +210,10 @@ function Rows({ listId, viewId, data, wrapTitles }: { listId: number; viewId: nu
                   position={item.position}
                   wrap={wrapTitles}
                   selected={selected === item.row.id}
-                  onSelect={(id) => select(id, true)}
+                  onSelect={(id) => {
+                    select(id, opening === "preview");
+                    if (opening === "full") open(id);
+                  }}
                   actions={actions}
                 />
               )}

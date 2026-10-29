@@ -19,7 +19,7 @@ export interface IssueKeyHandlers {
   togglePin: () => void;
   /** M: the selected issue is marked read, or unread again when it is read. */
   toggleRead: () => void;
-  /** Space: opens or closes the selected issue's peek; absent where there is none, so Space scrolls. */
+  /** Space: opens or closes the selected issue's preview; absent where there is none, so Space scrolls. */
   togglePeek?: () => void;
   hasSelection: () => boolean;
   peekOpen: () => boolean;
@@ -46,14 +46,14 @@ export const ISSUE_KEY_COMMANDS: Command[] = [
   { id: "issue.previous.arrow", title: "Previous issue (arrow)", scope: "main", defaultBinding: "ArrowUp", when: () => handlers !== null, run: () => handlers?.move(-1) },
   { id: "group.collapse", title: "Collapse the issue's group", scope: "main", defaultBinding: "ArrowLeft", when: selected, run: () => handlers?.setGroupOpen(false) },
   { id: "group.expand", title: "Expand the issue's group", scope: "main", defaultBinding: "ArrowRight", when: selected, run: () => handlers?.setGroupOpen(true) },
-  { id: "peek.close", title: "Close the peek", scope: "main", defaultBinding: "Escape", when: () => (handlers?.peekOpen() ?? false) && !document.querySelector("[role=dialog]"), run: () => handlers?.closePeek() },
+  { id: "peek.close", title: "Close the preview", scope: "main", defaultBinding: "Escape", when: () => (handlers?.peekOpen() ?? false) && !document.querySelector("[role=dialog]"), run: () => handlers?.closePeek() },
   { id: "issue.copyKey", title: "Copy issue key", scope: "main", defaultBinding: "Mod+C", when: () => selected() && nothingElseToCopy(), run: () => handlers?.copyKey() },
   { id: "issue.copyUrl", title: "Copy issue URL", scope: "main", defaultBinding: "Mod+Shift+C", when: selected, run: () => handlers?.copyUrl() },
   { id: "issue.open", title: "Open the issue", scope: "main", defaultBinding: "Enter", when: () => selected() && handlers?.open !== undefined, run: () => handlers?.open?.() },
   { id: "issue.openEpic", title: "Open the issue's epic", scope: "main", defaultBinding: "E", when: selected, run: () => handlers?.openEpic() },
   { id: "issue.togglePin", title: "Bookmark the issue or remove its bookmark", scope: "main", defaultBinding: "P", when: selected, run: () => handlers?.togglePin() },
   { id: "issue.markSeen", title: "Mark the issue as read or unread", scope: "main", defaultBinding: "M", when: selected, run: () => handlers?.toggleRead() },
-  { id: "issue.togglePeek", title: "Open or close the peek", scope: "main", defaultBinding: "Space", when: () => selected() && handlers?.togglePeek !== undefined, run: () => handlers?.togglePeek?.() },
+  { id: "issue.togglePeek", title: "Open or close the preview", scope: "main", defaultBinding: "Space", when: () => selected() && handlers?.togglePeek !== undefined, run: () => handlers?.togglePeek?.() },
   {
     id: "issue.back",
     title: "Back from the Issue view",

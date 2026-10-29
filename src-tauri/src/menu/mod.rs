@@ -83,7 +83,7 @@ pub const LIST_SEEN: &[Item] = &[item(
 )];
 pub const ISSUE: &[Item] = &[
     plain("Open", "page:issue.open"),
-    plain("Open or Close Peek", "page:issue.togglePeek"),
+    plain("Open or Close Preview", "page:issue.togglePeek"),
     plain("Open Epic", "page:issue.openEpic"),
     item("Open in Jira", "page:issue.openInJira", "CmdOrCtrl+Enter"),
     plain("Copy Key", "page:issue.copyKey"),

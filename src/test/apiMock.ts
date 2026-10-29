@@ -122,6 +122,7 @@ export function createApiMock(): Api {
     viewSetSort: vi.fn(),
     viewSetWidths: vi.fn(),
     viewSetWrap: vi.fn(),
+    viewSetOpenWith: vi.fn(),
     viewSetColumnCollapsed: vi.fn(),
     viewMove: vi.fn(),
     viewDelete: vi.fn(),

@@ -13,6 +13,7 @@ export function view(patch: Partial<View> = {}): View {
     sort: { by: "updated", descending: true },
     widths: {},
     wrapTitles: true,
+    openWith: null,
     collapsed: {},
     position: 0,
     isDefault: false,

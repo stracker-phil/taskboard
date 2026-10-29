@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../../test/apiMock")).createApiMock() }));
 
-import { api, type Row, type ViewData, type ViewPlace } from "../../api";
+import { api, type IssueOpening, type Row, type ViewData, type ViewPlace } from "../../api";
 import { installCommands } from "../../commands";
 import { getCommand } from "../../commands/registry";
 import { createQueryClient } from "../../queries/queryClient";
@@ -14,6 +14,7 @@ import { ALEX, COLUMNS, groupOf, row, SAM, viewData } from "../../test/issues";
 import { connectionView } from "../../test/jira";
 import { startMotionTimers, stubMotion } from "../../test/motion";
 import { issueTarget, pinItem, pins } from "../../test/pins";
+import { settings } from "../../test/settings";
 import { sidebarTree, space } from "../../test/spaces";
 import { ListView } from "./ListView";
 
@@ -27,6 +28,7 @@ const place = () => useStore.getState().places["11:101"];
 beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
+  mocked.getSettings.mockResolvedValue(settings());
   mocked.sidebarTree.mockResolvedValue(sidebarTree([]));
   mocked.pinsList.mockResolvedValue(pins());
   mocked.columnsCatalogue.mockResolvedValue(COLUMNS);
@@ -44,15 +46,17 @@ afterEach(() => {
   spies.forEach((s) => s.mockRestore());
 });
 
-async function renderList(data: ViewData) {
+async function renderList(data: ViewData, openWith: IssueOpening | null = null) {
   mocked.viewRows.mockResolvedValue(data);
   render(
     <QueryClientProvider client={createQueryClient()}>
-      <ListView listId={11} viewId={101} />
+      <ListView listId={11} viewId={101} openWith={openWith} />
     </QueryClientProvider>,
   );
   await screen.findByRole("grid");
   await waitFor(() => expect(place()).toBeDefined());
+  await waitFor(() => expect(mocked.getSettings).toHaveBeenCalled());
+  await act(async () => {});
 }
 
 const OPEN = row({ id: "1", key: "NW-1042", summary: "Redesign the pricing page", commentCount: 3 });
@@ -160,6 +164,49 @@ describe("ListView", () => {
       await userEvent.click(await screen.findByText("Publish the launch notes"));
 
       expect(place()).toMatchObject({ selectedId: "2", peekOpen: true });
+    });
+  });
+
+  describe("opening an issue by click", () => {
+    const click = async () => userEvent.click(await screen.findByText("Publish the launch notes"));
+    const data = () => viewData([groupOf([OPEN, DONE])], [OPEN, DONE]);
+
+    it("selects the row, opens the preview and no Issue view when the view opens with the preview", async () => {
+      await renderList(data(), "preview");
+
+      await click();
+
+      expect(place()).toMatchObject({ selectedId: "2", peekOpen: true });
+      expect(useStore.getState().issueView).toBeNull();
+    });
+
+    it("selects the row without the preview and opens the Issue view over the view when the view opens in full", async () => {
+      await renderList(data(), "full");
+
+      await click();
+
+      expect(screen.getByRole("row", { name: /NW-1001/ })).toHaveAttribute("aria-selected", "true");
+      expect(place().peekOpen).toBe(false);
+      expect(useStore.getState().issueView).toEqual({ origin: { listId: 11, viewId: 101 }, stack: ["2"] });
+    });
+
+    it("follows the app setting when the view has no choice", async () => {
+      mocked.getSettings.mockResolvedValue(settings({ behaviour: { seenAfterSeconds: 2, pinDefault: "untilUnpinned", openIssuesIn: "full" } }));
+      await renderList(data());
+
+      await click();
+
+      expect(useStore.getState().issueView).toEqual({ origin: { listId: 11, viewId: 101 }, stack: ["2"] });
+    });
+
+    it("prefers the view's choice over the app setting", async () => {
+      mocked.getSettings.mockResolvedValue(settings({ behaviour: { seenAfterSeconds: 2, pinDefault: "untilUnpinned", openIssuesIn: "full" } }));
+      await renderList(data(), "preview");
+
+      await click();
+
+      expect(place()).toMatchObject({ selectedId: "2", peekOpen: true });
+      expect(useStore.getState().issueView).toBeNull();
     });
   });
 

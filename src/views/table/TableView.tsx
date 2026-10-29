@@ -2,6 +2,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Group, Narrowing, View, ViewData } from "../../api";
 import { useViewRows } from "../../queries/views";
+import { useStore } from "../../state/store";
 import { EmptyLevel } from "../../shell/EmptyLevel";
 import { flatten, itemKey, type Item } from "../list/flatten";
 import { GroupHeader } from "../list/GroupHeader";
@@ -10,6 +11,7 @@ import { nextSort } from "./sortable";
 import { TableHeader } from "./TableHeader";
 import { TableRow } from "./TableRow";
 import { useColumnResize } from "./useColumnResize";
+import { useIssueOpening } from "../useIssueOpening";
 import { useViewSettings } from "./useViewSettings";
 import { columnWidth, SUMMARY_MIN_WIDTH } from "./widths";
 
@@ -44,6 +46,14 @@ function Table({ view, data }: { view: View; data: ViewData }) {
   const { factors, animate } = useGroupMotion();
   const settings = useViewSettings(view);
   const resize = useColumnResize((id, width) => void settings.setWidth(id, width));
+  const opening = useIssueOpening(view.openWith);
+  const updatePlace = useStore((s) => s.updatePlace);
+  const openIssue = useStore((s) => s.openIssue);
+  const select = (id: string) => {
+    setSelected(id);
+    if (opening === "full") openIssue(id, { listId: view.listId, viewId: view.id });
+    else updatePlace(view.listId, view.id, { selectedId: id, peekOpen: true });
+  };
 
   const widthOf = (id: string) => resize.liveWidth(id) ?? columnWidth(id, view.widths);
   // The Table always has its own Status column; a view's Status column would repeat it.
@@ -115,7 +125,7 @@ function Table({ view, data }: { view: View; data: ViewData }) {
                     onToggle={() => toggle(item.group)}
                   />
                 ) : (
-                  <TableRow row={item.row} columns={columns} widthOf={widthOf} selected={selected === item.row.id} onSelect={setSelected} />
+                  <TableRow row={item.row} columns={columns} widthOf={widthOf} selected={selected === item.row.id} onSelect={select} />
                 )}
               </div>
             );

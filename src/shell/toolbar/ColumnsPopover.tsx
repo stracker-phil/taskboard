@@ -1,8 +1,10 @@
 import { Search } from "lucide-react";
 import { type RefObject, useState } from "react";
-import { api, type Column, type View } from "../../api";
+import { api, type Column, type IssueOpening, type View } from "../../api";
 import { Popover } from "../../components/Popover";
+import { SegmentedControl } from "../../components/SegmentedControl";
 import { Toggle } from "../../components/Toggle";
+import { useSettings } from "../../queries/settings";
 import { useColumnsCatalogue } from "../../queries/views";
 import { attempt } from "../../state/requests";
 import { useStore } from "../../state/store";
@@ -13,6 +15,10 @@ import { useViewEdit } from "./useViewEdit";
 const HINTS: Record<string, string> = { epic: "parent", release: "fix version" };
 /** The popover names the due column in full; the column header stays short. */
 const LABELS: Record<string, string> = { due: "Due date" };
+
+type Opening = IssueOpening | "default";
+const OPENINGS: Opening[] = ["default", "preview", "full"];
+const OPENING_NAMES: Record<IssueOpening, string> = { preview: "Preview", full: "Full view" };
 
 interface Props {
   view: View;
@@ -58,6 +64,7 @@ export function ColumnsPopover({ view, spaceProjectId, anchor, onClose }: Props)
         <span className="popover__title">Columns</span>
         <span className="popover__meta">View: {view.name}</span>
       </div>
+      {view.layout !== "board" && <OpenWith view={view} onChange={(openWith) => edit(api.viewSetOpenWith(view.id, openWith), "Could not change how issues open")} />}
       {view.layout === "list" && (
         <button
           type="button"
@@ -154,6 +161,24 @@ function Section({ columns, shown, onToggle, onReorder, reorderable, mono = fals
         );
       })}
       <DropLine y={dropLineY} />
+    </div>
+  );
+}
+
+/** What a click on an issue opens in this view; Default follows Settings → General. */
+function OpenWith({ view, onChange }: { view: View; onChange: (openWith: IssueOpening | null) => void }) {
+  const { data: settings } = useSettings();
+  const appDefault = OPENING_NAMES[settings?.behaviour.openIssuesIn ?? "preview"];
+  return (
+    <div className="columns-popover__open">
+      <span className="column-row__label">Open issues in</span>
+      <SegmentedControl<Opening>
+        label="Open issues in"
+        options={OPENINGS}
+        labels={{ default: `Default (${appDefault})`, ...OPENING_NAMES }}
+        value={view.openWith ?? "default"}
+        onChange={(choice) => onChange(choice === "default" ? null : choice)}
+      />
     </div>
   );
 }

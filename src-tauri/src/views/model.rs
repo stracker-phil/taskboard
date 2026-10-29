@@ -64,6 +64,18 @@ impl Default for Sort {
     }
 }
 
+/// What a click on an issue opens: the preview beside the view, or the full Issue view.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq, TS)]
+#[ts(export, export_to = "src/api/types.gen.ts")]
+#[serde(rename_all = "camelCase")]
+pub enum IssueOpening {
+    Full,
+    /// Also what an unknown value reads as.
+    #[default]
+    #[serde(other)]
+    Preview,
+}
+
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
 #[ts(export, export_to = "src/api/types.gen.ts")]
 #[serde(rename_all = "camelCase")]
@@ -85,6 +97,8 @@ pub struct View {
     /// A Board's columns the owner collapsed (true) or expanded (false), by status id; the rest use the
     /// default (Done collapsed).
     pub collapsed: BTreeMap<String, bool>,
+    /// What a click on an issue opens here; none follows Settings → General.
+    pub open_with: Option<IssueOpening>,
     pub position: i64,
     /// The tab a level opens with.
     pub is_default: bool,
@@ -100,4 +114,28 @@ pub fn to_text<T: Serialize>(value: T) -> String {
 
 pub fn from_text<T: for<'de> Deserialize<'de>>(text: &str) -> Option<T> {
     serde_json::from_value(serde_json::Value::String(text.to_string())).ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn an_issue_opening_reads_its_camel_case_name_and_an_unknown_one_as_preview() {
+        for (text, expected) in [
+            ("full", IssueOpening::Full),
+            ("preview", IssueOpening::Preview),
+            ("sidebar", IssueOpening::Preview),
+            ("", IssueOpening::Preview),
+        ] {
+            assert_eq!(from_text::<IssueOpening>(text), Some(expected), "{text:?}");
+        }
+    }
+
+    #[test]
+    fn an_issue_opening_is_stored_as_its_camel_case_name() {
+        assert_eq!(to_text(IssueOpening::Full), "full");
+        assert_eq!(to_text(IssueOpening::Preview), "preview");
+        assert_eq!(IssueOpening::default(), IssueOpening::Preview);
+    }
 }
