@@ -11,7 +11,7 @@ import { SpaceStatuses } from "./SpaceStatuses";
 
 const LAYOUTS: Layout[] = ["list", "board", "table"];
 const LAYOUT_NAMES: Record<Layout, string> = { list: "List", board: "Board", table: "Table" };
-const GROUPS: GroupBy[] = ["status", "assignee", "priority", "epic", "release", "due", "none"];
+const GROUPS: GroupBy[] = ["status", "statusType", "assignee", "priority", "epic", "release", "due", "none"];
 const VISIBILITY_NAMES: Record<FieldVisibility, string> = {
   visible: "Visible",
   hiddenInList: "Hidden in list",

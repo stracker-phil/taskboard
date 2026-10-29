@@ -12,7 +12,7 @@ describe("StatusPill", () => {
     expect(pill.childElementCount).toBe(0);
   });
 
-  it.each<Style>(["todo", "progress", "review", "blocked", "done"])("carries the %s style class", (style) => {
+  it.each<Style>(["backlog", "todo", "progress", "review", "blocked", "done"])("carries the %s style class", (style) => {
     render(<StatusPill style={style} name="Status" />);
 
     expect(screen.getByText("Status")).toHaveClass(`status-pill--${style}`);

@@ -1,6 +1,7 @@
 //! An issue as the peek shows it, on the demo site synced from the in-process fake Jira into a temp database.
 
 use std::sync::Arc;
+use std::sync::atomic::{AtomicI64, Ordering};
 
 use chrono::{DateTime, NaiveDate, Utc};
 use tempfile::TempDir;
@@ -45,6 +46,7 @@ struct Site {
     fake: FakeJira,
     _dir: TempDir,
     ctx: SyncContext,
+    clock_minutes: AtomicI64,
 }
 
 impl Site {
@@ -87,6 +89,7 @@ impl Site {
             fake,
             _dir: dir,
             ctx,
+            clock_minutes: AtomicI64::new(0),
         }
     }
 
@@ -146,11 +149,24 @@ impl Site {
             .unwrap()
     }
 
-    async fn try_sync_web_links(&self, key: &str) -> AppResult<bool> {
+    /// Syncs at `minutes` after the demo's now.
+    async fn try_sync_web_links_at(&self, key: &str, minutes: i64) -> AppResult<bool> {
         let id = self.id_of(key).await;
         let connection = self.ctx.settings.get().connection;
         let source = source_for(&self.ctx.access, &connection).unwrap();
-        issue_sync_web_links(self.db(), source.as_ref(), id).await
+        let now = viewer().now + chrono::Duration::minutes(minutes);
+        issue_sync_web_links(self.db(), source.as_ref(), id, now).await
+    }
+
+    /// Each call happens 6 minutes after the previous one, so none is answered from the freshness window.
+    async fn try_sync_web_links(&self, key: &str) -> AppResult<bool> {
+        let minutes = self.clock_minutes.fetch_add(6, Ordering::SeqCst);
+        self.try_sync_web_links_at(key, minutes).await
+    }
+
+    async fn web_link_fetches(&self, key: &str) -> usize {
+        let path = format!("/rest/api/3/issue/{}/remotelink", self.id_of(key).await);
+        self.fake.paths().iter().filter(|p| **p == path).count()
     }
 
     async fn sync_web_links(&self, key: &str) -> bool {
@@ -1061,6 +1077,66 @@ async fn changed_web_links_replace_the_cached_ones() {
 
 #[tokio::test]
 #[ignore = "syncs the demo site into a temp database"]
+async fn web_links_fetched_within_five_minutes_are_not_asked_for_again() {
+    let site = Site::new().await;
+    assert!(site.try_sync_web_links_at("NW-1042", 0).await.unwrap());
+    let before = site.web_links("NW-1042").await;
+    let fetches = site.web_link_fetches("NW-1042").await;
+    site.fake.set_remote_links("NW-1042", vec![]);
+
+    for minutes in [0, 1, 4] {
+        assert!(
+            !site
+                .try_sync_web_links_at("NW-1042", minutes)
+                .await
+                .unwrap(),
+            "{minutes} min"
+        );
+    }
+
+    assert_eq!(site.web_link_fetches("NW-1042").await, fetches);
+    assert_eq!(site.web_links("NW-1042").await, before);
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn web_links_are_fetched_again_after_five_minutes_and_show_the_new_ones() {
+    let site = Site::new().await;
+    assert!(site.try_sync_web_links_at("NW-1042", 0).await.unwrap());
+    let fetches = site.web_link_fetches("NW-1042").await;
+    site.fake.set_remote_links(
+        "NW-1042",
+        vec![remote_link(
+            70_010,
+            "https://gitlab.example.com/shop/store-api/-/merge_requests/58",
+            Some("Cart totals from the Store API"),
+        )],
+    );
+
+    assert!(site.try_sync_web_links_at("NW-1042", 5).await.unwrap());
+
+    assert_eq!(site.web_link_fetches("NW-1042").await, fetches + 1);
+    let links = site.web_links("NW-1042").await;
+    let ids: Vec<&str> = links.iter().map(|link| link.id.as_str()).collect();
+    assert_eq!(ids, ["70010"]);
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn a_failed_web_link_fetch_does_not_count_as_a_fetch() {
+    let site = Site::new().await;
+    site.fake.fail_next(1, 500, None);
+    assert!(site.try_sync_web_links_at("NW-1042", 0).await.is_err());
+    let fetches = site.web_link_fetches("NW-1042").await;
+
+    assert!(site.try_sync_web_links_at("NW-1042", 1).await.unwrap());
+
+    assert_eq!(site.web_link_fetches("NW-1042").await, fetches + 1);
+    assert_eq!(site.web_links("NW-1042").await.len(), 2);
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
 async fn web_links_removed_on_the_site_are_removed_from_the_cache() {
     let site = Site::new().await;
     assert!(site.sync_web_links("NW-1042").await);
@@ -1108,7 +1184,7 @@ async fn web_links_of_an_unknown_issue_are_not_fetched() {
     let source = source_for(&site.ctx.access, &connection).unwrap();
     let fetches_before = site.fake.paths().len();
 
-    let changed = issue_sync_web_links(site.db(), source.as_ref(), "99999999".into())
+    let changed = issue_sync_web_links(site.db(), source.as_ref(), "99999999".into(), viewer().now)
         .await
         .unwrap();
 

@@ -3,6 +3,7 @@
   display: flex; align-items: flex-start; gap: 12px; height: 100%; min-height: 0; box-sizing: border-box; overflow: auto;
   padding: 6px 20px 20px 24px; border-top: 1px solid var(--hairline);
 }
+.board--backlog { --column-tint: var(--status-backlog-tint); --column-count: var(--status-backlog-count); }
 .board--todo { --column-tint: var(--status-todo-tint); --column-count: var(--status-todo-count); }
 .board--progress { --column-tint: var(--status-progress-tint); --column-count: var(--status-progress-count); }
 .board--review { --column-tint: var(--status-review-tint); --column-count: var(--status-review-count); }

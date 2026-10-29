@@ -18,7 +18,7 @@ describe("groupMenu", () => {
     const { menu } = build("epic");
 
     const groupings = menu.filter((e) => e.text !== "Sort by");
-    expect(groupings.map((e) => e.text)).toEqual(["Status", "Space", "Client", "Assignee", "Epic", "Release", "Priority", "Due date", "None"]);
+    expect(groupings.map((e) => e.text)).toEqual(["Status", "Status type", "Space", "Client", "Assignee", "Epic", "Release", "Priority", "Due date", "None"]);
     expect(groupings.filter((e) => e.checked).map((e) => e.text)).toEqual(["Epic"]);
   });
 

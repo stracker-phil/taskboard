@@ -135,6 +135,18 @@ describe("SpaceSettings", () => {
       expect(await screen.findByRole("button", { name: "Grouping of new views" })).toHaveTextContent("Assignee");
     });
 
+    it("offers Status type right after Status in the grouping menu and saves it", async () => {
+      mocked.spaceSetLayouts.mockResolvedValue(spaceConfig({ layouts: layouts({ defaultGroup: "statusType" }) }));
+      await renderSettings();
+
+      await userEvent.click(screen.getByRole("button", { name: "Grouping of new views" }));
+      expect(lastMenu().map((e) => e.text).slice(0, 2)).toEqual(["Status", "Status type"]);
+      await runEntry("Status type");
+
+      expect(mocked.spaceSetLayouts).toHaveBeenCalledWith("10001", layouts({ defaultGroup: "statusType" }));
+      expect(await screen.findByRole("button", { name: "Grouping of new views" })).toHaveTextContent("Status type");
+    });
+
     it("shows an error toast when the layouts cannot be saved", async () => {
       mocked.spaceSetLayouts.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
       await renderSettings();

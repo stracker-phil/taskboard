@@ -60,7 +60,7 @@ key: string, name: string,
  */
 mark: GroupMark | null, 
 /**
- * The column's tint: its status's style, or To do's neutral one for any other grouping.
+ * The column's tint: its status's style (or status type's), else To do's neutral one.
  */
 style: Style, 
 /**
@@ -186,7 +186,7 @@ export type FilterOptions = { fields: Array<FilterField>, statuses: Array<Choice
 
 export type Group = { key: string, label: string, mark: GroupMark | null, count: number, collapsedByDefault: boolean, rowIds: Array<string>, };
 
-export type GroupBy = "status" | "project" | "client" | "assignee" | "epic" | "release" | "priority" | "due" | "none";
+export type GroupBy = "status" | "statusType" | "project" | "client" | "assignee" | "epic" | "release" | "priority" | "due" | "none";
 
 /**
  * What the group header draws before its label.
@@ -584,7 +584,7 @@ issues: number, };
 /**
  * Stored as its name; the `--status-{style}-*` tokens draw it. Ordered as the list's status groups.
  */
-export type Style = "progress" | "review" | "blocked" | "todo" | "done";
+export type Style = "progress" | "review" | "blocked" | "todo" | "backlog" | "done";
 
 export type SyncOverview = { state: SyncState, lastFullAt: string | null, projects: Array<ProjectCounts>, };
 

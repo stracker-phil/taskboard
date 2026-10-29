@@ -104,15 +104,17 @@ padding, 2px gap, a `--hairline` bottom line.
 
 ## Status language
 
-One language for every Jira status (`src-tauri/src/status_style/`): five styles, To do, In progress, In
-review, Blocked and Done. Jira's category decides To do (`new`) and Done (`done`); otherwise a name containing
-"review" is In review, one containing "block" is Blocked, everything else In progress. A Space's settings
+One language for every Jira status (`src-tauri/src/status_style/`): six styles (status types), Backlog,
+To do, In progress, In review, Blocked and Done. Jira's category decides To do (`new`; Backlog when the name
+contains "backlog") and Done (`done`); otherwise a name containing "review" is In review, one containing
+"block" is Blocked, everything else In progress. The Group menu and the Columns popover also offer Status type:
+one group, Board column or pill per style, whatever the status is called; the Board orders them Backlog first. A Space's settings
 (Settings → Spaces → the Space → Statuses) override it per status for that Space only.
 
 - **StatusSquare** (`components/issue/StatusSquare.tsx`): the only status marker, a filled 10 × 10 square,
-  radius 3, in `--status-*-square` (To do grey). No rings or outlines anywhere.
+  radius 3, in `--status-*-square` (To do grey, Backlog lighter). No rings or outlines anywhere.
 - **StatusPill**: caps, text only, symmetric padding, `--status-*-bg/fg/border`. Variants: default (26 high,
-  12/700, 7 radius, 1px border), `peek` (24, 11/700, no border), `activity` (20, 10/700), `tab` (the List's
+  12/700, 7 radius, 1px border, dashed for Backlog), `peek` (24, 11/700, no border), `activity` (20, 10/700), `tab` (the List's
   group tab: 30, 0.04em, top corners 8, all corners when closed; To do uses `--status-todo-tab-*`).
 - **EpicChip** (22, 12/500, `--epic-N-*`): Jira's epic colour (`ghx-label-N`) maps to the
   nearest of the five tints; an epic without one gets a tint from its id.
@@ -451,7 +453,7 @@ no separate Settings design; owner, 2026-10-28). Its colours are the `--settings
     its views offer (one stays on), the default layout of new views and their grouping. *Statuses*: only the
     statuses this Space's issues are in, under a section per Jira category, with a search field; a row: the pill,
     "N issues", and a button (the style's square and "Automatic · X" or the style's name) with a native menu of
-    Automatic and the five styles. *Custom fields*: a row per field with a menu of Visible, Hidden in list (no
+    Automatic and the six styles. *Custom fields*: a row per field with a menu of Visible, Hidden in list (no
     column choice), Hidden in detail (not in the Issue view) and Hidden everywhere. Each field
     saves on its own with Rust's field error under it. "Track projects under Projects to get Spaces." when none
     is tracked. The sidebar's "Colour and icon…" and "Client label…" items open `SpacePopover` (300px, 12px

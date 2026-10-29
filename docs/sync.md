@@ -52,8 +52,8 @@ row `gone`), which takes it out of every list at once. Issues gone for more than
 comments, changes and seen rows. Runs after every full sync and hourly.
 
 **Detail**: opening an issue fetches its comments when the cached ones are older than the issue
-(`issues::issue_sync_comments`), and always its web links (`issues::issue_sync_web_links`, `Source::remote_links`):
-they replace the cached ones; a failure is logged and the cached links stay.
+(`issues::issue_sync_comments`), and its web links unless fetched in the last 5 minutes (`issues::issue_sync_web_links`,
+`Source::remote_links`): they replace the cached ones; a failure is logged and the cached links stay.
 
 ## Schedule
 

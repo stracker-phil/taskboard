@@ -1,4 +1,4 @@
-//! One status language: every Jira status shows in one of five styles, detected from its category and
+//! One status language: every Jira status shows in one of six styles (status types), detected from its category and
 //! name unless the owner picked one (`status_style`).
 
 pub mod commands;
@@ -23,13 +23,30 @@ pub enum Style {
     Review,
     Blocked,
     Todo,
+    Backlog,
     Done,
 }
 
-/// Jira's category decides To do and Done; the name tells review and blocked apart from in progress.
+impl Style {
+    /// The status type's name, as the Status type group and column show it.
+    pub fn name(self) -> &'static str {
+        match self {
+            Style::Backlog => "Backlog",
+            Style::Todo => "To do",
+            Style::Progress => "In progress",
+            Style::Review => "In review",
+            Style::Blocked => "Blocked",
+            Style::Done => "Done",
+        }
+    }
+}
+
+/// Jira's category decides To do and Done; the name tells backlog apart from to do, and review and blocked
+/// apart from in progress.
 pub fn detect(category: &str, name: &str) -> Style {
     let name = name.to_lowercase();
     match category {
+        "new" if name.contains("backlog") => Style::Backlog,
         "new" => Style::Todo,
         "done" => Style::Done,
         _ if name.contains("review") => Style::Review,
@@ -168,6 +185,10 @@ mod tests {
         for (category, name, expected) in [
             ("new", "To Do", Style::Todo),
             ("new", "Blocked", Style::Todo),
+            ("new", "Backlog", Style::Backlog),
+            ("new", "Product BACKLOG", Style::Backlog),
+            ("indeterminate", "Backlog", Style::Progress),
+            ("done", "Backlog", Style::Done),
             ("done", "Done", Style::Done),
             ("done", "Done review", Style::Done),
             ("indeterminate", "In Review", Style::Review),
@@ -185,6 +206,7 @@ mod tests {
     fn styles_rank_in_the_lists_group_order() {
         let mut styles = [
             Style::Done,
+            Style::Backlog,
             Style::Todo,
             Style::Blocked,
             Style::Review,
@@ -198,9 +220,24 @@ mod tests {
                 Style::Review,
                 Style::Blocked,
                 Style::Todo,
+                Style::Backlog,
                 Style::Done
             ]
         );
+    }
+
+    #[test]
+    fn each_style_has_a_readable_name() {
+        for (style, expected) in [
+            (Style::Backlog, "Backlog"),
+            (Style::Todo, "To do"),
+            (Style::Progress, "In progress"),
+            (Style::Review, "In review"),
+            (Style::Blocked, "Blocked"),
+            (Style::Done, "Done"),
+        ] {
+            assert_eq!(style.name(), expected, "{style:?}");
+        }
     }
 
     #[test]

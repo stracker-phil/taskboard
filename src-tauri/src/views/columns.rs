@@ -10,8 +10,9 @@ use crate::filter::RELEVANT_FIELD;
 use crate::space_config::hidden_columns;
 
 /// Standard column ids with their names, in the Columns popover's order.
-const STANDARD: [(&str, &str); 8] = [
+const STANDARD: [(&str, &str); 9] = [
     ("status", "Status"),
+    ("statusType", "Status type"),
     ("assignee", "Assignee"),
     ("epic", "Epic"),
     ("release", "Release"),
@@ -155,10 +156,22 @@ mod tests {
         assert_eq!(
             ids,
             [
-                "status", "assignee", "epic", "release", "priority", "labels", "sprint", "due",
-                BETA, ZONE
+                "status",
+                "statusType",
+                "assignee",
+                "epic",
+                "release",
+                "priority",
+                "labels",
+                "sprint",
+                "due",
+                BETA,
+                ZONE
             ]
         );
+        let status_type = columns.iter().find(|c| c.id == "statusType").unwrap();
+        assert_eq!(status_type.name, "Status type");
+        assert!(!status_type.custom);
     }
 
     #[tokio::test]

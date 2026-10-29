@@ -5,16 +5,9 @@ import { api, type StatusStyleRow, type Style } from "../../../api";
 import { STATUS_STYLES_KEY, useStatusStyles } from "../../../queries/views";
 import { fail } from "../../../state/store";
 import { StatusPill } from "../../issue/StatusPill";
+import { STYLE_NAMES, STYLE_ORDER } from "../../issue/styleNames";
 import { Group } from "../controls";
 
-const STYLE_NAMES: Record<Style, string> = {
-  todo: "To do",
-  progress: "In progress",
-  review: "In review",
-  blocked: "Blocked",
-  done: "Done",
-};
-const STYLE_ORDER = Object.keys(STYLE_NAMES) as Style[];
 const CATEGORY_NAMES: Record<string, string> = { new: "To do", indeterminate: "In progress", done: "Done" };
 const CATEGORY_ORDER = ["new", "indeterminate", "done"];
 

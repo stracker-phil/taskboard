@@ -57,5 +57,5 @@ pub async fn issue_web_links(state: State<'_, AppState>, id: String) -> AppResul
 pub async fn issue_sync_web_links(state: State<'_, AppState>, id: String) -> AppResult<bool> {
     let connection = state.settings.get().connection;
     let source = crate::sync::source_for(&state.jira, &connection)?;
-    super::issue_sync_web_links(&state.db, source.as_ref(), id).await
+    super::issue_sync_web_links(&state.db, source.as_ref(), id, chrono::Utc::now()).await
 }

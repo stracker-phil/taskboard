@@ -6,7 +6,7 @@ use chrono::{Datelike, Duration, NaiveDate};
 use serde::Serialize;
 use ts_rs::TS;
 
-use super::model::GroupBy;
+use super::model::{GroupBy, to_text};
 use super::rows::{Person, Row};
 use crate::status_style::Style;
 
@@ -113,6 +113,12 @@ fn slot_of(row: &Row, facts: &Facts, by: GroupBy, lookup: &Lookup) -> (Order, Gr
             &row.status_name,
             Some(GroupMark::Status { style: row.style }),
             (row.style as i64, row.status_name.to_lowercase()),
+        ),
+        GroupBy::StatusType => slot(
+            &to_text(row.style),
+            row.style.name(),
+            Some(GroupMark::Status { style: row.style }),
+            (row.style as i64, String::new()),
         ),
         GroupBy::Project => match lookup.spaces.get(&facts.project_id) {
             Some(space) => slot(
@@ -382,6 +388,52 @@ mod tests {
             })
         );
         assert_eq!(groups[0].key, "in progress");
+    }
+
+    #[test]
+    fn status_type_groups_merge_statuses_of_one_style_in_the_style_order() {
+        let rows = [
+            with_status("1", Style::Done, "Done"),
+            with_status("2", Style::Backlog, "Backlog"),
+            with_status("3", Style::Progress, "In Progress"),
+            with_status("4", Style::Progress, "Testing"),
+            with_status("5", Style::Todo, "To Do"),
+            with_status("6", Style::Review, "In Review"),
+            with_status("7", Style::Blocked, "Blocked"),
+            with_status("8", Style::Backlog, "Icebox backlog"),
+        ];
+        let groups = run(&rows, GroupBy::StatusType);
+
+        assert_eq!(
+            labels(&groups),
+            [
+                "In progress",
+                "In review",
+                "Blocked",
+                "To do",
+                "Backlog",
+                "Done"
+            ]
+        );
+        assert_eq!(
+            groups.iter().map(|g| g.key.as_str()).collect::<Vec<_>>(),
+            ["progress", "review", "blocked", "todo", "backlog", "done"]
+        );
+        assert_eq!(groups[0].row_ids, ["3", "4"]);
+        assert_eq!(groups[4].row_ids, ["2", "8"]);
+        assert_eq!(
+            groups[4].mark,
+            Some(GroupMark::Status {
+                style: Style::Backlog
+            })
+        );
+        assert_eq!(
+            groups
+                .iter()
+                .map(|g| g.collapsed_by_default)
+                .collect::<Vec<_>>(),
+            [false, false, false, false, false, true]
+        );
     }
 
     #[test]

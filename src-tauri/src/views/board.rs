@@ -1,6 +1,6 @@
 //! The Board layout: one column per group of the view's grouping. By status (the default, also for an
-//! ungrouped view) the columns follow the Board artboard's style order; any other grouping orders them as the
-//! List does.
+//! ungrouped view) or status type the columns follow the Board artboard's style order; any other grouping
+//! orders them as the List does.
 
 use std::collections::HashMap;
 
@@ -36,7 +36,7 @@ pub struct BoardColumn {
     pub name: String,
     /// What the header draws before the name; a status shows as its pill.
     pub mark: Option<GroupMark>,
-    /// The column's tint: its status's style, or To do's neutral one for any other grouping.
+    /// The column's tint: its status's style (or status type's), else To do's neutral one.
     pub style: Style,
     /// Shown as a 48px strip.
     pub collapsed: bool,
@@ -44,14 +44,16 @@ pub struct BoardColumn {
     pub ids: Vec<String>,
 }
 
-/// To do, In progress, Blocked, In review, Done: the Board artboard's order (the List groups differently).
+/// Backlog, To do, In progress, Blocked, In review, Done: the Board artboard's order (the List groups
+/// differently).
 fn style_rank(style: Style) -> u8 {
     match style {
-        Style::Todo => 0,
-        Style::Progress => 1,
-        Style::Blocked => 2,
-        Style::Review => 3,
-        Style::Done => 4,
+        Style::Backlog => 0,
+        Style::Todo => 1,
+        Style::Progress => 2,
+        Style::Blocked => 3,
+        Style::Review => 4,
+        Style::Done => 5,
     }
 }
 
@@ -114,7 +116,7 @@ pub async fn view_board(
                     spaces: &spaces(conn)?,
                     versions: &versions,
                 };
-                group(&items, by, &lookup)
+                let mut columns: Vec<BoardColumn> = group(&items, by, &lookup)
                     .into_iter()
                     .map(|g| BoardColumn {
                         collapsed: view
@@ -122,13 +124,20 @@ pub async fn view_board(
                             .get(&g.key)
                             .copied()
                             .unwrap_or(g.collapsed_by_default),
+                        style: match g.mark {
+                            Some(GroupMark::Status { style }) => style,
+                            _ => Style::Todo,
+                        },
                         key: g.key,
                         name: g.label,
                         mark: g.mark,
-                        style: Style::Todo,
                         ids: g.row_ids,
                     })
-                    .collect()
+                    .collect();
+                if by == GroupBy::StatusType {
+                    columns.sort_by_key(|c| style_rank(c.style));
+                }
+                columns
             }
         };
         Ok(BoardData {

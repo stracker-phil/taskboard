@@ -144,6 +144,28 @@ describe("BoardView", () => {
     });
   });
 
+  describe("columns by status type", () => {
+    const BACKLOG = boardColumn({ key: "backlog", name: "Backlog", style: "backlog", mark: { kind: "status", style: "backlog" } });
+    const IN_PROGRESS = boardColumn({ key: "progress", name: "In progress", style: "progress", ids: ["1"] });
+
+    it("renders each column with the pill and the board class of its status type", async () => {
+      await renderBoard(boardData([BACKLOG, IN_PROGRESS], [PRICING]));
+
+      const backlog = screen.getByRole("listitem", { name: "Backlog" });
+      expect(backlog).toHaveClass("board--backlog");
+      expect(within(backlog).getByText("Backlog", { selector: ".status-pill" })).toHaveClass("status-pill--backlog");
+      const progress = screen.getByRole("listitem", { name: "In progress" });
+      expect(progress).toHaveClass("board--progress");
+      expect(within(progress).getByText("Redesign the pricing page")).toBeInTheDocument();
+    });
+
+    it("gives a collapsed column's strip the board class of its status type", async () => {
+      await renderBoard(boardData([{ ...BACKLOG, collapsed: true }]));
+
+      expect(screen.getByRole("button", { name: "Expand Backlog (0)" })).toHaveClass("board--backlog");
+    });
+  });
+
   describe("columns of another grouping", () => {
     const ALEX_COLUMN = boardColumn({ key: "demo-account-1", name: "Alex Morgan", mark: { kind: "person", person: ALEX }, ids: ["1"] });
     const SAM_COLUMN = boardColumn({ key: "demo-account-2", name: "Sam Lee", mark: { kind: "person", person: SAM }, ids: ["2"] });

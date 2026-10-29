@@ -2,6 +2,7 @@ import type { GroupBy, MenuEntry, Sort, SortBy } from "../../api";
 
 export const GROUP_NAMES: Record<GroupBy, string> = {
   status: "Status",
+  statusType: "Status type",
   project: "Space",
   client: "Client",
   assignee: "Assignee",

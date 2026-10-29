@@ -923,11 +923,12 @@ mod board {
 
     fn rank(style: Style) -> u8 {
         match style {
-            Style::Todo => 0,
-            Style::Progress => 1,
-            Style::Blocked => 2,
-            Style::Review => 3,
-            Style::Done => 4,
+            Style::Backlog => 0,
+            Style::Todo => 1,
+            Style::Progress => 2,
+            Style::Blocked => 3,
+            Style::Review => 4,
+            Style::Done => 5,
         }
     }
 
@@ -1265,6 +1266,69 @@ mod board {
 
     #[tokio::test]
     #[ignore = "syncs the demo site into a temp database"]
+    async fn grouping_by_status_type_gives_one_column_per_style_in_the_board_order() {
+        let site = Site::new().await;
+        let (space, view) = site.nw().await;
+        view_set_group(site.db(), view, GroupBy::StatusType)
+            .await
+            .unwrap();
+
+        let board = site.board(space, view, Narrowing::default()).await;
+
+        let styles: Vec<Style> = board.columns.iter().map(|c| c.style).collect();
+        let mut ordered = styles.clone();
+        ordered.sort_by_key(|style| rank(*style));
+        ordered.dedup();
+        assert_eq!(styles, ordered);
+        for column in &board.columns {
+            assert_eq!(column.name, column.style.name());
+            assert_eq!(
+                column.mark,
+                Some(GroupMark::Status {
+                    style: column.style
+                })
+            );
+            assert_eq!(
+                serde_json::to_value(column.style).unwrap(),
+                serde_json::json!(column.key)
+            );
+            assert_eq!(column.collapsed, column.style == Style::Done);
+            for id in &column.ids {
+                assert_eq!(board.rows[id].style, column.style);
+            }
+        }
+        assert_eq!(shown(&board), board.rows.len());
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn a_list_grouped_by_status_type_has_one_group_per_style_in_the_list_order() {
+        let site = Site::new().await;
+        let (space, view) = site.nw().await;
+        view_set_group(site.db(), view, GroupBy::StatusType)
+            .await
+            .unwrap();
+
+        let data = site.data(space, view, Narrowing::default()).await;
+
+        let styles: Vec<Style> = data
+            .groups
+            .iter()
+            .map(|g| style_of(g).expect("a status mark"))
+            .collect();
+        let mut ordered = styles.clone();
+        ordered.sort();
+        ordered.dedup();
+        assert_eq!(styles, ordered);
+        for group in &data.groups {
+            let style = style_of(group).unwrap();
+            assert_eq!(group.label, style.name());
+            assert_eq!(group.collapsed_by_default, style == Style::Done);
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
     async fn grouping_by_priority_gives_one_column_per_level() {
         let site = Site::new().await;
         let (space, view) = site.nw().await;
@@ -1342,13 +1406,22 @@ mod catalogue {
 
         let ids: Vec<&str> = columns.iter().map(|c| c.id.as_str()).collect();
         assert_eq!(
-            ids[..8],
+            ids[..9],
             [
-                "status", "assignee", "epic", "release", "priority", "labels", "sprint", "due"
+                "status",
+                "statusType",
+                "assignee",
+                "epic",
+                "release",
+                "priority",
+                "labels",
+                "sprint",
+                "due"
             ]
         );
-        assert!(columns[..8].iter().all(|c| !c.custom));
-        assert!(columns[8..].iter().all(|c| c.custom));
+        assert_eq!(columns[1].name, "Status type");
+        assert!(columns[..9].iter().all(|c| !c.custom));
+        assert!(columns[9..].iter().all(|c| c.custom));
         let reviewer = columns.iter().find(|c| c.id == REVIEWER).unwrap();
         assert_eq!(reviewer.name, "Reviewer");
         assert!(reviewer.custom);

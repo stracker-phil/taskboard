@@ -120,7 +120,7 @@ describe("SpaceStatuses", () => {
     });
   });
 
-  it("offers Automatic with the detected style, then the five styles", async () => {
+  it("offers Automatic with the detected style, then the six styles starting with Backlog", async () => {
     await renderStatuses([IN_REVIEW]);
 
     await userEvent.click(await screen.findByRole("button", { name: "Style of Code Review" }));
@@ -128,6 +128,7 @@ describe("SpaceStatuses", () => {
     expect(lastMenu().map((e) => (e === "separator" ? e : e.text))).toEqual([
       "Automatic (In review)",
       "separator",
+      "Backlog",
       "To do",
       "In progress",
       "In review",

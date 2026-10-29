@@ -56,7 +56,13 @@
   --changed-chip-text: #a8c6ff;
   --changed-dot: #60a5fa;
 
-  /* Status styles: pill fill, pill text, pill border, row square, board tint, board count; To do has its own List tab */
+  /* Status styles: pill fill, pill text, pill border, row square, board tint, board count; To do has its own List tab, Backlog a dashed border */
+  --status-backlog-bg: #26262a;
+  --status-backlog-fg: #a1a1aa;
+  --status-backlog-border: #4a4a52;
+  --status-backlog-square: #5a5a63;
+  --status-backlog-tint: #222226;
+  --status-backlog-count: #8a8a93;
   --status-todo-bg: #34343a;
   --status-todo-fg: #d4d4d8;
   --status-todo-border: #44444b;

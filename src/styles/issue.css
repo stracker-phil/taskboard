@@ -1,5 +1,6 @@
 /* The status language and the small parts of an issue (docs/ux.md → Status language). */
 .status-square { display: inline-block; flex: none; width: 10px; height: 10px; border-radius: 3px; }
+.status-square--backlog { background: var(--status-backlog-square); }
 .status-square--todo { background: var(--status-todo-square); }
 .status-square--progress { background: var(--status-progress-square); }
 .status-square--review { background: var(--status-review-square); }
@@ -15,12 +16,14 @@
 .status-pill--activity { height: 20px; font-size: 10px; }
 .status-pill--tab { height: 30px; padding: 0 12px; border: 0; border-radius: 8px 8px 0 0; letter-spacing: 0.04em; }
 .status-pill--tab.status-pill--closed { border-radius: 8px; }
+.status-pill--backlog { background: var(--status-backlog-bg); color: var(--status-backlog-fg); border-color: var(--status-backlog-border); border-style: dashed; }
 .status-pill--todo { background: var(--status-todo-bg); color: var(--status-todo-fg); border-color: var(--status-todo-border); }
 .status-pill--progress { background: var(--status-progress-bg); color: var(--status-progress-fg); border-color: var(--status-progress-border); }
 .status-pill--review { background: var(--status-review-bg); color: var(--status-review-fg); border-color: var(--status-review-border); }
 .status-pill--blocked { background: var(--status-blocked-bg); color: var(--status-blocked-fg); border-color: var(--status-blocked-border); }
 .status-pill--done { background: var(--status-done-bg); color: var(--status-done-fg); border-color: var(--status-done-border); }
-.status-pill--tab.status-pill--todo { background: var(--status-todo-tab-bg); color: var(--status-todo-tab-fg); }
+.status-pill--tab.status-pill--backlog { background: var(--status-backlog-bg); color: var(--status-backlog-fg); border-color: var(--status-backlog-border); border-style: dashed; }
+.status-pill--todo { background: var(--status-todo-tab-bg); color: var(--status-todo-tab-fg); }
 
 .epic-chip {
   display: inline-flex; align-items: center; max-width: 100%; height: 22px; padding: 0 8px; box-sizing: border-box; overflow: hidden;

@@ -4,7 +4,7 @@ import type { Style } from "../../api";
 import { StatusSquare } from "./StatusSquare";
 
 describe("StatusSquare", () => {
-  it.each<Style>(["todo", "progress", "review", "blocked", "done"])("renders one marker with the %s style class", (style) => {
+  it.each<Style>(["backlog", "todo", "progress", "review", "blocked", "done"])("renders one marker with the %s style class", (style) => {
     const { container } = render(<StatusSquare style={style} />);
 
     expect(container.children).toHaveLength(1);

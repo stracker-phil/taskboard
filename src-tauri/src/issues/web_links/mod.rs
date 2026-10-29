@@ -1,8 +1,9 @@
-//! An issue's web links (Jira's remote links: pull requests, documents): fetched when the issue is opened,
-//! cached in `cache.remote_link`, shown in the Issue view and the peek.
+//! An issue's web links (Jira's remote links: pull requests, documents): fetched when the issue is opened, at
+//! most once per `FRESH_FOR`, cached in `cache.remote_link`, shown in the Issue view and the peek.
 
 mod classify;
 
+use chrono::{DateTime, Duration, Utc};
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::Serialize;
 use ts_rs::TS;
@@ -30,17 +31,28 @@ pub struct WebLink {
     pub openable: bool,
 }
 
+/// How long fetched links count as current: moving through issues doesn't ask the tracker for each again.
+pub const FRESH_FOR: Duration = Duration::minutes(5);
+
 /// The cached web links, in the tracker's order.
 pub async fn issue_web_links(db: &Db, id: String) -> AppResult<Vec<WebLink>> {
     db.read(move |conn| cached(conn, &id)).await
 }
 
-/// Fetches the issue's web links and replaces the cached ones. Returns whether they changed; the cache emits
-/// `issues_changed` for the issue when they did. On a failure the cached links stay.
-pub async fn issue_sync_web_links(db: &Db, source: &dyn Source, id: String) -> AppResult<bool> {
+/// Fetches the issue's web links and replaces the cached ones, unless they were fetched within `FRESH_FOR` of
+/// `now`. Returns whether they changed; the cache emits `issues_changed` for the issue when they did. On a
+/// failure the cached links stay.
+pub async fn issue_sync_web_links(
+    db: &Db,
+    source: &dyn Source,
+    id: String,
+    now: DateTime<Utc>,
+) -> AppResult<bool> {
     let lookup = id.clone();
-    let known = db.read(move |conn| is_cached(conn, &lookup)).await?;
-    if !known {
+    let Some(synced_at) = db.read(move |conn| last_synced(conn, &lookup)).await? else {
+        return Ok(false);
+    };
+    if synced_at.is_some_and(|at| now - at < FRESH_FOR) {
         return Ok(false);
     }
     let links = match source.remote_links(&id).await {
@@ -53,6 +65,10 @@ pub async fn issue_sync_web_links(db: &Db, source: &dyn Source, id: String) -> A
     let source_name = source.kind().as_str();
     db.write(move |tx, changes| {
         let changed = store(tx, &id, &links, source_name)?;
+        tx.execute(
+            "UPDATE cache.issue SET links_synced_at = ?2 WHERE id = ?1",
+            params![id, now.to_rfc3339()],
+        )?;
         if changed {
             changes.issue_changed(&id);
         }
@@ -61,15 +77,19 @@ pub async fn issue_sync_web_links(db: &Db, source: &dyn Source, id: String) -> A
     .await
 }
 
-fn is_cached(conn: &Connection, id: &str) -> AppResult<bool> {
-    Ok(conn
+/// None when the issue isn't cached (or is gone); else when its links were last fetched, if ever.
+fn last_synced(conn: &Connection, id: &str) -> AppResult<Option<Option<DateTime<Utc>>>> {
+    let at: Option<Option<String>> = conn
         .query_row(
-            "SELECT 1 FROM cache.issue WHERE id = ?1 AND gone = 0",
+            "SELECT links_synced_at FROM cache.issue WHERE id = ?1 AND gone = 0",
             [id],
-            |_| Ok(()),
+            |row| row.get(0),
         )
-        .optional()?
-        .is_some())
+        .optional()?;
+    Ok(at.map(|at| {
+        at.and_then(|at| DateTime::parse_from_rfc3339(&at).ok())
+            .map(|at| at.with_timezone(&Utc))
+    }))
 }
 
 /// One stored row: what the tracker said, before it is classified for display.

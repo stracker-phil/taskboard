@@ -479,6 +479,17 @@ describe("ListView", () => {
       expect(issue.querySelector(".status-square")).not.toBeNull();
     });
 
+    it("shows the status type's name as a pill when the view has the Status type column", async () => {
+      const inReview = row({ id: "5", key: "NW-1005", summary: "Check the footer links", style: "review", statusName: "Code review" });
+      mocked.columnsCatalogue.mockResolvedValue([...COLUMNS, { id: "statusType", name: "Status type", custom: false }]);
+      await renderList(viewData([groupOf([inReview])], [inReview], { columns: ["statusType"], groupBy: "none" }));
+
+      expect(await screen.findByRole("columnheader", { name: "Status type" })).toBeInTheDocument();
+      const issue = screen.getByRole("row", { name: /NW-1005/ });
+      expect(within(issue).getByText("In review")).toHaveClass("status-pill", "status-pill--review");
+      expect(within(issue).queryByText("Code review")).not.toBeInTheDocument();
+    });
+
     it("shows the status square but no pill when the view lacks the Status column", async () => {
       await renderList(viewData([groupOf([OPEN])], [OPEN], { columns: ["assignee"], groupBy: "none" }));
 

@@ -4,6 +4,7 @@ import { Avatar, AvatarStack } from "../../components/issue/Avatar";
 import { EpicChip } from "../../components/issue/EpicChip";
 import { PriorityFlag } from "../../components/issue/PriorityFlag";
 import { StatusPill } from "../../components/issue/StatusPill";
+import { STYLE_NAMES } from "../../components/issue/styleNames";
 import { EMPTY, FONT, type MeasureText, widthOf } from "./measure";
 
 /** A view column: how a row fills it, how wide that draws (the List sizes columns to their content), and the
@@ -19,6 +20,11 @@ const STANDARD: Record<string, ColumnDef> = {
     width: 130,
     cell: (row) => <StatusPill style={row.style} name={row.statusName} variant="activity" />,
     measure: (row, m) => widthOf.pill(m, row.statusName),
+  },
+  statusType: {
+    width: 120,
+    cell: (row) => <StatusPill style={row.style} name={STYLE_NAMES[row.style]} variant="activity" />,
+    measure: (row, m) => widthOf.pill(m, STYLE_NAMES[row.style]),
   },
   assignee: {
     width: 96,
