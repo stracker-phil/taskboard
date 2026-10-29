@@ -32,30 +32,35 @@
 }
 /* The default pill turned 90°: its height becomes the width and its side padding runs along the length. */
 .status-pill--vertical { justify-content: center; width: 26px; height: auto; padding: 10px 0; writing-mode: vertical-rl; }
+/* The count turns with it, so a long number still fits the strip. */
+.board-column__count--vertical { writing-mode: vertical-rl; }
 
 .board-card {
-  position: relative; display: flex; flex: none; flex-direction: column; gap: 10px; padding: 12px 14px; border: 1px solid var(--card-border);
+  position: relative; display: flex; flex: none; flex-direction: column; gap: 10px; min-width: 0; padding: 12px 14px; border: 1px solid var(--card-border);
   border-radius: 10px; background: var(--panel-bg); box-shadow: var(--shadow-card); color: var(--text); cursor: default; outline: 0;
-  transition: box-shadow var(--motion-fast) var(--ease-out), border-color var(--motion-fast) var(--ease-out),
-    transform var(--motion-fast) var(--ease-out), background-color var(--motion-fast) var(--ease-out);
+  transition: box-shadow var(--motion-fast) var(--ease-out), border-color var(--motion-fast) var(--ease-out), background-color var(--motion-fast) var(--ease-out);
 }
-.board-card:hover, .board-card:focus-visible { box-shadow: var(--shadow-hover); transform: translateY(-1px); }
-.board-card:active { transform: none; box-shadow: var(--shadow-card); }
+.board-card:hover, .board-card:focus-visible { border-color: var(--border-strong); box-shadow: var(--shadow-hover); }
+.board-card:active { box-shadow: var(--shadow-card); }
 .board-card:focus-visible { border-color: var(--accent); }
 .board-card--changed { border-color: var(--changed-border); background: var(--changed-bg); }
-.board-card__top, .board-card__footer { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.board-card__footer { gap: 10px; font-size: 12px; color: var(--text-tertiary); }
+/* Weighted like the List's titles. */
+.board-card__title { margin: 0; font-size: 14px; line-height: 22px; white-space: normal; overflow-wrap: anywhere; }
+.board-card--changed .board-card__summary { font-weight: 600; }
+.board-card__tags { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.board-card__tags > .epic-chip { max-width: 100%; }
+.board-card__labels { display: contents; }
+.board-card__footer { display: flex; align-items: center; gap: 10px; min-width: 0; font-size: 12px; color: var(--text-tertiary); }
 .board-card__spacer { flex: 1; }
 .board-card__dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--changed-dot); }
 .board-card__key { flex: none; font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
-.board-card__summary { margin: 0; font-size: 14px; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
 .board-card__release {
   display: inline-flex; align-items: center; height: 20px; padding: 0 6px; border: 1px solid var(--border); border-radius: 5px;
   font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary);
 }
 .board-card__priority { display: inline-flex; }
-/* The hover toolbar sits on the card's top line, over the key. */
-.board-card__actions { position: absolute; top: 9px; right: 10px; }
+/* The hover toolbar sits in the card's bottom-right corner, over the key. */
+.board-card__actions { position: absolute; right: 10px; bottom: 9px; }
 .board-card .row-actions { position: static; transform: translateY(2px); transition: opacity var(--motion-base) var(--ease-out), transform var(--motion-base) var(--ease-out); }
 .board-card:hover .row-actions, .board-card:focus-within .row-actions { transform: none; }
 .board-card:hover .row-actions, .board-card:focus-within .row-actions { opacity: 1; pointer-events: auto; }

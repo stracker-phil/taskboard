@@ -54,7 +54,10 @@
 
 .list-row__name { position: relative; display: flex; align-items: center; gap: 10px; min-width: 0; }
 .list-row__key { flex: none; font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+/* The title and its inline labels share what the name cell has left; neither spills out of it. */
+.list-row__title { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .list-row__summary { min-width: 0; overflow: hidden; font-size: 14px; white-space: nowrap; text-overflow: ellipsis; }
+.list-row__title .row-labels { min-width: 0; overflow: hidden; }
 .list-row--changed .list-row__summary { font-weight: 600; }
 .list-row__cell { display: flex; align-items: center; min-width: 0; white-space: nowrap; }
 
@@ -65,7 +68,7 @@
 .list-cell--secondary { font-size: 13px; color: var(--text-secondary); }
 .list-cell--tertiary { font-size: 13px; color: var(--text-tertiary); }
 .list-cell--priority { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-secondary); }
-.list-cell--labels { display: flex; gap: 4px; }
+.list-cell--labels { display: flex; gap: 4px; overflow: hidden; }
 
 /* The Table reuses the group header without the List's grid and gutter. */
 .table-item .list-group { display: flex; gap: 4px; padding: 0; }
@@ -91,7 +94,9 @@
    on the first line. */
 .list-row--wrap { height: auto; min-height: 44px; padding-top: 8px; padding-bottom: 8px; }
 .list-row--wrap .list-row__name { align-items: flex-start; }
-.list-row--wrap .list-row__summary { line-height: 22px; white-space: normal; text-overflow: clip; overflow-wrap: anywhere; }
+.list-row--wrap .list-row__title { display: block; line-height: 22px; white-space: normal; overflow-wrap: anywhere; }
+.list-row--wrap .list-row__summary { white-space: normal; text-overflow: clip; }
+.list-row--wrap .list-cell--labels { flex-wrap: wrap; }
 .list-row--wrap .list-row__key { line-height: 22px; }
 .list-row--wrap .status-square { margin-top: 6px; }
 .list-row--wrap .change-chip, .list-row--wrap .comment-count { margin-top: 2px; }

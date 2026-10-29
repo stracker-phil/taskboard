@@ -3,23 +3,26 @@ import type { Row } from "../../api";
 import { AvatarStack } from "../../components/issue/Avatar";
 import { CommentCount } from "../../components/issue/CommentCount";
 import { EpicChip } from "../../components/issue/EpicChip";
+import { LabelChips } from "../../components/issue/LabelChips";
 import { PriorityFlag } from "../../components/issue/PriorityFlag";
 import { RowActions, type RowActionHandlers } from "../list/RowActions";
 
 interface Props {
   row: Row;
-  /** The view's card fields: which of epic, assignee, release and priority show. */
   fields: string[];
+  /** The labels as tags after the title, while they aren't a card field. */
+  inlineLabels?: boolean;
   /** The keyboard's current card. */
   selected?: boolean;
   onOpen: (id: string) => void;
   actions: RowActionHandlers;
 }
 
-/** A Board card: epic and key, the summary (always wrapped, never cut), then people, release, comments and
- *  priority; changed cards are tinted. */
-export const BoardCard = memo(function BoardCard({ row, fields, selected = false, onOpen, actions }: Props) {
+/** A Board card: the summary first, always wrapped, the key in the bottom-right corner; changed cards are tinted. */
+export const BoardCard = memo(function BoardCard({ row, fields, inlineLabels = false, selected = false, onOpen, actions }: Props) {
   const shows = (field: string) => fields.includes(field);
+  const epic = shows("epic") && row.epic;
+  const labels = shows("labels") && row.labels.length > 0;
   return (
     <article
       className={["board-card", row.changed && "board-card--changed", selected && "board-card--selected"].filter(Boolean).join(" ")}
@@ -32,13 +35,16 @@ export const BoardCard = memo(function BoardCard({ row, fields, selected = false
         if (e.key === "Enter" && e.target === e.currentTarget) onOpen(row.id);
       }}
     >
-      <div className="board-card__top">
-        {shows("epic") && row.epic && <EpicChip epic={row.epic} />}
-        <span className="board-card__spacer" />
-        {row.changed && <span className="board-card__dot" title="Changed since yesterday" />}
-        <span className="board-card__key">{row.key}</span>
-      </div>
-      <p className="board-card__summary">{row.summary}</p>
+      <p className="board-card__title">
+        <span className="board-card__summary">{row.summary}</span>
+        {inlineLabels && <LabelChips labels={row.labels} className="row-labels row-labels--flow" />}
+      </p>
+      {(epic || labels) && (
+        <div className="board-card__tags">
+          {epic && <EpicChip epic={epic} />}
+          {labels && <LabelChips labels={row.labels} className="board-card__labels" />}
+        </div>
+      )}
       <div className="board-card__footer">
         {shows("assignee") && <AvatarStack people={row.assignees} />}
         <span className="board-card__spacer" />
@@ -49,6 +55,8 @@ export const BoardCard = memo(function BoardCard({ row, fields, selected = false
             <PriorityFlag level={row.priority.level} />
           </span>
         )}
+        {row.changed && <span className="board-card__dot" title="Changed since yesterday" />}
+        <span className="board-card__key">{row.key}</span>
       </div>
       <span className="board-card__actions">
         <RowActions issueId={row.id} issueKey={row.key} changed={row.changed} actions={actions} />

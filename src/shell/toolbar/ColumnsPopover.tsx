@@ -15,6 +15,8 @@ import { useViewEdit } from "./useViewEdit";
 const HINTS: Record<string, string> = { epic: "parent", release: "fix version" };
 /** The popover names the due column in full; the column header stays short. */
 const LABELS: Record<string, string> = { due: "Due date", labels: "Labels (column)" };
+/** A Board's labels are a card field, not a column. */
+const BOARD_LABELS: Record<string, string> = { ...LABELS, labels: "Labels (card field)" };
 
 type Opening = IssueOpening | "default";
 const OPENINGS: Opening[] = ["default", "preview", "full"];
@@ -34,6 +36,8 @@ export function ColumnsPopover({ view, spaceProjectId, anchor, onClose }: Props)
   const [search, setSearch] = useState("");
   const edit = useViewEdit();
   const toast = useStore((s) => s.toast);
+  const board = view.layout === "board";
+  const names = board ? BOARD_LABELS : LABELS;
   const save = (columns: string[]) => edit(api.viewSetColumns(view.id, columns), "Could not change the columns");
 
   const standard = inViewOrder(catalog.filter((c) => !c.custom), view.columns);
@@ -48,7 +52,7 @@ export function ColumnsPopover({ view, spaceProjectId, anchor, onClose }: Props)
   // While searching, only matching fields show and their order can't change: a drag among some of them
   // would lose the place of the others.
   const needle = search.trim().toLowerCase();
-  const visible = (columns: Column[]) => (needle ? columns.filter((c) => matches(c, needle)) : columns);
+  const visible = (columns: Column[]) => (needle ? columns.filter((c) => matches(c, needle, names)) : columns);
   const shownStandard = visible(standard);
   const shownCustom = visible(custom);
 
@@ -64,19 +68,17 @@ export function ColumnsPopover({ view, spaceProjectId, anchor, onClose }: Props)
         <span className="popover__title">Columns</span>
         <span className="popover__meta">View: {view.name}</span>
       </div>
-      {view.layout !== "board" && <OpenWith view={view} onChange={(openWith) => edit(api.viewSetOpenWith(view.id, openWith), "Could not change how issues open")} />}
-      {view.layout !== "board" && (
-        <button
-          type="button"
-          className="column-row columns-popover__wrap"
-          aria-pressed={view.inlineLabels}
-          onClick={() => edit(api.viewSetInlineLabels(view.id, !view.inlineLabels), "Could not change how labels show")}
-        >
-          <span className="column-row__label">Labels (inline)</span>
-          <span className="column-row__hint">{view.columns.includes("labels") ? "off while the column shows" : "after the title"}</span>
-          <Toggle on={view.inlineLabels} />
-        </button>
-      )}
+      {!board && <OpenWith view={view} onChange={(openWith) => edit(api.viewSetOpenWith(view.id, openWith), "Could not change how issues open")} />}
+      <button
+        type="button"
+        className="column-row columns-popover__wrap"
+        aria-pressed={view.inlineLabels}
+        onClick={() => edit(api.viewSetInlineLabels(view.id, !view.inlineLabels), "Could not change how labels show")}
+      >
+        <span className="column-row__label">Labels (inline)</span>
+        <span className="column-row__hint">{view.columns.includes("labels") ? `off while the ${board ? "card field" : "column"} shows` : "after the title"}</span>
+        <Toggle on={view.inlineLabels} />
+      </button>
       {view.layout === "list" && (
         <button
           type="button"
@@ -97,13 +99,13 @@ export function ColumnsPopover({ view, spaceProjectId, anchor, onClose }: Props)
         {shownStandard.length > 0 && (
           <>
             <div className="popover__caps">Jira fields</div>
-            <Section columns={shownStandard} shown={view.columns} onToggle={toggle} onReorder={(next) => saveOrder(next, custom)} reorderable={!needle} />
+            <Section columns={shownStandard} shown={view.columns} onToggle={toggle} onReorder={(next) => saveOrder(next, custom)} reorderable={!needle} names={names} />
           </>
         )}
         {shownCustom.length > 0 && (
           <>
             <div className="popover__caps popover__caps--spaced">Custom fields · this project</div>
-            <Section columns={shownCustom} shown={view.columns} onToggle={toggle} onReorder={(next) => saveOrder(standard, next)} reorderable={!needle} mono />
+            <Section columns={shownCustom} shown={view.columns} onToggle={toggle} onReorder={(next) => saveOrder(standard, next)} reorderable={!needle} names={names} mono />
           </>
         )}
         {shownStandard.length === 0 && shownCustom.length === 0 && <p className="columns-popover__empty">No field matches “{search.trim()}”.</p>}
@@ -121,9 +123,9 @@ export function ColumnsPopover({ view, spaceProjectId, anchor, onClose }: Props)
 }
 
 /** By the name shown, the Jira id or its hint ("cf_10071", "fix version"). */
-function matches(column: Column, needle: string): boolean {
+function matches(column: Column, needle: string, names: Record<string, string>): boolean {
   const hint = column.custom ? column.id.replace("customfield_", "cf_") : (HINTS[column.id] ?? "");
-  return [LABELS[column.id] ?? column.name, column.id, hint].some((text) => text.toLowerCase().includes(needle));
+  return [names[column.id] ?? column.name, column.id, hint].some((text) => text.toLowerCase().includes(needle));
 }
 
 /** The view's columns in its order, then the others in the catalog's. */
@@ -138,10 +140,12 @@ interface SectionProps {
   onToggle: (id: string) => void;
   onReorder: (columns: Column[]) => void;
   reorderable: boolean;
+  /** Names that differ from the field's own. */
+  names: Record<string, string>;
   mono?: boolean;
 }
 
-function Section({ columns, shown, onToggle, onReorder, reorderable, mono = false }: SectionProps) {
+function Section({ columns, shown, onToggle, onReorder, reorderable, names, mono = false }: SectionProps) {
   const { containerRef, item, handle, dropLineY } = useDragReorder<HTMLDivElement>((from, to) => {
     const next = [...columns];
     const [moved] = next.splice(from, 1);
@@ -166,7 +170,7 @@ function Section({ columns, shown, onToggle, onReorder, reorderable, mono = fals
             <span className={reorderable ? "column-row__handle" : "column-row__handle column-row__handle--off"} aria-hidden="true">
               ⋮⋮
             </span>
-            <span className="column-row__label">{LABELS[column.id] ?? column.name}</span>
+            <span className="column-row__label">{names[column.id] ?? column.name}</span>
             {hint && <span className={mono ? "column-row__hint mono" : "column-row__hint"}>{hint}</span>}
             <Toggle on={on} />
           </button>

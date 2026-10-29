@@ -40,3 +40,5 @@
 .table-row__title { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .table-row--changed .table-row__title { font-weight: 600; }
 .table-row__status { font-size: 13px; color: var(--text-secondary); white-space: nowrap; }
+/* The Labels cell stays one line; its labels scroll sideways inside it. */
+.table-row__cell > .list-cell--labels { display: flex; gap: 4px; min-width: 0; max-width: 100%; overflow: auto hidden; isolation: isolate; }

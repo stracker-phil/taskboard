@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../../test/apiMock")).createApiMock() }));
 
-import { api, type BoardData } from "../../api";
+import { api, type BoardData, type View } from "../../api";
 import { installCommands, useCommandKeys } from "../../commands";
 import { createQueryClient } from "../../queries/queryClient";
 import { resetStore, useStore } from "../../state/store";
@@ -49,11 +49,11 @@ afterEach(() => {
   spies.forEach((s) => s.mockRestore());
 });
 
-async function renderBoard(data: BoardData) {
+async function renderBoard(data: BoardData, current: View = BOARD) {
   mocked.viewBoard.mockResolvedValue(data);
   render(
     <QueryClientProvider client={createQueryClient()}>
-      <BoardView view={BOARD} />
+      <BoardView view={current} />
     </QueryClientProvider>,
   );
   await screen.findByRole("list", { name: "Board" });
@@ -118,6 +118,14 @@ describe("BoardView", () => {
       expect(strip).toHaveTextContent("Done");
       expect(strip).toHaveTextContent("1");
       expect(screen.queryByText("Publish the launch notes")).not.toBeInTheDocument();
+    });
+
+    it("shows the number of issues of a collapsed column inside its strip", async () => {
+      const many = [PRICING, NOTES, row({ id: "3", key: "NW-1003", summary: "Archive the old banners" })];
+      await renderBoard(boardData([{ ...PROGRESS, ids: ["1", "2", "3"], collapsed: true }], many));
+
+      const strip = screen.getByRole("button", { name: "Expand In Progress (3)" });
+      expect(within(strip).getByText("3")).toBeInTheDocument();
     });
 
     it("writes a collapsed column's name in the vertical status pill of its strip", async () => {
@@ -270,6 +278,50 @@ describe("BoardView", () => {
       expect(within(card).getByRole("img", { name: "High priority" })).toBeInTheDocument();
       expect(within(card).queryByText("Checkout")).not.toBeInTheDocument();
       expect(within(card).queryByText("2.4.0")).not.toBeInTheDocument();
+    });
+
+    it("writes the summary before the key", async () => {
+      await renderBoard(boardData([PROGRESS], [PRICING]));
+
+      const card = screen.getByRole("article");
+      const summary = within(card).getByText("Redesign the pricing page");
+      const key = within(card).getByText("NW-1042");
+      expect(summary.compareDocumentPosition(key) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    describe("labels", () => {
+      const LABELLED = row({ id: "1", key: "NW-1042", summary: "Redesign the pricing page", labels: [{ name: "frontend", tint: 1 }, { name: "design", tint: 2 }] });
+
+      it("shows the issue's labels when the card fields list them", async () => {
+        await renderBoard(boardData([PROGRESS], [LABELLED], { cardFields: ["labels"] }), view({ layout: "board", inlineLabels: false }));
+
+        const card = screen.getByRole("article");
+        expect(within(card).getByText("frontend")).toBeInTheDocument();
+        expect(within(card).getByText("design")).toBeInTheDocument();
+      });
+
+      it("shows each label once when the card fields list them and the view is inline", async () => {
+        await renderBoard(boardData([PROGRESS], [LABELLED], { cardFields: ["labels"] }), view({ layout: "board", inlineLabels: true }));
+
+        expect(within(screen.getByRole("article")).getAllByText("frontend")).toHaveLength(1);
+      });
+
+      it("shows the labels after the title when they are not a card field and the view is inline", async () => {
+        await renderBoard(boardData([PROGRESS], [LABELLED], { cardFields: [] }), view({ layout: "board", inlineLabels: true }));
+
+        const card = screen.getByRole("article");
+        const summary = within(card).getByText("Redesign the pricing page");
+        const label = within(card).getByText("frontend");
+        expect(summary.compareDocumentPosition(label) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      });
+
+      it("hides the labels when they are not a card field and the view is not inline", async () => {
+        await renderBoard(boardData([PROGRESS], [LABELLED], { cardFields: [] }), view({ layout: "board", inlineLabels: false }));
+
+        const card = screen.getByRole("article");
+        expect(within(card).queryByText("frontend")).not.toBeInTheDocument();
+        expect(within(card).queryByText("design")).not.toBeInTheDocument();
+      });
     });
 
     it("shows the comment count when there are comments, whatever the card fields", async () => {

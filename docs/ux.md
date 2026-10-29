@@ -179,9 +179,14 @@ one group, Board column or pill per style, whatever the status is called; the Bo
   the cells. Long titles wrap onto more lines by default and the row grows (each row is measured); "Wrap long
   titles" in the Columns popover turns that off per view, and titles truncate instead (`view.wrap_titles`). The
   Table always truncates at a fixed row height; Board cards always wrap. A clicked row is selected (`--selection-bg`).
-- An issue's labels show as small tags (`row-labels`, 18px `label-chip`s) after its title in the List and the
-  Table, unless the view has the Labels column. The Columns popover lists the column as "Labels (column)" and
-  has a "Labels (inline)" switch (`view.inline_labels`, on by default) for List and Table views.
+- An issue's labels show as small tags (`row-labels`, 18px `label-chip`s) after its title in the List, the
+  Table and on Board cards, unless the view shows the Labels field. The Columns popover lists the field as
+  "Labels (column)" ("Labels (card field)" on a Board) and has a "Labels (inline)" switch (`view.inline_labels`,
+  on by default) for every layout.
+- Labels never leave their cell. A label is at most as wide as its cell and ends in an ellipsis (the whole name
+  shows on hover). With wrapped titles, inline labels flow after the title's last word and wrap like text,
+  and the Labels column's chips wrap onto more lines in the cell; the row grows to fit. With "Wrap long titles"
+  off, both stay on the row's one line and are cut at the cell's edge.
 - Rows are virtualized (`@tanstack/react-virtual`): a card is drawn from its pieces (the header item, then
   rows that know whether they are first, middle, last or the only one).
 
@@ -438,12 +443,14 @@ button, Escape and a press outside close it, focus goes back to the button).
   300 wide, 12px radius, on its status tint (`--status-*-tint`), with the header pill, the count in
   `--status-*-count` and a collapse button; a collapsed one is a 48 × 300 strip with the header pill turned 90° (`status-pill--vertical`: the
   same 26px and padding, centered; owner, 2026-10-29) and the
-  count, and expands on click. Done starts collapsed; the choice is kept per view.
-- Cards (gap 10, padding 12 14, 10px radius, `--card-border`, `--shadow-card`, lifted with `--shadow-hover`
-  on hover): epic chip and the mono key on top (a 7px `--changed-dot` before it when changed), the 600 summary
-  that always wraps and never truncates, then avatars, release chip, comment count and priority flag. Card
-  fields (the Columns button reads "Card fields") choose epic, assignee, release and priority. Changed cards
-  use `--changed-bg` and `--changed-border`. Hover shows the row toolbar in the top-right corner.
+  count, also turned 90° so a long number fits, and expands on click. Done starts collapsed; the choice is kept per view.
+- Cards (gap 10, padding 12 14, 10px radius, `--card-border`, `--shadow-card`): the summary first, 14/400 like
+  the List's titles (600 when changed), always wrapped and never truncated, with the inline labels after it;
+  then the epic chip and label chips (wrapping); then avatars, release chip, comment count, priority flag and,
+  in the bottom-right corner, the mono key (a 7px `--changed-dot` before it when changed). Card fields (the
+  Columns button reads "Card fields") choose epic, labels, assignee, release and priority. Changed cards use
+  `--changed-bg` and `--changed-border`. Hover never moves a card: it takes a `--border-strong` edge and
+  `--shadow-hover`, and shows the row toolbar in the bottom-right corner over the key.
 - A card opens the full Issue view (the mockup's behavior; List rows open the preview). A Board never shows the
   preview (`CurrentPeek`), whatever opened it.
 - Each column virtualizes its cards (`BoardColumnCards`, measured heights), so a Space with thousands of
@@ -456,7 +463,9 @@ the row's bottom), with a sticky 34px header: Key, Summary (flexible),
 Status, then the view's columns. A sortable header (Key, Summary, Status, Priority, Due) sorts on click and
 again flips the direction (`aria-sort`, ↑/↓); a 6px handle at each header's right edge resizes the column
 (48–800), saved on the view. Grouped tables keep the list's group headers; the table scrolls sideways when the
-columns are wider than the window. Groups open and close with the List's animation (`useGroupMotion`).
+columns are wider than the window. Groups open and close with the List's animation (`useGroupMotion`). Rows
+never grow: inline labels after the summary are cut at the cell's edge, and the Labels cell keeps its chips on
+one line that scrolls sideways inside the cell (an overlay scrollbar, [below](#scrollbars)).
 
 ## Tokens
 

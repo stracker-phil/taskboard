@@ -36,10 +36,18 @@
 .epic-chip--4 { background: var(--epic-4-bg); color: var(--epic-4-fg); }
 .epic-chip--5 { background: var(--epic-5-bg); color: var(--epic-5-fg); }
 
-.label-chip { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 6px; font-size: 12px; white-space: nowrap; }
-/* Labels as tags after an issue's title (List and Table, while the view has no Labels column). */
+/* A label never grows past its container: a long one ends in an ellipsis and shows whole on hover. */
+.label-chip {
+  display: inline-block; flex: none; box-sizing: border-box; max-width: 100%; height: 22px; padding: 0 8px; overflow: hidden;
+  border-radius: 6px; font-size: 12px; line-height: 22px; white-space: nowrap; text-overflow: ellipsis;
+}
+/* Labels as tags after an issue's title (List, Table and Board, while the view doesn't show them as a field). */
 .row-labels { display: inline-flex; flex: none; gap: 4px; }
-.row-labels .label-chip { height: 18px; padding: 0 6px; border-radius: 5px; font-size: 11px; }
+.row-labels .label-chip { height: 18px; padding: 0 6px; border-radius: 5px; font-size: 11px; line-height: 18px; }
+/* After a wrapping title with 22px lines: the labels follow its last word and wrap like words. */
+.row-labels--flow { display: inline; word-spacing: 4px; }
+.row-labels--flow::before { content: " "; }
+.row-labels--flow .label-chip { margin: 2px 4px 0 0; vertical-align: top; word-spacing: normal; }
 .label-chip--0 { background: var(--label-neutral-bg); color: var(--label-neutral-fg); }
 .label-chip--1 { background: var(--label-1-bg); color: var(--label-1-fg); }
 .label-chip--2 { background: var(--label-2-bg); color: var(--label-2-fg); }

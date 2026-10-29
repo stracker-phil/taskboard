@@ -112,6 +112,28 @@ describe("ColumnsPopover", () => {
     await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not change the columns: Disk full"));
   });
 
+  it("lists the labels field as a card field in a board view", async () => {
+    const popover = await openColumns(view({ layout: "board" }));
+
+    expect(within(popover).getByRole("button", { name: "Labels (card field)" })).toBeInTheDocument();
+    expect(within(popover).queryByRole("button", { name: "Labels (column)" })).not.toBeInTheDocument();
+  });
+
+  it.each(["list", "table"] as const)("lists the labels field as a column in a %s view", async (layout) => {
+    const popover = await openColumns(view({ layout }));
+
+    expect(within(popover).getByRole("button", { name: "Labels (column)" })).toBeInTheDocument();
+    expect(within(popover).queryByRole("button", { name: "Labels (card field)" })).not.toBeInTheDocument();
+  });
+
+  it("saves the labels card field of a board view when it is toggled on", async () => {
+    const popover = await openColumns(view({ layout: "board", columns: ["assignee"] }));
+
+    await userEvent.click(within(popover).getByRole("button", { name: "Labels (card field)" }));
+
+    expect(mocked.viewSetColumns).toHaveBeenCalledWith(101, ["assignee", "labels"]);
+  });
+
   it("lists Status among the Jira fields, off when the view lacks it", async () => {
     const popover = await openColumns();
 
@@ -201,16 +223,25 @@ describe("ColumnsPopover", () => {
       await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not change how labels show: Disk full"));
     });
 
-    it.each(["list", "table"] as const)("is offered in a %s view", async (layout) => {
+    it.each(["list", "table", "board"] as const)("is offered in a %s view", async (layout) => {
       const popover = await openColumns(view({ layout }));
 
       expect(within(popover).getByRole("button", { name: /^Labels \(inline\)/ })).toBeInTheDocument();
     });
 
-    it("is not offered in a board view", async () => {
-      const popover = await openColumns(view({ layout: "board" }));
+    it("saves the opposite of the current setting in a board view", async () => {
+      mocked.viewSetInlineLabels.mockResolvedValue(view({ layout: "board", inlineLabels: false }));
+      const popover = await openColumns(view({ layout: "board", inlineLabels: true }));
 
-      expect(within(popover).queryByRole("button", { name: /^Labels \(inline\)/ })).not.toBeInTheDocument();
+      await userEvent.click(within(popover).getByRole("button", { name: /^Labels \(inline\)/ }));
+
+      expect(mocked.viewSetInlineLabels).toHaveBeenCalledWith(101, false);
+    });
+
+    it("says it is off while the card field shows in a board view", async () => {
+      const popover = await openColumns(view({ layout: "board", columns: ["labels"] }));
+
+      expect(within(popover).getByRole("button", { name: /^Labels \(inline\) ?off while the card field shows$/ })).toBeInTheDocument();
     });
   });
 

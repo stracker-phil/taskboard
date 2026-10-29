@@ -33,8 +33,10 @@ export function IssueRow({ row, columns, position, wrap = false, inlineLabels = 
       <span className="list-row__name" role="gridcell">
         <StatusSquare style={row.style} />
         <span className="list-row__key">{row.key}</span>
-        <span className="list-row__summary">{row.summary}</span>
-        {inlineLabels && <LabelChips labels={row.labels} className="row-labels" />}
+        <span className="list-row__title">
+          <span className="list-row__summary">{row.summary}</span>
+          {inlineLabels && <LabelChips labels={row.labels} className={wrap ? "row-labels row-labels--flow" : "row-labels"} />}
+        </span>
         {row.changeNote && <ChangeChip note={row.changeNote} />}
         <CommentCount count={row.commentCount} />
         <RowActions issueId={row.id} issueKey={row.key} changed={row.changed} actions={actions} />

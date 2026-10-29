@@ -31,6 +31,7 @@ function Board({ view, data }: { view: View; data: BoardData }) {
     void attempt(api.viewSetColumnCollapsed(view.id, column.key, collapsed), "Could not change the column");
   const open = useCallback((id: string) => openIssue(id, { listId: view.listId, viewId: view.id }), [openIssue, view.listId, view.id]);
   const selected = useBoardKeys(data, open, actions);
+  const inlineLabels = view.inlineLabels && !data.cardFields.includes("labels");
   if (data.columns.length === 0) return <EmptyLevel listId={view.listId} viewId={view.id} />;
   return (
     <div className="board" role="list" aria-label="Board">
@@ -44,7 +45,7 @@ function Board({ view, data }: { view: View; data: BoardData }) {
               onClick={() => setCollapsed(column, false)}
             >
               <ColumnTitle column={column} vertical />
-              <span className="board-column__count">{column.ids.length}</span>
+              <span className="board-column__count board-column__count--vertical">{column.ids.length}</span>
             </button>
           </div>
         ) : (
@@ -61,6 +62,7 @@ function Board({ view, data }: { view: View; data: BoardData }) {
               ids={column.ids}
               rows={data.rows}
               fields={data.cardFields}
+              inlineLabels={inlineLabels}
               selected={selected !== null && column.ids.includes(selected) ? selected : null}
               onOpen={open}
               actions={actions}
