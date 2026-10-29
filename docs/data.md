@@ -10,9 +10,9 @@ All in the config dir (`~/Library/Application Support/com.philippstracker.taskbo
 
 | File | Holds | Reset cache |
 |---|---|---|
-| `local.sqlite` | The owner's setup: Spaces, filter lists, views, pins, status style overrides | kept |
+| `local.sqlite` | The owner's setup: Spaces, filter lists, views, bookmarks (`pin`), status style overrides | kept |
 | `cache.sqlite` | The tracker mirror (Jira today): spaces, issues, comments, people, versions, fields, change log, seen marks, sync state, search index | deleted and recreated empty |
-| `settings.json`, `keybindings.json`, `ui_state.json`, `places.json` | Settings, key overrides, window layout, each view's remembered place (`store/`; no longer the Me chip or the text filter, [ADR 0038](adr/0038-filter-changes-are-drafts-until-the-view-is-saved.md): an old `onlyMine` seeds `view.only_mine` once at startup, `text` is ignored) | kept |
+| `settings.json`, `keybindings.json`, `ui_state.json`, `places.json` | Settings, key overrides, window layout (the hidden sidebar, the activity column's width), each view's remembered place (`store/`; no longer the Me chip or the text filter, [ADR 0038](adr/0038-filter-changes-are-drafts-until-the-view-is-saved.md): an old `onlyMine` seeds `view.only_mine` once at startup, `text` is ignored) | kept |
 | `nav.json` | The main window's place: the open level and view, each level's last view, the expanded Spaces (`nav/`). A place that no longer exists falls back to the level's default view, then to Everything | kept |
 
 Attachments shown in Quick Look are downloaded to `~/Library/Caches/<bundle identifier>/attachments/<id>/<name>`
@@ -56,7 +56,7 @@ unique across sources (Jira's numeric ids; another source prefixes its own):
 | `status` | `id, name, category` (`new`, `indeterminate`, `done`) |
 | `issue` | keyed by the numeric Jira id (as text), never the key. Normalized columns for everything the UI filters, groups or sorts on, `raw` for the rest (attachments are read from `raw`; migration `cache/0009` clears the delta cursor so the next sync is a full one that fills them). Ours, derived during sync: `status_category`, `type_is_subtask`, `is_epic`, `sprint_id`, `sprint_state`, `comment_count`, `comments_synced_at`, `links_synced_at`, `history_synced_at`, `synced_at`, `gone` |
 | `issue_change` | what the sync saw change (status, assignee, due date, priority, comments, created) |
-| `issue_seen` | when the owner last looked at an issue: changes after it are unseen (`changes::UNSEEN`) |
+| `issue_seen` | when the owner last looked at an issue: changes after it are unseen (`changes::UNSEEN`); `unread` (migration `cache/0006`): marked unread by the owner, unread until read again |
 | `comment` | `body_html` from Jira, `body_text` (ours) for search, `body_adf` (migration `cache/0010`, [ADR 0036](adr/0036-rich-text-renders-from-adf-not-renderedfields.md)): the body as ADF, which the page is shown from (`adf::html_or`); null on rows from before the migration until the next sync, which then show `body_html` |
 | `remote_link` | an issue's web links (migration `cache/0004`): `issue_id` (cascades), `id`, `position`, `url` (untrusted), `title`, `application`, `relationship`, `source`; replaced as a whole when the issue is opened, at most every 5 minutes: `issue.links_synced_at` (migration `cache/0005`) holds the last fetch (`issues::issue_sync_web_links`, `issues::fetched::FRESH_FOR`) |
 | `issue_history` | an issue's history, Jira's changelog (migration `cache/0007`, [ADR 0031](adr/0031-issue-history-comes-from-the-changelog-on-demand.md)): `issue_id` (cascades), `position` (oldest first), `field` (Jira's name: `status`, `Fix Version`, `Sprint`), `field_id`, `from_value`/`to_value` (ids: status, account, version), `from_text`/`to_text`, `author_id`, `changed_at` (UTC, sorts with `issue_change`), `source`; replaced as a whole when the issue is opened, at most every 5 minutes: `issue.history_synced_at` holds the last fetch (`issues::issue_sync_history`). Never read by `changes::UNSEEN` |
@@ -73,7 +73,7 @@ unique across sources (Jira's numeric ids; another source prefixes its own):
 | `space` | a tracked project as the sidebar shows it: name, icon, color (`1`–`12`), client, position, `default_columns` for new views; its Space settings (`local/0007`): `layouts` (JSON array of the layouts its views offer; null = all), `default_layout` and `default_group` for new views |
 | `filter_list` | WHICH issues: the sidebar tree (`kind` everything, space, list, recent, pinned); a JSON filter ANDed with its ancestors |
 | `view` | HOW to show a list: one tab; layout, columns, grouping, sort; `filter` (`local/0012`): its own conditions, ANDed with its list's ([ADR 0033](adr/0033-views-can-hold-their-own-filter.md)); `subtasks` (`local/0013`): how subtasks show ([ADR 0037](adr/0037-views-choose-how-subtasks-show.md)); `only_mine` (`local/0014`): the saved Me chip ([ADR 0038](adr/0038-filter-changes-are-drafts-until-the-view-is-saved.md)) |
-| `pin` | pinned issues, comments and lists, with an optional reason and expiry; active while not unpinned and not expired (`pins::active`); ended pins stay in Recently unpinned for 7 days |
+| `pin` | bookmarked issues, comments and lists (Bookmarks in the UI), with an optional reason and expiry; active while not removed and not expired (`pins::active`); ended bookmarks stay in Recently removed for 7 days |
 | `space_status_style` | overrides the detected style of a status in one Space (`local/0007`; the old app-wide `status_style` rows were copied to every Space) |
 | `space_field` | how a custom field shows in one Space: `hiddenInList`, `hiddenInDetail` or `hidden`; no row = visible (`space_config`) |
 
@@ -122,7 +122,7 @@ Built in (migration `local/0002`): Everything (one "All issues" view grouped by 
 Board, Table; grouped by status; the Space's default columns, else Assignee, Epic, Release, Priority) and the
 filter lists Current sprint, Epics, Release *next unreleased version* (when the project has one), Open bugs, each
 with one List view. Positions among siblings stay 0, 1, 2, … (`order.rs`). Deleting a filter list deletes its
-views and pins; a level keeps at least one view.
+views and bookmarks; a level keeps at least one view.
 
 ### Group and sort keys
 

@@ -62,7 +62,7 @@ These rules hold everywhere in the code. Keep them when you change things.
   ([ADR 0016](adr/0016-closing-the-window-keeps-the-app-running.md)). There is no tray, LaunchAgent or global
   shortcut.
 - **The CLI**: `taskboard` starts or activates the app; `status [--json]`, `show`, `focus`, `hide`,
-  `open <KEY>`, `sync [--full]` and `quit` (debug builds also `dev drift` and `dev seed-synthetic <n>`) ask the running app (`cli/`, `remote.rs`). `show` and `focus` start it when it
+  `open <KEY>`, `sync [--full]` and `quit` (debug builds also `dev drift` and `dev seed-synthetic <n>`) ask the running app (`cli/`, `remote/`). `show` and `focus` start it when it
   isn't running; the others exit 2 with "Taskboard isn't running".
 - **Settings** is a window of its own ([ux.md](ux.md#settings)).
 
@@ -75,7 +75,7 @@ loads as defaults, unknown keys are ignored and a file that cannot be parsed is 
 `<name>.<timestamp>.corrupt`. A store saves a changed copy before it swaps it in.
 
 Taskboard's data is two SQLite files ([data.md](data.md), [ADR 0019](adr/0019-two-sqlite-files-through-rusqlite.md)):
-`local.sqlite` holds the owner's setup (Spaces, filter lists, views, pins), `cache.sqlite` the Jira mirror,
+`local.sqlite` holds the owner's setup (Spaces, filter lists, views, bookmarks), `cache.sqlite` the Jira mirror,
 attached as `cache`. Every change goes through `Db::write`, which emits `issues_changed` or `local_changed`
 after the commit. Reset cache deletes only the cache file.
 
@@ -92,9 +92,10 @@ and the only part of `sync/` that names the Jira client
 
 Which issues a sidebar level holds is decided locally: `lists/` keeps the tree of Spaces and filter lists,
 `filter/` compiles their conditions to SQL over the cache, and `views/` keeps the tabs that decide how issues
-show and may narrow which ([ADR 0033](adr/0033-views-can-hold-their-own-filter.md)). The page's unsaved Me chip and
+show and may narrow which ([ADR 0024](adr/0024-filters-run-locally-in-sql-views-never-filter.md),
+[ADR 0033](adr/0033-views-can-hold-their-own-filter.md), [data.md](data.md)). The page's unsaved Me chip and
 Filter conditions travel with each view query as drafts until Save View writes them
-([ADR 0038](adr/0038-filter-changes-are-drafts-until-the-view-is-saved.md)) ([ADR 0024](adr/0024-filters-run-locally-in-sql-views-never-filter.md), [data.md](data.md)).
+([ADR 0038](adr/0038-filter-changes-are-drafts-until-the-view-is-saved.md)).
 
 ## Repository map
 
@@ -110,7 +111,7 @@ src-tauri/
                              names sidebar levels and views; remote/places lists and opens them)
   src/events.rs state.rs     every event name; AppState
   src/error.rs lock.rs       AppError (+ ErrorKind); poison-tolerant lock helpers
-  src/store/                 JsonFile, JsonStore, settings/, keybindings, ui_state
+  src/store/                 JsonFile, JsonStore, settings/, keybindings, ui_state, places (each view's place)
   src/bus/                   the command bus
   src/db/                    the two SQLite files: open, migrate, read, the one write path
   migrations/local/ cache/   numbered SQL migrations per file
@@ -139,7 +140,8 @@ src-tauri/
   src/nav/                   where the main window is (level and view, nav.json); previous/next Space
   src/<feature>/             one folder per feature: types, pure logic, commands.rs, tests
   src/window/ menu/          the main and Settings windows, the native app menu
-  src/dev.rs                 debug builds only: window frame, background launch, eval
+  src/dev/                   debug builds only: window frame, background launch, eval; fake.rs the fake Jira's server
+  src/diagnostics/           Settings → Status: what the connection, the sync and this Mac report
   src/test_support/          fixtures, fakes (cfg test, test-util); the demo Jira site and the fake Jira (also debug)
   tauri.conf.json tauri.debug.conf.json
 src/

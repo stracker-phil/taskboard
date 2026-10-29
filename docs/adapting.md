@@ -23,7 +23,7 @@ own name, identifier, data, socket and URL scheme
 | Config dir | `~/Library/Application Support/com.philippstracker.taskboard/` | `….taskboard.debug/` | `lib.rs` `config_dir()` |
 | Logs | `~/Library/Logs/com.philippstracker.taskboard/` | `….taskboard.debug/` | Tauri's `app_log_dir` |
 | Signing certificate | `Taskboard Local Signing` or `TASKBOARD_SIGN_IDENTITY` | the same | `scripts/create-signing-cert.sh`, `scripts/sign-app.sh` |
-| Env vars | `TASKBOARD_SIGN_IDENTITY` | also `TASKBOARD_WINDOW_FRAME`, `TASKBOARD_BACKGROUND`, `TASKBOARD_DEV_TERMINAL` | `scripts/sign-app.sh`; `dev.rs`; `scripts/dev/launch.sh` |
+| Env vars | `TASKBOARD_SIGN_IDENTITY` | also `TASKBOARD_WINDOW_FRAME`, `TASKBOARD_BACKGROUND`, `TASKBOARD_DEV_TERMINAL` | `scripts/sign-app.sh`; `dev/`; `scripts/dev/launch.sh` |
 | Store on `window` | none | `window.taskboard` (`VITE_DEV_HOOKS=1`) | `src/main.tsx`, `src/vite-env.d.ts`, the dev scripts |
 | Author, license | Philipp Stracker, MIT | | `Cargo.toml`, `package.json`, `LICENSE` |
 

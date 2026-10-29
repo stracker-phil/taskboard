@@ -19,7 +19,7 @@ stands in Taskboard. The numbers in this table are Taskboard's.
 | [0007](0007-color-palettes.md) | Color palettes are complete token sets; no color literal outside a palette | Accepted (2026-10-28) |
 | [0008](0008-cli-asks-the-running-app.md) | The CLI is a second process that asks the running app over the socket | Accepted (2026-10-28) |
 | [0009](0009-a-scheme-per-system-mode.md) | Appearance follows macOS, with one of three schemes per mode | Superseded in part by 0017; by 0028 |
-| [0010](0010-native-macos-look.md) | The app looks native and light | Superseded by 0017 for the main window; amended by 0033 (menus) |
+| [0010](0010-native-macos-look.md) | The app looks native and light | Superseded by 0017 for the main window; amended by 0034 (menus) |
 | [0011](0011-debug-build-is-a-separate-app-with-demo-data.md) | The debug build is a separate app with demo data | Accepted (2026-10-28) |
 | [0012](0012-commands-live-in-rust.md) | Commands live in Rust | Accepted (2026-10-28) |
 | [0013](0013-network-only-to-listed-hosts.md) | The app talks only to listed hosts | Amended by 0020 |

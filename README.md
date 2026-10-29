@@ -7,7 +7,10 @@ so nothing waits on the network.
 It is a local tool for one person on one Mac. Published as source, as-is: no releases, no binaries, no
 support. To build it or port it, point a coding agent at [AGENTS.md](AGENTS.md).
 
-![A Space's issues in the List layout, grouped by status](docs/screens/list.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screens/list-dark.png">
+  <img alt="A Space's issues in the List layout, grouped by status, with subtasks under their parents" src="docs/screens/list-light.png">
+</picture>
 
 ## What it does
 
@@ -15,22 +18,28 @@ support. To build it or port it, point a coding agent at [AGENTS.md](AGENTS.md).
   and shows what is cached. It reads only: nothing is written back to Jira.
 - **Spaces, filter lists and views:** each tracked project is a Space with its own filter lists (current
   sprint, open bugs, a release); every list has views as tabs, shown as a List, a Board or a Table, grouped,
-  sorted and with their own columns. Filters run locally, so they are instant.
+  sorted and with their own columns, filter, Me chip and subtasks (hidden, under their parent or as rows).
+  Filters run locally, so they are instant; changes stay a draft until Save View (⌘S). Spaces, lists and views
+  get their own icon and color.
 - **Space settings:** per Space, the layouts its views offer and how new views start, its own status colors
   (six status types from Backlog to Done, which views can also group by) and where each custom field shows.
 - **What changed:** Unread collects new comments, status and assignee changes since you last looked, and
   anything you mark unread; bookmarks keep issues at hand for a while.
-- **The Issue view:** description, the filled custom fields (acceptance criteria, steps to reproduce),
-  web links (pull requests show as such), related issues and the activity, with Jira's HTML sanitized and
-  links opened in the browser.
+- **The Issue view:** description and the filled custom fields (acceptance criteria, steps to reproduce)
+  as rich text with inline images, attachments that open in Quick Look, web links (pull requests show as
+  such), related issues and subtasks, and the activity: comments and Jira's history, newest first, with
+  people's avatars. A click opens an issue in the Preview beside the list or in the full view, per view;
+  ⌥ + hover peeks at any issue. A click on an issue key copies it.
 - **Keyboard first:** ⌘K finds issues by key or text, J/K move, every action has a menu item and a
-  rebindable key, and the `taskboard` command line drives the window from scripts.
+  rebindable key, right-click menus offer the rest, and the `taskboard` command line drives the window from
+  scripts.
 
 | | |
 |---|---|
-| ![The Board layout of a Space](docs/screens/board.png) | ![An issue in the full Issue view](docs/screens/issue.png) |
-| ![Unread, with new changes](docs/screens/recent.png) | ![The command palette](docs/screens/palette.png) |
-| ![A Space's settings](docs/screens/space-settings.png) | ![The Table layout](docs/screens/table.png) |
+| ![The Board layout of a Space, with labels on the cards](docs/screens/board-dark.png) | ![The Issue view: an inline image, web links, subtasks, an attachment and the activity with Jira's history](docs/screens/issue-light.png) |
+| ![A filter list's Filter popover: its own conditions, a draft for this view and Save View](docs/screens/filter-dark.png) | ![A view tab's menu: rename, icon and color, duplicate, layout](docs/screens/menu-light.png) |
+| ![Unread, with what changed on each issue](docs/screens/unread-dark.png) | ![The Table layout](docs/screens/table-light.png) |
+| ![The command palette finding issues and actions](docs/screens/palette-dark.png) | ![A Space's settings: name, icon and color, client, layouts](docs/screens/space-settings-dark.png) |
 
 All screenshots show made-up demo data from the debug build.
 
@@ -38,7 +47,8 @@ All screenshots show made-up demo data from the debug build.
 
 - The API token lives only in the macOS Keychain; it is never written to the settings, the cache or the logs.
 - Network traffic goes only to your Jira site and `api.atlassian.com`, through one allowlisted gateway that
-  refuses anything but the read requests Taskboard needs.
+  refuses anything but the read requests Taskboard needs. Profile pictures come from Atlassian's avatar host,
+  without credentials.
 - The cache stays on your Mac (`~/Library/Application Support/com.philippstracker.taskboard/`). Settings →
   Sync → Cache, File → Reset Cache… or `taskboard reset-cache --yes` empties it.
 
@@ -75,9 +85,9 @@ never changes Settings, and it never writes to Jira.
 | `taskboard layout <list\|board\|table>` | shows the current view as a list, a board or a table |
 | `taskboard search <WORDS…>` | cached issues by key or text, as the command palette finds them |
 | `taskboard sync [--full]` | fetches what changed in Jira now (`--full`: every issue of the sync scope); returns at once |
-| `taskboard reset-cache --yes` | empties the local copy of Jira and fetches it again; Spaces, filter lists, views and pins stay |
+| `taskboard reset-cache --yes` | empties the local copy of Jira and fetches it again; Spaces, filter lists, views and bookmarks stay |
 
-A `LEVEL` is `everything`, `recent`, `pinned`, a Space's key or name, a filter list's name (`KEY/name` when
+A `LEVEL` is `everything`, `recent` (Unread), `pinned` (Bookmarks), a Space's key or name, a filter list's name (`KEY/name` when
 two Spaces have one of that name) or any id from `spaces` and `filters`. A `VIEW` is a view's name or id. A
 unique start of a name is enough. `--json` prints any reply as JSON.
 

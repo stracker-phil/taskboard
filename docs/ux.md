@@ -644,8 +644,8 @@ global shortcuts.
   which opens Settings → Sync → Cache to confirm; Close Window ⌘W). Go moves around (Command Palette ⌘K,
   Everything ⇧⌘E, Unread ⇧⌘U, Bookmarks ⇧⌘P, Previous/Next Space ⌥⌘↑/↓, Previous/Next View ⌃⇧⇥/⌃⇥).
   List acts on the shown issues (Show as List / Board / Table ⌃⌘1–3; Group and Sort… ⌥⌘G, Columns… ⌥⌘C, Edit
-  Filter… ⌥⌘F, Only My Issues ⇧⌘M, Filter This View ⌘F, Save View ⌘S, Revert View; Mark All Seen ⇧⌘A). Issue acts on the selected one
-  (Open, Open or Close Peek, Open Epic, Open in Jira ⌘↩, Copy Key, Copy Link ⇧⌘C, Add or Remove Bookmark, Mark as Read or Unread).
+  Filter… ⌥⌘F, Only My Issues ⇧⌘M, Filter This View ⌘F, Save View ⌘S, Revert View; Mark All as Read ⇧⌘A). Issue acts on the selected one
+  (Open, Open or Close Preview, Open Epic, Open in Jira ⌘↩, Copy Key, Copy Link ⇧⌘C, Add or Remove Bookmark, Mark as Read or Unread).
   View is the window's appearance only (Toggle Sidebar ⌘\, Enter Full Screen; the debug build's Reload ⌥⌘R),
   never what the page shows. Help has Open Log Folder and Show Data Folder. Plain-letter keys stay off menu
   items so they never take a typed letter; Copy Key has no ⌘C there because Edit → Copy owns it.
