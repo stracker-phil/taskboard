@@ -8,6 +8,7 @@ import { Header } from "./Header";
 import { TokenBanner } from "./TokenBanner";
 import { findLevel } from "./levels";
 import { Sidebar } from "./Sidebar/Sidebar";
+import { SidebarToggle } from "./SidebarToggle";
 import { Toolbar } from "./toolbar/Toolbar";
 import { ViewTabs } from "./ViewTabs";
 
@@ -17,13 +18,15 @@ interface Props {
   children: ReactNode;
 }
 
-/** The main window's frame: the sidebar beside the inset content panel. */
+/** The main window's frame: the sidebar beside the inset content panel, and the sidebar toggle fixed in the
+ *  lower-left corner over both. */
 export function Window({ sidebarHidden, children }: Props) {
   const issueView = useStore((s) => s.issueView);
   useCloseIssueOnNavigation();
   return (
     <div className={sidebarHidden ? "shell shell--sidebar-hidden" : "shell"}>
       {!sidebarHidden && <Sidebar />}
+      <SidebarToggle sidebarHidden={sidebarHidden} />
       <div className="shell__content">
         {sidebarHidden && <div className="shell__titlebar" data-tauri-drag-region />}
         <main className="content-panel">

@@ -24,8 +24,14 @@ an item.
   sidebar), 12px radius, `--shadow-panel`. Popovers anchor to the panel.
 - **Traffic lights** are the native ones, inside the sidebar's top 18px strip (`trafficLightPosition` 20, 24);
   the strip and empty chrome drag the window. There is no top bar, icon rail or status bar.
-- **Sidebar** ([below](#sidebar)): ⌘\ hides it; the panel then takes the full width under a 42px strip that
-  keeps the traffic lights off it. The state is kept in `ui_state.json`.
+- **Sidebar** ([below](#sidebar)): ⌘\ or the sidebar toggle hides it; the panel then takes the full width under
+  a 42px strip that keeps the traffic lights off it. The state is kept in `ui_state.json`.
+- **Sidebar toggle** (`src/shell/SidebarToggle.tsx`): a 34px button (panel icon 17/1.8, styled like Settings)
+  that the frame, not the sidebar, draws 12px from the window's left and bottom edges, so it never moves. With
+  the sidebar shown it is the footer's first item; hidden, it floats over the panel's lower-left corner on
+  `--panel-bg` with `--shadow-panel` (`--shadow-hover` on hover), and the Table and Board keep 46px clear
+  below their content. "Hide sidebar" or "Show sidebar" with the current shortcut; `aria-pressed` while the
+  sidebar shows. It runs `view:toggleSidebar` and stays the same element, so focus stays on it.
 - **Content panel** (`main`, a flex column): the [header](#content-header), the [view tabs](#view-tabs), then
   the view body (`.content-panel__body`). Until the issue list the body is `SyncStatusView` (`src/shell/SyncStatusView.tsx`) says
   "Connect Jira in Settings" with an Open Settings button while no project is tracked; during a full sync
@@ -63,10 +69,12 @@ an item.
   selected one's name renames it, one on its tile or icon opens the look editor (`LookPopover`, saved with
   `space_update` or `list_set_look`) under it. A double-click renames as well. The header and Home show the same
   tile.
-- **Footer** (`SidebarFooter`): the sync chip (34px, 13px `--text-tertiary`; a 7px dot in `--sync-ok`,
-  `--sync-busy`, `--sync-offline` or `--sync-error-dot` by state; the state in words from
-  `describeSyncState`; a refresh icon 14/2; a click syncs now) and Settings (34px, gear 17/1.8).
-- **Hover**: rows, "+", the chip and Settings take `--fill-hover`; the selected row keeps its fill.
+- **Footer** (`SidebarFooter`): room on the left for the window's [sidebar toggle](#window), then the sync
+  chip (34px, 13px `--text-tertiary`; a 7px dot in `--sync-ok`, `--sync-busy`, `--sync-offline` or
+  `--sync-error-dot` by state; the state in words from `describeSyncState`; a refresh icon 14/2; a click syncs
+  now) and Settings (34px, gear 17/1.8).
+- **Hover**: rows, "+", the chip, Settings and the sidebar toggle take `--fill-hover`; the selected row keeps
+  its fill.
 - **Context menus** ([Menus](#menus)). A filter list: Rename, Icon and Color…, Duplicate, Add to Home or
   Remove from Home, Delete. A Space: Rename, Icon and Color…, Client label…, Space Settings…, Stop tracking.
 - **Renaming** (`components/InlineRename.tsx`), everywhere a name is renamed: the name turns into a field with

@@ -1,5 +1,6 @@
 /* The main window's frame: the sidebar on the window background beside the inset content panel. */
 .shell {
+  position: relative;
   display: grid;
   grid-template-columns: 264px 1fr;
   height: 100%;
@@ -23,6 +24,21 @@
   flex: none;
   height: 18px;
 }
+
+/* The sidebar toggle never moves: the footer's first item, or floating over the panel's corner when hidden. */
+.sidebar-toggle {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  z-index: 3;
+  transition: background-color var(--motion-base) var(--ease-out), box-shadow var(--motion-base) var(--ease-out);
+}
+.shell--sidebar-hidden .sidebar-toggle { background: var(--panel-bg); box-shadow: var(--shadow-panel); }
+.shell--sidebar-hidden .sidebar-toggle:hover { background: var(--panel-bg); box-shadow: var(--shadow-hover); color: var(--text); }
+
+/* Views whose content reaches the panel's lower-left corner scroll it clear of the floating toggle. */
+.shell--sidebar-hidden .table-content { padding-bottom: 46px; }
+.shell--sidebar-hidden .board { padding-bottom: 46px; }
 
 .shell__content {
   display: flex;

@@ -157,7 +157,8 @@
   pointer-events: none;
 }
 
-.sb-footer { display: flex; flex: none; align-items: center; gap: 6px; }
+/* The window's sidebar toggle (shell.css) sits over the footer's left end. */
+.sb-footer { display: flex; flex: none; align-items: center; gap: 6px; padding-left: 40px; }
 .sb-sync {
   display: flex;
   flex: 1;
@@ -178,7 +179,7 @@
 .sb-sync__dot[data-state="running"] { background: var(--sync-busy); }
 .sb-sync__dot[data-state="offline"] { background: var(--sync-offline); }
 .sb-sync__dot[data-state="error"], .sb-sync__dot[data-state="paused"] { background: var(--sync-error-dot); }
-.sb-settings {
+.sb-settings, .sidebar-toggle {
   display: flex;
   flex: none;
   align-items: center;
@@ -191,7 +192,7 @@
   background: transparent;
   color: var(--text-tertiary);
 }
-.sb-sync:hover, .sb-settings:hover { background: var(--fill-hover); }
+.sb-sync:hover, .sb-settings:hover, .sidebar-toggle:hover { background: var(--fill-hover); }
 
 /* The chip's states (artboard 8, panel 5): offline on white, paused and failed in red. */
 .sb-sync[data-state="offline"] { background: var(--panel-bg); }
