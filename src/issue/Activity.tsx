@@ -81,7 +81,7 @@ export function ActivityEntry({ item }: { item: ActivityItem }) {
   );
 }
 
-/** Comments and recorded changes, oldest first, with All / Comments / Changes; new ones under a divider. */
+/** Comments and recorded changes, newest first; the new ones sit under a divider at the top. */
 function ActivityList({ items }: { items: ActivityItem[] }) {
   const firstNew = items.findIndex((item) => item.fresh);
   return items.map((item, i) => (

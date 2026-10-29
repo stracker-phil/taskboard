@@ -1,4 +1,4 @@
-//! An issue's activity: its comments and the field changes the sync recorded, oldest first.
+//! An issue's activity: its comments and the field changes the sync recorded, newest first.
 
 use std::collections::HashMap;
 
@@ -59,7 +59,7 @@ fn activity(conn: &Connection, viewer: &Viewer, id: &str) -> AppResult<Vec<Activ
     let me = viewer.me.clone();
     let mut items = comments(conn, id, me.as_deref())?;
     items.extend(changes(conn, id, me.as_deref())?);
-    items.sort_by(|a, b| at(a).cmp(at(b)));
+    items.sort_by(|a, b| at(b).cmp(at(a)));
     if let Some(boundary) = unseen_since(conn, id)? {
         for item in &mut items {
             let newer = at(item) > boundary.as_str();

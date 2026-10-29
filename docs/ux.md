@@ -251,7 +251,7 @@ view with its place intact).
   open first, done behind "Show N done"; "Open as list view" narrows the origin view to the epic (a removable
   chip in the toolbar, never saved).
 - Activity (400 wide, `--panel-subtle-bg`): All / Comments / Changes, comment cards and change lines (status
-  changes as activity pills), oldest first; the comment box waits for writes. Opening an issue fetches its
+  changes as activity pills), newest first; the comment box waits for writes. Opening an issue fetches its
   comments when the cached ones may be behind (`issue_sync_comments`).
 - Jira's HTML is sanitised (`lib/jiraHtml.ts`, [ADR 0027](adr/0027-jira-html-is-sanitised-and-shows-no-remote-content.md)):
   links open in the browser, images become link chips. The peek shows the same description and the latest

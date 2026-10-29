@@ -62,13 +62,13 @@ describe("Activity", () => {
     expect(await screen.findByText("Created the issue")).toBeInTheDocument();
   });
 
-  it("keeps the order it is given", async () => {
-    renderActivity([created(), commentItem({ id: "1", author: SAM }), changeItem()]);
+  it("lists the items in the order received, newest first", async () => {
+    renderActivity([changeItem(), commentItem({ id: "1", author: SAM }), created()]);
 
     await screen.findByText("Sam Lee");
     const text = screen.getByRole("complementary", { name: "Activity" }).textContent ?? "";
-    expect(text.indexOf("Created the issue")).toBeLessThan(text.indexOf("Sam Lee"));
-    expect(text.indexOf("Sam Lee")).toBeLessThan(text.indexOf("Changed status"));
+    expect(text.indexOf("Changed status")).toBeLessThan(text.indexOf("Sam Lee"));
+    expect(text.indexOf("Sam Lee")).toBeLessThan(text.indexOf("Created the issue"));
   });
 
   describe("new since yesterday", () => {
@@ -76,19 +76,20 @@ describe("Activity", () => {
     const first = () => commentItem({ id: "2", author: SAM, bodyHtml: "<p>First new note</p>", fresh: true });
     const second = () => commentItem({ id: "3", author: SAM, bodyHtml: "<p>Second new note</p>", fresh: true });
 
-    it("puts one separator right before the first fresh item, even when later ones are fresh too", async () => {
-      renderActivity([old(), first(), second()]);
+    it("puts one separator above the fresh items at the top, ahead of the older ones", async () => {
+      renderActivity([second(), first(), old()]);
 
       const separator = await screen.findByRole("separator");
       expect(separator).toHaveTextContent("New since yesterday");
       expect(screen.getAllByRole("separator")).toHaveLength(1);
       const text = screen.getByRole("complementary", { name: "Activity" }).textContent ?? "";
-      expect(text.indexOf("Old note")).toBeLessThan(text.indexOf("New since yesterday"));
-      expect(text.indexOf("New since yesterday")).toBeLessThan(text.indexOf("First new note"));
+      expect(text.indexOf("New since yesterday")).toBeLessThan(text.indexOf("Second new note"));
+      expect(text.indexOf("Second new note")).toBeLessThan(text.indexOf("First new note"));
+      expect(text.indexOf("First new note")).toBeLessThan(text.indexOf("Old note"));
     });
 
     it("shows no separator when no item is fresh", async () => {
-      renderActivity([old(), changeItem()]);
+      renderActivity([changeItem(), old()]);
 
       await screen.findByText("Old note");
       expect(screen.queryByRole("separator")).not.toBeInTheDocument();
@@ -96,7 +97,7 @@ describe("Activity", () => {
   });
 
   describe("filter", () => {
-    const items = () => [created(), commentItem({ author: SAM }), changeItem()];
+    const items = () => [changeItem(), commentItem({ author: SAM }), created()];
 
     it("shows everything by default", async () => {
       renderActivity(items());

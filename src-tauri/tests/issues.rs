@@ -622,7 +622,7 @@ async fn an_unknown_id_is_not_found() {
 
 #[tokio::test]
 #[ignore = "syncs the demo site into a temp database"]
-async fn the_activity_lists_the_comments_in_time_order_with_their_authors() {
+async fn the_activity_lists_the_comments_newest_first_with_their_authors() {
     let site = Site::new().await;
 
     let items = site.activity("NW-1042").await;
@@ -638,14 +638,39 @@ async fn the_activity_lists_the_comments_in_time_order_with_their_authors() {
         comments,
         [
             (Some(marta()), false),
-            (Some(alex()), false),
             (Some(marta()), false),
+            (Some(alex()), false),
             (Some(marta()), false),
         ]
     );
     let times = comment_times(&items);
     assert_eq!(times.len(), 4);
-    assert!(times.is_sorted(), "{times:?}");
+    assert!(times.is_sorted_by(|a, b| a >= b), "{times:?}");
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn a_change_newer_than_the_comments_comes_before_them_in_the_activity() {
+    let site = Site::new().await;
+    site.fake.set_now(later());
+    site.fake
+        .edit_issue("NW-1042", |fields| fields["status"] = done_status());
+
+    site.resync().await;
+
+    let items = site.activity("NW-1042").await;
+    let times: Vec<&str> = items
+        .iter()
+        .map(|item| match item {
+            ActivityItem::Comment { at, .. } | ActivityItem::Change { at, .. } => at.as_str(),
+        })
+        .collect();
+    assert_eq!(items.len(), 5);
+    assert!(
+        matches!(&items[0], ActivityItem::Change { at, .. } if at == LATER_UTC),
+        "{items:?}"
+    );
+    assert!(times.is_sorted_by(|a, b| a >= b), "{times:?}");
 }
 
 #[tokio::test]

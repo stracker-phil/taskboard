@@ -508,7 +508,7 @@ mod fresh_activity {
         }
     }
 
-    /// `(at, fresh)` of the field changes, oldest first.
+    /// `(at, fresh)` of the field changes, sorted oldest first for stable comparison.
     fn change_freshness(items: &[ActivityItem]) -> Vec<(String, bool)> {
         let mut found: Vec<(String, bool)> = items
             .iter()

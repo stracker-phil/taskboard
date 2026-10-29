@@ -325,8 +325,8 @@ describe("Peek", () => {
   describe("latest activity", () => {
     const comment = (id: string, text: string) => commentItem({ id, bodyHtml: `<p>${text}</p>` });
 
-    it("shows the latest three items, newest first, under Latest activity", async () => {
-      mocked.issueActivity.mockResolvedValue([comment("1", "First note"), comment("2", "Second note"), comment("3", "Third note"), comment("4", "Fourth note")]);
+    it("shows the first three items as received, newest first, under Latest activity", async () => {
+      mocked.issueActivity.mockResolvedValue([comment("4", "Fourth note"), comment("3", "Third note"), comment("2", "Second note"), comment("1", "First note")]);
       renderPeek();
 
       const section = within(await screen.findByRole("region", { name: "Latest activity" }));

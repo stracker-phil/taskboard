@@ -72,7 +72,7 @@ const LATEST = 3;
 
 function Body({ issue, onExpand, onClose }: { issue: IssueDetail; onExpand: () => void; onClose: () => void }) {
   const { data: activity = [] } = useIssueActivity(issue.id);
-  const latest = activity.slice(-LATEST).reverse();
+  const latest = activity.slice(0, LATEST);
   return (
     <>
       <h2 className={issue.gone ? "peek__title issue-title--gone" : "peek__title"}>{issue.summary}</h2>
