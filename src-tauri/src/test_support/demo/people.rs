@@ -5,7 +5,7 @@ use serde_json::{Value, json};
 use super::SITE_URL;
 
 pub const ME_EMAIL: &str = "alex.morgan@example.com";
-const TIME_ZONE: &str = "Europe/Vienna";
+const TIME_ZONE: &str = "Europe/Berlin";
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Person {

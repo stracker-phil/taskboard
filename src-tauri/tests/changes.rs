@@ -38,7 +38,7 @@ const THREE_DAYS_AGO: &str = "2026-10-25T09:00:00.000Z";
 fn viewer() -> Viewer {
     Viewer {
         me: Some(ME_ACCOUNT_ID.into()),
-        time_zone: Some("Europe/Vienna".into()),
+        time_zone: Some("Europe/Berlin".into()),
         now: DEMO_NOW.parse::<DateTime<Utc>>().unwrap(),
     }
 }

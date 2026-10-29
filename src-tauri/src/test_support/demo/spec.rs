@@ -1,6 +1,6 @@
 //! Compact descriptions of demo issues and comments, built into Jira JSON by `render`.
 //!
-//! Times are Vienna wall-clock strings (`"2026-10-28 11:42"`) relative to `DEMO_NOW`.
+//! Times are Berlin wall-clock strings (`"2026-10-28 11:42"`) relative to `DEMO_NOW`.
 
 use super::catalog::{Kind, Priority, Status};
 use super::people::{JR, Person};

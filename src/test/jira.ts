@@ -10,7 +10,7 @@ export function connection(patch: Partial<Connection> = {}): Connection {
     cloudId: null,
     accountId: "demo-account-1",
     displayName: "Alex Morgan",
-    timeZone: "Europe/Vienna",
+    timeZone: "Europe/Berlin",
     ...patch,
   };
 }

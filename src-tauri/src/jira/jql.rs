@@ -110,12 +110,12 @@ mod tests {
         for (instant, zone, expected) in [
             (
                 utc(2026, 1, 15, 9, 5, 0),
-                "Europe/Vienna",
+                "Europe/Berlin",
                 "2026-01-15 10:05",
             ),
             (
                 utc(2026, 7, 15, 8, 5, 0),
-                "Europe/Vienna",
+                "Europe/Berlin",
                 "2026-07-15 10:05",
             ),
             (
@@ -137,7 +137,7 @@ mod tests {
     #[test]
     fn date_literals_round_down_to_the_minute() {
         assert_eq!(
-            date_literal(utc(2026, 10, 28, 9, 5, 59), "Europe/Vienna").unwrap(),
+            date_literal(utc(2026, 10, 28, 9, 5, 59), "Europe/Berlin").unwrap(),
             "2026-10-28 10:05"
         );
     }
@@ -145,7 +145,7 @@ mod tests {
     #[test]
     fn date_literals_cross_the_day_boundary_with_the_zone_offset() {
         assert_eq!(
-            date_literal(utc(2026, 10, 28, 23, 30, 0), "Europe/Vienna").unwrap(),
+            date_literal(utc(2026, 10, 28, 23, 30, 0), "Europe/Berlin").unwrap(),
             "2026-10-29 00:30"
         );
         assert_eq!(

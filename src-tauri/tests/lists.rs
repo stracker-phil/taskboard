@@ -44,7 +44,7 @@ const NWS: &str = "10002";
 fn viewer(me: Option<&str>) -> Viewer {
     Viewer {
         me: me.map(String::from),
-        time_zone: Some("Europe/Vienna".into()),
+        time_zone: Some("Europe/Berlin".into()),
         now: DEMO_NOW.parse::<DateTime<Utc>>().unwrap(),
     }
 }

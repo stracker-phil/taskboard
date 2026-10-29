@@ -81,7 +81,7 @@ export function createApiMock(): Api {
       hasToken: token !== null,
       expiry: { state: "fine" },
     })),
-    connectionTest: vi.fn().mockResolvedValue({ displayName: "Alex Morgan", accountId: "demo-account-1", timeZone: "Europe/Vienna", cloudId: null }),
+    connectionTest: vi.fn().mockResolvedValue({ displayName: "Alex Morgan", accountId: "demo-account-1", timeZone: "Europe/Berlin", cloudId: null }),
     projectsList: vi.fn().mockResolvedValue([]),
     projectsRefresh: vi.fn().mockResolvedValue([]),
     projectTrack: vi.fn().mockResolvedValue(undefined),

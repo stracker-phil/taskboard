@@ -26,7 +26,7 @@ const COMMENT_TEXT: &str = "Please check the staging deploy before Friday.";
 fn viewer(now: &str) -> Viewer {
     Viewer {
         me: Some(ME.into()),
-        time_zone: Some("Europe/Vienna".into()),
+        time_zone: Some("Europe/Berlin".into()),
         now: now.parse::<DateTime<Utc>>().unwrap(),
     }
 }

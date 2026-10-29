@@ -64,7 +64,7 @@ mod tests {
     }
 
     fn vienna() -> Tz {
-        "Europe/Vienna".parse().unwrap()
+        "Europe/Berlin".parse().unwrap()
     }
 
     fn ends(duration: PinDuration, now: &str, tz: Tz) -> Option<DateTime<Utc>> {

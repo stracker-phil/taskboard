@@ -419,7 +419,7 @@ mod demo_answers {
 
         assert_eq!(me.account_id, "712020:5a1e0c3f-8d2b-4f61-9c7e-1b2a3c4d5e01");
         assert_eq!(me.display_name, "Alex Morgan");
-        assert_eq!(me.time_zone, "Europe/Vienna");
+        assert_eq!(me.time_zone, "Europe/Berlin");
     }
 
     #[tokio::test]
@@ -748,7 +748,7 @@ mod fake_knobs {
         });
 
         let just_before =
-            date_literal(edited_at - chrono::Duration::minutes(1), "Europe/Vienna").unwrap();
+            date_literal(edited_at - chrono::Duration::minutes(1), "Europe/Berlin").unwrap();
         assert_eq!(just_before, "2026-10-28 12:59");
         let found = all_issues(&client, &and_updated_since(&tracked_scope(), &just_before)).await;
         assert_eq!(found.len(), 1);
@@ -762,7 +762,7 @@ mod fake_knobs {
             parse_jira_time("2026-10-28T12:00:00.000+0000")
         );
         let after_edit =
-            date_literal(edited_at + chrono::Duration::minutes(1), "Europe/Vienna").unwrap();
+            date_literal(edited_at + chrono::Duration::minutes(1), "Europe/Berlin").unwrap();
         assert!(
             all_issues(&client, &and_updated_since(&tracked_scope(), &after_edit))
                 .await

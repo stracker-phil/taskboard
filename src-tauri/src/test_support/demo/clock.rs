@@ -1,7 +1,7 @@
-//! Turns the tables' Vienna wall-clock times into Jira timestamps, shifted to a chosen "now".
+//! Turns the tables' Berlin wall-clock times into Jira timestamps, shifted to a chosen "now".
 
 use chrono::{DateTime, NaiveDate, NaiveDateTime, TimeDelta, TimeZone, Utc};
-use chrono_tz::Europe::Vienna;
+use chrono_tz::Europe::Berlin;
 
 use super::DEMO_NOW;
 
@@ -17,17 +17,17 @@ impl Clock {
     /// A clock that keeps every table time as far before `now` as it is before [`DEMO_NOW`].
     pub fn new(now: DateTime<Utc>) -> Self {
         let anchor = demo_now();
-        let local_day = |at: DateTime<Utc>| at.with_timezone(&Vienna).date_naive();
+        let local_day = |at: DateTime<Utc>| at.with_timezone(&Berlin).date_naive();
         Self {
             shift: now - anchor,
             day_shift: (local_day(now) - local_day(anchor)).num_days(),
         }
     }
 
-    /// `"2026-10-28 11:42"` (Vienna) as Jira's `2026-10-28T11:42:00.000+0100`, shifted exactly.
+    /// `"2026-10-28 11:42"` (Berlin) as Jira's `2026-10-28T11:42:00.000+0100`, shifted exactly.
     pub fn stamp(&self, local: &str) -> String {
         let at = vienna(parse(local)) + self.shift;
-        at.with_timezone(&Vienna)
+        at.with_timezone(&Berlin)
             .format("%Y-%m-%dT%H:%M:%S%.3f%z")
             .to_string()
     }
@@ -56,10 +56,10 @@ fn parse(local: &str) -> NaiveDateTime {
 }
 
 fn vienna(naive: NaiveDateTime) -> DateTime<Utc> {
-    Vienna
+    Berlin
         .from_local_datetime(&naive)
         .earliest()
-        .expect("demo time in Vienna")
+        .expect("demo time in Berlin")
         .with_timezone(&Utc)
 }
 
@@ -67,7 +67,7 @@ pub fn demo_now() -> DateTime<Utc> {
     DEMO_NOW.parse().expect("DEMO_NOW is RFC 3339")
 }
 
-/// Formats an instant as the Vienna wall-clock time the tables use.
+/// Formats an instant as the Berlin wall-clock time the tables use.
 pub fn local(at: DateTime<Utc>) -> String {
-    at.with_timezone(&Vienna).format(LOCAL_FORMAT).to_string()
+    at.with_timezone(&Berlin).format(LOCAL_FORMAT).to_string()
 }

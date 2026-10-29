@@ -148,7 +148,7 @@ impl Rig {
     async fn open_counts(&self) -> (Option<i64>, i64) {
         let viewer = Viewer {
             me: None,
-            time_zone: Some("Europe/Vienna".into()),
+            time_zone: Some("Europe/Berlin".into()),
             now: DEMO_NOW.parse::<DateTime<Utc>>().unwrap(),
         };
         let tree = sidebar_tree(&self.ctx.db, viewer).await.unwrap();
@@ -620,7 +620,7 @@ mod the_full_sync {
 
         let connection = rig.ctx.settings.get().connection;
         assert_eq!(connection.display_name.as_deref(), Some("Alex Morgan"));
-        assert_eq!(connection.time_zone.as_deref(), Some("Europe/Vienna"));
+        assert_eq!(connection.time_zone.as_deref(), Some("Europe/Berlin"));
         assert_eq!(
             connection.account_id.as_deref(),
             Some("712020:5a1e0c3f-8d2b-4f61-9c7e-1b2a3c4d5e01")
@@ -1417,7 +1417,7 @@ mod the_delta_sync {
         rig.full_sync().await;
         let cursor = rig.cursor().await.unwrap();
         let since = cursor.parse::<DateTime<Utc>>().unwrap() - chrono::Duration::minutes(2);
-        let literal = date_literal(since, "Europe/Vienna").unwrap();
+        let literal = date_literal(since, "Europe/Berlin").unwrap();
         let scope = default_scope(&tracked_keys(), 90).unwrap();
 
         rig.job(Job::Delta, None).await;

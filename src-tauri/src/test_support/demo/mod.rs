@@ -25,7 +25,7 @@ pub use synthetic::synthetic;
 use clock::Clock;
 use spec::{CommentSpec, IssueSpec};
 
-/// The fixed "now" the demo tables are written against (Wednesday, 12:00 in Vienna).
+/// The fixed "now" the demo tables are written against (Wednesday, 12:00 in Berlin).
 pub const DEMO_NOW: &str = "2026-10-28T11:00:00Z";
 /// The placeholder site URL in `self` links.
 pub const SITE_URL: &str = "https://example.atlassian.net";

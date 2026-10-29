@@ -269,7 +269,7 @@ impl Parser {
 
 #[cfg(test)]
 mod tests {
-    use chrono_tz::Europe::Vienna;
+    use chrono_tz::Europe::Berlin;
     use serde_json::json;
 
     use super::*;
@@ -304,7 +304,7 @@ mod tests {
     fn context_at(now: &str) -> Context {
         Context {
             now: now.parse().unwrap(),
-            zone: Vienna,
+            zone: Berlin,
         }
     }
 

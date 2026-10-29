@@ -238,7 +238,7 @@ impl Fixture {
         Ctx {
             me: me.map(str::to_string),
             today: NaiveDate::from_ymd_opt(2026, 10, 28).unwrap(),
-            tz: chrono_tz::Europe::Vienna,
+            tz: chrono_tz::Europe::Berlin,
             custom: self.custom.clone(),
         }
     }

@@ -29,7 +29,7 @@ const RUNS: usize = 20;
 fn viewer() -> Viewer {
     Viewer {
         me: Some(ME_ACCOUNT_ID.into()),
-        time_zone: Some("Europe/Vienna".into()),
+        time_zone: Some("Europe/Berlin".into()),
         now: DEMO_NOW.parse::<DateTime<Utc>>().unwrap(),
     }
 }

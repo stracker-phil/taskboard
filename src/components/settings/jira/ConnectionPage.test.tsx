@@ -94,7 +94,7 @@ describe("ConnectionPage", () => {
       await userEvent.type(screen.getByLabelText("API token"), "demo-token-123");
       await userEvent.click(screen.getByRole("button", { name: "Test Connection" }));
 
-      expect(await screen.findByText("Connected as Alex Morgan · Europe/Vienna")).toBeInTheDocument();
+      expect(await screen.findByText("Connected as Alex Morgan · Europe/Berlin")).toBeInTheDocument();
       expect(mocked.connectionSave).toHaveBeenCalledWith(
         { siteUrl: "https://example.atlassian.net/", email: "alex.morgan@example.com", tokenKind: "classic", tokenExpires: null, cloudId: null },
         "demo-token-123",

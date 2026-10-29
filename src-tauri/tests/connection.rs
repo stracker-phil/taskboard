@@ -100,7 +100,7 @@ impl Rig {
                 s.connection.cloud_id = Some("cloud-1".into());
                 s.connection.account_id = Some("account-1".into());
                 s.connection.display_name = Some("Alex Morgan".into());
-                s.connection.time_zone = Some("Europe/Vienna".into());
+                s.connection.time_zone = Some("Europe/Berlin".into());
             })
             .await
             .unwrap();
@@ -240,7 +240,7 @@ mod saving {
         assert_eq!(view.connection.cloud_id.as_deref(), Some("cloud-1"));
         assert_eq!(view.connection.account_id.as_deref(), Some("account-1"));
         assert_eq!(view.connection.display_name.as_deref(), Some("Alex Morgan"));
-        assert_eq!(view.connection.time_zone.as_deref(), Some("Europe/Vienna"));
+        assert_eq!(view.connection.time_zone.as_deref(), Some("Europe/Berlin"));
     }
 
     #[tokio::test]
@@ -373,14 +373,14 @@ mod testing_the_connection {
             ConnectionTest {
                 display_name: "Alex Morgan".into(),
                 account_id: ME_ACCOUNT_ID.into(),
-                time_zone: "Europe/Vienna".into(),
+                time_zone: "Europe/Berlin".into(),
                 cloud_id: None,
             }
         );
         let stored = rig.settings.get().connection;
         assert_eq!(stored.account_id.as_deref(), Some(ME_ACCOUNT_ID));
         assert_eq!(stored.display_name.as_deref(), Some("Alex Morgan"));
-        assert_eq!(stored.time_zone.as_deref(), Some("Europe/Vienna"));
+        assert_eq!(stored.time_zone.as_deref(), Some("Europe/Berlin"));
         assert_eq!(rig.fake.paths(), ["/rest/api/3/myself"]);
     }
 
