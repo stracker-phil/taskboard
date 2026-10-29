@@ -1,5 +1,7 @@
-//! The one door to Jira (ADR 0025): every request is an allowlisted `Endpoint`.
+//! The one door to Jira (ADR 0025): every request is an allowlisted `Endpoint`; profile pictures come only
+//! from Atlassian's avatar host through `AvatarClient` (ADR 0032).
 
+mod avatar;
 mod endpoint;
 mod guard;
 mod http;
@@ -13,6 +15,7 @@ use base64::Engine;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
+pub use avatar::{AvatarClient, Image, ImageKind, MAX_AVATAR_BYTES, check_image};
 pub use endpoint::{Access, BadRequest, Endpoint, PAGE_SIZE, Planned};
 pub use guard::check;
 pub use http::MAX_ANSWER_BYTES;

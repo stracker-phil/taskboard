@@ -7,6 +7,7 @@ use crate::connection::JiraAccess;
 use crate::db::Db;
 use crate::error::AppResult;
 use crate::jira::Limiter;
+use crate::jira::gateway::AvatarClient;
 use crate::launch::LaunchQueue;
 use crate::nav::NavStore;
 use crate::secrets::SecretStore;
@@ -22,6 +23,7 @@ pub struct AppState {
     pub launches: LaunchQueue,
     pub db: Db,
     pub jira: JiraAccess,
+    pub avatars: AvatarClient,
     pub nav: NavStore,
     pub places: PlaceStore,
 }
@@ -35,6 +37,7 @@ impl AppState {
             launches: LaunchQueue::default(),
             db: Db::open(config_dir)?,
             jira: JiraAccess::new(secret_store(), Arc::new(Limiter::default())),
+            avatars: AvatarClient::default(),
             nav: NavStore::open(config_dir),
             places: PlaceStore::open(config_dir),
         })

@@ -4,6 +4,7 @@ use chrono::{DateTime, Utc};
 use serde_json::Value;
 
 use crate::jira::dto::{Issue, parse_jira_time};
+use crate::net::AvatarUrl;
 
 /// The custom fields whose ids differ per site (found in `/field` by their type).
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -256,7 +257,8 @@ fn users_of(issue: &Issue) -> Vec<UserRow> {
             users.push(UserRow {
                 account_id,
                 name,
-                avatar_url: text(&person["avatarUrls"]["48x48"]),
+                avatar_url: text(&person["avatarUrls"]["48x48"])
+                    .filter(|url| AvatarUrl::parse(url).is_some()),
             });
         }
     }
@@ -344,15 +346,24 @@ mod tests {
         map_issue(&edited(key, edit), &ids()).unwrap_or_else(|| panic!("{key} didn't map"))
     }
 
+    /// The demo people's pictures are on `avatar.example.com`, which isn't Atlassian's avatar host.
     fn user_row(account_id: &str, name: &str) -> UserRow {
         UserRow {
             account_id: account_id.into(),
             name: name.into(),
-            avatar_url: Some(format!(
-                "https://avatar.example.com/{}/48.png",
-                account_id.replace(':', "-")
-            )),
+            avatar_url: None,
         }
+    }
+
+    fn assignee_avatar(url: &str) -> Option<String> {
+        let mapped = mapped_edit("NW-1042", |issue| {
+            issue["fields"]["assignee"]["avatarUrls"]["48x48"] = json!(url);
+        });
+        mapped
+            .users
+            .into_iter()
+            .find(|u| u.account_id == ALEX)
+            .and_then(|u| u.avatar_url)
     }
 
     type SprintColumns = (Option<String>, Option<String>, Option<String>);
@@ -743,6 +754,26 @@ mod tests {
                 user_row(MARTA, "Marta Klein"),
             ]
         );
+    }
+
+    #[test]
+    fn a_person_keeps_their_48_px_picture_on_the_atlassian_avatar_host() {
+        let url = "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/712020:aaaa/0f1e2d3c/48";
+
+        assert_eq!(assignee_avatar(url).as_deref(), Some(url));
+    }
+
+    #[test]
+    fn a_picture_on_any_other_host_is_not_kept() {
+        for url in [
+            "https://secure.gravatar.com/avatar/0f1e2d3c?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FAM-1.png",
+            "http://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/712020:aaaa/0f1e2d3c/48",
+            "https://avatar-management--avatars.evil.example.com/712020:aaaa/48",
+            "https://example.atlassian.net/secure/useravatar?avatarId=10122",
+            "not a url",
+        ] {
+            assert_eq!(assignee_avatar(url), None, "{url}");
+        }
     }
 
     #[test]

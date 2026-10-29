@@ -1,6 +1,6 @@
-//! What the network layer shares (ADR 0013, ADR 0020): the hosts, its answer and error types, and log
-//! redaction. The only HTTP client lives in `jira::gateway` (ADR 0025); the webview never talks to the
-//! network.
+//! What the network layer shares (ADR 0013, ADR 0020, ADR 0032): the hosts, the avatar host rule, its answer
+//! and error types, and log redaction. The only HTTP client lives in `jira::gateway` (ADR 0025); the webview
+//! never talks to the network.
 
 use url::Url;
 
@@ -30,6 +30,51 @@ pub struct Answer {
     pub retry_after: Option<String>,
     pub rate_limit_reason: Option<String>,
     pub body: Vec<u8>,
+}
+
+/// Atlassian's public avatar CDN is `avatar-management--avatars.<region>.prod.public.atl-paas.net`.
+const AVATAR_HOST_PREFIX: &str = "avatar-management--avatars.";
+const AVATAR_HOST_SUFFIX: &str = ".prod.public.atl-paas.net";
+const MAX_AVATAR_URL_LEN: usize = 2048;
+
+/// A profile picture's address on Atlassian's avatar host (ADR 0032): `https`, the default port, no
+/// credentials, no fragment. The only kind of address the avatar client fetches.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AvatarUrl(Url);
+
+impl AvatarUrl {
+    pub fn parse(text: &str) -> Option<Self> {
+        if text.len() > MAX_AVATAR_URL_LEN {
+            return None;
+        }
+        let url = Url::parse(text).ok()?;
+        let plain = url.scheme() == "https"
+            && url.username().is_empty()
+            && url.password().is_none()
+            && url.port().is_none()
+            && url.fragment().is_none();
+        (plain && url.host_str().is_some_and(is_avatar_host)).then_some(Self(url))
+    }
+
+    pub fn as_url(&self) -> &Url {
+        &self.0
+    }
+
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+/// The region is lowercase letters, digits and dashes: no dot, so nothing can be appended or prepended.
+pub(crate) fn is_avatar_host(host: &str) -> bool {
+    host.strip_prefix(AVATAR_HOST_PREFIX)
+        .and_then(|rest| rest.strip_suffix(AVATAR_HOST_SUFFIX))
+        .is_some_and(|region| {
+            !region.is_empty()
+                && region
+                    .chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+        })
 }
 
 /// Plain `http` to loopback, where the fake Jira runs; only tests and debug builds may use it.
@@ -147,6 +192,75 @@ mod tests {
     #[test]
     fn plain_prose_about_basic_auth_stays_readable() {
         assert_eq!(redact("basic auth failed", EMAIL), "basic auth failed");
+    }
+
+    const AVATAR: &str = "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/712020:aaaa/0f1e2d3c/48";
+
+    #[test]
+    fn an_address_on_atlassians_avatar_host_is_an_avatar_url() {
+        for text in [
+            AVATAR,
+            "https://avatar-management--avatars.eu-central-1.prod.public.atl-paas.net/712020:bbbb/1a2b/48",
+            "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net:443/712020:aaaa/48",
+            "https://AVATAR-MANAGEMENT--AVATARS.US-WEST-2.PROD.PUBLIC.ATL-PAAS.NET/712020:aaaa/48",
+        ] {
+            assert!(AvatarUrl::parse(text).is_some(), "{text}");
+        }
+        assert_eq!(AvatarUrl::parse(AVATAR).unwrap().as_str(), AVATAR);
+    }
+
+    #[test]
+    fn plain_http_and_other_schemes_are_not_avatar_urls() {
+        for text in [
+            "http://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/712020:aaaa/48",
+            "ftp://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/712020:aaaa/48",
+            "data:image/png;base64,iVBORw0KGgo=",
+            "file:///tmp/avatar.png",
+        ] {
+            assert!(AvatarUrl::parse(text).is_none(), "{text}");
+        }
+    }
+
+    #[test]
+    fn other_hosts_and_lookalikes_are_not_avatar_urls() {
+        for text in [
+            "https://secure.gravatar.com/avatar/0f1e2d3c?d=mm",
+            "https://example.atlassian.net/secure/useravatar?avatarId=10122",
+            "https://api.atlassian.com/avatar.png",
+            "https://avatar-management--avatars.evil.com/712020:aaaa/48",
+            "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net.evil.com/48",
+            "https://avatar-management--avatars.us-west-2.evil.prod.public.atl-paas.net/48",
+            "https://avatar-management--avatars..prod.public.atl-paas.net/48",
+            "https://xavatar-management--avatars.us-west-2.prod.public.atl-paas.net/48",
+            "https://evil.example.com/avatar-management--avatars.us-west-2.prod.public.atl-paas.net/48",
+            "https://avatar-management--avatars.us_west.prod.public.atl-paas.net/48",
+            "https://127.0.0.1/48",
+            "https://localhost/48",
+            "http://127.0.0.1:47470/48",
+            "not a url",
+            "",
+        ] {
+            assert!(AvatarUrl::parse(text).is_none(), "{text}");
+        }
+    }
+
+    #[test]
+    fn credentials_a_port_or_a_fragment_make_it_no_avatar_url() {
+        for text in [
+            "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net@evil.example.com/48",
+            "https://user:secret@avatar-management--avatars.us-west-2.prod.public.atl-paas.net/48",
+            "https://user@avatar-management--avatars.us-west-2.prod.public.atl-paas.net/48",
+            "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net:8443/48",
+            "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/48#x",
+        ] {
+            assert!(AvatarUrl::parse(text).is_none(), "{text}");
+        }
+    }
+
+    #[test]
+    fn an_overlong_address_is_no_avatar_url() {
+        let long = format!("{AVATAR}/{}", "a".repeat(2048));
+        assert!(AvatarUrl::parse(&long).is_none());
     }
 
     #[test]

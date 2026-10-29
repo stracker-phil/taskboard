@@ -128,6 +128,7 @@ export function createApiMock(): Api {
     viewSetColumnCollapsed: vi.fn(),
     viewMove: vi.fn(),
     viewDelete: vi.fn(),
+    userAvatar: vi.fn(async (): Promise<string | null> => null),
     viewRows: vi.fn(async (): Promise<ViewData> => ({ groupBy: "none", groups: [], rows: {}, columns: [] })),
     viewBoard: vi.fn(async (): Promise<BoardData> => ({ columns: [], rows: {}, cardFields: [] })),
     issueGet: vi.fn(async (id: string): Promise<IssueDetail> => issueDetail({ id })),

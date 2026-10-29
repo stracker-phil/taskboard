@@ -1,7 +1,9 @@
 import type { Person } from "../../api";
+import { useUserAvatar } from "../../queries/avatars";
 
-/** A person's initials on their color. */
+/** A person's Jira profile picture (a `data:` URL from Rust), else their initials on their color. */
 export function Avatar({ person, size = 26 }: { person: Person; size?: number }) {
+  const { data: picture } = useUserAvatar(person.accountId);
   return (
     <span
       className={`avatar avatar--${person.color}`}
@@ -10,7 +12,7 @@ export function Avatar({ person, size = 26 }: { person: Person; size?: number })
       aria-label={person.name}
       role="img"
     >
-      {person.initials}
+      {picture ? <img className="avatar__picture" src={picture} alt="" draggable={false} /> : person.initials}
     </span>
   );
 }

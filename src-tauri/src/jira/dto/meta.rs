@@ -2,6 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::net::AvatarUrl;
+
 #[derive(Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Myself {
@@ -25,6 +27,24 @@ pub struct User {
     pub display_name: String,
     #[serde(default = "active")]
     pub active: bool,
+    #[serde(default)]
+    pub avatar_urls: AvatarUrls,
+}
+
+impl User {
+    /// The 48 px picture's address, when it is on Atlassian's avatar host (ADR 0032).
+    pub fn avatar_url(&self) -> Option<String> {
+        self.avatar_urls
+            .large
+            .clone()
+            .filter(|url| AvatarUrl::parse(url).is_some())
+    }
+}
+
+#[derive(Deserialize, Debug, Clone, Default, PartialEq)]
+pub struct AvatarUrls {
+    #[serde(rename = "48x48", default)]
+    pub large: Option<String>,
 }
 
 fn active() -> bool {

@@ -81,7 +81,9 @@ after the commit. Reset cache deletes only the cache file.
 
 Jira is reached only through `jira/gateway/` ([jira.md](jira.md)): one `JiraClient` per connection, whose
 gateway sends only the operations on its allowlist, to the site and `api.atlassian.com` only
-([ADR 0025](adr/0025-all-jira-traffic-goes-through-one-allowlisted-gateway.md)). The API token stays in the Keychain (`secrets.rs`);
+([ADR 0025](adr/0025-all-jira-traffic-goes-through-one-allowlisted-gateway.md)); its `AvatarClient` fetches
+profile pictures from Atlassian's avatar host only, without credentials, for `avatars/`
+([ADR 0032](adr/0032-avatars-come-from-atlassians-avatar-host-through-rust.md)). The API token stays in the Keychain (`secrets.rs`);
 `connection::JiraAccess` builds clients from the saved connection. The debug build serves the demo site from
 the fake Jira on loopback. The sync engine (`sync/`, [sync.md](sync.md)) is the one task that fetches issues;
 it asks a `sync::source::Source` (`SyncContext::source`), and `sync/jira_source.rs` is the only implementation
@@ -110,9 +112,10 @@ src-tauri/
   src/bus/                   the command bus
   src/db/                    the two SQLite files: open, migrate, read, the one write path
   migrations/local/ cache/   numbered SQL migrations per file
-  src/net.rs secrets.rs      hosts, answer and error types, log redaction; the Keychain
+  src/net.rs secrets.rs      hosts, the avatar host rule (AvatarUrl), answer and error types, log redaction; the Keychain
   src/jira/                  Jira Cloud: site, client, limiter, retries, paging, endpoints, DTOs, JQL
-  src/jira/gateway/          the one door to Jira: endpoint allowlist, validated values, guard, the HTTP client
+  src/jira/gateway/          the one door to Jira: endpoint allowlist, validated values, guard, the HTTP client,
+                             the avatar client (avatar.rs)
   src/connection/            the Jira connection: Keychain access, Test Connection, tracked projects, scope
   src/sync/                  the sync engine: one task, the full sync, Jira JSON to rows, change records
   src/filter/                filter conditions: the model, SQL compiler, conditions in words
@@ -125,6 +128,7 @@ src-tauri/
                              history (fetched.rs: how often details are fetched)
   src/status_style/          the six status styles (status types): detection and the owner's overrides per Space
   src/space_config/          a Space's own settings: offered layouts, new views' layout and grouping, field visibility
+  src/avatars/               people's profile pictures: freshness, the `cache.avatar` rows, `user_avatar` (data URLs)
   src/nav/                   where the main window is (level and view, nav.json); previous/next Space
   src/<feature>/             one folder per feature: types, pure logic, commands.rs, tests
   src/window/ menu/          the main and Settings windows, the native app menu

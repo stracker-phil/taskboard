@@ -62,6 +62,17 @@ request and sends `Authorization: Basic base64(email:token)` (never to `_edge/te
 4. `http.rs` `Http` sends it: listed hosts only, no redirects (a 3xx fails), JSON only on success, answers capped
    at `MAX_ANSWER_BYTES` (32 MB). It is the only place `reqwest` may be used (`src-tauri/clippy.toml`).
 
+**Profile pictures** ([ADR 0032](adr/0032-avatars-come-from-atlassians-avatar-host-through-rust.md)) are the one
+request that isn't an API call. `gateway/avatar.rs` `AvatarClient::fetch` takes only a `net::AvatarUrl`:
+`https`, the default port, no credentials or fragment, and the host exactly
+`avatar-management--avatars.<region>.prod.public.atl-paas.net` with a region of lowercase letters, digits and
+dashes. `Http::get_image` checks the rule again before the wire and sends a plain `GET` with no
+`Authorization` and no cookie (the host is public; the token and email never go there). A redirect, a non-2xx,
+an answer over `MAX_AVATAR_BYTES` (512 KB), or one whose `Content-Type` and magic bytes don't both say PNG,
+JPEG, GIF or WebP (never SVG) fails; `avatars::user_avatar` logs it without the address and shows initials.
+Jira's default pictures (Gravatar, `secure.gravatar.com`) are never fetched. The sync stores only addresses
+that pass the rule (`user.avatar_url`, the 48 px one).
+
 **Not API traffic:** the webview has no HTTP, shell or opener permission (`capabilities/default.json`). Links
 ("Open in Jira", links in descriptions) go through the `open_url` command, which hands an `https` URL without
 credentials to the default browser; the app sends nothing itself and the token never leaves the gateway.

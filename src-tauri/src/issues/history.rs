@@ -86,9 +86,9 @@ fn store(conn: &Connection, id: &str, entries: &[Changelog], source: &str) -> Ap
         };
         if let Some(author) = entry.author.as_ref().filter(|a| !a.display_name.is_empty()) {
             conn.execute(
-                "INSERT INTO cache.user (account_id, name, avatar_url) VALUES (?1, ?2, NULL)
-                 ON CONFLICT (account_id) DO UPDATE SET name = excluded.name",
-                params![author.account_id, author.display_name],
+                "INSERT INTO cache.user (account_id, name, avatar_url) VALUES (?1, ?2, ?3)
+                 ON CONFLICT (account_id) DO UPDATE SET name = excluded.name, avatar_url = excluded.avatar_url",
+                params![author.account_id, author.display_name, author.avatar_url()],
             )?;
         }
         incoming.extend(entry.items.iter().map(|item| HistoryRow {

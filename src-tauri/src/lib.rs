@@ -2,6 +2,7 @@
 //! Taskboard or starts the app.
 
 mod app;
+pub mod avatars;
 pub mod bus;
 pub mod changes;
 pub mod cli;

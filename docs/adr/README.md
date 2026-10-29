@@ -29,7 +29,7 @@ stands in Taskboard. The numbers in this table are Taskboard's.
 | [0017](0017-the-main-window-follows-the-taskboard-mockup.md) | The main window follows the Taskboard mockup | Accepted (2026-10-28) |
 | [0018](0018-reads-go-through-tanstack-query.md) | Reads go through TanStack Query, invalidated by events | Accepted (2026-10-28) |
 | [0019](0019-two-sqlite-files-through-rusqlite.md) | Two SQLite files through rusqlite: the owner's setup and a disposable Jira cache | Accepted (2026-10-28) |
-| [0020](0020-jira-site-and-atlassian-gateway-are-the-hosts.md) | The app talks to the configured Jira site and api.atlassian.com | Accepted (2026-10-28) |
+| [0020](0020-jira-site-and-atlassian-gateway-are-the-hosts.md) | The app talks to the configured Jira site and api.atlassian.com | Superseded in part by 0032 (avatars) |
 | [0021](0021-the-token-lives-in-the-keychain-through-secrets-rs.md) | The API token lives in the Keychain through `secrets.rs` | Amended by 0026 |
 | [0022](0022-the-debug-build-syncs-from-a-built-in-fake-jira.md) | The debug build syncs from a built-in fake Jira | Accepted (2026-10-28) |
 | [0023](0023-one-sync-task-full-sync-per-project-changes-by-diffing.md) | One sync task; the full sync runs per tracked project; changes are recorded by diffing | Accepted (2026-10-28) |
@@ -41,5 +41,6 @@ stands in Taskboard. The numbers in this table are Taskboard's.
 | [0029](0029-issues-come-from-a-source-jira-is-the-first.md) | Issues come from a source; Jira is the first | Accepted (2026-10-29) |
 | [0030](0030-a-space-carries-its-own-settings.md) | A Space carries its own settings | Accepted (2026-10-29) |
 | [0031](0031-issue-history-comes-from-the-changelog-on-demand.md) | Issue history comes from the changelog, on demand | Accepted (2026-10-29) |
+| [0032](0032-avatars-come-from-atlassians-avatar-host-through-rust.md) | Avatars come from Atlassian's avatar host, through Rust | Accepted (2026-10-29) |
 
 Open: integrations with Daybook and TimeTracker.

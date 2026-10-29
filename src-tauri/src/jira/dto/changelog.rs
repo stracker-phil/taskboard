@@ -107,6 +107,7 @@ mod tests {
                         account_id: "712020:aaaa".into(),
                         display_name: "Alex Morgan".into(),
                         active: true,
+                        avatar_urls: Default::default(),
                     }),
                     created: "2026-10-23T09:30:00.000+0200".into(),
                     items: vec![ChangeItem {

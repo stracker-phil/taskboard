@@ -133,7 +133,10 @@ one group, Board column or pill per style, whatever the status is called; the Bo
   nearest of the five tints; an epic without one gets a tint from its id.
 - **Avatar** (26, white 9/700 initials on `--avatar-N`): the connected account is always `--avatar-1`, other
   people one of the rest by a stable hash of their account id. In a stack each has a 2px `--avatar-ring` border
-  and overlaps by 6.
+  and overlaps by 6. A person with a Jira profile picture shows it instead of the initials, round and covering
+  the circle (`object-fit: cover`), as a `data:` URL from `user_avatar` (`queries/avatars.ts`, stale after an
+  hour); people on Jira's default (Gravatar) picture and the demo people keep their initials
+  ([ADR 0032](adr/0032-avatars-come-from-atlassians-avatar-host-through-rust.md)).
 - **PriorityFlag** (14, `--flag-*`, Lowest shares Low's color), **ChangeChip** (18, `--changed-chip-*`, 11/600),
   **CommentCount** (12, bubble icon), label chips (22, `--label-N-*` by a hash of the name).
 

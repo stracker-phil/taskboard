@@ -1,4 +1,5 @@
-//! The app's only HTTP client: JSON over HTTPS to the listed hosts, no redirects, answers size-capped.
+//! The app's only HTTP client: JSON over HTTPS to the listed hosts and pictures from Atlassian's avatar host,
+//! no redirects, answers size-capped.
 #![allow(clippy::disallowed_types, clippy::disallowed_methods)]
 
 use std::sync::Arc;
@@ -8,7 +9,8 @@ use reqwest::Method;
 use reqwest::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE, HeaderValue};
 use url::Url;
 
-use crate::net::{Answer, NetError, is_fake_jira};
+use super::avatar::{Image, MAX_AVATAR_BYTES, check_image};
+use crate::net::{Answer, AvatarUrl, NetError, is_fake_jira};
 
 const TIMEOUT: Duration = Duration::from_secs(30);
 /// Far above the largest page Taskboard asks for (100 issues with rendered fields).
@@ -104,13 +106,7 @@ impl Http {
         {
             return Err(too_large());
         }
-        let mut body = Vec::new();
-        while let Some(chunk) = response.chunk().await.map_err(transport_error)? {
-            if body.len() + chunk.len() > MAX_ANSWER_BYTES {
-                return Err(too_large());
-            }
-            body.extend_from_slice(&chunk);
-        }
+        let body = read_capped(&mut response, MAX_ANSWER_BYTES, too_large).await?;
         Ok(Answer {
             status,
             retry_after,
@@ -118,6 +114,66 @@ impl Http {
             body,
         })
     }
+
+    /// GETs a profile picture (ADR 0032) without `Authorization` or cookie; a redirect or an answer that fails
+    /// `check_image` fails.
+    pub(super) async fn get_image(&self, url: &AvatarUrl) -> Result<Image, NetError> {
+        let request = self.image_request(url)?;
+        let mut response = self
+            .client
+            .execute(request)
+            .await
+            .map_err(transport_error)?;
+        let status = response.status().as_u16();
+        if !(200..300).contains(&status) {
+            return Err(NetError::Unexpected(format!(
+                "The avatar host answered HTTP {status}"
+            )));
+        }
+        let content_type = response
+            .headers()
+            .get(CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .map(str::to_string);
+        if response
+            .content_length()
+            .is_some_and(|length| length > MAX_AVATAR_BYTES as u64)
+        {
+            return Err(super::avatar::too_large());
+        }
+        let body = read_capped(&mut response, MAX_AVATAR_BYTES, super::avatar::too_large).await?;
+        check_image(content_type.as_deref(), body)
+    }
+
+    /// The request `get_image` sends, checked against the avatar host rule again right before the wire.
+    pub(super) fn image_request(&self, url: &AvatarUrl) -> Result<reqwest::Request, NetError> {
+        if AvatarUrl::parse(url.as_str()).is_none() {
+            return Err(NetError::NotAllowed(
+                url.as_url().host_str().unwrap_or("").into(),
+            ));
+        }
+        self.client
+            .get(url.as_url().clone())
+            .header(ACCEPT, "image/png, image/jpeg, image/gif, image/webp")
+            .build()
+            .map_err(|e| NetError::Request(e.without_url().to_string()))
+    }
+}
+
+/// The body, failing with `too_large()` once it passes `cap` bytes.
+async fn read_capped(
+    response: &mut reqwest::Response,
+    cap: usize,
+    too_large: fn() -> NetError,
+) -> Result<Vec<u8>, NetError> {
+    let mut body = Vec::new();
+    while let Some(chunk) = response.chunk().await.map_err(transport_error)? {
+        if body.len() + chunk.len() > cap {
+            return Err(too_large());
+        }
+        body.extend_from_slice(&chunk);
+    }
+    Ok(body)
 }
 
 fn too_large() -> NetError {
@@ -224,6 +280,32 @@ mod tests {
         ] {
             assert!(!http.allows(&url(target)), "{target}");
         }
+    }
+
+    const AVATAR: &str = "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/712020:aaaa/0f1e2d3c/48";
+
+    #[test]
+    fn an_avatar_request_carries_no_credentials_or_cookies() {
+        let http = http(&["example.atlassian.net", "api.atlassian.com"]);
+        let request = http
+            .image_request(&AvatarUrl::parse(AVATAR).unwrap())
+            .unwrap();
+
+        assert_eq!(request.method(), Method::GET);
+        assert_eq!(request.url().as_str(), AVATAR);
+        assert!(request.headers().get(AUTHORIZATION).is_none());
+        assert!(request.headers().get(reqwest::header::COOKIE).is_none());
+        assert!(request.body().is_none());
+        assert_eq!(
+            request.headers().get(ACCEPT).unwrap(),
+            "image/png, image/jpeg, image/gif, image/webp"
+        );
+    }
+
+    #[test]
+    fn the_avatar_host_is_not_a_jira_host() {
+        let http = http(&["example.atlassian.net", "api.atlassian.com"]);
+        assert!(!http.allows(&url(AVATAR)));
     }
 
     #[tokio::test]

@@ -200,6 +200,8 @@ export const api = {
   issueSyncWebLinks: (id: string) => invoke<boolean>("issue_sync_web_links", { id }),
   /** Fetches the issue's history (Jira's changelog) at most every 5 minutes; true when it changed. */
   issueSyncHistory: (id: string) => invoke<boolean>("issue_sync_history", { id }),
+  /** The person's profile picture as a `data:` URL, fetched and cached by Rust; null shows initials. */
+  userAvatar: (accountId: string) => invoke<string | null>("user_avatar", { accountId }),
   placeGet: (listId: number, viewId: number) => invoke<ViewPlace | null>("place_get", { listId, viewId }),
   placeSet: (listId: number, viewId: number, place: ViewPlace) => invoke<void>("place_set", { listId, viewId, place }),
   /** The system clipboard; only text. */
