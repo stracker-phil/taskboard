@@ -196,6 +196,8 @@ export const api = {
   issueWebLinks: (id: string) => invoke<WebLink[]>("issue_web_links", { id }),
   /** Fetches the issue's web links from Jira; true when they changed. */
   issueSyncWebLinks: (id: string) => invoke<boolean>("issue_sync_web_links", { id }),
+  /** Fetches the issue's history (Jira's changelog) at most every 5 minutes; true when it changed. */
+  issueSyncHistory: (id: string) => invoke<boolean>("issue_sync_history", { id }),
   placeGet: (listId: number, viewId: number) => invoke<ViewPlace | null>("place_get", { listId, viewId }),
   placeSet: (listId: number, viewId: number, place: ViewPlace) => invoke<void>("place_set", { listId, viewId, place }),
   /** The system clipboard; only text. */

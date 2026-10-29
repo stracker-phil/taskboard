@@ -14,9 +14,18 @@ at: string, edited: boolean,
  */
 fresh: boolean, } | { "kind": "change", 
 /**
- * `status`, `assignee`, `due_date`, `priority` or `created`.
+ * `status`, `assignee`, `reporter`, `due_date`, `priority`, `created`, else the tracker's name of the
+ * field (`Fix Version`, `Sprint`, `labels`, `description`).
  */
-field: string, from: ChangeValue | null, to: ChangeValue | null, at: string, fresh: boolean, };
+field: string, 
+/**
+ * Both none for long text (a description): the change has no values to show.
+ */
+from: ChangeValue | null, to: ChangeValue | null, 
+/**
+ * Who made the change; none when the sync recorded it.
+ */
+author: Person | null, at: string, fresh: boolean, };
 
 /**
  * The JSON shape of an `AppError`.

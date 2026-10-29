@@ -10,14 +10,14 @@ use std::pin::Pin;
 use crate::error::AppResult;
 use crate::jira::SearchRequest;
 use crate::jira::dto::{
-    BulkFetch, Comment, Field, Myself, Project, RemoteLink, SearchPage, Status, Version,
+    BulkFetch, Changelog, Comment, Field, Myself, Project, RemoteLink, SearchPage, Status, Version,
 };
 
 /// A source's answer, boxed so a source can sit behind `dyn Source`.
 pub type Answer<'a, T> = Pin<Box<dyn Future<Output = AppResult<T>> + Send + 'a>>;
 
 /// Which tracker a cached row comes from: the `source` column of `cache.issue`, `cache.space` and
-/// `cache.comment` (and `cache.remote_link`).
+/// `cache.comment` (and `cache.remote_link`, `cache.issue_history`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SourceKind {
     Jira,
@@ -59,6 +59,8 @@ pub trait Source: Send + Sync {
     fn comments<'a>(&'a self, issue_key: &'a str) -> Answer<'a, Vec<Comment>>;
     /// An issue's web links (pull requests, documents), by its id.
     fn remote_links<'a>(&'a self, issue_id: &'a str) -> Answer<'a, Vec<RemoteLink>>;
+    /// Every change to an issue's fields, oldest first, by its id.
+    fn changelog<'a>(&'a self, issue_id: &'a str) -> Answer<'a, Vec<Changelog>>;
     /// The custom fields a space's recent issues fill.
     fn used_custom_fields<'a>(&'a self, space_key: &'a str) -> Answer<'a, BTreeSet<String>>;
 }

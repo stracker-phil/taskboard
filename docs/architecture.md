@@ -121,7 +121,8 @@ src-tauri/
   src/search/                full-text search: safe FTS5 queries, the palette's issues and lists, the text field
   src/pins/                  local pins (Bookmarks in the UI): durations to local midnights, the Bookmarks view, Add to Home
   src/changes/               unseen (unread) changes: the change chip and Since-yesterday words, read and unread
-  src/issues/                one issue: detail, custom fields, related issues, activity, comments, web links
+  src/issues/                one issue: detail, custom fields, related issues, activity, comments, web links,
+                             history (fetched.rs: how often details are fetched)
   src/status_style/          the six status styles (status types): detection and the owner's overrides per Space
   src/space_config/          a Space's own settings: offered layouts, new views' layout and grouping, field visibility
   src/nav/                   where the main window is (level and view, nav.json); previous/next Space

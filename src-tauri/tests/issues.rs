@@ -14,7 +14,7 @@ use taskboard_lib::error::{AppResult, ErrorKind};
 use taskboard_lib::issues::{
     ActivityItem, ChangeValue, CustomField, IssueDetail, IssueLink, RelatedIssue, WebLink,
     WebLinkKind, issue_activity, issue_forget, issue_get, issue_related, issue_sync_comments,
-    issue_sync_web_links, issue_web_links,
+    issue_sync_history, issue_sync_web_links, issue_web_links,
 };
 use taskboard_lib::jira::{Limiter, TokenKind};
 use taskboard_lib::lists::Viewer;
@@ -26,7 +26,7 @@ use taskboard_lib::test_support::demo::{self, DEMO_NOW, ME_EMAIL, REVIEWER};
 use taskboard_lib::test_support::fake_jira::{DEMO_TOKEN, FakeJira};
 use taskboard_lib::test_support::{FakeSecrets, temp_config_dir};
 use taskboard_lib::views::rows::{self, Cell, EpicChip, Person};
-use taskboard_lib::views::{view_set_columns, views_of};
+use taskboard_lib::views::{unseen_ids, view_set_columns, views_of};
 
 const LATER_UTC: &str = "2026-10-28T13:00:00.000Z";
 const NW_PROJECT_ID: &str = "10001";
@@ -176,6 +176,38 @@ impl Site {
     async fn web_links(&self, key: &str) -> Vec<WebLink> {
         let id = self.id_of(key).await;
         issue_web_links(self.db(), id).await.unwrap()
+    }
+
+    /// Syncs the history at `minutes` after the demo's now.
+    async fn try_sync_history_at(&self, key: &str, minutes: i64) -> AppResult<bool> {
+        let id = self.id_of(key).await;
+        let connection = self.ctx.settings.get().connection;
+        let source = source_for(&self.ctx.access, &connection).unwrap();
+        let now = viewer().now + chrono::Duration::minutes(minutes);
+        issue_sync_history(self.db(), source.as_ref(), id, now).await
+    }
+
+    /// Each call happens 6 minutes after the previous one, so none is answered from the freshness window.
+    async fn try_sync_history(&self, key: &str) -> AppResult<bool> {
+        let minutes = self.clock_minutes.fetch_add(6, Ordering::SeqCst);
+        self.try_sync_history_at(key, minutes).await
+    }
+
+    async fn sync_history(&self, key: &str) -> bool {
+        self.try_sync_history(key).await.unwrap()
+    }
+
+    async fn history_fetches(&self, key: &str) -> usize {
+        let path = format!("/rest/api/3/issue/{}/changelog", self.id_of(key).await);
+        self.fake.paths().iter().filter(|p| **p == path).count()
+    }
+
+    async fn changes(&self, key: &str) -> Vec<ActivityItem> {
+        self.activity(key)
+            .await
+            .into_iter()
+            .filter(|item| matches!(item, ActivityItem::Change { .. }))
+            .collect()
     }
 
     async fn resync(&self) {
@@ -701,6 +733,7 @@ async fn an_issue_created_after_the_first_sync_shows_a_created_change() {
             field: "created".into(),
             from: None,
             to: Some(ChangeValue::Text(key.clone())),
+            author: None,
             at: LATER_UTC.into(),
             fresh: true,
         }]
@@ -731,6 +764,7 @@ async fn a_status_edited_on_the_site_shows_as_a_change_with_names_and_styles() {
                 name: "Done".into(),
                 style: Style::Done,
             }),
+            author: None,
             at: LATER_UTC.into(),
             fresh: true,
         }]
@@ -793,6 +827,7 @@ async fn an_assignee_edited_on_the_site_shows_as_a_change_between_people() {
             field: "assignee".into(),
             from: Some(ChangeValue::Person(alex())),
             to: Some(ChangeValue::Person(marta())),
+            author: None,
             at: LATER_UTC.into(),
             fresh: true,
         }]
@@ -1425,6 +1460,500 @@ async fn a_custom_column_shows_up_in_the_detail_with_its_name_and_value() {
             html: None,
         }
     );
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn fetched_history_shows_in_the_activity_newest_first_with_authors_among_the_comments() {
+    let site = Site::new().await;
+    assert_eq!(site.changes("NW-1042").await, []);
+
+    assert!(site.sync_history("NW-1042").await);
+
+    let items = site.activity("NW-1042").await;
+    let times: Vec<&str> = items
+        .iter()
+        .map(|item| match item {
+            ActivityItem::Comment { at, .. } | ActivityItem::Change { at, .. } => at.as_str(),
+        })
+        .collect();
+    assert_eq!(items.len(), 15);
+    assert_eq!(comment_times(&items).len(), 4);
+    assert!(times.is_sorted_by(|a, b| a >= b), "{times:?}");
+    let changes = site.changes("NW-1042").await;
+    assert_eq!(
+        parts(&changes[0]),
+        (
+            "status",
+            status("In Review", Style::Review),
+            status("In Progress", Style::Progress),
+            Some(marta()),
+        )
+    );
+    assert!(
+        matches!(&changes[0], ActivityItem::Change { at, .. } if at == "2026-10-28T10:41:00.000Z"),
+        "{changes:?}"
+    );
+    assert_eq!(
+        parts(&changes[2]),
+        (
+            "status",
+            status("To Do", Style::Todo),
+            status("In Progress", Style::Progress),
+            Some(alex()),
+        )
+    );
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn history_fields_are_named_and_valued_as_the_activity_shows_them() {
+    let site = Site::new().await;
+    assert!(site.sync_history("NW-1042").await);
+    let changes = site.changes("NW-1042").await;
+
+    for (field, expected) in [
+        (
+            "status",
+            vec![
+                (
+                    status("In Review", Style::Review),
+                    status("In Progress", Style::Progress),
+                ),
+                (
+                    status("In Progress", Style::Progress),
+                    status("In Review", Style::Review),
+                ),
+                (
+                    status("To Do", Style::Todo),
+                    status("In Progress", Style::Progress),
+                ),
+            ],
+        ),
+        ("assignee", vec![(None, Some(ChangeValue::Person(alex())))]),
+        ("priority", vec![(text("Medium"), text("High"))]),
+        (
+            "due_date",
+            vec![
+                (text("2026-11-06"), text("2026-10-30")),
+                (None, text("2026-11-06")),
+            ],
+        ),
+        ("Fix Version", vec![(None, text("2.4.0"))]),
+        ("Sprint", vec![(None, text("Sprint 22"))]),
+        ("labels", vec![(None, text("frontend"))]),
+        ("description", vec![(None, None)]),
+    ] {
+        assert_eq!(of_field(&changes, field), expected, "{field}");
+    }
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn a_summary_change_shows_both_texts() {
+    let site = Site::new().await;
+    assert!(site.sync_history("NW-1047").await);
+
+    assert_eq!(
+        of_field(&site.changes("NW-1047").await, "summary"),
+        [(
+            text("Cart totals via Store API"),
+            text("Migrate cart totals to the Store API")
+        )]
+    );
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn a_value_over_120_characters_is_left_out_and_one_of_120_stays() {
+    let site = Site::new().await;
+    let long = "a".repeat(121);
+    let limit = "b".repeat(120);
+    site.fake.set_changelog(
+        "NW-1049",
+        vec![
+            entry("2026-10-27T09:00:00.000+0100", "summary", "Short", &long),
+            entry("2026-10-28T09:00:00.000+0100", "summary", "Short", &limit),
+        ],
+    );
+
+    assert!(site.sync_history("NW-1049").await);
+
+    let changes = site.changes("NW-1049").await;
+    assert_eq!(
+        changes.iter().map(parts).collect::<Vec<_>>(),
+        [
+            (
+                "summary",
+                text("Short"),
+                Some(ChangeValue::Text(limit)),
+                Some(alex())
+            ),
+            ("summary", None, None, Some(alex())),
+        ]
+    );
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn history_fetched_within_five_minutes_is_not_asked_for_again() {
+    let site = Site::new().await;
+    assert!(site.try_sync_history_at("NW-1042", 0).await.unwrap());
+    let before = site.activity("NW-1042").await;
+    let fetches = site.history_fetches("NW-1042").await;
+    site.fake.set_changelog("NW-1042", vec![]);
+
+    for minutes in [0, 1, 4] {
+        assert!(
+            !site.try_sync_history_at("NW-1042", minutes).await.unwrap(),
+            "{minutes} min"
+        );
+    }
+
+    assert_eq!(site.history_fetches("NW-1042").await, fetches);
+    assert_eq!(site.activity("NW-1042").await, before);
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn unchanged_history_fetched_again_after_five_minutes_reports_no_change() {
+    let site = Site::new().await;
+    assert!(site.try_sync_history_at("NW-1042", 0).await.unwrap());
+    let before = site.activity("NW-1042").await;
+    let fetches = site.history_fetches("NW-1042").await;
+
+    assert!(!site.try_sync_history_at("NW-1042", 5).await.unwrap());
+
+    assert_eq!(site.history_fetches("NW-1042").await, fetches + 1);
+    assert_eq!(site.activity("NW-1042").await, before);
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn changed_history_replaces_the_cached_one_after_five_minutes() {
+    let site = Site::new().await;
+    assert!(site.try_sync_history_at("NW-1042", 0).await.unwrap());
+    site.fake.set_changelog(
+        "NW-1042",
+        vec![entry(
+            "2026-10-28T11:00:00.000+0100",
+            "labels",
+            "frontend",
+            "frontend backend",
+        )],
+    );
+
+    assert!(site.try_sync_history_at("NW-1042", 5).await.unwrap());
+
+    let changes = site.changes("NW-1042").await;
+    assert_eq!(
+        changes.iter().map(parts).collect::<Vec<_>>(),
+        [(
+            "labels",
+            text("frontend"),
+            text("frontend backend"),
+            Some(alex())
+        )]
+    );
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn history_at_or_after_a_synced_change_replaces_it_and_brings_the_author() {
+    let site = Site::new().await;
+    site.fake.set_now(later());
+    site.fake
+        .edit_issue("NW-1044", |fields| fields["status"] = done_status());
+    site.resync().await;
+    let from_the_sync = site.changes("NW-1044").await;
+    assert_eq!(
+        from_the_sync.iter().map(parts).collect::<Vec<_>>(),
+        [(
+            "status",
+            status("In Review", Style::Review),
+            status("Done", Style::Done),
+            None
+        )]
+    );
+
+    for created in [
+        "2026-10-28T14:00:00.000+0100",
+        "2026-10-28T14:30:00.000+0100",
+    ] {
+        site.fake
+            .set_changelog("NW-1044", vec![entry(created, "labels", "", "backend")]);
+
+        assert!(site.sync_history("NW-1044").await, "{created}");
+
+        let changes = site.changes("NW-1044").await;
+        assert_eq!(
+            changes.iter().map(parts).collect::<Vec<_>>(),
+            [("labels", None, text("backend"), Some(alex()))],
+            "{created}"
+        );
+    }
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn a_synced_change_newer_than_the_history_still_shows_without_an_author() {
+    let site = Site::new().await;
+    site.fake.set_now(later());
+    site.fake
+        .edit_issue("NW-1044", |fields| fields["status"] = done_status());
+    site.resync().await;
+    site.fake.set_changelog(
+        "NW-1044",
+        vec![entry(
+            "2026-10-28T12:00:00.000+0100",
+            "labels",
+            "",
+            "backend",
+        )],
+    );
+
+    assert!(site.sync_history("NW-1044").await);
+
+    let changes = site.changes("NW-1044").await;
+    assert_eq!(
+        changes.iter().map(parts).collect::<Vec<_>>(),
+        [
+            (
+                "status",
+                status("In Review", Style::Review),
+                status("Done", Style::Done),
+                None
+            ),
+            ("labels", None, text("backend"), Some(alex())),
+        ]
+    );
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn the_created_change_stays_when_the_history_is_newer() {
+    let site = Site::new().await;
+    site.fake.set_now(later());
+    let key = site
+        .fake
+        .add_issue("NW-1055", "NW", "Order confirmation email: shipping notice");
+    site.resync().await;
+    site.fake.set_changelog(
+        &key,
+        vec![entry(
+            "2026-10-28T14:30:00.000+0100",
+            "summary",
+            "Old",
+            "New",
+        )],
+    );
+
+    assert!(site.sync_history(&key).await);
+
+    let changes = site.changes(&key).await;
+    let fields: Vec<&str> = changes.iter().map(|item| parts(item).0).collect();
+    assert_eq!(fields, ["summary", "created"]);
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn fetching_history_does_not_make_a_seen_issue_unread() {
+    let site = Site::new().await;
+    site.execute("UPDATE cache.issue_seen SET seen_at = '2026-10-28T10:00:00.000Z'")
+        .await;
+    let space = site
+        .db()
+        .read(|conn| {
+            Ok(conn.query_row(
+                "SELECT id FROM filter_list WHERE kind = 'space' AND project_id = ?1",
+                [NW_PROJECT_ID],
+                |r| r.get::<_, i64>(0),
+            )?)
+        })
+        .await
+        .unwrap();
+    let unseen = site
+        .db()
+        .read(move |conn| unseen_ids(conn, &viewer(), space))
+        .await
+        .unwrap();
+    assert_eq!(unseen, Vec::<String>::new());
+
+    assert!(site.sync_history("NW-1042").await);
+
+    let detail = site.detail("NW-1042").await;
+    assert!(!detail.unread);
+    assert!(detail.since.is_none());
+    let unseen = site
+        .db()
+        .read(move |conn| unseen_ids(conn, &viewer(), space))
+        .await
+        .unwrap();
+    assert_eq!(unseen, Vec::<String>::new());
+    assert_eq!(fresh_flags(&site.changes("NW-1042").await), [false; 11]);
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn history_items_after_the_seen_time_are_fresh_while_the_issue_is_unseen() {
+    let site = Site::new().await;
+    site.execute(
+        "UPDATE cache.issue_seen SET seen_at = '2026-10-26T12:00:00.000Z'
+         WHERE issue_id = (SELECT id FROM cache.issue WHERE key = 'NW-1042')",
+    )
+    .await;
+    site.execute(
+        "INSERT INTO cache.issue_change (issue_id, field, old_value, new_value, changed_at)
+         SELECT id, 'comment_added', '4', '5', '2026-10-26T13:00:00.000Z'
+         FROM cache.issue WHERE key = 'NW-1042'",
+    )
+    .await;
+    assert!(site.sync_history("NW-1042").await);
+
+    let changes = site.changes("NW-1042").await;
+
+    let mut expected = vec![true, true];
+    expected.extend([false; 9]);
+    assert_eq!(fresh_flags(&changes), expected);
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn history_of_an_issue_gone_from_the_site_is_not_fetched() {
+    let site = Site::new().await;
+    site.execute("UPDATE cache.issue SET gone = 1 WHERE key = 'NW-1042'")
+        .await;
+    let fetches = site.history_fetches("NW-1042").await;
+
+    assert!(!site.sync_history("NW-1042").await);
+
+    assert_eq!(site.history_fetches("NW-1042").await, fetches);
+    assert_eq!(site.changes("NW-1042").await, []);
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn history_of_an_unknown_issue_is_not_fetched() {
+    let site = Site::new().await;
+    let connection = site.ctx.settings.get().connection;
+    let source = source_for(&site.ctx.access, &connection).unwrap();
+    let requests = site.fake.paths().len();
+
+    let changed = issue_sync_history(site.db(), source.as_ref(), "99999999".into(), viewer().now)
+        .await
+        .unwrap();
+
+    assert!(!changed);
+    assert_eq!(site.fake.paths().len(), requests);
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn a_history_longer_than_a_page_arrives_whole() {
+    let site = Site::new().await;
+    site.fake.set_page_size(2);
+
+    assert!(site.sync_history("NW-1042").await);
+
+    let changes = site.changes("NW-1042").await;
+    assert_eq!(changes.len(), 11);
+    assert_eq!(of_field(&changes, "status").len(), 3, "{changes:?}");
+    assert_eq!(
+        of_field(&changes, "priority"),
+        [(text("Medium"), text("High"))]
+    );
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn a_failed_history_fetch_keeps_the_cached_history() {
+    let site = Site::new().await;
+    assert!(site.sync_history("NW-1042").await);
+    let before = site.activity("NW-1042").await;
+    site.fake.set_changelog("NW-1042", vec![]);
+    site.fake.fail_next(1, 500, None);
+
+    let err = site.try_sync_history("NW-1042").await.unwrap_err();
+
+    assert_eq!(err.kind(), ErrorKind::Internal);
+    assert_eq!(site.activity("NW-1042").await, before);
+}
+
+fn parts(
+    item: &ActivityItem,
+) -> (
+    &str,
+    Option<ChangeValue>,
+    Option<ChangeValue>,
+    Option<Person>,
+) {
+    match item {
+        ActivityItem::Change {
+            field,
+            from,
+            to,
+            author,
+            ..
+        } => (field.as_str(), from.clone(), to.clone(), author.clone()),
+        ActivityItem::Comment { .. } => panic!("expected a change, got {item:?}"),
+    }
+}
+
+fn of_field(
+    items: &[ActivityItem],
+    field: &str,
+) -> Vec<(Option<ChangeValue>, Option<ChangeValue>)> {
+    items
+        .iter()
+        .map(parts)
+        .filter(|(name, ..)| *name == field)
+        .map(|(_, from, to, _)| (from, to))
+        .collect()
+}
+
+fn text(value: &str) -> Option<ChangeValue> {
+    Some(ChangeValue::Text(value.into()))
+}
+
+fn status(name: &str, style: Style) -> Option<ChangeValue> {
+    Some(ChangeValue::Status {
+        name: name.into(),
+        style,
+    })
+}
+
+/// A changelog entry by the demo account with one changed field.
+fn entry(created: &str, field: &str, from: &str, to: &str) -> serde_json::Value {
+    let author = demo::demo()
+        .users
+        .iter()
+        .find(|u| u["accountId"] == ME_ACCOUNT_ID)
+        .cloned()
+        .expect("Alex is a demo user");
+    serde_json::json!({
+        "id": "90001",
+        "author": author,
+        "created": created,
+        "items": [{
+            "field": field,
+            "fieldtype": "jira",
+            "fieldId": field,
+            "from": null,
+            "fromString": from,
+            "to": null,
+            "toString": to,
+        }],
+    })
+}
+
+fn fresh_flags(items: &[ActivityItem]) -> Vec<bool> {
+    items
+        .iter()
+        .filter_map(|item| match item {
+            ActivityItem::Change { fresh, .. } => Some(*fresh),
+            ActivityItem::Comment { .. } => None,
+        })
+        .collect()
 }
 
 #[tokio::test]

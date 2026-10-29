@@ -104,7 +104,7 @@ impl FakeJira {
         self.requests().into_iter().map(|r| r.path).collect()
     }
 
-    /// Search pages of `size` issues, whatever `maxResults` asks for.
+    /// Search and changelog pages of `size` entries, whatever `maxResults` asks for.
     pub fn set_page_size(&self, size: usize) {
         self.content().page_size = Some(size);
     }
@@ -195,6 +195,16 @@ impl FakeJira {
             .unwrap_or_default()
             .to_string();
         content.data.remote_links.insert(id, links);
+    }
+
+    /// Replaces the issue's changelog (`GET /issue/{id}/changelog` entries, oldest first); `updated` stays.
+    pub fn set_changelog(&self, id_or_key: &str, entries: Vec<Value>) {
+        let mut content = self.content();
+        let id = issue_mut(&mut content.data, id_or_key)["id"]
+            .as_str()
+            .unwrap_or_default()
+            .to_string();
+        content.data.changelogs.insert(id, entries);
     }
 
     /// Adds a comment by `author` (a user object) and stamps `updated`.

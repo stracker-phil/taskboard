@@ -2,8 +2,9 @@
 
 use super::client::JiraClient;
 use super::dto::{
-    ApproximateCount, BulkFetch, Comment, CommentPage, Field, Issue, Myself, ParsedQueries,
-    Project, ProjectPage, RemoteLink, SearchPage, Status, TenantInfo, Version,
+    ApproximateCount, BulkFetch, Changelog, ChangelogPage, Comment, CommentPage, Field, Issue,
+    Myself, ParsedQueries, Project, ProjectPage, RemoteLink, SearchPage, Status, TenantInfo,
+    Version,
 };
 use super::gateway::{Endpoint, FieldIds, IssueRef, IssueRefs, Jql, ProjectKey};
 use super::paging::{SearchPages, SearchRequest};
@@ -103,6 +104,27 @@ impl JiraClient {
         self.gateway()
             .send(Endpoint::IssueRemoteLinks { issue })
             .await
+    }
+
+    /// Every change to an issue's fields, oldest first.
+    pub async fn changelog(&self, issue_id: &str) -> AppResult<Vec<Changelog>> {
+        let issue = IssueRef::parse(issue_id)?;
+        let mut entries = Vec::new();
+        loop {
+            let start_at = u32::try_from(entries.len()).unwrap_or(u32::MAX);
+            let page: ChangelogPage = self
+                .gateway()
+                .send(Endpoint::IssueChangelog {
+                    issue: issue.clone(),
+                    start_at,
+                })
+                .await?;
+            let empty = page.values.is_empty();
+            entries.extend(page.values);
+            if page.is_last || empty || entries.len() as u64 >= page.total {
+                return Ok(entries);
+            }
+        }
     }
 
     /// The custom fields the project's most recently updated issues have a value in.

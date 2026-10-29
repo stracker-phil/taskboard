@@ -10,7 +10,7 @@ use serde_json::{Value, json};
 
 use taskboard_lib::error::{AppError, ErrorKind};
 use taskboard_lib::jira::dto::{
-    Issue, RemoteApplication, RemoteIcon, RemoteLink, RemoteObject, parse_jira_time,
+    Changelog, Issue, RemoteApplication, RemoteIcon, RemoteLink, RemoteObject, parse_jira_time,
 };
 use taskboard_lib::jira::jql::{and_updated_since, date_literal, default_scope};
 use taskboard_lib::jira::{JiraClient, Limiter, SearchRequest, TokenKind};
@@ -642,6 +642,113 @@ mod demo_answers {
                 },
             }]
         );
+    }
+
+    fn changelog_ids(entries: &[Changelog]) -> Vec<&str> {
+        entries.iter().map(|entry| entry.id.as_str()).collect()
+    }
+
+    #[tokio::test]
+    async fn the_changelog_of_an_issue_comes_back_complete_and_oldest_first() {
+        let fake = FakeJira::start_demo().await;
+
+        let entries = fake
+            .client(TokenKind::Classic)
+            .changelog("NW-1042")
+            .await
+            .unwrap();
+
+        assert_eq!(
+            changelog_ids(&entries),
+            [
+                "80001", "80002", "80003", "80004", "80005", "80006", "80007", "80008", "80009"
+            ]
+        );
+        let created: Vec<_> = entries
+            .iter()
+            .map(|entry| parse_jira_time(&entry.created).expect(&entry.created))
+            .collect();
+        assert!(
+            created.windows(2).all(|pair| pair[0] < pair[1]),
+            "{created:?}"
+        );
+        let authors: Vec<_> = entries
+            .iter()
+            .map(|entry| entry.author.as_ref().unwrap().display_name.as_str())
+            .collect();
+        assert_eq!(
+            authors,
+            [
+                "Jonas Reiter",
+                "Jonas Reiter",
+                "Alex Morgan",
+                "Alex Morgan",
+                "Jonas Reiter",
+                "Jonas Reiter",
+                "Alex Morgan",
+                "Alex Morgan",
+                "Marta Klein",
+            ]
+        );
+        let last = &entries[8].items;
+        assert_eq!(last.len(), 1);
+        assert_eq!(last[0].field, "status");
+        assert_eq!(last[0].from_text.as_deref(), Some("In Review"));
+        assert_eq!(last[0].to_text.as_deref(), Some("In Progress"));
+        assert_eq!(entries[1].items.len(), 2);
+        assert_eq!(fake.paths(), ["/rest/api/3/issue/NW-1042/changelog"]);
+        assert_eq!(fake.requests()[0].query_value("startAt"), Some("0"));
+        assert_eq!(fake.requests()[0].query_value("maxResults"), Some("100"));
+    }
+
+    #[tokio::test]
+    async fn a_paged_changelog_arrives_in_order_across_all_its_pages() {
+        let fake = FakeJira::start_demo().await;
+        let client = fake.client(TokenKind::Classic);
+        let whole = client.changelog("NW-1042").await.unwrap();
+        let fake = FakeJira::start_demo().await;
+        fake.set_page_size(2);
+
+        let paged = fake
+            .client(TokenKind::Classic)
+            .changelog("NW-1042")
+            .await
+            .unwrap();
+
+        assert_eq!(paged, whole);
+        let starts: Vec<_> = fake
+            .requests()
+            .iter()
+            .map(|r| r.query_value("startAt").map(str::to_string))
+            .collect();
+        assert_eq!(starts, [0, 2, 4, 6, 8].map(|start| Some(start.to_string())));
+    }
+
+    #[tokio::test]
+    async fn an_issue_without_history_has_an_empty_changelog() {
+        let fake = FakeJira::start_demo().await;
+
+        let entries = fake
+            .client(TokenKind::Classic)
+            .changelog(NW_1020_ID)
+            .await
+            .unwrap();
+
+        assert_eq!(entries, []);
+        assert_eq!(fake.requests().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn the_changelog_of_an_unknown_issue_is_not_found() {
+        let fake = FakeJira::start_demo().await;
+
+        let err = fake
+            .client(TokenKind::Classic)
+            .changelog("NW-9999")
+            .await
+            .unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::NotFound);
     }
 
     #[tokio::test]

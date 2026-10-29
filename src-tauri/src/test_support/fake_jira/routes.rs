@@ -51,6 +51,7 @@ pub fn route(site: &Content, request: &Recorded) -> Response {
         ("POST", ["issue", "bulkfetch"]) => bulk_fetch(site, &request.body),
         ("GET", ["issue", key, "comment"]) => comments(site, key, request),
         ("GET", ["issue", key, "remotelink"]) => remote_links(site, key),
+        ("GET", ["issue", key, "changelog"]) => changelog(site, key, request),
         ("POST", ["jql", "parse"]) => parse_jql(&request.body),
         _ => not_found(),
     }
@@ -258,6 +259,28 @@ fn remote_links(site: &Content, id_or_key: &str) -> Response {
     let id = issue["id"].as_str().unwrap_or_default();
     let links = site.data.remote_links.get(id).cloned().unwrap_or_default();
     Response::json(200, json!(links))
+}
+
+/// Pages of `page_size` entries when set, else of `maxResults`.
+fn changelog(site: &Content, id_or_key: &str, request: &Recorded) -> Response {
+    let Some(issue) = find_issue(site, id_or_key) else {
+        return not_found();
+    };
+    let id = issue["id"].as_str().unwrap_or_default();
+    let all = site.data.changelogs.get(id).cloned().unwrap_or_default();
+    let (start, asked) = offset_query(request, 100);
+    let size = site.page_size.unwrap_or(asked).max(1);
+    let page: Vec<Value> = all.iter().skip(start).take(size).cloned().collect();
+    Response::json(
+        200,
+        json!({
+            "values": page,
+            "startAt": start,
+            "maxResults": size,
+            "total": all.len(),
+            "isLast": start + size >= all.len(),
+        }),
+    )
 }
 
 fn parse_jql(body: &Value) -> Response {

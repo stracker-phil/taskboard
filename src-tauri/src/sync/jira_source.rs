@@ -7,7 +7,7 @@ use std::pin::Pin;
 use super::source::{Answer, IssuePages, Source, SourceKind};
 use crate::error::AppResult;
 use crate::jira::dto::{
-    BulkFetch, Comment, Field, Myself, Project, RemoteLink, SearchPage, Status, Version,
+    BulkFetch, Changelog, Comment, Field, Myself, Project, RemoteLink, SearchPage, Status, Version,
 };
 use crate::jira::{JiraClient, SearchPages, SearchRequest};
 
@@ -74,6 +74,10 @@ impl Source for JiraSource {
 
     fn remote_links<'a>(&'a self, issue_id: &'a str) -> Answer<'a, Vec<RemoteLink>> {
         Box::pin(self.client.remote_links(issue_id))
+    }
+
+    fn changelog<'a>(&'a self, issue_id: &'a str) -> Answer<'a, Vec<Changelog>> {
+        Box::pin(self.client.changelog(issue_id))
     }
 
     fn used_custom_fields<'a>(&'a self, space_key: &'a str) -> Answer<'a, BTreeSet<String>> {

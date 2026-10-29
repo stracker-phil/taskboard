@@ -54,6 +54,12 @@ comments, changes and seen rows. Runs after every full sync and hourly.
 **Detail**: opening an issue fetches its comments when the cached ones are older than the issue
 (`issues::issue_sync_comments`), and its web links unless fetched in the last 5 minutes (`issues::issue_sync_web_links`,
 `Source::remote_links`): they replace the cached ones; a failure is logged and the cached links stay.
+Its history (`issues::issue_sync_history`, `Source::changelog`, [ADR 0031](adr/0031-issue-history-comes-from-the-changelog-on-demand.md))
+is fetched the same way: Jira's whole changelog, at most every 5 minutes per issue (`issues::fetched::FRESH_FOR`,
+`issue.history_synced_at`), replacing the cached `issue_history` rows; `issues_changed` is emitted only when
+they changed. History never makes an issue unread: unseen changes stay those the sync recorded in `issue_change`.
+The activity shows the history with its authors and drops the recorded changes (except `created`) at or before
+its newest entry, which the history already has.
 
 ## Schedule
 

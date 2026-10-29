@@ -5,6 +5,7 @@ mod adf;
 mod catalog;
 mod clock;
 mod fields;
+mod history;
 mod issues_more;
 mod issues_nw;
 mod people;
@@ -54,6 +55,8 @@ pub struct JiraData {
     pub comments: BTreeMap<String, Vec<Value>>,
     /// Issue id to `GET /issue/{id}/remotelink`
     pub remote_links: BTreeMap<String, Vec<Value>>,
+    /// Issue id to `GET /issue/{id}/changelog` `values`, oldest first
+    pub changelogs: BTreeMap<String, Vec<Value>>,
 }
 
 /// The mockup's site, with every time as it was at [`DEMO_NOW`].
@@ -67,9 +70,11 @@ pub fn demo_at(now: DateTime<Utc>) -> JiraData {
     specs.extend(issues_more::issues());
     let mut comments = issues_nw::comments();
     comments.extend(issues_more::comments());
+    let clock = Clock::new(now);
     JiraData {
         remote_links: web_links::remote_links(),
-        ..site(&specs, &comments, &Clock::new(now))
+        changelogs: history::changelogs(&clock),
+        ..site(&specs, &comments, &clock)
     }
 }
 
@@ -97,5 +102,6 @@ fn site(specs: &[IssueSpec], comments: &[CommentSpec], clock: &Clock) -> JiraDat
         issues,
         comments,
         remote_links: BTreeMap::new(),
+        changelogs: BTreeMap::new(),
     }
 }

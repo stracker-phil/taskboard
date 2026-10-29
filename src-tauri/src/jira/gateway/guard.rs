@@ -61,6 +61,11 @@ const RULES: &[Rule] = &[
         &[Literal("issue"), IssueIdOrKey, Literal("remotelink")],
         &[],
     ),
+    read(
+        Get,
+        &[Literal("issue"), IssueIdOrKey, Literal("changelog")],
+        &["startAt", "maxResults"],
+    ),
     read(Post, &[Literal("search"), Literal("jql")], &[]),
     read(
         Post,

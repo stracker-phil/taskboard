@@ -42,7 +42,7 @@ commands, which validate them. Tracking a project writes `local.space`, not the 
 
 ## Tables
 
-**cache** (the tracker's data, plus our derived columns). `space`, `issue`, `comment` and `remote_link` carry `source` (`jira`
+**cache** (the tracker's data, plus our derived columns). `space`, `issue`, `comment`, `remote_link` and `issue_history` carry `source` (`jira`
 today; migration `cache/0003`, [ADR 0029](adr/0029-issues-come-from-a-source-jira-is-the-first.md)); ids are
 unique across sources (Jira's numeric ids; another source prefixes its own):
 
@@ -50,11 +50,12 @@ unique across sources (Jira's numeric ids; another source prefixes its own):
 |---|---|
 | `space` | the tracker's projects (renamed from `project` in `cache/0003`): `id, key, name, avatar_url, raw, source`; the owner's Space settings are in `local.space`, so queries name this one `cache.space` |
 | `status` | `id, name, category` (`new`, `indeterminate`, `done`) |
-| `issue` | keyed by the numeric Jira id (as text), never the key. Normalised columns for everything the UI filters, groups or sorts on, `raw` for the rest. Ours, derived during sync: `status_category`, `type_is_subtask`, `is_epic`, `sprint_id`, `sprint_state`, `comment_count`, `comments_synced_at`, `synced_at`, `gone` |
+| `issue` | keyed by the numeric Jira id (as text), never the key. Normalised columns for everything the UI filters, groups or sorts on, `raw` for the rest. Ours, derived during sync: `status_category`, `type_is_subtask`, `is_epic`, `sprint_id`, `sprint_state`, `comment_count`, `comments_synced_at`, `links_synced_at`, `history_synced_at`, `synced_at`, `gone` |
 | `issue_change` | what the sync saw change (status, assignee, due date, priority, comments, created) |
 | `issue_seen` | when the owner last looked at an issue: changes after it are unseen (`changes::UNSEEN`) |
 | `comment` | `body_html` from Jira, `body_text` (ours) for search |
-| `remote_link` | an issue's web links (migration `cache/0004`): `issue_id` (cascades), `id`, `position`, `url` (untrusted), `title`, `application`, `relationship`, `source`; replaced as a whole when the issue is opened, at most every 5 minutes: `issue.links_synced_at` (migration `cache/0005`) holds the last fetch (`issues::issue_sync_web_links`, `FRESH_FOR`) |
+| `remote_link` | an issue's web links (migration `cache/0004`): `issue_id` (cascades), `id`, `position`, `url` (untrusted), `title`, `application`, `relationship`, `source`; replaced as a whole when the issue is opened, at most every 5 minutes: `issue.links_synced_at` (migration `cache/0005`) holds the last fetch (`issues::issue_sync_web_links`, `issues::fetched::FRESH_FOR`) |
+| `issue_history` | an issue's history, Jira's changelog (migration `cache/0007`, [ADR 0031](adr/0031-issue-history-comes-from-the-changelog-on-demand.md)): `issue_id` (cascades), `position` (oldest first), `field` (Jira's name: `status`, `Fix Version`, `Sprint`), `field_id`, `from_value`/`to_value` (ids: status, account, version), `from_text`/`to_text`, `author_id`, `changed_at` (UTC, sorts with `issue_change`), `source`; replaced as a whole when the issue is opened, at most every 5 minutes: `issue.history_synced_at` holds the last fetch (`issues::issue_sync_history`). Never read by `changes::UNSEEN` |
 | `version`, `user`, `field` | releases, people, custom field names (`field.shown` is ours; `field.used`, migration `cache/0002`: a tracked project's recent issues fill it, so the Columns popover and the filter editor offer it, `filter::RELEVANT_FIELD`) |
 | `sync_state` | one row per sync scope, or per project for the full sync's cursor |
 | `issue_fts` | FTS5 over key, summary, description and comments; rowid = the issue id; keeps its text for snippets; `remove_diacritics 2`. Queried by the palette and the `text` filter field, always through `search::match_expression` (quoted prefix terms, so typed FTS5 syntax stays literal) |

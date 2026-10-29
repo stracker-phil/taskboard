@@ -17,7 +17,7 @@ pub async fn issue_get(state: State<'_, AppState>, id: String) -> AppResult<Issu
     super::issue_get(&state.db, viewer(&state), id).await
 }
 
-/// Comments and recorded field changes, oldest first.
+/// Comments, history and recorded field changes, newest first.
 #[tauri::command]
 pub async fn issue_activity(
     state: State<'_, AppState>,
@@ -58,4 +58,12 @@ pub async fn issue_sync_web_links(state: State<'_, AppState>, id: String) -> App
     let connection = state.settings.get().connection;
     let source = crate::sync::source_for(&state.jira, &connection)?;
     super::issue_sync_web_links(&state.db, source.as_ref(), id, chrono::Utc::now()).await
+}
+
+/// Fetches the issue's history (the tracker's changelog); true when it changed.
+#[tauri::command]
+pub async fn issue_sync_history(state: State<'_, AppState>, id: String) -> AppResult<bool> {
+    let connection = state.settings.get().connection;
+    let source = crate::sync::source_for(&state.jira, &connection)?;
+    super::issue_sync_history(&state.db, source.as_ref(), id, Utc::now()).await
 }

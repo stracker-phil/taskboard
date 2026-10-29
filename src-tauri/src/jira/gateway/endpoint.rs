@@ -8,7 +8,7 @@ use super::params::{Expand, FieldIds, IssueRef, IssueRefs, Jql, PageToken, Proje
 use crate::error::{AppError, AppResult};
 use crate::jira::site::Site;
 
-/// Results per search or comment page.
+/// Results per search, comment or changelog page.
 pub const PAGE_SIZE: u32 = 100;
 const PROJECT_PAGE_SIZE: u32 = 50;
 
@@ -71,6 +71,11 @@ pub enum Endpoint {
     /// The issue's web links (Jira's remote links), all in one answer.
     IssueRemoteLinks {
         issue: IssueRef,
+    },
+    /// A page of the issue's changelog, oldest first.
+    IssueChangelog {
+        issue: IssueRef,
+        start_at: u32,
     },
     /// Strict validation of a query.
     JqlParse {
@@ -146,6 +151,12 @@ impl Endpoint {
             }
             Self::IssueRemoteLinks { issue } => {
                 Rest::get(&["issue", issue.as_str(), "remotelink"]).plan(site)
+            }
+            Self::IssueChangelog { issue, start_at } => {
+                Rest::get(&["issue", issue.as_str(), "changelog"])
+                    .query("startAt", start_at)
+                    .query("maxResults", PAGE_SIZE)
+                    .plan(site)
             }
             Self::FieldUsage { project } => Rest::read_post(
                 &["search", "jql"],

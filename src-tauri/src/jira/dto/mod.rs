@@ -1,10 +1,13 @@
 //! Jira REST API v3 answers, only the parts Taskboard reads.
 
+mod changelog;
 mod comment;
 mod issue;
 mod meta;
 mod remote_link;
 
+pub(crate) use changelog::ChangelogPage;
+pub use changelog::{ChangeItem, Changelog};
 pub use comment::Comment;
 pub(crate) use comment::{CommentPage, ParsedQueries};
 pub use issue::{ApproximateCount, BulkFetch, Issue, SearchPage, parse_jira_time};

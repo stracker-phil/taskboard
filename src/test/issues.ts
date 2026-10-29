@@ -79,6 +79,7 @@ export function changeItem(patch: Partial<Extract<ActivityItem, { kind: "change"
     field: "status",
     from: { kind: "status", value: { name: "In Review", style: "review" } },
     to: { kind: "status", value: { name: "Done", style: "done" } },
+    author: null,
     at: "2026-10-06T11:00:00Z",
     fresh: false,
     ...patch,

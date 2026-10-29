@@ -167,6 +167,24 @@ fn allowlist() -> Vec<(Endpoint, Method, &'static str, Option<Value>)> {
             None,
         ),
         (
+            Endpoint::IssueChangelog {
+                issue: issue("NW-1042"),
+                start_at: 0,
+            },
+            Method::GET,
+            "issue/NW-1042/changelog?startAt=0&maxResults=100",
+            None,
+        ),
+        (
+            Endpoint::IssueChangelog {
+                issue: issue("10001"),
+                start_at: 300,
+            },
+            Method::GET,
+            "issue/10001/changelog?startAt=300&maxResults=100",
+            None,
+        ),
+        (
             Endpoint::JqlParse { jql: jql(QUERY) },
             Method::POST,
             "jql/parse?validation=strict",
@@ -361,6 +379,11 @@ fn the_guard_accepts_the_allowed_requests_when_built_by_hand() {
             (Method::GET, "rest/api/3/project/LUM/versions"),
             (Method::GET, "rest/api/3/issue/NW-1/comment"),
             (Method::GET, "rest/api/3/issue/NW-1/remotelink"),
+            (Method::GET, "rest/api/3/issue/NW-1/changelog"),
+            (
+                Method::GET,
+                "rest/api/3/issue/NW-1/changelog?startAt=0&maxResults=100",
+            ),
             (Method::POST, "rest/api/3/search/jql"),
             (Method::POST, "rest/api/3/jql/parse"),
         ] {
@@ -458,6 +481,21 @@ fn paths_methods_and_queries_outside_the_table_are_refused() {
         (Method::GET, "rest/api/3/issue/nw-1/remotelink"),
         (Method::GET, "rest/api/3/issue//remotelink"),
         (Method::GET, "rest/api/3/issue/-1/remotelink"),
+        (Method::POST, "rest/api/3/issue/NW-1/changelog"),
+        (Method::PUT, "rest/api/3/issue/NW-1/changelog"),
+        (Method::DELETE, "rest/api/3/issue/NW-1/changelog"),
+        (
+            Method::GET,
+            "rest/api/3/issue/NW-1/changelog?startAt=0&startAt=1",
+        ),
+        (Method::GET, "rest/api/3/issue/NW-1/changelog?expand=x"),
+        (Method::GET, "rest/api/3/issue/NW-1/changelog/list"),
+        (Method::GET, "rest/api/3/issue/NW-1/changelog/"),
+        (Method::GET, "rest/api/3/issue/%2e%2e/changelog"),
+        (Method::GET, "rest/api/3/issue/nw-1/changelog"),
+        (Method::GET, "rest/api/3/issue//changelog"),
+        (Method::GET, "rest/api/3/issue/-1/changelog"),
+        (Method::POST, "rest/api/3/changelog/bulkfetch"),
     ];
     for (label, site) in sites() {
         for (method, relative) in &cases {
