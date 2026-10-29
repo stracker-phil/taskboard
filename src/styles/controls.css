@@ -81,3 +81,4 @@
 .switch:checked::after { transform: translateX(14px); }
 .switch:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--settings-focus-ring); }
 :root.window-blurred .switch:checked { background: var(--settings-blurred-fill); }
+:root.window-blurred .settings-pane .btn-primary:not(:disabled) { background: var(--settings-control); color: var(--settings-text); }

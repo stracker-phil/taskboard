@@ -12,6 +12,7 @@ import type {
   ConnectionInput,
   ConnectionTest,
   ConnectionView,
+  Diagnostics,
   ErrorKind,
   EventName,
   EventPayloads,
@@ -75,6 +76,8 @@ export const api = {
   getUiState: () => invoke<UiState>("get_ui_state"),
   setUiState: (ui: UiState) => invoke<UiState>("set_ui_state", { ui }),
   openLogFolder: () => invoke<void>("open_log_folder"),
+  /** Settings → Status: the connection, the sync and this Mac, each row with a tone and maybe a command. */
+  diagnosticsGet: () => invoke<Diagnostics>("diagnostics_get"),
   /** https links only; Rust refuses anything else. */
   openUrl: (url: string) => invoke<void>("open_url", { url }),
   logError: (message: string) => invoke<void>("log_frontend_error", { message }),

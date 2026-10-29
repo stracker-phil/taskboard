@@ -23,6 +23,7 @@ pub fn handlers() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
         commands::place_get,
         commands::place_set,
         commands::open_log_folder,
+        crate::diagnostics::diagnostics_get,
         commands::open_url,
         commands::log_frontend_error,
         commands::take_launch_events,

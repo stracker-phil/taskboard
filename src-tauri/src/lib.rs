@@ -10,6 +10,7 @@ pub mod connection;
 pub mod db;
 #[cfg(debug_assertions)]
 mod dev;
+pub mod diagnostics;
 pub mod error;
 pub mod events;
 pub mod filter;

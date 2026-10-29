@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { api } from "../api";
 import { runBusCommand } from "../state/requests";
 import { useStore } from "../state/store";
-import { isRecordingTarget, registerCommands, resolveKeydown, setOverrides, type Command } from "./registry";
+import { isRecordingTarget, isTextInput, registerCommands, resolveKeydown, setOverrides, type Command } from "./registry";
 import { activeScopes, registerScope } from "./scopes";
 import { ISSUE_KEY_COMMANDS } from "./issueKeys";
 import { VIEW_KEY_COMMANDS } from "./viewKeys";
@@ -18,7 +18,11 @@ export function registerCoreScopes() {
   registerScope({ id: "global", parent: null, label: "Every window", isActive: () => true });
   // Settings lists the Taskboard window's keys without running them.
   registerScope({ id: "main", parent: "global", label: "Taskboard window", isActive: () => currentWindow === "main" });
+  registerScope({ id: "settings", parent: "global", label: "Settings window", isActive: () => currentWindow === "settings" });
 }
+
+/** Escape belongs to a field being typed in or an open sheet or popover before it closes the window. */
+const escapeIsFree = () => !isTextInput(document.activeElement) && !document.querySelector('[role="dialog"]');
 
 /** The windows' own keys. Settings (⌘,), Quit and Close Window are Rust commands with app menu keys only. The
  *  sidebar key is the menu item's too; the page claims it so it can be rebound, and runs the same bus command. */
@@ -30,6 +34,8 @@ const APP_COMMANDS: Command[] = [
   ...VIEW_KEY_COMMANDS,
   ...PAGE_ACTION_COMMANDS,
   ...ISSUE_KEY_COMMANDS,
+  { id: "settings.close", title: "Close Settings", scope: "settings", defaultBinding: "Escape", when: escapeIsFree, run: () => runBusCommand("window:close", "Could not close the window") },
+  { id: "settings.search", title: "Search Settings", scope: "settings", defaultBinding: "Mod+F", run: () => document.querySelector<HTMLInputElement>(".settings-nav-search")?.focus() },
 ];
 
 /** Every window registers every command, so Settings can list them; a scope keeps a key to its window. */

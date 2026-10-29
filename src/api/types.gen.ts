@@ -122,6 +122,18 @@ export type ConnectionView = { connection: Connection, hasToken: boolean, expiry
 
 export type CustomField = { id: string, name: string, value: Cell | null, };
 
+export type DiagnosticGroup = { title: string, rows: Array<DiagnosticRow>, };
+
+export type DiagnosticRow = { label: string, value: string, tone: DiagnosticTone, 
+/**
+ * A bus command the page offers as a button.
+ */
+command: string | null, commandLabel: string | null, };
+
+export type DiagnosticTone = "ok" | "warn" | "error" | "info";
+
+export type Diagnostics = { groups: Array<DiagnosticGroup>, };
+
 export type EpicChip = { id: string, name: string, 
 /**
  * The `--epic-N-*` token pair.

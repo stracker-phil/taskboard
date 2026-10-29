@@ -9,6 +9,7 @@ import {
   type Connection,
   type ConnectionInput,
   type ConnectionView,
+  type Diagnostics,
   type EventName,
   type EventPayloads,
   type FilterOptions,
@@ -141,6 +142,7 @@ export function createApiMock(): Api {
     statusStyleSet: vi.fn().mockResolvedValue([]),
     syncOverview: vi.fn(async (): Promise<SyncOverview> => ({ state: { state: "idle", lastOk: null }, lastFullAt: null, projects: [] })),
     syncRun: vi.fn().mockResolvedValue(undefined),
+    diagnosticsGet: vi.fn(async (): Promise<Diagnostics> => ({ groups: [] })),
     popupMenu: vi.fn().mockResolvedValue(undefined),
     appInfo: vi.fn().mockResolvedValue({ name: "Taskboard", version: "1.2.3" }),
     listen: vi.fn(async (event: string, handler: Handler) => {

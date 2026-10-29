@@ -166,3 +166,14 @@
 .status-row__count { font-size: 12px; color: var(--settings-text-tertiary); white-space: nowrap; }
 .status-row__spacer { flex: 1; }
 .status-row__style { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+
+/* Settings → Status: a value with its tone icon. */
+.diagnostic-value { display: inline-flex; align-items: center; gap: 6px; min-width: 0; font-size: 12px; }
+.diagnostic-value .settings-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.diagnostic-value svg { flex: none; }
+.diagnostic-value[data-tone="ok"] svg { color: var(--sync-ok); }
+.diagnostic-value[data-tone="warn"] svg { color: var(--banner-warn-dot); }
+.diagnostic-value[data-tone="error"] svg { color: var(--banner-error-dot); }
+.diagnostic-value[data-tone="info"] svg { color: var(--settings-text-tertiary); }
+.settings-row-control:has(.diagnostic-value) { flex: 0 1 auto; min-width: 0; }
+.settings-row:has(.diagnostic-value) .settings-row-text { flex: none; }

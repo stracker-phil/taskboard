@@ -44,6 +44,11 @@ pub fn register(bus: &mut Bus) {
             .run(|app| async move { crate::commands::open_log_folder(app) }),
     );
     bus.add(
+        Command::new("app:data", "Show Data Folder")
+            .help("Show the folder with the settings and the cache in Finder")
+            .run(|app| async move { crate::diagnostics::open_data_folder(app) }),
+    );
+    bus.add(
         Command::new("window:close", "Close Window")
             .help("Hide the focused window")
             .hidden()
@@ -157,6 +162,16 @@ mod tests {
             assert_eq!(info.title, title, "{id}");
             assert!(!info.hidden, "{id}");
         }
+    }
+
+    #[test]
+    fn show_data_folder_is_registered_and_visible() {
+        let bus = registered();
+
+        assert!(bus.knows("app:data"));
+        let info = bus.info("app:data").unwrap();
+        assert_eq!(info.title, "Show Data Folder");
+        assert!(!info.hidden);
     }
 
     #[test]

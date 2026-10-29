@@ -408,16 +408,17 @@ or a view, Stop tracking, Reset Cache. The question names what goes and what sta
 
 ## Settings
 
-A window of its own (about 880 × 720, at least 760 × 560) in Daybook's System Settings layout, until the
-owner's own Settings design replaces it. Its colours are the `--settings-*` tokens of the same palette.
+A window of its own (about 880 × 720, at least 760 × 560) in Daybook's System Settings layout and code (there is
+no separate Settings design; owner, 2026-10-28). Its colours are the `--settings-*` tokens of the same palette.
 
 - **Page list** on `--settings-chrome` (190px): a drag strip for the window buttons and a search field that
   stay put (it narrows by page, group or section title), then rows under small group headings; the current
-  page a `--settings-fill-strong` fill. Only the list scrolls.
+  page a `--settings-fill-strong` fill. Only the list scrolls. ⌘F focuses the search.
 - **Page** on `--settings-bg`: the title in the strip beside the window buttons, then groups 24px apart. A
   change applies at once (fields on blur or ↵); only small forms whose fields belong together (the Jira site,
-  the scope query) save with their own Save button. Esc, ⌘W and the close button hide the window; it reopens
-  on the page it showed.
+  the scope query) save with their own Save button. Esc (unless a field or a sheet takes it), ⌘W and the
+  close button hide the window; it reopens on the page it showed. While another window is in front, switches,
+  primary buttons and the page list turn grey (`window-blurred`), as macOS does.
 - **Group** (`Group` in `components/settings/controls.tsx`): a 13px semibold heading over its inset group
   (`--settings-fill-quiet`, 12px radius). **Row** (`Row`): label and an optional description on the left, the
   control on the right, hairlines between rows.
@@ -448,8 +449,13 @@ owner's own Settings design replaces it. Its colours are the `--settings-*` toke
     (minutes in front and in the background, days to keep done issues) and *Cache* (the sync state line with
     Sync Now, one row per tracked project with its key, last full sync and "N issues · M open", then Reset
     Cache, confirmed in a sheet). It stays as the diagnostics view of the cache.
-  - **General** (System): About and logs. Shortcuts and Appearance join with their features.
-- The layout stays Daybook's until the owner's own Settings design arrives.
+  - **General** (System): *Behaviour* (seen delay, default pin duration) and *About* (version, log folder).
+  - **Appearance**: Automatic, Light or Dark. **Shortcuts**: every command and its key, rebindable.
+  - **Status** (`components/settings/status/`, Daybook's Status page): `diagnostics_get` reports groups of
+    rows, each a value with a tone icon (ok, warning, error, info) and maybe a bus command as a button: *Jira*
+    (site, account, API token and its expiry), *Sync* (state, tracked projects, last full sync, cached
+    issues) and *This Mac* (version, data and log folders with Show, the command-line tool's path). It reads
+    again when the window comes to the front and after a sync.
 
 ## Keys
 
