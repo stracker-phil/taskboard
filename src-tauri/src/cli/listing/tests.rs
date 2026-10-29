@@ -119,8 +119,8 @@ fn views_start_with_their_level_and_mark_the_current_and_default_ones() {
 
 #[test]
 fn a_level_without_views_prints_only_its_header() {
-    let reply = json!({ "level": "Pinned", "views": [] });
-    assert_eq!(printed(&views(), reply), "Pinned:");
+    let reply = json!({ "level": "Bookmarks", "views": [] });
+    assert_eq!(printed(&views(), reply), "Bookmarks:");
 }
 
 #[test]

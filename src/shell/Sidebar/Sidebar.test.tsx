@@ -51,7 +51,7 @@ const RELEASE = list(24, "Release 2.4.0", { count: 4 });
 function treeWith(patch: { nw?: Partial<SpaceNode>; nws?: ListNode[] } = {}): SidebarTree {
   return {
     everything: list(1, "Everything", { kind: "everything", count: 42 }),
-    home: [list(2, "Recently changed", { kind: "recent", count: 8 }), list(3, "Pinned", { kind: "pinned", count: null })],
+    home: [list(2, "Unread", { kind: "recent", count: 8 }), list(3, "Bookmarks", { kind: "pinned", count: null })],
     pinnedLists: [],
     spaces: [
       space({ icon: "R", color: "3", client: "Northwind", lists: [SPRINT, EPICS], ...patch.nw }),
@@ -84,7 +84,7 @@ async function renderSidebar(tree: SidebarTree = treeWith(), nav: Nav = navAt(nu
 }
 
 // A row's label and count are adjacent spans, so its accessible name is the label followed by the count, no space.
-// Recently changed shows its count as a badge labeled "<n> unread".
+// Unread shows its count as a badge labeled "<n> unread".
 const named = (label: string) => new RegExp(`^${label}\\s*(\\d+( unread)?)?$`);
 const spaceButton = (label: string) => screen.getByRole("button", { name: named(label) });
 
@@ -121,35 +121,35 @@ describe("Sidebar", () => {
       const home = screen.getByRole("navigation", { name: "Home" });
 
       expect(within(within(home).getByRole("button", { name: named("Everything") })).getByText("42")).toBeInTheDocument();
-      expect(within(within(home).getByRole("button", { name: named("Recently changed") })).getByText("8")).toBeInTheDocument();
+      expect(within(within(home).getByRole("button", { name: named("Unread") })).getByText("8")).toBeInTheDocument();
     });
 
-    it("show Recently changed's count as an unread badge", async () => {
+    it("show Unread's count as an unread badge", async () => {
       await renderSidebar();
 
       expect(within(screen.getByRole("navigation", { name: "Home" })).getByLabelText("8 unread")).toHaveTextContent("8");
     });
 
-    it.each([0, null])("show no badge and no count on Recently changed when its count is %s", async (count) => {
+    it.each([0, null])("show no badge and no count on Unread when its count is %s", async (count) => {
       const tree = treeWith();
-      tree.home = [list(2, "Recently changed", { kind: "recent", count }), list(3, "Pinned", { kind: "pinned", count: null })];
+      tree.home = [list(2, "Unread", { kind: "recent", count }), list(3, "Bookmarks", { kind: "pinned", count: null })];
       await renderSidebar(tree);
 
-      const row = within(screen.getByRole("navigation", { name: "Home" })).getByRole("button", { name: "Recently changed" });
-      expect(row).toHaveTextContent(/^Recently changed$/);
+      const row = within(screen.getByRole("navigation", { name: "Home" })).getByRole("button", { name: "Unread" });
+      expect(row).toHaveTextContent(/^Unread$/);
       expect(screen.queryByLabelText(/unread/)).not.toBeInTheDocument();
     });
 
     it("show no count when it is null", async () => {
       await renderSidebar();
 
-      expect(within(screen.getByRole("navigation", { name: "Home" })).getByRole("button", { name: "Pinned" })).toHaveTextContent(/^Pinned$/);
+      expect(within(screen.getByRole("navigation", { name: "Home" })).getByRole("button", { name: "Bookmarks" })).toHaveTextContent(/^Bookmarks$/);
     });
 
     it("open the row's level when clicked", async () => {
       await renderSidebar();
 
-      await userEvent.click(screen.getByRole("button", { name: named("Recently changed") }));
+      await userEvent.click(screen.getByRole("button", { name: named("Unread") }));
 
       expect(mocked.navGo).toHaveBeenCalledWith(2, null);
     });
@@ -158,7 +158,7 @@ describe("Sidebar", () => {
       await renderSidebar(treeWith(), navAt(1));
 
       expect(await screen.findByRole("button", { name: named("Everything") })).toHaveAttribute("aria-current", "page");
-      expect(screen.getByRole("button", { name: "Pinned" })).not.toHaveAttribute("aria-current");
+      expect(screen.getByRole("button", { name: "Bookmarks" })).not.toHaveAttribute("aria-current");
     });
   });
 
@@ -338,7 +338,7 @@ describe("Sidebar", () => {
       expect(mocked.navGo).toHaveBeenCalledWith(listId, null);
     });
 
-    it("offers no Go to Recently changed or Pinned when the tree has no such Home rows", async () => {
+    it("offers no Go to Unread or Bookmarks when the tree has no such Home rows", async () => {
       const tree = treeWith();
       tree.home = [];
       await renderSidebar(tree);
@@ -348,7 +348,7 @@ describe("Sidebar", () => {
       expect(run("go.everything")).toBe(true);
     });
 
-    it("opens Pinned on ⌘⇧P", async () => {
+    it("opens Bookmarks on ⌘⇧P", async () => {
       installCommands("main");
       await renderSidebar();
       render(<Keys />);
@@ -433,7 +433,7 @@ describe("Sidebar", () => {
       await renderSidebar(tree);
 
       const rows = within(screen.getByRole("navigation", { name: "Home" })).getAllByRole("button");
-      expect(rows.map((r) => r.textContent)).toEqual(["Everything42", "Recently changed8", "Pinned", "Epics3"]);
+      expect(rows.map((r) => r.textContent)).toEqual(["Everything42", "Unread8", "Bookmarks", "Epics3"]);
     });
 
     it("open the list's level when clicked", async () => {

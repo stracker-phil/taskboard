@@ -209,11 +209,11 @@ describe("CommandPalette", () => {
     });
 
     it("lists a list outside any Space by its name alone", async () => {
-      await renderPalette({ results: { issues: [], lists: [listHit({ id: 2, name: "Recently changed", projectId: null })] } });
+      await renderPalette({ results: { issues: [], lists: [listHit({ id: 2, name: "Unread", projectId: null })] } });
 
       await search("recent");
 
-      expect(within(await screen.findByRole("option", { name: /Recently changed/ })).getByText("Recently changed")).toBeInTheDocument();
+      expect(within(await screen.findByRole("option", { name: /Unread/ })).getByText("Unread")).toBeInTheDocument();
     });
 
     it("counts the issues and the actions", async () => {
