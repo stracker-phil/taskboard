@@ -324,6 +324,8 @@ button, Escape and a press outside close it, focus goes back to the button).
   fields (the Columns button reads "Card fields") choose epic, assignee, release and priority. Changed cards
   use `--changed-bg` and `--changed-border`. Hover shows the row toolbar in the top-right corner.
 - A card opens the full Issue view (the mockup's behaviour; List rows open the peek).
+- Each column virtualises its cards (`BoardColumnCards`, measured heights), so a Space with thousands of
+  issues mounts only the cards on screen; the keyboard's card scrolls into view.
 
 ## Table view
 
@@ -332,7 +334,7 @@ the row's bottom), with a sticky 34px header: Key, Summary (flexible),
 Status, then the view's columns. A sortable header (Key, Summary, Status, Priority, Due) sorts on click and
 again flips the direction (`aria-sort`, ↑/↓); a 6px handle at each header's right edge resizes the column
 (48–800), saved on the view. Grouped tables keep the list's group headers; the table scrolls sideways when the
-columns are wider than the window.
+columns are wider than the window. Groups open and close with the List's animation (`useGroupMotion`).
 
 ## Tokens
 

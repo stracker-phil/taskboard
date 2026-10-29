@@ -1,4 +1,5 @@
 import { ChevronLeft } from "lucide-react";
+import { useCallback } from "react";
 import { api, type BoardColumn, type BoardData, type Narrowing, type View } from "../../api";
 import { StatusPill } from "../../components/issue/StatusPill";
 import { EmptyLevel } from "../../shell/EmptyLevel";
@@ -6,7 +7,7 @@ import { useViewBoard } from "../../queries/views";
 import { attempt } from "../../state/requests";
 import { useStore } from "../../state/store";
 import { useIssueActions } from "../list/useIssueActions";
-import { BoardCard } from "./BoardCard";
+import { BoardColumnCards } from "./BoardColumnCards";
 import { useBoardKeys } from "./useBoardKeys";
 
 interface Props {
@@ -26,7 +27,7 @@ function Board({ view, data }: { view: View; data: BoardData }) {
   const actions = useIssueActions();
   const setCollapsed = (column: BoardColumn, collapsed: boolean) =>
     void attempt(api.viewSetColumnCollapsed(view.id, column.statusId, collapsed), "Could not change the column");
-  const open = (id: string) => openIssue(id, { listId: view.listId, viewId: view.id });
+  const open = useCallback((id: string) => openIssue(id, { listId: view.listId, viewId: view.id }), [openIssue, view.listId, view.id]);
   const selected = useBoardKeys(data, open, actions);
   if (data.columns.length === 0) return <EmptyLevel listId={view.listId} viewId={view.id} />;
   return (
@@ -54,12 +55,14 @@ function Board({ view, data }: { view: View; data: BoardData }) {
                 <ChevronLeft size={15} strokeWidth={2} aria-hidden="true" />
               </button>
             </header>
-            <div className="board-column__cards">
-              {column.ids.map((id) => {
-                const row = data.rows[id];
-                return row ? <BoardCard key={id} row={row} fields={data.cardFields} selected={id === selected} onOpen={open} actions={actions} /> : null;
-              })}
-            </div>
+            <BoardColumnCards
+              ids={column.ids}
+              rows={data.rows}
+              fields={data.cardFields}
+              selected={selected !== null && column.ids.includes(selected) ? selected : null}
+              onOpen={open}
+              actions={actions}
+            />
           </section>
         ),
       )}

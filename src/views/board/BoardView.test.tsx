@@ -1,7 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../../test/apiMock")).createApiMock() }));
 
@@ -25,6 +25,9 @@ const TODO = boardColumn({ statusId: "1", name: "To Do", style: "todo" });
 const PROGRESS = boardColumn({ statusId: "3", name: "In Progress", style: "progress", ids: ["1"] });
 const DONE = boardColumn({ statusId: "5", name: "Done", style: "done", ids: ["2"] });
 
+const CARD_HEIGHT = 110;
+let spies: { mockRestore: () => void }[] = [];
+
 beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
@@ -32,6 +35,18 @@ beforeEach(() => {
   mocked.viewSetColumnCollapsed.mockResolvedValue(BOARD);
   mocked.pinsList.mockResolvedValue(pins());
   mocked.copyText.mockResolvedValue(undefined);
+  spies = [
+    vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(1000),
+    vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(800),
+    vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockImplementation(function (this: HTMLElement) {
+      return this.classList.contains("board-column__cards") ? 1000 : CARD_HEIGHT;
+    }),
+    vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(800),
+  ];
+});
+
+afterEach(() => {
+  spies.forEach((s) => s.mockRestore());
 });
 
 async function renderBoard(data: BoardData) {
@@ -401,6 +416,29 @@ describe("BoardView", () => {
 
         expect(currentKeys()).toEqual([]);
       });
+    });
+
+    describe("a long column", () => {
+      const many = Array.from({ length: 300 }, (_, i) => row({ id: String(i + 1), key: `NW-${1000 + i}`, summary: `Sample task ${i + 1}` }));
+      const LONG = boardData([boardColumn({ ids: many.map((r) => r.id) })], many);
+
+      it("mounts only part of its cards, starting with the first", async () => {
+        await renderKeyed(LONG);
+
+        const cards = screen.getAllByRole("article");
+        expect(cards.length).toBeLessThan(many.length);
+        expect(screen.getByRole("article", { name: "NW-1000 Sample task 1" })).toBeInTheDocument();
+        expect(screen.queryByRole("article", { name: "NW-1299 Sample task 300" })).not.toBeInTheDocument();
+      });
+
+      it("marks the current card while moving down inside the rendered cards", async () => {
+        await renderKeyed(LONG);
+
+        await userEvent.keyboard("jjj");
+
+        expect(currentKeys()).toEqual(["NW-1002"]);
+      });
+
     });
 
     describe("acting on the selected card", () => {

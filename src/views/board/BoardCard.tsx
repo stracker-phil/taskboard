@@ -1,3 +1,4 @@
+import { memo } from "react";
 import type { Row } from "../../api";
 import { AvatarStack } from "../../components/issue/Avatar";
 import { CommentCount } from "../../components/issue/CommentCount";
@@ -17,15 +18,12 @@ interface Props {
 
 /** A Board card: epic and key, the summary (always wrapped, never cut), then people, release, comments and
  *  priority; changed cards are tinted. */
-export function BoardCard({ row, fields, selected = false, onOpen, actions }: Props) {
+export const BoardCard = memo(function BoardCard({ row, fields, selected = false, onOpen, actions }: Props) {
   const shows = (field: string) => fields.includes(field);
   return (
     <article
       className={["board-card", row.changed && "board-card--changed", selected && "board-card--selected"].filter(Boolean).join(" ")}
       aria-current={selected || undefined}
-      ref={(element) => {
-        if (selected) element?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
-      }}
       tabIndex={0}
       aria-label={`${row.key} ${row.summary}`}
       onClick={() => onOpen(row.id)}
@@ -56,4 +54,4 @@ export function BoardCard({ row, fields, selected = false, onOpen, actions }: Pr
       </span>
     </article>
   );
-}
+});
