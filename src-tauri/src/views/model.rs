@@ -1,4 +1,5 @@
-//! A view: one tab of a sidebar level. It decides how issues show, never which.
+//! A view: one tab of a sidebar level. It decides how issues show, and its own conditions narrow which
+//! (ADR 0033).
 
 use std::collections::BTreeMap;
 
@@ -108,6 +109,12 @@ pub struct View {
     pub position: i64,
     /// The tab a level opens with.
     pub is_default: bool,
+    /// The view's own conditions as stored JSON (ADR 0033), ANDed with its list's.
+    #[serde(skip)]
+    #[ts(skip)]
+    pub filter: Option<String>,
+    /// For the Filter badge; 0 when the stored filter can't be read.
+    pub own_conditions: usize,
 }
 
 /// Enum values as stored in their text columns.

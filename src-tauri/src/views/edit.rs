@@ -5,17 +5,17 @@ use std::collections::{BTreeMap, HashSet};
 use rusqlite::types::Value as SqlValue;
 use rusqlite::{Connection, OptionalExtension, Row, params};
 
-use super::display::{write_inline_labels, write_look, write_open_with, write_wrap};
 use super::model::{DEFAULT_COLUMNS, GroupBy, Layout, Sort, SortBy, View, from_text, to_text};
 use crate::db::{Db, LocalPart};
 use crate::error::{AppError, AppResult};
+use crate::filter::Filter;
 use crate::lists::{Kind, node};
 use crate::order::Siblings;
 use crate::space_config::{ALL_LAYOUTS, SpaceLayouts, hidden_columns, level_layouts};
 
-const COLUMNS: &str = "id, list_id, name, layout, columns, group_by, sort_by, sort_order, position, is_default, widths, wrap_titles, collapsed, open_with, icon, color, inline_labels";
+const COLUMNS: &str = "id, list_id, name, layout, columns, group_by, sort_by, sort_order, position, is_default, widths, wrap_titles, collapsed, open_with, icon, color, inline_labels, filter";
 
-fn siblings(list_id: i64) -> Siblings<'static> {
+pub(super) fn siblings(list_id: i64) -> Siblings<'static> {
     Siblings {
         table: "view",
         key: "id",
@@ -26,6 +26,7 @@ fn siblings(list_id: i64) -> Siblings<'static> {
 
 fn from_row(row: &Row) -> rusqlite::Result<View> {
     let columns: Option<String> = row.get(4)?;
+    let filter: Option<String> = row.get(17)?;
     Ok(View {
         id: row.get(0)?,
         list_id: row.get(1)?,
@@ -57,6 +58,8 @@ fn from_row(row: &Row) -> rusqlite::Result<View> {
         icon: row.get(14)?,
         color: row.get(15)?,
         inline_labels: row.get(16)?,
+        own_conditions: Filter::parse(filter.as_deref()).map_or(0, |f| f.conditions.len()),
+        filter,
     })
 }
 
@@ -127,32 +130,6 @@ pub fn insert_view(
     Ok(conn.last_insert_rowid())
 }
 
-pub fn copy_views(conn: &Connection, from: i64, to: i64) -> AppResult<()> {
-    for view in list_views(conn, from)? {
-        copy_view(conn, &view, to, &view.name)?;
-    }
-    Ok(())
-}
-
-fn copy_view(conn: &Connection, view: &View, list_id: i64, name: &str) -> AppResult<i64> {
-    let id = insert_view(
-        conn,
-        list_id,
-        name,
-        view.layout,
-        view.group_by,
-        &view.columns,
-    )?;
-    write_sort(conn, id, view.sort)?;
-    write_widths(conn, id, &view.widths)?;
-    write_collapsed(conn, id, &view.collapsed)?;
-    write_wrap(conn, id, view.wrap_titles)?;
-    write_inline_labels(conn, id, view.inline_labels)?;
-    write_open_with(conn, id, view.open_with)?;
-    write_look(conn, id, view.icon.as_deref(), view.color.as_deref())?;
-    Ok(id)
-}
-
 /// The Space's columns for new views, else the app's.
 pub fn columns_for_new_view(conn: &Connection, list_id: i64) -> AppResult<Vec<String>> {
     let stored: Option<String> = conn
@@ -186,7 +163,7 @@ fn sort_order(descending: bool) -> i64 {
     if descending { -1 } else { 1 }
 }
 
-fn write_sort(conn: &Connection, id: i64, sort: Sort) -> AppResult<()> {
+pub(super) fn write_sort(conn: &Connection, id: i64, sort: Sort) -> AppResult<()> {
     conn.execute(
         "UPDATE view SET sort_by = ?2, sort_order = ?3 WHERE id = ?1",
         params![id, to_text(sort.by), sort_order(sort.descending)],
@@ -194,7 +171,7 @@ fn write_sort(conn: &Connection, id: i64, sort: Sort) -> AppResult<()> {
     Ok(())
 }
 
-fn write_collapsed(
+pub(super) fn write_collapsed(
     conn: &Connection,
     id: i64,
     collapsed: &BTreeMap<String, bool>,
@@ -206,7 +183,11 @@ fn write_collapsed(
     Ok(())
 }
 
-fn write_widths(conn: &Connection, id: i64, widths: &BTreeMap<String, i64>) -> AppResult<()> {
+pub(super) fn write_widths(
+    conn: &Connection,
+    id: i64,
+    widths: &BTreeMap<String, i64>,
+) -> AppResult<()> {
     conn.execute(
         "UPDATE view SET widths = ?2 WHERE id = ?1",
         params![id, serde_json::to_string(widths)?],
@@ -276,18 +257,6 @@ pub async fn view_rename(db: &Db, id: i64, name: String) -> AppResult<View> {
     edit(db, id, move |conn| {
         conn.execute("UPDATE view SET name = ?2 WHERE id = ?1", params![id, name])?;
         Ok(())
-    })
-    .await
-}
-
-/// A copy right after the original, named "<name> copy".
-pub async fn view_duplicate(db: &Db, id: i64) -> AppResult<View> {
-    db.write(move |tx, changes| {
-        let view = read_view(tx, id)?;
-        let copy = copy_view(tx, &view, view.list_id, &format!("{} copy", view.name))?;
-        siblings(view.list_id).move_to(tx, SqlValue::Integer(copy), view.position + 1)?;
-        changes.local_changed(LocalPart::Views);
-        read_view(tx, copy)
     })
     .await
 }

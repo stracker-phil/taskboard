@@ -1,4 +1,5 @@
-//! What the Filter popover shows: a level's conditions with display names, and the values its pickers offer.
+//! What the Filter popover shows: a level's and a view's conditions with display names, and the values its
+//! pickers offer.
 
 use rusqlite::Connection;
 use serde::Serialize;
@@ -7,8 +8,9 @@ use ts_rs::TS;
 use super::context::names;
 use super::nodes::{Kind, Node, all_nodes, node, own_conditions};
 use crate::db::Db;
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 use crate::filter::{Condition, Field, Names, Parts, RELEVANT_FIELD, parts};
+use crate::views::{read_view, view_conditions};
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
 #[ts(export, export_to = "src/api/types.gen.ts")]
@@ -23,6 +25,10 @@ pub struct ListConditions {
     pub error: Option<String>,
     /// A filter list in a Space: the Space gives the project, so a condition can't pick one.
     pub project_fixed: bool,
+    /// The view's own conditions (ADR 0033), ANDed with the level's.
+    pub view: Vec<Condition>,
+    /// Why the view's stored filter can't be read.
+    pub view_error: Option<String>,
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
@@ -36,8 +42,25 @@ pub struct LockedCondition {
     pub source: String,
 }
 
-pub async fn list_conditions(db: &Db, id: i64) -> AppResult<ListConditions> {
-    db.read(move |conn| conditions_of(conn, id)).await
+/// `view_id`: a view of the level, whose own conditions come along.
+pub async fn list_conditions(db: &Db, id: i64, view_id: Option<i64>) -> AppResult<ListConditions> {
+    db.read(move |conn| {
+        let mut conditions = conditions_of(conn, id)?;
+        if let Some(view_id) = view_id {
+            let view = read_view(conn, view_id)?;
+            if view.list_id != id {
+                return Err(AppError::NotFound(format!(
+                    "View {view_id} isn't a view of filter list {id}"
+                )));
+            }
+            match view_conditions(&view) {
+                Ok(own) => conditions.view = own,
+                Err(e) => conditions.view_error = Some(e.to_string()),
+            }
+        }
+        Ok(conditions)
+    })
+    .await
 }
 
 fn conditions_of(conn: &Connection, id: i64) -> AppResult<ListConditions> {
@@ -69,6 +92,8 @@ fn conditions_of(conn: &Connection, id: i64) -> AppResult<ListConditions> {
         own,
         error,
         project_fixed,
+        view: Vec::new(),
+        view_error: None,
     })
 }
 

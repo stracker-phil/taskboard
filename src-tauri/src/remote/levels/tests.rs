@@ -94,6 +94,8 @@ fn view(id: i64, name: &str, layout: Layout, is_default: bool) -> View {
         color: None,
         position: id,
         is_default,
+        filter: None,
+        own_conditions: 0,
     }
 }
 

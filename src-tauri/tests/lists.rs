@@ -31,8 +31,8 @@ use taskboard_lib::test_support::{FakeSecrets, temp_config_dir};
 use taskboard_lib::views::{
     DEFAULT_COLUMNS, GroupBy, IssueOpening, Layout, Sort, SortBy, View, space_default_columns,
     view_create, view_delete, view_duplicate, view_move, view_rename, view_set_column_collapsed,
-    view_set_columns, view_set_group, view_set_inline_labels, view_set_layout, view_set_look,
-    view_set_open_with, view_set_sort, view_set_widths, view_set_wrap, views_of,
+    view_set_columns, view_set_filter, view_set_group, view_set_inline_labels, view_set_layout,
+    view_set_look, view_set_open_with, view_set_sort, view_set_widths, view_set_wrap, views_of,
 };
 
 const ME_ACCOUNT_ID: &str = "712020:5a1e0c3f-8d2b-4f61-9c7e-1b2a3c4d5e01";
@@ -870,7 +870,7 @@ mod the_conditions_a_level_shows {
     async fn everything_has_no_locked_and_no_own_conditions() {
         let (_dir, db) = tracked_lab().await;
 
-        let shown = list_conditions(&db, node_id(&db, "everything").await)
+        let shown = list_conditions(&db, node_id(&db, "everything").await, None)
             .await
             .unwrap();
 
@@ -882,6 +882,8 @@ mod the_conditions_a_level_shows {
                 own: vec![],
                 error: None,
                 project_fixed: false,
+                view: vec![],
+                view_error: None,
             }
         );
     }
@@ -890,7 +892,7 @@ mod the_conditions_a_level_shows {
     async fn a_space_locks_its_project_and_has_no_own_conditions() {
         let (_dir, db) = tracked_lab().await;
 
-        let shown = list_conditions(&db, space_node_id(&db, NW).await)
+        let shown = list_conditions(&db, space_node_id(&db, NW).await, None)
             .await
             .unwrap();
 
@@ -902,6 +904,8 @@ mod the_conditions_a_level_shows {
                 own: vec![],
                 error: None,
                 project_fixed: false,
+                view: vec![],
+                view_error: None,
             }
         );
     }
@@ -910,7 +914,7 @@ mod the_conditions_a_level_shows {
     async fn a_list_in_a_space_has_a_fixed_project() {
         let (_dir, db) = tracked_lab().await;
 
-        let shown = list_conditions(&db, list_id(&db, "Open bugs").await)
+        let shown = list_conditions(&db, list_id(&db, "Open bugs").await, None)
             .await
             .unwrap();
 
@@ -925,7 +929,7 @@ mod the_conditions_a_level_shows {
             .await
             .unwrap();
 
-        let shown = list_conditions(&db, list_id(&db, "My bugs").await)
+        let shown = list_conditions(&db, list_id(&db, "My bugs").await, None)
             .await
             .unwrap();
 
@@ -938,7 +942,7 @@ mod the_conditions_a_level_shows {
         let (_dir, db) = tracked_lab().await;
 
         for kind in ["recent", "pinned"] {
-            let shown = list_conditions(&db, node_id(&db, kind).await)
+            let shown = list_conditions(&db, node_id(&db, kind).await, None)
                 .await
                 .unwrap();
 
@@ -954,6 +958,8 @@ mod the_conditions_a_level_shows {
             own: vec![],
             error: None,
             project_fixed: true,
+            view: vec![],
+            view_error: None,
         };
 
         assert_eq!(
@@ -972,7 +978,7 @@ mod the_conditions_a_level_shows {
         )
         .await;
 
-        let shown = list_conditions(&db, open_bugs).await.unwrap();
+        let shown = list_conditions(&db, open_bugs, None).await.unwrap();
 
         assert_eq!(shown.kind, Kind::List);
         assert_eq!(shown.locked, [locked("from Space")]);
@@ -990,7 +996,7 @@ mod the_conditions_a_level_shows {
         )
         .await;
 
-        let shown = list_conditions(&db, list_id(&db, "Epics").await)
+        let shown = list_conditions(&db, list_id(&db, "Epics").await, None)
             .await
             .unwrap();
 
@@ -1002,9 +1008,63 @@ mod the_conditions_a_level_shows {
     async fn an_unknown_level_is_not_found() {
         let (_dir, db) = tracked_lab().await;
 
-        let err = list_conditions(&db, 9999).await.unwrap_err();
+        let err = list_conditions(&db, 9999, None).await.unwrap_err();
 
         assert_eq!(err.kind(), ErrorKind::NotFound);
+    }
+
+    #[tokio::test]
+    async fn a_view_of_another_list_is_not_found() {
+        let (_dir, db) = tracked_lab().await;
+        let epics = list_id(&db, "Epics").await;
+        let bugs_view = views_of(&db, list_id(&db, "Open bugs").await)
+            .await
+            .unwrap()[0]
+            .id;
+
+        let err = list_conditions(&db, epics, Some(bugs_view))
+            .await
+            .unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::NotFound);
+    }
+
+    #[tokio::test]
+    async fn a_view_adds_its_own_conditions_and_leaves_the_level_untouched() {
+        let (_dir, db) = tracked_lab().await;
+        let epics = list_id(&db, "Epics").await;
+        let view = views_of(&db, epics).await.unwrap()[0].id;
+        view_set_filter(&db, viewer(None), view, bugs())
+            .await
+            .unwrap();
+
+        let shown = list_conditions(&db, epics, Some(view)).await.unwrap();
+
+        assert_eq!(shown.view, bugs().conditions);
+        assert_eq!(shown.view_error, None);
+        assert_eq!(
+            shown.own,
+            list_conditions(&db, epics, None).await.unwrap().own
+        );
+    }
+
+    #[tokio::test]
+    async fn a_view_whose_stored_filter_is_broken_reports_a_view_error_and_no_level_error() {
+        let (_dir, db) = tracked_lab().await;
+        let epics = list_id(&db, "Epics").await;
+        let view = views_of(&db, epics).await.unwrap()[0].id;
+        db.write(move |tx, _| {
+            tx.execute("UPDATE view SET filter = 'not json' WHERE id = ?1", [view])?;
+            Ok(())
+        })
+        .await
+        .unwrap();
+
+        let shown = list_conditions(&db, epics, Some(view)).await.unwrap();
+
+        assert!(shown.view_error.is_some());
+        assert!(shown.view.is_empty());
+        assert_eq!(shown.error, None);
     }
 }
 
@@ -1627,6 +1687,180 @@ mod editing_views {
         assert!(after[0].is_default);
     }
 
+    async fn stored_view_filter(db: &Db, view: i64) -> Option<String> {
+        db.read(move |conn| {
+            Ok(
+                conn.query_row("SELECT filter FROM view WHERE id = ?1", [view], |row| {
+                    row.get::<_, Option<String>>(0)
+                })?,
+            )
+        })
+        .await
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn a_view_filter_is_stored_and_counted_in_the_returned_view() {
+        let (_dir, db) = tracked_lab().await;
+        let epics = list_id(&db, "Epics").await;
+        let view = views_of(&db, epics).await.unwrap()[0].id;
+        let two = filter(vec![
+            Condition::is(Field::Type, "Bug"),
+            Condition::is(Field::Priority, "High"),
+        ]);
+
+        let set = view_set_filter(&db, viewer(None), view, two.clone())
+            .await
+            .unwrap();
+
+        assert_eq!(set.own_conditions, 2);
+        assert_eq!(
+            list_conditions(&db, epics, Some(view)).await.unwrap().view,
+            two.conditions
+        );
+        assert_eq!(views_of(&db, epics).await.unwrap()[0].own_conditions, 2);
+    }
+
+    #[tokio::test]
+    async fn an_empty_view_filter_clears_the_stored_one() {
+        let (_dir, db) = tracked_lab().await;
+        let epics = list_id(&db, "Epics").await;
+        let view = views_of(&db, epics).await.unwrap()[0].id;
+        view_set_filter(&db, viewer(None), view, bugs())
+            .await
+            .unwrap();
+
+        let cleared = view_set_filter(&db, viewer(None), view, filter(vec![]))
+            .await
+            .unwrap();
+
+        assert_eq!(cleared.own_conditions, 0);
+        assert_eq!(stored_view_filter(&db, view).await, None);
+        assert!(
+            list_conditions(&db, epics, Some(view))
+                .await
+                .unwrap()
+                .view
+                .is_empty()
+        );
+    }
+
+    #[tokio::test]
+    async fn a_view_filter_with_an_unknown_custom_field_is_rejected_and_the_old_one_stays() {
+        let (_dir, db) = tracked_lab().await;
+        let epics = list_id(&db, "Epics").await;
+        let view = views_of(&db, epics).await.unwrap()[0].id;
+        view_set_filter(&db, viewer(None), view, bugs())
+            .await
+            .unwrap();
+        let before = stored_view_filter(&db, view).await;
+
+        let err = view_set_filter(
+            &db,
+            viewer(None),
+            view,
+            filter(vec![Condition::is(
+                Field::Custom("customfield_99999".into()),
+                "x",
+            )]),
+        )
+        .await
+        .unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::InvalidInput);
+        assert!(before.is_some());
+        assert_eq!(stored_view_filter(&db, view).await, before);
+    }
+
+    #[tokio::test]
+    async fn the_filter_of_an_unknown_view_is_not_found() {
+        let (_dir, db) = tracked_lab().await;
+
+        let err = view_set_filter(&db, viewer(None), 9999, bugs())
+            .await
+            .unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::NotFound);
+    }
+
+    #[tokio::test]
+    async fn a_custom_field_used_in_a_view_filter_is_marked_shown() {
+        let (_dir, db) = tracked_lab().await;
+        db.write(|tx, _| {
+            tx.execute(
+                "INSERT INTO cache.field (id, name, type) VALUES (?1, 'Reviewer', 'user')",
+                [REVIEWER],
+            )?;
+            Ok(())
+        })
+        .await
+        .unwrap();
+        let epics = list_id(&db, "Epics").await;
+        let view = views_of(&db, epics).await.unwrap()[0].id;
+
+        view_set_filter(
+            &db,
+            viewer(Some(ME_ACCOUNT_ID)),
+            view,
+            filter(vec![Condition::is(Field::Custom(REVIEWER.into()), "me")]),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(
+            number(
+                &db,
+                format!("SELECT shown FROM cache.field WHERE id = '{REVIEWER}'")
+            )
+            .await,
+            1
+        );
+    }
+
+    #[tokio::test]
+    async fn duplicating_a_view_copies_its_filter() {
+        let (_dir, db) = tracked_lab().await;
+        let epics = list_id(&db, "Epics").await;
+        let view = views_of(&db, epics).await.unwrap()[0].id;
+        view_set_filter(&db, viewer(None), view, bugs())
+            .await
+            .unwrap();
+
+        let copy = view_duplicate(&db, view).await.unwrap();
+
+        assert_eq!(copy.own_conditions, 1);
+        assert_eq!(
+            list_conditions(&db, epics, Some(copy.id))
+                .await
+                .unwrap()
+                .view,
+            bugs().conditions
+        );
+    }
+
+    #[tokio::test]
+    async fn duplicating_a_list_copies_the_filters_of_its_views() {
+        let (_dir, db) = tracked_lab().await;
+        let epics = list_id(&db, "Epics").await;
+        let view = views_of(&db, epics).await.unwrap()[0].id;
+        view_set_filter(&db, viewer(None), view, bugs())
+            .await
+            .unwrap();
+
+        let copy = list_duplicate(&db, epics).await.unwrap();
+
+        let copied = views_of(&db, copy).await.unwrap();
+        assert_eq!(copied[0].own_conditions, 1);
+        assert_eq!(
+            list_conditions(&db, copy, Some(copied[0].id))
+                .await
+                .unwrap()
+                .view,
+            bugs().conditions
+        );
+        assert!(copied[1..].iter().all(|v| v.own_conditions == 0));
+    }
+
     #[tokio::test]
     async fn layout_group_and_sort_are_stored_per_view() {
         let (_dir, db) = tracked_lab().await;
@@ -1899,6 +2133,7 @@ mod editing_views {
                 "color": null,
                 "position": 0,
                 "isDefault": true,
+                "ownConditions": 0,
             })
         );
     }

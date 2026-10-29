@@ -37,11 +37,11 @@ export const SPACE_CONFIG_KEY = ["spaceConfig"] as const;
 export const useSpaceConfig = (projectId: string) =>
   useQuery({ queryKey: [...SPACE_CONFIG_KEY, projectId], queryFn: () => api.spaceConfig(projectId) });
 
-/** A level's locked and own conditions, for the Filter popover. */
+/** A level's locked and own conditions and the view's own ones, for the Filter popover. */
 export const LIST_CONDITIONS_KEY = ["listConditions"] as const;
-export const listConditionsKey = (listId: number) => [...LIST_CONDITIONS_KEY, listId] as const;
-export const useListConditions = (listId: number) =>
-  useQuery({ queryKey: listConditionsKey(listId), queryFn: () => api.listConditions(listId) });
+export const listConditionsKey = (listId: number, viewId: number) => [...LIST_CONDITIONS_KEY, listId, viewId] as const;
+export const useListConditions = (listId: number, viewId: number) =>
+  useQuery({ queryKey: listConditionsKey(listId, viewId), queryFn: () => api.listConditions(listId, viewId) });
 
 export const FILTER_OPTIONS_KEY = ["filterOptions"] as const;
 export const useFilterOptions = () => useQuery({ queryKey: FILTER_OPTIONS_KEY, queryFn: api.filterOptions });

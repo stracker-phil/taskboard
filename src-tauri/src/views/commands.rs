@@ -6,6 +6,7 @@ use chrono::Utc;
 
 use super::{BoardData, Column, GroupBy, IssueOpening, Layout, Narrowing, Sort, View, ViewData};
 use crate::error::AppResult;
+use crate::filter::Filter;
 use crate::lists::Viewer;
 use crate::state::AppState;
 
@@ -99,6 +100,17 @@ pub async fn view_set_open_with(
     open_with: Option<IssueOpening>,
 ) -> AppResult<View> {
     super::view_set_open_with(&state.db, id, open_with).await
+}
+
+/// The view's own conditions, ANDed with its list's.
+#[tauri::command]
+pub async fn view_set_filter(
+    state: State<'_, AppState>,
+    id: i64,
+    filter: Filter,
+) -> AppResult<View> {
+    let viewer = Viewer::of(&state.settings.get().connection, Utc::now());
+    super::view_set_filter(&state.db, viewer, id, filter).await
 }
 
 #[tauri::command]

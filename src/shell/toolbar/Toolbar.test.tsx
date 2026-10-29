@@ -20,15 +20,15 @@ const mocked = vi.mocked(api, true);
 const LIST_LEVEL: Level = { kind: "list", space: space(), node: listNode() };
 const SPACE_LEVEL: Level = { kind: "space", space: space() };
 
-function Harness({ level }: { level: Level }) {
+function Harness({ level, ownConditions }: { level: Level; ownConditions: number }) {
   useCommandKeys();
-  return <Toolbar level={level} view={view({ groupBy: "status" })} />;
+  return <Toolbar level={level} view={view({ groupBy: "status", ownConditions })} />;
 }
 
-function renderToolbar(level: Level = LIST_LEVEL) {
+function renderToolbar(level: Level = LIST_LEVEL, ownConditions = 0) {
   render(
     <QueryClientProvider client={createQueryClient()}>
-      <Harness level={level} />
+      <Harness level={level} ownConditions={ownConditions} />
     </QueryClientProvider>,
   );
 }
@@ -103,11 +103,43 @@ describe("Toolbar page actions", () => {
       expect(await screen.findByRole("dialog", { name: "Filter" })).toBeInTheDocument();
     });
 
-    it("is not offered on a Space level, which has no Filter button", () => {
+    it("is offered on a Space level too", async () => {
       renderToolbar(SPACE_LEVEL);
 
-      expect(run("toolbar.filter")).toBe(false);
-      expect(screen.queryByRole("button", { name: "Filter" })).not.toBeInTheDocument();
+      expect(run("toolbar.filter")).toBe(true);
+
+      expect(await screen.findByRole("dialog", { name: "Filter" })).toBeInTheDocument();
+    });
+  });
+
+  describe("Filter button badge", () => {
+    it("shows no badge when neither the list nor the view has conditions", () => {
+      renderToolbar(
+        { kind: "list", space: space(), node: listNode({ ownConditions: 0 }) },
+        0,
+      );
+
+      expect(screen.getByRole("button", { name: "Filter" })).toBeInTheDocument();
+      expect(screen.queryByLabelText(/condition/)).not.toBeInTheDocument();
+    });
+
+    it("counts the list's and the view's conditions together", () => {
+      renderToolbar({ kind: "list", space: space(), node: listNode({ ownConditions: 1 }) }, 2);
+
+      expect(screen.getByLabelText("3 conditions")).toHaveTextContent("3");
+    });
+
+    it("counts only the view's conditions on a Space level", () => {
+      renderToolbar(SPACE_LEVEL, 2);
+
+      expect(screen.getByRole("button", { name: /^Filter/ })).toBeInTheDocument();
+      expect(screen.getByLabelText("2 conditions")).toHaveTextContent("2");
+    });
+
+    it("says 1 condition for a single one", () => {
+      renderToolbar(SPACE_LEVEL, 1);
+
+      expect(screen.getByLabelText("1 condition")).toBeInTheDocument();
     });
   });
 

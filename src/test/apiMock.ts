@@ -27,12 +27,14 @@ import {
   type SyncOverview,
   type SyncSettings,
   type UiState,
+  type View,
   type ViewData,
 } from "../api/types";
 import { filterOptions } from "./filters";
 import { issueDetail } from "./issues";
 import { settings } from "./settings";
 import { spaceConfig } from "./spaces";
+import { view } from "./views";
 
 type Api = typeof realApi;
 
@@ -100,7 +102,7 @@ export function createApiMock(): Api {
     listMove: vi.fn(),
     listSetFilter: vi.fn(),
     listSetLook: vi.fn(),
-    listConditions: vi.fn(async (): Promise<ListConditions> => ({ kind: "everything", locked: [], own: [], error: null, projectFixed: false })),
+    listConditions: vi.fn(async (): Promise<ListConditions> => ({ kind: "everything", locked: [], own: [], error: null, view: [], viewError: null, projectFixed: false })),
     filterOptions: vi.fn(async (): Promise<FilterOptions> => filterOptions()),
     listMatchCount: vi.fn(),
     spaceMove: vi.fn(),
@@ -118,6 +120,7 @@ export function createApiMock(): Api {
     viewDuplicate: vi.fn(),
     viewSetLayout: vi.fn(),
     viewSetLook: vi.fn(),
+    viewSetFilter: vi.fn(async (id: number): Promise<View> => view({ id })),
     viewSetColumns: vi.fn(),
     viewSetGroup: vi.fn(),
     viewSetSort: vi.fn(),

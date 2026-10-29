@@ -45,7 +45,7 @@ fn check_filter(
 }
 
 /// The next sync fetches the custom fields a filter uses.
-fn fetch_its_fields(conn: &Connection, filter: &Filter) -> AppResult<()> {
+pub fn mark_fields_shown(conn: &Connection, filter: &Filter) -> AppResult<()> {
     for condition in &filter.conditions {
         if let Field::Custom(id) = &condition.field {
             conn.execute("UPDATE cache.field SET shown = 1 WHERE id = ?1", [id])?;
@@ -82,7 +82,7 @@ pub async fn list_create(
             }
         };
         check_filter(tx, &viewer, parent.as_ref(), &filter)?;
-        fetch_its_fields(tx, &filter)?;
+        mark_fields_shown(tx, &filter)?;
         let id = insert_list(tx, parent.map(|p| p.id), &name, &filter)?;
         lists_and_views_changed(changes);
         Ok(id)
@@ -183,7 +183,7 @@ pub async fn list_set_filter(db: &Db, viewer: Viewer, id: i64, filter: Filter) -
         let list = filter_list(tx, id)?;
         let parent = list.parent_id.map(|p| node(tx, p)).transpose()?;
         check_filter(tx, &viewer, parent.as_ref(), &filter)?;
-        fetch_its_fields(tx, &filter)?;
+        mark_fields_shown(tx, &filter)?;
         tx.execute(
             "UPDATE filter_list SET filter = ?2 WHERE id = ?1",
             params![id, filter.to_json()?],

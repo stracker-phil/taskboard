@@ -91,10 +91,14 @@ pub async fn space_update(
     super::space_update(&state.db, project_id, update).await
 }
 
-/// A level's locked and own conditions for the Filter popover.
+/// A level's locked and own conditions, and a view's own ones, for the Filter popover.
 #[tauri::command]
-pub async fn list_conditions(state: State<'_, AppState>, id: i64) -> AppResult<ListConditions> {
-    super::list_conditions(&state.db, id).await
+pub async fn list_conditions(
+    state: State<'_, AppState>,
+    id: i64,
+    view_id: Option<i64>,
+) -> AppResult<ListConditions> {
+    super::list_conditions(&state.db, id, view_id).await
 }
 
 /// The fields and values the Filter popover offers.

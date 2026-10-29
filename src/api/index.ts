@@ -124,8 +124,8 @@ export const api = {
   listMove: (id: number, position: number) => invoke<void>("list_move", { id, position }),
   listSetFilter: (id: number, filter: Filter) => invoke<void>("list_set_filter", { id, filter }),
   /** What `id` inherits ANDed with `filter` in place of its own conditions. */
-  /** A level's locked conditions (with display names) and a filter list's own ones. */
-  listConditions: (id: number) => invoke<ListConditions>("list_conditions", { id }),
+  /** A level's locked conditions (with display names), a filter list's own ones and the view's own ones. */
+  listConditions: (id: number, viewId: number | null) => invoke<ListConditions>("list_conditions", { id, viewId }),
   /** The fields and cached values the Filter popover's selects offer. */
   filterOptions: () => invoke<FilterOptions>("filter_options"),
   listMatchCount: (id: number, filter: Filter) => invoke<MatchCount>("list_match_count", { id, filter }),
@@ -166,6 +166,8 @@ export const api = {
   viewRows: (listId: number, viewId: number, narrowing: Narrowing) => invoke<ViewData>("view_rows", { listId, viewId, narrowing }),
   /** The Board layout: a column per status of the issues shown, with the cards' rows. */
   viewBoard: (listId: number, viewId: number, narrowing: Narrowing) => invoke<BoardData>("view_board", { listId, viewId, narrowing }),
+  /** The view's own conditions, ANDed with its level's; rejects with `invalid_input` when they don't compile. */
+  viewSetFilter: (id: number, filter: Filter) => invoke<View>("view_set_filter", { id, filter }),
   viewSetColumnCollapsed: (id: number, statusId: string, collapsed: boolean) => invoke<View>("view_set_column_collapsed", { id, statusId, collapsed }),
   /** How long an open issue takes to count as seen, and the default pin duration. */
   behaviourSet: (behaviour: Behaviour) => invoke<Settings>("behaviour_set", { behaviour }),

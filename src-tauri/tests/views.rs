@@ -12,6 +12,7 @@ use taskboard_lib::connection::{
 };
 use taskboard_lib::db::Db;
 use taskboard_lib::error::ErrorKind;
+use taskboard_lib::filter::{Condition, Field, Filter};
 use taskboard_lib::jira::{Limiter, TokenKind};
 use taskboard_lib::lists::{SidebarTree, Viewer, sidebar_tree};
 use taskboard_lib::status_style::{Style, status_style_set, status_styles_list};
@@ -24,8 +25,8 @@ use taskboard_lib::views::groups::{Group, GroupMark};
 use taskboard_lib::views::rows::{Cell, Row};
 use taskboard_lib::views::{
     BoardColumn, BoardData, GroupBy, Narrowing, Sort, SortBy, ViewData, columns_catalogue,
-    view_board, view_rows, view_set_column_collapsed, view_set_columns, view_set_group,
-    view_set_sort, views_of,
+    view_board, view_rows, view_set_column_collapsed, view_set_columns, view_set_filter,
+    view_set_group, view_set_sort, views_of,
 };
 
 const ME_ACCOUNT_ID: &str = "712020:5a1e0c3f-8d2b-4f61-9c7e-1b2a3c4d5e01";
@@ -1390,6 +1391,116 @@ mod board {
         let ungrouped = site.board(space, view, Narrowing::default()).await;
 
         assert_eq!(ungrouped, by_status);
+    }
+}
+
+mod view_filters {
+    use super::*;
+
+    fn bugs() -> Filter {
+        Filter {
+            conditions: vec![Condition::is(Field::Type, "Bug")],
+        }
+    }
+
+    /// The Website relaunch Space's first two views.
+    async fn two_views(site: &Site) -> (i64, i64, i64) {
+        let space = site.nw_space().await;
+        let views = views_of(site.db(), space).await.unwrap();
+        (space, views[0].id, views[1].id)
+    }
+
+    async fn set_bugs(site: &Site, view: i64) {
+        view_set_filter(site.db(), viewer(), view, bugs())
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn a_view_filter_narrows_only_its_own_view() {
+        let site = Site::new().await;
+        let (space, filtered, other) = two_views(&site).await;
+        let whole = site.data(space, other, Narrowing::default()).await;
+
+        set_bugs(&site, filtered).await;
+
+        let narrowed = site.data(space, filtered, Narrowing::default()).await;
+        let untouched = site.data(space, other, Narrowing::default()).await;
+        assert_eq!(sorted_keys(&untouched), sorted_keys(&whole));
+        let keys = sorted_keys(&narrowed);
+        assert!(!keys.is_empty());
+        assert!(keys.len() < whole.rows.len());
+        for key in &keys {
+            assert_eq!(
+                text(
+                    site.db(),
+                    format!("SELECT issue_type FROM cache.issue WHERE key = '{key}'")
+                )
+                .await,
+                "Bug",
+                "{key}"
+            );
+        }
+        assert_consistent(&narrowed);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn a_view_filter_narrows_the_board_of_that_view() {
+        let site = Site::new().await;
+        let (space, filtered, other) = two_views(&site).await;
+        let board = |view: i64| view_board(site.db(), viewer(), space, view, Narrowing::default());
+        let whole = board(other).await.unwrap();
+
+        set_bugs(&site, filtered).await;
+
+        let narrowed = board(filtered).await.unwrap();
+        let untouched = board(other).await.unwrap();
+        assert_eq!(untouched.rows.len(), whole.rows.len());
+        assert!(!narrowed.rows.is_empty());
+        assert!(narrowed.rows.len() < whole.rows.len());
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn the_sidebar_counts_ignore_view_filters() {
+        let site = Site::new().await;
+        let (_, filtered, _) = two_views(&site).await;
+        let before = site.tree().await;
+
+        set_bugs(&site, filtered).await;
+
+        assert_eq!(site.tree().await, before);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn a_broken_view_filter_fails_only_that_view() {
+        let site = Site::new().await;
+        let (space, broken, other) = two_views(&site).await;
+        site.db()
+            .write(move |tx, _| {
+                tx.execute(
+                    "UPDATE view SET filter = 'not json' WHERE id = ?1",
+                    [broken],
+                )?;
+                Ok(())
+            })
+            .await
+            .unwrap();
+
+        let failed = view_rows(site.db(), viewer(), space, broken, Narrowing::default())
+            .await
+            .unwrap_err();
+        let board = view_board(site.db(), viewer(), space, broken, Narrowing::default())
+            .await
+            .unwrap_err();
+        let working = site.data(space, other, Narrowing::default()).await;
+
+        assert_eq!(failed.kind(), ErrorKind::InvalidInput);
+        assert_eq!(board.kind(), ErrorKind::InvalidInput);
+        assert!(!working.rows.is_empty());
     }
 }
 

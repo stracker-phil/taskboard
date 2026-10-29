@@ -11,6 +11,7 @@ import { createQueryClient } from "../../queries/queryClient";
 import { resetStore } from "../../state/store";
 import { filterOptions, listConditions } from "../../test/filters";
 import { sidebarTree, space } from "../../test/spaces";
+import { view } from "../../test/views";
 import { FilterPopover } from "./FilterPopover";
 
 const mocked = vi.mocked(api, true);
@@ -27,7 +28,9 @@ const OPTIONS = filterOptions({
   ],
 });
 
+const VIEW_ID = 101;
 const HIGH_PRIORITY = { field: "priority", op: "is", value: "High" } as const;
+const NO_DUE_DATE = { field: "due", op: "isEmpty" } as const;
 const FILTER_LIST: ListConditions = listConditions({ kind: "list", own: [HIGH_PRIORITY] });
 const SPACE: ListConditions = listConditions({ kind: "space", locked: [{ field: "Project", op: "=", value: "NW", source: "this Space" }] });
 
@@ -39,7 +42,7 @@ function Harness({ listId, name }: { listId: number; name: string }) {
       <button ref={anchor} type="button" onClick={() => setOpen((o) => !o)}>
         Filter
       </button>
-      {open && <FilterPopover listId={listId} listName={name} anchor={anchor} onClose={() => setOpen(false)} />}
+      {open && <FilterPopover listId={listId} viewId={VIEW_ID} listName={name} anchor={anchor} onClose={() => setOpen(false)} />}
     </>
   );
 }
@@ -55,6 +58,10 @@ async function openFilter(conditions: ListConditions, listId = 21, name = "My op
   await screen.findByText("Show issues where");
   return screen.getByRole("dialog", { name: "Filter" });
 }
+
+const LIST_SECTION = "All views of this list";
+const VIEW_SECTION = "This view";
+const section = (popover: HTMLElement, name: string) => within(popover).getByRole("group", { name });
 
 /** Unticks High and ticks Low in the open value picker. */
 async function swapPriority(popover: HTMLElement) {
@@ -72,6 +79,7 @@ beforeEach(() => {
   mocked.listMatchCount.mockResolvedValue({ open: 5, total: 9 });
   mocked.sidebarTree.mockResolvedValue(sidebarTree([space()]));
   mocked.listSetFilter.mockResolvedValue(undefined);
+  mocked.viewSetFilter.mockResolvedValue(view({ id: VIEW_ID }));
 });
 
 describe("FilterPopover", () => {
@@ -152,11 +160,11 @@ describe("FilterPopover", () => {
       await waitFor(() => expect(mocked.listSetFilter).toHaveBeenLastCalledWith(21, { conditions: [{ field: "priority", op: "isNot", value: "High" }] }));
     });
 
-    it("counts the matching issues in the header and names the list in the footer", async () => {
+    it("counts the matching issues in the header and names the list and the view in the footer", async () => {
       const popover = await openFilter(FILTER_LIST);
 
       expect(await within(popover).findByText("5 issues match")).toBeInTheDocument();
-      expect(within(popover).getByText("Changes save to “My open issues”.")).toBeInTheDocument();
+      expect(within(popover).getByText("Changes save to “My open issues” and this view.")).toBeInTheDocument();
     });
 
     it("offers no Save as filter list", async () => {
@@ -184,9 +192,9 @@ describe("FilterPopover", () => {
     it("adds a row with a ready-to-use condition and saves it", async () => {
       const popover = await openFilter(FILTER_LIST);
 
-      await userEvent.click(within(popover).getByRole("button", { name: "+ Add condition" }));
+      await userEvent.click(within(section(popover, LIST_SECTION)).getByRole("button", { name: "+ Add condition" }));
 
-      expect(within(popover).getAllByLabelText("Field")).toHaveLength(2);
+      expect(within(section(popover, LIST_SECTION)).getAllByLabelText("Field")).toHaveLength(2);
       await waitFor(() =>
         expect(mocked.listSetFilter).toHaveBeenCalledWith(21, { conditions: [HIGH_PRIORITY, { field: "status", op: "is", value: "3" }] }),
       );
@@ -203,7 +211,7 @@ describe("FilterPopover", () => {
 
     it("does not save a condition whose text is still empty", async () => {
       const popover = await openFilter(listConditions({ kind: "list" }));
-      await userEvent.click(within(popover).getByRole("button", { name: "+ Add condition" }));
+      await userEvent.click(within(section(popover, LIST_SECTION)).getByRole("button", { name: "+ Add condition" }));
 
       await userEvent.selectOptions(within(popover).getByLabelText("Field"), "Review notes");
       await wait(500);
@@ -255,7 +263,7 @@ describe("FilterPopover", () => {
       const popover = await openFilter(SPACE, 11, "Website relaunch");
 
       expect(await within(popover).findByText("5 open issues")).toBeInTheDocument();
-      expect(within(popover).getByText("Adding a condition here creates a new filter list.")).toBeInTheDocument();
+      expect(within(popover).getByText("Changes save to this view.")).toBeInTheDocument();
     });
 
     it("counts the matching issues once a condition is added", async () => {
@@ -275,12 +283,12 @@ describe("FilterPopover", () => {
       expect(within(popover).getByRole("button", { name: "Save as filter list" })).toBeEnabled();
     });
 
-    it("never saves the draft to the Space itself", async () => {
+    it("saves the draft to the view and never to the Space itself", async () => {
       const popover = await openFilter(SPACE, 11, "Website relaunch");
 
       await userEvent.click(within(popover).getByRole("button", { name: "+ Add condition" }));
-      await wait(500);
 
+      await waitFor(() => expect(mocked.viewSetFilter).toHaveBeenCalledWith(VIEW_ID, { conditions: [{ field: "status", op: "is", value: "3" }] }));
       expect(mocked.listSetFilter).not.toHaveBeenCalled();
     });
 
@@ -339,19 +347,110 @@ describe("FilterPopover", () => {
     it("is not the field of a condition added inside a Space", async () => {
       const popover = await openFilter(listConditions({ kind: "list", projectFixed: true }));
 
-      await userEvent.click(within(popover).getByRole("button", { name: "+ Add condition" }));
+      await userEvent.click(within(section(popover, LIST_SECTION)).getByRole("button", { name: "+ Add condition" }));
 
       expect(within(popover).getByLabelText("Field")).toHaveDisplayValue("Status");
       expect(fieldNames(popover)).not.toContain("Project");
     });
   });
 
-  describe("built-in lists", () => {
-    it.each<ListConditions["kind"]>(["recent", "pinned"])("says a %s list is built in and offers no editing", async (kind) => {
+  describe("sections", () => {
+    it("shows both All views of this list and This view on a filter list, each with its own conditions", async () => {
+      const popover = await openFilter(listConditions({ kind: "list", own: [HIGH_PRIORITY], view: [NO_DUE_DATE] }));
+
+      const list = section(popover, LIST_SECTION);
+      const own = section(popover, VIEW_SECTION);
+      expect(within(list).getByLabelText("Field")).toHaveDisplayValue("Priority");
+      expect(within(own).getByLabelText("Field")).toHaveDisplayValue("Due date");
+      expect(within(list).getByRole("button", { name: "+ Add condition" })).toBeInTheDocument();
+      expect(within(own).getByRole("button", { name: "+ Add condition" })).toBeInTheDocument();
+    });
+
+    it("saves a condition added in This view through the view and not the list", async () => {
+      const popover = await openFilter(FILTER_LIST);
+
+      await userEvent.click(within(section(popover, VIEW_SECTION)).getByRole("button", { name: "+ Add condition" }));
+
+      await waitFor(() =>
+        expect(mocked.viewSetFilter).toHaveBeenCalledWith(VIEW_ID, { conditions: [{ field: "status", op: "is", value: "3" }] }),
+      );
+      expect(mocked.listSetFilter).not.toHaveBeenCalled();
+    });
+
+    it("saves an edited view condition through the view and not the list", async () => {
+      const popover = await openFilter(listConditions({ kind: "list", own: [HIGH_PRIORITY], view: [NO_DUE_DATE] }));
+
+      await userEvent.selectOptions(within(section(popover, VIEW_SECTION)).getByLabelText("Operator"), "is set");
+
+      await waitFor(() => expect(mocked.viewSetFilter).toHaveBeenCalledWith(VIEW_ID, { conditions: [{ field: "due", op: "isNotEmpty" }] }));
+      expect(mocked.listSetFilter).not.toHaveBeenCalled();
+    });
+
+    it("saves a condition added in All views of this list through the list and not the view", async () => {
+      const popover = await openFilter(FILTER_LIST);
+
+      await userEvent.click(within(section(popover, LIST_SECTION)).getByRole("button", { name: "+ Add condition" }));
+
+      await waitFor(() => expect(mocked.listSetFilter).toHaveBeenCalledWith(21, { conditions: [HIGH_PRIORITY, { field: "status", op: "is", value: "3" }] }));
+      expect(mocked.viewSetFilter).not.toHaveBeenCalled();
+    });
+
+    it("saves the view without a view condition that is removed", async () => {
+      const popover = await openFilter(listConditions({ kind: "list", view: [NO_DUE_DATE] }));
+
+      await userEvent.click(within(section(popover, VIEW_SECTION)).getByRole("button", { name: "Remove condition" }));
+
+      await waitFor(() => expect(mocked.viewSetFilter).toHaveBeenCalledWith(VIEW_ID, { conditions: [] }));
+    });
+
+    it("counts the issues matching the list and view conditions together", async () => {
+      await openFilter(listConditions({ kind: "list", own: [HIGH_PRIORITY], view: [NO_DUE_DATE] }));
+
+      await waitFor(() => expect(mocked.listMatchCount).toHaveBeenCalledWith(21, { conditions: [HIGH_PRIORITY, NO_DUE_DATE] }));
+    });
+
+    it("shows a damaged view filter in This view and not in the list section", async () => {
+      const popover = await openFilter(listConditions({ kind: "list", viewError: "The view filter is damaged" }));
+
+      expect(within(section(popover, VIEW_SECTION)).getByText("The view filter is damaged")).toBeInTheDocument();
+      expect(within(section(popover, LIST_SECTION)).queryByText("The view filter is damaged")).not.toBeInTheDocument();
+    });
+
+    it("shows a damaged list filter in the list section", async () => {
+      const popover = await openFilter(listConditions({ kind: "list", error: "The filter is damaged" }));
+
+      expect(within(section(popover, LIST_SECTION)).getByText("The filter is damaged")).toBeInTheDocument();
+    });
+
+    it("shows a damaged filter above the sections on a level without a list section", async () => {
+      const popover = await openFilter(listConditions({ kind: "space", error: "The filter is damaged" }));
+
+      expect(within(popover).getByText("The filter is damaged")).toBeInTheDocument();
+      expect(within(section(popover, VIEW_SECTION)).queryByText("The filter is damaged")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("built-in levels", () => {
+    it.each<ListConditions["kind"]>(["everything", "space", "recent", "pinned"])(
+      "offers only This view on a %s level and saves its conditions to the view",
+      async (kind) => {
+        const popover = await openFilter(listConditions({ kind, view: [NO_DUE_DATE] }));
+
+        expect(within(popover).queryByRole("group", { name: LIST_SECTION })).not.toBeInTheDocument();
+        expect(within(popover).getAllByRole("button", { name: "+ Add condition" })).toHaveLength(1);
+        expect(within(section(popover, VIEW_SECTION)).getByLabelText("Field")).toHaveDisplayValue("Due date");
+        expect(within(popover).getByText("Changes save to this view.")).toBeInTheDocument();
+
+        await userEvent.click(within(popover).getByRole("button", { name: "Remove condition" }));
+
+        await waitFor(() => expect(mocked.viewSetFilter).toHaveBeenCalledWith(VIEW_ID, { conditions: [] }));
+        expect(mocked.listSetFilter).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each<ListConditions["kind"]>(["recent", "pinned"])("offers no Save as filter list on a %s level", async (kind) => {
       const popover = await openFilter(listConditions({ kind }));
 
-      expect(within(popover).getByText("This list is built in.")).toBeInTheDocument();
-      expect(within(popover).queryByRole("button", { name: "+ Add condition" })).not.toBeInTheDocument();
       expect(within(popover).queryByRole("button", { name: "Save as filter list" })).not.toBeInTheDocument();
     });
   });

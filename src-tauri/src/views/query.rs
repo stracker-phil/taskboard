@@ -1,5 +1,6 @@
-//! A view's issues: the level's filter plus the toolbar's narrowing, sorted, grouped and shaped as rows
-//! (ADR 0024). One query per call; grouping and sorting happen here, not in the page.
+//! A view's issues: the level's filter (ADR 0024), the view's own conditions (ADR 0033) and the toolbar's
+//! narrowing, sorted, grouped and shaped as rows. One query per call; grouping and sorting happen here, not in
+//! the page.
 
 use std::collections::{BTreeMap, HashMap};
 
@@ -12,7 +13,9 @@ use ts_rs::TS;
 
 use super::columns::{CustomColumn, custom_columns};
 use super::edit::read_view;
-use super::groups::{Facts, Group, Lookup, SpaceInfo, Version, group};
+use super::filter::view_conditions;
+use super::groups::{Facts, Group, Lookup, Version, group};
+use super::lookup::{spaces, versions};
 use super::model::{GroupBy, View};
 use super::rows::{self, Row};
 use super::sorting::{fold, sort};
@@ -92,7 +95,7 @@ pub(super) fn fetch_view(
         versions: &versions,
         custom: custom_columns(conn, &view.columns)?,
     };
-    let (condition, params) = conditions(conn, viewer, &ctx, list_id, narrowing)?;
+    let (condition, params) = conditions(conn, viewer, &ctx, list_id, Some(&view), narrowing)?;
     let mut items = fetch(conn, &source, &condition, params)?;
     mark_changed(conn, ctx.me.as_deref(), &mut items)?;
     let needle = fold(narrowing.text.trim());
@@ -156,10 +159,10 @@ fn mark_changed(conn: &Connection, me: Option<&str>, items: &mut [(Row, Facts)])
     Ok(())
 }
 
-/// The filter list's unread issues, for Mark all as read.
+/// The filter list's unread issues, for Mark all as read; its views' own conditions don't narrow them.
 pub fn unseen_ids(conn: &Connection, viewer: &Viewer, list_id: i64) -> AppResult<Vec<String>> {
     let ctx = viewer.ctx(conn)?;
-    let (condition, params) = conditions(conn, viewer, &ctx, list_id, &Narrowing::default())?;
+    let (condition, params) = conditions(conn, viewer, &ctx, list_id, None, &Narrowing::default())?;
     let mut query = conn.prepare(&format!(
         "SELECT i.id FROM cache.issue i WHERE {condition} AND {UNSEEN}"
     ))?;
@@ -167,12 +170,13 @@ pub fn unseen_ids(conn: &Connection, viewer: &Viewer, list_id: i64) -> AppResult
     Ok(ids.collect::<Result<_, _>>()?)
 }
 
-/// The level's conditions with its kind's own rule and the narrowing, as one SQL condition.
+/// The level's conditions, the view's own ones, its kind's own rule and the narrowing, as one SQL condition.
 fn conditions(
     conn: &Connection,
     viewer: &Viewer,
     ctx: &Ctx,
     list_id: i64,
+    view: Option<&View>,
     narrowing: &Narrowing,
 ) -> AppResult<(String, Vec<SqlValue>)> {
     let nodes = all_nodes(conn)?;
@@ -180,7 +184,11 @@ fn conditions(
         .iter()
         .find(|n| n.id == list_id)
         .ok_or_else(|| AppError::NotFound(format!("Filter list {list_id} doesn't exist")))?;
-    let compiled = compile(&scope_of(&nodes, node).all()?, ctx)?;
+    let mut chain = scope_of(&nodes, node).all()?;
+    if let Some(view) = view {
+        chain.extend(view_conditions(view)?);
+    }
+    let compiled = compile(&chain, ctx)?;
     let mut condition = compiled.where_clause();
     let mut params = compiled.params;
     match node.kind {
@@ -354,52 +362,4 @@ fn json_of(value: SqlValue) -> Json {
 fn string_list(json: Option<&str>) -> Vec<String> {
     json.and_then(|j| serde_json::from_str(j).ok())
         .unwrap_or_default()
-}
-
-/// The owner's icon letter, else the name's first letter.
-fn space_letter(icon: Option<String>, name: &str) -> String {
-    icon.filter(|i| !i.is_empty())
-        .unwrap_or_else(|| name.chars().take(1).flat_map(char::to_uppercase).collect())
-}
-
-pub(super) fn spaces(conn: &Connection) -> AppResult<HashMap<String, SpaceInfo>> {
-    let mut query = conn.prepare(
-        "SELECT s.project_id, COALESCE(s.name, p.name), s.icon, s.color, s.client
-         FROM space s JOIN cache.space p ON p.id = s.project_id
-         WHERE s.tracked = 1 ORDER BY s.position, p.key",
-    )?;
-    let rows = query.query_map([], |row| {
-        let name: String = row.get(1)?;
-        let icon: Option<String> = row.get(2)?;
-        Ok((
-            row.get::<_, String>(0)?,
-            SpaceInfo {
-                position: 0,
-                letter: space_letter(icon, &name),
-                name,
-                color: row.get(3)?,
-                client: row.get(4)?,
-            },
-        ))
-    })?;
-    let mut spaces = HashMap::new();
-    for (position, row) in rows.enumerate() {
-        let (project_id, space) = row?;
-        spaces.insert(project_id, SpaceInfo { position, ..space });
-    }
-    Ok(spaces)
-}
-
-pub(super) fn versions(conn: &Connection) -> AppResult<HashMap<String, Version>> {
-    let mut query = conn.prepare("SELECT id, name, release_date FROM cache.version")?;
-    let rows = query.query_map([], |row| {
-        Ok((
-            row.get(0)?,
-            Version {
-                name: row.get(1)?,
-                release_date: row.get(2)?,
-            },
-        ))
-    })?;
-    Ok(rows.collect::<Result<_, _>>()?)
 }

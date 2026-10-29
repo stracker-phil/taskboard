@@ -9,8 +9,9 @@ use serde::Serialize;
 use ts_rs::TS;
 
 use super::groups::{Facts, GroupMark, Lookup, group};
+use super::lookup::{spaces, versions};
 use super::model::{GroupBy, View};
-use super::query::{Fetched, Narrowing, fetch_view, spaces, versions};
+use super::query::{Fetched, Narrowing, fetch_view};
 use super::rows::Row;
 use crate::db::Db;
 use crate::error::AppResult;

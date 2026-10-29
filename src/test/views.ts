@@ -18,6 +18,7 @@ export function view(patch: Partial<View> = {}): View {
     collapsed: {},
     position: 0,
     isDefault: false,
+    ownConditions: 0,
     icon: null,
     color: null,
     ...patch,

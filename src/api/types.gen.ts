@@ -314,7 +314,15 @@ error: string | null,
 /**
  * A filter list in a Space: the Space gives the project, so a condition can't pick one.
  */
-projectFixed: boolean, };
+projectFixed: boolean, 
+/**
+ * The view's own conditions (ADR 0033), ANDed with the level's.
+ */
+view: Array<Condition>, 
+/**
+ * Why the view's stored filter can't be read.
+ */
+viewError: string | null, };
 
 export type ListHit = { id: number, name: string, 
 /**
@@ -705,7 +713,11 @@ color: string | null, position: number,
 /**
  * The tab a level opens with.
  */
-isDefault: boolean, };
+isDefault: boolean, 
+/**
+ * For the Filter badge; 0 when the stored filter can't be read.
+ */
+ownConditions: number, };
 
 export type ViewData = { groupBy: GroupBy, groups: Array<Group>, rows: { [key in string]: Row }, columns: Array<string>, };
 

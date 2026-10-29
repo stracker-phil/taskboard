@@ -87,6 +87,8 @@
 .filter-popover__header { padding-bottom: 4px; }
 .filter-popover__icon { color: var(--text-tertiary); }
 .filter-popover__body { display: flex; flex-direction: column; gap: 6px; padding: 10px 16px 16px; }
+.filter-popover__section { display: flex; flex-direction: column; gap: 6px; }
+.filter-popover__caps { margin: 0; padding: 6px 0 0; }
 .filter-popover__error { margin: 0; font-size: 12px; color: var(--banner-error-text); }
 .filter-popover__add {
   align-self: flex-start; height: 28px; padding: 0 10px; border: 1px dashed var(--border-strong); border-radius: 7px;

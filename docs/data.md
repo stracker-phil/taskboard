@@ -68,7 +68,7 @@ unique across sources (Jira's numeric ids; another source prefixes its own):
 |---|---|
 | `space` | a tracked project as the sidebar shows it: name, icon, color (`1`–`12`), client, position, `default_columns` for new views; its Space settings (`local/0007`): `layouts` (JSON array of the layouts its views offer; null = all), `default_layout` and `default_group` for new views |
 | `filter_list` | WHICH issues: the sidebar tree (`kind` everything, space, list, recent, pinned); a JSON filter ANDed with its ancestors |
-| `view` | HOW to show a list: one tab; layout, columns, grouping, sort; never a filter |
+| `view` | HOW to show a list: one tab; layout, columns, grouping, sort; `filter` (`local/0012`): its own conditions, ANDed with its list's ([ADR 0033](adr/0033-views-can-hold-their-own-filter.md)) |
 | `pin` | pinned issues, comments and lists, with an optional reason and expiry; active while not unpinned and not expired (`pins::active`); ended pins stay in Recently unpinned for 7 days |
 | `space_status_style` | overrides the detected style of a status in one Space (`local/0007`; the old app-wide `status_style` rows were copied to every Space) |
 | `space_field` | how a custom field shows in one Space: `hiddenInList`, `hiddenInDetail` or `hidden`; no row = visible (`space_config`) |
@@ -97,6 +97,15 @@ JSON; no condition is stored as null:
   time zone).
 - `value`: a string, a list of strings or a number of days, as the operator needs.
 
+A view holds the same JSON in `view.filter` (migration `local/0012`, [ADR 0033](adr/0033-views-can-hold-their-own-filter.md)):
+its own conditions, ANDed with its level's chain, so two views of one list can show different issues. Only the
+view's issues are narrowed (`view_rows`, `view_board`, their groups and Board columns); the sidebar counts and
+Mark all as read stay with the level. A view filter that can't be read or compiled is an error of that view only.
+`view_set_filter(id, filter)` compiles it under the level first and marks its custom fields `shown`;
+`list_conditions(id, viewId)` returns the view's conditions next to the level's (`ListConditions.view`,
+`viewError`), and `View.ownConditions` counts them for the Filter badge. Duplicating a view or a filter list
+copies the view filters.
+
 Built in (migration `local/0002`): Everything (one "All issues" view grouped by Space), and under Home Unread
 (kind `recent`) and Bookmarks (kind `pinned`; renamed by `local/0008`). Tracking a project (`lists::ensure_space`) adds its Space node with three views (All issues,
 Board, Table; grouped by status; the Space's default columns, else Assignee, Epic, Release, Priority) and the
@@ -107,7 +116,7 @@ views and pins; a level keeps at least one view.
 ### Group and sort keys
 
 `view_rows(listId, viewId, narrowing)` returns the view's issues as `ViewData { groupBy, groups, rows,
-columns }`: the level's filter, plus the kind's own rule (Unread: issues with unseen changes or marked
+columns }`: the level's filter, plus the view's own conditions, plus the kind's own rule (Unread: issues with unseen changes or marked
 unread, open or done, plus those read since the owner came to this place; Bookmarks: the actively bookmarked
 issues), plus the narrowing (`me`, `text` in the key or summary ignoring
 case and accents, `epic`).
