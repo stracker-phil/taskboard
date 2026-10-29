@@ -186,7 +186,8 @@ one group, Board column or pill per style, whatever the status is called; the Bo
 - Labels never leave their cell. A label is at most as wide as its cell and ends in an ellipsis (the whole name
   shows on hover). With wrapped titles, inline labels flow after the title's last word and wrap like text,
   and the Labels column's chips wrap onto more lines in the cell; the row grows to fit. With "Wrap long titles"
-  off, both stay on the row's one line and are cut at the cell's edge.
+  off, both stay on the row's one line and are cut at the cell's edge; the title comes first and truncates
+  only when the cell is narrower than the title itself, and inline labels fill what it leaves.
 - Rows are virtualized (`@tanstack/react-virtual`): a card is drawn from its pieces (the header item, then
   rows that know whether they are first, middle, last or the only one).
 - **Subtasks** follow the view's mode ([ADR 0037](adr/0037-views-choose-how-subtasks-show.md)). The subtask
@@ -492,11 +493,12 @@ Status, then the view's columns. A sortable header (Key, Summary, Status, Priori
 again flips the direction (`aria-sort`, ↑/↓); a 6px handle at each header's right edge resizes the column
 (48–800), saved on the view. Grouped tables keep the list's group headers; the table scrolls sideways when the
 columns are wider than the window. Groups open and close with the List's animation (`useGroupMotion`). Rows
-never grow: inline labels after the summary are cut at the cell's edge, and the Labels cell keeps its chips on
+never grow: inline labels after the summary fill what the title leaves and are cut at the cell's edge (the
+title truncates only when the cell is narrower than the title), and the Labels cell keeps its chips on
 one line that scrolls sideways inside the cell (an overlay scrollbar, [below](#scrollbars)). Subtasks show as in
 the List: the caret, the indent (`table-row--child`), the glyph and the count chip sit in the Summary cell. In
 Hierarchy every row leaves the caret's room before its title (`table-row--tree`), so titles line up whether a
-row has subtasks or not; subtasks indent one level further.
+row has subtasks or not, and the Summary header lines up with them; subtasks indent one level further.
 
 ## Tokens
 

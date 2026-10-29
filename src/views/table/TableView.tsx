@@ -93,6 +93,7 @@ function Table({ view, data }: { view: View; data: ViewData }) {
     virtualizer.measure();
   }, [factors, virtualizer]);
 
+  const tree = data.subtasks === "hierarchy";
   const toggle = (group: Group) => {
     const opening = !isOpen(group, toggled);
     setToggled((all) => ({ ...all, [group.key]: opening }));
@@ -109,6 +110,7 @@ function Table({ view, data }: { view: View; data: ViewData }) {
           widthOf={widthOf}
           onSort={(by) => void settings.setSort(nextSort(view.sort, by))}
           onResizeStart={resize.start}
+          tree={tree}
         />
         <div className="table-space" style={{ height: virtualizer.getTotalSize() }}>
           {virtualizer.getVirtualItems().map((virtual) => {
@@ -143,7 +145,7 @@ function Table({ view, data }: { view: View; data: ViewData }) {
                     onSelect={select}
                     onOpen={open}
                     inlineLabels={inlineLabels}
-                    tree={data.subtasks === "hierarchy"}
+                    tree={tree}
                     nesting={item.nesting}
                     subtasksOpen={subtasksOpen(item.row.id)}
                     onToggleSubtasks={toggleSubtasks}

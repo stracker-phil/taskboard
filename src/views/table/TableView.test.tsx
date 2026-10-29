@@ -420,6 +420,21 @@ describe("TableView", () => {
       expect(within(rowOf(/NW-1042/)).getByRole("button", { name: "Collapse subtasks" })).toHaveAttribute("aria-expanded", "true");
     });
 
+    it.each([
+      ["hierarchy", true],
+      ["list", false],
+      ["hidden", false],
+    ] as const)("indents the header row only in Hierarchy (%s)", async (subtasks, indented) => {
+      await renderTable(modeData(subtasks));
+      await screen.findByRole("row", { name: /NW-1042/ });
+
+      const header = within(screen.getByRole("grid")).getAllByRole("row")[0];
+
+      expect(header).toHaveClass("table-header");
+      if (indented) expect(header).toHaveClass("table-header--tree");
+      else expect(header).not.toHaveClass("table-header--tree");
+    });
+
     it("collapses and expands the subtasks with the caret, keeping the collapse in the view's place", async () => {
       await renderTable(modeData("hierarchy"));
 

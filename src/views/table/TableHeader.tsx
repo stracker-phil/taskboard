@@ -12,15 +12,17 @@ interface Props {
   widthOf: (id: string) => number;
   onSort: (by: SortBy) => void;
   onResizeStart: (id: string, width: number, e: PointerEvent) => void;
+  /** Hierarchy: the Summary name lines up with the titles behind a parent's caret. */
+  tree?: boolean;
 }
 
 /** The sticky header row: every sortable name sorts on click, every column but Summary resizes at its edge. */
-export function TableHeader({ listId, columns, sort, widthOf, onSort, onResizeStart }: Props) {
+export function TableHeader({ listId, columns, sort, widthOf, onSort, onResizeStart, tree = false }: Props) {
   const { data: catalog = [] } = useColumnsCatalogue(listId);
   const name = (id: string) => FIXED_NAMES[id] ?? catalog.find((c) => c.id === id)?.name ?? id;
 
   return (
-    <div className="table-header" role="row">
+    <div className={tree ? "table-header table-header--tree" : "table-header"} role="row">
       {columns.map((id) => {
         const by = sortByOf(id);
         const sorted = by !== null && sort.by === by;
