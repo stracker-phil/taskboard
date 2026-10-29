@@ -115,7 +115,8 @@ export const api = {
   listConditions: (id: number, viewId: number | null) => invoke<ListConditions>("list_conditions", { id, viewId }),
   /** The fields and cached values the Filter popover's selects offer. */
   filterOptions: () => invoke<FilterOptions>("filter_options"),
-  listMatchCount: (id: number, filter: Filter) => invoke<MatchCount>("list_match_count", { id, filter }),
+  /** `me`: only the connected account's issues, like the Me chip. */
+  listMatchCount: (id: number, filter: Filter, me: boolean) => invoke<MatchCount>("list_match_count", { id, filter, me }),
   spaceMove: (projectId: string, position: number) => invoke<void>("space_move", { projectId, position }),
   spaceUpdate: (projectId: string, update: SpaceUpdate) => invoke<void>("space_update", { projectId, update }),
   /** "Use as Space default": the columns new views in this Space start with. */

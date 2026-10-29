@@ -4,7 +4,7 @@ import { useId, type RefObject } from "react";
 import { api, type Condition, type FilterOptions, type ListConditions, type LockedCondition } from "../../api";
 import { Popover } from "../../components/Popover";
 import { useNavGo, useSidebar } from "../../queries/sidebar";
-import { useFilterOptions, useListConditions } from "../../queries/views";
+import { useFilterOptions, useListConditions, useRequestNarrowing } from "../../queries/views";
 import { attempt } from "../../state/requests";
 import { narrowingKey } from "../../state/slices/narrowing";
 import { useStore } from "../../state/store";
@@ -57,7 +57,8 @@ function Editor({ listId, viewId, conditions, options: allOptions, dirty, onSave
   const setViewDraft = (update: (all: Condition[]) => Condition[]) => setNarrowing(key, { view: update(useStore.getState().narrowings[key]?.view ?? conditions.view) });
   const listComplete = listDraft.filter(isComplete);
   const viewComplete = viewDraft.filter(isComplete);
-  const count = useMatchCount(listId, [...listComplete, ...viewComplete]);
+  const me = useRequestNarrowing(listId, viewId)?.me ?? false;
+  const count = useMatchCount(listId, [...listComplete, ...viewComplete], me);
 
   const { data: tree } = useSidebar();
   const go = useNavGo();
@@ -70,7 +71,7 @@ function Editor({ listId, viewId, conditions, options: allOptions, dirty, onSave
     onClose();
     await go(id);
   };
-  const narrowed = editsList || listDraft.length + viewDraft.length > 0;
+  const narrowed = editsList || me || listDraft.length + viewDraft.length > 0;
 
   return (
     <>
@@ -158,11 +159,11 @@ function LockedRow({ condition }: { condition: LockedCondition }) {
 const matchText = (n: number) => (n === 1 ? "1 issue matches" : `${n} issues match`);
 const openText = (n: number) => (n === 1 ? "1 open issue" : `${n} open issues`);
 
-/** The level's count with the drafts in place of its own and the view's conditions. */
-function useMatchCount(listId: number, conditions: Condition[]) {
+/** Open issues under the drafts and the Me chip; the text filter is a search and isn't counted. */
+function useMatchCount(listId: number, conditions: Condition[], me: boolean) {
   const { data } = useQuery({
-    queryKey: ["matchCount", listId, conditions],
-    queryFn: () => api.listMatchCount(listId, { conditions }),
+    queryKey: ["matchCount", listId, conditions, me],
+    queryFn: () => api.listMatchCount(listId, { conditions }, me),
     placeholderData: keepPreviousData,
   });
   return data;

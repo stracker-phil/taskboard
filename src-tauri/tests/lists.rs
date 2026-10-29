@@ -29,11 +29,11 @@ use taskboard_lib::test_support::demo::{DEMO_NOW, ME_EMAIL};
 use taskboard_lib::test_support::fake_jira::{DEMO_TOKEN, FakeJira};
 use taskboard_lib::test_support::{FakeSecrets, temp_config_dir};
 use taskboard_lib::views::{
-    DEFAULT_COLUMNS, GroupBy, IssueOpening, Layout, Sort, SortBy, SubtaskMode, View,
+    DEFAULT_COLUMNS, GroupBy, IssueOpening, Layout, Narrowing, Sort, SortBy, SubtaskMode, View,
     seed_only_mine, space_default_columns, view_create, view_delete, view_duplicate, view_move,
-    view_rename, view_set_column_collapsed, view_set_columns, view_set_filter, view_set_group,
-    view_set_inline_labels, view_set_layout, view_set_look, view_set_only_mine, view_set_open_with,
-    view_set_sort, view_set_subtasks, view_set_widths, view_set_wrap, views_of,
+    view_rename, view_rows, view_set_column_collapsed, view_set_columns, view_set_filter,
+    view_set_group, view_set_inline_labels, view_set_layout, view_set_look, view_set_only_mine,
+    view_set_open_with, view_set_sort, view_set_subtasks, view_set_widths, view_set_wrap, views_of,
 };
 
 const ME_ACCOUNT_ID: &str = "712020:5a1e0c3f-8d2b-4f61-9c7e-1b2a3c4d5e01";
@@ -717,11 +717,12 @@ mod the_tree_on_the_demo_site {
             viewer(Some(ME_ACCOUNT_ID)),
             nw,
             Filter::default(),
+            false,
         )
         .await
         .unwrap();
         let bugs_in_the_space =
-            list_match_count(site.db(), viewer(Some(ME_ACCOUNT_ID)), nw, bugs())
+            list_match_count(site.db(), viewer(Some(ME_ACCOUNT_ID)), nw, bugs(), false)
                 .await
                 .unwrap();
 
@@ -753,10 +754,12 @@ mod the_tree_on_the_demo_site {
         .await;
         let me = viewer(Some(ME_ACCOUNT_ID));
 
-        let from_the_list = list_match_count(site.db(), me.clone(), epics, bugs())
+        let from_the_list = list_match_count(site.db(), me.clone(), epics, bugs(), false)
             .await
             .unwrap();
-        let from_the_space = list_match_count(site.db(), me, nw, bugs()).await.unwrap();
+        let from_the_space = list_match_count(site.db(), me, nw, bugs(), false)
+            .await
+            .unwrap();
 
         assert_eq!(from_the_list, from_the_space);
     }
@@ -771,6 +774,7 @@ mod the_tree_on_the_demo_site {
             viewer(Some(ME_ACCOUNT_ID)),
             everything,
             Filter::default(),
+            false,
         )
         .await
         .unwrap();
@@ -807,9 +811,103 @@ mod the_tree_on_the_demo_site {
             viewer(Some(ME_ACCOUNT_ID)),
             nw,
             filter(vec![Condition::is(Field::Type, &subtask_type)]),
+            false,
         )
         .await
         .unwrap();
+
+        assert_eq!(count, MatchCount { open: 0, total: 0 });
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn the_match_count_with_me_counts_only_issues_assigned_to_the_connected_account() {
+        let site = Synced::new().await;
+        let nw = space_node_id(site.db(), NW).await;
+
+        let everyone = list_match_count(
+            site.db(),
+            viewer(Some(ME_ACCOUNT_ID)),
+            nw,
+            Filter::default(),
+            false,
+        )
+        .await
+        .unwrap();
+        let mine = list_match_count(
+            site.db(),
+            viewer(Some(ME_ACCOUNT_ID)),
+            nw,
+            Filter::default(),
+            true,
+        )
+        .await
+        .unwrap();
+
+        let assigned_to_me = format!(
+            "FROM cache.issue WHERE project_id = '10001' AND gone = 0 AND type_is_subtask = 0
+             AND assignee_id = '{ME_ACCOUNT_ID}'"
+        );
+        assert_eq!(
+            mine,
+            MatchCount {
+                open: number(
+                    site.db(),
+                    format!("SELECT COUNT(*) {assigned_to_me} AND status_category <> 'done'")
+                )
+                .await,
+                total: number(site.db(), format!("SELECT COUNT(*) {assigned_to_me}")).await,
+            }
+        );
+        assert!(mine.total > 0);
+        assert!(mine.total < everyone.total);
+        assert!(mine.open < everyone.open);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn the_match_count_with_me_agrees_with_the_top_level_rows_of_the_narrowed_view() {
+        let site = Synced::new().await;
+        let nw = space_node_id(site.db(), NW).await;
+        let view = views_of(site.db(), nw).await.unwrap()[0].id;
+        view_set_subtasks(site.db(), view, SubtaskMode::Hidden)
+            .await
+            .unwrap();
+
+        let mine = list_match_count(
+            site.db(),
+            viewer(Some(ME_ACCOUNT_ID)),
+            nw,
+            Filter::default(),
+            true,
+        )
+        .await
+        .unwrap();
+        let data = view_rows(
+            site.db(),
+            viewer(Some(ME_ACCOUNT_ID)),
+            nw,
+            view,
+            Narrowing {
+                me: true,
+                ..Narrowing::default()
+            },
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(data.rows.len() as i64, mine.total);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn the_match_count_with_me_and_no_connected_account_is_zero() {
+        let site = Synced::new().await;
+        let nw = space_node_id(site.db(), NW).await;
+
+        let count = list_match_count(site.db(), viewer(None), nw, Filter::default(), true)
+            .await
+            .unwrap();
 
         assert_eq!(count, MatchCount { open: 0, total: 0 });
     }

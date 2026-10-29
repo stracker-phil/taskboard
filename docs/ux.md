@@ -432,8 +432,8 @@ button, Escape and a press outside close it, focus goes back to the button).
   with a drag handle (⋮⋮) to reorder and a 30 × 18 switch (`components/Toggle.tsx`). A long list scrolls. Each change saves to the view; "Use as Space default" sets
   the columns new views in the Space start with.
 - **Filter** (badge: the filter list's own conditions plus the view's): the *Filter* popover (440 wide,
-  right-aligned): "Show issues where" and the live count of open issues ("N issues match" on a filter list or
-  with a condition, "N open issues" before any); inherited conditions locked on `--fill-subtle` with a lock,
+  right-aligned): "Show issues where" and the live count of open issues ("N issues match" on a filter list,
+  with a condition or with the Me chip on, "N open issues" before any); inherited conditions locked on `--fill-subtle` with a lock,
   "from Space" or "this Space"; then two sections under small caps headings ([ADR 0033](adr/0033-views-can-hold-their-own-filter.md)):
   "All views of this list" (the filter list's own conditions, only on a filter list) and "This view" (the
   view's own conditions; Everything, a Space, Unread and Bookmarks show only this one). Each holds conditions as
@@ -441,8 +441,8 @@ button, Escape and a press outside close it, focus goes back to the button).
   "+ Add condition". Inside a Space the Project field isn't offered (`projectFixed`). Changes apply to the rows
   at once as drafts and are not saved ([ADR 0038](adr/0038-filter-changes-are-drafts-until-the-view-is-saved.md)):
   the footer says "Changes show until you leave this view.", and while something differs from what's saved "Not
-  saved: Save View keeps it." with Save View as a link. The live count follows the drafts and counts top-level
-  issues, like the sidebar. On Everything and a Space "Save as filter list" turns the view's (drafted)
+  saved: Save View keeps it." with Save View as a link. The live count follows the drafts and the Me chip (not
+  the text filter, a search) and counts top-level issues, like the sidebar. On Everything and a Space "Save as filter list" turns the view's (drafted)
   conditions into a new list and opens it. A picked field's value opens a
   list with a search box and a checkbox per value (`ValuePicker`); every tick applies at once, and several values
   are stored as `in` / `not in` (shown as "is" / "is not").

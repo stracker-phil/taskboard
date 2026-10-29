@@ -171,7 +171,7 @@ impl Site {
 
     async fn match_total(&self, filter: Filter) -> i64 {
         let space = self.space_id(NW).await;
-        list_match_count(self.db(), viewer(), space, filter)
+        list_match_count(self.db(), viewer(), space, filter, false)
             .await
             .unwrap()
             .total
@@ -646,7 +646,7 @@ mod text_filter {
                 )],
             };
 
-            let err = list_match_count(site.db(), viewer(), space, filter.clone())
+            let err = list_match_count(site.db(), viewer(), space, filter.clone(), false)
                 .await
                 .unwrap_err();
             assert_eq!(err.kind(), ErrorKind::InvalidInput, "{op:?}");
@@ -673,7 +673,7 @@ mod text_filter {
                 conditions: vec![Condition::new(Field::Text, Op::Contains, value.clone())],
             };
 
-            let err = list_match_count(site.db(), viewer(), space, filter)
+            let err = list_match_count(site.db(), viewer(), space, filter, false)
                 .await
                 .unwrap_err();
 

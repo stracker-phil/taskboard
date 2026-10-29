@@ -12,6 +12,7 @@ import { narrowingKey } from "../../state/slices/narrowing";
 import { resetStore, useStore } from "../../state/store";
 import { filterOptions, listConditions } from "../../test/filters";
 import { sidebarTree, space } from "../../test/spaces";
+import { view } from "../../test/views";
 import { FilterPopover } from "./FilterPopover";
 
 const mocked = vi.mocked(api, true);
@@ -83,6 +84,7 @@ beforeEach(() => {
   mocked.filterOptions.mockResolvedValue(OPTIONS);
   mocked.listMatchCount.mockResolvedValue({ open: 5, total: 9 });
   mocked.sidebarTree.mockResolvedValue(sidebarTree([space()]));
+  mocked.viewsOf.mockResolvedValue([view({ id: VIEW_ID })]);
 });
 
 describe("FilterPopover", () => {
@@ -266,11 +268,11 @@ describe("FilterPopover", () => {
 
     it("counts the drafted conditions instead of the saved ones", async () => {
       const popover = await openFilter(FILTER_LIST);
-      await waitFor(() => expect(mocked.listMatchCount).toHaveBeenLastCalledWith(21, { conditions: [HIGH_PRIORITY] }));
+      await waitFor(() => expect(mocked.listMatchCount).toHaveBeenLastCalledWith(21, { conditions: [HIGH_PRIORITY] }, false));
 
       await swapPriority(popover);
 
-      await waitFor(() => expect(mocked.listMatchCount).toHaveBeenLastCalledWith(21, { conditions: [LOW_PRIORITY] }));
+      await waitFor(() => expect(mocked.listMatchCount).toHaveBeenLastCalledWith(21, { conditions: [LOW_PRIORITY] }, false));
     });
   });
 
@@ -369,6 +371,44 @@ describe("FilterPopover", () => {
     });
   });
 
+  describe("the Me chip", () => {
+    const savedOnlyMine = (onlyMine: boolean, listId = 11) => mocked.viewsOf.mockResolvedValue([view({ id: VIEW_ID, listId, onlyMine })]);
+
+    it("counts with Me on and says issues match, even without conditions, for a view that saved Me", async () => {
+      savedOnlyMine(true);
+      const popover = await openFilter(SPACE, 11);
+
+      expect(await within(popover).findByText("5 issues match")).toBeInTheDocument();
+      expect(within(popover).queryByText("5 open issues")).not.toBeInTheDocument();
+      await waitFor(() => expect(mocked.listMatchCount).toHaveBeenLastCalledWith(11, { conditions: [] }, true));
+    });
+
+    it("counts with Me off for a view that did not save it", async () => {
+      await openFilter(SPACE, 11);
+
+      await waitFor(() => expect(mocked.listMatchCount).toHaveBeenLastCalledWith(11, { conditions: [] }, false));
+    });
+
+    it.each([
+      ["on over a view that saved Me off", true, false],
+      ["off over a view that saved Me on", false, true],
+    ])("counts with the drafted Me chip %s", async (_name, drafted, saved) => {
+      savedOnlyMine(saved);
+      useStore.getState().setNarrowing(narrowingKey(11, VIEW_ID), { me: drafted });
+
+      await openFilter(SPACE, 11);
+
+      await waitFor(() => expect(mocked.listMatchCount).toHaveBeenLastCalledWith(11, { conditions: [] }, drafted));
+    });
+
+    it("counts the drafted conditions together with Me", async () => {
+      savedOnlyMine(true, 21);
+      await openFilter(FILTER_LIST);
+
+      await waitFor(() => expect(mocked.listMatchCount).toHaveBeenLastCalledWith(21, { conditions: [HIGH_PRIORITY] }, true));
+    });
+  });
+
   describe("the Project field", () => {
     const fieldNames = (popover: HTMLElement) => within(within(popover).getByLabelText("Field")).getAllByRole("option").map((o) => o.textContent);
 
@@ -442,7 +482,7 @@ describe("FilterPopover", () => {
     it("counts the issues matching the list and view conditions together", async () => {
       await openFilter(listConditions({ kind: "list", own: [HIGH_PRIORITY], view: [NO_DUE_DATE] }));
 
-      await waitFor(() => expect(mocked.listMatchCount).toHaveBeenCalledWith(21, { conditions: [HIGH_PRIORITY, NO_DUE_DATE] }));
+      await waitFor(() => expect(mocked.listMatchCount).toHaveBeenCalledWith(21, { conditions: [HIGH_PRIORITY, NO_DUE_DATE] }, false));
     });
 
     it("shows a damaged view filter in This view and not in the list section", async () => {

@@ -203,26 +203,33 @@ pub struct MatchCount {
 }
 
 /// The Filter popover's live count: what `node_id` inherits ANDed with `draft` in place of its own
-/// conditions. On a Space or Everything the draft is a new filter list's. Top-level issues only, like the
-/// sidebar's counts (ADR 0037).
+/// conditions, with `me` narrowed as `view_rows` narrows `Narrowing::me`. On a Space or Everything the draft is
+/// a new filter list's. Top-level issues only, like the sidebar's counts (ADR 0037).
 pub async fn list_match_count(
     db: &Db,
     viewer: Viewer,
     node_id: i64,
     draft: Filter,
+    me: bool,
 ) -> AppResult<MatchCount> {
     db.read(move |conn| {
         let nodes = all_nodes(conn)?;
         let target = node(conn, node_id)?;
         let mut conditions = scope_of(&nodes, &target).inherited;
         conditions.extend(draft.conditions);
-        let compiled = compile(&conditions, &viewer.ctx(conn)?)?;
+        let ctx = viewer.ctx(conn)?;
+        let compiled = compile(&conditions, &ctx)?;
+        let mut condition = compiled.where_clause();
+        let mut params = compiled.params;
+        if me {
+            condition.push_str(" AND i.assignee_id = ?");
+            params.push(ctx.me.unwrap_or_default().into());
+        }
         let sql = format!(
-            "SELECT COUNT(*) FILTER (WHERE {OPEN_ISSUES}), COUNT(*) FROM cache.issue i WHERE {} AND {TOP_LEVEL}",
-            compiled.where_clause()
+            "SELECT COUNT(*) FILTER (WHERE {OPEN_ISSUES}), COUNT(*) FROM cache.issue i WHERE {condition} AND {TOP_LEVEL}"
         );
         Ok(
-            conn.query_row(&sql, params_from_iter(&compiled.params), |row| {
+            conn.query_row(&sql, params_from_iter(&params), |row| {
                 Ok(MatchCount {
                     open: row.get(0)?,
                     total: row.get(1)?,

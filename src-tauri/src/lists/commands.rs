@@ -69,8 +69,9 @@ pub async fn list_match_count(
     state: State<'_, AppState>,
     id: i64,
     filter: Filter,
+    me: bool,
 ) -> AppResult<MatchCount> {
-    super::list_match_count(&state.db, viewer(&state), id, filter).await
+    super::list_match_count(&state.db, viewer(&state), id, filter, me).await
 }
 
 #[tauri::command]

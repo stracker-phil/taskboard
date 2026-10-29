@@ -114,7 +114,8 @@ The page edits both layers and the Me chip as drafts ([ADR 0038](adr/0038-filter
 `Narrowing.listDraft` and `Narrowing.viewDraft` stand in for the filter list's own and the view's stored conditions in
 `view_rows` and `view_board` (a list draft only on a filter list), compiled under the same chain as the setters check
 them, and nothing is written until Save View calls `list_set_filter`, `view_set_filter` and `view_set_only_mine`.
-`list_match_count`, the popover's live count, counts top-level issues only, like the sidebar.
+`list_match_count`, the popover's live count, counts top-level issues only, like the sidebar, and with `me` only
+the connected account's issues, like a view's `Narrowing.me`.
 
 Built in (migration `local/0002`): Everything (one "All issues" view grouped by Space), and under Home Unread
 (kind `recent`) and Bookmarks (kind `pinned`; renamed by `local/0008`). Tracking a project (`lists::ensure_space`) adds its Space node with three views (All issues,
