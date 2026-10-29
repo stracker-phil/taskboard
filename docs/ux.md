@@ -194,8 +194,8 @@ columns that no longer fit beside a 240px title, rightmost first, until it close
 
 What a click opens is the view's choice (Columns → Open issues in: Default, Preview, Full view; `view.open_with`,
 null for Default) or else Settings → General → Open issues in (`behaviour.openIssuesIn`, Preview unless changed;
-`useIssueOpening`). Full view opens the Issue view at once, the row still selected. A Board always opens the
-Issue view.
+`useIssueOpening`). Full view opens the Issue view at once, the row still selected. A double-click on a List or Table row
+always opens the Issue view; a Board always opens it.
 
 - Header 50: mono key · type text, then Bookmark (with bookmarks), Open in Jira, Full view, Close.
 - Body: title 22/750, one line of chips (status pill `peek`, epic chip, release outline chip, priority,

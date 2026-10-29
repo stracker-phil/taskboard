@@ -6,6 +6,7 @@ import { columnDef } from "./columns";
 import type { CardPosition } from "./flatten";
 import { RowActions, type RowActionHandlers } from "./RowActions";
 import { LabelChips } from "../../components/issue/LabelChips";
+import { opensIssue } from "./opensIssue";
 
 interface Props {
   row: Row;
@@ -18,15 +19,17 @@ interface Props {
   inlineLabels?: boolean;
   selected: boolean;
   onSelect: (id: string) => void;
+  /** A double-click: always the full Issue view. */
+  onOpen: (id: string) => void;
   actions: RowActionHandlers;
 }
 
-export function IssueRow({ row, columns, position, wrap = false, inlineLabels = false, selected, onSelect, actions }: Props) {
+export function IssueRow({ row, columns, position, wrap = false, inlineLabels = false, selected, onSelect, onOpen, actions }: Props) {
   const className = ["list-row", `list-row--${position}`, wrap && "list-row--wrap", row.changed && "list-row--changed", selected && "list-row--selected"]
     .filter(Boolean)
     .join(" ");
   return (
-    <div className={className} role="row" aria-selected={selected} data-issue-id={row.id} onClick={() => onSelect(row.id)}>
+    <div className={className} role="row" aria-selected={selected} data-issue-id={row.id} onClick={() => onSelect(row.id)} onDoubleClick={(e) => opensIssue(e) && onOpen(row.id)}>
       <span className="list-row__name" role="gridcell">
         <StatusSquare style={row.style} />
         <span className="list-row__key">{row.key}</span>

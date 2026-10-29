@@ -2,6 +2,7 @@ import type { Row } from "../../api";
 import { StatusSquare } from "../../components/issue/StatusSquare";
 import { columnDef } from "../list/columns";
 import { LabelChips } from "../../components/issue/LabelChips";
+import { opensIssue } from "../list/opensIssue";
 
 interface Props {
   row: Row;
@@ -9,15 +10,17 @@ interface Props {
   widthOf: (id: string) => number;
   selected: boolean;
   onSelect: (id: string) => void;
+  /** A double-click: always the full Issue view. */
+  onOpen: (id: string) => void;
   /** The labels as tags after the summary. */
   inlineLabels?: boolean;
 }
 
 /** One issue: key, summary, status, then the view's cells. */
-export function TableRow({ row, columns, widthOf, inlineLabels = false, selected, onSelect }: Props) {
+export function TableRow({ row, columns, widthOf, inlineLabels = false, selected, onSelect, onOpen }: Props) {
   const className = ["table-row", row.changed && "table-row--changed", selected && "table-row--selected"].filter(Boolean).join(" ");
   return (
-    <div className={className} role="row" aria-selected={selected} data-issue-id={row.id} onClick={() => onSelect(row.id)}>
+    <div className={className} role="row" aria-selected={selected} data-issue-id={row.id} onClick={() => onSelect(row.id)} onDoubleClick={(e) => opensIssue(e) && onOpen(row.id)}>
       <span className="table-row__cell table-row__key" role="gridcell" style={{ width: widthOf("key") }}>
         {row.key}
       </span>

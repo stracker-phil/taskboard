@@ -50,10 +50,11 @@ function Table({ view, data }: { view: View; data: ViewData }) {
   const opening = useIssueOpening(view.openWith);
   const updatePlace = useStore((s) => s.updatePlace);
   const openIssue = useStore((s) => s.openIssue);
+  const open = (id: string) => openIssue(id, { listId: view.listId, viewId: view.id });
   const select = (id: string) => {
     setSelected(id);
     refreshIssueExtras(id);
-    if (opening === "full") openIssue(id, { listId: view.listId, viewId: view.id });
+    if (opening === "full") open(id);
     else updatePlace(view.listId, view.id, { selectedId: id, peekOpen: true });
   };
 
@@ -128,7 +129,7 @@ function Table({ view, data }: { view: View; data: ViewData }) {
                     onToggle={() => toggle(item.group)}
                   />
                 ) : (
-                  <TableRow row={item.row} columns={columns} widthOf={widthOf} selected={selected === item.row.id} onSelect={select} inlineLabels={inlineLabels} />
+                  <TableRow row={item.row} columns={columns} widthOf={widthOf} selected={selected === item.row.id} onSelect={select} onOpen={open} inlineLabels={inlineLabels} />
                 )}
               </div>
             );

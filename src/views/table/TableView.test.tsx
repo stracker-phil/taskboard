@@ -298,6 +298,14 @@ describe("TableView", () => {
       expect(screen.getByRole("row", { name: /NW-1001/ })).toHaveAttribute("aria-selected", "true");
     });
 
+    it("opens the Issue view of a double-clicked row even when the view opens with the preview", async () => {
+      await renderTable(undefined, { ...TABLE, openWith: "preview" });
+
+      await userEvent.dblClick(await screen.findByText("Publish the launch notes"));
+
+      expect(useStore.getState().issueView).toEqual({ origin: { listId: 11, viewId: 101 }, stack: ["2"] });
+    });
+
     it("follows the app setting when the view has no choice", async () => {
       mocked.getSettings.mockResolvedValue(settings({ behaviour: { seenAfterSeconds: 2, pinDefault: "untilUnpinned", openIssuesIn: "full" } }));
       await renderTable();

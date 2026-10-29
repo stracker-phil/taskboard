@@ -227,6 +227,7 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
                     select(id, opening === "preview");
                     if (opening === "full") open(id);
                   }}
+                  onOpen={open}
                   actions={actions}
                 />
               )}

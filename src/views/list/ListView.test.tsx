@@ -231,6 +231,26 @@ describe("ListView", () => {
     });
   });
 
+  describe("opening an issue by double-click", () => {
+    const data = () => viewData([groupOf([OPEN, DONE])], [OPEN, DONE]);
+
+    it("opens the Issue view even when the view opens with the preview", async () => {
+      await renderList(data(), "preview");
+
+      await userEvent.dblClick(await screen.findByText("Publish the launch notes"));
+
+      expect(useStore.getState().issueView).toEqual({ origin: { listId: 11, viewId: 101 }, stack: ["2"] });
+    });
+
+    it("opens no Issue view when a row's action button is double-clicked", async () => {
+      await renderList(data(), "preview");
+
+      await userEvent.dblClick(await screen.findByRole("button", { name: "Copy NW-1001" }));
+
+      expect(useStore.getState().issueView).toBeNull();
+    });
+  });
+
   describe("title wrapping", () => {
     const renderWith = (wrapTitles?: boolean) => {
       mocked.viewRows.mockResolvedValue(viewData([groupOf([OPEN])], [OPEN]));
