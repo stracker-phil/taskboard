@@ -13,7 +13,7 @@ use crate::lists::{Kind, node};
 use crate::order::Siblings;
 use crate::space_config::{ALL_LAYOUTS, SpaceLayouts, hidden_columns, level_layouts};
 
-const COLUMNS: &str = "id, list_id, name, layout, columns, group_by, sort_by, sort_order, position, is_default, widths, wrap_titles, collapsed, open_with, icon, color, inline_labels, filter, subtasks";
+const COLUMNS: &str = "id, list_id, name, layout, columns, group_by, sort_by, sort_order, position, is_default, widths, wrap_titles, collapsed, open_with, icon, color, inline_labels, filter, subtasks, only_mine";
 
 pub(super) fn siblings(list_id: i64) -> Siblings<'static> {
     Siblings {
@@ -62,6 +62,7 @@ fn from_row(row: &Row) -> rusqlite::Result<View> {
             .get::<_, Option<String>>(18)?
             .and_then(|text| from_text(&text))
             .unwrap_or_default(),
+        only_mine: row.get(19)?,
         own_conditions: Filter::parse(filter.as_deref()).map_or(0, |f| f.conditions.len()),
         filter,
     })

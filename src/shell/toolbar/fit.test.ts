@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type Collapsible, OVERFLOW_ORDER, overflowing, TEXT_FILTER_MIN } from "./fit";
+import { type Collapsible, OVERFLOW_ORDER, overflowing, SAVE_VIEW, TEXT_FILTER_MIN } from "./fit";
 
 const WIDTHS: Record<Collapsible, number> = { columns: 100, subtasks: 100, filter: 100, group: 100, me: 100 };
 /** Five items with their 8px gaps, plus the text filter at its minimum. */
@@ -46,6 +46,36 @@ describe("overflowing", () => {
 
   it("keeps the other items when only one is measured and it fits", () => {
     expect(overflowing(100 + 5 * 8 + TEXT_FILTER_MIN, { columns: 100 })).toEqual([]);
+  });
+
+  describe("while the view has unsaved changes", () => {
+    /** Save View (84) and its gap, and the "…" button (30) and its gap, which Revert View needs. */
+    const DIRTY_EXTRA = SAVE_VIEW + 8 + MORE;
+
+    it("reserves room for Save View and the More button even when nothing is hidden", () => {
+      expect(overflowing(ALL_SHOWN + DIRTY_EXTRA, WIDTHS, [], true)).toEqual([]);
+      expect(overflowing(ALL_SHOWN + DIRTY_EXTRA - 1, WIDTHS, [], true)).toEqual(["columns"]);
+    });
+
+    it("hides Columns where a clean bar of the same width would hide nothing", () => {
+      const available = ALL_SHOWN + 64;
+
+      expect(overflowing(available, WIDTHS)).toEqual([]);
+      expect(overflowing(available, WIDTHS, [], true)).toEqual(["columns"]);
+    });
+
+    it("counts the More button once, however many items are hidden", () => {
+      const withoutColumns = 4 * (100 + 8) + TEXT_FILTER_MIN + SAVE_VIEW + 8 + MORE;
+
+      expect(overflowing(withoutColumns, WIDTHS, [], true)).toEqual(["columns"]);
+      expect(overflowing(withoutColumns - 1, WIDTHS, [], true)).toEqual(["columns", "subtasks"]);
+    });
+
+    it("still ignores absent items", () => {
+      const fourShown = 4 * (100 + 8) + TEXT_FILTER_MIN;
+
+      expect(overflowing(fourShown + DIRTY_EXTRA, WIDTHS, ["subtasks"], true)).toEqual([]);
+    });
   });
 
   describe("with absent items", () => {

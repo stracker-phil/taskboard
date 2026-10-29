@@ -56,6 +56,7 @@ pub fn start(
             let state = app.state::<AppState>();
             announce_db_changes(app.handle(), &state.db);
             give_spaces_their_lists(&state.db);
+            carry_over_me_chips(app.handle(), &state);
             start_sync(app.handle(), &state);
             take_initial(app.handle(), &state, initial);
             #[cfg(debug_assertions)]
@@ -136,6 +137,26 @@ fn give_spaces_their_lists(db: &Db) {
     tauri::async_runtime::spawn(async move {
         if let Err(e) = crate::lists::ensure_tracked_spaces(&db).await {
             log::warn!("Couldn't create the default filter lists: {e}");
+        }
+    });
+}
+
+/// Views whose place kept the Me chip on before views saved it (ADR 0038) save it now, once. Read before the
+/// page can save a place, which would drop the old key.
+fn carry_over_me_chips(app: &AppHandle, state: &AppState) {
+    let ids = state.places.legacy_only_mine();
+    if ids.is_empty() {
+        return;
+    }
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let state = app.state::<AppState>();
+        let carried = match crate::views::seed_only_mine(&state.db, ids).await {
+            Ok(()) => state.places.forget_legacy_only_mine().await,
+            Err(e) => Err(e),
+        };
+        if let Err(e) = carried {
+            log::warn!("Couldn't carry over the views' Me chips: {e}");
         }
     });
 }

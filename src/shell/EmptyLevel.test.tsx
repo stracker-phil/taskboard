@@ -10,7 +10,7 @@ import { createQueryClient } from "../queries/queryClient";
 import { narrowingKey } from "../state/slices/narrowing";
 import { resetStore, useStore } from "../state/store";
 import { sidebarTree, space } from "../test/spaces";
-import { listNode } from "../test/views";
+import { listNode, view } from "../test/views";
 import { EmptyLevel } from "./EmptyLevel";
 
 const mocked = vi.mocked(api, true);
@@ -35,6 +35,7 @@ async function renderEmpty(listId: number, tree: SidebarTree) {
 beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
+  mocked.viewsOf.mockImplementation(async (listId) => [view({ id: VIEW_ID, listId })]);
 });
 
 describe("EmptyLevel", () => {
@@ -120,6 +121,23 @@ describe("EmptyLevel", () => {
       expect(useStore.getState().narrowings[KEY]).toMatchObject({ me: false, text: "pricing" });
       expect(screen.queryByRole("button", { name: "Clear Me filter" })).not.toBeInTheDocument();
       expect(screen.getByText("No issues match Priority = High and the text “pricing”.")).toBeInTheDocument();
+    });
+
+    it("words the Me chip the view saved as part of the narrowing", async () => {
+      mocked.viewsOf.mockResolvedValue([view({ id: VIEW_ID, listId: FILTER_ID, onlyMine: true })]);
+      await renderEmpty(FILTER_ID, treeWithFilter());
+
+      expect(await screen.findByText("No issues match Priority = High and Assignee = me.")).toBeInTheDocument();
+    });
+
+    it("turns off the Me chip the view saved as a draft, without saving the view", async () => {
+      mocked.viewsOf.mockResolvedValue([view({ id: VIEW_ID, listId: FILTER_ID, onlyMine: true })]);
+      await renderEmpty(FILTER_ID, treeWithFilter());
+
+      await userEvent.click(await screen.findByRole("button", { name: "Clear Me filter" }));
+
+      expect(await screen.findByText("No issues match Priority = High.")).toBeInTheDocument();
+      expect(mocked.viewSetOnlyMine).not.toHaveBeenCalled();
     });
 
     it("is offered on a Space too", async () => {

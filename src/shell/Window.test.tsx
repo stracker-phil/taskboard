@@ -1,4 +1,5 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -105,6 +106,86 @@ describe("Window", () => {
       expect(screen.queryByRole("tablist", { name: "Views" })).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: /^Filter/ })).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "More toolbar items" })).not.toBeInTheDocument();
+    });
+  });
+
+  describe("unsaved view drafts", () => {
+    const saveView = () => screen.queryByRole("button", { name: "Save View" });
+
+    beforeEach(() => {
+      mocked.viewsOf.mockImplementation(async (listId) =>
+        listId === 11 ? [view(), view({ id: 102, name: "Board" })] : [view({ id: 201, listId: 21, onlyMine: true })],
+      );
+    });
+
+    async function draftMe() {
+      await renderWindow(false);
+      await userEvent.click(await screen.findByRole("button", { name: "Me", pressed: false }));
+      return screen.findByRole("button", { name: "Save View" });
+    }
+
+    it.each([
+      ["another view of the same list", nav(11, 102)],
+      ["another list", nav(21, 201)],
+    ])("are dropped when the place moves to %s", async (_name, target) => {
+      await draftMe();
+
+      await goTo(target);
+
+      await waitFor(() => expect(saveView()).not.toBeInTheDocument());
+      expect(useStore.getState().narrowings["11:101"]).toBeUndefined();
+    });
+
+    it("are gone when the owner comes back to the view", async () => {
+      await draftMe();
+      await goTo(nav(11, 102));
+      await waitFor(() => expect(saveView()).not.toBeInTheDocument());
+
+      await goTo(nav(11, 101));
+
+      expect(await screen.findByRole("button", { name: "Me", pressed: false })).toBeInTheDocument();
+      expect(saveView()).not.toBeInTheDocument();
+    });
+
+    it("take the text filter with them", async () => {
+      await renderWindow(false);
+      await userEvent.type(await screen.findByRole("textbox", { name: "Filter this view" }), "pricing");
+      await waitFor(() => expect(useStore.getState().narrowings["11:101"]?.text).toBe("pricing"));
+
+      await goTo(nav(11, 102));
+      await waitFor(() => expect(useStore.getState().narrowings["11:101"]).toBeUndefined());
+      await goTo(nav(11, 101));
+
+      expect(await screen.findByRole("textbox", { name: "Filter this view" })).toHaveValue("");
+    });
+
+    it("stay when the same place is announced again", async () => {
+      await draftMe();
+
+      await goTo(nav(11, 101));
+
+      expect(saveView()).toBeInTheDocument();
+    });
+
+    it("stay while an issue is open over the view, and show again when it closes", async () => {
+      await draftMe();
+
+      act(() => useStore.getState().openIssue("10042", { listId: 11, viewId: 101 }));
+      await userEvent.click(await screen.findByRole("button", { name: /^Back to / }));
+
+      expect(await screen.findByRole("button", { name: "Save View" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Only my issues, click to show all", pressed: true })).toBeInTheDocument();
+    });
+
+    it("do not carry over to a view that saved the Me chip: it opens with Me on", async () => {
+      await renderWindow(false);
+      await screen.findByRole("button", { name: "Me", pressed: false });
+
+      await goTo(nav(21, 201));
+
+      expect(await screen.findByRole("button", { name: "Only my issues, click to show all", pressed: true })).toBeInTheDocument();
+      expect(saveView()).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Me", pressed: false })).not.toBeInTheDocument();
     });
   });
 

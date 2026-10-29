@@ -75,6 +75,8 @@ pub const LIST_TOOLBAR: &[Item] = &[
     item("Edit Filter…", "page:toolbar.filter", "CmdOrCtrl+Alt+F"),
     item("Only My Issues", "page:toolbar.me", "CmdOrCtrl+Shift+M"),
     item("Filter This View", "page:toolbar.search", "CmdOrCtrl+F"),
+    item("Save View", "page:view.save", "CmdOrCtrl+S"),
+    plain("Revert View", "page:view.revert"),
 ];
 pub const LIST_SEEN: &[Item] = &[item(
     "Mark All as Read",
@@ -280,6 +282,8 @@ mod tests {
                 "toolbar.filter",
                 "toolbar.me",
                 "toolbar.search",
+                "view.save",
+                "view.revert",
                 "recent.markAllSeen",
                 "issue.open",
                 "issue.togglePeek",
@@ -386,6 +390,24 @@ mod tests {
         }
         assert_eq!(commands(LIST_SEEN), ["page:recent.markAllSeen"]);
         assert!(!commands(ISSUE).contains(&"page:recent.markAllSeen"));
+    }
+
+    #[test]
+    fn save_and_revert_view_close_the_list_toolbar_menu() {
+        let tail: Vec<(&str, &str, Option<&str>)> = LIST_TOOLBAR
+            .iter()
+            .rev()
+            .take(2)
+            .rev()
+            .map(|item| (item.label, item.command, item.accelerator))
+            .collect();
+        assert_eq!(
+            tail,
+            [
+                ("Save View", "page:view.save", Some("CmdOrCtrl+S")),
+                ("Revert View", "page:view.revert", None),
+            ]
+        );
     }
 
     #[test]

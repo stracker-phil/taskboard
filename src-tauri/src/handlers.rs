@@ -89,6 +89,7 @@ pub fn handlers() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
         views::view_set_inline_labels,
         views::view_set_subtasks,
         views::view_set_filter,
+        views::view_set_only_mine,
         views::view_set_column_collapsed,
         views::view_board,
         views::view_move,

@@ -12,13 +12,16 @@ async function openIssue(id: string, origin: Location) {
   openIssue(id, origin);
 }
 
-/** Sets the current view's Me chip, or flips it when `on` is null. */
+/** Sets the current view's Me chip as a draft (ADR 0038), or flips the one it shows when `on` is null. */
 async function onlyMine(on: boolean | null) {
   const { location } = await api.navCurrent();
   if (!location) return;
   const key = narrowingKey(location.listId, location.viewId);
   const { narrowings, setNarrowing } = useStore.getState();
-  setNarrowing(key, { me: on ?? !(narrowings[key]?.me ?? false) });
+  if (on !== null) return setNarrowing(key, { me: on });
+  const drafted = narrowings[key]?.me ?? null;
+  const shown = drafted ?? (await api.viewsOf(location.listId)).find((v) => v.id === location.viewId)?.onlyMine ?? false;
+  setNarrowing(key, { me: !shown });
 }
 
 async function handleLaunchEvents(events: LaunchEvent[]) {

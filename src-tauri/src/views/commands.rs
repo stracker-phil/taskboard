@@ -126,6 +126,11 @@ pub async fn view_set_filter(
 }
 
 #[tauri::command]
+pub async fn view_set_only_mine(state: State<'_, AppState>, id: i64, on: bool) -> AppResult<View> {
+    super::view_set_only_mine(&state.db, id, on).await
+}
+
+#[tauri::command]
 pub async fn view_set_column_collapsed(
     state: State<'_, AppState>,
     id: i64,

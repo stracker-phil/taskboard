@@ -220,6 +220,22 @@ describe("IssueView", () => {
       expect(screen.getByRole("button", { name: "Next issue" })).toBeDisabled();
     });
 
+    it("follows the order of the origin view with its unsaved Me chip and filter", async () => {
+      const draft = { field: "priority", op: "is", value: "High" } as const;
+      renderIssue("10042");
+      act(() => useStore.getState().setNarrowing(narrowingKey(11, 101), { me: true, view: [draft] }));
+
+      await waitFor(() => expect(mocked.viewRows).toHaveBeenCalledWith(11, 101, { me: true, text: "", epic: null, listDraft: null, viewDraft: [draft] }));
+    });
+
+    it("follows the Me chip the origin view saved", async () => {
+      mocked.viewsOf.mockResolvedValue([view({ onlyMine: true })]);
+
+      renderIssue("10042");
+
+      await waitFor(() => expect(mocked.viewRows).toHaveBeenCalledWith(11, 101, expect.objectContaining({ me: true })));
+    });
+
     it("disables both when the issue is not in the origin view", async () => {
       renderIssue("10001");
 

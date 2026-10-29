@@ -8,6 +8,7 @@ import { installCommands } from "../commands";
 import { usePageAction } from "../commands/pageActions";
 import { clearCommands, registerCommands } from "../commands/registry";
 import { emitEvent } from "../test/apiMock";
+import { view } from "../test/views";
 import { narrowingKey } from "./slices/narrowing";
 import { resetStore, useStore } from "./store";
 import { useAppEvents } from "./useAppEvents";
@@ -80,12 +81,31 @@ describe("useAppEvents launch events", () => {
       await waitFor(() => expect(useStore.getState().narrowings[key].me).toBe(after));
     });
 
-    it("turns the Me chip on when on is null and the view has no narrowing yet", async () => {
+    it("turns the Me chip on when on is null and the view has no draft and did not save it", async () => {
+      mocked.viewsOf.mockResolvedValue([view({ id: origin.viewId, listId: origin.listId, onlyMine: false })]);
       mocked.takeLaunchEvents.mockResolvedValue([{ type: "onlyMine", on: null }]);
 
       await mountEvents();
 
       await waitFor(() => expect(useStore.getState().narrowings[key].me).toBe(true));
+    });
+
+    it("drafts Me off when on is null and the view saved it on", async () => {
+      mocked.viewsOf.mockResolvedValue([view({ id: origin.viewId, listId: origin.listId, onlyMine: true })]);
+      mocked.takeLaunchEvents.mockResolvedValue([{ type: "onlyMine", on: null }]);
+
+      await mountEvents();
+
+      await waitFor(() => expect(useStore.getState().narrowings[key].me).toBe(false));
+    });
+
+    it("saves nothing to the view, only drafts", async () => {
+      mocked.takeLaunchEvents.mockResolvedValue([{ type: "onlyMine", on: true }]);
+
+      await mountEvents();
+
+      await waitFor(() => expect(useStore.getState().narrowings[key].me).toBe(true));
+      expect(mocked.viewSetOnlyMine).not.toHaveBeenCalled();
     });
 
     it("changes nothing when navigation has no location", async () => {

@@ -14,6 +14,16 @@
 .toolbar-btn--open { background: var(--accent-soft-bg); }
 .toolbar-btn--filter { padding: 0 9px 0 11px; }
 .toolbar-btn--active { background: var(--accent-soft-bg); border-color: var(--accent-soft-border); }
+/* Save View: the view's unsaved Me chip or filter (ADR 0038); it pops in beside the Filter button. */
+.save-view-btn {
+  border-color: var(--accent); background: var(--accent); color: var(--text-on-accent); font-weight: 600;
+  animation: pop-in var(--motion-slow) var(--ease-out);
+}
+.save-view-btn:hover { border-color: var(--accent-text); background: var(--accent-text); }
+@keyframes pop-in {
+  from { opacity: 0; transform: scale(0.92); }
+}
+
 .toolbar-badge {
   display: flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box;
   border-radius: 9px; background: var(--accent); color: var(--text-on-accent); font-size: 11px; font-weight: 700;

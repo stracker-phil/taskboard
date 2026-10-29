@@ -14,7 +14,7 @@ use taskboard_lib::db::Db;
 use taskboard_lib::error::ErrorKind;
 use taskboard_lib::filter::{Condition, Field, Filter};
 use taskboard_lib::jira::{Limiter, TokenKind};
-use taskboard_lib::lists::{SidebarTree, Viewer, sidebar_tree};
+use taskboard_lib::lists::{SidebarTree, Viewer, list_conditions, list_create, sidebar_tree};
 use taskboard_lib::status_style::{Style, status_style_set, status_styles_list};
 use taskboard_lib::store::settings::SettingsStore;
 use taskboard_lib::sync::{Emit, SyncContext, full_sync};
@@ -1510,6 +1510,174 @@ mod view_filters {
         assert_eq!(failed.kind(), ErrorKind::InvalidInput);
         assert_eq!(board.kind(), ErrorKind::InvalidInput);
         assert!(!working.rows.is_empty());
+    }
+}
+
+mod drafts {
+    use super::*;
+
+    fn bugs() -> Vec<Condition> {
+        vec![Condition::is(Field::Type, "Bug")]
+    }
+
+    fn view_draft(conditions: Vec<Condition>) -> Narrowing {
+        Narrowing {
+            view_draft: Some(conditions),
+            ..Narrowing::default()
+        }
+    }
+
+    fn list_draft(conditions: Vec<Condition>) -> Narrowing {
+        Narrowing {
+            list_draft: Some(conditions),
+            ..Narrowing::default()
+        }
+    }
+
+    /// The Website relaunch Space's first two views.
+    async fn two_views(site: &Site) -> (i64, i64, i64) {
+        let space = site.nw_space().await;
+        let views = views_of(site.db(), space).await.unwrap();
+        (space, views[0].id, views[1].id)
+    }
+
+    async fn stored_filter(site: &Site, list: i64, view: i64) -> Option<String> {
+        views_of(site.db(), list)
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|v| v.id == view)
+            .unwrap()
+            .filter
+    }
+
+    async fn bug_hunt(site: &Site) -> (i64, i64) {
+        let space = site.nw_space().await;
+        let list = list_create(
+            site.db(),
+            viewer(),
+            space,
+            "Bug hunt".into(),
+            Some(Filter { conditions: bugs() }),
+        )
+        .await
+        .unwrap();
+        (list, site.first_view(list).await)
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn a_view_draft_replaces_the_stored_view_conditions_without_writing_them() {
+        let site = Site::new().await;
+        let (space, filtered, other) = two_views(&site).await;
+        let whole = site.data(space, other, Narrowing::default()).await;
+        view_set_filter(site.db(), viewer(), filtered, Filter { conditions: bugs() })
+            .await
+            .unwrap();
+        let stored = stored_filter(&site, space, filtered).await;
+        let narrowed = site.data(space, filtered, Narrowing::default()).await;
+
+        let cleared = site.data(space, filtered, view_draft(Vec::new())).await;
+
+        assert!(narrowed.rows.len() < whole.rows.len());
+        assert_eq!(sorted_keys(&cleared), sorted_keys(&whole));
+        assert_eq!(stored_filter(&site, space, filtered).await, stored);
+        let again = site.data(space, filtered, Narrowing::default()).await;
+        assert_eq!(sorted_keys(&again), sorted_keys(&narrowed));
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn a_view_draft_narrows_a_view_that_has_no_conditions_the_way_saving_them_would() {
+        let site = Site::new().await;
+        let (space, draft_view, saved_view) = two_views(&site).await;
+
+        let drafted = site.data(space, draft_view, view_draft(bugs())).await;
+
+        assert_eq!(stored_filter(&site, space, draft_view).await, None);
+        view_set_filter(
+            site.db(),
+            viewer(),
+            saved_view,
+            Filter { conditions: bugs() },
+        )
+        .await
+        .unwrap();
+        let saved = site.data(space, saved_view, Narrowing::default()).await;
+        assert!(!drafted.rows.is_empty());
+        assert_eq!(sorted_keys(&drafted), sorted_keys(&saved));
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn a_view_draft_also_replaces_the_conditions_of_the_board() {
+        let site = Site::new().await;
+        let (space, filtered, other) = two_views(&site).await;
+        let board = |view: i64, narrowing: Narrowing| {
+            view_board(site.db(), viewer(), space, view, narrowing)
+        };
+        let whole = board(other, Narrowing::default()).await.unwrap();
+        view_set_filter(site.db(), viewer(), filtered, Filter { conditions: bugs() })
+            .await
+            .unwrap();
+        let stored = stored_filter(&site, space, filtered).await;
+
+        let cleared = board(filtered, view_draft(Vec::new())).await.unwrap();
+        let bug_cards = board(other, view_draft(bugs())).await.unwrap();
+
+        assert_eq!(cleared.rows.len(), whole.rows.len());
+        assert!(!bug_cards.rows.is_empty());
+        assert!(bug_cards.rows.len() < whole.rows.len());
+        assert_eq!(stored_filter(&site, space, filtered).await, stored);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn a_list_draft_replaces_the_filter_lists_own_conditions_without_writing_them() {
+        let site = Site::new().await;
+        let (space, space_view) = site.nw().await;
+        let whole = site.data(space, space_view, Narrowing::default()).await;
+        let (list, view) = bug_hunt(&site).await;
+        let saved = site.data(list, view, Narrowing::default()).await;
+
+        let cleared = site.data(list, view, list_draft(Vec::new())).await;
+        let board = view_board(site.db(), viewer(), list, view, list_draft(Vec::new()))
+            .await
+            .unwrap();
+
+        assert!(saved.rows.len() < whole.rows.len());
+        assert_eq!(sorted_keys(&cleared), sorted_keys(&whole));
+        assert_eq!(board.rows.len(), whole.rows.len());
+        let stored = list_conditions(site.db(), list, None).await.unwrap();
+        assert_eq!(stored.own, bugs());
+        let again = site.data(list, view, Narrowing::default()).await;
+        assert_eq!(sorted_keys(&again), sorted_keys(&saved));
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn a_list_draft_on_a_space_is_ignored() {
+        let site = Site::new().await;
+        let whole = site.nw_data(Narrowing::default()).await;
+
+        let drafted = site.nw_data(list_draft(bugs())).await;
+
+        assert_eq!(sorted_keys(&drafted), sorted_keys(&whole));
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn a_draft_that_does_not_compile_fails_the_rows() {
+        let site = Site::new().await;
+        let (space, view) = site.nw().await;
+        let unknown = vec![Condition::is(
+            Field::Custom("customfield_99999".into()),
+            "x",
+        )];
+
+        let err = view_rows(site.db(), viewer(), space, view, view_draft(unknown)).await;
+
+        assert!(err.is_err());
     }
 }
 

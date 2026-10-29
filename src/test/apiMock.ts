@@ -123,6 +123,7 @@ export function createApiMock(): Api {
     viewSetLayout: vi.fn(),
     viewSetLook: vi.fn(),
     viewSetFilter: vi.fn(async (id: number): Promise<View> => view({ id })),
+    viewSetOnlyMine: vi.fn(async (id: number, on: boolean): Promise<View> => view({ id, onlyMine: on })),
     viewSetColumns: vi.fn(),
     viewSetGroup: vi.fn(),
     viewSetSort: vi.fn(),

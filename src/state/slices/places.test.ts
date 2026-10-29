@@ -8,7 +8,7 @@ import { EMPTY_PLACE } from "./places";
 
 const mocked = vi.mocked(api, true);
 
-const SAVED: ViewPlace = { scrollTop: 320, toggled: { "status:done": true }, collapsedParents: [], selectedId: "10042", peekOpen: true, onlyMine: false, text: "" };
+const SAVED: ViewPlace = { scrollTop: 320, toggled: { "status:done": true }, collapsedParents: [], selectedId: "10042", peekOpen: true };
 const KEY = "11:101";
 const place = () => useStore.getState().places[KEY];
 const toasts = () => useStore.getState().toasts.map((t) => [t.kind, t.message]);
@@ -72,29 +72,21 @@ describe("loadPlace", () => {
     expect(place()).toEqual({ ...EMPTY_PLACE, scrollTop: 50 });
   });
 
-  it("seeds the view's narrowing from the saved Me chip and text", async () => {
-    mocked.placeGet.mockResolvedValue({ ...SAVED, onlyMine: true, text: "login" });
+  it("leaves the view's narrowing alone", async () => {
+    mocked.placeGet.mockResolvedValue(SAVED);
+    useStore.getState().setNarrowing(KEY, { me: true, text: "login", epic: "10001" });
 
     await useStore.getState().loadPlace(11, 101);
 
-    expect(useStore.getState().narrowings[KEY]).toEqual({ me: true, text: "login", epic: null });
+    expect(useStore.getState().narrowings[KEY]).toMatchObject({ me: true, text: "login", epic: "10001" });
   });
 
-  it("seeds an unnarrowed view when Rust has no place", async () => {
-    mocked.placeGet.mockResolvedValue(null);
+  it("creates no narrowing for a view that had none", async () => {
+    mocked.placeGet.mockResolvedValue(SAVED);
 
     await useStore.getState().loadPlace(11, 101);
 
-    expect(useStore.getState().narrowings[KEY]).toEqual({ me: false, text: "", epic: null });
-  });
-
-  it("keeps a narrowing that was set before the place loaded", async () => {
-    mocked.placeGet.mockResolvedValue({ ...SAVED, onlyMine: true, text: "login" });
-    useStore.setState({ narrowings: { [KEY]: { me: false, text: "", epic: "10001" } } });
-
-    await useStore.getState().loadPlace(11, 101);
-
-    expect(useStore.getState().narrowings[KEY]).toEqual({ me: false, text: "", epic: "10001" });
+    expect(useStore.getState().narrowings).toEqual({});
   });
 
   it("shows a toast and starts from the empty place when the load fails", async () => {

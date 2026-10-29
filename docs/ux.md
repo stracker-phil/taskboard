@@ -350,9 +350,10 @@ view with its place intact).
   backgrounds by type, expands in a bordered box with a bold title, mentions in `--accent-text`, and status
   lozenges as small uppercase chips in the status and label colors.
 
-**Remember my place:** each view keeps its opened and closed groups, scroll position, selected row, open
-peek, and the toolbar's Me chip and text filter (`state/slices/places.ts`, saved by Rust in `places.json` a moment after the last change, at most 200
-views), also across restarts.
+**Remember my place:** each view keeps its opened and closed groups, scroll position, selected row and open
+peek (`state/slices/places.ts`, saved by Rust in `places.json` a moment after the last change, at most 200
+views), also across restarts. The Me chip is saved with the view and the text filter is never saved
+([below](#toolbar)); while the Issue view, the preview or the Peek is open over a view, its drafts and text stay.
 
 ## Text and controls never wrap
 
@@ -433,16 +434,29 @@ button, Escape and a press outside close it, focus goes back to the button).
   "All views of this list" (the filter list's own conditions, only on a filter list) and "This view" (the
   view's own conditions; Everything, a Space, Unread and Bookmarks show only this one). Each holds conditions as
   field / operator / value selects (value pickers from the cache, dates, days, text) with × and its own
-  "+ Add condition". Inside a Space the Project field isn't offered (`projectFixed`). Changes save as you edit
-  ("Changes save to “Name” and this view." or "Changes save to this view."); on Everything and a Space
-  "Save as filter list" turns the view's conditions into a new list and opens it. A picked field's value opens a
+  "+ Add condition". Inside a Space the Project field isn't offered (`projectFixed`). Changes apply to the rows
+  at once as drafts and are not saved ([ADR 0038](adr/0038-filter-changes-are-drafts-until-the-view-is-saved.md)):
+  the footer says "Changes show until you leave this view.", and while something differs from what's saved "Not
+  saved: Save View keeps it." with Save View as a link. The live count follows the drafts and counts top-level
+  issues, like the sidebar. On Everything and a Space "Save as filter list" turns the view's (drafted)
+  conditions into a new list and opens it. A picked field's value opens a
   list with a search box and a checkbox per value (`ValuePicker`); every tick applies at once, and several values
   are stored as `in` / `not in` (shown as "is" / "is not").
 - **Me** chip (on: `--accent-soft-*` pill with the `--avatar-1` avatar and "Me ×") and **Filter this view**
-  (190 wide, filters by key or summary as you type). Both narrow only the current view and stay with its place
-  (`places.json`).
+  (190 wide, filters by key or summary as you type). Both narrow only the current view. A view opens with the Me
+  chip it saved (`view.only_mine`); a click changes it as a draft. The text is never saved.
+- **Save View** (left of the Filter button, `SaveViewButton.tsx`, on `--accent` with `--text-on-accent`; pops in
+  with a short fade and scale, instant under reduced motion) shows while the Me chip or any condition of either
+  popover section differs from what the view and its list saved (`useViewDraft`). It saves the list's
+  conditions (when changed), the view's and its Me chip, then the button goes. ⌘S and List → Save View run it
+  (`view.save`); Revert View (`view.revert`, also the last row of the toolbar's "…" menu while there are drafts)
+  drops the drafts. There is no other discard: going to another view tab, list or level drops the drafts, the
+  text filter and an epic narrowing (`useDiscardDraftsOnLeave` in `shell/Window.tsx`); opening an issue (the
+  Issue view, the preview, the Peek) and coming back, or switching windows, keeps them. The Filter badge counts
+  the drafted conditions.
 - When the bar is narrow, the text filter shrinks to 96 first; then Columns, Subtasks, Filter, Group and finally
-  the Me chip move into a "…" menu (`fit.ts`, `useToolbarFit`), and come back as soon as they fit.
+  the Me chip move into a "…" menu (`fit.ts`, `useToolbarFit`), and come back as soon as they fit. Save View
+  never moves; while it shows, it and the "…" button (holding Revert View) take their room first.
 
 ## Board view
 
@@ -477,7 +491,9 @@ again flips the direction (`aria-sort`, ↑/↓); a 6px handle at each header's 
 columns are wider than the window. Groups open and close with the List's animation (`useGroupMotion`). Rows
 never grow: inline labels after the summary are cut at the cell's edge, and the Labels cell keeps its chips on
 one line that scrolls sideways inside the cell (an overlay scrollbar, [below](#scrollbars)). Subtasks show as in
-the List: the caret, the indent (`table-row--child`), the glyph and the count chip sit in the Summary cell.
+the List: the caret, the indent (`table-row--child`), the glyph and the count chip sit in the Summary cell. In
+Hierarchy every row leaves the caret's room before its title (`table-row--tree`), so titles line up whether a
+row has subtasks or not; subtasks indent one level further.
 
 ## Tokens
 
@@ -618,7 +634,7 @@ global shortcuts.
   which opens Settings → Sync → Cache to confirm; Close Window ⌘W). Go moves around (Command Palette ⌘K,
   Everything ⇧⌘E, Unread ⇧⌘U, Bookmarks ⇧⌘P, Previous/Next Space ⌥⌘↑/↓, Previous/Next View ⌃⇧⇥/⌃⇥).
   List acts on the shown issues (Show as List / Board / Table ⌃⌘1–3; Group and Sort… ⌥⌘G, Columns… ⌥⌘C, Edit
-  Filter… ⌥⌘F, Only My Issues ⇧⌘M, Filter This View ⌘F; Mark All Seen ⇧⌘A). Issue acts on the selected one
+  Filter… ⌥⌘F, Only My Issues ⇧⌘M, Filter This View ⌘F, Save View ⌘S, Revert View; Mark All Seen ⇧⌘A). Issue acts on the selected one
   (Open, Open or Close Peek, Open Epic, Open in Jira ⌘↩, Copy Key, Copy Link ⇧⌘C, Add or Remove Bookmark, Mark as Read or Unread).
   View is the window's appearance only (Toggle Sidebar ⌘\, Enter Full Screen; the debug build's Reload ⌥⌘R),
   never what the page shows. Help has Open Log Folder and Show Data Folder. Plain-letter keys stay off menu

@@ -1,5 +1,5 @@
-//! Copying views: a duplicated tab, or every tab of a duplicated filter list, with all their settings and
-//! their own conditions.
+//! Copying views: a duplicated tab, or every tab of a duplicated filter list, with all their settings,
+//! their own conditions and their Me chip.
 
 use rusqlite::Connection;
 use rusqlite::types::Value as SqlValue;
@@ -10,7 +10,7 @@ use super::display::{
 use super::edit::{
     insert_view, list_views, read_view, siblings, write_collapsed, write_sort, write_widths,
 };
-use super::filter::write_filter;
+use super::filter::{write_filter, write_only_mine};
 use super::model::View;
 use crate::db::{Db, LocalPart};
 use crate::error::AppResult;
@@ -40,6 +40,7 @@ fn copy_view(conn: &Connection, view: &View, list_id: i64, name: &str) -> AppRes
     write_subtasks(conn, id, view.subtasks)?;
     write_look(conn, id, view.icon.as_deref(), view.color.as_deref())?;
     write_filter(conn, id, view.filter.as_deref())?;
+    write_only_mine(conn, id, view.only_mine)?;
     Ok(id)
 }
 

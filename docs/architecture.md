@@ -91,8 +91,10 @@ and the only part of `sync/` that names the Jira client
 ([ADR 0029](adr/0029-issues-come-from-a-source-jira-is-the-first.md)).
 
 Which issues a sidebar level holds is decided locally: `lists/` keeps the tree of Spaces and filter lists,
-`filter/` compiles their conditions to SQL over the cache, and `views/` keeps the tabs that only decide how
-issues show ([ADR 0024](adr/0024-filters-run-locally-in-sql-views-never-filter.md), [data.md](data.md)).
+`filter/` compiles their conditions to SQL over the cache, and `views/` keeps the tabs that decide how issues
+show and may narrow which ([ADR 0033](adr/0033-views-can-hold-their-own-filter.md)). The page's unsaved Me chip and
+Filter conditions travel with each view query as drafts until Save View writes them
+([ADR 0038](adr/0038-filter-changes-are-drafts-until-the-view-is-saved.md)) ([ADR 0024](adr/0024-filters-run-locally-in-sql-views-never-filter.md), [data.md](data.md)).
 
 ## Repository map
 
@@ -143,10 +145,10 @@ src/
   main.tsx modules.ts App.tsx
   api/index.ts types.gen.ts types.ts   the only IPC; generated and hand-written types
   queries/                   TanStack Query hooks and the event → query-key map (ADR 0018)
-  state/store.ts slices/     UI-only state (zustand)
+  state/store.ts slices/     UI-only state (zustand); slices/narrowing.ts the views' drafts and text filters
   shell/                     the main window frame: sidebar and content panel
   shell/toolbar/             the view toolbar: Group menu, Columns popover, Subtasks menu, Filter popover, Me chip,
-                             text filter
+                             text filter, Save View (useViewDraft.ts)
   views/list/ views/table/   the List and Table layouts over the view query's rows (views/board/ the Board)
   issue/                     the Issue view, the preview (Peek.tsx), activity; hoverPeek/ the ⌥ + hover Peek
   pins/ palette/             Bookmarks; the command palette

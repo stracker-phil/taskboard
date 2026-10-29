@@ -12,7 +12,7 @@ All in the config dir (`~/Library/Application Support/com.philippstracker.taskbo
 |---|---|---|
 | `local.sqlite` | The owner's setup: Spaces, filter lists, views, pins, status style overrides | kept |
 | `cache.sqlite` | The tracker mirror (Jira today): spaces, issues, comments, people, versions, fields, change log, seen marks, sync state, search index | deleted and recreated empty |
-| `settings.json`, `keybindings.json`, `ui_state.json`, `places.json` | Settings, key overrides, window layout, each view's remembered place (`store/`) | kept |
+| `settings.json`, `keybindings.json`, `ui_state.json`, `places.json` | Settings, key overrides, window layout, each view's remembered place (`store/`; no longer the Me chip or the text filter, [ADR 0038](adr/0038-filter-changes-are-drafts-until-the-view-is-saved.md): an old `onlyMine` seeds `view.only_mine` once at startup, `text` is ignored) | kept |
 | `nav.json` | The main window's place: the open level and view, each level's last view, the expanded Spaces (`nav/`). A place that no longer exists falls back to the level's default view, then to Everything | kept |
 
 Attachments shown in Quick Look are downloaded to `~/Library/Caches/<bundle identifier>/attachments/<id>/<name>`
@@ -72,7 +72,7 @@ unique across sources (Jira's numeric ids; another source prefixes its own):
 |---|---|
 | `space` | a tracked project as the sidebar shows it: name, icon, color (`1`–`12`), client, position, `default_columns` for new views; its Space settings (`local/0007`): `layouts` (JSON array of the layouts its views offer; null = all), `default_layout` and `default_group` for new views |
 | `filter_list` | WHICH issues: the sidebar tree (`kind` everything, space, list, recent, pinned); a JSON filter ANDed with its ancestors |
-| `view` | HOW to show a list: one tab; layout, columns, grouping, sort; `filter` (`local/0012`): its own conditions, ANDed with its list's ([ADR 0033](adr/0033-views-can-hold-their-own-filter.md)); `subtasks` (`local/0013`): how subtasks show ([ADR 0037](adr/0037-views-choose-how-subtasks-show.md)) |
+| `view` | HOW to show a list: one tab; layout, columns, grouping, sort; `filter` (`local/0012`): its own conditions, ANDed with its list's ([ADR 0033](adr/0033-views-can-hold-their-own-filter.md)); `subtasks` (`local/0013`): how subtasks show ([ADR 0037](adr/0037-views-choose-how-subtasks-show.md)); `only_mine` (`local/0014`): the saved Me chip ([ADR 0038](adr/0038-filter-changes-are-drafts-until-the-view-is-saved.md)) |
 | `pin` | pinned issues, comments and lists, with an optional reason and expiry; active while not unpinned and not expired (`pins::active`); ended pins stay in Recently unpinned for 7 days |
 | `space_status_style` | overrides the detected style of a status in one Space (`local/0007`; the old app-wide `status_style` rows were copied to every Space) |
 | `space_field` | how a custom field shows in one Space: `hiddenInList`, `hiddenInDetail` or `hidden`; no row = visible (`space_config`) |
@@ -108,7 +108,13 @@ Mark all as read stay with the level. A view filter that can't be read or compil
 `view_set_filter(id, filter)` compiles it under the level first and marks its custom fields `shown`;
 `list_conditions(id, viewId)` returns the view's conditions next to the level's (`ListConditions.view`,
 `viewError`), and `View.ownConditions` counts them for the Filter badge. Duplicating a view or a filter list
-copies the view filters.
+copies the view filters and `view.only_mine` (`View.onlyMine`, set by `view_set_only_mine`).
+
+The page edits both layers and the Me chip as drafts ([ADR 0038](adr/0038-filter-changes-are-drafts-until-the-view-is-saved.md)):
+`Narrowing.listDraft` and `Narrowing.viewDraft` stand in for the filter list's own and the view's stored conditions in
+`view_rows` and `view_board` (a list draft only on a filter list), compiled under the same chain as the setters check
+them, and nothing is written until Save View calls `list_set_filter`, `view_set_filter` and `view_set_only_mine`.
+`list_match_count`, the popover's live count, counts top-level issues only, like the sidebar.
 
 Built in (migration `local/0002`): Everything (one "All issues" view grouped by Space), and under Home Unread
 (kind `recent`) and Bookmarks (kind `pinned`; renamed by `local/0008`). Tracking a project (`lists::ensure_space`) adds its Space node with three views (All issues,
@@ -122,8 +128,8 @@ views and pins; a level keeps at least one view.
 `view_rows(listId, viewId, narrowing)` returns the view's issues as `ViewData { groupBy, subtasks, groups,
 rows, columns }`: the level's filter, plus the view's own conditions, plus the kind's own rule (Unread: issues with unseen changes or marked
 unread, open or done, plus those read since the owner came to this place; Bookmarks: the actively bookmarked
-issues), plus the narrowing (`me`, `text` in the key or summary ignoring
-case and accents, `epic`).
+issues), plus the narrowing (`me`: the view's Me chip as drafted or saved, `text` in the key or summary ignoring
+case and accents, `epic`, and the draft conditions `listDraft` and `viewDraft`).
 
 Subtasks (`cache.issue.type_is_subtask = 1`) follow `view.subtasks` (migration `local/0013`, `view_set_subtasks`,
 [ADR 0037](adr/0037-views-choose-how-subtasks-show.md); null reads `hidden`; duplicating copies it):

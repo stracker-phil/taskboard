@@ -51,6 +51,8 @@ export const PAGE_ACTION_COMMANDS: Command[] = [
   action("toolbar.filter", "Edit Filter…", "Mod+Alt+F"),
   action("toolbar.columns", "Columns…", "Mod+Alt+C"),
   action("toolbar.group", "Group and Sort…", "Mod+Alt+G"),
+  action("view.save", "Save View", "Mod+S"),
+  action("view.revert", "Revert View"),
   action("go.everything", "Go to Everything", "Mod+Shift+E"),
   action("go.recent", "Go to Unread", "Mod+Shift+U"),
   action("go.pinned", "Go to Bookmarks", "Mod+Shift+P"),

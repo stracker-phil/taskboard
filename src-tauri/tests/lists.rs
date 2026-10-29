@@ -18,7 +18,7 @@ use taskboard_lib::error::{AppError, ErrorKind};
 use taskboard_lib::filter::{Condition, Field, Filter};
 use taskboard_lib::jira::{Limiter, TokenKind};
 use taskboard_lib::lists::{
-    Kind, LIST_VIEW, ListConditions, ListNode, LockedCondition, SidebarTree, SpaceNode,
+    Kind, LIST_VIEW, ListConditions, ListNode, LockedCondition, MatchCount, SidebarTree, SpaceNode,
     SpaceUpdate, ValueKind, Viewer, ensure_tracked_spaces, filter_options, list_conditions,
     list_create, list_delete, list_duplicate, list_match_count, list_move, list_rename,
     list_set_filter, list_set_look, sidebar_tree, space_move, space_update,
@@ -30,10 +30,10 @@ use taskboard_lib::test_support::fake_jira::{DEMO_TOKEN, FakeJira};
 use taskboard_lib::test_support::{FakeSecrets, temp_config_dir};
 use taskboard_lib::views::{
     DEFAULT_COLUMNS, GroupBy, IssueOpening, Layout, Sort, SortBy, SubtaskMode, View,
-    space_default_columns, view_create, view_delete, view_duplicate, view_move, view_rename,
-    view_set_column_collapsed, view_set_columns, view_set_filter, view_set_group,
-    view_set_inline_labels, view_set_layout, view_set_look, view_set_open_with, view_set_sort,
-    view_set_subtasks, view_set_widths, view_set_wrap, views_of,
+    seed_only_mine, space_default_columns, view_create, view_delete, view_duplicate, view_move,
+    view_rename, view_set_column_collapsed, view_set_columns, view_set_filter, view_set_group,
+    view_set_inline_labels, view_set_layout, view_set_look, view_set_only_mine, view_set_open_with,
+    view_set_sort, view_set_subtasks, view_set_widths, view_set_wrap, views_of,
 };
 
 const ME_ACCOUNT_ID: &str = "712020:5a1e0c3f-8d2b-4f61-9c7e-1b2a3c4d5e01";
@@ -725,9 +725,18 @@ mod the_tree_on_the_demo_site {
                 .await
                 .unwrap();
 
+        let top_level =
+            "FROM cache.issue WHERE project_id = '10001' AND gone = 0 AND type_is_subtask = 0";
         assert_eq!(
             (everything_in_the_space.open, everything_in_the_space.total),
-            (26, 38)
+            (
+                number(
+                    site.db(),
+                    format!("SELECT COUNT(*) {top_level} AND status_category <> 'done'")
+                )
+                .await,
+                number(site.db(), format!("SELECT COUNT(*) {top_level}")).await
+            )
         );
         assert_eq!(bugs_in_the_space.open, open_bugs);
         assert_eq!(bugs_in_the_space.total, all_bugs);
@@ -766,8 +775,43 @@ mod the_tree_on_the_demo_site {
         .await
         .unwrap();
 
-        assert_eq!(count.open, 63);
-        assert_eq!(count.total, 82);
+        let top_level = "FROM cache.issue WHERE gone = 0 AND type_is_subtask = 0
+             AND project_id IN (SELECT project_id FROM space WHERE tracked = 1)";
+        assert_eq!(
+            count.open,
+            number(
+                site.db(),
+                format!("SELECT COUNT(*) {top_level} AND status_category <> 'done'")
+            )
+            .await
+        );
+        assert_eq!(
+            count.total,
+            number(site.db(), format!("SELECT COUNT(*) {top_level}")).await
+        );
+    }
+
+    #[tokio::test]
+    async fn the_match_count_leaves_out_subtasks_that_match_the_conditions() {
+        let site = Synced::new().await;
+        let nw = space_node_id(site.db(), NW).await;
+        let subtask_type = text(
+            site.db(),
+            "SELECT issue_type FROM cache.issue
+             WHERE project_id = '10001' AND gone = 0 AND type_is_subtask = 1 LIMIT 1",
+        )
+        .await;
+
+        let count = list_match_count(
+            site.db(),
+            viewer(Some(ME_ACCOUNT_ID)),
+            nw,
+            filter(vec![Condition::is(Field::Type, &subtask_type)]),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(count, MatchCount { open: 0, total: 0 });
     }
 
     #[tokio::test]
@@ -2162,6 +2206,7 @@ mod editing_views {
                 "collapsed": {},
                 "openWith": null,
                 "subtasks": "hidden",
+                "onlyMine": false,
                 "icon": null,
                 "color": null,
                 "position": 0,
@@ -2585,6 +2630,76 @@ mod editing_views {
             views_of(&db, copied_list).await.unwrap()[0].collapsed,
             overrides(&[("10002", false)])
         );
+    }
+
+    #[tokio::test]
+    async fn a_view_starts_with_the_me_chip_off() {
+        let (_dir, db) = tracked_lab().await;
+
+        let flags: Vec<bool> = space_views(&db).await.iter().map(|v| v.only_mine).collect();
+
+        assert_eq!(flags, [false, false, false]);
+    }
+
+    #[tokio::test]
+    async fn setting_the_me_chip_is_stored_returned_and_limited_to_that_view() {
+        let (_dir, db) = tracked_lab().await;
+        let views = space_views(&db).await;
+
+        let on = view_set_only_mine(&db, views[1].id, true).await.unwrap();
+
+        assert!(on.only_mine);
+        let flags: Vec<bool> = space_views(&db).await.iter().map(|v| v.only_mine).collect();
+        assert_eq!(flags, [false, true, false]);
+        let off = view_set_only_mine(&db, views[1].id, false).await.unwrap();
+        assert!(!off.only_mine);
+    }
+
+    #[tokio::test]
+    async fn the_me_chip_of_an_unknown_view_is_not_found() {
+        let (_dir, db) = tracked_lab().await;
+
+        let err = view_set_only_mine(&db, 9999, true).await.unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::NotFound);
+    }
+
+    #[tokio::test]
+    async fn a_duplicate_view_and_a_duplicate_list_keep_the_me_chip() {
+        let (_dir, db) = tracked_lab().await;
+        let table = space_views(&db).await[2].id;
+        view_set_only_mine(&db, table, true).await.unwrap();
+        let epics = list_id(&db, "Epics").await;
+        let epics_view = views_of(&db, epics).await.unwrap()[0].id;
+        view_set_only_mine(&db, epics_view, true).await.unwrap();
+
+        let copy = view_duplicate(&db, table).await.unwrap();
+        let copied_list = list_duplicate(&db, epics).await.unwrap();
+
+        assert!(copy.only_mine);
+        assert!(views_of(&db, copied_list).await.unwrap()[0].only_mine);
+    }
+
+    #[tokio::test]
+    async fn seeding_the_me_chip_turns_it_on_for_the_given_views_and_skips_unknown_ids() {
+        let (_dir, db) = tracked_lab().await;
+        let views = space_views(&db).await;
+
+        seed_only_mine(&db, vec![views[0].id, views[2].id, 9999])
+            .await
+            .unwrap();
+
+        let flags: Vec<bool> = space_views(&db).await.iter().map(|v| v.only_mine).collect();
+        assert_eq!(flags, [true, false, true]);
+    }
+
+    #[tokio::test]
+    async fn seeding_the_me_chip_for_no_views_changes_nothing() {
+        let (_dir, db) = tracked_lab().await;
+
+        seed_only_mine(&db, Vec::new()).await.unwrap();
+
+        assert!(space_views(&db).await.iter().all(|v| !v.only_mine));
     }
 }
 

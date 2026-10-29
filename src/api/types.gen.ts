@@ -415,7 +415,7 @@ export type MatchCount = { open: number, total: number, };
 export type MatchedIn = "key" | "summary" | "description" | "comment";
 
 /**
- * The toolbar's quick narrowing on top of the level's filter.
+ * The toolbar's narrowing on top of the level's filter, and the Filter popover's unsaved conditions (ADR 0038).
  */
 export type Narrowing = { 
 /**
@@ -429,7 +429,15 @@ text: string,
 /**
  * Only children of this epic.
  */
-epic: string | null, };
+epic: string | null, 
+/**
+ * Unsaved conditions in place of the filter list's own ones; only a filter list has its own.
+ */
+listDraft: Array<Condition> | null, 
+/**
+ * Unsaved conditions in place of the view's own ones.
+ */
+viewDraft: Array<Condition> | null, };
 
 /**
  * What the page needs to draw the sidebar's place.
@@ -742,6 +750,10 @@ collapsed: { [key in string]: boolean },
  */
 openWith: IssueOpening | null, subtasks: SubtaskMode, 
 /**
+ * The saved Me chip (ADR 0038): only the connected account's issues.
+ */
+onlyMine: boolean, 
+/**
  * The tab's icon (`look`); none shows the layout's.
  */
 icon: string | null, 
@@ -768,15 +780,7 @@ toggled: { [key in string]: boolean },
 /**
  * Parents whose subtasks the owner collapsed in Hierarchy (ADR 0037); the others show them.
  */
-collapsedParents: Array<string>, selectedId: string | null, peekOpen: boolean, 
-/**
- * The toolbar's Me chip, kept per view.
- */
-onlyMine: boolean, 
-/**
- * The toolbar's "Filter this view" text, kept per view.
- */
-text: string, };
+collapsedParents: Array<string>, selectedId: string | null, peekOpen: boolean, };
 
 export type WebLink = { id: string, url: string, 
 /**

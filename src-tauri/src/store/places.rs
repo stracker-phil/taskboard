@@ -1,5 +1,6 @@
 //! Where the owner left each view (`places.json`): scroll position, opened and closed groups, the selected
-//! row and whether its peek was open. Restored when the view comes back, also after a restart.
+//! row and whether its peek was open. Restored when the view comes back, also after a restart. The Me chip and
+//! the text filter aren't kept here (ADR 0038): the view saves its Me chip, the text is for the moment.
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -24,10 +25,10 @@ pub struct ViewPlace {
     pub collapsed_parents: Vec<String>,
     pub selected_id: Option<String>,
     pub peek_open: bool,
-    /// The toolbar's Me chip, kept per view.
-    pub only_mine: bool,
-    /// The toolbar's "Filter this view" text, kept per view.
-    pub text: String,
+    /// The Me chip as files from before ADR 0038 kept it; read once to seed `view.only_mine`, never written.
+    #[serde(rename = "onlyMine", skip_serializing)]
+    #[ts(skip)]
+    pub legacy_only_mine: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
@@ -60,6 +61,29 @@ impl PlaceStore {
                 .get(&key(list_id, view_id))
                 .map(|(_, place)| place.clone())
         })
+    }
+
+    /// The views whose place still holds the Me chip on, from before views saved it (ADR 0038).
+    pub fn legacy_only_mine(&self) -> Vec<i64> {
+        self.store.read(|places| {
+            places
+                .views
+                .iter()
+                .filter(|(_, (_, place))| place.legacy_only_mine)
+                .filter_map(|(key, _)| key.split_once(':')?.1.parse().ok())
+                .collect()
+        })
+    }
+
+    /// Writes the file again without the old Me chips, so they seed the views only once.
+    pub async fn forget_legacy_only_mine(&self) -> AppResult<()> {
+        self.store
+            .update_async(|places| {
+                for (_, place) in places.views.values_mut() {
+                    place.legacy_only_mine = false;
+                }
+            })
+            .await
     }
 
     pub async fn set(&self, list_id: i64, view_id: i64, place: ViewPlace) -> AppResult<()> {
@@ -195,8 +219,7 @@ mod tests {
     #[test]
     fn a_place_serializes_with_camel_case_keys() {
         let value = serde_json::to_value(ViewPlace {
-            only_mine: true,
-            text: "invoice".to_string(),
+            legacy_only_mine: true,
             ..place(12.5, "10042")
         })
         .unwrap();
@@ -209,8 +232,6 @@ mod tests {
                 "collapsedParents": [],
                 "selectedId": "10042",
                 "peekOpen": true,
-                "onlyMine": true,
-                "text": "invoice",
             })
         );
     }
@@ -228,55 +249,111 @@ mod tests {
         );
     }
 
-    #[tokio::test]
-    async fn the_me_chip_and_filter_text_persist_across_reopen() {
+    const OLD_FILE: &str = r#"{"views": {
+        "1:2": [0, {"scrollTop": 42.5, "toggled": {"done": false}, "selectedId": "10042", "peekOpen": true, "onlyMine": true, "text": "invoice"}],
+        "1:3": [1, {"scrollTop": 8, "onlyMine": false, "text": "retro"}],
+        "4:5": [2, {"scrollTop": 3, "onlyMine": true}]
+    }, "next": 3}"#;
+
+    fn write_old_file(dir: &Path) {
+        fs::write(dir.join("places.json"), OLD_FILE).unwrap();
+    }
+
+    #[test]
+    fn a_file_with_the_old_me_chip_and_text_keys_still_loads_its_other_fields() {
         let dir = temp_config_dir();
-        let saved = ViewPlace {
-            only_mine: true,
-            text: "invoice".to_string(),
-            ..place(7.0, "10042")
-        };
-        PlaceStore::open(dir.path())
-            .set(1, 2, saved.clone())
-            .await
-            .unwrap();
+        write_old_file(dir.path());
 
-        assert_eq!(PlaceStore::open(dir.path()).get(1, 2), Some(saved));
+        let loaded = PlaceStore::open(dir.path()).get(1, 2).unwrap();
+
+        assert_eq!(
+            loaded,
+            ViewPlace {
+                scroll_top: 42.5,
+                toggled: BTreeMap::from([("done".to_string(), false)]),
+                selected_id: Some("10042".to_string()),
+                peek_open: true,
+                legacy_only_mine: true,
+                collapsed_parents: Vec::new(),
+            }
+        );
     }
 
     #[test]
-    fn a_place_serializes_the_me_chip_and_filter_text_in_camel_case() {
-        let value = serde_json::to_value(ViewPlace {
-            only_mine: true,
-            text: "invoice".to_string(),
-            ..ViewPlace::default()
-        })
-        .unwrap();
+    fn the_legacy_me_chip_lists_the_views_that_had_it_on() {
+        let dir = temp_config_dir();
+        write_old_file(dir.path());
 
-        assert_eq!(value["onlyMine"], serde_json::json!(true));
-        assert_eq!(value["text"], serde_json::json!("invoice"));
+        let mut ids = PlaceStore::open(dir.path()).legacy_only_mine();
+        ids.sort();
+
+        assert_eq!(ids, [2, 5]);
     }
 
     #[test]
-    fn a_file_written_before_the_me_chip_and_text_existed_loads_them_as_off() {
+    fn a_file_without_the_old_keys_has_no_legacy_me_chip() {
         let dir = temp_config_dir();
         fs::write(
             dir.path().join("places.json"),
-            r#"{"views": {"1:2": [0, {"scrollTop": 42.5, "toggled": {"done": false}, "selectedId": "10042", "peekOpen": true}]}, "next": 1}"#,
+            r#"{"views": {"1:2": [0, {"scrollTop": 1}]}, "next": 1}"#,
         )
         .unwrap();
 
         assert_eq!(
-            PlaceStore::open(dir.path()).get(1, 2),
+            PlaceStore::open(dir.path()).legacy_only_mine(),
+            Vec::<i64>::new()
+        );
+    }
+
+    #[tokio::test]
+    async fn forgetting_the_legacy_me_chip_removes_it_from_the_file_and_keeps_the_rest() {
+        let dir = temp_config_dir();
+        write_old_file(dir.path());
+        let store = PlaceStore::open(dir.path());
+
+        store.forget_legacy_only_mine().await.unwrap();
+
+        assert_eq!(store.legacy_only_mine(), Vec::<i64>::new());
+        let reopened = PlaceStore::open(dir.path());
+        assert_eq!(reopened.legacy_only_mine(), Vec::<i64>::new());
+        assert_eq!(
+            reopened.get(1, 2),
             Some(ViewPlace {
                 scroll_top: 42.5,
                 toggled: BTreeMap::from([("done".to_string(), false)]),
                 selected_id: Some("10042".to_string()),
                 peek_open: true,
-                only_mine: false,
-                text: String::new(),
-                collapsed_parents: Vec::new(),
+                ..ViewPlace::default()
             })
+        );
+        let written = fs::read_to_string(dir.path().join("places.json")).unwrap();
+        assert!(!written.contains("onlyMine"), "{written}");
+        assert!(!written.contains("text"), "{written}");
+    }
+
+    #[tokio::test]
+    async fn a_saved_place_never_writes_the_me_chip_or_text_keys() {
+        let dir = temp_config_dir();
+        let store = PlaceStore::open(dir.path());
+
+        store
+            .set(
+                1,
+                2,
+                ViewPlace {
+                    legacy_only_mine: true,
+                    ..place(7.0, "10042")
+                },
+            )
+            .await
+            .unwrap();
+
+        let written = fs::read_to_string(dir.path().join("places.json")).unwrap();
+        assert!(!written.contains("onlyMine"), "{written}");
+        assert!(!written.contains("\"text\""), "{written}");
+        assert_eq!(
+            PlaceStore::open(dir.path()).legacy_only_mine(),
+            Vec::<i64>::new()
         );
     }
 

@@ -2,7 +2,8 @@ import { useEffect } from "react";
 import { PinnedView } from "../pins/PinnedView";
 import { useNav, useSidebar, useViews } from "../queries/sidebar";
 import { useSyncOverview } from "../queries/sync";
-import { narrowingKey } from "../state/slices/narrowing";
+import { requestNarrowing } from "../queries/views";
+import { narrowingKey, NO_VIEW_NARROWING } from "../state/slices/narrowing";
 import { useStore } from "../state/store";
 import { BoardView } from "../views/board/BoardView";
 import { ListView } from "../views/list/ListView";
@@ -18,11 +19,11 @@ export function MainBody() {
   const { data: views } = useViews(location?.listId ?? null);
   const { data: tree } = useSidebar();
   const loadPlace = useStore((s) => s.loadPlace);
-  // Every layout's place, the narrowing among it, loads here; the List also restores its scroll from it.
+  // Every layout's place loads here; the List also restores its scroll from it.
   useEffect(() => {
     if (location) void loadPlace(location.listId, location.viewId);
   }, [loadPlace, location]);
-  const narrowing = useStore((s) => (location ? s.narrowings[narrowingKey(location.listId, location.viewId)] : undefined));
+  const stored = useStore((s) => (location ? s.narrowings[narrowingKey(location.listId, location.viewId)] : undefined));
   const hasIssues = overview?.projects.some((p) => p.cached > 0) ?? false;
   if (!hasIssues || !location) return <SyncStatusView />;
   // A Space still in its first sync shows the progress; finished Spaces can be browsed meanwhile.
@@ -35,6 +36,7 @@ export function MainBody() {
   const view = views?.find((v) => v.id === location.viewId);
   // Until the views load the layout is unknown; drawing a List first would flash before a Board or Table.
   if (!view) return null;
+  const narrowing = requestNarrowing(stored ?? NO_VIEW_NARROWING, view.onlyMine);
   if (view.layout === "table") return <TableView view={view} narrowing={narrowing} />;
   if (view.layout === "board") return <BoardView view={view} narrowing={narrowing} />;
   return <ListView listId={location.listId} viewId={location.viewId} narrowing={narrowing} wrapTitles={view.wrapTitles} openWith={view.openWith} inlineLabels={view.inlineLabels} />;

@@ -199,7 +199,7 @@ describe("MainBody", () => {
 
       renderBody();
 
-      await waitFor(() => expect(mocked.viewRows).toHaveBeenCalledWith(11, 101, { me: true, text: "", epic: null }));
+      await waitFor(() => expect(mocked.viewRows).toHaveBeenCalledWith(11, 101, { me: true, text: "", epic: null, listDraft: null, viewDraft: null }));
     });
 
     it("asks for the rows narrowed by the text of this view only", async () => {
@@ -209,13 +209,42 @@ describe("MainBody", () => {
 
       renderBody();
 
-      await waitFor(() => expect(mocked.viewRows).toHaveBeenCalledWith(11, 101, { me: false, text: "pricing", epic: null }));
+      await waitFor(() => expect(mocked.viewRows).toHaveBeenCalledWith(11, 101, { me: false, text: "pricing", epic: null, listDraft: null, viewDraft: null }));
       expect(mocked.viewRows).not.toHaveBeenCalledWith(11, 101, expect.objectContaining({ me: true }));
+    });
+
+    it("opens a view that saved the Me chip with Me on", async () => {
+      mocked.viewsOf.mockResolvedValue([view({ onlyMine: true })]);
+
+      renderBody();
+
+      await waitFor(() => expect(mocked.viewRows).toHaveBeenCalledWith(11, 101, expect.objectContaining({ me: true })));
+    });
+
+    it("lets a drafted Me chip off win over the one the view saved", async () => {
+      mocked.viewsOf.mockResolvedValue([view({ onlyMine: true })]);
+      useStore.getState().setNarrowing(narrowingKey(11, 101), { me: false });
+
+      renderBody();
+
+      await waitFor(() => expect(mocked.viewRows).toHaveBeenCalledWith(11, 101, expect.objectContaining({ me: false })));
+      expect(mocked.viewRows).not.toHaveBeenCalledWith(11, 101, expect.objectContaining({ me: true }));
+    });
+
+    it("sends the complete conditions of the drafts in place of the saved ones", async () => {
+      const complete = { field: "priority", op: "is", value: "High" } as const;
+      const incomplete = { field: "priority", op: "is", value: "" } as const;
+      mocked.viewsOf.mockResolvedValue([view()]);
+      useStore.getState().setNarrowing(narrowingKey(11, 101), { list: [complete, incomplete], view: [] });
+
+      renderBody();
+
+      await waitFor(() => expect(mocked.viewRows).toHaveBeenCalledWith(11, 101, expect.objectContaining({ listDraft: [complete], viewDraft: [] })));
     });
   });
 
   describe("saved place", () => {
-    const SAVED = { scrollTop: 0, toggled: {}, collapsedParents: [], selectedId: null, peekOpen: false, onlyMine: true, text: "pricing" };
+    const SAVED = { scrollTop: 0, toggled: {}, collapsedParents: [], selectedId: null, peekOpen: false };
 
     beforeEach(() => {
       mocked.navCurrent.mockResolvedValue({ location: { listId: 11, viewId: 101 }, expanded: [] });
@@ -230,14 +259,6 @@ describe("MainBody", () => {
 
       await waitFor(() => expect(useStore.getState().places[narrowingKey(11, 101)]).toEqual(SAVED));
       expect(mocked.placeGet).toHaveBeenCalledWith(11, 101);
-    });
-
-    it("narrows the rows by the Me chip and text saved with the view", async () => {
-      mocked.viewsOf.mockResolvedValue([view({ layout: "table" })]);
-
-      renderBody();
-
-      await waitFor(() => expect(mocked.viewRows).toHaveBeenCalledWith(11, 101, { me: true, text: "pricing", epic: null }));
     });
   });
 

@@ -4,7 +4,7 @@ import { usePageAction } from "../../commands/pageActions";
 import { type Presence, usePresence } from "../../lib/motion";
 import { api, type View } from "../../api";
 import { openMenu, type MenuEntry } from "../../components/menu";
-import { narrowingKey, NO_NARROWING } from "../../state/slices/narrowing";
+import { narrowingKey, NO_VIEW_NARROWING } from "../../state/slices/narrowing";
 import { useStore } from "../../state/store";
 import { spaceOf, type Level } from "../levels";
 import { ColumnsPopover } from "./ColumnsPopover";
@@ -15,12 +15,15 @@ import { GROUP_NAMES, groupMenu } from "./groupMenu";
 import { SubtasksButton, subtasksMenu } from "./SubtasksButton";
 import { MeChip } from "./MeChip";
 import { TextFilter } from "./TextFilter";
+import { SaveViewButton } from "./SaveViewButton";
 import { useToolbarFit } from "./useToolbarFit";
+import { useViewDraft } from "./useViewDraft";
 import { useViewEdit } from "./useViewEdit";
 
 type Open = "columns" | "filter" | null;
 
-/** One popover at a time; when the bar is too narrow, the text filter shrinks and then items move into a "…" menu. */
+/** One popover at a time; when the bar is too narrow, the text filter shrinks and then items move into a "…" menu.
+ *  The Me chip and the Filter popover change the view as a draft until Save View (ADR 0038). */
 export function Toolbar({ level, view }: { level: Level; view: View }) {
   const [open, setOpen] = useState<Open>(null);
   const barRef = useRef<HTMLDivElement>(null);
@@ -30,10 +33,11 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
   const searchRef = useRef<HTMLInputElement>(null);
   // The Board always hides subtasks, so its bar has no Subtasks button.
   const hasSubtasks = view.layout !== "board";
-  const { hidden, measure } = useToolbarFit(barRef, hasSubtasks ? [] : ["subtasks"]);
+  const draft = useViewDraft(level, view);
+  const { hidden, measure } = useToolbarFit(barRef, hasSubtasks ? [] : ["subtasks"], draft.dirty);
   const edit = useViewEdit();
   const key = narrowingKey(view.listId, view.id);
-  const narrowing = useStore((s) => s.narrowings[key]) ?? NO_NARROWING;
+  const narrowing = useStore((s) => s.narrowings[key]) ?? NO_VIEW_NARROWING;
   const setNarrowing = useStore((s) => s.setNarrowing);
   const setText = useCallback((text: string) => setNarrowing(key, { text }), [key, setNarrowing]);
 
@@ -71,13 +75,16 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
   const subtaskEntries = () => subtasksMenu(view.subtasks, (mode) => edit(api.viewSetSubtasks(view.id, mode), "Could not change how subtasks show"));
 
   const space = spaceOf(level);
-  // Both layers count: the filter list's own conditions and the view's.
-  const own = (level.kind === "space" ? 0 : level.node.ownConditions) + view.ownConditions;
-  const listName = level.kind === "space" ? level.space.name : level.node.name;
+  // Both layers count, as drafted or saved: the filter list's own conditions and the view's.
+  const own = draft.conditions;
+  const toggleMe = () => setNarrowing(key, { me: !draft.me });
+  const save = () => void draft.save();
   const columnsLabel = view.layout === "board" ? "Card fields" : "Columns";
   const shows = (item: Collapsible) => !hidden.includes(item) && (item !== "subtasks" || hasSubtasks);
 
-  usePageAction("toolbar.me", () => setNarrowing(key, { me: !narrowing.me }));
+  usePageAction("toolbar.me", toggleMe);
+  usePageAction("view.save", draft.dirty ? save : null);
+  usePageAction("view.revert", draft.dirty ? draft.revert : null);
   usePageAction("toolbar.search", () => {
     searchRef.current?.focus();
     searchRef.current?.select();
@@ -86,8 +93,8 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
   usePageAction("toolbar.columns", () => setOpen("columns"));
   usePageAction("toolbar.group", openGroupMenu);
 
-  const moreEntries = (): MenuEntry[] =>
-    hidden.map((item): MenuEntry => {
+  const moreEntries = (): MenuEntry[] => [
+    ...hidden.map((item): MenuEntry => {
       switch (item) {
         case "columns":
           return { text: `${columnsLabel}…`, run: () => setOpen("columns") };
@@ -98,9 +105,11 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
         case "group":
           return { text: `Group: ${GROUP_NAMES[view.groupBy]}`, items: groupEntries() };
         case "me":
-          return { text: "Only my issues", checked: narrowing.me, toggle: true, run: () => setNarrowing(key, { me: !narrowing.me }) };
+          return { text: "Only my issues", checked: draft.me, toggle: true, run: toggleMe };
       }
-    });
+    }),
+    ...(draft.dirty ? revertEntries(hidden.length > 0, draft.revert) : []),
+  ];
 
   const columnsPopover = (anchor: RefObject<HTMLButtonElement | null>) =>
     columnsShown.mounted && (
@@ -111,7 +120,7 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
   const filterPopover = (anchor: RefObject<HTMLButtonElement | null>) =>
     filterShown.mounted && (
       <Fading state={filterShown.state}>
-        <FilterPopover listId={view.listId} viewId={view.id} listName={listName} anchor={anchor} onClose={close} />
+        <FilterPopover listId={view.listId} viewId={view.id} anchor={anchor} dirty={draft.dirty} onSave={save} onClose={close} />
       </Fading>
     );
 
@@ -140,6 +149,7 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
       )}
       {shows("subtasks") && <SubtasksButton ref={measure("subtasks")} mode={view.subtasks} entries={subtaskEntries} />}
       <span className="toolbar__spacer" />
+      {draft.dirty && <SaveViewButton onSave={save} />}
       {shows("filter") && (
         <span ref={measure("filter")} className="toolbar__anchor toolbar__anchor--end">
           <button
@@ -162,12 +172,12 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
       )}
       {shows("me") && (
         <span ref={measure("me")} className="toolbar__item">
-          <MeChip on={narrowing.me} onChange={(me) => setNarrowing(key, { me })} />
+          <MeChip on={draft.me} onChange={(me) => setNarrowing(key, { me })} />
         </span>
       )}
       {narrowing.epic && <EpicNarrowingChip epicId={narrowing.epic} onClear={() => setNarrowing(key, { epic: null })} />}
       <TextFilter key={key} value={narrowing.text} onChange={setText} inputRef={searchRef} />
-      {hidden.length > 0 && (
+      {(hidden.length > 0 || draft.dirty) && (
         <span className="toolbar__anchor toolbar__anchor--end">
           <button ref={moreRef} type="button" className="toolbar-btn toolbar-btn--icon" aria-label="More toolbar items" aria-haspopup="menu" onClick={(e) => openMenu(moreEntries(), e.currentTarget, "More toolbar items")}>
             <Ellipsis size={14} strokeWidth={2} aria-hidden="true" />
@@ -178,6 +188,12 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
       )}
     </div>
   );
+}
+
+/** Revert View, after a separator when other items come first. */
+function revertEntries(afterItems: boolean, revert: () => void): MenuEntry[] {
+  const entry: MenuEntry = { text: "Revert View", run: revert };
+  return afterItems ? ["separator", entry] : [entry];
 }
 
 /** Plays a popover's exit while it is still mounted; a leaving popover takes no input. */

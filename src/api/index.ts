@@ -157,6 +157,7 @@ export const api = {
   viewBoard: (listId: number, viewId: number, narrowing: Narrowing) => invoke<BoardData>("view_board", { listId, viewId, narrowing }),
   /** The view's own conditions, ANDed with its level's; rejects with `invalid_input` when they don't compile. */
   viewSetFilter: (id: number, filter: Filter) => invoke<View>("view_set_filter", { id, filter }),
+  viewSetOnlyMine: (id: number, on: boolean) => invoke<View>("view_set_only_mine", { id, on }),
   viewSetColumnCollapsed: (id: number, statusId: string, collapsed: boolean) => invoke<View>("view_set_column_collapsed", { id, statusId, collapsed }),
   /** How long an open issue takes to count as seen, and the default pin duration. */
   behaviourSet: (behaviour: Behaviour) => invoke<Settings>("behaviour_set", { behaviour }),

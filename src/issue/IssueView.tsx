@@ -7,7 +7,7 @@ import { hasContent } from "../lib/jiraHtml";
 import { formatLocalTime } from "../lib/time";
 import { refreshIssueExtras, useIssue, useIssueRelated } from "../queries/issues";
 import { useNavGo, useSidebar, useViews } from "../queries/sidebar";
-import { useViewRows } from "../queries/views";
+import { useRequestNarrowing, useViewRows } from "../queries/views";
 import { findLevel, spaceOf } from "../shell/levels";
 import { narrowingKey } from "../state/slices/narrowing";
 import type { IssueOrigin } from "../state/slices/issueView";
@@ -28,7 +28,7 @@ import { WebLinks } from "./WebLinks";
 
 /** The issue's neighbors in the view it was opened from, for the previous/next arrows and J/K. */
 function useNeighbors(origin: IssueOrigin, id: string): { previous: string | null; next: string | null } {
-  const narrowing = useStore((s) => s.narrowings[narrowingKey(origin.listId, origin.viewId)]);
+  const narrowing = useRequestNarrowing(origin.listId, origin.viewId);
   const { data } = useViewRows(origin.listId, origin.viewId, narrowing);
   const order = data?.groups.flatMap((group) => group.rowIds) ?? [];
   const at = order.indexOf(id);

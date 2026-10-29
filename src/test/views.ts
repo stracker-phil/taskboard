@@ -20,6 +20,7 @@ export function view(patch: Partial<View> = {}): View {
     position: 0,
     isDefault: false,
     ownConditions: 0,
+    onlyMine: false,
     icon: null,
     color: null,
     ...patch,

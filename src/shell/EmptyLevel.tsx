@@ -1,6 +1,7 @@
 import { Funnel } from "lucide-react";
 import { useSidebar } from "../queries/sidebar";
-import { narrowingKey, NO_NARROWING } from "../state/slices/narrowing";
+import { NO_NARROWING, useRequestNarrowing } from "../queries/views";
+import { narrowingKey } from "../state/slices/narrowing";
 import { useStore } from "../state/store";
 import { findLevel } from "./levels";
 
@@ -8,7 +9,7 @@ import { findLevel } from "./levels";
 export function EmptyLevel({ listId, viewId }: { listId: number; viewId: number }) {
   const { data: tree } = useSidebar();
   const key = narrowingKey(listId, viewId);
-  const narrowing = useStore((s) => s.narrowings[key]) ?? NO_NARROWING;
+  const narrowing = useRequestNarrowing(listId, viewId) ?? NO_NARROWING;
   const setNarrowing = useStore((s) => s.setNarrowing);
   const requestFilter = useStore((s) => s.requestFilter);
   const level = tree ? findLevel(tree, listId) : null;

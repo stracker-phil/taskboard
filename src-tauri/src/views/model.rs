@@ -117,6 +117,8 @@ pub struct View {
     /// What a click on an issue opens here; none follows Settings → General.
     pub open_with: Option<IssueOpening>,
     pub subtasks: SubtaskMode,
+    /// The saved Me chip (ADR 0038): only the connected account's issues.
+    pub only_mine: bool,
     /// The tab's icon (`look`); none shows the layout's.
     pub icon: Option<String>,
     /// The icon's tile color; none shows the icon plain.

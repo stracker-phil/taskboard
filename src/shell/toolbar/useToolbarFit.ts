@@ -5,8 +5,9 @@ import { type Collapsible, overflowing } from "./fit";
 const PADDING = 48;
 
 /** Watches the toolbar's width and returns the items that don't fit. Each item reports its element through
- *  `measure(item)`; its last known width counts while it is hidden. `absent` items aren't in this bar. */
-export function useToolbarFit(bar: RefObject<HTMLElement | null>, absent: readonly Collapsible[] = []) {
+ *  `measure(item)`; its last known width counts while it is hidden. `absent` items aren't in this bar;
+ *  `dirty` makes room for Save View. */
+export function useToolbarFit(bar: RefObject<HTMLElement | null>, absent: readonly Collapsible[] = [], dirty = false) {
   const widths = useRef<Partial<Record<Collapsible, number>>>({});
   const [widthsVersion, setWidthsVersion] = useState(0);
   const [available, setAvailable] = useState(Number.POSITIVE_INFINITY);
@@ -22,9 +23,9 @@ export function useToolbarFit(bar: RefObject<HTMLElement | null>, absent: readon
 
   const absentKey = absent.join();
   useLayoutEffect(() => {
-    const next = overflowing(available, widths.current, absentKey ? (absentKey.split(",") as Collapsible[]) : []);
+    const next = overflowing(available, widths.current, absentKey ? (absentKey.split(",") as Collapsible[]) : [], dirty);
     setHidden((current) => (current.join() === next.join() ? current : next));
-  }, [available, widthsVersion, absentKey]);
+  }, [available, widthsVersion, absentKey, dirty]);
 
   const measure = (item: Collapsible) => (element: HTMLElement | null) => {
     if (!element) return;

@@ -1,8 +1,32 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { api, type Narrowing } from "../api";
-import { NO_NARROWING } from "../state/slices/narrowing";
+import { isComplete } from "../shell/toolbar/conditionEditing";
+import { narrowingKey, NO_VIEW_NARROWING, type ViewNarrowing } from "../state/slices/narrowing";
+import { useStore } from "../state/store";
+import { useViews } from "./sidebar";
 
-export { NO_NARROWING };
+/** Rows asked for without any narrowing or draft. */
+export const NO_NARROWING: Narrowing = { me: false, text: "", epic: null, listDraft: null, viewDraft: null };
+
+/** What a view's rows are asked with (ADR 0038): the toolbar's narrowing, the Me chip as drafted or else as the
+ *  view saved it, and the drafts' complete conditions in place of the saved ones. */
+export function requestNarrowing(narrowing: ViewNarrowing, savedOnlyMine: boolean): Narrowing {
+  return {
+    me: narrowing.me ?? savedOnlyMine,
+    text: narrowing.text,
+    epic: narrowing.epic,
+    listDraft: narrowing.list?.filter(isComplete) ?? null,
+    viewDraft: narrowing.view?.filter(isComplete) ?? null,
+  };
+}
+
+/** The narrowing a view's rows are asked with; undefined until the level's views load. */
+export function useRequestNarrowing(listId: number, viewId: number): Narrowing | undefined {
+  const narrowing = useStore((s) => s.narrowings[narrowingKey(listId, viewId)]) ?? NO_VIEW_NARROWING;
+  const { data: views } = useViews(listId);
+  const view = views?.find((v) => v.id === viewId);
+  return view ? requestNarrowing(narrowing, view.onlyMine) : undefined;
+}
 
 /** Every view's rows; `viewRowsKey` is one view's with one narrowing. */
 export const VIEW_ROWS_KEY = ["view"] as const;

@@ -1,25 +1,19 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../../test/apiMock")).createApiMock() }));
 
-import { api } from "../../api";
+import type { Condition } from "../../api";
 import { resetStore, useStore } from "../store";
-import { EMPTY_PLACE } from "./places";
-
-const mocked = vi.mocked(api, true);
+import { NO_VIEW_NARROWING } from "./narrowing";
 
 const KEY = "11:101";
+const OTHER = "11:102";
+const HIGH: Condition = { field: "priority", op: "is", value: "High" };
+const narrowings = () => useStore.getState().narrowings;
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.useFakeTimers({ shouldAdvanceTime: true });
   resetStore();
-  mocked.placeSet.mockResolvedValue(undefined);
-});
-
-afterEach(async () => {
-  await vi.runOnlyPendingTimersAsync();
-  vi.useRealTimers();
 });
 
 describe("setNarrowing", () => {
@@ -27,51 +21,71 @@ describe("setNarrowing", () => {
     useStore.getState().setNarrowing(KEY, { text: "login" });
     useStore.getState().setNarrowing(KEY, { me: true });
 
-    expect(useStore.getState().narrowings[KEY]).toEqual({ me: true, text: "login", epic: null });
+    expect(narrowings()[KEY]).toEqual({ ...NO_VIEW_NARROWING, me: true, text: "login" });
+  });
+
+  it("starts a view from the saved state: no draft of any kind", () => {
+    useStore.getState().setNarrowing(KEY, { text: "login" });
+
+    expect(narrowings()[KEY]).toMatchObject({ me: null, list: null, view: null, epic: null });
   });
 
   it("keeps the narrowings of different views apart", () => {
-    useStore.getState().setNarrowing("11:101", { me: true });
-
-    expect(useStore.getState().narrowings["11:102"]).toBeUndefined();
-  });
-
-  it("saves the Me chip with the view's place after the debounce", async () => {
     useStore.getState().setNarrowing(KEY, { me: true });
 
-    await vi.advanceTimersByTimeAsync(299);
-    expect(mocked.placeSet).not.toHaveBeenCalled();
-    await vi.advanceTimersByTimeAsync(1);
+    expect(narrowings()[OTHER]).toBeUndefined();
+  });
+});
 
-    expect(mocked.placeSet).toHaveBeenCalledWith(11, 101, { ...EMPTY_PLACE, onlyMine: true, text: "" });
+describe("clearDrafts", () => {
+  it("drops the Me chip and both condition drafts of the view", () => {
+    useStore.getState().setNarrowing(KEY, { me: true, list: [HIGH], view: [] });
+
+    useStore.getState().clearDrafts(KEY);
+
+    expect(narrowings()[KEY]).toMatchObject({ me: null, list: null, view: null });
   });
 
-  it("saves the text together with the current Me chip", async () => {
+  it("keeps the text filter and the epic", () => {
+    useStore.getState().setNarrowing(KEY, { me: true, text: "login", epic: "10001" });
+
+    useStore.getState().clearDrafts(KEY);
+
+    expect(narrowings()[KEY]).toEqual({ ...NO_VIEW_NARROWING, text: "login", epic: "10001" });
+  });
+
+  it("leaves other views' drafts alone", () => {
     useStore.getState().setNarrowing(KEY, { me: true });
-    useStore.getState().setNarrowing(KEY, { text: "login" });
+    useStore.getState().setNarrowing(OTHER, { me: true });
 
-    await vi.advanceTimersByTimeAsync(300);
+    useStore.getState().clearDrafts(KEY);
 
-    expect(mocked.placeSet).toHaveBeenCalledTimes(1);
-    expect(mocked.placeSet).toHaveBeenCalledWith(11, 101, { ...EMPTY_PLACE, onlyMine: true, text: "login" });
+    expect(narrowings()[OTHER]?.me).toBe(true);
   });
 
-  it("saves nothing for an epic-only change", async () => {
-    useStore.getState().setNarrowing(KEY, { epic: "10001" });
+  it("does nothing for a view without a narrowing", () => {
+    useStore.getState().clearDrafts(KEY);
 
-    await vi.advanceTimersByTimeAsync(1000);
+    expect(narrowings()).toEqual({});
+  });
+});
 
-    expect(mocked.placeSet).not.toHaveBeenCalled();
-    expect(useStore.getState().narrowings[KEY]?.epic).toBe("10001");
+describe("keepOnlyNarrowing", () => {
+  it("drops the text, epic and drafts of every other view", () => {
+    useStore.getState().setNarrowing(OTHER, { me: true, text: "login", epic: "10001", list: [HIGH] });
+    useStore.getState().setNarrowing("12:201", { view: [HIGH] });
+
+    useStore.getState().keepOnlyNarrowing(KEY);
+
+    expect(narrowings()).toEqual({});
   });
 
-  it("keeps the rest of the saved place when the Me chip changes", async () => {
-    mocked.placeGet.mockResolvedValue({ ...EMPTY_PLACE, scrollTop: 320, selectedId: "10042" });
-    await useStore.getState().loadPlace(11, 101);
+  it("keeps the narrowing of the view it is given", () => {
+    useStore.getState().setNarrowing(KEY, { me: true, text: "login", list: [HIGH] });
+    useStore.getState().setNarrowing(OTHER, { me: true });
 
-    useStore.getState().setNarrowing(KEY, { me: true });
-    await vi.advanceTimersByTimeAsync(300);
+    useStore.getState().keepOnlyNarrowing(KEY);
 
-    expect(mocked.placeSet).toHaveBeenCalledWith(11, 101, { ...EMPTY_PLACE, scrollTop: 320, selectedId: "10042", onlyMine: true });
+    expect(narrowings()).toEqual({ [KEY]: { ...NO_VIEW_NARROWING, me: true, text: "login", list: [HIGH] } });
   });
 });

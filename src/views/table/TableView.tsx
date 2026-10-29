@@ -143,6 +143,7 @@ function Table({ view, data }: { view: View; data: ViewData }) {
                     onSelect={select}
                     onOpen={open}
                     inlineLabels={inlineLabels}
+                    tree={data.subtasks === "hierarchy"}
                     nesting={item.nesting}
                     subtasksOpen={subtasksOpen(item.row.id)}
                     onToggleSubtasks={toggleSubtasks}

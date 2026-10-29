@@ -77,7 +77,7 @@ describe("ListView", () => {
   it("asks Rust for the rows of the list and view", async () => {
     await renderList(viewData([groupOf([OPEN])], [OPEN]));
 
-    expect(mocked.viewRows).toHaveBeenCalledWith(11, 101, { me: false, text: "", epic: null });
+    expect(mocked.viewRows).toHaveBeenCalledWith(11, 101, { me: false, text: "", epic: null, listDraft: null, viewDraft: null });
   });
 
   it("shows what the level is missing instead of a grid when the view has no issues", async () => {
@@ -318,7 +318,7 @@ describe("ListView", () => {
       groupOf([OPEN], { key: "status:progress", label: "In Progress" }),
       groupOf([DONE], { key: "status:done", label: "Done", collapsedByDefault: true }),
     ];
-    const saved: ViewPlace = { scrollTop: 0, toggled: { "status:done": true, "status:progress": false }, collapsedParents: [], selectedId: "2", peekOpen: false, onlyMine: false, text: "" };
+    const saved: ViewPlace = { scrollTop: 0, toggled: { "status:done": true, "status:progress": false }, collapsedParents: [], selectedId: "2", peekOpen: false };
 
     it("restores the selection and the opened and closed groups", async () => {
       mocked.placeGet.mockResolvedValue(saved);
@@ -421,7 +421,7 @@ describe("ListView", () => {
     });
 
     it("restores a saved collapse", async () => {
-      mocked.placeGet.mockResolvedValue({ scrollTop: 0, toggled: {}, collapsedParents: ["1"], selectedId: null, peekOpen: false, onlyMine: false, text: "" });
+      mocked.placeGet.mockResolvedValue({ scrollTop: 0, toggled: {}, collapsedParents: ["1"], selectedId: null, peekOpen: false });
       await renderList(modeData("hierarchy"));
 
       expect(await screen.findByRole("button", { name: "Expand subtasks" })).toBeInTheDocument();

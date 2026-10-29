@@ -1,6 +1,7 @@
 import { type ReactNode, useEffect } from "react";
 import { IssueView } from "../issue/IssueView";
 import { useNav, useSidebar, useViews } from "../queries/sidebar";
+import { narrowingKey } from "../state/slices/narrowing";
 import { useStore } from "../state/store";
 import { HoverPeek } from "../issue/hoverPeek/HoverPeek";
 import { CurrentPeek } from "./CurrentPeek";
@@ -23,6 +24,7 @@ interface Props {
 export function Window({ sidebarHidden, children }: Props) {
   const issueView = useStore((s) => s.issueView);
   useCloseIssueOnNavigation();
+  useDiscardDraftsOnLeave();
   return (
     <div className={sidebarHidden ? "shell shell--sidebar-hidden" : "shell"}>
       {!sidebarHidden && <Sidebar />}
@@ -60,6 +62,19 @@ function useCloseIssueOnNavigation() {
     if (listId === undefined) return;
     if (open && (open.origin.listId !== listId || open.origin.viewId !== viewId)) closeIssue();
   }, [listId, viewId, closeIssue]);
+}
+
+/** Leaving a view drops its drafts and its text filter (ADR 0038); the Issue view, the preview and the Peek
+ *  over it don't change the nav place, so they keep them. */
+function useDiscardDraftsOnLeave() {
+  const { data: nav } = useNav();
+  const keepOnly = useStore((s) => s.keepOnlyNarrowing);
+  const listId = nav?.location?.listId;
+  const viewId = nav?.location?.viewId;
+  useEffect(() => {
+    if (listId === undefined || viewId === undefined) return;
+    keepOnly(narrowingKey(listId, viewId));
+  }, [listId, viewId, keepOnly]);
 }
 
 /** The current level's header, view tabs and toolbar, once the tree and the place are known. */

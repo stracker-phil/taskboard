@@ -22,14 +22,14 @@ use super::subtasks::{nest, subtasks_of, top_level_only};
 use crate::changes::{Names, UNSEEN, chip, facts, unseen_changes};
 use crate::db::Db;
 use crate::error::{AppError, AppResult};
-use crate::filter::{Ctx, compile};
+use crate::filter::{Condition, Ctx, compile};
 use crate::issues::status_names;
 use crate::lists::{Kind, Viewer, all_nodes, scope_of};
 use crate::pins::active;
 use crate::status_style::Styles;
 use crate::sync::map::format_utc;
 
-/// The toolbar's quick narrowing on top of the level's filter.
+/// The toolbar's narrowing on top of the level's filter, and the Filter popover's unsaved conditions (ADR 0038).
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, TS)]
 #[ts(export, export_to = "src/api/types.gen.ts")]
 #[serde(default, rename_all = "camelCase")]
@@ -40,6 +40,10 @@ pub struct Narrowing {
     pub text: String,
     /// Only children of this epic.
     pub epic: Option<String>,
+    /// Unsaved conditions in place of the filter list's own ones; only a filter list has its own.
+    pub list_draft: Option<Vec<Condition>>,
+    /// Unsaved conditions in place of the view's own ones.
+    pub view_draft: Option<Vec<Condition>>,
     /// Unread keeps these read issues (read since the owner came here); set by Rust, never by the page.
     #[serde(skip)]
     #[ts(skip)]
@@ -205,6 +209,8 @@ pub fn unseen_ids(conn: &Connection, viewer: &Viewer, list_id: i64) -> AppResult
 }
 
 /// The level's conditions, the view's own ones, its kind's own rule and the narrowing, as one SQL condition.
+/// The narrowing's drafts stand in for the list's and the view's own conditions; they compile under the same
+/// chain as `list_set_filter` and `view_set_filter` check them.
 fn conditions(
     conn: &Connection,
     viewer: &Viewer,
@@ -218,9 +224,15 @@ fn conditions(
         .iter()
         .find(|n| n.id == list_id)
         .ok_or_else(|| AppError::NotFound(format!("Filter list {list_id} doesn't exist")))?;
-    let mut chain = scope_of(&nodes, node).all()?;
-    if let Some(view) = view {
-        chain.extend(view_conditions(view)?);
+    let scope = scope_of(&nodes, node);
+    let mut chain = match &narrowing.list_draft {
+        Some(draft) if node.kind == Kind::List => [scope.inherited, draft.clone()].concat(),
+        _ => scope.all()?,
+    };
+    match (view, &narrowing.view_draft) {
+        (Some(_), Some(draft)) => chain.extend(draft.iter().cloned()),
+        (Some(view), None) => chain.extend(view_conditions(view)?),
+        (None, _) => {}
     }
     let compiled = compile(&chain, ctx)?;
     let mut condition = compiled.where_clause();

@@ -19,6 +19,7 @@ pub const LOCAL: &[&str] = &[
     include_str!("../../migrations/local/0011_view_inline_labels.sql"),
     include_str!("../../migrations/local/0012_view_filter.sql"),
     include_str!("../../migrations/local/0013_view_subtasks.sql"),
+    include_str!("../../migrations/local/0014_view_only_mine.sql"),
 ];
 pub const CACHE: &[&str] = &[
     include_str!("../../migrations/cache/0001_init.sql"),
@@ -143,6 +144,33 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM space_field", [], |r| r.get(0))
             .unwrap();
         assert_eq!(fields, 0);
+    }
+
+    #[test]
+    fn views_from_before_the_saved_me_chip_start_with_it_off() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        migrate(&mut conn, "local", &LOCAL[..13]).unwrap();
+        conn.execute_batch(
+            "INSERT INTO view (list_id, name, layout, group_by, sort_by, sort_order)
+             VALUES (1, 'Board', 'board', 'status', 'updated', 0),
+                    (1, 'List', 'list', 'status', 'updated', 0)",
+        )
+        .unwrap();
+
+        migrate(&mut conn, "local", LOCAL).unwrap();
+
+        let mut query = conn
+            .prepare("SELECT name, only_mine FROM view ORDER BY id")
+            .unwrap();
+        let rows: Vec<(String, bool)> = query
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect();
+        for name in ["Board", "List"] {
+            assert!(rows.contains(&(name.to_string(), false)), "{name}");
+        }
+        assert!(rows.iter().all(|(_, only_mine)| !only_mine), "{rows:?}");
     }
 
     #[test]

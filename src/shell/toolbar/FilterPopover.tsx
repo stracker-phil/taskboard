@@ -1,34 +1,37 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { ListFilter, Lock } from "lucide-react";
-import { useEffect, useId, useRef, useState, type RefObject } from "react";
+import { useId, type RefObject } from "react";
 import { api, type Condition, type FilterOptions, type ListConditions, type LockedCondition } from "../../api";
 import { Popover } from "../../components/Popover";
 import { useNavGo, useSidebar } from "../../queries/sidebar";
 import { useFilterOptions, useListConditions } from "../../queries/views";
 import { attempt } from "../../state/requests";
+import { narrowingKey } from "../../state/slices/narrowing";
+import { useStore } from "../../state/store";
 import { ConditionRow } from "./ConditionRow";
 import { isComplete, newCondition } from "./conditionEditing";
 
-const SAVE_DELAY_MS = 300;
 const NEW_LIST_NAME = "New filter list";
 
 interface Props {
   listId: number;
   viewId: number;
-  /** The filter list's name, for "Changes save to …". */
-  listName: string;
   anchor: RefObject<HTMLElement | null>;
+  /** The view has unsaved changes: the footer offers Save View. */
+  dirty: boolean;
+  onSave: () => void;
   onClose: () => void;
 }
 
 /** "Show issues where": the locked conditions, then the filter list's own ones (every view of it) and the
- *  view's own ones, each saved as they change, and a live count. Built-in levels only offer the view's. */
-export function FilterPopover({ listId, viewId, listName, anchor, onClose }: Props) {
+ *  view's own ones, and a live count. Edits are the view's drafts (ADR 0038): they apply at once and are saved
+ *  only by Save View. Built-in levels only offer the view's. */
+export function FilterPopover({ listId, viewId, anchor, dirty, onSave, onClose }: Props) {
   const { data: conditions } = useListConditions(listId, viewId);
   const { data: options } = useFilterOptions();
   return (
     <Popover label="Filter" anchor={anchor} onClose={onClose} className="filter-popover">
-      {conditions && options ? <Editor key={`${listId}:${viewId}`} listId={listId} viewId={viewId} listName={listName} conditions={conditions} options={options} onClose={onClose} /> : null}
+      {conditions && options ? <Editor key={`${listId}:${viewId}`} listId={listId} viewId={viewId} conditions={conditions} options={options} dirty={dirty} onSave={onSave} onClose={onClose} /> : null}
     </Popover>
   );
 }
@@ -36,22 +39,25 @@ export function FilterPopover({ listId, viewId, listName, anchor, onClose }: Pro
 interface EditorProps {
   listId: number;
   viewId: number;
-  listName: string;
   conditions: ListConditions;
   options: FilterOptions;
+  dirty: boolean;
+  onSave: () => void;
   onClose: () => void;
 }
 
-function Editor({ listId, viewId, listName, conditions, options: allOptions, onClose }: EditorProps) {
+function Editor({ listId, viewId, conditions, options: allOptions, dirty, onSave, onClose }: EditorProps) {
   const editsList = conditions.kind === "list";
   const options = conditions.projectFixed ? { ...allOptions, fields: allOptions.fields.filter((f) => f.id !== "project") } : allOptions;
-  const [listDraft, setListDraft] = useState<Condition[]>(conditions.own);
-  const [viewDraft, setViewDraft] = useState<Condition[]>(conditions.view);
+  const key = narrowingKey(listId, viewId);
+  const listDraft = useStore((s) => s.narrowings[key]?.list) ?? conditions.own;
+  const viewDraft = useStore((s) => s.narrowings[key]?.view) ?? conditions.view;
+  const setNarrowing = useStore((s) => s.setNarrowing);
+  const setListDraft = (update: (all: Condition[]) => Condition[]) => setNarrowing(key, { list: update(useStore.getState().narrowings[key]?.list ?? conditions.own) });
+  const setViewDraft = (update: (all: Condition[]) => Condition[]) => setNarrowing(key, { view: update(useStore.getState().narrowings[key]?.view ?? conditions.view) });
   const listComplete = listDraft.filter(isComplete);
   const viewComplete = viewDraft.filter(isComplete);
   const count = useMatchCount(listId, [...listComplete, ...viewComplete]);
-  useSaveWhileEditing(listDraft, conditions.own, editsList ? { kind: "list", id: listId } : null);
-  useSaveWhileEditing(viewDraft, conditions.view, { kind: "view", id: viewId });
 
   const { data: tree } = useSidebar();
   const go = useNavGo();
@@ -82,7 +88,17 @@ function Editor({ listId, viewId, listName, conditions, options: allOptions, onC
         <ConditionSection title="This view" draft={viewDraft} setDraft={setViewDraft} options={options} error={conditions.viewError} />
       </div>
       <div className="popover__footer">
-        <span className="popover__footer-text">{editsList ? `Changes save to “${listName}” and this view.` : "Changes save to this view."}</span>
+        {dirty ? (
+          <span className="popover__footer-text">
+            Not saved:{" "}
+            <button type="button" className="link-btn" onClick={onSave}>
+              Save View
+            </button>{" "}
+            keeps it.
+          </span>
+        ) : (
+          <span className="popover__footer-text">Changes show until you leave this view.</span>
+        )}
         {offersNewList && (
           <button type="button" className="btn-secondary" disabled={viewComplete.length === 0} onClick={() => void saveAsList()}>
             Save as filter list
@@ -150,28 +166,4 @@ function useMatchCount(listId: number, conditions: Condition[]) {
     placeholderData: keepPreviousData,
   });
   return data;
-}
-
-interface SaveTarget {
-  kind: "list" | "view";
-  id: number;
-}
-
-/** Saves the complete conditions to the filter list or the view shortly after each change; none saves nothing. */
-function useSaveWhileEditing(draft: Condition[], saved: Condition[], target: SaveTarget | null) {
-  const last = useRef(JSON.stringify(saved.filter(isComplete)));
-  const kind = target?.kind;
-  const id = target?.id;
-  useEffect(() => {
-    if (kind === undefined || id === undefined) return;
-    const conditions = draft.filter(isComplete);
-    const json = JSON.stringify(conditions);
-    if (json === last.current) return;
-    const timer = setTimeout(() => {
-      last.current = json;
-      const saving: Promise<unknown> = kind === "list" ? api.listSetFilter(id, { conditions }) : api.viewSetFilter(id, { conditions });
-      void attempt(saving, "Could not save the filter");
-    }, SAVE_DELAY_MS);
-    return () => clearTimeout(timer);
-  }, [kind, id, draft]);
 }
