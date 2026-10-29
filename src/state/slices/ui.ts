@@ -22,11 +22,18 @@ export interface ToastAction {
 export interface UiSlice {
   /** The main window's sidebar is hidden (`ui_state.json` `sidebarHidden`). */
   sidebarHidden: boolean;
+  /** The Issue view's activity column (`activityWidth`); null is the default. */
+  activityWidth: number | null;
   loadUiState: () => Promise<void>;
   toggleSidebar: () => void;
+  setActivityWidth: (width: number) => void;
   toasts: Toast[];
   toast: (kind: Toast["kind"], message: string, action?: ToastAction) => void;
   dismissToast: (id: number) => void;
+}
+
+function saveUiState({ sidebarHidden, activityWidth }: UiSlice) {
+  void api.setUiState({ sidebarHidden, activityWidth }).catch((e) => fail(e, "Could not save the window layout"));
 }
 
 let nextToastId = 1;
@@ -35,21 +42,26 @@ const MAX_TOASTS = 5;
 export const uiSlice: Slice<UiSlice> = {
   create: (set, get) => ({
     sidebarHidden: false,
+    activityWidth: null,
     toasts: [],
 
     async loadUiState() {
       try {
         const ui = await api.getUiState();
-        set({ sidebarHidden: ui.sidebarHidden });
+        set({ sidebarHidden: ui.sidebarHidden, activityWidth: ui.activityWidth });
       } catch (e) {
         fail(e, "Could not load the window layout");
       }
     },
 
     toggleSidebar() {
-      const sidebarHidden = !get().sidebarHidden;
-      set({ sidebarHidden });
-      void api.setUiState({ sidebarHidden }).catch((e) => fail(e, "Could not save the window layout"));
+      set({ sidebarHidden: !get().sidebarHidden });
+      saveUiState(get());
+    },
+
+    setActivityWidth(activityWidth) {
+      set({ activityWidth });
+      saveUiState(get());
     },
 
     toast(kind, message, action) {

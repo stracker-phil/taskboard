@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowLeft, ArrowUp, CheckCheck, CircleDot, ExternalLink } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, CheckCheck, CircleDot, ExternalLink, Link2 } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { api, type IssueDetail } from "../api";
 import { onIssueKeys } from "../commands/issueKeys";
@@ -6,7 +6,7 @@ import { SpaceTile } from "../components/SpaceTile";
 import { hasContent } from "../lib/jiraHtml";
 import { formatLocalTime } from "../lib/time";
 import { useIssue, useIssueRelated } from "../queries/issues";
-import { useSidebar, useViews } from "../queries/sidebar";
+import { useNavGo, useSidebar, useViews } from "../queries/sidebar";
 import { useViewRows } from "../queries/views";
 import { findLevel, spaceOf } from "../shell/levels";
 import { narrowingKey } from "../state/slices/narrowing";
@@ -79,6 +79,7 @@ function IssueHeader({
   const originName = level?.kind === "list" || level?.kind === "home" ? level.node.name : views?.find((v) => v.id === origin.viewId)?.name;
   const showIssue = useStore((s) => s.showIssue);
   const actions = useIssueActions();
+  const go = useNavGo();
   return (
     <header className="issue-header">
       <button type="button" className="issue-header__icon" aria-label={`Back to ${originName ?? "the list"}`} title="Back (esc)" onClick={onBack}>
@@ -87,18 +88,27 @@ function IssueHeader({
       <nav className="issue-header__crumbs" aria-label="Breadcrumb">
         {space && (
           <>
-            <SpaceTile space={space} size={20} />
-            <span>{space.name}</span>
+            <button type="button" className="issue-header__crumb" onClick={() => void go(space.listId)}>
+              <SpaceTile space={space} size={20} />
+              <span>{space.name}</span>
+            </button>
             <span className="issue-header__sep">/</span>
           </>
         )}
         {originName && (
           <>
-            <span>{originName}</span>
+            <button type="button" className="issue-header__crumb" onClick={() => void go(origin.listId, origin.viewId)}>
+              <span>{originName}</span>
+            </button>
             <span className="issue-header__sep">/</span>
           </>
         )}
         <span className="issue-header__key">{issue?.key}</span>
+        {issue && actions.openInJira && (
+          <button type="button" className="issue-header__copy" aria-label={`Copy the link to ${issue.key}`} title="Copy link (⇧⌘C)" onClick={() => actions.copyUrl(issue.key)}>
+            <Link2 size={13} strokeWidth={2} aria-hidden="true" />
+          </button>
+        )}
       </nav>
       <span className="issue-header__spacer" />
       {issue && <span className="issue-header__updated">Updated {formatLocalTime(issue.updatedAt)}</span>}

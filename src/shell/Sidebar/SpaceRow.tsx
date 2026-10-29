@@ -1,3 +1,4 @@
+import { Plus } from "lucide-react";
 import type { HTMLAttributes, MouseEvent } from "react";
 import { api, type SpaceNode } from "../../api";
 import { InlineRename } from "../../components/InlineRename";
@@ -22,6 +23,7 @@ interface Props {
   onRename: () => void;
   onRenameDone: () => void;
   onEdit: (focus: SpaceEditFocus) => void;
+  onAddList: () => void;
   /** Pointer handlers that drag the row. */
   dragHandle: HTMLAttributes<HTMLElement>;
 }
@@ -31,8 +33,9 @@ function rename(space: SpaceNode, name: string) {
   void attempt(api.spaceUpdate(space.projectId, { name, icon, color, client }), "Could not rename the Space");
 }
 
-/** A Space in the sidebar: chevron, tile, name and open count; the row opens it, the chevron folds its lists. */
-export function SpaceRow({ space, active, holdsActive, expanded, renaming, onOpen, onToggle, onRename, onRenameDone, onEdit, dragHandle }: Props) {
+/** A Space in the sidebar: chevron, tile, name and, once it has filter lists, a + for another; the row opens it,
+ *  the chevron folds its lists. */
+export function SpaceRow({ space, active, holdsActive, expanded, renaming, onOpen, onToggle, onRename, onRenameDone, onEdit, onAddList, dragHandle }: Props) {
   const openMenu = (e: MouseEvent) => {
     e.preventDefault();
     void api.popupMenu([
@@ -65,7 +68,11 @@ export function SpaceRow({ space, active, holdsActive, expanded, renaming, onOpe
         <button type="button" className="sb-space__main" aria-current={active ? "page" : undefined} onClick={onOpen}>
           <SpaceTile space={space} size={22} />
           <span className="sb-row__label">{space.name}</span>
-          <span className="sb-row__count">{space.openCount}</span>
+        </button>
+      )}
+      {!renaming && space.lists.length > 0 && (
+        <button type="button" className="sb-space__add" aria-label={`New filter list in ${space.name}`} title="New filter list" onClick={onAddList}>
+          <Plus size={14} strokeWidth={2} aria-hidden="true" />
         </button>
       )}
     </div>

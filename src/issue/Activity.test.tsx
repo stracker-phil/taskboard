@@ -73,6 +73,57 @@ describe("Activity", () => {
     expect(text.indexOf("Sam Lee")).toBeLessThan(text.indexOf("Created the issue"));
   });
 
+  describe("width", () => {
+    const handle = () => screen.findByRole("separator", { name: "Activity width" });
+
+    it("is 400 by default", async () => {
+      renderActivity([]);
+
+      expect(await handle()).toHaveAttribute("aria-valuenow", "400");
+    });
+
+    it.each([
+      [500, "500"],
+      [1000, "720"],
+      [100, "300"],
+    ])("shows the saved width %s clamped to %s", async (saved, shown) => {
+      resetStore({ activityWidth: saved });
+      renderActivity([]);
+
+      expect(await handle()).toHaveAttribute("aria-valuenow", shown);
+    });
+
+    it("widens by 16 on ArrowLeft and saves it", async () => {
+      renderActivity([]);
+      (await handle()).focus();
+
+      await userEvent.keyboard("{ArrowLeft}");
+
+      expect(await handle()).toHaveAttribute("aria-valuenow", "416");
+      expect(mocked.setUiState).toHaveBeenLastCalledWith({ sidebarHidden: false, activityWidth: 416 });
+    });
+
+    it("narrows by 16 on ArrowRight and saves it", async () => {
+      renderActivity([]);
+      (await handle()).focus();
+
+      await userEvent.keyboard("{ArrowRight}");
+
+      expect(await handle()).toHaveAttribute("aria-valuenow", "384");
+      expect(mocked.setUiState).toHaveBeenLastCalledWith({ sidebarHidden: false, activityWidth: 384 });
+    });
+
+    it("stops widening at the maximum", async () => {
+      resetStore({ activityWidth: 720 });
+      renderActivity([]);
+      (await handle()).focus();
+
+      await userEvent.keyboard("{ArrowLeft}");
+
+      expect(await handle()).toHaveAttribute("aria-valuenow", "720");
+    });
+  });
+
   describe("new since yesterday", () => {
     const old = () => commentItem({ id: "1", author: SAM, bodyHtml: "<p>Old note</p>" });
     const first = () => commentItem({ id: "2", author: SAM, bodyHtml: "<p>First new note</p>", fresh: true });
@@ -81,9 +132,9 @@ describe("Activity", () => {
     it("puts one separator above the fresh items at the top, ahead of the older ones", async () => {
       renderActivity([second(), first(), old()]);
 
-      const separator = await screen.findByRole("separator");
+      const separator = await screen.findByRole("separator", { name: "" });
       expect(separator).toHaveTextContent("New since yesterday");
-      expect(screen.getAllByRole("separator")).toHaveLength(1);
+      expect(screen.getAllByRole("separator", { name: "" })).toHaveLength(1);
       const text = screen.getByRole("complementary", { name: "Activity" }).textContent ?? "";
       expect(text.indexOf("New since yesterday")).toBeLessThan(text.indexOf("Second new note"));
       expect(text.indexOf("Second new note")).toBeLessThan(text.indexOf("First new note"));
@@ -94,7 +145,7 @@ describe("Activity", () => {
       renderActivity([changeItem(), old()]);
 
       await screen.findByText("Old note");
-      expect(screen.queryByRole("separator")).not.toBeInTheDocument();
+      expect(screen.queryByRole("separator", { name: "" })).not.toBeInTheDocument();
     });
   });
 

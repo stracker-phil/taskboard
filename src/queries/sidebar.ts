@@ -2,6 +2,8 @@ import { useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Nav } from "../api";
 import { fail } from "../state/requests";
+import { narrowingKey } from "../state/slices/narrowing";
+import { useStore } from "../state/store";
 
 export const SIDEBAR_KEY = ["sidebar"] as const;
 export const NAV_KEY = ["nav"] as const;
@@ -21,15 +23,25 @@ export const useNav = () => useQuery({ queryKey: NAV_KEY, queryFn: api.navCurren
 export const useViews = (listId: number | null) =>
   useQuery({ queryKey: viewsKey(listId ?? -1), queryFn: () => api.viewsOf(listId ?? -1), enabled: listId !== null });
 
-/** Opens a level (at `viewId`, or its last or default view) and takes Rust's new place into the cache. */
+/** Opens a level (at `viewId`, or its last or default view) and takes Rust's new place into the cache. Going
+ *  to the place already shown brings back its view: the Issue view and the peek close. */
 export function useNavGo() {
   const client = useQueryClient();
   return useCallback(
-    (listId: number, viewId: number | null = null) =>
-      api.navGo(listId, viewId).then(
-        (nav) => void client.setQueryData<Nav>(NAV_KEY, nav),
+    (listId: number, viewId: number | null = null) => {
+      const before = client.getQueryData<Nav>(NAV_KEY)?.location;
+      return api.navGo(listId, viewId).then(
+        (nav) => {
+          client.setQueryData<Nav>(NAV_KEY, nav);
+          const at = nav.location;
+          if (!at || !before || at.listId !== before.listId || at.viewId !== before.viewId) return;
+          const store = useStore.getState();
+          store.closeIssue();
+          if (store.places[narrowingKey(at.listId, at.viewId)]?.peekOpen) store.updatePlace(at.listId, at.viewId, { peekOpen: false });
+        },
         (e: unknown) => void fail(e, "Could not open it"),
-      ),
+      );
+    },
     [client],
   );
 }

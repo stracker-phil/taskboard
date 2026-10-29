@@ -7,7 +7,7 @@ export type * from "./types.gen";
 export type Keybindings = Record<string, string | null>;
 
 /** Until Rust's state loads. */
-export const EMPTY_UI_STATE: UiState = { sidebarHidden: false };
+export const EMPTY_UI_STATE: UiState = { sidebarHidden: false, activityWidth: null };
 
 /** The app as macOS knows it (the bundle's name and version). */
 export interface AppInfo {

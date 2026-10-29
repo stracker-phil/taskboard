@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
 
 import { api } from "../api";
+import { narrowingKey } from "../state/slices/narrowing";
 import { resetStore, useStore } from "../state/store";
 import { lumenSpace, sidebarTree, space } from "../test/spaces";
 import { view } from "../test/views";
@@ -103,6 +104,37 @@ describe("sidebar queries", () => {
 
       await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not open it: No such list"));
       expect(screen.getByText("Place: none")).toBeInTheDocument();
+    });
+  });
+
+  describe("opening the place already shown", () => {
+    const peekOpen = (listId: number, viewId: number) => useStore.getState().places[narrowingKey(listId, viewId)]?.peekOpen;
+
+    async function renderAt(listId: number, viewId: number) {
+      mocked.navCurrent.mockResolvedValue({ location: { listId, viewId }, expanded: [] });
+      resetStore({ issueView: { origin: { listId, viewId }, stack: ["10042"] } });
+      act(() => useStore.getState().updatePlace(12, 5, { peekOpen: true }));
+      renderProbe();
+      await screen.findByText(`Place: ${listId}/${viewId}`);
+    }
+
+    it("closes the Issue view and the peek of that place", async () => {
+      await renderAt(12, 5);
+
+      await userEvent.click(screen.getByRole("button", { name: "Open" }));
+
+      await waitFor(() => expect(useStore.getState().issueView).toBeNull());
+      expect(peekOpen(12, 5)).toBe(false);
+    });
+
+    it("leaves the Issue view and the target's peek alone when going elsewhere", async () => {
+      await renderAt(11, 101);
+
+      await userEvent.click(screen.getByRole("button", { name: "Open" }));
+
+      expect(await screen.findByText("Place: 12/5")).toBeInTheDocument();
+      expect(useStore.getState().issueView).not.toBeNull();
+      expect(peekOpen(12, 5)).toBe(true);
     });
   });
 

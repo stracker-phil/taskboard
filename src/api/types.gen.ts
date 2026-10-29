@@ -629,7 +629,11 @@ export type TokenExpiry = { "state": "fine" } | { "state": "soon", days: number,
  */
 export type TokenKind = "classic" | "scoped";
 
-export type UiState = { sidebarHidden: boolean, };
+export type UiState = { sidebarHidden: boolean, 
+/**
+ * The Issue view's activity column in points; none is the default width.
+ */
+activityWidth: number | null, };
 
 export type Value = number | string | Array<string>;
 

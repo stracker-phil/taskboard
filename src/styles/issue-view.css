@@ -8,6 +8,17 @@
 }
 .issue-header__crumbs { display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; }
 .issue-header__crumbs > span { overflow: hidden; text-overflow: ellipsis; }
+.issue-header__crumb {
+  display: flex; align-items: center; gap: 8px; min-width: 0; padding: 2px 4px; margin: 0 -4px; border: none; border-radius: 6px;
+  background: transparent; color: inherit; font: inherit; transition: background-color var(--motion-fast) var(--ease-out);
+}
+.issue-header__crumb > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.issue-header__crumb:hover { background: var(--hover-bg); color: var(--text); }
+.issue-header__copy {
+  display: grid; place-items: center; width: 22px; height: 22px; margin-left: -4px; padding: 0; border: none; border-radius: 6px;
+  background: transparent; color: var(--text-muted);
+}
+.issue-header__copy:hover { background: var(--hover-bg); color: var(--text); }
 .issue-header__sep { color: var(--text-faint); }
 .issue-header__key { font-family: var(--font-mono); color: var(--text); }
 .issue-header__spacer { flex: 1; }
@@ -92,7 +103,12 @@
 .jira-html pre { overflow: auto; padding: 10px 12px; border-radius: 8px; background: var(--fill-subtle); }
 .jira-chip { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; }
 
-.activity { display: flex; flex: none; flex-direction: column; width: 400px; min-height: 0; border-left: 1px solid var(--hairline); background: var(--panel-subtle-bg); }
+.activity { position: relative; display: flex; flex: none; flex-direction: column; width: 400px; max-width: 60%; min-height: 0; border-left: 1px solid var(--hairline); background: var(--panel-subtle-bg); }
+/* A 7px grab strip over the left border; the line lights up while hovered or dragged. */
+.activity__resize { position: absolute; z-index: 2; top: 0; bottom: 0; left: -4px; width: 7px; cursor: col-resize; }
+.activity__resize::after { content: ""; position: absolute; top: 0; bottom: 0; left: 3px; width: 1px; background: transparent; transition: background-color var(--motion-fast) var(--ease-out); }
+.activity__resize:hover::after, .activity[data-resizing] .activity__resize::after, .activity__resize:focus-visible::after { background: var(--accent); }
+.activity[data-resizing] { user-select: none; }
 .activity__header { display: flex; flex: none; align-items: center; gap: 8px; height: 50px; padding: 0 20px; box-sizing: border-box; }
 .activity__header h2 { flex: 1; margin: 0; font-size: 15px; font-weight: 700; }
 .segmented { display: flex; gap: 2px; padding: 3px; border-radius: 8px; background: var(--segmented-bg); }

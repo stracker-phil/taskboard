@@ -168,15 +168,21 @@ describe("Sidebar", () => {
   });
 
   describe("Spaces", () => {
-    it("show their tile letter, name and open count", async () => {
+    it("show their tile letter and name, without an open count", async () => {
       await renderSidebar();
 
-      expect(within(spaceButton("Website relaunch")).getByText("21")).toBeInTheDocument();
-      expect(within(spaceButton("Northwind support")).getByText("5")).toBeInTheDocument();
-      expect(within(spaceButton("Lumen iOS app")).getByText("9")).toBeInTheDocument();
+      for (const [name, count] of [["Website relaunch", "21"], ["Northwind support", "5"], ["Lumen iOS app", "9"]]) {
+        expect(screen.getByRole("button", { name })).not.toHaveTextContent(count);
+      }
       expect(screen.getByText("R")).toBeInTheDocument();
       expect(screen.getByText("N")).toBeInTheDocument();
       expect(screen.getByText("L")).toBeInTheDocument();
+    });
+
+    it("have no Add Space button in the header", async () => {
+      await renderSidebar();
+
+      expect(within(screen.getByRole("navigation", { name: "Spaces" })).queryByRole("button", { name: "Add Space" })).not.toBeInTheDocument();
     });
 
     it("open when clicked", async () => {
@@ -211,6 +217,13 @@ describe("Sidebar", () => {
       expect(spaceButton("Website relaunch").parentElement).toHaveAttribute("data-state", "holds-active");
       expect(spaceButton("Website relaunch")).not.toHaveAttribute("aria-current");
       expect(spaceButton("Northwind support").parentElement).not.toHaveAttribute("data-state");
+    });
+
+    it("show each filter list's count", async () => {
+      await renderSidebar(treeWith(), navAt(null, [NW_ID]));
+
+      expect(within(await screen.findByRole("button", { name: named("Current sprint") })).getByText("7")).toBeInTheDocument();
+      expect(within(screen.getByRole("button", { name: named("Epics") })).getByText("3")).toBeInTheDocument();
     });
 
     it("open a list when clicked", async () => {
@@ -271,7 +284,7 @@ describe("Sidebar", () => {
         return 30;
       });
 
-      await userEvent.click(await screen.findByRole("button", { name: "New filter list" }));
+      await userEvent.click(await screen.findByRole("button", { name: "New filter list in Website relaunch" }));
 
       const field = await screen.findByRole("textbox", { name: "Filter list name" });
       expect(mocked.listCreate).toHaveBeenCalledWith(NW_ID, "New filter list", null);
@@ -279,6 +292,24 @@ describe("Sidebar", () => {
       await userEvent.clear(field);
       await userEvent.type(field, "Roadmap{Enter}");
       expect(mocked.listRename).toHaveBeenCalledWith(30, "Roadmap");
+    });
+
+    it("shows the plain button only for a Space without filter lists", async () => {
+      await renderSidebar(treeWith({ nw: { lists: [] } }), navAt(null, [NW_ID, LUM_ID]));
+
+      expect(await screen.findByRole("button", { name: "New filter list" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "New filter list in Website relaunch" })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "New filter list in Lumen iOS app" })).toBeInTheDocument();
+      expect(screen.getAllByRole("button", { name: "New filter list" })).toHaveLength(1);
+    });
+
+    it("creates the first list of an empty Space from the plain button", async () => {
+      await renderSidebar(treeWith({ nw: { lists: [] } }), navAt(null, [NW_ID]));
+
+      await userEvent.click(await screen.findByRole("button", { name: "New filter list" }));
+
+      await waitFor(() => expect(mocked.listCreate).toHaveBeenCalledWith(NW_ID, "New filter list", null));
+      expect(mocked.navGo).toHaveBeenCalledWith(30, null);
     });
   });
 
@@ -671,14 +702,6 @@ describe("Sidebar", () => {
   });
 
   describe("footer", () => {
-    it("opens Settings → Projects from Add Space", async () => {
-      await renderSidebar();
-
-      await userEvent.click(screen.getByRole("button", { name: "Add Space" }));
-
-      expect(mocked.runCommand).toHaveBeenCalledWith("app:settings:projects");
-    });
-
     it("opens Settings from the Settings button", async () => {
       await renderSidebar();
 

@@ -13,6 +13,8 @@ use crate::error::AppResult;
 #[serde(default, rename_all = "camelCase")]
 pub struct UiState {
     pub sidebar_hidden: bool,
+    /// The Issue view's activity column in points; none is the default width.
+    pub activity_width: Option<u32>,
 }
 
 pub struct UiStateStore {
@@ -62,9 +64,16 @@ mod tests {
         assert_eq!(
             UiStateStore::open(dir.path()).get(),
             UiState {
-                sidebar_hidden: false
+                sidebar_hidden: false,
+                activity_width: None,
             }
         );
+    }
+
+    #[test]
+    fn without_a_file_the_activity_width_is_none() {
+        let dir = temp_config_dir();
+        assert_eq!(UiStateStore::open(dir.path()).get().activity_width, None);
     }
 
     #[tokio::test]
@@ -73,6 +82,7 @@ mod tests {
         let saved = UiStateStore::open(dir.path())
             .set(UiState {
                 sidebar_hidden: true,
+                activity_width: None,
             })
             .await
             .unwrap();
@@ -80,10 +90,47 @@ mod tests {
         assert_eq!(
             saved,
             UiState {
-                sidebar_hidden: true
+                sidebar_hidden: true,
+                activity_width: None,
             }
         );
         assert_eq!(UiStateStore::open(dir.path()).get(), saved);
+    }
+
+    #[tokio::test]
+    async fn a_saved_activity_width_comes_back_after_reopening() {
+        let dir = temp_config_dir();
+        UiStateStore::open(dir.path())
+            .set(UiState {
+                sidebar_hidden: false,
+                activity_width: Some(360),
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(
+            UiStateStore::open(dir.path()).get().activity_width,
+            Some(360)
+        );
+    }
+
+    #[test]
+    fn an_old_file_with_only_the_sidebar_flag_still_loads() {
+        let dir = temp_config_dir();
+        fs::write(
+            dir.path().join("ui_state.json"),
+            r#"{"sidebarHidden": true}"#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            UiStateStore::open(dir.path()).get(),
+            UiState {
+                sidebar_hidden: true,
+                activity_width: None,
+            }
+        );
+        assert_eq!(backups(dir.path()), 0);
     }
 
     #[test]
@@ -108,7 +155,8 @@ mod tests {
         assert_eq!(
             UiStateStore::open(dir.path()).get(),
             UiState {
-                sidebar_hidden: true
+                sidebar_hidden: true,
+                activity_width: None,
             }
         );
         assert_eq!(backups(dir.path()), 0);
@@ -118,9 +166,13 @@ mod tests {
     fn keys_are_camel_case() {
         let value = serde_json::to_value(UiState {
             sidebar_hidden: true,
+            activity_width: Some(320),
         })
         .unwrap();
-        assert_eq!(value, serde_json::json!({ "sidebarHidden": true }));
+        assert_eq!(
+            value,
+            serde_json::json!({ "sidebarHidden": true, "activityWidth": 320 })
+        );
     }
 
     #[tokio::test]
@@ -129,12 +181,16 @@ mod tests {
         UiStateStore::open(dir.path())
             .set(UiState {
                 sidebar_hidden: true,
+                activity_width: Some(320),
             })
             .await
             .unwrap();
 
         let raw = fs::read_to_string(dir.path().join("ui_state.json")).unwrap();
         let value: serde_json::Value = serde_json::from_str(&raw).unwrap();
-        assert_eq!(value, serde_json::json!({ "sidebarHidden": true }));
+        assert_eq!(
+            value,
+            serde_json::json!({ "sidebarHidden": true, "activityWidth": 320 })
+        );
     }
 }

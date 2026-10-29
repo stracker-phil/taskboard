@@ -46,9 +46,10 @@ an item.
   `--text-strong-body`; icons 17/1.8; the count 12px `--text-muted`, hidden while Rust has none. Recently
   changed has no count: while it has unseen issues its label is 600 and a badge (20px, `--accent`, white
   11/700) shows how many.
-- **Spaces** (`SpacesSection`, scrolls): the "Spaces" header (12/600 `--text-muted`) with "+" (24px), which
-  opens Settings → Projects (`app:settings:projects`). Each Space (`SpaceRow`): 36px, a 10px ▾/▸ chevron in
-  `--text-faint`, the 22px tile (6px radius, 11/800 letter on `--space-tile-N`), the name and the open count.
+- **Spaces** (`SpacesSection`, scrolls): the "Spaces" header (12/600 `--text-muted`); Spaces are added in
+  Settings → Projects, not here. Each Space (`SpaceRow`): 36px, a 10px ▾/▸ chevron in `--text-faint`, the 22px
+  tile (6px radius, 11/800 letter on `--space-tile-N`) and the name; no count (only filter lists count). Once it
+  has filter lists, hovering shows a 24px + on the right that adds one.
   The current Space has `--selection-bg` with `--selection-text` and a 600 name; the Space of the current
   filter list keeps no fill but a 600 name in `--text`.
 - **Expanding**: the chevron toggles a Space (saved with `nav_set_expanded`); ⌥-click keeps only that Space
@@ -56,8 +57,8 @@ an item.
 - **Filter lists** (`FilterListTree`): indented 34px behind a 1px `--border` guide with 12px padding; 32px
   rows, 9px gap, `--text-secondary`, the list's icon 15/2 (the funnel unless one was picked), name and count (`ListCount`; a list whose filter can't be
   used shows a muted `CircleAlert` with the reason as its tooltip instead). The current list is selected like
-  a Space, 600. "+ New filter list" (30px, 13px, `--text-muted`) creates "New filter list", opens it and
-  starts renaming it. A click on a list's icon opens `IconPicker` (a grid of `components/listIcons.ts`; the
+  a Space, 600. A Space without filter lists shows "+ New filter list" (30px, 13px, `--text-muted`); it and
+  the Space row's + create "New filter list", open it and start renaming it. A click on a list's icon opens `IconPicker` (a grid of `components/listIcons.ts`; the
   funnel resets), saved with `list_set_icon`; the header and Home show the same icon.
 - **Footer** (`SidebarFooter`): the sync chip (34px, 13px `--text-tertiary`; a 7px dot in `--sync-ok`,
   `--sync-busy`, `--sync-offline` or `--sync-error-dot` by state; the state in words from
@@ -247,7 +248,7 @@ Replace and × (dismissed for the rest of the day). Nothing blocks: the app keep
 Full view button or E (the selected issue's epic); esc goes back one step (an opened epic or child, then the
 view with its place intact).
 
-- Header 50: back, breadcrumb (Space tile and name / list or view / key), "Updated …", previous and next in the
+- Header 50: back, breadcrumb (Space tile and name / list or view / key and a copy-link button), "Updated …", previous and next in the
   view's order (also J/K), Mark as read or unread, Bookmark (with bookmarks), **Open in Jira** (primary).
 - Main column: type badge · key · comment count, the 30/750 title, the field grid (Status, Assignee, Epic chip
   that opens the epic here, Release, Priority, Sprint, then the custom fields shown as columns or marked shown,
@@ -259,7 +260,10 @@ view with its place intact).
   when it is https, otherwise it is plain text; no remote icon loads), and Child issues (epics) or Subtasks, when there are any:
   open first, done behind "Show N done"; "Open as list view" narrows the origin view to the epic (a removable
   chip in the toolbar, never saved).
-- Activity (400 wide, `--panel-subtle-bg`): All / Comments / Changes, comment cards and change lines (status
+- The breadcrumb's Space and list are buttons that go there. Going to the place already shown (sidebar, tabs,
+  breadcrumb) closes the Issue view and the peek (`useNavGo`).
+- Activity (400 wide by default, 300–720 by dragging its left edge or ←/→ on the focused edge; saved in
+  `ui_state.json` `activityWidth` for every issue, `useActivityWidth`; `--panel-subtle-bg`): All / Comments / Changes, comment cards and change lines (status
   changes as activity pills), newest first; the comment box waits for writes. Opening an issue fetches its
   comments when the cached ones may be behind (`issue_sync_comments`).
 - Jira's HTML is sanitised (`lib/jiraHtml.ts`, [ADR 0027](adr/0027-jira-html-is-sanitised-and-shows-no-remote-content.md)):
@@ -508,7 +512,7 @@ global shortcuts.
   open the row's group), Space opens or closes the peek (the Board opens the Issue view), ↩ opens the Issue
   view, E the epic, P adds or removes a bookmark (default duration), M marks read or unread, ⌘C copies the key (only with no text
   field focused and no text selected), ⌘⇧C the URL, ⌘↩ opens it in Jira, esc closes the peek or goes back.
-- `app:settings:<page>` opens Settings at a page or section (the Spaces "+" uses `app:settings:projects`).
+- `app:settings:<page>` opens Settings at a page or section (Settings → Projects is `app:settings:projects`).
 
 ## Palette checks
 

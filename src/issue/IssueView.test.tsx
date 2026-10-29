@@ -106,6 +106,45 @@ describe("IssueView", () => {
       expect(crumbs.getByText("Website relaunch")).toBeInTheDocument();
     });
 
+    it("opens the Space from its breadcrumb button", async () => {
+      renderIssue();
+      const crumbs = within(screen.getByRole("navigation", { name: "Breadcrumb" }));
+
+      await userEvent.click(await crumbs.findByRole("button", { name: "Website relaunch" }));
+
+      expect(mocked.navGo).toHaveBeenCalledWith(11, null);
+    });
+
+    it.each([
+      ["view", { listId: 11, viewId: 101 }, "List"],
+      ["filter list", { listId: 21, viewId: 201 }, "My open issues"],
+    ])("opens the %s the issue was opened from, at its view, from its breadcrumb button", async (_kind, origin, name) => {
+      renderIssue("10042", origin);
+      const crumbs = within(screen.getByRole("navigation", { name: "Breadcrumb" }));
+
+      await userEvent.click(await crumbs.findByRole("button", { name }));
+
+      expect(mocked.navGo).toHaveBeenCalledWith(origin.listId, origin.viewId);
+    });
+
+    it("copies the link to the issue and says so in a toast on the Jira site", async () => {
+      mocked.connectionGet.mockResolvedValue(connectionView({ siteUrl: "https://example.atlassian.net" }));
+      renderIssue();
+
+      await userEvent.click(await screen.findByRole("button", { name: "Copy the link to NW-1042" }));
+
+      expect(mocked.copyText).toHaveBeenCalledWith("https://example.atlassian.net/browse/NW-1042");
+      await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Copied the link to NW-1042"));
+    });
+
+    it("offers no copy link button without a site", async () => {
+      renderIssue();
+
+      await title("Checkout: address validation for DACH postcodes");
+      await waitFor(() => expect(mocked.connectionGet).toHaveBeenCalled());
+      expect(screen.queryByRole("button", { name: /^Copy the link to/ })).not.toBeInTheDocument();
+    });
+
     it("goes back to the origin from the back button", async () => {
       renderIssue();
 

@@ -20,19 +20,21 @@ interface Props {
   open: (listId: number) => Promise<void>;
 }
 
-/** A Space's filter lists under the hairline guide, then "New filter list". */
+/** Adds a filter list to the Space, opens it and starts renaming it. */
+export async function createList(space: SpaceNode, open: (listId: number) => Promise<void>, setRenamingId: (id: number | null) => void) {
+  const id = await attempt(api.listCreate(space.listId, NEW_LIST_NAME, null), "Could not create the filter list");
+  if (id === null) return;
+  await open(id);
+  setRenamingId(id);
+}
+
+/** A Space's filter lists under the hairline guide; "New filter list" only while it has none (the Space row's
+ *  + adds more). */
 export function FilterListTree({ space, activeId, renamingId, setRenamingId, open }: Props) {
   const lists = space.lists;
   const { containerRef, item, handle, dropLineY } = useDragReorder<HTMLDivElement>((from, to) => {
     void attempt(api.listMove(lists[from].id, to), "Could not move the filter list");
   });
-
-  const create = async () => {
-    const id = await attempt(api.listCreate(space.listId, NEW_LIST_NAME, null), "Could not create the filter list");
-    if (id === null) return;
-    await open(id);
-    setRenamingId(id);
-  };
 
   return (
     <div className="sb-tree" ref={containerRef}>
@@ -48,12 +50,14 @@ export function FilterListTree({ space, activeId, renamingId, setRenamingId, ope
           dragProps={{ ...item(index), ...handle(index) }}
         />
       ))}
-      <button type="button" className="sb-new-list" onClick={() => void create()}>
-        <span className="sb-new-list__plus" aria-hidden="true">
-          +
-        </span>
-        {NEW_LIST_NAME}
-      </button>
+      {lists.length === 0 && (
+        <button type="button" className="sb-new-list" onClick={() => void createList(space, open, setRenamingId)}>
+          <span className="sb-new-list__plus" aria-hidden="true">
+            +
+          </span>
+          {NEW_LIST_NAME}
+        </button>
+      )}
       <DropLine y={dropLineY} />
     </div>
   );

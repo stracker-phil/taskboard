@@ -1,8 +1,8 @@
 import { api, type Nav, type SpaceNode } from "../../api";
 import { Disclosure } from "../../components/Disclosure";
-import { attempt, runBusCommand } from "../../state/requests";
+import { attempt } from "../../state/requests";
 import { DropLine } from "./DropLine";
-import { FilterListTree } from "./FilterListTree";
+import { createList, FilterListTree } from "./FilterListTree";
 import { SpaceRow, type SpaceEditFocus } from "./SpaceRow";
 import { useDragReorder } from "./useDragReorder";
 
@@ -18,7 +18,7 @@ interface Props {
   onEdit: (space: SpaceNode, focus: SpaceEditFocus) => void;
 }
 
-/** "Spaces" with its "+" (Settings → Projects), then each Space with its filter lists while expanded. */
+/** "Spaces", then each Space with its filter lists while expanded; Spaces are added in Settings → Projects. */
 export function SpacesSection({ spaces, nav, activeSpace, open, setExpanded, renamingId, setRenamingId, onEdit }: Props) {
   const { containerRef, item, handle, dropLineY } = useDragReorder<HTMLElement>((from, to) => {
     void attempt(api.spaceMove(spaces[from].projectId, to), "Could not move the Space");
@@ -35,9 +35,6 @@ export function SpacesSection({ spaces, nav, activeSpace, open, setExpanded, ren
     <nav className="sb-spaces" aria-label="Spaces" ref={containerRef}>
       <div className="sb-spaces__header">
         <span className="sb-spaces__title">Spaces</span>
-        <button type="button" className="sb-spaces__add" aria-label="Add Space" title="Add Space" onClick={() => runBusCommand("app:settings:projects", "Could not open Settings")}>
-          +
-        </button>
       </div>
       {spaces.map((space, index) => {
         const isActiveSpace = space.listId === activeSpace?.listId;
@@ -55,6 +52,7 @@ export function SpacesSection({ spaces, nav, activeSpace, open, setExpanded, ren
               onRename={() => setRenamingId(space.listId)}
               onRenameDone={() => setRenamingId(null)}
               onEdit={(focus) => onEdit(space, focus)}
+              onAddList={() => void createList(space, open, setRenamingId)}
               dragHandle={handle(index)}
             />
             <Disclosure open={expanded}>

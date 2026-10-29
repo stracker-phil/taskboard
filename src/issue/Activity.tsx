@@ -10,6 +10,7 @@ import { PinButton } from "../pins/PinButton";
 import { attempt } from "../state/requests";
 import { JiraHtml } from "./JiraHtml";
 import { holdUnread } from "./useSeenAfter";
+import { ACTIVITY_WIDTH, useActivityWidth } from "./useActivityWidth";
 
 type Filter = "all" | "comments" | "changes";
 const FILTERS: { id: Filter; label: string }[] = [
@@ -117,8 +118,20 @@ export function Activity({ id }: { id: string }) {
   const [filter, setFilter] = useState<Filter>("all");
   const { data: items = [] } = useIssueActivity(id);
   const shown = items.filter((item) => filter === "all" || (filter === "comments") === (item.kind === "comment"));
+  const { width, dragging, handle } = useActivityWidth();
   return (
-    <aside className="activity" aria-label="Activity">
+    <aside className="activity" aria-label="Activity" style={{ width }} data-resizing={dragging || undefined}>
+      <div
+        className="activity__resize"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Activity width"
+        aria-valuenow={width}
+        aria-valuemin={ACTIVITY_WIDTH.min}
+        aria-valuemax={ACTIVITY_WIDTH.max}
+        tabIndex={0}
+        {...handle}
+      />
       <header className="activity__header">
         <h2>Activity</h2>
         <div className="segmented" role="group" aria-label="Show">
