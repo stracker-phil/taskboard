@@ -103,7 +103,12 @@ One method on `JiraClient` each (`jira/api.rs`), one `Endpoint` each; the answer
 | `used_custom_fields` | `POST search/jql`: `project = "KEY" ORDER BY updated DESC`, one page of 100, `*all` without the large system fields | the custom field ids with a value |
 
 `Issue.fields` stays raw JSON, as the cache stores it; accessors read what the sync needs
-(`summary`, `project_id`, `status_id`, `updated`). `parse_jira_time` reads Jira's `2026-10-20T09:14:03.120+0200`.
+(`summary`, `project_id`, `status_id`, `updated`). Searches ask for explicit fields (`sync/full.rs`
+`SEARCH_FIELDS`): the mapped ones, `comment`, `description`, `issuelinks` and `attachment` (id, file name, size,
+MIME type, created, author and the `content` address; `dto::Attachment`), plus the shown custom fields.
+`issues::attachments_of` reads the attachments from the stored issue; `issue_get` keeps an attachment's address
+only when it is `https` on the connected site's host and port (`issues::is_on_site`), and the page opens it with
+`open_url`. The app never fetches attachment bytes. `parse_jira_time` reads Jira's `2026-10-20T09:14:03.120+0200`.
 
 **Search pages** come one after another: `SearchPages::next_page` sends the previous page's `nextPageToken`
 and stops after a page with `isLast` (or without a token). A failed page is returned once, then the cursor
@@ -160,5 +165,5 @@ but answers `401` without one.
 - `requests()` and `paths()` return what it was asked, with the `Authorization` header and the JSON body.
 
 The demo site (`test_support/demo/`) is made up and matches the mockup (`demo/web_links.rs` gives a few issues
-pull request and document links, `demo/history.rs` a few issues' changelogs); `synthetic(n)` builds `n` issues on the
+pull request and document links, `demo/attachments.rs` a few issues' files, `demo/history.rs` a few issues' changelogs); `synthetic(n)` builds `n` issues on the
 same site for performance tests.

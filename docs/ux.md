@@ -292,7 +292,7 @@ view with its place intact).
 
 - Header 50: back, breadcrumb (Space tile and name / list or view / key and a copy-link button), "Updated …", previous and next in the
   view's order (also J/K), Mark as read or unread, Bookmark (with bookmarks), **Open in Jira** (primary).
-- Main column: type badge · key · comment count, the 30/750 title, the field grid (Status, Assignee, Epic chip
+- Main column: type badge · key · comment count (· attachment count, when there are any), the 30/750 title, the field grid (Status, Assignee, Epic chip
   that opens the epic here, Release, Priority, Sprint, then the custom fields shown as columns or marked shown,
   then every other custom field the issue fills, by name), links ("blocks", "is blocked by"), the description,
   then each rich text custom field with content (acceptance criteria, steps to reproduce) as its own section
@@ -301,7 +301,12 @@ view with its place intact).
   merge requests, else a link icon and the host; a row opens its address in the browser through `open_url`, only
   when it is https, otherwise it is plain text; no remote icon loads), and Child issues (epics) or Subtasks, when there are any:
   open first, done behind "Show N done"; "Open as list view" narrows the origin view to the epic (a removable
-  chip in the toolbar, never saved).
+  chip in the toolbar, never saved). Last, Attachments when there are any (`Attachments`): a 16/700 heading over
+  a two-column grid (gap 8) of tiles (h 44, r 9, `--hairline` border): a 28 × 28 badge with the extension in caps
+  (`--fill-subtle`; "FILE" without one), the file name (13/500, ellipsis) and "1.2 MB · Marta Klein" (11, muted).
+  A click opens the file on the Jira site in the browser through `open_url`; the context menu has Open and Copy
+  link ("Copied the link to …"). Only addresses on the connected https site open; any other tile is plain text.
+  Names are plain text; nothing is downloaded or previewed.
 - The breadcrumb's Space and list are buttons that go there. Going to the place already shown (sidebar, tabs,
   breadcrumb) closes the Issue view and the preview (`useNavGo`).
 - Activity (400 wide by default, 300–720 by dragging its left edge or ←/→ on the focused edge; saved in
@@ -473,7 +478,7 @@ bundled fonts. Weights 400, 500, 600, 700, 750 (titles) and 800 (tile letters).
 | Preview title | 22 / 750 | preview heading, page headings |
 | Space title | 19 / 700 | content header |
 | Card title, palette field | 17 / 700, 17 / 400 | state cards, the palette's query |
-| Section | 16 / 700 | Description, Child issues, empty states |
+| Section | 16 / 700 | Description, Attachments, Child issues, empty states |
 | Body | 14 / 400 (600 when strong) | rows, summaries, sidebar rows |
 | Control | 13 / 400 (600 when strong) | toolbar buttons, popover rows, buttons, banners, breadcrumbs |
 | Meta | 12 / 400 (600 for headers) | counts, column headers, timestamps |

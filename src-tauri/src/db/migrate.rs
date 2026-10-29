@@ -28,6 +28,7 @@ pub const CACHE: &[&str] = &[
     include_str!("../../migrations/cache/0006_issue_unread.sql"),
     include_str!("../../migrations/cache/0007_issue_history.sql"),
     include_str!("../../migrations/cache/0008_avatar.sql"),
+    include_str!("../../migrations/cache/0009_refetch_for_attachments.sql"),
 ];
 
 /// Brings the connection's file up to date in one transaction. A file migrated by a newer Taskboard is
@@ -140,6 +141,44 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM space_field", [], |r| r.get(0))
             .unwrap();
         assert_eq!(fields, 0);
+    }
+
+    #[test]
+    fn the_attachments_migration_clears_the_delta_cursor_and_keeps_the_rest() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        migrate(&mut conn, "cache", &CACHE[..8]).unwrap();
+        conn.execute_batch(
+            "INSERT INTO sync_state (scope_id, jql, last_delta_at, last_full_at)
+             VALUES ('scope', 'project = NW', '2026-10-28T09:00:00.000Z', '2026-10-27T09:00:00.000Z'),
+                    ('10001', 'project = NW', '2026-10-28T09:00:00.000Z', '2026-10-27T09:00:00.000Z')",
+        )
+        .unwrap();
+
+        migrate(&mut conn, "cache", CACHE).unwrap();
+
+        let mut query = conn
+            .prepare("SELECT scope_id, last_delta_at, last_full_at FROM sync_state ORDER BY 1")
+            .unwrap();
+        let rows: Vec<(String, Option<String>, Option<String>)> = query
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect();
+        assert_eq!(
+            rows,
+            [
+                (
+                    "10001".to_string(),
+                    Some("2026-10-28T09:00:00.000Z".to_string()),
+                    Some("2026-10-27T09:00:00.000Z".to_string())
+                ),
+                (
+                    "scope".to_string(),
+                    None,
+                    Some("2026-10-27T09:00:00.000Z".to_string())
+                ),
+            ]
+        );
     }
 
     #[test]

@@ -16,6 +16,7 @@ import { useStore } from "../state/store";
 import { PinButton } from "../pins/PinButton";
 import { useIssueActions } from "../views/list/useIssueActions";
 import { Activity } from "./Activity";
+import { Attachments } from "./Attachments";
 import { GoneNotice } from "./GoneNotice";
 import { SinceBanner } from "./SinceBanner";
 import { holdUnread, useSeenAfter } from "./useSeenAfter";
@@ -146,6 +147,7 @@ function IssueMain({ issue, origin }: { issue: IssueDetail; origin: IssueOrigin 
     closeIssue();
   };
   const comments = issue.commentCount === 1 ? "1 comment" : `${issue.commentCount} comments`;
+  const files = issue.attachments.length;
   return (
     <div ref={scrollRef} className="issue-main">
       <div className="issue-main__type">
@@ -153,6 +155,12 @@ function IssueMain({ issue, origin }: { issue: IssueDetail; origin: IssueOrigin 
         <span className="issue-main__key">{issue.key}</span>
         <span aria-hidden="true">·</span>
         <span>{comments}</span>
+        {files > 0 && (
+          <>
+            <span aria-hidden="true">·</span>
+            <span>{files === 1 ? "1 attachment" : `${files} attachments`}</span>
+          </>
+        )}
       </div>
       <h1 className={issue.gone ? "issue-main__title issue-title--gone" : "issue-main__title"}>{issue.summary}</h1>
       {issue.gone && <GoneNotice issue={issue} onRemoved={closeIssue} />}
@@ -170,6 +178,7 @@ function IssueMain({ issue, origin }: { issue: IssueDetail; origin: IssueOrigin 
       <RichFields fields={issue.custom} variant="issue" />
       <WebLinks id={issue.id} variant="issue" />
       {related && <Children related={related} isEpic={issue.isEpic} onOpen={openRelated} onOpenAsList={openAsList} />}
+      <Attachments attachments={issue.attachments} />
     </div>
   );
 }

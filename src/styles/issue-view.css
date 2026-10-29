@@ -157,3 +157,23 @@ button.web-link:hover { background: var(--row-hover-bg); }
 .web-link__icon { flex: none; color: var(--text-tertiary); }
 .web-link__title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .web-link__meta { flex: none; max-width: 40%; overflow: hidden; text-overflow: ellipsis; font-size: 12px; color: var(--text-muted); }
+
+/* Attachments: a tile per file; a click opens it on the Jira site in the browser. */
+.attachments { display: flex; flex-direction: column; gap: 8px; padding-top: 14px; border-top: 1px solid var(--hairline); }
+.attachments h2 { margin: 0; font-size: 16px; font-weight: 700; }
+.attachments__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.attachment {
+  display: flex; align-items: center; gap: 10px; min-width: 0; height: 44px; padding: 0 12px; box-sizing: border-box;
+  border: 1px solid var(--hairline); border-radius: 9px; background: transparent; color: var(--text); text-align: left;
+  transition: background-color var(--motion-fast) var(--ease-out);
+}
+button.attachment:hover { background: var(--row-hover-bg); }
+.attachment--inert { color: var(--text-secondary); }
+.attachment__badge {
+  display: flex; flex: none; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 6px;
+  background: var(--fill-subtle); color: var(--text-tertiary); font-size: 10px; font-weight: 700;
+}
+.attachment__text { display: flex; flex: 1; flex-direction: column; gap: 1px; min-width: 0; }
+.attachment__name, .attachment__meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.attachment__name { font-size: 13px; font-weight: 500; }
+.attachment__meta { font-size: 11px; color: var(--text-muted); }

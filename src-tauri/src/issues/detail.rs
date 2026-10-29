@@ -7,6 +7,7 @@ use rusqlite::{Connection, OptionalExtension};
 use serde::Serialize;
 use ts_rs::TS;
 
+use super::attachments::{Attachment, attachments_of};
 use super::{status_names, user_names};
 use crate::changes::{Names, Since, since, unseen_since};
 use crate::db::Db;
@@ -57,6 +58,8 @@ pub struct IssueDetail {
     pub since: Option<Since>,
     /// Unseen changes, or marked unread by the owner.
     pub unread: bool,
+    /// Files attached in Jira, in Jira's order.
+    pub attachments: Vec<Attachment>,
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
@@ -150,6 +153,7 @@ fn read(conn: &Connection, viewer: &Viewer, id: &str) -> AppResult<IssueDetail> 
             custom: Vec::new(),
             since: None,
             unread: false,
+            attachments: Vec::new(),
         };
         let raw: String = r.get(25)?;
         let project_id: String = r.get(27)?;
@@ -157,6 +161,7 @@ fn read(conn: &Connection, viewer: &Viewer, id: &str) -> AppResult<IssueDetail> 
     })
     .optional()?
     .map(|(mut detail, raw, project_id)| -> AppResult<IssueDetail> {
+        detail.attachments = attachments_of(&raw);
         detail.custom = custom_fields(conn, &project_id, &raw, me)?;
         detail.since = since_banner(conn, viewer, id)?;
         detail.unread = unseen_since(conn, id)?.is_some();

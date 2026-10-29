@@ -42,6 +42,7 @@ const detail = (): IssueDetail => ({
   custom: [],
   since: null,
   unread: false,
+  attachments: [],
 });
 
 function renderPeek() {

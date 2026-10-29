@@ -14,7 +14,12 @@ fn viewer(state: &AppState) -> Viewer {
 
 #[tauri::command]
 pub async fn issue_get(state: State<'_, AppState>, id: String) -> AppResult<IssueDetail> {
-    super::issue_get(&state.db, viewer(&state), id).await
+    let mut detail = super::issue_get(&state.db, viewer(&state), id).await?;
+    super::keep_site_urls(
+        &mut detail.attachments,
+        &state.settings.get().connection.site_url,
+    );
+    Ok(detail)
 }
 
 /// Comments, history and recorded field changes, newest first.

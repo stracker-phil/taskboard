@@ -46,6 +46,28 @@ export type AppErrorField = { path: string, message: string, };
  */
 export type Appearance = "light" | "dark" | "system";
 
+export type Attachment = { id: string, 
+/**
+ * Plain text: the page never renders it as HTML.
+ */
+filename: string, 
+/**
+ * The extension in caps ("PDF"), else "FILE".
+ */
+badge: string, 
+/**
+ * "1.2 MB"; none when Jira sent no size.
+ */
+size: string | null, mimeType: string | null, 
+/**
+ * UTC, RFC 3339.
+ */
+createdAt: string | null, authorName: string | null, 
+/**
+ * The download address, only when it is on the connected Jira site (see [`keep_site_urls`]).
+ */
+url: string | null, };
+
 /**
  * How issues and pins behave by default (Settings → General).
  */
@@ -246,7 +268,11 @@ since: Since | null,
 /**
  * Unseen changes, or marked unread by the owner.
  */
-unread: boolean, };
+unread: boolean, 
+/**
+ * Files attached in Jira, in Jira's order.
+ */
+attachments: Array<Attachment>, };
 
 export type IssueHit = { id: string, key: string, 
 /**

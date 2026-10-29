@@ -511,6 +511,30 @@ async fn the_comment_count_matches_the_comments_of_the_issue() {
 
 #[tokio::test]
 #[ignore = "syncs the demo site into a temp database"]
+async fn the_detail_lists_the_attachments_the_sync_stored_with_the_issue() {
+    let site = Site::new().await;
+
+    let epic = site.detail("NW-1020").await;
+
+    let found: Vec<(&str, &str)> = epic
+        .attachments
+        .iter()
+        .map(|a| (a.filename.as_str(), a.badge.as_str()))
+        .collect();
+    assert_eq!(
+        found,
+        [("release-notes.pdf", "PDF"), ("checkout-flow.png", "PNG")]
+    );
+    assert_eq!(epic.attachments[0].size.as_deref(), Some("1.2 MB"));
+    assert_eq!(
+        epic.attachments[0].author_name.as_deref(),
+        Some("Marta Klein")
+    );
+    assert!(site.detail("NW-1049").await.attachments.is_empty());
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
 async fn an_issue_marked_gone_says_so() {
     let site = Site::new().await;
     assert!(!site.detail("NW-1042").await.gone);

@@ -2,6 +2,7 @@
 //! responses. The fake Jira serves it to tests and to the debug build.
 
 mod adf;
+mod attachments;
 mod catalog;
 mod clock;
 mod fields;
@@ -71,10 +72,12 @@ pub fn demo_at(now: DateTime<Utc>) -> JiraData {
     let mut comments = issues_nw::comments();
     comments.extend(issues_more::comments());
     let clock = Clock::new(now);
+    let mut data = site(&specs, &comments, &clock);
+    attachments::attach(&mut data.issues, &clock);
     JiraData {
         remote_links: web_links::remote_links(),
         changelogs: history::changelogs(&clock),
-        ..site(&specs, &comments, &clock)
+        ..data
     }
 }
 

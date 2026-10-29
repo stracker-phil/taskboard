@@ -13,7 +13,7 @@ import { createQueryClient } from "../queries/queryClient";
 import type { IssueOrigin } from "../state/slices/issueView";
 import { narrowingKey } from "../state/slices/narrowing";
 import { resetStore, useStore } from "../state/store";
-import { commentItem, groupOf, issueDetail, related, relatedIssue, row, SAM, viewData } from "../test/issues";
+import { attachment, commentItem, groupOf, issueDetail, related, relatedIssue, row, SAM, viewData } from "../test/issues";
 import { connectionView } from "../test/jira";
 import { pinItem, pins } from "../test/pins";
 import { settings } from "../test/settings";
@@ -243,6 +243,31 @@ describe("IssueView", () => {
       renderIssue();
 
       expect(await screen.findByText("1 comment")).toBeInTheDocument();
+    });
+
+    it("counts the attachments on the type line and lists them in an Attachments section", async () => {
+      serve(issueDetail({ attachments: [attachment(), attachment({ id: "30002", filename: "wireframes.png", badge: "PNG" })] }));
+      renderIssue();
+
+      expect(await screen.findByText("2 attachments")).toBeInTheDocument();
+      const section = within(screen.getByRole("region", { name: "Attachments" }));
+      expect(section.getByRole("button", { name: /release-notes\.pdf/ })).toBeInTheDocument();
+      expect(section.getByRole("button", { name: /wireframes\.png/ })).toBeInTheDocument();
+    });
+
+    it("uses the singular for one attachment", async () => {
+      serve(issueDetail({ attachments: [attachment()] }));
+      renderIssue();
+
+      expect(await screen.findByText("1 attachment")).toBeInTheDocument();
+    });
+
+    it("mentions no attachments and shows no section when there are none", async () => {
+      renderIssue();
+
+      await title("Checkout: address validation for DACH postcodes");
+      expect(screen.queryByText(/attachment/)).not.toBeInTheDocument();
+      expect(screen.queryByRole("region", { name: "Attachments" })).not.toBeInTheDocument();
     });
 
     it("shows the sanitized description as text without its tags", async () => {

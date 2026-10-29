@@ -1,4 +1,4 @@
-import type { ActivityItem, Column, Group, IssueDetail, Person, Related, RelatedIssue, Row, StatusStyleRow, ViewData } from "../api/types";
+import type { ActivityItem, Attachment, Column, Group, IssueDetail, Person, Related, RelatedIssue, Row, StatusStyleRow, ViewData } from "../api/types";
 
 export const ALEX: Person = { accountId: "demo-account-1", name: "Alex Morgan", initials: "AM", color: 1 };
 export const SAM: Person = { accountId: "demo-account-2", name: "Sam Lee", initials: "SL", color: 2 };
@@ -53,6 +53,22 @@ export function issueDetail(patch: Partial<IssueDetail> = {}): IssueDetail {
     custom: [],
     since: null,
     unread: false,
+    attachments: [],
+    ...patch,
+  };
+}
+
+/** A file attached to an issue; override per test. */
+export function attachment(patch: Partial<Attachment> = {}): Attachment {
+  return {
+    id: "30001",
+    filename: "release-notes.pdf",
+    badge: "PDF",
+    size: "1.2 MB",
+    mimeType: "application/pdf",
+    createdAt: "2026-10-03T08:00:00Z",
+    authorName: "Ada Example",
+    url: "https://example.com/secure/attachment/30001/release-notes.pdf",
     ...patch,
   };
 }

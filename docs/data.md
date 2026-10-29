@@ -50,7 +50,7 @@ unique across sources (Jira's numeric ids; another source prefixes its own):
 |---|---|
 | `space` | the tracker's projects (renamed from `project` in `cache/0003`): `id, key, name, avatar_url, raw, source`; the owner's Space settings are in `local.space`, so queries name this one `cache.space` |
 | `status` | `id, name, category` (`new`, `indeterminate`, `done`) |
-| `issue` | keyed by the numeric Jira id (as text), never the key. Normalized columns for everything the UI filters, groups or sorts on, `raw` for the rest. Ours, derived during sync: `status_category`, `type_is_subtask`, `is_epic`, `sprint_id`, `sprint_state`, `comment_count`, `comments_synced_at`, `links_synced_at`, `history_synced_at`, `synced_at`, `gone` |
+| `issue` | keyed by the numeric Jira id (as text), never the key. Normalized columns for everything the UI filters, groups or sorts on, `raw` for the rest (attachments are read from `raw`; migration `cache/0009` clears the delta cursor so the next sync is a full one that fills them). Ours, derived during sync: `status_category`, `type_is_subtask`, `is_epic`, `sprint_id`, `sprint_state`, `comment_count`, `comments_synced_at`, `links_synced_at`, `history_synced_at`, `synced_at`, `gone` |
 | `issue_change` | what the sync saw change (status, assignee, due date, priority, comments, created) |
 | `issue_seen` | when the owner last looked at an issue: changes after it are unseen (`changes::UNSEEN`) |
 | `comment` | `body_html` from Jira, `body_text` (ours) for search |

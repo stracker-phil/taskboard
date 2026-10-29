@@ -2,6 +2,7 @@
 //! and history.
 
 mod activity;
+mod attachments;
 pub mod commands;
 mod comments;
 mod detail;
@@ -12,6 +13,7 @@ mod web_links;
 
 pub use activity::{ActivityItem, ChangeValue, issue_activity};
 pub(crate) use activity::{status_names, user_names};
+pub use attachments::{Attachment, attachments_of, is_on_site, keep_site_urls};
 pub use comments::issue_sync_comments;
 pub use detail::{CustomField, IssueDetail, issue_forget, issue_get};
 pub use history::issue_sync_history;

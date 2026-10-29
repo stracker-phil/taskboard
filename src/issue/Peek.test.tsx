@@ -43,6 +43,7 @@ function detail(patch: Partial<IssueDetail> = {}): IssueDetail {
     custom: [],
     since: null,
     unread: false,
+    attachments: [],
     ...patch,
   };
 }
