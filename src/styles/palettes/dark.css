@@ -1,5 +1,5 @@
-/* The dark palette: the same tokens as light.css, designed for dark rather than inverted. Greys follow macOS
-   dark windows; status fills stay recognisable with readable text; tints are the hue at low strength. */
+/* The dark palette: the same tokens as light.css, designed for dark rather than inverted. Grays follow macOS
+   dark windows; status fills stay recognizable with readable text; tints are the hue at low strength. */
 :root[data-scheme="dark"] {
   color-scheme: dark;
 
@@ -214,6 +214,6 @@
   --settings-knob: #e5e5e5;
   --settings-knob-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.3), 0 0.5px 2px rgba(0, 0, 0, 0.4);
   --settings-focus-ring: rgba(96, 165, 250, 0.55);
-  /* accent fills of an inactive window turn grey */
+  /* accent fills of an inactive window turn gray */
   --settings-blurred-fill: rgba(229, 229, 229, 0.25);
 }

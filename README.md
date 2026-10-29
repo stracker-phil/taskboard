@@ -16,12 +16,12 @@ support. To build it or port it, point a coding agent at [AGENTS.md](AGENTS.md).
 - **Spaces, filter lists and views:** each tracked project is a Space with its own filter lists (current
   sprint, open bugs, a release); every list has views as tabs, shown as a List, a Board or a Table, grouped,
   sorted and with their own columns. Filters run locally, so they are instant.
-- **Space settings:** per Space, the layouts its views offer and how new views start, its own status colours
+- **Space settings:** per Space, the layouts its views offer and how new views start, its own status colors
   (six status types from Backlog to Done, which views can also group by) and where each custom field shows.
 - **What changed:** Unread collects new comments, status and assignee changes since you last looked, and
   anything you mark unread; bookmarks keep issues at hand for a while.
 - **The Issue view:** description, the filled custom fields (acceptance criteria, steps to reproduce),
-  web links (pull requests show as such), related issues and the activity, with Jira's HTML sanitised and
+  web links (pull requests show as such), related issues and the activity, with Jira's HTML sanitized and
   links opened in the browser.
 - **Keyboard first:** ⌘K finds issues by key or text, J/K move, every action has a menu item and a
   rebindable key, and the `taskboard` command line drives the window from scripts.

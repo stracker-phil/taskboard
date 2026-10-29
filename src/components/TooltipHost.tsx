@@ -101,7 +101,7 @@ export function TooltipHost() {
   }, []);
 
   if (!tip) return null;
-  // Below the control, centred; above it when there's no room underneath.
+  // Below the control, centered; above it when there's no room underneath.
   const below = tip.rect.bottom + GAP + 28 < window.innerHeight;
   const left = Math.min(Math.max(tip.rect.left + tip.rect.width / 2, EDGE), window.innerWidth - EDGE);
   const style = below ? { left, top: tip.rect.bottom + GAP } : { left, bottom: window.innerHeight - tip.rect.top + GAP };

@@ -15,7 +15,7 @@ import { ColumnsPopover } from "./ColumnsPopover";
 
 const mocked = vi.mocked(api, true);
 
-const CATALOGUE: Column[] = [
+const CATALOG: Column[] = [
   { id: "status", name: "Status", custom: false },
   { id: "assignee", name: "Assignee", custom: false },
   { id: "priority", name: "Priority", custom: false },
@@ -54,7 +54,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
   mocked.getSettings.mockResolvedValue(settings());
-  mocked.columnsCatalogue.mockResolvedValue(CATALOGUE);
+  mocked.columnsCatalogue.mockResolvedValue(CATALOG);
   mocked.viewSetColumns.mockResolvedValue(view());
 });
 
@@ -340,7 +340,7 @@ describe("ColumnsPopover", () => {
       expect(within(popover).getByRole("button", { name: /^Reviewer ?cf_10071$/ })).toBeInTheDocument();
     });
 
-    it("saves the view's columns plus the toggled custom field in catalogue order", async () => {
+    it("saves the view's columns plus the toggled custom field in catalog order", async () => {
       const popover = await openColumns();
       await search(popover, "rev");
 

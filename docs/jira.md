@@ -102,7 +102,7 @@ ends; the caller decides whether to repeat the job.
 
 - `jira/limiter.rs` `Limiter`: a burst of 5, then 5 requests per second, shared by every client.
 - `jira/retry.rs`: `429` is retried, and `503` only with `Retry-After`; at most `MAX_RETRIES` (4). A
-  `Retry-After` in seconds or as an HTTP date is honoured (capped at 15 minutes); without one, the wait is
+  `Retry-After` in seconds or as an HTTP date is honored (capped at 15 minutes); without one, the wait is
   exponential with full jitter (base 1 s, cap 30 s). `RateLimit-Reason` is logged. Writes will pass
   `Retry::Never`: Jira may have applied the first attempt.
 

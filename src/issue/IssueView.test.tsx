@@ -187,7 +187,7 @@ describe("IssueView", () => {
       mocked.viewRows.mockResolvedValue(viewData([groupOf(rows)], rows));
     });
 
-    it("moves to the neighbours in the order of the view the issue was opened from", async () => {
+    it("moves to the neighbors in the order of the view the issue was opened from", async () => {
       renderIssue("10042");
       const next = screen.getByRole("button", { name: "Next issue" });
       await waitFor(() => expect(next).toBeEnabled());
@@ -245,7 +245,7 @@ describe("IssueView", () => {
       expect(await screen.findByText("1 comment")).toBeInTheDocument();
     });
 
-    it("shows the sanitised description as text without its tags", async () => {
+    it("shows the sanitized description as text without its tags", async () => {
       serve(issueDetail({ descriptionHtml: "<p>Validate <strong>DACH</strong> postcodes.</p><script>alert(1)</script>" }));
       renderIssue();
 

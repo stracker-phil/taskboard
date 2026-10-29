@@ -30,7 +30,7 @@ function webAddress(value: string | null, base: string | undefined): string | nu
 }
 
 /**
- * Sanitises Jira HTML for display: relative links point at the Jira site, links that aren't `https` lose
+ * Sanitizes Jira HTML for display: relative links point at the Jira site, links that aren't `https` lose
  * their address, and every image becomes a link chip ("Image · name"), so the webview never loads remote
  * content (ADR 0020). Links open in the browser through `JiraHtml`'s click handler.
  */

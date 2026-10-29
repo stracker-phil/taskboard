@@ -188,7 +188,7 @@ describe("widthOf", () => {
   });
 
   describe("pill", () => {
-    it("is the capitalised name plus tracking, 10px padding and a border on each side", () => {
+    it("is the capitalized name plus tracking, 10px padding and a border on each side", () => {
       // 11 * 7 + 0.3 * 11 + 20 + 2
       expect(widthOf.pill(chars7, "In Progress")).toBeCloseTo(102.3);
     });

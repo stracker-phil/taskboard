@@ -1,6 +1,6 @@
 const FLAGS = ["highest", "high", "medium", "low", "low"] as const;
 
-/** The flag of a priority level (1 Highest … 5 Lowest); Lowest shares Low's colour. */
+/** The flag of a priority level (1 Highest … 5 Lowest); Lowest shares Low's color. */
 export function PriorityFlag({ level, size = 14 }: { level: number; size?: number }) {
   const flag = FLAGS[Math.min(Math.max(level, 1), 5) - 1];
   return (

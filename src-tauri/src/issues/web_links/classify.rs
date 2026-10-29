@@ -97,7 +97,7 @@ mod tests {
     }
 
     #[test]
-    fn pull_requests_and_merge_requests_are_recognised_with_their_repo_and_number() {
+    fn pull_requests_and_merge_requests_are_recognized_with_their_repo_and_number() {
         for (address, host, reference) in [
             (
                 "https://github.com/example/shop/pull/481",

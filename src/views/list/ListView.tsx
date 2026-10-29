@@ -31,7 +31,7 @@ interface Props {
   inlineLabels?: boolean;
 }
 
-/** The List layout: each group a card under its tab, virtualised. */
+/** The List layout: each group a card under its tab, virtualized. */
 export function ListView({ listId, viewId, narrowing, wrapTitles = true, openWith = null, inlineLabels = true }: Props) {
   const { data } = useViewRows(listId, viewId, narrowing);
   const opening = useIssueOpening(openWith);
@@ -79,13 +79,13 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
   const actions = useIssueActions();
   const client = useQueryClient();
   const width = useElementWidth(scrollRef);
-  const { data: catalogue = NO_COLUMNS } = useColumnsCatalogue(listId);
+  const { data: catalog = NO_COLUMNS } = useColumnsCatalogue(listId);
 
   useEffect(() => {
     void loadPlace(listId, viewId);
   }, [loadPlace, listId, viewId]);
 
-  const headers = useMemo(() => data.columns.map((id) => catalogue.find((c) => c.id === id)?.name ?? id), [data.columns, catalogue]);
+  const headers = useMemo(() => data.columns.map((id) => catalog.find((c) => c.id === id)?.name ?? id), [data.columns, catalog]);
   const widths = useMemo(
     () => columnWidths(Object.values(data.rows), data.columns.map((id, i) => ({ id, header: headers[i], cellWidth: columnDef(id).measure })), measure),
     [data.rows, data.columns, headers],
@@ -118,7 +118,7 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
     setPlace({ selectedId: id, peekOpen: openPeek });
     refreshIssueExtras(id);
     const at = rowIds.indexOf(id);
-    for (const neighbour of [rowIds[at - 1], rowIds[at + 1]]) if (neighbour) prefetchIssue(client, neighbour);
+    for (const neighbor of [rowIds[at - 1], rowIds[at + 1]]) if (neighbor) prefetchIssue(client, neighbor);
   };
 
   // The keys reach this render's state through a ref the effect below keeps current.

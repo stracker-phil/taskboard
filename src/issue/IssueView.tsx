@@ -25,8 +25,8 @@ import { RichFields } from "./RichFields";
 import { Children, Links } from "./Related";
 import { WebLinks } from "./WebLinks";
 
-/** The issue's neighbours in the view it was opened from, for the previous/next arrows and J/K. */
-function useNeighbours(origin: IssueOrigin, id: string): { previous: string | null; next: string | null } {
+/** The issue's neighbors in the view it was opened from, for the previous/next arrows and J/K. */
+function useNeighbors(origin: IssueOrigin, id: string): { previous: string | null; next: string | null } {
   const narrowing = useStore((s) => s.narrowings[narrowingKey(origin.listId, origin.viewId)]);
   const { data } = useViewRows(origin.listId, origin.viewId, narrowing);
   const order = data?.groups.flatMap((group) => group.rowIds) ?? [];
@@ -39,7 +39,7 @@ function useNeighbours(origin: IssueOrigin, id: string): { previous: string | nu
 export function IssueView({ id, origin }: { id: string; origin: IssueOrigin }) {
   const { data: issue, isError } = useIssue(id);
   const back = useStore((s) => s.issueBack);
-  const neighbours = useNeighbours(origin, id);
+  const neighbors = useNeighbors(origin, id);
   useSeenAfter(id, issue?.unread ?? false);
 
   useEffect(() => {
@@ -50,14 +50,14 @@ export function IssueView({ id, origin }: { id: string; origin: IssueOrigin }) {
 
   return (
     <div className="issue-view">
-      <IssueHeader issue={issue} origin={origin} neighbours={neighbours} onBack={back} />
+      <IssueHeader issue={issue} origin={origin} neighbors={neighbors} onBack={back} />
       <div className="issue-view__columns">
         <div className="issue-view__main">
           {issue ? <IssueMain issue={issue} origin={origin} /> : isError ? <p className="issue-view__missing">This issue is no longer in the cache.</p> : null}
         </div>
         <Activity id={id} />
       </div>
-      <IssueKeys issue={issue} neighbours={neighbours} />
+      <IssueKeys issue={issue} neighbors={neighbors} />
     </div>
   );
 }
@@ -65,12 +65,12 @@ export function IssueView({ id, origin }: { id: string; origin: IssueOrigin }) {
 function IssueHeader({
   issue,
   origin,
-  neighbours,
+  neighbors,
   onBack,
 }: {
   issue: IssueDetail | undefined;
   origin: IssueOrigin;
-  neighbours: { previous: string | null; next: string | null };
+  neighbors: { previous: string | null; next: string | null };
   onBack: () => void;
 }) {
   const { data: tree } = useSidebar();
@@ -113,10 +113,10 @@ function IssueHeader({
       </nav>
       <span className="issue-header__spacer" />
       {issue && <span className="issue-header__updated">Updated {formatLocalTime(issue.updatedAt)}</span>}
-      <button type="button" className="issue-header__nav" aria-label="Previous issue" title="Previous (K)" disabled={!neighbours.previous} onClick={() => neighbours.previous && showIssue(neighbours.previous)}>
+      <button type="button" className="issue-header__nav" aria-label="Previous issue" title="Previous (K)" disabled={!neighbors.previous} onClick={() => neighbors.previous && showIssue(neighbors.previous)}>
         <ArrowUp size={14} strokeWidth={2} aria-hidden="true" />
       </button>
-      <button type="button" className="issue-header__nav" aria-label="Next issue" title="Next (J)" disabled={!neighbours.next} onClick={() => neighbours.next && showIssue(neighbours.next)}>
+      <button type="button" className="issue-header__nav" aria-label="Next issue" title="Next (J)" disabled={!neighbors.next} onClick={() => neighbors.next && showIssue(neighbors.next)}>
         <ArrowDown size={14} strokeWidth={2} aria-hidden="true" />
       </button>
       {issue && <ReadToggle issue={issue} />}
@@ -194,14 +194,14 @@ function ReadToggle({ issue }: { issue: IssueDetail }) {
   );
 }
 
-/** J/K move to the neighbours; E opens the epic; ⌘C, ⌘⇧C and ⌘↩ act on the shown issue. */
-function IssueKeys({ issue, neighbours }: { issue: IssueDetail | undefined; neighbours: { previous: string | null; next: string | null } }) {
+/** J/K move to the neighbors; E opens the epic; ⌘C, ⌘⇧C and ⌘↩ act on the shown issue. */
+function IssueKeys({ issue, neighbors }: { issue: IssueDetail | undefined; neighbors: { previous: string | null; next: string | null } }) {
   const showIssue = useStore((s) => s.showIssue);
   const openRelated = useStore((s) => s.openRelated);
   const actions = useIssueActions();
-  const state = useRef({ issue, neighbours, showIssue, openRelated, actions });
+  const state = useRef({ issue, neighbors, showIssue, openRelated, actions });
   useEffect(() => {
-    state.current = { issue, neighbours, showIssue, openRelated, actions };
+    state.current = { issue, neighbors, showIssue, openRelated, actions };
   });
   useEffect(() => {
     const withKey = (run: (key: string) => void) => {
@@ -210,8 +210,8 @@ function IssueKeys({ issue, neighbours }: { issue: IssueDetail | undefined; neig
     };
     return onIssueKeys({
       move: (step) => {
-        const { neighbours, showIssue } = state.current;
-        const target = step > 0 ? neighbours.next : neighbours.previous;
+        const { neighbors, showIssue } = state.current;
+        const target = step > 0 ? neighbors.next : neighbors.previous;
         if (target) showIssue(target);
       },
       setGroupOpen: () => {},

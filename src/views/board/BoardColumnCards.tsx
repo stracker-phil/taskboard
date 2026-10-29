@@ -17,7 +17,7 @@ interface Props {
 const CARD_ESTIMATE = 110;
 const CARD_GAP = 8;
 
-/** A column's cards, virtualised: a Space with thousands of issues mounts only the cards on screen. */
+/** A column's cards, virtualized: a Space with thousands of issues mounts only the cards on screen. */
 export const BoardColumnCards = memo(function BoardColumnCards({ ids, rows, fields, selected, onOpen, actions }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const virtualizer = useVirtualizer({

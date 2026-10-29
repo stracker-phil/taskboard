@@ -10,7 +10,7 @@ export function useIssueActions() {
   const { data: connection } = useConnection();
   const toast = useStore((s) => s.toast);
   const site = connection?.connection.siteUrl;
-  // Stable, so memoised cards don't re-render with their parent.
+  // Stable, so memoized cards don't re-render with their parent.
   return useMemo(() => {
     const copy = (text: string, done: string) =>
       void attempt(api.copyText(text), "Could not copy").then((copied) => {

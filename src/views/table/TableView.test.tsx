@@ -225,26 +225,26 @@ describe("TableView", () => {
     });
 
     describe("labels", () => {
-      const LABELLED = row({ id: "5", key: "NW-1005", summary: "Update the footer", labels: [{ name: "launch", tint: 1 }] });
-      const renderLabelled = async (inlineLabels: boolean, columns: string[]) => {
-        await renderTable(viewData([groupOf([LABELLED])], [LABELLED], { columns, groupBy: "none" }), view({ layout: "table", inlineLabels }));
+      const LABELED = row({ id: "5", key: "NW-1005", summary: "Update the footer", labels: [{ name: "launch", tint: 1 }] });
+      const renderLabeled = async (inlineLabels: boolean, columns: string[]) => {
+        await renderTable(viewData([groupOf([LABELED])], [LABELED], { columns, groupBy: "none" }), view({ layout: "table", inlineLabels }));
         return within(screen.getByRole("row", { name: /NW-1005/ })).getAllByRole("gridcell");
       };
 
       it("shows them after the title when the view shows labels inline", async () => {
-        const [, title] = await renderLabelled(true, []);
+        const [, title] = await renderLabeled(true, []);
 
         expect(within(title).getByText("launch")).toBeInTheDocument();
       });
 
       it("shows none when inline labels are off", async () => {
-        await renderLabelled(false, []);
+        await renderLabeled(false, []);
 
         expect(screen.queryByText("launch")).not.toBeInTheDocument();
       });
 
       it("shows them only in the Labels column when the view has it", async () => {
-        const [, title, , labels] = await renderLabelled(true, ["labels"]);
+        const [, title, , labels] = await renderLabeled(true, ["labels"]);
 
         expect(within(title).queryByText("launch")).not.toBeInTheDocument();
         expect(within(labels).getByText("launch")).toBeInTheDocument();

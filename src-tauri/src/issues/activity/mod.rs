@@ -30,7 +30,7 @@ pub enum ActivityItem {
     Comment {
         id: String,
         author: Option<Person>,
-        /// Jira's rendered HTML, untrusted: the page sanitises it.
+        /// Jira's rendered HTML, untrusted: the page sanitizes it.
         body_html: Option<String>,
         /// UTC, RFC 3339.
         at: String,

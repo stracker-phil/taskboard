@@ -1,4 +1,4 @@
-/* The Space editor (`components/SpaceEditor.tsx`): the colour swatches, the Spaces settings page and the
+/* The Space editor (`components/SpaceEditor.tsx`): the color swatches, the Spaces settings page and the
    sidebar's small popover. */
 .space-icon-input.input { width: 44px; text-align: center; }
 .space-colors { display: flex; align-items: center; gap: 12px; }
@@ -23,7 +23,7 @@
 }
 .space-settings-chevron { flex: none; color: var(--settings-text-secondary); }
 
-/* The sidebar's "Colour and icon…" and "Client label…" popover (the design spec's popovers: r12, the popover
+/* The sidebar's "Color and icon…" and "Client label…" popover (the design spec's popovers: r12, the popover
    shadow), next to the top of the content panel. */
 .space-popover {
   position: fixed;

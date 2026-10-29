@@ -31,7 +31,7 @@ interface Props {
   narrowing?: Narrowing;
 }
 
-/** The Table layout: a sticky, sortable, resizable header over the virtualised rows. */
+/** The Table layout: a sticky, sortable, resizable header over the virtualized rows. */
 export function TableView({ view, narrowing }: Props) {
   const { data } = useViewRows(view.listId, view.id, narrowing);
   if (!data) return null;
@@ -81,7 +81,7 @@ function Table({ view, data }: { view: View; data: ViewData }) {
     overscan: 12,
   });
 
-  // A group in motion changes its rows' heights every frame; the virtualiser caches sizes.
+  // A group in motion changes its rows' heights every frame; the virtualizer caches sizes.
   useLayoutEffect(() => {
     virtualizer.measure();
   }, [factors, virtualizer]);

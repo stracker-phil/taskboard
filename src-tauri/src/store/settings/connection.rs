@@ -11,7 +11,7 @@ use crate::jira::{Site, TokenKind};
 #[ts(export, export_to = "src/api/types.gen.ts")]
 #[serde(default, rename_all = "camelCase")]
 pub struct Connection {
-    /// Normalised (`https://example.atlassian.net/`); empty until set up.
+    /// Normalized (`https://example.atlassian.net/`); empty until set up.
     pub site_url: String,
     pub email: String,
     pub token_kind: TokenKind,

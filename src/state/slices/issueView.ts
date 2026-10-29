@@ -12,7 +12,7 @@ export interface IssueViewSlice {
   openIssue: (id: string, origin: IssueOrigin) => void;
   /** Opens a related issue (an epic, a child, a link) on top; back returns to the one before. */
   openRelated: (id: string) => void;
-  /** Swaps the shown issue for its neighbour in the view (previous/next). */
+  /** Swaps the shown issue for its neighbor in the view (previous/next). */
   showIssue: (id: string) => void;
   /** One step back: the previous issue, or the view. */
   issueBack: () => void;

@@ -8,7 +8,7 @@ function motionFactor(item: Item, factors: Record<string, number>): number {
 }
 
 /**
- * The virtualiser and each item's size. Fixed-height rows take their height from the item; wrapped rows are
+ * The virtualizer and each item's size. Fixed-height rows take their height from the item; wrapped rows are
  * measured and, while their group collapses, shrink from the height they had when it started.
  */
 export function useRowSizing(items: Item[], factors: Record<string, number>, wrapTitles: boolean, scrollRef: RefObject<HTMLDivElement | null>) {

@@ -20,7 +20,7 @@ function applyScheme(scheme: Scheme) {
 }
 
 /** Sets `data-scheme` on <html> before the first render (from macOS, until the settings load), so the first
- *  paint has colours. */
+ *  paint has colors. */
 export function applyInitialLook() {
   applyScheme(systemDark() ? "dark" : "light");
 }

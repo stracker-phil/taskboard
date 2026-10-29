@@ -2,14 +2,14 @@
 
 The reference for how Taskboard looks and behaves. The main window follows the owner's Taskboard mockup, a
 light ClickUp-style window ([ADR 0017](adr/0017-the-main-window-follows-the-taskboard-mockup.md)); the Settings
-window and the behaviour (keys, scrollbars, overlays) follow Daybook's design language. Colours come only from
+window and the behavior (keys, scrollbars, overlays) follow Daybook's design language. Colors come only from
 palettes ([ADR 0007](adr/0007-color-palettes.md)). Update this page with every change that builds or changes
 an item.
 
 ## Principles
 
-- **Built to the mockup.** Sizes, colours and type match it; nothing is redesigned. Where the mockup is
-  silent, Daybook's behaviour applies.
+- **Built to the mockup.** Sizes, colors and type match it; nothing is redesigned. Where the mockup is
+  silent, Daybook's behavior applies.
 - **Light and fast.** The window opens instantly; nothing animates for show.
 - **Fully keyboard-usable.** Every action is a command with a rebindable shortcut and a palette entry.
 - **The sidebar decides which issues, the view tabs decide how.** Filters never live in a view.
@@ -125,16 +125,16 @@ one group, Board column or pill per style, whatever the status is called; the Bo
 (Settings → Spaces → the Space → Statuses) override it per status for that Space only.
 
 - **StatusSquare** (`components/issue/StatusSquare.tsx`): the only status marker, a filled 10 × 10 square,
-  radius 3, in `--status-*-square` (To do grey, Backlog lighter). No rings or outlines anywhere.
+  radius 3, in `--status-*-square` (To do gray, Backlog lighter). No rings or outlines anywhere.
 - **StatusPill**: caps, text only, symmetric padding, `--status-*-bg/fg/border`. Variants: default (26 high,
   12/700, 7 radius, 1px border, dashed for Backlog), `peek` (24, 11/700, no border), `activity` (20, 10/700), `tab` (the List's
   group tab: 30, 0.04em, top corners 8, all corners when closed; To do uses `--status-todo-tab-*`).
-- **EpicChip** (22, 12/500, `--epic-N-*`): Jira's epic colour (`ghx-label-N`) maps to the
+- **EpicChip** (22, 12/500, `--epic-N-*`): Jira's epic color (`ghx-label-N`) maps to the
   nearest of the five tints; an epic without one gets a tint from its id.
 - **Avatar** (26, white 9/700 initials on `--avatar-N`): the connected account is always `--avatar-1`, other
   people one of the rest by a stable hash of their account id. In a stack each has a 2px `--avatar-ring` border
   and overlaps by 6.
-- **PriorityFlag** (14, `--flag-*`, Lowest shares Low's colour), **ChangeChip** (18, `--changed-chip-*`, 11/600),
+- **PriorityFlag** (14, `--flag-*`, Lowest shares Low's color), **ChangeChip** (18, `--changed-chip-*`, 11/600),
   **CommentCount** (12, bubble icon), label chips (22, `--label-N-*` by a hash of the name).
 
 ## List view
@@ -144,7 +144,7 @@ one group, Board column or pill per style, whatever the status is called; the Bo
 - The list canvas is `--list-bg` under a `--hairline`; padding 22 24 40 52 (a 30px chevron gutter).
 - Each group is a white card (radius 10, top-left 0, `--shadow-group-card`, `--row-hairline` between rows)
   with its **tab** sitting on it: a status pill (`tab` variant; for other groupings a neutral tab with the
-  Space tile, avatar, epic colour or flag) and the count. Clicking the tab toggles the group; a closed group is
+  Space tile, avatar, epic color or flag) and the count. Clicking the tab toggles the group; a closed group is
   the tab alone. Groups are 44 apart; Done starts closed.
 - **Column headers** sit in each group's tab row (11/600 caps, 0.05em, `--text-muted`), bottom-aligned with
   the tab; there is no global header row. Without grouping the one card has the headers and no tab.
@@ -161,7 +161,7 @@ one group, Board column or pill per style, whatever the status is called; the Bo
 - An issue's labels show as small tags (`row-labels`, 18px `label-chip`s) after its title in the List and the
   Table, unless the view has the Labels column. The Columns popover lists the column as "Labels (column)" and
   has a "Labels (inline)" switch (`view.inline_labels`, on by default) for List and Table views.
-- Rows are virtualised (`@tanstack/react-virtual`): a card is drawn from its pieces (the header item, then
+- Rows are virtualized (`@tanstack/react-virtual`): a card is drawn from its pieces (the header item, then
   rows that know whether they are first, middle, last or the only one).
 
 ## Peek
@@ -186,7 +186,7 @@ Issue view.
 
 - Header 50: mono key · type text, then Bookmark (with bookmarks), Open in Jira, Full view, Close.
 - Body: title 22/750, one line of chips (status pill `peek`, epic chip, release outline chip, priority,
-  assignee), the sanitised description, web links, the latest three activity items with "All activity".
+  assignee), the sanitized description, web links, the latest three activity items with "All activity".
 - Footer 36: the keys.
 - Hovering a row shows its toolbar at the end of the title: Mark as read (unread rows) or Mark as unread, Copy
   key, Bookmark, Open in Jira (`RowActions`).
@@ -300,7 +300,7 @@ view with its place intact).
   Jira name in lowercase. Selecting a row (List, Table) or opening an issue asks Rust to fetch the history and
   the web links (`refreshIssueExtras`; each at most every 5 minutes), so they are usually there by the time the
   issue opens.
-- Jira's HTML is sanitised (`lib/jiraHtml.ts`, [ADR 0027](adr/0027-jira-html-is-sanitised-and-shows-no-remote-content.md)):
+- Jira's HTML is sanitized (`lib/jiraHtml.ts`, [ADR 0027](adr/0027-jira-html-is-sanitised-and-shows-no-remote-content.md)):
   links open in the browser, images become link chips. The preview shows the same description and the latest
   three activity items.
 
@@ -371,19 +371,19 @@ button, Escape and a press outside close it, focus goes back to the button).
 
 - Columns scroll sideways (padding 6 20 20 24, gap 12), one per group of the view's Group by: per status in the
   Board order (also when ungrouped), else one per person, priority, epic, release, due bucket or Space as the List
-  groups them, on the neutral To do tint with a grey pill holding the List's group mark (avatar, flag). An open column is
+  groups them, on the neutral To do tint with a gray pill holding the List's group mark (avatar, flag). An open column is
   300 wide, 12px radius, on its status tint (`--status-*-tint`), with the header pill, the count in
   `--status-*-count` and a collapse button; a collapsed one is a 48 × 300 strip with the header pill turned 90° (`status-pill--vertical`: the
-  same 26px and padding, centred; owner, 2026-10-29) and the
+  same 26px and padding, centered; owner, 2026-10-29) and the
   count, and expands on click. Done starts collapsed; the choice is kept per view.
 - Cards (gap 10, padding 12 14, 10px radius, `--card-border`, `--shadow-card`, lifted with `--shadow-hover`
   on hover): epic chip and the mono key on top (a 7px `--changed-dot` before it when changed), the 600 summary
   that always wraps and never truncates, then avatars, release chip, comment count and priority flag. Card
   fields (the Columns button reads "Card fields") choose epic, assignee, release and priority. Changed cards
   use `--changed-bg` and `--changed-border`. Hover shows the row toolbar in the top-right corner.
-- A card opens the full Issue view (the mockup's behaviour; List rows open the preview). A Board never shows the
+- A card opens the full Issue view (the mockup's behavior; List rows open the preview). A Board never shows the
   preview (`CurrentPeek`), whatever opened it.
-- Each column virtualises its cards (`BoardColumnCards`, measured heights), so a Space with thousands of
+- Each column virtualizes its cards (`BoardColumnCards`, measured heights), so a Space with thousands of
   issues mounts only the cards on screen; the keyboard's card scrolls into view.
 
 ## Table view
@@ -399,7 +399,7 @@ columns are wider than the window. Groups open and close with the List's animati
 
 Two palettes in `src/styles/palettes/` (`light.css`, `dark.css`), selected by `data-scheme` on `<html>`
 (`lib/theme.ts`): Settings → Appearance is Automatic (follows macOS, the default), Light or Dark (ADR 0028).
-Every palette defines the same tokens; the dark one is designed (macOS dark greys, status fills kept, tints at
+Every palette defines the same tokens; the dark one is designed (macOS dark grays, status fills kept, tints at
 low strength), and both pass the same contrast checks.
 
 | Group | Tokens | Light |
@@ -409,13 +409,13 @@ low strength), and both pass the same contrast checks.
 | Lines | `--border` (controls, the tree guide), `--border-strong` (selects, dashed adds), `--hairline` (section edges), `--row-hairline` (between rows), `--card-border` | `#E4E4E7`, `#D4D4D8`, `#EDEDF0`, `#F1F1F3`, `#E9E9EC` |
 | Accent | `--accent`, `--accent-text`, `--selection-bg`/`--selection-text`, `--accent-soft-bg`/`-border`/`-text`, `--button-primary-bg`/`-text`, `--spinner-track`, `--focus-ring` | blue 600, blue 700, `#E3EBFD`, … |
 | Changed | `--changed-bg`, `--changed-border`, `--changed-chip-bg`/`-text`, `--changed-dot` | light blues |
-| Status | `--status-{todo,progress,review,blocked,done}-{bg,fg,border,square,tint,count}`, `--status-todo-tab-{bg,fg}` | grey, blue, violet, red, green |
+| Status | `--status-{todo,progress,review,blocked,done}-{bg,fg,border,square,tint,count}`, `--status-todo-tab-{bg,fg}` | gray, blue, violet, red, green |
 | Data | `--flag-*`, `--epic-{1..5}-{bg,fg}`, `--label-{1,2,neutral}-{bg,fg}`, `--avatar-{1..4}`, `--avatar-ring`, `--space-tile-{1..12}`, `--view-{list,board,table}` | |
 | Messages | `--banner-{info,warn,error}-*`, `--notice-neutral-*`, `--pin-*`, `--pr-open-*`, `--sync-*`, `--progress-done` | |
 | Shadows | `--shadow-{panel,popover,palette,peek,raised,card,knob,group-card,hover,hover-toolbar}` | |
 | Hover, list | `--hover-bg`, `--row-hover-bg`, `--list-bg` | `#F4F4F5`, `#FAFAFB`, `#F7F7F8` |
 
-The mockup's near-duplicates are merged: the palette's own greys map to the zinc scale, the palette's active
+The mockup's near-duplicates are merged: the palette's own grays map to the zinc scale, the palette's active
 row uses `--selection-bg`, the PR chip uses the Checkout epic's purple, the warning banner text uses the amber
 `#92400E`. The accent is fixed blue; there is no accent or scheme choice. Hover fills (not in the mockup) use
 `--fill-hover`.
@@ -468,7 +468,7 @@ or a view, Stop tracking, Reset Cache. The question names what goes and what sta
 ## Settings
 
 A window of its own (about 880 × 720, at least 760 × 560) in Daybook's System Settings layout and code (there is
-no separate Settings design; owner, 2026-10-28). Its colours are the `--settings-*` tokens of the same palette.
+no separate Settings design; owner, 2026-10-28). Its colors are the `--settings-*` tokens of the same palette.
 
 - **Page list** on `--settings-chrome` (190px): a drag strip for the window buttons and a search field that
   stay put (it narrows by page, group or section title), then rows under small group headings; the current
@@ -477,7 +477,7 @@ no separate Settings design; owner, 2026-10-28). Its colours are the `--settings
   change applies at once (fields on blur or ↵); only small forms whose fields belong together (the Jira site,
   the scope query) save with their own Save button. Esc (unless a field or a sheet takes it), ⌘W and the
   close button hide the window; it reopens on the page it showed. While another window is in front, switches,
-  primary buttons and the page list turn grey (`window-blurred`), as macOS does.
+  primary buttons and the page list turn gray (`window-blurred`), as macOS does.
 - **Group** (`Group` in `components/settings/controls.tsx`): a 13px semibold heading over its inset group
   (`--settings-fill-quiet`, 12px radius). **Row** (`Row`): label and an optional description on the left, the
   control on the right, hairlines between rows.
@@ -543,7 +543,7 @@ global shortcuts.
 - ↵ and Space on a focused button or link activate it. `Tab` moves focus (sidebar, tabs, toolbar, content).
 - A command has one binding; ⌘1–⌘9 open the nth view tab.
 - **Issues** (`commands/issueKeys.ts`, registered by the shown List, Board or Issue view): J or ↓ and K or ↑
-  move (on the Board through a column's cards, ← and → to the neighbouring column; in a List ← and → close and
+  move (on the Board through a column's cards, ← and → to the neighboring column; in a List ← and → close and
   open the row's group), Space opens or closes the preview (the Board opens the Issue view), ↩ opens the Issue
   view, E the epic, P adds or removes a bookmark (default duration), M marks read or unread, ⌘C copies the key (only with no text
   field focused and no text selected), ⌘⇧C the URL, ⌘↩ opens it in Jira, esc closes the preview or goes back.
@@ -551,7 +551,7 @@ global shortcuts.
 
 ## Palette checks
 
-`src/styles/colors.test.ts` keeps colour literals inside `src/styles/palettes/` and every palette on the same
+`src/styles/colors.test.ts` keeps color literals inside `src/styles/palettes/` and every palette on the same
 token set; `src/styles/contrast.test.ts` checks text tokens on their surfaces (4.5:1 body, 3:1 meta and large
 text) and pill text on pill fills. With a dark palette, `scripts/dev/screenshot-looks.sh <dir>` captures the
 window in the current macOS mode; switch the system appearance and run it again.

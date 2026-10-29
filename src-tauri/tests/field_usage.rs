@@ -1,4 +1,4 @@
-//! Which custom fields the pickers offer: the marks `store_field_usage` writes, and the Columns catalogue and
+//! Which custom fields the pickers offer: the marks `store_field_usage` writes, and the Columns catalog and
 //! the filter editor's field list that leave unused fields out unless the owner already uses them.
 
 use std::collections::BTreeSet;
@@ -13,7 +13,7 @@ use taskboard_lib::views::columns_catalogue;
 
 const STORY_POINTS: &str = "customfield_10016";
 const REVIEWER: &str = "customfield_10071";
-const COST_CENTRE: &str = "customfield_10090";
+const COST_CENTER: &str = "customfield_10090";
 const LEGAL_APPROVAL: &str = "customfield_10091";
 
 async fn execute(db: &Db, sql: &'static str) {
@@ -35,7 +35,7 @@ async fn lab() -> (TempDir, Db) {
            ('summary', 'Summary', 'string'),
            ('customfield_10016', 'Story points', 'number'),
            ('customfield_10071', 'Reviewer', 'user'),
-           ('customfield_10090', 'Cost centre', 'option'),
+           ('customfield_10090', 'Cost center', 'option'),
            ('customfield_10091', 'Legal approval date', 'date'),
            ('customfield_10019', 'Rank', 'any');
          INSERT INTO filter_list (kind, name) VALUES ('list', 'Open bugs');
@@ -139,7 +139,7 @@ mod the_marks {
         let (_dir, db) = lab().await;
         mark_used(&db, &[STORY_POINTS, REVIEWER]).await;
 
-        mark_used(&db, &[COST_CENTRE]).await;
+        mark_used(&db, &[COST_CENTER]).await;
 
         assert_eq!(
             marks(&db).await,
@@ -201,7 +201,7 @@ mod the_fetched_fields {
         )
         .await;
 
-        assert_eq!(fetched(&db).await, ids(&[COST_CENTRE]));
+        assert_eq!(fetched(&db).await, ids(&[COST_CENTER]));
     }
 
     #[tokio::test]
@@ -224,7 +224,7 @@ mod the_fetched_fields {
 
         assert_eq!(
             fetched(&db).await,
-            ids(&[STORY_POINTS, REVIEWER, COST_CENTRE, LEGAL_APPROVAL])
+            ids(&[STORY_POINTS, REVIEWER, COST_CENTER, LEGAL_APPROVAL])
         );
     }
 
@@ -244,9 +244,9 @@ mod the_fetched_fields {
     #[tokio::test]
     async fn system_fields_and_unused_fields_are_not_added() {
         let (_dir, db) = lab().await;
-        mark_used(&db, &[COST_CENTRE]).await;
+        mark_used(&db, &[COST_CENTER]).await;
 
-        assert_eq!(fetched(&db).await, ids(&[COST_CENTRE]));
+        assert_eq!(fetched(&db).await, ids(&[COST_CENTER]));
     }
 }
 
@@ -257,7 +257,7 @@ mod the_pickers {
     async fn every_custom_field_is_offered_before_any_sampling() {
         let (_dir, db) = lab().await;
 
-        assert_offered(&db, &[COST_CENTRE, LEGAL_APPROVAL, REVIEWER, STORY_POINTS]).await;
+        assert_offered(&db, &[COST_CENTER, LEGAL_APPROVAL, REVIEWER, STORY_POINTS]).await;
     }
 
     #[tokio::test]
@@ -280,7 +280,7 @@ mod the_pickers {
         )
         .await;
 
-        assert_offered(&db, &[COST_CENTRE, REVIEWER, STORY_POINTS]).await;
+        assert_offered(&db, &[COST_CENTER, REVIEWER, STORY_POINTS]).await;
     }
 
     #[tokio::test]
@@ -310,7 +310,7 @@ mod the_pickers {
         )
         .await;
 
-        assert_offered(&db, &[COST_CENTRE, REVIEWER, STORY_POINTS]).await;
+        assert_offered(&db, &[COST_CENTER, REVIEWER, STORY_POINTS]).await;
     }
 
     #[tokio::test]
@@ -327,6 +327,6 @@ mod the_pickers {
         let (_dir, db) = lab().await;
         execute(&db, "UPDATE view SET columns = '[\"customfield_10019\"]'").await;
 
-        assert_offered(&db, &[COST_CENTRE, LEGAL_APPROVAL, REVIEWER, STORY_POINTS]).await;
+        assert_offered(&db, &[COST_CENTER, LEGAL_APPROVAL, REVIEWER, STORY_POINTS]).await;
     }
 }

@@ -245,7 +245,7 @@ fn an_unknown_view_is_an_error_pointing_to_the_listing() {
 }
 
 #[test]
-fn levels_are_labelled_the_way_messages_show_them() {
+fn levels_are_labeled_the_way_messages_show_them() {
     for (id, label) in [
         (1, Some("Everything")),
         (2, Some("Recently changed")),

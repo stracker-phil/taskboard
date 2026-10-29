@@ -288,7 +288,7 @@ mod tests {
     }
 
     #[test]
-    fn a_file_without_behaviour_reads_as_two_seconds_and_until_unpinned() {
+    fn a_file_without_behavior_reads_as_two_seconds_and_until_unpinned() {
         let dir = temp_config_dir();
         fs::write(
             dir.path().join(FILE_NAME),
@@ -309,12 +309,12 @@ mod tests {
     }
 
     #[test]
-    fn the_default_behaviour_opens_issues_in_the_preview() {
+    fn the_default_behavior_opens_issues_in_the_preview() {
         assert_eq!(Behaviour::default().open_issues_in, IssueOpening::Preview);
     }
 
     #[test]
-    fn a_behaviour_serializes_the_opening_choice_as_open_issues_in() {
+    fn a_behavior_serializes_the_opening_choice_as_open_issues_in() {
         for (opening, text) in [
             (IssueOpening::Preview, "preview"),
             (IssueOpening::Full, "full"),
@@ -333,7 +333,7 @@ mod tests {
     }
 
     #[test]
-    fn a_behaviour_in_the_file_without_the_opening_choice_reads_as_preview() {
+    fn a_behavior_in_the_file_without_the_opening_choice_reads_as_preview() {
         let dir = temp_config_dir();
         fs::write(
             dir.path().join(FILE_NAME),
@@ -374,7 +374,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn the_behaviour_round_trips_through_the_store_and_the_file() {
+    async fn the_behavior_round_trips_through_the_store_and_the_file() {
         let dir = temp_config_dir();
         let store = SettingsStore::open(dir.path());
         let behaviour = Behaviour {

@@ -30,14 +30,14 @@ interface Props {
 
 /** "Columns for this view": a toggle per field and drag handles for the order; every change saves to the view. */
 export function ColumnsPopover({ view, spaceProjectId, anchor, onClose }: Props) {
-  const { data: catalogue = [] } = useColumnsCatalogue(view.listId);
+  const { data: catalog = [] } = useColumnsCatalogue(view.listId);
   const [search, setSearch] = useState("");
   const edit = useViewEdit();
   const toast = useStore((s) => s.toast);
   const save = (columns: string[]) => edit(api.viewSetColumns(view.id, columns), "Could not change the columns");
 
-  const standard = inViewOrder(catalogue.filter((c) => !c.custom), view.columns);
-  const custom = inViewOrder(catalogue.filter((c) => c.custom), view.columns);
+  const standard = inViewOrder(catalog.filter((c) => !c.custom), view.columns);
+  const custom = inViewOrder(catalog.filter((c) => c.custom), view.columns);
   const listedIds = [...standard, ...custom].map((c) => c.id);
   /** Each section keeps its own order; the view shows the Jira fields first. */
   const saveOrder = (nextStandard: Column[], nextCustom: Column[]) =>
@@ -126,7 +126,7 @@ function matches(column: Column, needle: string): boolean {
   return [LABELS[column.id] ?? column.name, column.id, hint].some((text) => text.toLowerCase().includes(needle));
 }
 
-/** The view's columns in its order, then the others in the catalogue's. */
+/** The view's columns in its order, then the others in the catalog's. */
 function inViewOrder(columns: Column[], shown: string[]): Column[] {
   const on = shown.map((id) => columns.find((c) => c.id === id)).filter((c): c is Column => !!c);
   return [...on, ...columns.filter((c) => !shown.includes(c.id))];

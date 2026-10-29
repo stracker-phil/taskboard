@@ -93,7 +93,7 @@ fn stable_hash(text: &str) -> u64 {
     })
 }
 
-/// `me` is always the first avatar colour; everyone else gets one of the others.
+/// `me` is always the first avatar color; everyone else gets one of the others.
 pub fn person(account_id: &str, name: &str, me: Option<&str>) -> Person {
     let color = if me == Some(account_id) {
         1
@@ -123,7 +123,7 @@ pub fn initials(name: &str) -> String {
         .collect()
 }
 
-/// Jira's epic colour (`ghx-label-N`, 1–14) mapped to the nearest of the five epic tints; an epic without one
+/// Jira's epic color (`ghx-label-N`, 1–14) mapped to the nearest of the five epic tints; an epic without one
 /// gets a tint from its id.
 pub fn epic_color(ghx_label: Option<&str>, epic_id: &str) -> u8 {
     let jira = ghx_label
@@ -224,7 +224,7 @@ mod tests {
     }
 
     #[test]
-    fn me_gets_the_first_avatar_colour_and_others_a_stable_one_of_the_rest() {
+    fn me_gets_the_first_avatar_color_and_others_a_stable_one_of_the_rest() {
         let me = person("acc-me", "Alex Morgan", Some("acc-me"));
         assert_eq!(me.color, 1);
         assert_eq!(me.initials, "AM");
@@ -239,7 +239,7 @@ mod tests {
     }
 
     #[test]
-    fn jira_epic_colours_map_to_the_five_tints() {
+    fn jira_epic_colors_map_to_the_five_tints() {
         for (ghx, expected) in [
             ("ghx-label-7", 1),
             ("ghx-label-3", 2),
@@ -252,7 +252,7 @@ mod tests {
     }
 
     #[test]
-    fn an_epic_without_a_known_colour_gets_a_stable_tint_from_its_id() {
+    fn an_epic_without_a_known_color_gets_a_stable_tint_from_its_id() {
         for ghx in [None, Some("red"), Some("ghx-label-99")] {
             let color = epic_color(ghx, "10042");
             assert!((1..=5).contains(&color), "{ghx:?}");

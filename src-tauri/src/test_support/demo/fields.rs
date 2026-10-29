@@ -55,7 +55,7 @@ pub fn fields() -> Vec<Value> {
         // Company-wide fields no tracked project fills: the field pickers leave them out.
         custom(
             10090,
-            "Cost centre",
+            "Cost center",
             json!({ "type": "option" }),
             "com.atlassian.jira.plugin.system.customfieldtypes:select",
         ),

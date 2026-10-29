@@ -185,7 +185,7 @@ describe("SyncPage", () => {
       expect(mocked.cacheReset).not.toHaveBeenCalled();
     });
 
-    it("closes without resetting when cancelled", async () => {
+    it("closes without resetting when canceled", async () => {
       await renderPage();
       await userEvent.click(screen.getByRole("button", { name: "Reset Cache" }));
 

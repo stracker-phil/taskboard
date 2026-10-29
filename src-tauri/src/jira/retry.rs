@@ -1,4 +1,4 @@
-//! When to send a request again: `429`, and `503` with `Retry-After`, up to 4 times. Honours
+//! When to send a request again: `429`, and `503` with `Retry-After`, up to 4 times. Honors
 //! `Retry-After`, else backs off exponentially with full jitter.
 
 use std::future::Future;
@@ -136,7 +136,7 @@ mod tests {
     }
 
     #[test]
-    fn retry_after_in_seconds_is_honoured_for_429_and_503() {
+    fn retry_after_in_seconds_is_honored_for_429_and_503() {
         assert_eq!(wait(0, 429, Some("2")), secs(2));
         assert_eq!(wait(0, 503, Some("3")), secs(3));
     }

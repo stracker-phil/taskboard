@@ -3,7 +3,7 @@ import type { BoardData } from "../../api";
 import { onIssueKeys } from "../../commands/issueKeys";
 import type { RowActionHandlers } from "../list/RowActions";
 
-/** The Board's issue keys: J/K (↓/↑) move through a column's cards, ←/→ to the neighbouring open column, ↩
+/** The Board's issue keys: J/K (↓/↑) move through a column's cards, ←/→ to the neighboring open column, ↩
  *  opens; Copy, Bookmark, the read toggle and Open in Jira act on the current card. Returns the current card's id. */
 export function useBoardKeys(data: BoardData, open: (id: string) => void, actions: RowActionHandlers & { copyUrl: (key: string) => void }) {
   const [selected, setSelected] = useState<string | null>(null);
@@ -30,7 +30,7 @@ export function useBoardKeys(data: BoardData, open: (id: string) => void, action
         const ids = all[column].ids;
         setSelected(ids[Math.min(Math.max(index + step, 0), ids.length - 1)]);
       },
-      // ← and → go to the same place in the neighbouring column.
+      // ← and → go to the same place in the neighboring column.
       setGroupOpen: (right) => {
         const { all, column, index } = where();
         const next = all[column + (right ? 1 : -1)];

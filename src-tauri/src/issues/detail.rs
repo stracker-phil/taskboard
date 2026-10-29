@@ -43,7 +43,7 @@ pub struct IssueDetail {
     /// UTC, RFC 3339.
     pub created_at: String,
     pub updated_at: String,
-    /// Jira's rendered HTML, untrusted: the page sanitises it before showing it.
+    /// Jira's rendered HTML, untrusted: the page sanitizes it before showing it.
     pub description_html: Option<String>,
     pub comment_count: i64,
     pub is_epic: bool,

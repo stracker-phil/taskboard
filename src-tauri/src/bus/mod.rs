@@ -171,7 +171,7 @@ impl<H: Host> CommandBus<H> {
     }
 }
 
-/// Which commands exist and can run now; menus leave out unknown ones and grey disabled ones.
+/// Which commands exist and can run now; menus leave out unknown ones and gray disabled ones.
 pub trait CommandStatus {
     fn knows(&self, id: &str) -> bool;
     fn is_enabled(&self, id: &str) -> bool;

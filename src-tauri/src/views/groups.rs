@@ -615,15 +615,15 @@ mod tests {
 
     #[test]
     fn priority_groups_follow_the_level_with_no_priority_last() {
-        let prioritised = |id: &str, name: Option<&str>| {
+        let prioritized = |id: &str, name: Option<&str>| {
             let mut row = row(id);
             row.priority = name.map(priority);
             (row, facts())
         };
         let rows = [
-            prioritised("1", None),
-            prioritised("2", Some("Low")),
-            prioritised("3", Some("High")),
+            prioritized("1", None),
+            prioritized("2", Some("Low")),
+            prioritized("3", Some("High")),
         ];
         let groups = run(&rows, GroupBy::Priority);
 

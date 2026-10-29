@@ -31,7 +31,7 @@
   min-height: 0;
 }
 
-/* Without the sidebar a window-coloured strip keeps the traffic lights off the panel. */
+/* Without the sidebar a window-colored strip keeps the traffic lights off the panel. */
 .shell__titlebar {
   flex: none;
   height: 42px;

@@ -1,4 +1,4 @@
-//! Compiles conditions to a parameterised SQL condition over `cache.issue i` (ADR 0024). Values only ever
+//! Compiles conditions to a parameterized SQL condition over `cache.issue i` (ADR 0024). Values only ever
 //! reach SQLite as bound parameters.
 
 use std::collections::HashMap;

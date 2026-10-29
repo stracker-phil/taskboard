@@ -91,9 +91,9 @@ describe("Peek", () => {
   it("shows the description without its tags", async () => {
     renderPeek();
 
-    const emphasised = await screen.findByText("pricing");
-    expect(emphasised.parentElement).toHaveTextContent("Update the pricing table.");
-    expect(emphasised.parentElement?.textContent).not.toContain("<");
+    const emphasized = await screen.findByText("pricing");
+    expect(emphasized.parentElement).toHaveTextContent("Update the pricing table.");
+    expect(emphasized.parentElement?.textContent).not.toContain("<");
   });
 
   it("drops scripts from the description", async () => {

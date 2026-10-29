@@ -11,7 +11,7 @@ use crate::jira::dto::Project;
 use crate::lists::ensure_space;
 use crate::sync::store::store_versions;
 
-/// How many Space tile colours the palette has (`--space-tile-*`).
+/// How many Space tile colors the palette has (`--space-tile-*`).
 const SPACE_COLORS: i64 = 12;
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
@@ -110,7 +110,7 @@ pub async fn tracked_projects(db: &Db) -> AppResult<Vec<ProjectRow>> {
 }
 
 /// Tracking a project for the first time makes its Space: next position, the name's first letter as
-/// icon, a tile colour by position, and its default views and filter lists. Untracking keeps all of it, so
+/// icon, a tile color by position, and its default views and filter lists. Untracking keeps all of it, so
 /// the settings survive re-tracking.
 pub async fn track_project(db: &Db, project_id: String, tracked: bool) -> AppResult<()> {
     db.write(move |tx, changes| {

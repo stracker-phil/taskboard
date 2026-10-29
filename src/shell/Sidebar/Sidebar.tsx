@@ -21,7 +21,7 @@ export function Sidebar() {
   const setExpanded = useSetExpanded();
   const setPaletteOpen = useStore((s) => s.setPaletteOpen);
   const [renamingId, setRenamingId] = useState<number | null>(null);
-  // The Space popover ("Colour and icon…", "Client label…") opens from here.
+  // The Space popover ("Color and icon…", "Client label…") opens from here.
   const [editing, setEditing] = useState<{ space: SpaceNode; focus: SpaceEditFocus } | null>(null);
 
   const currentId = nav?.location?.listId ?? null;

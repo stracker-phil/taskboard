@@ -286,7 +286,7 @@ describe("ViewTabs", () => {
       expect(screen.queryByRole("textbox", { name: "View name" })).not.toBeInTheDocument();
     });
 
-    it("leaves a view's name alone when the rename is cancelled", async () => {
+    it("leaves a view's name alone when the rename is canceled", async () => {
       await renderTabs();
       await userEvent.pointer({ keys: "[MouseRight]", target: screen.getByRole("tab", { name: "Sprint board" }) });
 
@@ -420,7 +420,7 @@ describe("ViewTabs", () => {
       await waitFor(() => expect(mocked.navGo).toHaveBeenCalledWith(11, null));
     });
 
-    it("keeps the view when the deletion is cancelled", async () => {
+    it("keeps the view when the deletion is canceled", async () => {
       await renderTabs([LIST, BOARD], 101);
       await userEvent.pointer({ keys: "[MouseRight]", target: screen.getByRole("tab", { name: "List" }) });
       await choose("Delete");

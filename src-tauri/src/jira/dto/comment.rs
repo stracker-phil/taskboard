@@ -14,7 +14,7 @@ pub struct Comment {
     /// ADF, kept for writes (M4).
     #[serde(default)]
     pub body: Value,
-    /// Jira's HTML, untrusted until the UI sanitises it.
+    /// Jira's HTML, untrusted until the UI sanitizes it.
     #[serde(default)]
     pub rendered_body: Option<String>,
     pub created: String,

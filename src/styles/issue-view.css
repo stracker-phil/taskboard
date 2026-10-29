@@ -93,7 +93,7 @@
 }
 .btn-secondary-small:hover { background: var(--hover-bg); border-color: var(--border-strong); }
 
-/* Jira's sanitised HTML. Images are link chips; nothing remote loads. */
+/* Jira's sanitized HTML. Images are link chips; nothing remote loads. */
 .jira-html { font-size: 15px; line-height: 1.6; color: var(--text-strong-body); overflow-wrap: anywhere; user-select: text; -webkit-user-select: text; }
 .jira-html p { margin: 0 0 10px; }
 .jira-html ul, .jira-html ol { margin: 0 0 10px; padding-left: 20px; }

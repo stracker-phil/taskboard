@@ -19,7 +19,7 @@ Carefully review the defined code scope and make sure it's easy to understand. I
 - Never restate a list that exists in code; describe the meaning, not the members. An enumeration goes stale the next time the list grows
 - Delete any summary line that is the symbol's own name as a sentence
 - Replace shorthand from your own investigation ("absent", "narrow", "the safe answer") with the vocabulary the code itself uses
-- Delete comments that are part of a dialogue with the user or yourself. Comments must strictly describe code
+- Delete comments that are part of a dialog with the user or yourself. Comments must strictly describe code
 - Never restate code in plain english; only describe reason or effect of the code if it's not obvious
 - Re-read every comment you wrote or kept as if seeing the code for the first time; a term that needs today's context to parse is a defect, not a style nit
 

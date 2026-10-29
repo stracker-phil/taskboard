@@ -48,7 +48,7 @@ interface TableProps {
   label: string;
   pins: PinItem[];
   onOpen: (pin: PinItem) => void;
-  /** Active pins can be unpinned; ended ones are greyed and show no time left. */
+  /** Active pins can be unpinned; ended ones are grayed and show no time left. */
   onUnpin?: (pin: PinItem) => void;
 }
 

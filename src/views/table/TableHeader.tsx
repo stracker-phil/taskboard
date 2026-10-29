@@ -16,8 +16,8 @@ interface Props {
 
 /** The sticky header row: every sortable name sorts on click, every column but Summary resizes at its edge. */
 export function TableHeader({ listId, columns, sort, widthOf, onSort, onResizeStart }: Props) {
-  const { data: catalogue = [] } = useColumnsCatalogue(listId);
-  const name = (id: string) => FIXED_NAMES[id] ?? catalogue.find((c) => c.id === id)?.name ?? id;
+  const { data: catalog = [] } = useColumnsCatalogue(listId);
+  const name = (id: string) => FIXED_NAMES[id] ?? catalog.find((c) => c.id === id)?.name ?? id;
 
   return (
     <div className="table-header" role="row">

@@ -6,7 +6,7 @@ function easeInOut(p: number): number {
   return p < 0.5 ? 2 * p * p : 1 - (-2 * p + 2) ** 2 / 2;
 }
 
-/** Animates a group's rows open or closed. A virtualised group isn't one element, so instead of a CSS height
+/** Animates a group's rows open or closed. A virtualized group isn't one element, so instead of a CSS height
  *  this drives a factor 0…1 per group that scales its rows' heights and opacity; only groups in motion have
  *  one. With no motion time (reduced motion, tests) nothing animates. */
 export function useGroupMotion() {

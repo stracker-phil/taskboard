@@ -1,4 +1,4 @@
-/* The Board layout (docs/ux.md → Board view; artboard 3). Each column carries its status tint and count colour. */
+/* The Board layout (docs/ux.md → Board view; artboard 3). Each column carries its status tint and count color. */
 .board {
   display: flex; align-items: flex-start; gap: 12px; height: 100%; min-height: 0; box-sizing: border-box; overflow: auto;
   padding: 6px 20px 20px 24px; border-top: 1px solid var(--hairline);

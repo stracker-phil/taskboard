@@ -67,7 +67,7 @@ impl<H: Host> Spec<H> {
         self
     }
 
-    /// A disabled command doesn't run, is greyed in menus and left out of the palette.
+    /// A disabled command doesn't run, is grayed in menus and left out of the palette.
     pub fn enabled_when(mut self, check: impl Fn(&H) -> bool + Send + Sync + 'static) -> Self {
         self.info.enabled = Some(Arc::new(check));
         self

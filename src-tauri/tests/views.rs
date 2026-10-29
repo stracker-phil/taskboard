@@ -1,5 +1,5 @@
 //! A view's rows on the demo site synced from the in-process fake Jira into a temp database: grouping, sort,
-//! narrowing, custom columns, status style overrides and the columns catalogue.
+//! narrowing, custom columns, status style overrides and the columns catalog.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -358,7 +358,7 @@ mod grouping {
 
     #[tokio::test]
     #[ignore = "syncs the demo site into a temp database"]
-    async fn grouping_by_epic_marks_each_group_with_its_epic_colour() {
+    async fn grouping_by_epic_marks_each_group_with_its_epic_color() {
         let site = Site::new().await;
         let (space, view) = site.nw().await;
         view_set_group(site.db(), view, GroupBy::Epic)
@@ -1393,7 +1393,7 @@ mod board {
     }
 }
 
-mod catalogue {
+mod catalog {
     use super::*;
 
     #[tokio::test]

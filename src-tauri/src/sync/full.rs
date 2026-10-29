@@ -17,7 +17,7 @@ use crate::jira::dto::Myself;
 use crate::jira::{SearchRequest, jql};
 use crate::store::settings::Connection;
 
-/// Every issue field the cache maps, besides the site's sprint and epic colour fields.
+/// Every issue field the cache maps, besides the site's sprint and epic color fields.
 const SEARCH_FIELDS: &[&str] = &[
     "summary",
     "status",
@@ -82,7 +82,7 @@ pub async fn full_sync(
         .await
 }
 
-/// What a search asks for: the mapped fields, the site's sprint and epic colour fields, and the custom fields
+/// What a search asks for: the mapped fields, the site's sprint and epic color fields, and the custom fields
 /// shown in the field grid or as a column or filled by the tracked projects (the Issue view shows those).
 pub(super) async fn search_fields(ctx: &SyncContext, ids: &FieldIds) -> AppResult<Vec<String>> {
     let mut fields: Vec<String> = SEARCH_FIELDS.iter().map(|f| f.to_string()).collect();
@@ -91,7 +91,7 @@ pub(super) async fn search_fields(ctx: &SyncContext, ids: &FieldIds) -> AppResul
     Ok(fields)
 }
 
-/// The site's field list, stored; returns its sprint and epic colour fields.
+/// The site's field list, stored; returns its sprint and epic color fields.
 pub(super) async fn refresh_fields(ctx: &SyncContext, source: &dyn Source) -> AppResult<FieldIds> {
     let fields = source.fields().await?;
     ctx.db.write(move |tx, _| store_fields(tx, &fields)).await
@@ -134,7 +134,7 @@ async fn sync_metadata(
         })
         .await?;
     log::info!(
-        "Jira fields: sprint {}, epic colour {}",
+        "Jira fields: sprint {}, epic color {}",
         ids.sprint.as_deref().unwrap_or("none"),
         ids.epic_color.as_deref().unwrap_or("none")
     );

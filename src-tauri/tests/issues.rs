@@ -433,7 +433,7 @@ async fn releases_are_listed_by_version_name() {
 
 #[tokio::test]
 #[ignore = "syncs the demo site into a temp database"]
-async fn the_demo_account_is_the_assignee_with_colour_one() {
+async fn the_demo_account_is_the_assignee_with_color_one() {
     let site = Site::new().await;
 
     let detail = site.detail("NW-1042").await;
@@ -773,7 +773,7 @@ async fn a_status_edited_on_the_site_shows_as_a_change_with_names_and_styles() {
 
 #[tokio::test]
 #[ignore = "syncs the demo site into a temp database"]
-async fn a_chosen_status_style_colours_the_status_change() {
+async fn a_chosen_status_style_colors_the_status_change() {
     let site = Site::new().await;
     let status = site.status_of("NW-1044").await;
     status_style_set(

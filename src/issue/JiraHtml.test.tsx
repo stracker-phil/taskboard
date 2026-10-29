@@ -26,7 +26,7 @@ beforeEach(() => {
 });
 
 describe("JiraHtml", () => {
-  it("renders the sanitised markup without its scripts", () => {
+  it("renders the sanitized markup without its scripts", () => {
     renderHtml('<p>Hello <strong>team</strong></p><script>alert(1)</script>');
 
     expect(screen.getByText("team").tagName).toBe("STRONG");

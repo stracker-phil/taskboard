@@ -258,9 +258,9 @@ describe("ListView", () => {
   });
 
   describe("inline labels", () => {
-    const LABELLED = row({ id: "5", key: "NW-1005", summary: "Update the footer", labels: [{ name: "launch", tint: 1 }] });
+    const LABELED = row({ id: "5", key: "NW-1005", summary: "Update the footer", labels: [{ name: "launch", tint: 1 }] });
     const renderWith = async (inlineLabels: boolean | undefined, columns: string[]) => {
-      mocked.viewRows.mockResolvedValue(viewData([groupOf([LABELLED])], [LABELLED], { columns }));
+      mocked.viewRows.mockResolvedValue(viewData([groupOf([LABELED])], [LABELED], { columns }));
       render(
         <QueryClientProvider client={createQueryClient()}>
           <ListView listId={11} viewId={101} inlineLabels={inlineLabels} />
@@ -856,7 +856,7 @@ describe("ListView", () => {
     });
   });
 
-  describe("virtualisation", () => {
+  describe("virtualization", () => {
     it("renders only the visible part of 5,000 rows", async () => {
       const many = Array.from({ length: 5000 }, (_, i) => row({ id: String(i), key: `NW-${i + 1}`, summary: `Task ${i + 1}` }));
       await renderList(viewData([groupOf(many)], many));

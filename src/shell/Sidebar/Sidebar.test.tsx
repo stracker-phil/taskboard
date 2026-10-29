@@ -82,7 +82,7 @@ async function renderSidebar(tree: SidebarTree = treeWith(), nav: Nav = navAt(nu
 }
 
 // A row's label and count are adjacent spans, so its accessible name is the label followed by the count, no space.
-// Recently changed shows its count as a badge labelled "<n> unread".
+// Recently changed shows its count as a badge labeled "<n> unread".
 const named = (label: string) => new RegExp(`^${label}\\s*(\\d+( unread)?)?$`);
 const spaceButton = (label: string) => screen.getByRole("button", { name: named(label) });
 
@@ -510,7 +510,7 @@ describe("Sidebar", () => {
       expect(screen.queryByRole("textbox", { name: "Filter list name" })).not.toBeInTheDocument();
     });
 
-    it("keeps the name when the rename is cancelled with escape", async () => {
+    it("keeps the name when the rename is canceled with escape", async () => {
       await chooseFromMenu("Rename");
 
       await userEvent.type(screen.getByRole("textbox", { name: "Filter list name" }), "Backlog{Escape}");
@@ -536,7 +536,7 @@ describe("Sidebar", () => {
       expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
     });
 
-    it("keeps the list when the deletion is cancelled", async () => {
+    it("keeps the list when the deletion is canceled", async () => {
       await chooseFromMenu("Delete");
 
       await userEvent.click(await screen.findByRole("button", { name: "Cancel" }));
@@ -684,7 +684,7 @@ describe("Sidebar", () => {
       expect(await screen.findByText("Could not open the Space's settings: No window")).toBeInTheDocument();
     });
 
-    it("renames the Space in place, keeping its icon, colour and client", async () => {
+    it("renames the Space in place, keeping its icon, color and client", async () => {
       await chooseFromMenu("Rename");
 
       const field = screen.getByRole("textbox", { name: "Space name" });
@@ -721,7 +721,7 @@ describe("Sidebar", () => {
       await waitFor(() => expect(mocked.projectTrack).toHaveBeenCalledWith("10001", false));
     });
 
-    it("keeps tracking the project when the question is cancelled", async () => {
+    it("keeps tracking the project when the question is canceled", async () => {
       await chooseFromMenu("Stop tracking");
 
       await userEvent.click(await screen.findByRole("button", { name: "Cancel" }));

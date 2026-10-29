@@ -4,7 +4,7 @@ import { sanitizeJiraHtml } from "../lib/jiraHtml";
 import { useConnection } from "../queries/settings";
 import { attempt } from "../state/requests";
 
-/** Jira's HTML (a description, a comment), sanitised; its links open in the default browser. */
+/** Jira's HTML (a description, a comment), sanitized; its links open in the default browser. */
 export function JiraHtml({ html, className }: { html: string; className?: string }) {
   const { data: connection } = useConnection();
   const site = connection?.connection.siteUrl;

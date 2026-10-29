@@ -2,7 +2,7 @@
 
 export type ActivityItem = { "kind": "comment", id: string, author: Person | null, 
 /**
- * Jira's rendered HTML, untrusted: the page sanitises it.
+ * Jira's rendered HTML, untrusted: the page sanitizes it.
  */
 bodyHtml: string | null, 
 /**
@@ -113,7 +113,7 @@ export type Condition = { field: Field, op: Op, value?: Value, };
 
 export type Connection = { 
 /**
- * Normalised (`https://example.atlassian.net/`); empty until set up.
+ * Normalized (`https://example.atlassian.net/`); empty until set up.
  */
 siteUrl: string, email: string, tokenKind: TokenKind, tokenExpires: string | null, 
 /**
@@ -224,7 +224,7 @@ due: string | null,
  */
 createdAt: string, updatedAt: string, 
 /**
- * Jira's rendered HTML, untrusted: the page sanitises it before showing it.
+ * Jira's rendered HTML, untrusted: the page sanitizes it before showing it.
  */
 descriptionHtml: string | null, commentCount: number, isEpic: boolean, 
 /**
@@ -576,7 +576,7 @@ listId: number, projectId: string, key: string, name: string,
  */
 projectName: string, icon: string | null, 
 /**
- * A Space tile colour token number.
+ * A Space tile color token number.
  */
 color: string | null, client: string | null, openCount: number, lists: Array<ListNode>, };
 

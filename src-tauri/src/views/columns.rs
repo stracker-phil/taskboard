@@ -39,13 +39,13 @@ pub struct CustomColumn {
     pub kind: String,
 }
 
-/// Custom fields with a value a cell can show. Jira's `any` fields (rank, epic colour) are internal, and the
+/// Custom fields with a value a cell can show. Jira's `any` fields (rank, epic color) are internal, and the
 /// sprint field is the standard Sprint column.
 pub const SHOWABLE: &str =
     "id LIKE 'customfield\\_%' ESCAPE '\\' AND COALESCE(type, '') <> 'any' AND name <> 'Sprint'";
 
 /// The columns a level's views can show: the standard ones and the custom fields its Space doesn't hide.
-pub fn catalogue(conn: &Connection, list_id: i64) -> AppResult<Vec<Column>> {
+pub fn catalog(conn: &Connection, list_id: i64) -> AppResult<Vec<Column>> {
     let hidden = hidden_columns(conn, list_id)?;
     let mut columns: Vec<Column> = STANDARD
         .iter()
@@ -93,7 +93,7 @@ pub fn custom_columns(conn: &Connection, ids: &[String]) -> AppResult<Vec<Custom
 }
 
 pub async fn columns_catalogue(db: &Db, list_id: i64) -> AppResult<Vec<Column>> {
-    db.read(move |conn| catalogue(conn, list_id)).await
+    db.read(move |conn| catalog(conn, list_id)).await
 }
 
 #[cfg(test)]

@@ -1,6 +1,6 @@
 import type { Person } from "../../api";
 
-/** A person's initials on their colour. */
+/** A person's initials on their color. */
 export function Avatar({ person, size = 26 }: { person: Person; size?: number }) {
   return (
     <span

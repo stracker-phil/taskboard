@@ -60,7 +60,7 @@ pub struct SpaceNode {
     /// The Jira project's own name; `name` differs when the owner renamed the Space.
     pub project_name: String,
     pub icon: Option<String>,
-    /// A Space tile colour token number.
+    /// A Space tile color token number.
     pub color: Option<String>,
     pub client: Option<String>,
     pub open_count: i64,

@@ -1,5 +1,5 @@
 /* The List layout (artboard 1, docs/ux.md → List view): each group a white card under its status tab, on the
-   faint list canvas. Virtualised items draw the card piece by piece: the header row, then each row with its
+   faint list canvas. Virtualized items draw the card piece by piece: the header row, then each row with its
    card edges by position. Columns share one grid, measured per view (`--list-columns`). */
 .list-scroll {
   height: 100%; min-height: 0; overflow: auto; box-sizing: border-box;
@@ -87,7 +87,7 @@
 .row-actions__btn:hover:not(:disabled) { background: var(--hover-bg); color: var(--text); }
 .row-actions__btn:disabled { opacity: 0.45; }
 
-/* Wrapped titles (the List's default): a row grows with its title; cells stay centred, the square and key sit
+/* Wrapped titles (the List's default): a row grows with its title; cells stay centered, the square and key sit
    on the first line. */
 .list-row--wrap { height: auto; min-height: 44px; padding-top: 8px; padding-bottom: 8px; }
 .list-row--wrap .list-row__name { align-items: flex-start; }

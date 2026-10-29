@@ -22,7 +22,7 @@ pub enum Layout {
 #[serde(rename_all = "camelCase")]
 pub enum GroupBy {
     Status,
-    /// The status's style: one group per status type (colour), however many statuses share it.
+    /// The status's style: one group per status type (color), however many statuses share it.
     StatusType,
     Project,
     Client,
