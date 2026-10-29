@@ -2,7 +2,7 @@
 
 export type ActivityItem = { "kind": "comment", id: string, author: Person | null, 
 /**
- * Jira's rendered HTML, untrusted: the page sanitizes it.
+ * Rendered from the comment's ADF, else Jira's rendered HTML; untrusted: the page sanitizes it.
  */
 bodyHtml: string | null, 
 /**
@@ -169,7 +169,7 @@ export type ConnectionView = { connection: Connection, hasToken: boolean, expiry
 
 export type CustomField = { id: string, name: string, value: Cell | null, 
 /**
- * Jira's rendered HTML for a rich text field (acceptance criteria, steps to reproduce); `value` is then empty.
+ * A rich text field's HTML (acceptance criteria, steps to reproduce), from its ADF; `value` is then empty.
  */
 html: string | null, };
 
@@ -246,7 +246,7 @@ due: string | null,
  */
 createdAt: string, updatedAt: string, 
 /**
- * Jira's rendered HTML, untrusted: the page sanitizes it before showing it.
+ * Rendered from the description's ADF, else Jira's rendered HTML; untrusted: the page sanitizes it.
  */
 descriptionHtml: string | null, commentCount: number, isEpic: boolean, 
 /**

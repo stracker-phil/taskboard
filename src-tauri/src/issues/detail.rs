@@ -9,6 +9,7 @@ use ts_rs::TS;
 
 use super::attachments::{Attachment, attachments_of};
 use super::{status_names, user_names};
+use crate::adf;
 use crate::changes::{Names, Since, since, unseen_since};
 use crate::db::Db;
 use crate::error::{AppError, AppResult};
@@ -44,7 +45,7 @@ pub struct IssueDetail {
     /// UTC, RFC 3339.
     pub created_at: String,
     pub updated_at: String,
-    /// Jira's rendered HTML, untrusted: the page sanitizes it before showing it.
+    /// Rendered from the description's ADF, else Jira's rendered HTML; untrusted: the page sanitizes it.
     pub description_html: Option<String>,
     pub comment_count: i64,
     pub is_epic: bool,
@@ -69,7 +70,7 @@ pub struct CustomField {
     pub id: String,
     pub name: String,
     pub value: Option<Cell>,
-    /// Jira's rendered HTML for a rich text field (acceptance criteria, steps to reproduce); `value` is then empty.
+    /// A rich text field's HTML (acceptance criteria, steps to reproduce), from its ADF; `value` is then empty.
     pub html: Option<String>,
 }
 
@@ -80,7 +81,7 @@ pub async fn issue_get(db: &Db, viewer: Viewer, id: String) -> AppResult<IssueDe
 const SELECT: &str = "SELECT i.id, i.key, i.issue_type, i.summary, i.status_id, COALESCE(st.name, ''),
     i.status_category, e.id, e.summary, e.epic_color, i.fix_versions, i.priority, i.assignee_id, a.name,
     i.reporter_id, r.name, i.sprint, i.labels, i.due_date, i.created_at, i.updated_at, i.description_html,
-    i.comment_count, i.is_epic, i.gone, i.raw, i.synced_at, i.project_id
+    i.comment_count, i.is_epic, i.gone, i.raw, i.synced_at, i.project_id, i.description_adf
     FROM cache.issue i
     LEFT JOIN cache.status st ON st.id = i.status_id
     LEFT JOIN cache.user a ON a.account_id = i.assignee_id
@@ -145,7 +146,7 @@ fn read(conn: &Connection, viewer: &Viewer, id: &str) -> AppResult<IssueDetail> 
                 .map(|d| rows::format_due(d, ctx.today)),
             created_at: r.get(19)?,
             updated_at: r.get(20)?,
-            description_html: r.get(21)?,
+            description_html: adf::html_or(r.get::<_, Option<String>>(28)?.as_deref(), r.get(21)?),
             comment_count: r.get(22)?,
             is_epic: r.get::<_, i64>(23)? != 0,
             gone: r.get::<_, i64>(24)? != 0,
@@ -215,12 +216,12 @@ fn custom_fields(
             .optional()?
             .unwrap_or_else(|| id.clone());
         let value = &raw["fields"][&id];
-        // Rich text arrives as an ADF document; Jira's rendering of it is in `renderedFields`.
+        // Rich text arrives as an ADF document; Jira's lossy rendering of it is in `renderedFields`.
         let html = (value["type"] == "doc")
-            .then(|| raw["renderedFields"][&id].as_str())
+            .then(|| adf::to_html(value))
             .flatten()
-            .filter(|html| !html.trim().is_empty())
-            .map(str::to_string);
+            .or_else(|| raw["renderedFields"][&id].as_str().map(str::to_string))
+            .filter(|html| !html.trim().is_empty());
         Ok(CustomField {
             value: if html.is_some() || value["type"] == "doc" {
                 None
@@ -386,12 +387,23 @@ mod tests {
         assert_eq!(found, [empty(ZONE, "Zone")]);
     }
 
+    fn doc_with(content: Value) -> Value {
+        json!({ "type": "doc", "version": 1, "content": content })
+    }
+
+    fn arrow_paragraph() -> Value {
+        json!([{ "type": "paragraph", "content": [
+            { "type": "text", "text": "Check " },
+            { "type": "text", "text": "a->b->c", "marks": [{ "type": "code" }] },
+        ] }])
+    }
+
     #[tokio::test]
-    async fn a_rich_text_field_gives_its_rendered_html_and_no_value() {
+    async fn a_rich_text_field_gives_html_rendered_from_its_adf_and_no_value() {
         let (_dir, db) = lab().await;
         let raw = json!({
-            "fields": { NOTES: doc() },
-            "renderedFields": { NOTES: "<p>Check the totals</p>" },
+            "fields": { NOTES: doc_with(arrow_paragraph()) },
+            "renderedFields": { NOTES: "<p>Check <tt>a</tt><del>b</del>c</p>" },
         });
 
         let found = custom(&db, raw).await;
@@ -402,16 +414,61 @@ mod tests {
                 id: NOTES.into(),
                 name: "Notes".into(),
                 value: None,
-                html: Some("<p>Check the totals</p>".into()),
+                html: Some("<p>Check <code>a-&gt;b-&gt;c</code></p>".into()),
             }]
         );
     }
 
     #[tokio::test]
-    async fn an_unshown_rich_text_field_with_blank_html_is_left_out() {
+    async fn a_rich_text_field_renders_from_its_adf_without_rendered_fields() {
+        let (_dir, db) = lab().await;
+        let raw = json!({ "fields": { NOTES: doc_with(arrow_paragraph()) } });
+
+        let found = custom(&db, raw).await;
+
+        assert_eq!(
+            found,
+            [CustomField {
+                id: NOTES.into(),
+                name: "Notes".into(),
+                value: None,
+                html: Some("<p>Check <code>a-&gt;b-&gt;c</code></p>".into()),
+            }]
+        );
+    }
+
+    #[tokio::test]
+    async fn a_value_that_is_no_valid_adf_doc_falls_back_to_the_rendered_html() {
         let (_dir, db) = lab().await;
 
-        for rendered in [json!({ NOTES: "  " }), json!({})] {
+        for value in [json!("Check the totals"), json!({ "type": "doc" })] {
+            let raw = json!({
+                "fields": { NOTES: value },
+                "renderedFields": { NOTES: "<p>Check the totals</p>" },
+            });
+
+            assert_eq!(
+                custom(&db, raw).await,
+                [CustomField {
+                    id: NOTES.into(),
+                    name: "Notes".into(),
+                    value: None,
+                    html: Some("<p>Check the totals</p>".into()),
+                }],
+                "{value}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn an_unshown_rich_text_field_with_no_content_is_left_out_whatever_jira_rendered() {
+        let (_dir, db) = lab().await;
+
+        for rendered in [
+            json!({ NOTES: "<p>Stale</p>" }),
+            json!({ NOTES: "  " }),
+            json!({}),
+        ] {
             let raw = json!({ "fields": { NOTES: doc() }, "renderedFields": rendered });
 
             assert_eq!(custom(&db, raw.clone()).await, [], "{raw}");
@@ -419,10 +476,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_shown_rich_text_field_with_blank_html_is_listed_without_value_or_html() {
+    async fn a_shown_rich_text_field_with_no_content_is_listed_without_value_or_html() {
         let (_dir, db) = lab().await;
         show(&db, NOTES).await;
-        let raw = json!({ "fields": { NOTES: doc() }, "renderedFields": { NOTES: "" } });
+        let raw =
+            json!({ "fields": { NOTES: doc() }, "renderedFields": { NOTES: "<p>Stale</p>" } });
 
         let found = custom(&db, raw).await;
 

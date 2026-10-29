@@ -11,6 +11,7 @@ use rusqlite::Connection;
 use serde::Serialize;
 use ts_rs::TS;
 
+use crate::adf;
 use crate::changes::unseen_since;
 use crate::db::Db;
 use crate::error::AppResult;
@@ -30,7 +31,7 @@ pub enum ActivityItem {
     Comment {
         id: String,
         author: Option<Person>,
-        /// Jira's rendered HTML, untrusted: the page sanitizes it.
+        /// Rendered from the comment's ADF, else Jira's rendered HTML; untrusted: the page sanitizes it.
         body_html: Option<String>,
         /// UTC, RFC 3339.
         at: String,
@@ -106,7 +107,7 @@ fn at(item: &ActivityItem) -> &str {
 
 fn comments(conn: &Connection, id: &str, values: &Values) -> AppResult<Vec<ActivityItem>> {
     let mut query = conn.prepare(
-        "SELECT id, author_id, body_html, created_at, updated_at FROM cache.comment WHERE issue_id = ?1",
+        "SELECT id, author_id, body_html, created_at, updated_at, body_adf FROM cache.comment WHERE issue_id = ?1",
     )?;
     let rows = query.query_map([id], |r| {
         let author_id: Option<String> = r.get(1)?;
@@ -115,7 +116,7 @@ fn comments(conn: &Connection, id: &str, values: &Values) -> AppResult<Vec<Activ
         Ok(ActivityItem::Comment {
             id: r.get(0)?,
             author: author_id.map(|a| values.person(&a, None)),
-            body_html: r.get(2)?,
+            body_html: adf::html_or(r.get::<_, Option<String>>(5)?.as_deref(), r.get(2)?),
             edited: updated != created,
             at: created,
             fresh: false,

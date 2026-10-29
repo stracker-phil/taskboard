@@ -423,11 +423,11 @@ fn store_comments(conn: &Connection, mapped: &Mapped, now: &str) -> AppResult<()
     }
     for comment in &mapped.comments {
         conn.execute(
-            "INSERT INTO cache.comment (id, issue_id, author_id, body_html, body_text, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+            "INSERT INTO cache.comment (id, issue_id, author_id, body_html, body_text, created_at, updated_at, body_adf)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
              ON CONFLICT (id) DO UPDATE SET issue_id = excluded.issue_id, author_id = excluded.author_id,
                body_html = excluded.body_html, body_text = excluded.body_text,
-               created_at = excluded.created_at, updated_at = excluded.updated_at",
+               created_at = excluded.created_at, updated_at = excluded.updated_at, body_adf = excluded.body_adf",
             params![
                 comment.id,
                 comment.issue_id,
@@ -435,7 +435,8 @@ fn store_comments(conn: &Connection, mapped: &Mapped, now: &str) -> AppResult<()
                 comment.body_html,
                 comment.body_text,
                 comment.created_at,
-                comment.updated_at
+                comment.updated_at,
+                comment.body_adf
             ],
         )?;
     }

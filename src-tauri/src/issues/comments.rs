@@ -62,8 +62,8 @@ fn store(conn: &Connection, id: &str, comments: &[Comment], now: &str) -> AppRes
             )?;
         }
         conn.execute(
-            "INSERT INTO cache.comment (id, issue_id, author_id, body_html, body_text, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            "INSERT INTO cache.comment (id, issue_id, author_id, body_html, body_text, created_at, updated_at, body_adf)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             params![
                 comment.id,
                 id,
@@ -71,7 +71,8 @@ fn store(conn: &Connection, id: &str, comments: &[Comment], now: &str) -> AppRes
                 comment.rendered_body,
                 body_text,
                 created,
-                updated
+                updated,
+                Some(&comment.body).filter(|b| b.is_object()).map(Value::to_string)
             ],
         )?;
         texts.push(body_text);

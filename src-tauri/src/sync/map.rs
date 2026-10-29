@@ -54,6 +54,7 @@ pub struct CommentRow {
     pub issue_id: String,
     pub author_id: Option<String>,
     pub body_html: Option<String>,
+    pub body_adf: Option<String>,
     pub body_text: String,
     pub created_at: String,
     pub updated_at: String,
@@ -226,6 +227,9 @@ fn comments_of(issue: &Issue) -> Vec<CommentRow> {
             Some(CommentRow {
                 body_text: body_html.as_deref().map(html_to_text).unwrap_or_default(),
                 body_html,
+                body_adf: Some(&c["body"])
+                    .filter(|b| b.is_object())
+                    .map(Value::to_string),
                 issue_id: issue.id.clone(),
                 author_id: text(&c["author"]["accountId"]),
                 created_at: utc(&c["created"])?,
@@ -688,6 +692,42 @@ mod tests {
         assert!(comments.iter().all(|c| c.updated_at == c.created_at));
         let distinct: HashSet<&str> = comments.iter().map(|c| c.id.as_str()).collect();
         assert_eq!(distinct.len(), 4);
+    }
+
+    #[test]
+    fn a_comment_row_carries_its_body_adf_as_json() {
+        let issue = demo_issue("NW-1047");
+
+        let comments = map_issue(&issue, &ids()).unwrap().comments;
+
+        assert_eq!(comments.len(), 1);
+        let adf: Value = serde_json::from_str(comments[0].body_adf.as_deref().unwrap()).unwrap();
+        assert_eq!(adf, issue.fields["comment"]["comments"][0]["body"]);
+        assert_eq!(adf["type"], "doc");
+    }
+
+    #[test]
+    fn a_comment_whose_body_is_not_an_object_has_no_adf() {
+        for body in [json!("Plain text"), json!(["a"]), Value::Null] {
+            let mapped = mapped_edit("NW-1042", |issue| {
+                for comment in issue["fields"]["comment"]["comments"]
+                    .as_array_mut()
+                    .unwrap()
+                {
+                    comment["body"] = body.clone();
+                }
+            });
+
+            assert_eq!(mapped.comments.len(), 4, "{body}");
+            assert!(
+                mapped.comments.iter().all(|c| c.body_adf.is_none()),
+                "{body}"
+            );
+            assert!(
+                mapped.comments.iter().all(|c| c.body_html.is_some()),
+                "{body}"
+            );
+        }
     }
 
     #[test]

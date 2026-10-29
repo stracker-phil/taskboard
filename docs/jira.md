@@ -112,6 +112,28 @@ only when it is `https` on the connected site's host and port (`issues::is_on_si
 `open_url`. Quick Look shows a downloaded copy (`attachment_content`, below;
 [ADR 0035](adr/0035-attachments-preview-in-quick-look.md)). `parse_jira_time` reads Jira's `2026-10-20T09:14:03.120+0200`.
 
+## Rich text (ADF)
+
+Descriptions, rich text custom fields and comments are shown from their Atlassian Document Format, not from
+Jira's `renderedFields` HTML ([ADR 0036](adr/0036-rich-text-renders-from-adf-not-renderedfields.md)): Jira builds
+that HTML through wiki markup, so inline code comes back as `<tt>` and `->text->` as strike-through. The cache
+keeps the ADF (`issue.description_adf`, `comment.body_adf`, the custom field in `issue.raw`) next to Jira's HTML;
+`issues/detail.rs` and `issues/activity/` render it with `adf::html_or` and fall back to the HTML when there is no
+ADF or it isn't a document. Search text still comes from the HTML (`sync::map::html_to_text`).
+
+`src-tauri/src/adf/` is pure. It escapes all text and writes only tags the page's sanitizer allows:
+
+- **Blocks** (`blocks.rs`): paragraph, heading 1–6, bullet, ordered (`start` from `attrs.order`), task (☑/☐) and
+  decision lists, blockquote, code block (`<pre title="language"><code>`), rule, tables with `colspan`/`rowspan`,
+  panel (`adf-panel adf-panel--<type>`), expand and nested expand (`adf-expand`, its title in
+  `adf-expand__title`), media single and group, block and embed cards.
+- **Inline** (`inline.rs`): text with the marks strong, em, underline, strike (`<s>`), code (`<code>`), sub/sup
+  and link (colors ignored), hard break, mention (`adf-mention`, `@Name`), emoji (its text, else the short name),
+  date (`Oct 30, 2026`, UTC), status (`adf-status adf-status--<color>`), inline card.
+- **Links** keep an `https` address or a path on the site (the page resolves it), else they lose the address.
+- **Media** become a text chip, "Attachment · name" (`jira-chip`); nothing remote is referenced.
+- **Unknown nodes** render their text or their children; a node that isn't an object is skipped.
+
 **Search pages** come one after another: `SearchPages::next_page` sends the previous page's `nextPageToken`
 and stops after a page with `isLast` (or without a token). A failed page is returned once, then the cursor
 ends; the caller decides whether to repeat the job.
@@ -168,5 +190,6 @@ but answers `401` without one.
 - `requests()` and `paths()` return what it was asked, with the `Authorization` header and the JSON body.
 
 The demo site (`test_support/demo/`) is made up and matches the mockup (`demo/web_links.rs` gives a few issues
-pull request and document links, `demo/attachments.rs` a few issues' files, `demo/history.rs` a few issues' changelogs); `synthetic(n)` builds `n` issues on the
+pull request and document links, `demo/attachments.rs` a few issues' files, `demo/history.rs` a few issues' changelogs; `demo/adf.rs` turns demo text with
+`` `code` ``, `~~strike~~`, `@{Name}`, `{status:TEXT}` and code fences into ADF and Jira's lossy HTML, used by NW-1047); `synthetic(n)` builds `n` issues on the
 same site for performance tests.

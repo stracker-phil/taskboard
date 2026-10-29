@@ -283,6 +283,42 @@ impl Site {
             .unwrap()
     }
 
+    /// The stored ADF of each of the issue's comments, as JSON.
+    async fn comment_adfs(&self, key: &str) -> Vec<Option<serde_json::Value>> {
+        let key = key.to_string();
+        self.db()
+            .read(move |conn| {
+                let mut query = conn.prepare(
+                    "SELECT c.body_adf FROM cache.comment c JOIN cache.issue i ON i.id = c.issue_id
+                     WHERE i.key = ?1 ORDER BY c.created_at",
+                )?;
+                let rows = query.query_map([&key], |r| r.get::<_, Option<String>>(0))?;
+                let adfs: Vec<Option<String>> = rows.collect::<Result<_, _>>()?;
+                Ok(adfs
+                    .into_iter()
+                    .map(|adf| adf.map(|json| serde_json::from_str(&json).unwrap()))
+                    .collect())
+            })
+            .await
+            .unwrap()
+    }
+
+    async fn raw_of(&self, key: &str) -> serde_json::Value {
+        let key = key.to_string();
+        let raw = self
+            .db()
+            .read(move |conn| {
+                Ok(
+                    conn.query_row("SELECT raw FROM cache.issue WHERE key = ?1", [&key], |r| {
+                        r.get::<_, String>(0)
+                    })?,
+                )
+            })
+            .await
+            .unwrap();
+        serde_json::from_str(&raw).unwrap()
+    }
+
     async fn count_rows(&self, sql: String) -> i64 {
         self.db()
             .read(move |conn| Ok(conn.query_row(&sql, [], |r| r.get::<_, i64>(0))?))
@@ -354,6 +390,16 @@ fn comment_times(items: &[ActivityItem]) -> Vec<&str> {
         .iter()
         .filter_map(|item| match item {
             ActivityItem::Comment { at, .. } => Some(at.as_str()),
+            ActivityItem::Change { .. } => None,
+        })
+        .collect()
+}
+
+fn comment_htmls(items: &[ActivityItem]) -> Vec<Option<&str>> {
+    items
+        .iter()
+        .filter_map(|item| match item {
+            ActivityItem::Comment { body_html, .. } => Some(body_html.as_deref()),
             ActivityItem::Change { .. } => None,
         })
         .collect()
@@ -536,6 +582,183 @@ async fn the_description_arrives_as_rendered_html() {
         "{html}"
     );
     assert_eq!(site.detail("NW-1049").await.description_html, None);
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn the_description_is_rendered_from_its_adf_over_jiras_lossy_html() {
+    let site = Site::new().await;
+    site.execute(
+        r#"UPDATE cache.issue SET
+             description_html = '<p>Stored <tt>a</tt><del>b</del>c</p>',
+             description_adf = '{"type":"doc","version":1,"content":[{"type":"paragraph","content":[{"type":"text","text":"a->b->c","marks":[{"type":"code"}]}]}]}'
+           WHERE key = 'NW-1042'"#,
+    )
+    .await;
+
+    let html = site.detail("NW-1042").await.description_html;
+
+    assert_eq!(html.as_deref(), Some("<p><code>a-&gt;b-&gt;c</code></p>"));
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn a_description_without_usable_adf_shows_the_stored_html() {
+    let site = Site::new().await;
+
+    for (sql, label) in [
+        (
+            "UPDATE cache.issue SET description_adf = NULL,
+               description_html = '<p>Stored <tt>a</tt><del>b</del>c</p>' WHERE key = 'NW-1042'",
+            "no ADF",
+        ),
+        (
+            "UPDATE cache.issue SET description_adf = '{not json',
+               description_html = '<p>Stored <tt>a</tt><del>b</del>c</p>' WHERE key = 'NW-1042'",
+            "malformed JSON",
+        ),
+        (
+            "UPDATE cache.issue SET description_adf = '[1, 2]',
+               description_html = '<p>Stored <tt>a</tt><del>b</del>c</p>' WHERE key = 'NW-1042'",
+            "not a document",
+        ),
+    ] {
+        site.execute(sql).await;
+
+        let html = site.detail("NW-1042").await.description_html;
+
+        assert_eq!(
+            html.as_deref(),
+            Some("<p>Stored <tt>a</tt><del>b</del>c</p>"),
+            "{label}"
+        );
+    }
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn a_synced_description_with_inline_markup_keeps_code_and_strike_apart() {
+    let site = Site::new().await;
+
+    let html = site
+        .detail("NW-1047")
+        .await
+        .description_html
+        .expect("a description");
+
+    assert!(
+        html.contains("<code>Shop()-&gt;cart-&gt;get_totals()</code>"),
+        "{html}"
+    );
+    assert!(
+        html.contains("<code>--no-cache --currency=EUR</code>"),
+        "{html}"
+    );
+    assert!(html.contains("cart -&gt;totals-&gt; invoice"), "{html}");
+    assert!(!html.contains("<del>"), "{html}");
+    assert!(!html.contains("<tt>"), "{html}");
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn a_comment_is_rendered_from_its_adf_over_jiras_lossy_html() {
+    let site = Site::new().await;
+    site.execute(
+        r#"UPDATE cache.comment SET
+             body_html = '<p>Stored <tt>a</tt><del>b</del>c</p>',
+             body_adf = '{"type":"doc","version":1,"content":[{"type":"paragraph","content":[{"type":"text","text":"a->b->c","marks":[{"type":"code"}]}]}]}'
+           WHERE issue_id = '101042'"#,
+    )
+    .await;
+
+    let items = site.activity("NW-1042").await;
+
+    assert_eq!(
+        comment_htmls(&items),
+        vec![Some("<p><code>a-&gt;b-&gt;c</code></p>"); 4]
+    );
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn a_comment_stored_before_the_adf_column_shows_its_stored_html() {
+    let site = Site::new().await;
+    site.execute(
+        "UPDATE cache.comment SET body_adf = NULL, body_html = '<p>Stored <tt>a</tt></p>'
+         WHERE issue_id = '101042'",
+    )
+    .await;
+
+    let items = site.activity("NW-1042").await;
+
+    assert_eq!(
+        comment_htmls(&items),
+        vec![Some("<p>Stored <tt>a</tt></p>"); 4]
+    );
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn a_synced_comment_with_inline_markup_shows_code_mention_and_status_not_jiras_lossy_tags() {
+    let site = Site::new().await;
+
+    let items = site.activity("NW-1047").await;
+
+    let htmls = comment_htmls(&items);
+    assert_eq!(htmls.len(), 1);
+    let html = htmls[0].expect("a comment body");
+    assert!(html.contains("<code>round_half_up()</code>"), "{html}");
+    assert!(html.contains("<code>--strict</code>"), "{html}");
+    assert!(
+        html.contains("<span class=\"adf-mention\">@Alex Morgan</span>"),
+        "{html}"
+    );
+    assert!(html.contains("adf-status"), "{html}");
+    assert!(html.contains("Decided"), "{html}");
+    assert!(!html.contains("<tt>"), "{html}");
+    assert!(!html.contains("<del>"), "{html}");
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn the_sync_stores_each_comments_body_adf() {
+    let site = Site::new().await;
+
+    let stored = site.comment_adfs("NW-1042").await;
+
+    assert_eq!(stored.len(), 4);
+    let raw = site.raw_of("NW-1042").await;
+    let from_jira: Vec<Option<serde_json::Value>> = raw["fields"]["comment"]["comments"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| Some(c["body"].clone()))
+        .collect();
+    assert_eq!(stored, from_jira);
+    assert!(
+        stored
+            .iter()
+            .all(|adf| adf.as_ref().unwrap()["type"] == "doc")
+    );
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn fetching_comments_stores_their_body_adf() {
+    let site = Site::new().await;
+    let expected = site.comment_adfs("NW-1047").await;
+    site.execute("UPDATE cache.comment SET body_adf = NULL WHERE issue_id = '101047'")
+        .await;
+    site.execute("UPDATE cache.issue SET comments_synced_at = NULL WHERE key = 'NW-1047'")
+        .await;
+    assert_eq!(site.comment_adfs("NW-1047").await, vec![None]);
+
+    assert!(site.sync_comments("NW-1047").await);
+
+    let stored = site.comment_adfs("NW-1047").await;
+    assert_eq!(stored, expected);
+    assert_eq!(stored.len(), 1);
+    assert_eq!(stored[0].as_ref().unwrap()["type"], "doc");
 }
 
 #[tokio::test]
@@ -1458,7 +1681,7 @@ async fn an_issue_that_fills_no_custom_field_lists_none_until_one_is_shown() {
 
 #[tokio::test]
 #[ignore = "syncs the demo site into a temp database"]
-async fn a_bug_lists_its_template_rich_text_fields_with_their_rendered_html() {
+async fn a_bug_lists_its_template_rich_text_fields_with_html_rendered_from_their_adf() {
     let site = Site::new().await;
     let raw: serde_json::Value = serde_json::from_str(
         &site
@@ -1474,7 +1697,7 @@ async fn a_bug_lists_its_template_rich_text_fields_with_their_rendered_html() {
             .unwrap(),
     )
     .unwrap();
-    let html = |id: &str| raw["renderedFields"][id].as_str().unwrap().to_string();
+    let html = |id: &str| taskboard_lib::adf::to_html(&raw["fields"][id]).unwrap();
 
     let detail = site.detail("NW-1038").await;
 

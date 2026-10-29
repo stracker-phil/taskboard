@@ -1,6 +1,7 @@
 //! Taskboard's library: the modules and `run`, which reads the command line, hands off to a running
 //! Taskboard or starts the app.
 
+pub mod adf;
 mod app;
 pub mod avatars;
 pub mod bus;

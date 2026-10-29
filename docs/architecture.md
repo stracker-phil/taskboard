@@ -118,6 +118,7 @@ src-tauri/
                              the avatar client (avatar.rs)
   src/connection/            the Jira connection: Keychain access, Test Connection, tracked projects, scope
   src/sync/                  the sync engine: one task, the full sync, Jira JSON to rows, change records
+  src/adf/                   Atlassian Document Format to HTML for descriptions, rich fields and comments (pure)
   src/filter/                filter conditions: the model, SQL compiler, conditions in words
   src/lists/ views/          the sidebar tree with counts and defaults; the view tabs and the view query (filter,
                              group, sort, rows, columns); order.rs keeps positions; look.rs the tiles' icon and color

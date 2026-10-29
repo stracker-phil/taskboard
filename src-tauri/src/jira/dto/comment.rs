@@ -11,7 +11,7 @@ pub struct Comment {
     pub id: String,
     #[serde(default)]
     pub author: Option<User>,
-    /// ADF, kept for writes (M4).
+    /// ADF: what the page shows (`adf::to_html`).
     #[serde(default)]
     pub body: Value,
     /// Jira's HTML, untrusted until the UI sanitizes it.

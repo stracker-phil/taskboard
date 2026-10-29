@@ -17,6 +17,19 @@ Switzerland use 4 digits, Germany uses 5.
 - Unknown countries pass without validation.
 - Guest checkout must never be blocked by this.";
 
+/// Rich text: inline code with `->` and `--`, a strike, a code block, a mention and a status (`demo/adf.rs`).
+const STORE_API: &str =
+    "Move the cart totals from the legacy endpoint to the Store API. Values pass cart ->totals-> \
+invoice, so nothing may round in between.
+- Replace `Shop()->cart->get_totals()` with the `/store/v1/cart` response.
+- Run the smoke test with `--no-cache --currency=EUR`.
+- ~~Keep the session cache for totals~~ (no longer needed).
+Status on staging: {status:In review}
+```php
+$totals = Shop()->cart->get_totals(); // old
+```
+@{Jonas Reiter} please confirm the rounding rules.";
+
 #[rustfmt::skip]
 pub fn issues() -> Vec<IssueSpec> {
     vec![
@@ -28,7 +41,7 @@ pub fn issues() -> Vec<IssueSpec> {
         issue("NW-1020", Epic, InProgress, "Checkout").to(JR).by(MK).fix("2.4.0").color("ghx-label-7").desc(CHECKOUT).at("2026-09-01 09:30", "2026-10-28 10:02"),
         // Open
         issue("NW-1042", Story, InProgress, "Checkout: address validation for DACH postcodes").to(AM).prio(High).parent("NW-1020").labels(&["frontend"]).fix("2.4.0").sprints(&[22]).points(5.0).reviewer(MK).due("2026-10-30").blocks("NW-1051").desc(POSTCODES).at("2026-10-12 09:14", "2026-10-28 11:42"),
-        issue("NW-1047", Task, InProgress, "Migrate cart totals to the Store API").to(AM).parent("NW-1020").labels(&["backend"]).fix("2.4.0").sprints(&[22]).points(3.0).reviewer(JR).at("2026-10-14 13:20", "2026-10-27 16:45"),
+        issue("NW-1047", Task, InProgress, "Migrate cart totals to the Store API").to(AM).parent("NW-1020").labels(&["backend"]).fix("2.4.0").sprints(&[22]).points(3.0).reviewer(JR).desc(STORE_API).at("2026-10-14 13:20", "2026-10-27 16:45"),
         issue("NW-1049", Story, InProgress, "Express payment buttons on product page").to(AM).prio(Highest).parent("NW-1002").labels(&["frontend"]).fix("2.5.0").sprints(&[22]).points(8.0).at("2026-10-15 10:00", "2026-10-28 08:15"),
         issue("NW-1038", Bug, InReview, "Shipping costs not refreshed after address change").to(AM).by(MK).prio(Highest).parent("NW-1020").labels(&["frontend"]).fix("2.4.0").sprints(&[21, 22]).points(2.0).reviewer(MK).at("2026-10-07 11:05", "2026-10-28 09:28"),
         issue("NW-1044", Task, InReview, "Lazy-load product gallery images").to(MK).prio(Low).parent("NW-1003").labels(&["frontend"]).fix("2.4.0").sprints(&[22]).points(2.0).reviewer(AM).at("2026-10-13 15:00", "2026-10-26 17:20"),
@@ -71,7 +84,7 @@ pub fn comments() -> Vec<CommentSpec> {
         comment("NW-1042", AM, "2026-10-26 17:48", "Validation done for AT, DE and CH. Tests are green on staging."),
         comment("NW-1042", MK, "2026-10-28 10:05", "Copy for the error states is in the design file, page \u{201c}Checkout\u{201d}."),
         comment("NW-1042", MK, "2026-10-28 11:42", "Client confirmed Liechtenstein should behave like Switzerland. Can you include it in the rules?"),
-        comment("NW-1047", JR, "2026-10-27 16:45", "The Store API returns totals in cents; please keep the rounding on the server."),
+        comment("NW-1047", JR, "2026-10-27 16:45", "The Store API returns totals in cents; please keep the rounding on the server.\nUse `round_half_up()` and pass `--strict`; ~~client-side rounding~~ is out. @{Alex Morgan} {status:Decided}\n```bash\nshop-cli totals --check --order=1001\n```"),
         comment("NW-1038", MK, "2026-10-08 09:15", "Reproduced on staging: totals stay on the old country until the page reloads."),
         comment("NW-1038", JR, "2026-10-15 11:40", "Same when switching from Germany to Austria."),
         comment("NW-1038", AM, "2026-10-28 09:28", "Fixed by refetching the rates on every address change. Ready for review."),

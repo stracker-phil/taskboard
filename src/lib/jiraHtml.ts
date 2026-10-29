@@ -1,13 +1,19 @@
 import createDOMPurify from "dompurify";
 
-/** Jira's rendered HTML is untrusted (ADR 0027): only text formatting, lists, tables, code and links survive;
- *  scripts, styles, frames, forms and event handlers never do. */
+/** Jira's HTML is untrusted (ADR 0027): only text formatting, lists, tables, code and links survive, with a
+ *  fixed set of class names; scripts, styles, frames, forms and event handlers never do. */
 const ALLOWED_TAGS = [
   "p", "br", "hr", "div", "span", "strong", "b", "em", "i", "u", "s", "del", "ins", "sub", "sup", "small",
   "h1", "h2", "h3", "h4", "h5", "h6", "blockquote", "ul", "ol", "li", "dl", "dt", "dd",
-  "pre", "code", "kbd", "table", "thead", "tbody", "tfoot", "tr", "th", "td", "caption", "a", "img",
+  "pre", "code", "tt", "kbd", "table", "thead", "tbody", "tfoot", "tr", "th", "td", "caption", "a", "img",
 ];
-const ALLOWED_ATTR = ["href", "src", "alt", "title", "colspan", "rowspan"];
+const ALLOWED_ATTR = ["href", "src", "alt", "title", "colspan", "rowspan", "start", "class"];
+/** The only class names that survive: the ones Rust's ADF renderer writes (`src-tauri/src/adf/`). */
+const ALLOWED_CLASSES = new Set([
+  "jira-chip", "adf-mention", "adf-expand", "adf-expand__title", "adf-panel", "adf-status",
+  ...["info", "note", "warning", "success", "error", "tip", "custom"].map((tone) => `adf-panel--${tone}`),
+  ...["neutral", "purple", "blue", "red", "yellow", "green"].map((color) => `adf-status--${color}`),
+]);
 
 const purify = createDOMPurify(window);
 
@@ -42,6 +48,11 @@ export function sanitizeJiraHtml(html: string, siteUrl?: string): string {
     ALLOW_DATA_ATTR: false,
     RETURN_DOM_FRAGMENT: true,
   });
+  for (const element of Array.from(fragment.querySelectorAll("[class]"))) {
+    const kept = Array.from(element.classList).filter((name) => ALLOWED_CLASSES.has(name));
+    if (kept.length) element.className = kept.join(" ");
+    else element.removeAttribute("class");
+  }
   for (const image of Array.from(fragment.querySelectorAll("img"))) {
     const src = webAddress(image.getAttribute("src"), base);
     const chip = fragment.ownerDocument.createElement(src ? "a" : "span");

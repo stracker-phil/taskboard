@@ -38,6 +38,54 @@ describe("sanitizeJiraHtml", () => {
     for (const selector of ["p", "strong", "em", "ul li", "table td", "pre code", "a"]) expect(out.querySelector(selector), selector).not.toBeNull();
   });
 
+  describe("inline code and lists", () => {
+    it.each(["code", "tt"])("keeps an inline <%s> element with its text", (tag) => {
+      const out = clean(`<p>Call <${tag}>Shop()-&gt;cart-&gt;get_totals()</${tag}></p>`);
+
+      expect(out.querySelector(tag)?.textContent).toBe("Shop()->cart->get_totals()");
+    });
+
+    it("keeps the start number of an ordered list", () => {
+      const out = clean('<ol start="3"><li>Third</li><li>Fourth</li></ol>');
+
+      expect(out.querySelector("ol")?.getAttribute("start")).toBe("3");
+    });
+  });
+
+  describe("class names", () => {
+    it.each([
+      ["div", "adf-panel adf-panel--warning"],
+      ["div", "adf-panel adf-panel--custom"],
+      ["span", "adf-status adf-status--green"],
+      ["span", "adf-mention"],
+      ["div", "adf-expand"],
+      ["span", "adf-expand__title"],
+    ])("keeps the allowed classes of a <%s> with class %j", (tag, classes) => {
+      const out = clean(`<${tag} class="${classes}">Text</${tag}>`);
+
+      expect(out.querySelector(tag)?.getAttribute("class")).toBe(classes);
+    });
+
+    it("removes unknown classes but keeps allowed ones on the same element", () => {
+      const out = clean('<span class="adf-status evil">Done</span>');
+
+      expect(out.querySelector("span")?.getAttribute("class")).toBe("adf-status");
+    });
+
+    it.each(["user-hover", "aui-lozenge", "user-hover aui-lozenge"])("removes the class attribute when only unknown classes (%s) are left", (classes) => {
+      const out = clean(`<a class="${classes}" href="https://example.com/u">Ada</a>`);
+
+      expect(out.querySelector("a")?.hasAttribute("class")).toBe(false);
+      expect(out.querySelector("a")?.textContent).toBe("Ada");
+    });
+
+    it("keeps the chip class on an image chip", () => {
+      const out = clean('<img class="evil" src="https://example.com/a.png" alt="Logo">');
+
+      expect(out.querySelector("a")?.getAttribute("class")).toBe("jira-chip");
+    });
+  });
+
   describe("links", () => {
     it.each([
       ["javascript:", "javascript:alert(1)"],

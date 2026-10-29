@@ -319,9 +319,16 @@ view with its place intact).
   Jira name in lowercase. Selecting a row (List, Table) or opening an issue asks Rust to fetch the history and
   the web links (`refreshIssueExtras`; each at most every 5 minutes), so they are usually there by the time the
   issue opens.
-- Jira's HTML is sanitized (`lib/jiraHtml.ts`, [ADR 0027](adr/0027-jira-html-is-sanitised-and-shows-no-remote-content.md)):
-  links open in the browser, images become link chips. The preview shows the same description and the latest
-  three activity items.
+- Rich text is rendered by Rust from ADF ([ADR 0036](adr/0036-rich-text-renders-from-adf-not-renderedfields.md),
+  [jira.md](jira.md#rich-text-adf)) and sanitized (`lib/jiraHtml.ts`,
+  [ADR 0027](adr/0027-jira-html-is-sanitised-and-shows-no-remote-content.md)): links open in the browser, images
+  and attachments become chips, and only the renderer's `adf-*` class names and `jira-chip` survive. The preview
+  shows the same description and the latest three activity items.
+- Rich text styles (`.jira-html` in `issue-view.css`): inline `code` and old `tt` as a mono chip on
+  `--fill-subtle` (not inside `pre`), code blocks on `--fill-subtle`, struck text muted, quotes with a
+  `--border-strong` bar, tables with `--border` lines and `--fill-subtle` headers, panels on the banner and status
+  backgrounds by type, expands in a bordered box with a bold title, mentions in `--accent-text`, and status
+  lozenges as small uppercase chips in the status and label colors.
 
 **Remember my place:** each view keeps its opened and closed groups, scroll position, selected row, open
 peek, and the toolbar's Me chip and text filter (`state/slices/places.ts`, saved by Rust in `places.json` a moment after the last change, at most 200
