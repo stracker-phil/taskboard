@@ -3,29 +3,34 @@
 //! Jira's own rendering (`renderedFields`) goes through wiki markup and loses formatting: inline code comes back
 //! as `<tt>`, and `->text->` turns into strike-through. Rendering the ADF here keeps what the author wrote. Every
 //! text is escaped and only tags and classes the page's sanitizer allows are written; the page still sanitizes
-//! the result (ADR 0027). Nothing remote is referenced: media become text chips (ADR 0020).
+//! the result (ADR 0027). Nothing remote is referenced: an image attached to the issue becomes a placeholder
+//! the page fills (ADR 0039), other media become text chips (ADR 0020).
 
 mod blocks;
 mod inline;
+mod media;
+
+pub use media::{File, Media, is_inline_image};
 
 use serde_json::Value;
 
-/// The document's HTML; `None` when `adf` isn't an ADF document (the caller falls back to Jira's HTML).
-pub fn to_html(adf: &Value) -> Option<String> {
+/// The document's HTML; `None` when `adf` isn't an ADF document (the caller falls back to Jira's HTML). `media`
+/// names the issue's attachments, so images among them show inline.
+pub fn to_html(adf: &Value, media: &Media) -> Option<String> {
     if adf["type"] != "doc" || !adf["content"].is_array() {
         return None;
     }
     let mut out = String::new();
-    children(adf, &mut out);
+    children(adf, media, &mut out);
     Some(out)
 }
 
 /// The HTML for a stored ADF document, else `fallback` (Jira's rendered HTML). A document that renders to
 /// nothing is no content.
-pub fn html_or(adf: Option<&str>, fallback: Option<String>) -> Option<String> {
+pub fn html_or(adf: Option<&str>, fallback: Option<String>, media: &Media) -> Option<String> {
     match adf
         .and_then(|json| serde_json::from_str::<Value>(json).ok())
-        .and_then(|doc| to_html(&doc))
+        .and_then(|doc| to_html(&doc, media))
     {
         Some(html) => Some(html).filter(|html| !html.is_empty()),
         None => fallback,
@@ -33,27 +38,27 @@ pub fn html_or(adf: Option<&str>, fallback: Option<String>) -> Option<String> {
 }
 
 /// One node of any kind; an unknown one renders its text or its children.
-fn node(node: &Value, out: &mut String) {
+fn node(node: &Value, media: &Media, out: &mut String) {
     let Some(kind) = node["type"].as_str() else {
         return;
     };
-    if !blocks::render(kind, node, out) && !inline::render(kind, node, out) {
+    if !blocks::render(kind, node, media, out) && !inline::render(kind, node, media, out) {
         match node["text"].as_str() {
             Some(text) => inline::text(text, &node["marks"], out),
-            None => children(node, out),
+            None => children(node, media, out),
         }
     }
 }
 
-fn children(parent: &Value, out: &mut String) {
+fn children(parent: &Value, media: &Media, out: &mut String) {
     for child in parent["content"].as_array().into_iter().flatten() {
-        node(child, out);
+        node(child, media, out);
     }
 }
 
-fn wrap(tag: &str, parent: &Value, out: &mut String) {
+fn wrap(tag: &str, parent: &Value, media: &Media, out: &mut String) {
     out.push_str(&format!("<{tag}>"));
-    children(parent, out);
+    children(parent, media, out);
     out.push_str(&format!("</{tag}>"));
 }
 
@@ -88,5 +93,7 @@ fn one_of<'a>(value: Option<&str>, allowed: &[&'a str], fallback: &'a str) -> &'
         .unwrap_or(fallback)
 }
 
+#[cfg(test)]
+mod media_tests;
 #[cfg(test)]
 mod tests;

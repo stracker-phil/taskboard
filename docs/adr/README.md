@@ -36,7 +36,7 @@ stands in Taskboard. The numbers in this table are Taskboard's.
 | [0024](0024-filters-run-locally-in-sql-views-never-filter.md) | Filters run locally in SQL; views never filter | Superseded in part by 0033 (view filters), 0038 (the saved Me chip) |
 | [0025](0025-all-jira-traffic-goes-through-one-allowlisted-gateway.md) | All Jira traffic goes through one allowlisted gateway | Accepted (2026-10-28) |
 | [0026](0026-the-debug-build-keeps-its-demo-token-in-memory.md) | The debug build keeps its demo token in memory | Accepted (2026-10-28) |
-| [0027](0027-jira-html-is-sanitised-and-shows-no-remote-content.md) | Jira HTML is sanitised and shows no remote content | Superseded in part by 0036 (rendering ADF) |
+| [0027](0027-jira-html-is-sanitised-and-shows-no-remote-content.md) | Jira HTML is sanitised and shows no remote content | Superseded in part by 0036 (rendering ADF) and 0039 (inline images) |
 | [0028](0028-automatic-light-or-dark-with-one-palette-each.md) | Automatic, light or dark, with one palette each | Accepted (2026-10-29) |
 | [0029](0029-issues-come-from-a-source-jira-is-the-first.md) | Issues come from a source; Jira is the first | Accepted (2026-10-29) |
 | [0030](0030-a-space-carries-its-own-settings.md) | A Space carries its own settings | Accepted (2026-10-29) |
@@ -45,8 +45,9 @@ stands in Taskboard. The numbers in this table are Taskboard's.
 | [0033](0033-views-can-hold-their-own-filter.md) | Views can hold their own filter | Superseded in part by 0038 (drafts, Save View) |
 | [0034](0034-menus-are-drawn-in-the-page.md) | Menus are drawn in the page | Accepted (2026-10-29) |
 | [0035](0035-attachments-preview-in-quick-look.md) | Attachments preview in Quick Look | Accepted (2026-10-29) |
-| [0036](0036-rich-text-renders-from-adf-not-renderedfields.md) | Rich text renders from ADF, not renderedFields | Accepted (2026-10-29) |
+| [0036](0036-rich-text-renders-from-adf-not-renderedfields.md) | Rich text renders from ADF, not renderedFields | Superseded in part by 0039 (inline images) |
 | [0037](0037-views-choose-how-subtasks-show.md) | Views choose how subtasks show | Accepted (2026-10-29) |
 | [0038](0038-filter-changes-are-drafts-until-the-view-is-saved.md) | Filter changes are drafts until the view is saved | Accepted (2026-10-29) |
+| [0039](0039-inline-images-come-from-issue-attachments-through-rust.md) | Inline images come from issue attachments through Rust | Accepted (2026-10-29) |
 
 Open: integrations with Daybook and TimeTracker.

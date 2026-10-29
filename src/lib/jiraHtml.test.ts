@@ -162,5 +162,43 @@ describe("sanitizeJiraHtml", () => {
       expect(out.querySelector("img")).toBeNull();
       expect(out.querySelectorAll(".jira-chip")).toHaveLength(3);
     });
+
+    describe("attachment placeholders", () => {
+      it("keeps the id, alt text and size of an attachment placeholder and nothing else", () => {
+        const out = clean(
+          '<img data-attachment-id="501" alt="Shot" width="640" height="360" src="https://example.com/a.png" class="evil" title="T" onerror="x()">',
+        );
+
+        const img = out.querySelector("img");
+        expect(img?.getAttributeNames().sort()).toEqual(["alt", "data-attachment-id", "height", "width"]);
+        expect(img?.getAttribute("data-attachment-id")).toBe("501");
+        expect(img?.getAttribute("alt")).toBe("Shot");
+        expect(img?.getAttribute("width")).toBe("640");
+        expect(img?.getAttribute("height")).toBe("360");
+      });
+
+      it.each([
+        ["width", "wide"],
+        ["height", "100%"],
+      ])("drops a placeholder's %s that is not digits (%s)", (attribute, value) => {
+        const img = clean(`<img data-attachment-id="501" alt="Shot" ${attribute}="${value}">`).querySelector("img");
+
+        expect(img?.getAttribute("data-attachment-id")).toBe("501");
+        expect(img?.hasAttribute(attribute)).toBe(false);
+      });
+
+      it.each(["abc", "12a", "", "-1"])("turns an image whose attachment id is %j into a chip", (id) => {
+        const out = clean(`<img data-attachment-id="${id}" alt="Shot">`);
+
+        expect(out.querySelector("img")).toBeNull();
+        expect(out.querySelector(".jira-chip")?.textContent).toBe("Image · Shot");
+      });
+
+      it.each(["data-attachment-id", "width", "height"])("removes %s from elements other than images", (attribute) => {
+        const out = clean(`<p ${attribute}="5">Text</p>`);
+
+        expect(out.querySelector("p")?.hasAttribute(attribute)).toBe(false);
+      });
+    });
   });
 });

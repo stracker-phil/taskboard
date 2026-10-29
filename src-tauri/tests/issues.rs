@@ -14,9 +14,10 @@ use taskboard_lib::connection::{
 use taskboard_lib::db::Db;
 use taskboard_lib::error::{AppResult, ErrorKind};
 use taskboard_lib::issues::{
-    ActivityItem, ChangeValue, CustomField, IssueDetail, IssueLink, RelatedIssue, WebLink,
-    WebLinkKind, attachment_file, issue_activity, issue_forget, issue_get, issue_related,
-    issue_sync_comments, issue_sync_history, issue_sync_web_links, issue_web_links,
+    ActivityItem, ChangeValue, CustomField, ImageMemory, IssueDetail, IssueLink,
+    MAX_INLINE_IMAGE_BYTES, RelatedIssue, WebLink, WebLinkKind, attachment_file, attachment_image,
+    issue_activity, issue_forget, issue_get, issue_related, issue_sync_comments,
+    issue_sync_history, issue_sync_web_links, issue_web_links,
 };
 use taskboard_lib::jira::{Limiter, TokenKind};
 use taskboard_lib::lists::Viewer;
@@ -225,6 +226,45 @@ impl Site {
             attachment_id.into(),
         )
         .await
+    }
+
+    async fn inline_image(
+        &self,
+        root: &Path,
+        memory: &ImageMemory,
+        issue_id: &str,
+        attachment_id: &str,
+    ) -> AppResult<Option<String>> {
+        let connection = self.ctx.settings.get().connection;
+        let source = source_for(&self.ctx.access, &connection).unwrap();
+        attachment_image(
+            self.db(),
+            source.as_ref(),
+            root,
+            memory,
+            issue_id.into(),
+            attachment_id.into(),
+        )
+        .await
+    }
+
+    /// Makes the tracker list `attachment_id` of `key` with `size` bytes.
+    async fn list_attachment_size(&self, key: &str, attachment_id: &str, size: u64) {
+        let mut raw = self.raw_of(key).await;
+        let list = raw["fields"]["attachment"].as_array_mut().unwrap();
+        let item = list.iter_mut().find(|a| a["id"] == attachment_id).unwrap();
+        item["size"] = serde_json::json!(size);
+        let (raw, key) = (raw.to_string(), key.to_string());
+        self.db()
+            .write(move |tx, _| {
+                tx.execute(
+                    "UPDATE cache.issue SET raw = ?1 WHERE key = ?2",
+                    [&raw, &key],
+                )?;
+                Ok(())
+            })
+            .await
+            .unwrap();
     }
 
     fn attachment_downloads(&self) -> usize {
@@ -1697,7 +1737,9 @@ async fn a_bug_lists_its_template_rich_text_fields_with_html_rendered_from_their
             .unwrap(),
     )
     .unwrap();
-    let html = |id: &str| taskboard_lib::adf::to_html(&raw["fields"][id]).unwrap();
+    let html = |id: &str| {
+        taskboard_lib::adf::to_html(&raw["fields"][id], &taskboard_lib::adf::Media::NONE).unwrap()
+    };
 
     let detail = site.detail("NW-1038").await;
 
@@ -2372,4 +2414,177 @@ async fn an_attachment_of_an_unknown_issue_is_not_found() {
 
     assert_eq!(err.kind(), ErrorKind::NotFound);
     assert_eq!(site.attachment_downloads(), 0);
+}
+
+fn decoded_png(url: &str) -> Vec<u8> {
+    use base64::Engine;
+    let encoded = url
+        .strip_prefix("data:image/png;base64,")
+        .unwrap_or_else(|| panic!("a PNG data URL: {url}"));
+    base64::engine::general_purpose::STANDARD
+        .decode(encoded)
+        .unwrap()
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn an_attached_png_is_returned_as_a_data_url_of_its_bytes() {
+    let site = Site::new().await;
+    let root = tempfile::tempdir().unwrap();
+    let memory = ImageMemory::default();
+    let issue = site.id_of("NW-1020").await;
+    let id = site.attachment_id("NW-1020", "checkout-flow.png").await;
+
+    let url = site
+        .inline_image(root.path(), &memory, &issue, &id)
+        .await
+        .unwrap()
+        .expect("an image");
+
+    assert_eq!(decoded_png(&url), demo::demo().attachment_files[&id].1);
+    assert_eq!(site.attachment_downloads(), 1);
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn an_image_of_another_issue_is_not_found_and_not_downloaded() {
+    let site = Site::new().await;
+    let root = tempfile::tempdir().unwrap();
+    let memory = ImageMemory::default();
+    let issue = site.id_of("NW-1020").await;
+    let other = site.attachment_id("NW-1042", "screenshot-login.png").await;
+
+    let err = site
+        .inline_image(root.path(), &memory, &issue, &other)
+        .await
+        .unwrap_err();
+
+    assert_eq!(err.kind(), ErrorKind::NotFound);
+    assert_eq!(site.attachment_downloads(), 0);
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn an_attachment_that_is_not_an_image_gives_none_without_a_download() {
+    let site = Site::new().await;
+    let root = tempfile::tempdir().unwrap();
+    let memory = ImageMemory::default();
+    let issue = site.id_of("NW-1020").await;
+    let id = site.attachment_id("NW-1020", "release-notes.pdf").await;
+
+    let url = site
+        .inline_image(root.path(), &memory, &issue, &id)
+        .await
+        .unwrap();
+
+    assert_eq!(url, None);
+    assert_eq!(site.attachment_downloads(), 0);
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn a_file_quick_look_already_downloaded_is_reused_for_the_image() {
+    let site = Site::new().await;
+    let root = tempfile::tempdir().unwrap();
+    let memory = ImageMemory::default();
+    let issue = site.id_of("NW-1020").await;
+    let id = site.attachment_id("NW-1020", "checkout-flow.png").await;
+    let bytes = demo::demo().attachment_files[&id].1.clone();
+    site.list_attachment_size("NW-1020", &id, bytes.len() as u64)
+        .await;
+    let path = root.path().join(&id).join("checkout-flow.png");
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    fs::write(&path, &bytes).unwrap();
+
+    let url = site
+        .inline_image(root.path(), &memory, &issue, &id)
+        .await
+        .unwrap()
+        .expect("an image");
+
+    assert_eq!(decoded_png(&url), bytes);
+    assert_eq!(site.attachment_downloads(), 0);
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn a_second_ask_for_the_same_image_is_answered_from_memory() {
+    let site = Site::new().await;
+    let root = tempfile::tempdir().unwrap();
+    let memory = ImageMemory::default();
+    let issue = site.id_of("NW-1020").await;
+    let id = site.attachment_id("NW-1020", "checkout-flow.png").await;
+
+    let first = site
+        .inline_image(root.path(), &memory, &issue, &id)
+        .await
+        .unwrap();
+    let second = site
+        .inline_image(root.path(), &memory, &issue, &id)
+        .await
+        .unwrap();
+
+    assert!(first.is_some());
+    assert_eq!(second, first);
+    assert_eq!(site.attachment_downloads(), 1);
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn an_image_listed_over_ten_megabytes_gives_none_without_a_download() {
+    let site = Site::new().await;
+    let root = tempfile::tempdir().unwrap();
+    let memory = ImageMemory::default();
+    let issue = site.id_of("NW-1020").await;
+    let id = site.attachment_id("NW-1020", "checkout-flow.png").await;
+    site.list_attachment_size("NW-1020", &id, MAX_INLINE_IMAGE_BYTES + 1)
+        .await;
+
+    let url = site
+        .inline_image(root.path(), &memory, &issue, &id)
+        .await
+        .unwrap();
+
+    assert_eq!(url, None);
+    assert_eq!(site.attachment_downloads(), 0);
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn the_demo_description_shows_its_screenshot_as_a_placeholder_with_the_image_size() {
+    let site = Site::new().await;
+    let id = site.attachment_id("NW-1042", "screenshot-login.png").await;
+
+    let html = site
+        .detail("NW-1042")
+        .await
+        .description_html
+        .expect("a description");
+
+    assert!(
+        html.contains(&format!(
+            "<img data-attachment-id=\"{id}\" alt=\"screenshot-login.png\" width=\"240\" height=\"120\">"
+        )),
+        "{html}"
+    );
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn the_demo_comment_shows_its_attached_image_as_a_placeholder() {
+    let site = Site::new().await;
+    let id = site.attachment_id("NW-1020", "checkout-flow.png").await;
+    let activity = site.activity("NW-1020").await;
+
+    let placeholder = format!(
+        "<img data-attachment-id=\"{id}\" alt=\"checkout-flow.png\" width=\"240\" height=\"120\">"
+    );
+    assert!(
+        comment_htmls(&activity)
+            .into_iter()
+            .flatten()
+            .any(|html| html.contains(&placeholder)),
+        "{:?}",
+        comment_htmls(&activity)
+    );
 }

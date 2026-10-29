@@ -75,7 +75,7 @@ function CommentCard({ comment, issueId }: { comment: Comment; issueId: string }
           {pin.timeLeft && <span>{pin.timeLeft}</span>}
         </div>
       )}
-      {comment.bodyHtml ? <JiraHtml html={comment.bodyHtml} className="comment-card__body" /> : null}
+      {comment.bodyHtml ? <JiraHtml html={comment.bodyHtml} issueId={issueId} className="comment-card__body" /> : null}
     </article>
   );
 }

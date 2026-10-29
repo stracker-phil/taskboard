@@ -342,8 +342,13 @@ view with its place intact).
   issue opens.
 - Rich text is rendered by Rust from ADF ([ADR 0036](adr/0036-rich-text-renders-from-adf-not-renderedfields.md),
   [jira.md](jira.md#rich-text-adf)) and sanitized (`lib/jiraHtml.ts`,
-  [ADR 0027](adr/0027-jira-html-is-sanitised-and-shows-no-remote-content.md)): links open in the browser, images
-  and attachments become chips, and only the renderer's `adf-*` class names and `jira-chip` survive. The preview
+  [ADR 0027](adr/0027-jira-html-is-sanitised-and-shows-no-remote-content.md)): links open in the browser, remote
+  images and other attachments become chips, and only the renderer's `adf-*` class names and `jira-chip` survive.
+  An image attached to the issue shows inline ([ADR 0039](adr/0039-inline-images-come-from-issue-attachments-through-rust.md),
+  `InlineImage`): at most the content width, keeping its aspect ratio, radius 8 and a `--hairline` border; while
+  it loads a `--fill-subtle` box of its size holds its place, and without an image it stays the chip
+  "Attachment · name". It is asked from Rust only once on screen (Issue view, preview, ⌥ Peek). A click shows it
+  in Quick Look (cursor zoom-in); its context menu is the attachment tile's. The preview
   shows the same description and the latest three activity items.
 - Rich text styles (`.jira-html` in `issue-view.css`): inline `code` and old `tt` as a mono chip on
   `--fill-subtle` (not inside `pre`), code blocks on `--fill-subtle`, struck text muted, quotes with a

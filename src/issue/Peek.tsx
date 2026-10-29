@@ -101,11 +101,11 @@ function Body({ issue, onExpand, onClose }: { issue: IssueDetail; onExpand: () =
       </div>
       {issue.since && <SinceBanner since={issue.since} />}
       {issue.descriptionHtml && hasContent(issue.descriptionHtml) ? (
-        <JiraHtml html={issue.descriptionHtml} className="peek__description" />
+        <JiraHtml html={issue.descriptionHtml} issueId={issue.id} className="peek__description" />
       ) : (
         <p className="peek__empty">No description.</p>
       )}
-      <RichFields fields={issue.custom} variant="peek" />
+      <RichFields fields={issue.custom} issueId={issue.id} variant="peek" />
       <WebLinks id={issue.id} variant="peek" />
       {latest.length > 0 && (
         <section className="peek__activity" aria-label="Latest activity">

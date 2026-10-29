@@ -7,10 +7,11 @@ mod values;
 
 use std::collections::HashMap;
 
-use rusqlite::Connection;
+use rusqlite::{Connection, OptionalExtension};
 use serde::Serialize;
 use ts_rs::TS;
 
+use super::attachments::{attachments_of, media_files};
 use crate::adf;
 use crate::changes::unseen_since;
 use crate::db::Db;
@@ -106,6 +107,12 @@ fn at(item: &ActivityItem) -> &str {
 }
 
 fn comments(conn: &Connection, id: &str, values: &Values) -> AppResult<Vec<ActivityItem>> {
+    let raw: Option<String> = conn
+        .query_row("SELECT raw FROM cache.issue WHERE id = ?1", [id], |r| {
+            r.get(0)
+        })
+        .optional()?;
+    let files = media_files(&attachments_of(raw.as_deref().unwrap_or_default()));
     let mut query = conn.prepare(
         "SELECT id, author_id, body_html, created_at, updated_at, body_adf FROM cache.comment WHERE issue_id = ?1",
     )?;
@@ -113,10 +120,14 @@ fn comments(conn: &Connection, id: &str, values: &Values) -> AppResult<Vec<Activ
         let author_id: Option<String> = r.get(1)?;
         let created: String = r.get(3)?;
         let updated: String = r.get(4)?;
+        let media = adf::Media {
+            files: &files,
+            written_at: Some(&created),
+        };
         Ok(ActivityItem::Comment {
             id: r.get(0)?,
             author: author_id.map(|a| values.person(&a, None)),
-            body_html: adf::html_or(r.get::<_, Option<String>>(5)?.as_deref(), r.get(2)?),
+            body_html: adf::html_or(r.get::<_, Option<String>>(5)?.as_deref(), r.get(2)?, &media),
             edited: updated != created,
             at: created,
             fresh: false,

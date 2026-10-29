@@ -10,6 +10,7 @@ use rusqlite::OptionalExtension;
 use super::attachments::find_attachment;
 use crate::db::Db;
 use crate::error::{AppError, AppResult};
+use crate::jira::dto;
 use crate::sync::source::Source;
 
 /// Below the file system's 255 bytes per name.
@@ -38,7 +39,16 @@ pub async fn attachment_file(
     issue_id: String,
     attachment_id: String,
 ) -> AppResult<PathBuf> {
-    let wanted = attachment_id.clone();
+    let attachment = issue_attachment(db, issue_id, attachment_id).await?;
+    local_copy(source, root, &attachment).await
+}
+
+/// The attachment as the issue lists it; `NotFound` when it isn't one of the issue's.
+pub(super) async fn issue_attachment(
+    db: &Db,
+    issue_id: String,
+    attachment_id: String,
+) -> AppResult<dto::Attachment> {
     let raw: Option<String> = db
         .read(move |conn| {
             Ok(conn
@@ -50,10 +60,17 @@ pub async fn attachment_file(
                 .optional()?)
         })
         .await?;
-    let attachment = raw
-        .as_deref()
-        .and_then(|raw| find_attachment(raw, &wanted))
-        .ok_or_else(|| AppError::NotFound("The attachment isn't on this issue".into()))?;
+    raw.as_deref()
+        .and_then(|raw| find_attachment(raw, &attachment_id))
+        .ok_or_else(|| AppError::NotFound("The attachment isn't on this issue".into()))
+}
+
+/// The downloaded copy, reused when it has the listed size, else downloaded now.
+pub(super) async fn local_copy(
+    source: &dyn Source,
+    root: &Path,
+    attachment: &dto::Attachment,
+) -> AppResult<PathBuf> {
     let path = cached_path(root, &attachment.id, &attachment.filename)?;
     if is_reusable(&path, attachment.size) {
         return Ok(path);

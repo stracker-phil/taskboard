@@ -31,8 +31,20 @@ impl ImageKind {
             .find(|kind| kind.mime() == mime)
     }
 
+    /// By a file name's extension (`.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, any case).
+    pub fn from_extension(filename: &str) -> Option<Self> {
+        let (_, ext) = filename.rsplit_once('.')?;
+        match ext.to_ascii_lowercase().as_str() {
+            "png" => Some(Self::Png),
+            "jpg" | "jpeg" => Some(Self::Jpeg),
+            "gif" => Some(Self::Gif),
+            "webp" => Some(Self::Webp),
+            _ => None,
+        }
+    }
+
     /// The format the bytes start with.
-    fn sniff(bytes: &[u8]) -> Option<Self> {
+    pub fn sniff(bytes: &[u8]) -> Option<Self> {
         if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
             Some(Self::Png)
         } else if bytes.starts_with(&[0xFF, 0xD8, 0xFF]) {
@@ -131,6 +143,38 @@ mod tests {
                 },
                 "{content_type}"
             );
+        }
+    }
+
+    #[test]
+    fn a_file_name_extension_names_a_raster_format_in_any_case() {
+        for (filename, expected) in [
+            ("a.png", Some(ImageKind::Png)),
+            ("a.PNG", Some(ImageKind::Png)),
+            ("a.b.jpg", Some(ImageKind::Jpeg)),
+            ("a.JPEG", Some(ImageKind::Jpeg)),
+            ("a.gif", Some(ImageKind::Gif)),
+            ("a.webp", Some(ImageKind::Webp)),
+            ("a.svg", None),
+            ("a.pdf", None),
+            ("png", None),
+            ("a.", None),
+        ] {
+            assert_eq!(ImageKind::from_extension(filename), expected, "{filename}");
+        }
+    }
+
+    #[test]
+    fn sniffing_names_the_format_the_bytes_start_with() {
+        for (bytes, expected) in [
+            (PNG, Some(ImageKind::Png)),
+            (JPEG, Some(ImageKind::Jpeg)),
+            (GIF, Some(ImageKind::Gif)),
+            (WEBP, Some(ImageKind::Webp)),
+            (SVG, None),
+            (b"".as_slice(), None),
+        ] {
+            assert_eq!(ImageKind::sniff(bytes), expected);
         }
     }
 

@@ -57,7 +57,7 @@ function PeekCard({ target }: { target: PeekTarget }) {
         ))}
       </div>
       {issue.descriptionHtml && hasContent(issue.descriptionHtml) ? (
-        <JiraHtml html={issue.descriptionHtml} className="hover-peek__description" />
+        <JiraHtml html={issue.descriptionHtml} issueId={issue.id} className="hover-peek__description" />
       ) : (
         <p className="hover-peek__empty">No description.</p>
       )}

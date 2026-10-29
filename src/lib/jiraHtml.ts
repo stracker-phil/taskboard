@@ -8,6 +8,9 @@ const ALLOWED_TAGS = [
   "pre", "code", "tt", "kbd", "table", "thead", "tbody", "tfoot", "tr", "th", "td", "caption", "a", "img",
 ];
 const ALLOWED_ATTR = ["href", "src", "alt", "title", "colspan", "rowspan", "start", "class"];
+/** Only the inline image placeholder Rust writes keeps these (ADR 0039); anything else loses them. */
+const PLACEHOLDER_ATTR = ["data-attachment-id", "width", "height"];
+const DIGITS = /^\d+$/;
 /** The only class names that survive: the ones Rust's ADF renderer writes (`src-tauri/src/adf/`). */
 const ALLOWED_CLASSES = new Set([
   "jira-chip", "adf-mention", "adf-expand", "adf-expand__title", "adf-panel", "adf-status",
@@ -35,16 +38,31 @@ function webAddress(value: string | null, base: string | undefined): string | nu
   }
 }
 
+/** `<img data-attachment-id="…">` with digits: an image attached to the issue, which `JiraHtml` fills from Rust. */
+function isPlaceholder(element: Element): boolean {
+  return element.tagName === "IMG" && DIGITS.test(element.getAttribute("data-attachment-id") ?? "");
+}
+
+/** Keeps the placeholder's id, alt and a size in digits; drops `src` and everything else. */
+function keepPlaceholder(image: Element) {
+  for (const { name, value } of Array.from(image.attributes)) {
+    const kept = name === "data-attachment-id" || name === "alt" || ((name === "width" || name === "height") && DIGITS.test(value));
+    if (!kept) image.removeAttribute(name);
+  }
+}
+
 /**
  * Sanitizes Jira HTML for display: relative links point at the Jira site, links that aren't `https` lose
  * their address, and every image becomes a link chip ("Image · name"), so the webview never loads remote
- * content (ADR 0020). Links open in the browser through `JiraHtml`'s click handler.
+ * content (ADR 0020). The one exception is the placeholder for an image attached to the issue
+ * (`<img data-attachment-id="…" alt width height>`, never a `src`), which `JiraHtml` fills with a `data:` URL
+ * (ADR 0039). Links open in the browser through `JiraHtml`'s click handler.
  */
 export function sanitizeJiraHtml(html: string, siteUrl?: string): string {
   const base = siteUrl ? `${siteUrl.replace(/\/+$/, "")}/` : undefined;
   const fragment = purify.sanitize(html, {
     ALLOWED_TAGS,
-    ALLOWED_ATTR,
+    ALLOWED_ATTR: [...ALLOWED_ATTR, ...PLACEHOLDER_ATTR],
     ALLOW_DATA_ATTR: false,
     RETURN_DOM_FRAGMENT: true,
   });
@@ -53,7 +71,12 @@ export function sanitizeJiraHtml(html: string, siteUrl?: string): string {
     if (kept.length) element.className = kept.join(" ");
     else element.removeAttribute("class");
   }
+  for (const element of Array.from(fragment.querySelectorAll(PLACEHOLDER_ATTR.map((name) => `[${name}]`).join(",")))) {
+    if (isPlaceholder(element)) keepPlaceholder(element);
+    else for (const name of PLACEHOLDER_ATTR) element.removeAttribute(name);
+  }
   for (const image of Array.from(fragment.querySelectorAll("img"))) {
+    if (isPlaceholder(image)) continue;
     const src = webAddress(image.getAttribute("src"), base);
     const chip = fragment.ownerDocument.createElement(src ? "a" : "span");
     chip.className = "jira-chip";

@@ -3,12 +3,12 @@
 use chrono::DateTime;
 use serde_json::Value;
 
-use super::{escape, one_of, web_address};
+use super::{Media, escape, one_of, web_address};
 
 const STATUS_COLORS: &[&str] = &["neutral", "purple", "blue", "red", "yellow", "green"];
 
 /// Writes `node` when `kind` is an inline node; `false` for any other kind.
-pub(super) fn render(kind: &str, node: &Value, out: &mut String) -> bool {
+pub(super) fn render(kind: &str, node: &Value, media: &Media, out: &mut String) -> bool {
     let attrs = &node["attrs"];
     match kind {
         "text" => text(
@@ -47,17 +47,7 @@ pub(super) fn render(kind: &str, node: &Value, out: &mut String) -> bool {
             out.push_str("</span>");
         }
         "inlineCard" => card(attrs, out),
-        "media" | "mediaInline" => {
-            out.push_str("<span class=\"jira-chip\">Attachment");
-            let name = ["alt", "name", "__fileName"]
-                .iter()
-                .find_map(|key| attrs[*key].as_str().filter(|n| !n.trim().is_empty()));
-            if let Some(name) = name {
-                out.push_str(" · ");
-                escape(name, out);
-            }
-            out.push_str("</span> ");
-        }
+        "media" | "mediaInline" => super::media::render(node, None, media, out),
         _ => return false,
     }
     true

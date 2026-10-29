@@ -310,7 +310,8 @@ mod tests {
         payment step. Austria and Switzerland use 4 digits, Germany uses 5.</p><ul>\
         <li>Show inline errors under the field, not in a toast.</li>\
         <li>Unknown countries pass without validation.</li>\
-        <li>Guest checkout must never be blocked by this.</li></ul>";
+        <li>Guest checkout must never be blocked by this.</li></ul>\
+        <p><img alt=\"screenshot-login.png\"></p>";
 
     const POSTCODES_TEXT: &str = "Validate the postcode against the selected country before the \
         payment step. Austria and Switzerland use 4 digits, Germany uses 5. Show inline errors \

@@ -2,15 +2,18 @@
 //!
 //! Each line is a paragraph; consecutive lines starting with `- ` form a bullet list, and lines between
 //! ```` ```lang ```` and ```` ``` ```` a code block. Inside a line, `` `code` ``, `~~struck~~`, `@{Name}` (a
-//! mention) and `{status:TEXT}` (a lozenge) are marked up. The HTML is as lossy as Jira's: code comes back as
-//! `<tt>`.
+//! mention) and `{status:TEXT}` (a lozenge) are marked up. A line `![name.png]` shows the issue's attachment of
+//! that name, as Jira's editor embeds it. The HTML is as lossy as Jira's: code comes back as `<tt>`.
 
 use serde_json::{Value, json};
+
+use super::attachment_files::{PNG_HEIGHT, PNG_WIDTH};
 
 enum Block<'a> {
     Paragraph(&'a str),
     Bullets(Vec<&'a str>),
     Code(&'a str, Vec<&'a str>),
+    Image(&'a str),
 }
 
 enum Inline<'a> {
@@ -38,6 +41,13 @@ fn blocks(text: &str) -> Vec<Block<'_>> {
             continue;
         }
         if trimmed.is_empty() {
+            continue;
+        }
+        if let Some(name) = trimmed
+            .strip_prefix("![")
+            .and_then(|rest| rest.strip_suffix(']'))
+        {
+            blocks.push(Block::Image(name));
             continue;
         }
         match (trimmed.strip_prefix("- "), blocks.last_mut()) {
@@ -127,6 +137,21 @@ pub fn doc(text: &str) -> Value {
                 "attrs": { "language": language },
                 "content": [{ "type": "text", "text": lines.join("\n") }],
             }),
+            Block::Image(name) => json!({
+                "type": "mediaSingle",
+                "attrs": { "layout": "center" },
+                "content": [{
+                    "type": "media",
+                    "attrs": {
+                        "type": "file",
+                        "id": format!("demo-media-{name}"),
+                        "collection": "",
+                        "alt": name,
+                        "width": PNG_WIDTH,
+                        "height": PNG_HEIGHT,
+                    },
+                }],
+            }),
         })
         .collect();
     json!({ "type": "doc", "version": 1, "content": content })
@@ -148,6 +173,7 @@ pub fn html(text: &str) -> String {
                 "<div class=\"code panel\"><pre>{}</pre></div>",
                 escape(&lines.join("\n"))
             ),
+            Block::Image(name) => format!("<p><img alt=\"{}\"></p>", escape(name)),
         })
         .collect()
 }

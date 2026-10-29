@@ -99,7 +99,7 @@ One method on `JiraClient` each (`jira/api.rs`), one `Endpoint` each; the answer
 | `comments` | `GET issue/{key}/comment`, every page, `expand=renderedBody` | `Comment` with ADF and HTML |
 | `remote_links` | `GET issue/{id}/remotelink` | `RemoteLink`: web links (url, title, application, relationship; the icon is read but never loaded) |
 | `changelog` | `GET issue/{id}/changelog`, every page by `startAt` (`maxResults=100`; only these two query keys are allowed) | `Changelog`, oldest first: id, author, time and the changed fields (`ChangeItem`: field name and id, `from`/`to` ids, `fromString`/`toString` texts). Asked when an issue is opened, at most every 5 minutes ([ADR 0031](adr/0031-issue-history-comes-from-the-changelog-on-demand.md)) |
-| `attachment_content` | `GET attachment/content/{id}?redirect=false` (the id digits only; `redirect` is the only query key) | the file's bytes in any format, through `Gateway::download` and `Http::download`: no redirect followed, at most `MAX_ATTACHMENT_BYTES` (50 MB, by `Content-Length` and while reading), a 5-minute timeout. For Quick Look ([ADR 0035](adr/0035-attachments-preview-in-quick-look.md)) |
+| `attachment_content` | `GET attachment/content/{id}?redirect=false` (the id digits only; `redirect` is the only query key) | the file's bytes in any format, through `Gateway::download` and `Http::download`: no redirect followed, at most `MAX_ATTACHMENT_BYTES` (50 MB, by `Content-Length` and while reading), a 5-minute timeout. For Quick Look ([ADR 0035](adr/0035-attachments-preview-in-quick-look.md)) and inline images ([ADR 0039](adr/0039-inline-images-come-from-issue-attachments-through-rust.md)) |
 | `check_jql` | `POST jql/parse?validation=strict` | Jira's messages; empty when valid |
 | `used_custom_fields` | `POST search/jql`: `project = "KEY" ORDER BY updated DESC`, one page of 100, `*all` without the large system fields | the custom field ids with a value |
 
@@ -110,7 +110,12 @@ MIME type, created, author and the `content` address; `dto::Attachment`), plus t
 `issues::attachments_of` reads the attachments from the stored issue; `issue_get` keeps an attachment's address
 only when it is `https` on the connected site's host and port (`issues::is_on_site`), and the page opens it with
 `open_url`. Quick Look shows a downloaded copy (`attachment_content`, below;
-[ADR 0035](adr/0035-attachments-preview-in-quick-look.md)). `parse_jira_time` reads Jira's `2026-10-20T09:14:03.120+0200`.
+[ADR 0035](adr/0035-attachments-preview-in-quick-look.md)). `attachment_image(issue_id, attachment_id)`
+(`issues/inline_image.rs`) hands the page an image attachment of that issue as a `data:` URL for rich text: the
+same downloaded copy, only PNG, JPEG, GIF or WebP whose magic bytes match the declared type (never SVG), at most
+`MAX_INLINE_IMAGE_BYTES` (10 MB); otherwise `None` and the page keeps the chip. `ImageMemory` keeps the last 20
+answers (at most 50 MB) ([ADR 0039](adr/0039-inline-images-come-from-issue-attachments-through-rust.md)).
+`parse_jira_time` reads Jira's `2026-10-20T09:14:03.120+0200`.
 
 ## Rich text (ADF)
 
@@ -131,7 +136,13 @@ ADF or it isn't a document. Search text still comes from the HTML (`sync::map::h
   and link (colors ignored), hard break, mention (`adf-mention`, `@Name`), emoji (its text, else the short name),
   date (`Oct 30, 2026`, UTC), status (`adf-status adf-status--<color>`), inline card.
 - **Links** keep an `https` address or a path on the site (the page resolves it), else they lose the address.
-- **Media** become a text chip, "Attachment · name" (`jira-chip`); nothing remote is referenced.
+- **Media** (`media.rs`): a node whose name (`alt`, else `name` or `__fileName`) matches a PNG, JPEG, GIF or WebP
+  attachment of the same issue becomes a placeholder, `<img data-attachment-id="…" alt="…" width="…" height="…">`
+  without a `src`, sized from the node (scaled to `mediaSingle`'s pixel width). Of several attachments with that
+  name, the newest created at or before the comment wins, else the newest. `adf::Media` carries the issue's
+  attachments (`issues::media_files`) and the comment's time into `to_html` and `html_or`. Other media become a
+  text chip, "Attachment · name" (`jira-chip`); `type: "external"` media a chip linking to the address. Nothing
+  remote is referenced ([ADR 0039](adr/0039-inline-images-come-from-issue-attachments-through-rust.md)).
 - **Unknown nodes** render their text or their children; a node that isn't an object is skipped.
 
 **Search pages** come one after another: `SearchPages::next_page` sends the previous page's `nextPageToken`
@@ -186,10 +197,11 @@ but answers `401` without one.
 - Knobs: `set_page_size`, `cap_max_results`, `fail_next(count, status, retry_after)`, `answer_next`,
   `set_latency`, `go_offline` / `go_online` (the port refuses connections), `advance` (the clock), and data
   changes: `edit_issue`, `move_issue` (same id, new key), `delete_issue`, `revoke_access`, `set_remote_links`, `set_changelog`. It serves the demo attachments' made-up bytes (`demo/attachment_files.rs`: a
-  1×1 PNG, a one-page PDF, a zip with one note) at `attachment/content/{id}`, and a 303 without `redirect=false`. `set_page_size` pages the changelog too.
+  240×120 PNG of a small mockup, a one-page PDF, a zip with one note) at `attachment/content/{id}`, and a 303 without `redirect=false`. `set_page_size` pages the changelog too.
 - `requests()` and `paths()` return what it was asked, with the `Authorization` header and the JSON body.
 
 The demo site (`test_support/demo/`) is made up and matches the mockup (`demo/web_links.rs` gives a few issues
 pull request and document links, `demo/attachments.rs` a few issues' files, `demo/history.rs` a few issues' changelogs; `demo/adf.rs` turns demo text with
-`` `code` ``, `~~strike~~`, `@{Name}`, `{status:TEXT}` and code fences into ADF and Jira's lossy HTML, used by NW-1047); `synthetic(n)` builds `n` issues on the
+`` `code` ``, `~~strike~~`, `@{Name}`, `{status:TEXT}`, code fences and `![file.png]` (an attached image) into ADF and Jira's lossy HTML, used by NW-1047,
+NW-1042's description and NW-1020's first comment); `synthetic(n)` builds `n` issues on the
 same site for performance tests.

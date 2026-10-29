@@ -1,6 +1,7 @@
-//! Small made-up files the fake Jira serves for the demo attachments, so Quick Look has something to show.
+//! Small made-up files the fake Jira serves for the demo attachments, so Quick Look and inline images have
+//! something to show.
 
-/// The bytes of a demo attachment by its MIME type: a 1×1 PNG, a one-page PDF or a zip with one note.
+/// The bytes of a demo attachment by its MIME type: a small picture, a one-page PDF or a zip with one note.
 pub fn demo_file(mime_type: &str) -> Vec<u8> {
     match mime_type {
         "image/png" => png(),
@@ -10,18 +11,49 @@ pub fn demo_file(mime_type: &str) -> Vec<u8> {
     }
 }
 
-/// A grey 1×1 PNG, its pixel data in an uncompressed zlib block.
+pub const PNG_WIDTH: u32 = 240;
+pub const PNG_HEIGHT: u32 = 120;
+
+/// The color of one pixel of the demo picture: a white card on a pale blue ground, with a blue dot and two
+/// grey lines of "text", like a small screen mockup.
+fn pixel(x: u32, y: u32) -> [u8; 3] {
+    let in_card = (20..220).contains(&x) && (20..100).contains(&y);
+    let (dx, dy) = (x.abs_diff(60), y.abs_diff(60));
+    if dx * dx + dy * dy <= 22 * 22 {
+        [64, 120, 230]
+    } else if (100..200).contains(&x) && (44..54).contains(&y)
+        || (100..170).contains(&x) && (64..72).contains(&y)
+    {
+        [180, 195, 225]
+    } else if in_card {
+        [255, 255, 255]
+    } else {
+        [220, 230, 250]
+    }
+}
+
+/// The demo picture as a `PNG_WIDTH`×`PNG_HEIGHT` RGB PNG, its pixel data in uncompressed zlib blocks.
 fn png() -> Vec<u8> {
-    let scanline = [0u8, 0x99];
-    let mut zlib = vec![0x78, 0x01, 0x01];
-    zlib.extend_from_slice(&(scanline.len() as u16).to_le_bytes());
-    zlib.extend_from_slice(&(!(scanline.len() as u16)).to_le_bytes());
-    zlib.extend_from_slice(&scanline);
-    zlib.extend_from_slice(&adler32(&scanline).to_be_bytes());
+    let mut raw = Vec::new();
+    for y in 0..PNG_HEIGHT {
+        raw.push(0); // no filter
+        for x in 0..PNG_WIDTH {
+            raw.extend_from_slice(&pixel(x, y));
+        }
+    }
+    let mut zlib = vec![0x78, 0x01];
+    let blocks: Vec<&[u8]> = raw.chunks(u16::MAX as usize).collect();
+    for (index, block) in blocks.iter().enumerate() {
+        zlib.push(u8::from(index + 1 == blocks.len()));
+        zlib.extend_from_slice(&(block.len() as u16).to_le_bytes());
+        zlib.extend_from_slice(&(!(block.len() as u16)).to_le_bytes());
+        zlib.extend_from_slice(block);
+    }
+    zlib.extend_from_slice(&adler32(&raw).to_be_bytes());
     let mut header = Vec::new();
-    header.extend_from_slice(&1u32.to_be_bytes());
-    header.extend_from_slice(&1u32.to_be_bytes());
-    header.extend_from_slice(&[8, 0, 0, 0, 0]); // 8-bit grey, no interlace
+    header.extend_from_slice(&PNG_WIDTH.to_be_bytes());
+    header.extend_from_slice(&PNG_HEIGHT.to_be_bytes());
+    header.extend_from_slice(&[8, 2, 0, 0, 0]); // 8-bit RGB, no interlace
     let mut out = b"\x89PNG\r\n\x1a\n".to_vec();
     for (kind, data) in [(b"IHDR", header), (b"IDAT", zlib), (b"IEND", Vec::new())] {
         out.extend_from_slice(&(data.len() as u32).to_be_bytes());

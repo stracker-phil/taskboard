@@ -7,7 +7,7 @@ fn doc(content: Value) -> Value {
 }
 
 fn html(content: Value) -> String {
-    to_html(&doc(content)).expect("a document")
+    to_html(&doc(content), &Media::NONE).expect("a document")
 }
 
 fn text(text: &str) -> Value {
@@ -43,14 +43,14 @@ fn values_that_are_not_documents_render_nothing() {
         (json!("doc"), "string"),
         (Value::Null, "null"),
     ] {
-        assert_eq!(to_html(&input), None, "{label}");
+        assert_eq!(to_html(&input, &Media::NONE), None, "{label}");
     }
 }
 
 #[test]
 fn html_or_falls_back_when_the_json_is_invalid() {
     assert_eq!(
-        html_or(Some("{not json"), Some("<p>jira</p>".into())),
+        html_or(Some("{not json"), Some("<p>jira</p>".into()), &Media::NONE),
         Some("<p>jira</p>".into())
     );
 }
@@ -58,7 +58,11 @@ fn html_or_falls_back_when_the_json_is_invalid() {
 #[test]
 fn html_or_falls_back_when_the_json_is_not_a_document() {
     assert_eq!(
-        html_or(Some(r#"{"type":"paragraph"}"#), Some("<p>jira</p>".into())),
+        html_or(
+            Some(r#"{"type":"paragraph"}"#),
+            Some("<p>jira</p>".into()),
+            &Media::NONE
+        ),
         Some("<p>jira</p>".into())
     );
 }
@@ -66,17 +70,17 @@ fn html_or_falls_back_when_the_json_is_not_a_document() {
 #[test]
 fn html_or_falls_back_when_there_is_no_adf() {
     assert_eq!(
-        html_or(None, Some("<p>jira</p>".into())),
+        html_or(None, Some("<p>jira</p>".into()), &Media::NONE),
         Some("<p>jira</p>".into())
     );
-    assert_eq!(html_or(None, None), None);
+    assert_eq!(html_or(None, None, &Media::NONE), None);
 }
 
 #[test]
 fn html_or_prefers_a_valid_document_over_the_fallback() {
     let adf = doc(json!([paragraph(json!([text("Own")]))])).to_string();
     assert_eq!(
-        html_or(Some(&adf), Some("<p>jira</p>".into())),
+        html_or(Some(&adf), Some("<p>jira</p>".into()), &Media::NONE),
         Some("<p>Own</p>".into())
     );
 }
@@ -84,7 +88,10 @@ fn html_or_prefers_a_valid_document_over_the_fallback() {
 #[test]
 fn html_or_gives_no_content_for_an_empty_document_instead_of_the_fallback() {
     let adf = doc(json!([])).to_string();
-    assert_eq!(html_or(Some(&adf), Some("<p>jira</p>".into())), None);
+    assert_eq!(
+        html_or(Some(&adf), Some("<p>jira</p>".into()), &Media::NONE),
+        None
+    );
 }
 
 #[test]

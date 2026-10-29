@@ -2,60 +2,60 @@
 
 use serde_json::Value;
 
-use super::{children, escape, inline, one_of, wrap};
+use super::{Media, children, escape, inline, one_of, wrap};
 
 const PANELS: &[&str] = &[
     "info", "note", "warning", "success", "error", "tip", "custom",
 ];
 
 /// Writes `node` when `kind` is a block node; `false` for any other kind.
-pub(super) fn render(kind: &str, node: &Value, out: &mut String) -> bool {
+pub(super) fn render(kind: &str, node: &Value, media: &Media, out: &mut String) -> bool {
     let attrs = &node["attrs"];
     match kind {
-        "paragraph" => wrap("p", node, out),
+        "paragraph" => wrap("p", node, media, out),
         "heading" => {
             let level = attrs["level"].as_u64().unwrap_or(1).clamp(1, 6);
-            wrap(&format!("h{level}"), node, out);
+            wrap(&format!("h{level}"), node, media, out);
         }
-        "bulletList" | "taskList" | "decisionList" => wrap("ul", node, out),
+        "bulletList" | "taskList" | "decisionList" => wrap("ul", node, media, out),
         "orderedList" => match attrs["order"].as_u64().filter(|&start| start != 1) {
             Some(start) => {
                 out.push_str(&format!("<ol start=\"{start}\">"));
-                children(node, out);
+                children(node, media, out);
                 out.push_str("</ol>");
             }
-            None => wrap("ol", node, out),
+            None => wrap("ol", node, media, out),
         },
-        "listItem" => wrap("li", node, out),
+        "listItem" => wrap("li", node, media, out),
         "taskItem" => {
             out.push_str(if attrs["state"] == "DONE" {
                 "<li>☑ "
             } else {
                 "<li>☐ "
             });
-            children(node, out);
+            children(node, media, out);
             out.push_str("</li>");
         }
         "decisionItem" => {
             out.push_str("<li>◆ ");
-            children(node, out);
+            children(node, media, out);
             out.push_str("</li>");
         }
-        "blockquote" => wrap("blockquote", node, out),
+        "blockquote" => wrap("blockquote", node, media, out),
         "codeBlock" => code_block(node, out),
         "rule" => out.push_str("<hr>"),
         "table" => {
             out.push_str("<table><tbody>");
-            children(node, out);
+            children(node, media, out);
             out.push_str("</tbody></table>");
         }
-        "tableRow" => wrap("tr", node, out),
-        "tableHeader" => cell("th", node, out),
-        "tableCell" => cell("td", node, out),
+        "tableRow" => wrap("tr", node, media, out),
+        "tableHeader" => cell("th", node, media, out),
+        "tableCell" => cell("td", node, media, out),
         "panel" => {
             let tone = one_of(attrs["panelType"].as_str(), PANELS, "info");
             out.push_str(&format!("<div class=\"adf-panel adf-panel--{tone}\">"));
-            children(node, out);
+            children(node, media, out);
             out.push_str("</div>");
         }
         "expand" | "nestedExpand" => {
@@ -65,12 +65,18 @@ pub(super) fn render(kind: &str, node: &Value, out: &mut String) -> bool {
                 escape(title, out);
                 out.push_str("</p>");
             }
-            children(node, out);
+            children(node, media, out);
             out.push_str("</div>");
         }
         "mediaSingle" | "mediaGroup" => {
+            let single = (kind == "mediaSingle").then_some(attrs);
             out.push_str("<p>");
-            children(node, out);
+            for child in node["content"].as_array().into_iter().flatten() {
+                match child["type"].as_str() {
+                    Some("media") => super::media::render(child, single, media, out),
+                    _ => super::node(child, media, out),
+                }
+            }
             out.push_str("</p>");
         }
         "blockCard" | "embedCard" => {
@@ -103,7 +109,7 @@ fn code_block(node: &Value, out: &mut String) {
     out.push_str("</code></pre>");
 }
 
-fn cell(tag: &str, node: &Value, out: &mut String) {
+fn cell(tag: &str, node: &Value, media: &Media, out: &mut String) {
     out.push('<');
     out.push_str(tag);
     for span in ["colspan", "rowspan"] {
@@ -112,6 +118,6 @@ fn cell(tag: &str, node: &Value, out: &mut String) {
         }
     }
     out.push('>');
-    children(node, out);
+    children(node, media, out);
     out.push_str(&format!("</{tag}>"));
 }

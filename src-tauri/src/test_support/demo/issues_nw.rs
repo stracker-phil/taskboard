@@ -16,7 +16,8 @@ const POSTCODES: &str =
 Switzerland use 4 digits, Germany uses 5.
 - Show inline errors under the field, not in a toast.
 - Unknown countries pass without validation.
-- Guest checkout must never be blocked by this.";
+- Guest checkout must never be blocked by this.
+![screenshot-login.png]";
 
 /// Rich text: inline code with `->` and `--`, a strike, a code block, a mention and a status (`demo/adf.rs`).
 const STORE_API: &str =
@@ -85,7 +86,7 @@ pub fn issues() -> Vec<IssueSpec> {
 #[rustfmt::skip]
 pub fn comments() -> Vec<CommentSpec> {
     vec![
-        comment("NW-1020", MK, "2026-10-12 09:30", "Attached the updated checkout flow from the client workshop."),
+        comment("NW-1020", MK, "2026-10-12 09:30", "Attached the updated checkout flow from the client workshop.\n![checkout-flow.png]"),
         comment("NW-1020", JR, "2026-10-26 14:02", "Scope for 2.4.0 is frozen. Anything new goes into 2.5.0."),
         comment("NW-1042", MK, "2026-10-13 10:30", "Design for the error states is ready for review."),
         comment("NW-1042", AM, "2026-10-26 17:48", "Validation done for AT, DE and CH. Tests are green on staging."),

@@ -6,6 +6,7 @@ use serde_json::Value;
 use ts_rs::TS;
 use url::Url;
 
+use crate::adf;
 use crate::jira::dto;
 use crate::sync::map::utc;
 
@@ -49,6 +50,19 @@ pub fn attachments_of(raw: &str) -> Vec<Attachment> {
             mime_type: a.mime_type,
             filename: a.filename,
             id: a.id,
+        })
+        .collect()
+}
+
+/// The attachments as rich text's media nodes may name them, so images among them show inline.
+pub fn media_files(attachments: &[Attachment]) -> Vec<adf::File> {
+    attachments
+        .iter()
+        .map(|a| adf::File {
+            id: a.id.clone(),
+            filename: a.filename.clone(),
+            mime_type: a.mime_type.clone(),
+            created_at: a.created_at.clone(),
         })
         .collect()
 }

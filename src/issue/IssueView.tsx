@@ -171,12 +171,12 @@ function IssueMain({ issue, origin }: { issue: IssueDetail; origin: IssueOrigin 
       <section className="issue-main__description" aria-label="Description">
         <h2>Description</h2>
         {issue.descriptionHtml && hasContent(issue.descriptionHtml) ? (
-          <JiraHtml html={issue.descriptionHtml} />
+          <JiraHtml html={issue.descriptionHtml} issueId={issue.id} />
         ) : (
           <p className="issue-main__empty">No description.</p>
         )}
       </section>
-      <RichFields fields={issue.custom} variant="issue" />
+      <RichFields fields={issue.custom} issueId={issue.id} variant="issue" />
       <WebLinks id={issue.id} variant="issue" />
       {related && <Children related={related} isEpic={issue.isEpic} onOpen={openRelated} onOpenAsList={openAsList} />}
       <Attachments issueId={issue.id} attachments={issue.attachments} />

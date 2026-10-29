@@ -7,7 +7,7 @@ use rusqlite::{Connection, OptionalExtension};
 use serde::Serialize;
 use ts_rs::TS;
 
-use super::attachments::{Attachment, attachments_of};
+use super::attachments::{Attachment, attachments_of, media_files};
 use super::{status_names, user_names};
 use crate::adf;
 use crate::changes::{Names, Since, since, unseen_since};
@@ -112,6 +112,13 @@ fn read(conn: &Connection, viewer: &Viewer, id: &str) -> AppResult<IssueDetail> 
             }),
             _ => None,
         };
+        let raw: String = r.get(25)?;
+        let attachments = attachments_of(&raw);
+        let files = media_files(&attachments);
+        let media = adf::Media {
+            files: &files,
+            written_at: None,
+        };
         let detail = IssueDetail {
             id: r.get(0)?,
             key: r.get(1)?,
@@ -146,7 +153,11 @@ fn read(conn: &Connection, viewer: &Viewer, id: &str) -> AppResult<IssueDetail> 
                 .map(|d| rows::format_due(d, ctx.today)),
             created_at: r.get(19)?,
             updated_at: r.get(20)?,
-            description_html: adf::html_or(r.get::<_, Option<String>>(28)?.as_deref(), r.get(21)?),
+            description_html: adf::html_or(
+                r.get::<_, Option<String>>(28)?.as_deref(),
+                r.get(21)?,
+                &media,
+            ),
             comment_count: r.get(22)?,
             is_epic: r.get::<_, i64>(23)? != 0,
             gone: r.get::<_, i64>(24)? != 0,
@@ -154,16 +165,19 @@ fn read(conn: &Connection, viewer: &Viewer, id: &str) -> AppResult<IssueDetail> 
             custom: Vec::new(),
             since: None,
             unread: false,
-            attachments: Vec::new(),
+            attachments,
         };
-        let raw: String = r.get(25)?;
         let project_id: String = r.get(27)?;
         Ok((detail, raw, project_id))
     })
     .optional()?
     .map(|(mut detail, raw, project_id)| -> AppResult<IssueDetail> {
-        detail.attachments = attachments_of(&raw);
-        detail.custom = custom_fields(conn, &project_id, &raw, me)?;
+        let files = media_files(&detail.attachments);
+        let media = adf::Media {
+            files: &files,
+            written_at: None,
+        };
+        detail.custom = custom_fields(conn, &project_id, &raw, me, &media)?;
         detail.since = since_banner(conn, viewer, id)?;
         detail.unread = unseen_since(conn, id)?.is_some();
         Ok(detail)
@@ -192,6 +206,7 @@ fn custom_fields(
     project_id: &str,
     raw: &str,
     me: Option<&str>,
+    media: &adf::Media,
 ) -> AppResult<Vec<CustomField>> {
     let raw: serde_json::Value = serde_json::from_str(raw).unwrap_or_default();
     let hidden = hidden_fields(conn, project_id, Place::Detail)?;
@@ -218,7 +233,7 @@ fn custom_fields(
         let value = &raw["fields"][&id];
         // Rich text arrives as an ADF document; Jira's lossy rendering of it is in `renderedFields`.
         let html = (value["type"] == "doc")
-            .then(|| adf::to_html(value))
+            .then(|| adf::to_html(value, media))
             .flatten()
             .or_else(|| raw["renderedFields"][&id].as_str().map(str::to_string))
             .filter(|html| !html.trim().is_empty());
@@ -328,7 +343,7 @@ mod tests {
     }
 
     async fn custom(db: &Db, raw: Value) -> Vec<CustomField> {
-        db.read(move |conn| custom_fields(conn, PROJECT, &raw.to_string(), None))
+        db.read(move |conn| custom_fields(conn, PROJECT, &raw.to_string(), None, &adf::Media::NONE))
             .await
             .unwrap()
     }

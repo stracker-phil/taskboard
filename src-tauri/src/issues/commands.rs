@@ -91,6 +91,28 @@ pub async fn attachment_preview(
     quick_look(&app, path).await
 }
 
+/// An image attached to the issue as a `data:` URL for rich text; `None` keeps the chip (ADR 0039).
+#[tauri::command]
+pub async fn attachment_image(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    issue_id: String,
+    attachment_id: String,
+) -> AppResult<Option<String>> {
+    let connection = state.settings.get().connection;
+    let source = crate::sync::source_for(&state.jira, &connection)?;
+    let root = attachment_cache(&app)?;
+    super::attachment_image(
+        &state.db,
+        source.as_ref(),
+        &root,
+        &state.inline_images,
+        issue_id,
+        attachment_id,
+    )
+    .await
+}
+
 /// `<app cache>/attachments`.
 pub fn attachment_cache(app: &AppHandle) -> AppResult<PathBuf> {
     let dir = app

@@ -93,7 +93,7 @@
 }
 .btn-secondary-small:hover { background: var(--hover-bg); border-color: var(--border-strong); }
 
-/* Jira's sanitized HTML. Images are link chips; nothing remote loads. */
+/* Jira's sanitized HTML. Remote images are link chips; nothing remote loads. */
 .jira-html { font-size: 15px; line-height: 1.6; color: var(--text-strong-body); overflow-wrap: anywhere; user-select: text; -webkit-user-select: text; }
 .jira-html p { margin: 0 0 10px; }
 .jira-html ul, .jira-html ol { margin: 0 0 10px; padding-left: 20px; }
@@ -129,6 +129,10 @@
 .jira-html .adf-status--red { background: var(--status-blocked-bg); color: var(--status-blocked-fg); }
 .jira-html .adf-status--purple { background: var(--status-review-bg); color: var(--status-review-fg); }
 .jira-html .adf-status--yellow { background: var(--banner-warn-bg); color: var(--banner-warn-text); }
+/* Images attached to the issue (ADR 0039): at most the content width, keeping their aspect ratio. */
+.jira-image-button { display: inline-block; max-width: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; vertical-align: top; }
+.jira-image { display: block; max-width: 100%; height: auto; box-sizing: border-box; border: 1px solid var(--hairline); border-radius: 8px; }
+.jira-image--loading { display: inline-block; height: auto; background: var(--fill-subtle); vertical-align: top; }
 .jira-chip { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; }
 
 .activity { position: relative; display: flex; flex: none; flex-direction: column; width: 400px; max-width: 60%; min-height: 0; border-left: 1px solid var(--hairline); background: var(--panel-subtle-bg); }
