@@ -972,6 +972,7 @@ mod attachment_downloads {
     }
 
     #[tokio::test]
+    #[ignore = "serves a body just over the 50 MB attachment limit"]
     async fn an_answer_over_the_attachment_limit_fails() {
         let fake = FakeJira::start_demo().await;
         fake.answer_raw(

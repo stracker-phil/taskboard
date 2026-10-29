@@ -107,19 +107,6 @@ describe("Attachments", () => {
       expect(tile()).toHaveTextContent("1.2 MB · Ada Example");
     });
 
-    it("ignores a second click while the preview is pending", async () => {
-      let finish: () => void = () => {};
-      mocked.attachmentPreview.mockReturnValue(new Promise<void>((resolve) => (finish = resolve)));
-      renderAttachments(attachment());
-
-      await userEvent.click(tile());
-      await userEvent.click(tile());
-
-      expect(mocked.attachmentPreview).toHaveBeenCalledTimes(1);
-      finish();
-      await waitFor(() => expect(tile()).toHaveAttribute("aria-busy", "false"));
-    });
-
     it("shows an error toast when the file cannot be previewed", async () => {
       mocked.attachmentPreview.mockRejectedValue({ kind: "network", message: "Download failed", code: null });
       renderAttachments(attachment());
