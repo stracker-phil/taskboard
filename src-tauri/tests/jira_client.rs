@@ -551,6 +551,91 @@ mod demo_answers {
     }
 
     #[tokio::test]
+    async fn the_used_custom_fields_of_a_project_are_the_ones_its_issues_fill() {
+        let fake = FakeJira::start_demo().await;
+
+        let used = fake
+            .client(TokenKind::Classic)
+            .used_custom_fields("NW")
+            .await
+            .unwrap();
+
+        assert!(used.contains("customfield_10016"), "{used:?}");
+        assert!(used.contains("customfield_10071"), "{used:?}");
+        assert!(!used.contains("customfield_10090"), "{used:?}");
+        assert!(!used.contains("customfield_10091"), "{used:?}");
+        assert!(used.iter().all(|id| id.starts_with("customfield_")));
+        let asked = fake.requests();
+        assert_eq!(asked.len(), 1);
+        assert_eq!(asked[0].path, SEARCH_PATH);
+        assert_eq!(
+            asked[0].body["jql"],
+            json!("project = \"NW\" ORDER BY updated DESC")
+        );
+        assert_eq!(asked[0].body["maxResults"], json!(100));
+    }
+
+    #[tokio::test]
+    async fn a_custom_field_counts_as_used_only_with_a_real_value() {
+        let cases = [
+            (json!(null), false),
+            (json!(""), false),
+            (json!([]), false),
+            (json!({}), false),
+            (json!("CC-100"), true),
+            (json!(0), true),
+            (json!(false), true),
+            (json!(["a"]), true),
+            (json!({ "value": "CC-100" }), true),
+        ];
+        for (value, expected) in cases {
+            let fake = FakeJira::start_demo().await;
+            let edited = value.clone();
+            fake.edit_issue("NW-1042", move |fields| {
+                fields["customfield_10090"] = edited;
+            });
+
+            let used = fake
+                .client(TokenKind::Classic)
+                .used_custom_fields("NW")
+                .await
+                .unwrap();
+
+            assert_eq!(used.contains("customfield_10090"), expected, "{value}");
+        }
+    }
+
+    #[tokio::test]
+    async fn only_the_asked_projects_issues_count_for_its_used_fields() {
+        let fake = FakeJira::start_demo().await;
+        fake.edit_issue("NW-1042", |fields| {
+            fields["customfield_10091"] = json!("2026-11-01");
+        });
+
+        let nws = fake
+            .client(TokenKind::Classic)
+            .used_custom_fields("NWS")
+            .await
+            .unwrap();
+
+        assert!(!nws.contains("customfield_10091"), "{nws:?}");
+    }
+
+    #[tokio::test]
+    async fn a_malformed_project_key_is_refused_before_anything_is_sent() {
+        let fake = FakeJira::start_demo().await;
+
+        let err = fake
+            .client(TokenKind::Classic)
+            .used_custom_fields("NW\" OR project = \"INT")
+            .await
+            .unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::InvalidInput);
+        assert!(fake.requests().is_empty());
+    }
+
+    #[tokio::test]
     async fn a_valid_query_has_no_problems_and_a_broken_one_has_some() {
         let fake = FakeJira::start_demo().await;
         let client = fake.client(TokenKind::Classic);

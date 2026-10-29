@@ -15,6 +15,12 @@ use crate::error::{AppError, AppResult};
 /// Issues of tracked projects that Jira still lists.
 pub const TRACKED_ISSUES: &str =
     "i.gone = 0 AND i.project_id IN (SELECT project_id FROM space WHERE tracked = 1)";
+/// A `cache.field` row worth offering in the Columns popover and the filter editor: a field the tracked projects
+/// fill, or one the owner already uses (in the field grid, as a view's column, in a filter's condition).
+pub const RELEVANT_FIELD: &str = "(used = 1 OR shown = 1
+    OR id IN (SELECT c.value FROM view v, json_each(v.columns) c)
+    OR id IN (SELECT json_extract(c.value, '$.field') FROM filter_list l, json_each(l.filter, '$.conditions') c))";
+
 /// Issues the sidebar counts.
 pub const OPEN_ISSUES: &str = "i.status_category <> 'done'";
 

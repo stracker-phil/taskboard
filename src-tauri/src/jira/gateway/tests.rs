@@ -156,6 +156,27 @@ fn allowlist() -> Vec<(Endpoint, Method, &'static str, Option<Value>)> {
             "jql/parse?validation=strict",
             Some(json!({ "queries": [QUERY] })),
         ),
+        (
+            Endpoint::FieldUsage {
+                project: project("NW"),
+            },
+            Method::POST,
+            "search/jql",
+            Some(json!({
+                "jql": "project = \"NW\" ORDER BY updated DESC",
+                "maxResults": 100,
+                "fields": [
+                    "*all",
+                    "-description",
+                    "-comment",
+                    "-attachment",
+                    "-worklog",
+                    "-issuelinks",
+                    "-subtasks",
+                    "-environment",
+                ],
+            })),
+        ),
     ]
 }
 
@@ -234,7 +255,8 @@ fn only_the_query_endpoints_read_a_bad_request_as_a_jql_error() {
             let expected = match endpoint {
                 Endpoint::SearchJql { .. }
                 | Endpoint::ApproximateCount { .. }
-                | Endpoint::JqlParse { .. } => BadRequest::Jql,
+                | Endpoint::JqlParse { .. }
+                | Endpoint::FieldUsage { .. } => BadRequest::Jql,
                 _ => BadRequest::Plain,
             };
             assert_eq!(
@@ -243,6 +265,43 @@ fn only_the_query_endpoints_read_a_bad_request_as_a_jql_error() {
                 "{endpoint:?}"
             );
         }
+    }
+}
+
+#[test]
+fn a_field_usage_sample_reads_the_search_endpoint_and_passes_the_guard_for_both_token_kinds() {
+    for (prefix, site) in sites() {
+        let plan = Endpoint::FieldUsage {
+            project: project("LUM"),
+        }
+        .plan(&site)
+        .unwrap();
+
+        assert_eq!(plan.url.as_str(), format!("{prefix}search/jql"));
+        assert_eq!(plan.method, Method::POST);
+        assert_eq!(plan.access, Access::Read);
+        assert_eq!(
+            plan.body.as_ref().unwrap()["jql"],
+            json!("project = \"LUM\" ORDER BY updated DESC")
+        );
+        assert!(check(&plan, &site).is_ok(), "{prefix}");
+    }
+}
+
+#[test]
+fn a_project_key_that_could_change_the_sampling_query_is_refused_before_planning() {
+    for key in [
+        "",
+        "nw",
+        "NW\" OR project = \"INT",
+        "NW ORDER BY created",
+        "NW/versions",
+        "NW?x=1",
+    ] {
+        assert!(
+            matches!(ProjectKey::parse(key), Err(AppError::InvalidInput(_))),
+            "{key:?}"
+        );
     }
 }
 

@@ -12,6 +12,18 @@ use crate::jira::site::Site;
 pub const PAGE_SIZE: u32 = 100;
 const PROJECT_PAGE_SIZE: u32 = 50;
 
+/// What a field-usage sample reads: every field but the large ones no custom field lives in.
+const USAGE_FIELDS: &[&str] = &[
+    "*all",
+    "-description",
+    "-comment",
+    "-attachment",
+    "-worklog",
+    "-issuelinks",
+    "-subtasks",
+    "-environment",
+];
+
 /// Reads may be retried; writes never are, and stay refused until writes are enabled (`guard`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Access {
@@ -59,6 +71,10 @@ pub enum Endpoint {
     /// Strict validation of a query.
     JqlParse {
         jql: Jql,
+    },
+    /// The project's most recently updated issues with all their fields, to see which custom fields it fills.
+    FieldUsage {
+        project: ProjectKey,
     },
 }
 
@@ -124,6 +140,16 @@ impl Endpoint {
                     .query("expand", "renderedBody")
                     .plan(site)
             }
+            Self::FieldUsage { project } => Rest::read_post(
+                &["search", "jql"],
+                json!({
+                    "jql": format!("project = \"{}\" ORDER BY updated DESC", project.as_str()),
+                    "maxResults": PAGE_SIZE,
+                    "fields": USAGE_FIELDS,
+                }),
+            )
+            .jql_errors()
+            .plan(site),
             Self::JqlParse { jql } => {
                 Rest::read_post(&["jql", "parse"], json!({ "queries": [jql.as_str()] }))
                     .query("validation", "strict")

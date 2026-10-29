@@ -13,7 +13,10 @@ pub const LOCAL: &[&str] = &[
     include_str!("../../migrations/local/0005_view_collapsed.sql"),
     include_str!("../../migrations/local/0006_list_icon.sql"),
 ];
-pub const CACHE: &[&str] = &[include_str!("../../migrations/cache/0001_init.sql")];
+pub const CACHE: &[&str] = &[
+    include_str!("../../migrations/cache/0001_init.sql"),
+    include_str!("../../migrations/cache/0002_field_used.sql"),
+];
 
 /// Brings the connection's file up to date in one transaction. A file migrated by a newer Taskboard is
 /// refused, never touched.

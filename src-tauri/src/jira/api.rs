@@ -2,12 +2,14 @@
 
 use super::client::JiraClient;
 use super::dto::{
-    ApproximateCount, BulkFetch, Comment, CommentPage, Field, Myself, ParsedQueries, Project,
-    ProjectPage, Status, TenantInfo, Version,
+    ApproximateCount, BulkFetch, Comment, CommentPage, Field, Issue, Myself, ParsedQueries,
+    Project, ProjectPage, SearchPage, Status, TenantInfo, Version,
 };
 use super::gateway::{Endpoint, FieldIds, IssueRef, IssueRefs, Jql, ProjectKey};
 use super::paging::{SearchPages, SearchRequest};
 use crate::error::AppResult;
+use serde_json::Value;
+use std::collections::BTreeSet;
 
 impl JiraClient {
     pub async fn myself(&self) -> AppResult<Myself> {
@@ -95,6 +97,16 @@ impl JiraClient {
         }
     }
 
+    /// The custom fields the project's most recently updated issues have a value in.
+    pub async fn used_custom_fields(&self, project_key: &str) -> AppResult<BTreeSet<String>> {
+        let project = ProjectKey::parse(project_key)?;
+        let page: SearchPage = self
+            .gateway()
+            .send(Endpoint::FieldUsage { project })
+            .await?;
+        Ok(filled_custom_fields(&page.issues))
+    }
+
     /// Jira's problems with a query, strictly validated; empty when the query is valid.
     pub async fn check_jql(&self, jql: &str) -> AppResult<Vec<String>> {
         let jql = Jql::parse(jql)?;
@@ -105,5 +117,26 @@ impl JiraClient {
             .next()
             .map(|query| query.errors)
             .unwrap_or_default())
+    }
+}
+
+/// Custom field ids with a value (not null, not an empty list or text) in any of the issues.
+fn filled_custom_fields(issues: &[Issue]) -> BTreeSet<String> {
+    issues
+        .iter()
+        .filter_map(|issue| issue.fields.as_object())
+        .flatten()
+        .filter(|(id, value)| id.starts_with("customfield_") && is_filled(value))
+        .map(|(id, _)| id.clone())
+        .collect()
+}
+
+fn is_filled(value: &Value) -> bool {
+    match value {
+        Value::Null => false,
+        Value::String(text) => !text.is_empty(),
+        Value::Array(items) => !items.is_empty(),
+        Value::Object(map) => !map.is_empty(),
+        _ => true,
     }
 }

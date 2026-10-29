@@ -1,11 +1,13 @@
 //! The full sync: metadata first, then the scope per tracked project (ADR 0023), page by page.
 
+use std::collections::BTreeSet;
+
 use chrono::Utc;
 
 use super::map::{FieldIds, format_utc};
 use super::store::{
-    has_project_sync, record_project_sync, record_scope_sync, shown_fields, store_fields,
-    store_page, store_statuses, store_versions,
+    has_project_sync, record_project_sync, record_scope_sync, shown_fields, store_field_usage,
+    store_fields, store_page, store_statuses, store_versions,
 };
 use super::{Job, SyncContext, SyncEvent, SyncProgress};
 use crate::connection::{ProjectRow, effective_scope, refresh_projects, tracked_projects};
@@ -74,7 +76,8 @@ pub async fn full_sync(
     let scope = run.scope;
     ctx.db
         .write(move |tx, _| record_scope_sync(tx, &scope, &now, newest.as_deref()))
-        .await
+        .await?;
+    refresh_field_usage(ctx, &run.client, &tracked).await
 }
 
 /// What a search asks for: the mapped fields, the site's sprint and epic colour fields, and the custom fields
@@ -134,6 +137,27 @@ async fn sync_metadata(
         ids.epic_color.as_deref().unwrap_or("none")
     );
     Ok((ids, tracked))
+}
+
+/// Which custom fields the tracked projects fill; when a project can't be sampled, the last answer stays.
+async fn refresh_field_usage(
+    ctx: &SyncContext,
+    client: &JiraClient,
+    tracked: &[ProjectRow],
+) -> AppResult<()> {
+    let mut used = BTreeSet::new();
+    for project in tracked {
+        match client.used_custom_fields(&project.key).await {
+            Ok(ids) => used.extend(ids),
+            Err(e) => {
+                log::warn!("Could not sample the fields of {}: {e}", project.key);
+                return Ok(());
+            }
+        }
+    }
+    ctx.db
+        .write(move |tx, _| store_field_usage(tx, &used))
+        .await
 }
 
 /// Kept only if the connection wasn't changed while Jira answered.

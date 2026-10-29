@@ -53,7 +53,7 @@ request and sends `Authorization: Basic base64(email:token)` (never to `_edge/te
    authenticated. Path segments are pushed one by one, so a value can't add a segment, a query or a fragment.
 2. `params.rs` validates every value first: `ProjectKey` (`[A-Z][A-Z0-9_]*`), `IssueRef` (digits, or a key),
    `IssueRefs` (1 to `BULK_FETCH_MAX`), `Jql` (non-empty, at most 10,000 characters, body only), `FieldIds`
-   (explicit ids, never `*all`), `Expand` (`renderedFields`), `PageToken`. A refused value fails as
+   (explicit ids, never `*all`; only `FieldUsage` asks for `*all`, from a fixed list in `endpoint.rs`), `Expand` (`renderedFields`), `PageToken`. A refused value fails as
    `invalid_input` and nothing is sent.
 3. `guard.rs` `check` compares the planned request with `RULES` (method, path under the REST base, allowed
    query keys) and the unauthenticated `GET /_edge/tenant_info`. Anything else, a fragment, credentials in the
@@ -87,6 +87,7 @@ One method on `JiraClient` each (`jira/api.rs`), one `Endpoint` each; the answer
 | `approximate_count` | `POST search/approximate-count` | a count |
 | `comments` | `GET issue/{key}/comment`, every page, `expand=renderedBody` | `Comment` with ADF and HTML |
 | `check_jql` | `POST jql/parse?validation=strict` | Jira's messages; empty when valid |
+| `used_custom_fields` | `POST search/jql`: `project = "KEY" ORDER BY updated DESC`, one page of 100, `*all` without the large system fields | the custom field ids with a value |
 
 `Issue.fields` stays raw JSON, as the cache stores it; accessors read what the sync needs
 (`summary`, `project_id`, `status_id`, `updated`). `parse_jira_time` reads Jira's `2026-10-20T09:14:03.120+0200`.

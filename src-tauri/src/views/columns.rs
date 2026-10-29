@@ -6,6 +6,7 @@ use ts_rs::TS;
 
 use crate::db::Db;
 use crate::error::AppResult;
+use crate::filter::RELEVANT_FIELD;
 
 /// Standard column ids with their names, in the Columns popover's order.
 const STANDARD: [(&str, &str); 8] = [
@@ -51,7 +52,8 @@ pub fn catalogue(conn: &Connection) -> AppResult<Vec<Column>> {
         })
         .collect();
     let mut query = conn.prepare(&format!(
-        "SELECT id, name FROM cache.field WHERE {SHOWABLE} ORDER BY name COLLATE NOCASE, id"
+        "SELECT id, name FROM cache.field WHERE {SHOWABLE} AND {RELEVANT_FIELD}
+         ORDER BY name COLLATE NOCASE, id"
     ))?;
     let custom = query.query_map([], |row| {
         Ok(Column {

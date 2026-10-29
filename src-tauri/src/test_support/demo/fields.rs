@@ -37,6 +37,19 @@ pub fn fields() -> Vec<Value> {
             json!({ "type": "user" }),
             "com.atlassian.jira.plugin.system.customfieldtypes:userpicker",
         ),
+        // Company-wide fields no tracked project fills: the field pickers leave them out.
+        custom(
+            10090,
+            "Cost centre",
+            json!({ "type": "option" }),
+            "com.atlassian.jira.plugin.system.customfieldtypes:select",
+        ),
+        custom(
+            10091,
+            "Legal approval date",
+            json!({ "type": "date" }),
+            "com.atlassian.jira.plugin.system.customfieldtypes:datepicker",
+        ),
         custom(
             10019,
             "Rank",

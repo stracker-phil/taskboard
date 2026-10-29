@@ -8,7 +8,7 @@ use super::context::names;
 use super::nodes::{Kind, Node, all_nodes, node, own_conditions};
 use crate::db::Db;
 use crate::error::AppResult;
-use crate::filter::{Condition, Field, Names, Parts, parts};
+use crate::filter::{Condition, Field, Names, Parts, RELEVANT_FIELD, parts};
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
 #[ts(export, export_to = "src/api/types.gen.ts")]
@@ -204,11 +204,12 @@ fn fields(conn: &Connection) -> AppResult<Vec<FilterField>> {
             kind: *kind,
         })
         .collect();
-    let mut query = conn.prepare(
+    let mut query = conn.prepare(&format!(
         "SELECT id, name, COALESCE(type, '') FROM cache.field
          WHERE id LIKE 'customfield\\_%' ESCAPE '\\' AND COALESCE(type, '') <> 'any' AND name <> 'Sprint'
-         ORDER BY name COLLATE NOCASE, id",
-    )?;
+           AND {RELEVANT_FIELD}
+         ORDER BY name COLLATE NOCASE, id"
+    ))?;
     let custom = query.query_map([], |row| {
         let kind: String = row.get(2)?;
         Ok(FilterField {

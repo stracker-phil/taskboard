@@ -34,6 +34,8 @@ directly.
 3. A `sync_state` row `full:<project id>` after each project; the `scope` row (`last_full_at`, and
    `last_delta_at` = the newest `updated` stored) after all of them. A failed page ends the job before its
    cursors move; the next run repeats it.
+4. Field usage: per tracked project, `used_custom_fields` samples its 100 newest issues; `field.used` marks the
+   custom fields any of them fills. A failed sample keeps the last marks and doesn't fail the sync.
 
 **Delta** (`delta.rs`): `(<scope>) AND updated >= "<cursor − 2 min>" ORDER BY updated ASC`, the date literal in
 the Jira user's time zone from `/myself` (Jira reads JQL dates there, at minute precision). Pages are stored

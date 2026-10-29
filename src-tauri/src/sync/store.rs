@@ -1,5 +1,7 @@
 //! The cache side of the sync: what it writes inside `Db::write` transactions, and the few reads it needs.
 
+use std::collections::BTreeSet;
+
 use rusqlite::{Connection, OptionalExtension, params};
 
 use super::diff::{Snapshot, diff};
@@ -32,6 +34,17 @@ pub fn store_fields(conn: &Connection, fields: &[Field]) -> AppResult<FieldIds> 
         )?;
     }
     Ok(ids)
+}
+
+/// Marks which custom fields the tracked projects' issues fill; the rest drop out of pickers (`filter::RELEVANT_FIELD`).
+pub fn store_field_usage(conn: &Connection, used: &BTreeSet<String>) -> AppResult<()> {
+    let used = serde_json::to_string(used)?;
+    conn.execute(
+        "UPDATE cache.field SET used = (id IN (SELECT value FROM json_each(?1)))
+         WHERE id LIKE 'customfield\\_%' ESCAPE '\\'",
+        [used],
+    )?;
+    Ok(())
 }
 
 /// Custom fields fetched with every issue: those the owner marked `shown` and those a view shows as a column.
