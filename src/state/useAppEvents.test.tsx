@@ -8,7 +8,8 @@ import { installCommands } from "../commands";
 import { usePageAction } from "../commands/pageActions";
 import { clearCommands, registerCommands } from "../commands/registry";
 import { emitEvent } from "../test/apiMock";
-import { resetStore } from "./store";
+import { narrowingKey } from "./slices/narrowing";
+import { resetStore, useStore } from "./store";
 import { useAppEvents } from "./useAppEvents";
 
 const mocked = vi.mocked(api, true);
@@ -25,6 +26,87 @@ beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
   clearCommands();
+});
+
+const origin = { listId: 3, viewId: 7 };
+const key = narrowingKey(origin.listId, origin.viewId);
+
+describe("useAppEvents launch events", () => {
+  it("selects the issue in its view with the peek closed and opens the Issue view over that origin", async () => {
+    mocked.takeLaunchEvents.mockResolvedValue([{ type: "openIssue", id: "DEMO-12", origin }]);
+
+    await mountEvents();
+
+    await waitFor(() => expect(useStore.getState().issueView).toEqual({ origin, stack: ["DEMO-12"] }));
+    expect(useStore.getState().places[key]).toMatchObject({ selectedId: "DEMO-12", peekOpen: false });
+  });
+
+  it("takes launch events again when Rust signals a launch", async () => {
+    await mountEvents();
+    mocked.takeLaunchEvents.mockResolvedValue([{ type: "openIssue", id: "DEMO-5", origin }]);
+
+    act(() => emitEvent(api, "launch", null));
+
+    await waitFor(() => expect(useStore.getState().issueView?.stack).toEqual(["DEMO-5"]));
+  });
+
+  describe("onlyMine", () => {
+    beforeEach(() => {
+      mocked.navCurrent.mockResolvedValue({ location: origin, expanded: [] });
+    });
+
+    it.each([
+      { on: true, before: false, after: true },
+      { on: false, before: true, after: false },
+      { on: true, before: true, after: true },
+    ])("sets the current view's Me chip to $after when on is $on and it was $before", async ({ on, before, after }) => {
+      useStore.getState().setNarrowing(key, { me: before });
+      mocked.takeLaunchEvents.mockResolvedValue([{ type: "onlyMine", on }]);
+
+      await mountEvents();
+
+      await waitFor(() => expect(useStore.getState().narrowings[key].me).toBe(after));
+    });
+
+    it.each([
+      { before: false, after: true },
+      { before: true, after: false },
+    ])("flips the Me chip from $before to $after when on is null", async ({ before, after }) => {
+      useStore.getState().setNarrowing(key, { me: before });
+      mocked.takeLaunchEvents.mockResolvedValue([{ type: "onlyMine", on: null }]);
+
+      await mountEvents();
+
+      await waitFor(() => expect(useStore.getState().narrowings[key].me).toBe(after));
+    });
+
+    it("turns the Me chip on when on is null and the view has no narrowing yet", async () => {
+      mocked.takeLaunchEvents.mockResolvedValue([{ type: "onlyMine", on: null }]);
+
+      await mountEvents();
+
+      await waitFor(() => expect(useStore.getState().narrowings[key].me).toBe(true));
+    });
+
+    it("changes nothing when navigation has no location", async () => {
+      mocked.navCurrent.mockResolvedValue({ location: null, expanded: [] });
+      mocked.takeLaunchEvents.mockResolvedValue([{ type: "onlyMine", on: true }]);
+
+      await mountEvents();
+      await waitFor(() => expect(mocked.navCurrent).toHaveBeenCalled());
+      await act(async () => {});
+
+      expect(useStore.getState().narrowings).toEqual({});
+    });
+  });
+
+  it("shows an error event as a toast", async () => {
+    mocked.takeLaunchEvents.mockResolvedValue([{ type: "error", message: "No such issue DEMO-404" }]);
+
+    await mountEvents();
+
+    await waitFor(() => expect(useStore.getState().toasts).toMatchObject([{ kind: "error", message: "No such issue DEMO-404" }]));
+  });
 });
 
 describe("useAppEvents page_command", () => {

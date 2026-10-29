@@ -253,7 +253,7 @@ tint: number, };
  * Something the page acts on once it listens: from the launch that started the app, a later launch,
  * or a deep link.
  */
-export type LaunchEvent = { "type": "error", message: string, } | { "type": "activate" };
+export type LaunchEvent = { "type": "error", message: string, } | { "type": "activate" } | { "type": "openIssue", id: string, origin: Location, } | { "type": "onlyMine", on: boolean | null, };
 
 export type Layout = "list" | "board" | "table";
 

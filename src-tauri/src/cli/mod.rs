@@ -1,13 +1,18 @@
 //! The `taskboard` command line. Without a subcommand it starts the app (or activates the running one);
-//! a subcommand asks the running app over the socket and prints its answer (`reply`).
+//! a subcommand asks the running app over the socket and prints its answer (`reply`). A new subcommand adds a
+//! `Command` variant, its `IpcMessage`, its arm in `remote::handle` and, when it prints something, in
+//! `reply::render`.
 
+mod listing;
 pub mod reply;
+pub mod rows;
 
 use std::ffi::OsString;
 
 use clap::{Parser, Subcommand};
 
 use crate::ipc::IpcMessage;
+use crate::views::Layout;
 
 /// The `--log-level` of the CLI; without it the app logs at `Info`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default, clap::ValueEnum)]
@@ -32,12 +37,27 @@ impl From<LogLevel> for log::LevelFilter {
     }
 }
 
+const EXAMPLES: &str = "Examples:
+  taskboard                          start Taskboard or bring it to the front
+  taskboard open nw-12               open an issue in the full Issue view
+  taskboard spaces                   the tracked Spaces with their keys
+  taskboard filters NW               a Space's filter lists with their ids
+  taskboard go NW Board              open a Space at one of its views
+  taskboard go \"NW/Open bugs\"        open a filter list
+  taskboard go recent                open Recently changed
+  taskboard me on                    show only my issues in the current view
+  taskboard layout table             show the current view as a table
+  taskboard search \"login page\" --json
+  taskboard sync --full              fetch every issue again
+  taskboard status --json | jq .place";
+
 #[derive(Parser, Debug)]
 #[command(
     name = "taskboard",
     version,
     about = "A local-first Jira Cloud client for macOS",
-    disable_help_subcommand = true
+    disable_help_subcommand = true,
+    after_help = EXAMPLES
 )]
 struct Cli {
     /// Start without showing the window; a running instance stays as it is
@@ -46,41 +66,98 @@ struct Cli {
     /// Log level for this run
     #[arg(long, value_enum)]
     log_level: Option<LogLevel>,
+    /// Print replies as JSON
+    #[arg(long, global = true)]
+    json: bool,
     #[command(subcommand)]
     command: Option<Command>,
 }
 
 #[derive(Subcommand, Debug)]
 enum Command {
-    /// Whether the app runs, its version and its window
-    Status {
-        /// Print the reply as JSON
-        #[arg(long)]
-        json: bool,
-    },
+    /// Whether the app runs, its version, its window, where it is and the sync
+    Status,
     /// Show the window without bringing the app to the front; starts the app when it isn't running
     Show,
     /// Show the window and bring the app to the front; starts the app when it isn't running
     Focus,
     /// Hide the window; the app keeps running
     Hide,
-    /// Open an issue by its key, e.g. NW-12
+    /// Quit the running app
+    Quit,
+    /// Open an issue by its key (e.g. NW-12) in the full Issue view; starts the app when it isn't running
     Open {
         #[arg(value_parser = issue_key)]
         key: String,
     },
-    /// Quit the running app
-    Quit,
+    /// List the tracked Spaces with their keys and ids
+    Spaces,
+    /// List Everything, Home's lists and the Spaces' filter lists with their ids
+    Filters {
+        /// Only this Space's lists (its key or name)
+        space: Option<String>,
+    },
+    /// List a level's views with their ids (default: the open level)
+    Views {
+        /// everything, recent, pinned, a Space's key or name, a filter list's name (KEY/name) or an id
+        level: Option<String>,
+    },
+    /// Open a Space, a filter list or a Home list, at a view or its last one; starts the app when it isn't running
+    Go {
+        /// everything, recent, pinned, a Space's key or name, a filter list's name (KEY/name) or an id
+        level: String,
+        /// A view's name or id (default: the one it showed last)
+        view: Option<String>,
+    },
+    /// Show only my issues in the current view: on, off, or flip it without an argument
+    Me {
+        #[arg(value_parser = switch)]
+        on: Option<bool>,
+    },
+    /// Show the current view as a list, a board or a table
+    Layout {
+        #[arg(value_enum)]
+        layout: LayoutArg,
+    },
+    /// Find cached issues by key or text, as the command palette does
+    Search {
+        /// Words to find
+        #[arg(required = true, num_args = 1..)]
+        text: Vec<String>,
+    },
     /// Ask the running app to sync with Jira now; returns at once
     Sync {
-        /// A full sync of the whole scope (the default until delta syncs exist)
+        /// Fetch every issue of the sync scope again
         #[arg(long)]
         full: bool,
+    },
+    /// Empty the local copy of Jira and fetch it again; Spaces, filter lists, views and pins stay
+    ResetCache {
+        /// Confirm it
+        #[arg(long, required = true)]
+        yes: bool,
     },
     /// Debug builds only: drive the fake Jira
     #[cfg(debug_assertions)]
     #[command(subcommand)]
     Dev(DevCommand),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum)]
+enum LayoutArg {
+    List,
+    Board,
+    Table,
+}
+
+impl From<LayoutArg> for Layout {
+    fn from(layout: LayoutArg) -> Self {
+        match layout {
+            LayoutArg::List => Layout::List,
+            LayoutArg::Board => Layout::Board,
+            LayoutArg::Table => Layout::Table,
+        }
+    }
 }
 
 #[cfg(debug_assertions)]
@@ -113,7 +190,7 @@ pub enum CliOutcome {
     Exit { message: String, code: i32 },
     /// A subcommand the running app answers; it never starts the app.
     Ask(CliRequest),
-    /// `show` or `focus`: the running app answers it, or the app starts with it.
+    /// A subcommand the running app answers, or the app starts with it (`show`, `focus`, `open`, `go`).
     Remote(CliRequest),
 }
 
@@ -132,31 +209,61 @@ where
             };
         }
     };
-    let ask = |message, json| CliOutcome::Ask(CliRequest { message, json });
-    match cli.command {
-        None => CliOutcome::Run {
+    let Some(command) = cli.command else {
+        return CliOutcome::Run {
             hidden: cli.hidden,
             log_level: cli.log_level,
+        };
+    };
+    let starts_app = matches!(
+        command,
+        Command::Show | Command::Focus | Command::Open { .. } | Command::Go { .. }
+    );
+    let request = CliRequest {
+        message: message(command),
+        json: cli.json,
+    };
+    if starts_app {
+        CliOutcome::Remote(request)
+    } else {
+        CliOutcome::Ask(request)
+    }
+}
+
+fn message(command: Command) -> IpcMessage {
+    match command {
+        Command::Status => IpcMessage::Status,
+        Command::Show => IpcMessage::Show { focus: false },
+        Command::Focus => IpcMessage::Activate { hidden: false },
+        Command::Hide => IpcMessage::Hide,
+        Command::Quit => IpcMessage::Quit,
+        Command::Open { key } => IpcMessage::Open { key },
+        Command::Spaces => IpcMessage::Spaces,
+        Command::Filters { space } => IpcMessage::Filters { space },
+        Command::Views { level } => IpcMessage::Views { level },
+        Command::Go { level, view } => IpcMessage::Go { level, view },
+        Command::Me { on } => IpcMessage::Me { on },
+        Command::Layout { layout } => IpcMessage::Layout {
+            layout: layout.into(),
         },
-        Some(Command::Status { json }) => ask(IpcMessage::Status, json),
-        Some(Command::Show) => CliOutcome::Remote(CliRequest {
-            message: IpcMessage::Show { focus: false },
-            json: false,
-        }),
-        Some(Command::Focus) => CliOutcome::Remote(CliRequest {
-            message: IpcMessage::Activate { hidden: false },
-            json: false,
-        }),
-        Some(Command::Hide) => ask(IpcMessage::Hide, false),
-        Some(Command::Open { key }) => ask(IpcMessage::Open { key }, false),
-        Some(Command::Quit) => ask(IpcMessage::Quit, false),
-        Some(Command::Sync { full }) => ask(IpcMessage::Sync { full }, false),
+        Command::Search { text } => IpcMessage::Search {
+            text: text.join(" "),
+        },
+        Command::Sync { full } => IpcMessage::Sync { full },
+        Command::ResetCache { .. } => IpcMessage::ResetCache,
         #[cfg(debug_assertions)]
-        Some(Command::Dev(DevCommand::Drift)) => ask(IpcMessage::DevDrift, false),
+        Command::Dev(DevCommand::Drift) => IpcMessage::DevDrift,
         #[cfg(debug_assertions)]
-        Some(Command::Dev(DevCommand::SeedSynthetic { count })) => {
-            ask(IpcMessage::DevSeedSynthetic { count }, false)
-        }
+        Command::Dev(DevCommand::SeedSynthetic { count }) => IpcMessage::DevSeedSynthetic { count },
+    }
+}
+
+/// `on` or `off`, any case.
+fn switch(text: &str) -> Result<bool, String> {
+    match text.to_ascii_lowercase().as_str() {
+        "on" => Ok(true),
+        "off" => Ok(false),
+        _ => Err(format!("“{text}” is neither on nor off")),
     }
 }
 
@@ -180,254 +287,4 @@ fn issue_key(text: &str) -> Result<String, String> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn parse_args(args: &[&str]) -> CliOutcome {
-        parse(std::iter::once("taskboard").chain(args.iter().copied()))
-    }
-
-    fn ask(message: IpcMessage, json: bool) -> CliOutcome {
-        CliOutcome::Ask(CliRequest { message, json })
-    }
-
-    fn exit_code(outcome: CliOutcome) -> i32 {
-        match outcome {
-            CliOutcome::Exit { code, .. } => code,
-            other => panic!("expected an exit, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn no_arguments_start_the_app_visibly_with_the_default_log_level() {
-        assert_eq!(
-            parse_args(&[]),
-            CliOutcome::Run {
-                hidden: false,
-                log_level: None
-            }
-        );
-    }
-
-    #[test]
-    fn hidden_starts_the_app_without_a_window() {
-        assert_eq!(
-            parse_args(&["--hidden"]),
-            CliOutcome::Run {
-                hidden: true,
-                log_level: None
-            }
-        );
-    }
-
-    #[test]
-    fn every_log_level_is_accepted() {
-        for (word, level) in [
-            ("error", LogLevel::Error),
-            ("warn", LogLevel::Warn),
-            ("info", LogLevel::Info),
-            ("debug", LogLevel::Debug),
-            ("trace", LogLevel::Trace),
-        ] {
-            assert_eq!(
-                parse_args(&["--log-level", word]),
-                CliOutcome::Run {
-                    hidden: false,
-                    log_level: Some(level)
-                },
-                "{word}"
-            );
-        }
-    }
-
-    #[test]
-    fn hidden_and_log_level_combine() {
-        assert_eq!(
-            parse_args(&["--hidden", "--log-level", "debug"]),
-            CliOutcome::Run {
-                hidden: true,
-                log_level: Some(LogLevel::Debug)
-            }
-        );
-    }
-
-    #[test]
-    fn an_unknown_log_level_is_a_usage_error() {
-        assert_eq!(exit_code(parse_args(&["--log-level", "loud"])), 2);
-    }
-
-    #[test]
-    fn log_levels_map_to_log_filters() {
-        for (level, filter) in [
-            (LogLevel::Error, log::LevelFilter::Error),
-            (LogLevel::Warn, log::LevelFilter::Warn),
-            (LogLevel::Info, log::LevelFilter::Info),
-            (LogLevel::Debug, log::LevelFilter::Debug),
-            (LogLevel::Trace, log::LevelFilter::Trace),
-        ] {
-            assert_eq!(log::LevelFilter::from(level), filter, "{level:?}");
-        }
-        assert_eq!(LogLevel::default(), LogLevel::Info);
-    }
-
-    #[test]
-    fn version_prints_the_name_and_version_and_exits_cleanly() {
-        match parse_args(&["--version"]) {
-            CliOutcome::Exit { message, code } => {
-                assert_eq!(code, 0);
-                assert_eq!(
-                    message.trim_end(),
-                    format!("taskboard {}", env!("CARGO_PKG_VERSION"))
-                );
-            }
-            other => panic!("expected an exit, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn help_exits_cleanly_and_lists_the_subcommands() {
-        match parse_args(&["--help"]) {
-            CliOutcome::Exit { message, code } => {
-                assert_eq!(code, 0);
-                for word in [
-                    "status", "show", "focus", "hide", "open", "quit", "sync", "--hidden",
-                ] {
-                    assert!(message.contains(word), "{word}");
-                }
-            }
-            other => panic!("expected an exit, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn status_asks_the_running_app_in_text_or_json() {
-        assert_eq!(parse_args(&["status"]), ask(IpcMessage::Status, false));
-        assert_eq!(
-            parse_args(&["status", "--json"]),
-            ask(IpcMessage::Status, true)
-        );
-    }
-
-    #[test]
-    fn show_does_not_ask_for_focus_and_may_start_the_app() {
-        assert_eq!(
-            parse_args(&["show"]),
-            CliOutcome::Remote(CliRequest {
-                message: IpcMessage::Show { focus: false },
-                json: false
-            })
-        );
-    }
-
-    #[test]
-    fn focus_activates_the_visible_window_and_may_start_the_app() {
-        assert_eq!(
-            parse_args(&["focus"]),
-            CliOutcome::Remote(CliRequest {
-                message: IpcMessage::Activate { hidden: false },
-                json: false
-            })
-        );
-    }
-
-    #[test]
-    fn hide_and_quit_ask_the_running_app() {
-        assert_eq!(parse_args(&["hide"]), ask(IpcMessage::Hide, false));
-        assert_eq!(parse_args(&["quit"]), ask(IpcMessage::Quit, false));
-    }
-
-    #[test]
-    fn sync_asks_the_running_app_for_a_sync_and_full_asks_for_the_whole_scope() {
-        assert_eq!(
-            parse_args(&["sync"]),
-            ask(IpcMessage::Sync { full: false }, false)
-        );
-        assert_eq!(
-            parse_args(&["sync", "--full"]),
-            ask(IpcMessage::Sync { full: true }, false)
-        );
-    }
-
-    #[test]
-    fn sync_rejects_unknown_flags() {
-        assert_eq!(exit_code(parse_args(&["sync", "--fully"])), 2);
-    }
-
-    #[cfg(debug_assertions)]
-    #[test]
-    fn dev_drift_asks_the_running_app_to_change_the_demo_site() {
-        assert_eq!(
-            parse_args(&["dev", "drift"]),
-            ask(IpcMessage::DevDrift, false)
-        );
-    }
-
-    #[cfg(debug_assertions)]
-    #[test]
-    fn dev_seed_synthetic_asks_the_running_app_for_that_many_issues() {
-        assert_eq!(
-            parse_args(&["dev", "seed-synthetic", "5000"]),
-            ask(IpcMessage::DevSeedSynthetic { count: 5000 }, false)
-        );
-    }
-
-    #[cfg(debug_assertions)]
-    #[test]
-    fn dev_seed_synthetic_without_a_numeric_count_is_a_usage_error() {
-        for args in [
-            &["dev", "seed-synthetic"][..],
-            &["dev", "seed-synthetic", "many"],
-            &["dev", "seed-synthetic", "-5"],
-        ] {
-            assert_eq!(exit_code(parse_args(args)), 2, "{args:?}");
-        }
-    }
-
-    #[cfg(debug_assertions)]
-    #[test]
-    fn dev_without_a_known_subcommand_is_a_usage_error() {
-        for args in [&["dev"][..], &["dev", "explode"]] {
-            assert_eq!(exit_code(parse_args(args)), 2, "{args:?}");
-        }
-    }
-
-    #[test]
-    fn open_upper_cases_the_issue_key() {
-        for (input, key) in [
-            ("nw-12", "NW-12"),
-            ("NW-12", "NW-12"),
-            ("Ab_c2-7", "AB_C2-7"),
-        ] {
-            assert_eq!(
-                parse_args(&["open", input]),
-                ask(IpcMessage::Open { key: key.into() }, false),
-                "{input}"
-            );
-        }
-    }
-
-    #[test]
-    fn open_rejects_malformed_issue_keys() {
-        for input in [
-            "12", "NW-", "NW-012", "-12", "N W-1", "NW-1a", "1W-5", "NW-0", "",
-        ] {
-            assert_eq!(exit_code(parse_args(&["open", input])), 2, "{input:?}");
-        }
-    }
-
-    #[test]
-    fn open_without_a_key_is_a_usage_error() {
-        assert_eq!(exit_code(parse_args(&["open"])), 2);
-    }
-
-    #[test]
-    fn unknown_subcommands_and_flags_are_usage_errors() {
-        for args in [
-            &["frobnicate"][..],
-            &["--frobnicate"],
-            &["status", "--frobnicate"],
-        ] {
-            assert_eq!(exit_code(parse_args(args)), 2, "{args:?}");
-        }
-    }
-}
+mod tests;

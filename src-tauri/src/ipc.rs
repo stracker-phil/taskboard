@@ -17,6 +17,7 @@ use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt};
 use tokio::net::unix::OwnedWriteHalf;
 
 use crate::error::{AppError, ErrorKind};
+use crate::views::Layout;
 
 /// Every request another process can make. Each CLI subcommand is one message; `remote::handle`
 /// dispatches them.
@@ -47,6 +48,35 @@ pub enum IpcMessage {
         #[serde(default)]
         full: bool,
     },
+    /// The tracked Spaces (`taskboard spaces`).
+    Spaces,
+    /// Home's lists and the Spaces' filter lists, or one Space's (`taskboard filters`).
+    Filters {
+        space: Option<String>,
+    },
+    /// A level's views, or the current level's (`taskboard views`).
+    Views {
+        level: Option<String>,
+    },
+    /// Opens a level at a view, or at its last one (`taskboard go`).
+    Go {
+        level: String,
+        view: Option<String>,
+    },
+    /// Sets or flips the current view's Me chip (`taskboard me`).
+    Me {
+        on: Option<bool>,
+    },
+    /// Shows the current view as a list, a board or a table (`taskboard layout`).
+    Layout {
+        layout: Layout,
+    },
+    /// Cached issues by key or text, as the palette finds them (`taskboard search`).
+    Search {
+        text: String,
+    },
+    /// Empties the Jira mirror and fetches it again (`taskboard reset-cache`).
+    ResetCache,
     /// Changes the fake Jira's demo site (`taskboard dev drift`).
     #[cfg(debug_assertions)]
     DevDrift,
@@ -74,6 +104,14 @@ impl IpcMessage {
             IpcMessage::Status => "Status",
             IpcMessage::Open { .. } => "Open",
             IpcMessage::Sync { .. } => "Sync",
+            IpcMessage::Spaces => "Spaces",
+            IpcMessage::Filters { .. } => "Filters",
+            IpcMessage::Views { .. } => "Views",
+            IpcMessage::Go { .. } => "Go",
+            IpcMessage::Me { .. } => "Me",
+            IpcMessage::Layout { .. } => "Layout",
+            IpcMessage::Search { .. } => "Search",
+            IpcMessage::ResetCache => "ResetCache",
             #[cfg(debug_assertions)]
             IpcMessage::DevDrift => "DevDrift",
             #[cfg(debug_assertions)]
@@ -495,6 +533,62 @@ mod tests {
             (
                 IpcMessage::Sync { full: false },
                 serde_json::json!({ "type": "sync", "full": false }),
+            ),
+            (
+                IpcMessage::Spaces,
+                serde_json::json!({ "type": "spaces" }),
+            ),
+            (
+                IpcMessage::Filters { space: None },
+                serde_json::json!({ "type": "filters", "space": null }),
+            ),
+            (
+                IpcMessage::Filters {
+                    space: Some("NW".into()),
+                },
+                serde_json::json!({ "type": "filters", "space": "NW" }),
+            ),
+            (
+                IpcMessage::Views { level: None },
+                serde_json::json!({ "type": "views", "level": null }),
+            ),
+            (
+                IpcMessage::Go {
+                    level: "NW".into(),
+                    view: None,
+                },
+                serde_json::json!({ "type": "go", "level": "NW", "view": null }),
+            ),
+            (
+                IpcMessage::Go {
+                    level: "NW/Open bugs".into(),
+                    view: Some("Board".into()),
+                },
+                serde_json::json!({ "type": "go", "level": "NW/Open bugs", "view": "Board" }),
+            ),
+            (
+                IpcMessage::Me { on: None },
+                serde_json::json!({ "type": "me", "on": null }),
+            ),
+            (
+                IpcMessage::Me { on: Some(true) },
+                serde_json::json!({ "type": "me", "on": true }),
+            ),
+            (
+                IpcMessage::Layout {
+                    layout: Layout::Board,
+                },
+                serde_json::json!({ "type": "layout", "layout": "board" }),
+            ),
+            (
+                IpcMessage::Search {
+                    text: "login page".into(),
+                },
+                serde_json::json!({ "type": "search", "text": "login page" }),
+            ),
+            (
+                IpcMessage::ResetCache,
+                serde_json::json!({ "type": "resetCache" }),
             ),
         ];
         #[cfg(debug_assertions)]

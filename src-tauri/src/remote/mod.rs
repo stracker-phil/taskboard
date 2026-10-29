@@ -1,5 +1,8 @@
 //! Requests from the CLI: `handle` maps each `IpcMessage` to the module that does it.
 
+mod levels;
+mod places;
+
 use std::time::Duration;
 
 use serde::Serialize;
@@ -25,6 +28,7 @@ async fn status_report(app: &AppHandle) -> Result<StatusReport, AppError> {
         version: app.package_info().version.to_string(),
         window_visible: window::main_visible(app),
         sync: overview(&app.state::<AppState>().db, sync).await?,
+        place: places::place(app).await?,
     })
 }
 
@@ -61,16 +65,35 @@ pub async fn handle(app: AppHandle, message: IpcMessage) -> HandlerResult {
                 .queue(if full { Job::Full } else { Job::Delta });
             Ok(serde_json::Value::Null)
         }
+        IpcMessage::Spaces => json(places::spaces(&app).await?),
+        IpcMessage::Filters { space } => json(places::filters(&app, space).await?),
+        IpcMessage::Views { level } => json(places::views(&app, level).await?),
+        IpcMessage::Go { level, view } => json(places::go(&app, level, view).await?),
+        IpcMessage::Open { key } => {
+            places::open_issue(&app, key).await?;
+            Ok(serde_json::Value::Null)
+        }
+        IpcMessage::Me { on } => {
+            places::only_mine(&app, on);
+            Ok(serde_json::Value::Null)
+        }
+        IpcMessage::Layout { layout } => {
+            places::set_layout(&app, layout).await?;
+            Ok(serde_json::Value::Null)
+        }
+        IpcMessage::Search { text } => json(places::search(&app, text).await?),
+        IpcMessage::ResetCache => {
+            app.state::<AppState>().db.reset_cache().await?;
+            log::info!("Cache reset");
+            app.state::<SyncEngine>().queue(Job::Full);
+            json("The cache is empty; a full sync fetches your issues again.")
+        }
         #[cfg(debug_assertions)]
         IpcMessage::DevDrift => json(crate::dev::drift()?),
         #[cfg(debug_assertions)]
         IpcMessage::DevSeedSynthetic { count } => {
             json(crate::dev::seed_synthetic(&app, count).await?)
         }
-        IpcMessage::Open { .. } => Err(AppError::NotConnected(
-            "Taskboard isn't connected to Jira yet; set up the connection in Settings".into(),
-        )
-        .into()),
         launch @ (IpcMessage::Activate { .. } | IpcMessage::Error { .. }) => {
             launch::queue(&app, launch);
             Ok(serde_json::Value::Null)

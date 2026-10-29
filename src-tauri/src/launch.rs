@@ -9,6 +9,7 @@ use ts_rs::TS;
 use crate::events::LAUNCH_EVENT;
 use crate::ipc::IpcMessage;
 use crate::lock::MutexExt;
+use crate::nav::Location;
 use crate::state::AppState;
 use crate::window;
 
@@ -18,8 +19,19 @@ use crate::window;
 #[ts(export, export_to = "src/api/types.gen.ts")]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum LaunchEvent {
-    Error { message: String },
+    Error {
+        message: String,
+    },
     Activate,
+    /// The full Issue view over `origin`, with the issue selected there (`taskboard open`).
+    OpenIssue {
+        id: String,
+        origin: Location,
+    },
+    /// The current view's Me chip: on, off, or `None` to flip it (`taskboard me`).
+    OnlyMine {
+        on: Option<bool>,
+    },
 }
 
 /// `LaunchEvent`s waiting for the page to take them (`take_launch_events`).
@@ -38,8 +50,12 @@ impl LaunchQueue {
             }
             _ => return false,
         };
-        self.events.lock_unpoisoned().push(event);
+        self.push_event(event);
         true
+    }
+
+    pub fn push_event(&self, event: LaunchEvent) {
+        self.events.lock_unpoisoned().push(event);
     }
 
     pub fn take_events(&self) -> Vec<LaunchEvent> {
@@ -50,19 +66,80 @@ impl LaunchQueue {
 /// Also shows the window, except for a hidden activation.
 pub fn queue(handle: &AppHandle, message: IpcMessage) {
     let show = !matches!(message, IpcMessage::Activate { hidden: true });
-    if handle.state::<AppState>().launches.push(message)
-        && let Err(e) = handle.emit(LAUNCH_EVENT, ())
-    {
-        log::warn!("Couldn't notify the page of a launch: {e}");
+    if handle.state::<AppState>().launches.push(message) {
+        notify(handle);
     }
     if show {
         window::show_main(handle);
     }
 }
 
+/// Hands the page a request and shows the window.
+pub fn queue_event(handle: &AppHandle, event: LaunchEvent) {
+    handle.state::<AppState>().launches.push_event(event);
+    notify(handle);
+    window::show_main(handle);
+}
+
+fn notify(handle: &AppHandle) {
+    if let Err(e) = handle.emit(LAUNCH_EVENT, ()) {
+        log::warn!("Couldn't notify the page of a launch: {e}");
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::views::Layout;
+
+    fn open_issue() -> LaunchEvent {
+        LaunchEvent::OpenIssue {
+            id: "10042".into(),
+            origin: Location {
+                list_id: 1,
+                view_id: 2,
+            },
+        }
+    }
+
+    #[test]
+    fn pushed_events_queue_in_order_among_pushed_messages() {
+        let queue = LaunchQueue::default();
+        queue.push_event(open_issue());
+        queue.push(IpcMessage::Activate { hidden: false });
+        queue.push_event(LaunchEvent::OnlyMine { on: Some(false) });
+        assert_eq!(
+            queue.take_events(),
+            vec![
+                open_issue(),
+                LaunchEvent::Activate,
+                LaunchEvent::OnlyMine { on: Some(false) }
+            ]
+        );
+        assert_eq!(queue.take_events(), vec![]);
+    }
+
+    #[test]
+    fn request_events_serialize_with_a_type_tag_and_camel_case_fields() {
+        assert_eq!(
+            serde_json::to_value(open_issue()).unwrap(),
+            serde_json::json!({
+                "type": "openIssue",
+                "id": "10042",
+                "origin": { "listId": 1, "viewId": 2 }
+            })
+        );
+        for (on, wire) in [
+            (Some(true), serde_json::json!({ "type": "onlyMine", "on": true })),
+            (None, serde_json::json!({ "type": "onlyMine", "on": null })),
+        ] {
+            assert_eq!(
+                serde_json::to_value(LaunchEvent::OnlyMine { on }).unwrap(),
+                wire,
+                "{on:?}"
+            );
+        }
+    }
 
     #[test]
     fn error_message_becomes_an_error_event() {
@@ -114,6 +191,22 @@ mod tests {
             IpcMessage::Open {
                 key: "NW-12".into(),
             },
+            IpcMessage::Spaces,
+            IpcMessage::Filters { space: None },
+            IpcMessage::Views { level: None },
+            IpcMessage::Go {
+                level: "NW".into(),
+                view: Some("Board".into()),
+            },
+            IpcMessage::Me { on: Some(true) },
+            IpcMessage::Layout {
+                layout: Layout::Table,
+            },
+            IpcMessage::Search {
+                text: "login".into(),
+            },
+            IpcMessage::Sync { full: true },
+            IpcMessage::ResetCache,
         ];
         for message in messages {
             let queue = LaunchQueue::default();

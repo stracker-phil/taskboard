@@ -102,7 +102,8 @@ src-tauri/
   src/app.rs handlers.rs     Tauri builder; every registered command (the install list)
   src/commands.rs launch.rs  settings, key bindings, UI state, links, logs; launch events pulled by the page
   src/instance.rs ipc.rs     socket handoff to the running app, instance lock; the socket protocol
-  src/cli/ remote.rs         the clap command line and its replies; the app's side of each request
+  src/cli/ remote/           the clap command line and its replies; the app's side of each request (remote/levels
+                             names sidebar levels and views; remote/places lists and opens them)
   src/events.rs state.rs     every event name; AppState
   src/error.rs lock.rs       AppError (+ ErrorKind); poison-tolerant lock helpers
   src/store/                 JsonFile, JsonStore, settings/, keybindings, ui_state

@@ -5,6 +5,8 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use super::listing;
+use super::rows::{IssueRow, LevelRow, PlaceReport, SpaceRow, ViewsReport};
 use crate::ipc::IpcMessage;
 use crate::sync::{SyncOverview, SyncState};
 
@@ -15,12 +17,21 @@ pub struct StatusReport {
     pub version: String,
     pub window_visible: bool,
     pub sync: SyncOverview,
+    /// Where the main window is; none while no level exists.
+    #[serde(default)]
+    pub place: Option<PlaceReport>,
 }
 
 /// The text for `result`, the reply to `message`; `None` when the subcommand prints nothing.
 pub fn render(message: &IpcMessage, result: &Value) -> Result<Option<String>, String> {
     Ok(match message {
         IpcMessage::Status => Some(status_text(&read::<StatusReport>(result)?)),
+        IpcMessage::Spaces => Some(listing::spaces(&read::<Vec<SpaceRow>>(result)?)),
+        IpcMessage::Filters { .. } => Some(listing::levels(&read::<Vec<LevelRow>>(result)?)),
+        IpcMessage::Views { .. } => Some(listing::views(&read::<ViewsReport>(result)?)),
+        IpcMessage::Go { .. } => read::<Option<PlaceReport>>(result)?.map(|p| listing::place(&p)),
+        IpcMessage::Search { .. } => Some(listing::issues(&read::<Vec<IssueRow>>(result)?)),
+        IpcMessage::ResetCache => Some(read::<String>(result)?),
         #[cfg(debug_assertions)]
         IpcMessage::DevDrift | IpcMessage::DevSeedSynthetic { .. } => Some(read::<String>(result)?),
         _ => None,
@@ -41,6 +52,10 @@ fn status_text(report: &StatusReport) -> String {
     let mut lines = vec![
         format!("Taskboard {}", report.version),
         format!("window: {window}"),
+        format!(
+            "at: {}",
+            report.place.as_ref().map_or("nothing open".into(), listing::place)
+        ),
         format!("sync: {}", sync_text(&report.sync.state)),
         format!(
             "last full sync: {}",
@@ -104,12 +119,20 @@ mod tests {
     }
 
     fn report(window_visible: bool, sync: SyncOverview) -> Value {
-        serde_json::to_value(StatusReport {
+        serde_json::to_value(status(window_visible, sync, None)).unwrap()
+    }
+
+    fn status(
+        window_visible: bool,
+        sync: SyncOverview,
+        place: Option<PlaceReport>,
+    ) -> StatusReport {
+        StatusReport {
             version: "1.2.3".into(),
             window_visible,
             sync,
-        })
-        .unwrap()
+            place,
+        }
     }
 
     fn status_text_of(reply: &Value) -> String {
@@ -121,7 +144,7 @@ mod tests {
         let reply = report(true, overview(idle(), None, vec![]));
         assert_eq!(
             status_text_of(&reply),
-            "Taskboard 1.2.3\nwindow: visible\nsync: idle\nlast full sync: never"
+            "Taskboard 1.2.3\nwindow: visible\nat: nothing open\nsync: idle\nlast full sync: never"
         );
     }
 
@@ -130,7 +153,37 @@ mod tests {
         let reply = report(false, overview(idle(), None, vec![]));
         assert_eq!(
             status_text_of(&reply),
-            "Taskboard 1.2.3\nwindow: hidden\nsync: idle\nlast full sync: never"
+            "Taskboard 1.2.3\nwindow: hidden\nat: nothing open\nsync: idle\nlast full sync: never"
+        );
+    }
+
+    #[test]
+    fn status_prints_where_the_window_is() {
+        let place = PlaceReport {
+            list_id: 2,
+            level: "NW Website relaunch".into(),
+            view_id: 5,
+            view: "Board".into(),
+        };
+        let reply =
+            serde_json::to_value(status(true, overview(idle(), None, vec![]), Some(place)))
+                .unwrap();
+        assert_eq!(
+            status_text_of(&reply),
+            "Taskboard 1.2.3\nwindow: visible\nat: NW Website relaunch › Board\nsync: idle\nlast full sync: never"
+        );
+    }
+
+    #[test]
+    fn a_status_reply_without_a_place_still_reads() {
+        let reply = json!({
+            "version": "1.2.3",
+            "windowVisible": true,
+            "sync": { "state": { "state": "idle", "lastOk": null }, "lastFullAt": null, "projects": [] }
+        });
+        assert_eq!(
+            status_text_of(&reply),
+            "Taskboard 1.2.3\nwindow: visible\nat: nothing open\nsync: idle\nlast full sync: never"
         );
     }
 
@@ -153,6 +206,7 @@ mod tests {
             status_text_of(&reply),
             "Taskboard 1.2.3\n\
              window: visible\n\
+             at: nothing open\n\
              sync: idle\n\
              last full sync: 2026-10-28T10:00:00.000Z\n\
              NW Website relaunch: 33 cached, 21 open\n\
@@ -188,7 +242,9 @@ mod tests {
             let reply = report(true, overview(state.clone(), None, vec![]));
             assert_eq!(
                 status_text_of(&reply),
-                format!("Taskboard 1.2.3\nwindow: visible\n{line}\nlast full sync: never"),
+                format!(
+                    "Taskboard 1.2.3\nwindow: visible\nat: nothing open\n{line}\nlast full sync: never"
+                ),
                 "{state:?}"
             );
         }
@@ -205,6 +261,10 @@ mod tests {
             },
             IpcMessage::Sync { full: false },
             IpcMessage::Sync { full: true },
+            IpcMessage::Me { on: None },
+            IpcMessage::Layout {
+                layout: crate::views::Layout::Board,
+            },
         ] {
             assert_eq!(render(&message, &json!(null)), Ok(None), "{message:?}");
         }
@@ -288,6 +348,7 @@ mod tests {
             json!({
                 "version": "1.2.3",
                 "windowVisible": false,
+                "place": null,
                 "sync": {
                     "state": { "state": "idle", "lastOk": null },
                     "lastFullAt": SYNCED_AT,
@@ -304,11 +365,7 @@ mod tests {
         );
         assert_eq!(
             serde_json::from_value::<StatusReport>(value).unwrap(),
-            StatusReport {
-                version: "1.2.3".into(),
-                window_visible: false,
-                sync,
-            }
+            status(false, sync, None)
         );
     }
 }

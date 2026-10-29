@@ -53,10 +53,10 @@ pub fn start(
             log::info!("Taskboard {} started", env!("CARGO_PKG_VERSION"));
             app.set_menu(menu::build(app.handle())?)?;
             let state = app.state::<AppState>();
-            state.launches.push(initial);
             announce_db_changes(app.handle(), &state.db);
             give_spaces_their_lists(&state.db);
             start_sync(app.handle(), &state);
+            take_initial(app.handle(), &state, initial);
             #[cfg(debug_assertions)]
             apply_dev_frame(app);
             #[cfg(debug_assertions)]
@@ -80,6 +80,24 @@ pub fn start(
             RunEvent::Reopen { .. } => window::show_main(app),
             _ => {}
         });
+}
+
+/// A launch for the page waits for it; a request (`taskboard open`, `go`) that started the app runs now, and
+/// its failure shows in the window, as no terminal waits for the answer.
+fn take_initial(app: &AppHandle, state: &AppState, initial: IpcMessage) {
+    if matches!(
+        initial,
+        IpcMessage::Activate { .. } | IpcMessage::Error { .. } | IpcMessage::Show { .. }
+    ) {
+        state.launches.push(initial);
+        return;
+    }
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        if let Err(e) = remote::handle(app.clone(), initial).await {
+            crate::launch::queue(&app, IpcMessage::Error { message: e.message });
+        }
+    });
 }
 
 fn announce_db_changes(app: &AppHandle, db: &Db) {
