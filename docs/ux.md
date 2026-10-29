@@ -470,13 +470,16 @@ their actions while on screen with `usePageAction(id, run)` (`commands/pageActio
 lists and rebinds the page's keys (conflicts are flagged); the menu shows the default keys. There are no
 global shortcuts.
 
-- **Menus** (`src-tauri/src/menu/`): File (New Filter List ⌘N, New View ⌘T), View (as List / Board / Table
-  ⌃⌘1–3; Group and Sort… ⌥⌘G, Columns… ⌥⌘C, Edit Filter… ⌥⌘F, Only My Issues ⇧⌘M, Filter This View ⌘F;
-  Toggle Sidebar ⌘\, Refresh ⌘R, Full Sync ⇧⌘R), Go (Command Palette ⌘K, Everything ⇧⌘E, Recently Changed
-  ⇧⌘U, Pinned ⇧⌘P, Previous/Next Space ⌥⌘↑/↓, Previous/Next View ⌃⇧⇥/⌃⇥), Issue (Open, Open or Close Peek,
-  Open Epic, Open in Jira ⌘↩, Copy Key, Copy Link ⇧⌘C, Pin or Unpin, Mark Seen, Mark All Seen ⇧⌘A), plus
-  ⌘, Settings, ⌘W, ⌘Q (the debug build's Reload is ⌥⌘R). Plain-letter keys stay off menu items so they never
-  take a typed letter; Copy Key has no ⌘C there because Edit → Copy owns it.
+- **Menus** (`src-tauri/src/menu/`), in the Mac order: Taskboard, File, Edit, Go, List, Issue, View, Window, Help.
+  File holds the core actions (New Filter List ⌘N, New View ⌘T; Refresh ⌘R, Full Sync ⇧⌘R; Reset Cache…,
+  which opens Settings → Sync → Cache to confirm; Close Window ⌘W). Go moves around (Command Palette ⌘K,
+  Everything ⇧⌘E, Recently Changed ⇧⌘U, Pinned ⇧⌘P, Previous/Next Space ⌥⌘↑/↓, Previous/Next View ⌃⇧⇥/⌃⇥).
+  List acts on the shown issues (Show as List / Board / Table ⌃⌘1–3; Group and Sort… ⌥⌘G, Columns… ⌥⌘C, Edit
+  Filter… ⌥⌘F, Only My Issues ⇧⌘M, Filter This View ⌘F; Mark All Seen ⇧⌘A). Issue acts on the selected one
+  (Open, Open or Close Peek, Open Epic, Open in Jira ⌘↩, Copy Key, Copy Link ⇧⌘C, Pin or Unpin, Mark Seen).
+  View is the window's appearance only (Toggle Sidebar ⌘\, Enter Full Screen; the debug build's Reload ⌥⌘R),
+  never what the page shows. Help has Open Log Folder and Show Data Folder. Plain-letter keys stay off menu
+  items so they never take a typed letter; Copy Key has no ⌘C there because Edit → Copy owns it.
 - Bare keys never fire in text fields; there only ⌘ and ⌃ combinations and Escape do.
 - ↵ and Space on a focused button or link activate it. `Tab` moves focus (sidebar, tabs, toolbar, content).
 - A command has one binding; ⌘1–⌘9 open the nth view tab.

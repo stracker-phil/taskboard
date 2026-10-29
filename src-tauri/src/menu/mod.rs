@@ -1,4 +1,4 @@
-//! The app menu (Taskboard, File, Edit, View, Go, Issue, Window, Help). Every custom item's id is the command
+//! The app menu (Taskboard, File, Edit, Go, List, Issue, View, Window, Help). Every custom item's id is the command
 //! it runs; `page:<id>` items run the main window's own commands (the same ids its keys run). The standard
 //! items (About, Services, Hide, the Edit items, Minimize) are macOS's own. Plain-letter keys (J, K, P, M) stay
 //! off the menu items, so they never take a typed letter from a text field.
@@ -37,27 +37,13 @@ pub const FILE: &[Item] = &[
     item("New Filter List", "page:list.new", "CmdOrCtrl+N"),
     item("New View", "page:view.new", "CmdOrCtrl+T"),
 ];
-pub const VIEW_LAYOUTS: &[Item] = &[
-    item("as List", "page:view.layout.list", "CmdOrCtrl+Ctrl+1"),
-    item("as Board", "page:view.layout.board", "CmdOrCtrl+Ctrl+2"),
-    item("as Table", "page:view.layout.table", "CmdOrCtrl+Ctrl+3"),
-];
-pub const VIEW_TOOLBAR: &[Item] = &[
-    item("Group and Sort…", "page:toolbar.group", "CmdOrCtrl+Alt+G"),
-    item("Columns…", "page:toolbar.columns", "CmdOrCtrl+Alt+C"),
-    item("Edit Filter…", "page:toolbar.filter", "CmdOrCtrl+Alt+F"),
-    item("Only My Issues", "page:toolbar.me", "CmdOrCtrl+Shift+M"),
-    item("Filter This View", "page:toolbar.search", "CmdOrCtrl+F"),
-];
-pub const VIEW: &[Item] = &[
-    item(
-        "Toggle Sidebar",
-        "view:toggleSidebar",
-        "CmdOrCtrl+Backslash",
-    ),
+pub const FILE_SYNC: &[Item] = &[
     item("Refresh", "sync:refresh", "CmdOrCtrl+R"),
     item("Full Sync", "sync:full", "CmdOrCtrl+Shift+R"),
 ];
+/// Opens Settings at the Cache group, which asks before it empties the cache.
+pub const RESET_CACHE: Item = plain("Reset Cache…", "app:settings:sync:cache");
+pub const CLOSE: Item = item("Close Window", "window:close", "CmdOrCtrl+W");
 pub const GO_LEVELS: &[Item] = &[
     item("Command Palette…", "page:palette.open", "CmdOrCtrl+K"),
     item("Everything", "page:go.everything", "CmdOrCtrl+Shift+E"),
@@ -70,7 +56,23 @@ pub const GO_MOVES: &[Item] = &[
     item("Previous View", "page:view.previous", "Ctrl+Shift+Tab"),
     item("Next View", "page:view.next", "Ctrl+Tab"),
 ];
-/// The issue keys are plain letters or shared with Edit (⌘C), so most items show no key here.
+pub const LIST_LAYOUTS: &[Item] = &[
+    item("Show as List", "page:view.layout.list", "CmdOrCtrl+Ctrl+1"),
+    item("Show as Board", "page:view.layout.board", "CmdOrCtrl+Ctrl+2"),
+    item("Show as Table", "page:view.layout.table", "CmdOrCtrl+Ctrl+3"),
+];
+pub const LIST_TOOLBAR: &[Item] = &[
+    item("Group and Sort…", "page:toolbar.group", "CmdOrCtrl+Alt+G"),
+    item("Columns…", "page:toolbar.columns", "CmdOrCtrl+Alt+C"),
+    item("Edit Filter…", "page:toolbar.filter", "CmdOrCtrl+Alt+F"),
+    item("Only My Issues", "page:toolbar.me", "CmdOrCtrl+Shift+M"),
+    item("Filter This View", "page:toolbar.search", "CmdOrCtrl+F"),
+];
+pub const LIST_SEEN: &[Item] = &[item(
+    "Mark All Seen",
+    "page:recent.markAllSeen",
+    "CmdOrCtrl+Shift+A",
+)];
 pub const ISSUE: &[Item] = &[
     plain("Open", "page:issue.open"),
     plain("Open or Close Peek", "page:issue.togglePeek"),
@@ -80,18 +82,19 @@ pub const ISSUE: &[Item] = &[
     item("Copy Link", "page:issue.copyUrl", "CmdOrCtrl+Shift+C"),
     plain("Pin or Unpin", "page:issue.togglePin"),
     plain("Mark Seen", "page:issue.markSeen"),
-    item(
-        "Mark All Seen",
-        "page:recent.markAllSeen",
-        "CmdOrCtrl+Shift+A",
-    ),
 ];
-/// Debug builds only; ⌘⇧R is the full sync.
+/// The window's appearance only; what the page shows lives in Go, List and Issue.
+pub const VIEW: &[Item] = &[item(
+    "Toggle Sidebar",
+    "view:toggleSidebar",
+    "CmdOrCtrl+Backslash",
+)];
 pub const RELOAD: Item = item("Reload", "app:reload", "CmdOrCtrl+Alt+R");
-pub const CLOSE: Item = item("Close Window", "window:close", "CmdOrCtrl+W");
-pub const HELP: &[Item] = &[plain("Open Log Folder", "app:logs")];
+pub const HELP: &[Item] = &[
+    plain("Open Log Folder", "app:logs"),
+    plain("Show Data Folder", "app:data"),
+];
 
-/// `None` for a command no feature registered.
 fn build_item(
     app: &AppHandle,
     commands: &dyn CommandStatus,
@@ -150,33 +153,42 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         .paste()
         .select_all()
         .build()?;
-    let file = with_items(app, &commands, SubmenuBuilder::new(app, "File"), FILE)?.build()?;
-    let view = with_items(
-        app,
-        &commands,
-        SubmenuBuilder::new(app, "View"),
-        VIEW_LAYOUTS,
-    )?
-    .separator();
-    let view = with_items(app, &commands, view, VIEW_TOOLBAR)?.separator();
-    let view = with_items(app, &commands, view, VIEW)?;
-    let view = with_items(app, &commands, view, &[RELOAD])?.build()?;
+    let file = with_items(app, &commands, SubmenuBuilder::new(app, "File"), FILE)?.separator();
+    let file = with_items(app, &commands, file, FILE_SYNC)?.separator();
+    let file = with_items(app, &commands, file, &[RESET_CACHE])?.separator();
+    let file = with_items(app, &commands, file, &[CLOSE])?.build()?;
     let go = with_items(app, &commands, SubmenuBuilder::new(app, "Go"), GO_LEVELS)?.separator();
     let go = with_items(app, &commands, go, GO_MOVES)?.build()?;
+    let list = with_items(
+        app,
+        &commands,
+        SubmenuBuilder::new(app, "List"),
+        LIST_LAYOUTS,
+    )?
+    .separator();
+    let list = with_items(app, &commands, list, LIST_TOOLBAR)?.separator();
+    let list = with_items(app, &commands, list, LIST_SEEN)?.build()?;
     let issue = with_items(app, &commands, SubmenuBuilder::new(app, "Issue"), ISSUE)?.build()?;
-    let window = SubmenuBuilder::new(app, "Window").minimize().maximize();
-    let window = with_items(app, &commands, window.separator(), &[CLOSE])?
+    let view = with_items(app, &commands, SubmenuBuilder::new(app, "View"), VIEW)?;
+    let view = with_items(app, &commands, view, &[RELOAD])?
+        .separator()
+        .fullscreen()
+        .build()?;
+    let window = SubmenuBuilder::new(app, "Window")
+        .minimize()
+        .maximize()
         .separator()
         .bring_all_to_front()
         .build()?;
     let help = with_items(app, &commands, SubmenuBuilder::new(app, "Help"), HELP)?.build()?;
     Menu::with_items(
         app,
-        &[&taskboard, &file, &edit, &view, &go, &issue, &window, &help],
+        &[
+            &taskboard, &file, &edit, &go, &list, &issue, &view, &window, &help,
+        ],
     )
 }
 
-/// A click on any menu item runs the command of its id.
 pub fn clicked(app: &AppHandle, id: &str) {
     if app.state::<bus::Commands>().knows(id) {
         bus::spawn(app, id);
@@ -196,15 +208,17 @@ mod tests {
     }
 
     fn all_items() -> Vec<&'static Item> {
-        let mut items: Vec<&Item> = vec![&SETTINGS, &QUIT, &CLOSE, &RELOAD];
+        let mut items: Vec<&Item> = vec![&SETTINGS, &QUIT, &RESET_CACHE, &CLOSE, &RELOAD];
         for list in [
             FILE,
-            VIEW_LAYOUTS,
-            VIEW_TOOLBAR,
-            VIEW,
+            FILE_SYNC,
             GO_LEVELS,
             GO_MOVES,
+            LIST_LAYOUTS,
+            LIST_TOOLBAR,
+            LIST_SEEN,
             ISSUE,
+            VIEW,
             HELP,
         ] {
             items.extend(list);
@@ -226,16 +240,30 @@ mod tests {
 
     #[test]
     fn page_items_use_the_ids_the_page_registers() {
-        let page_ids: Vec<&str> = [FILE, VIEW_LAYOUTS, VIEW_TOOLBAR, GO_LEVELS, GO_MOVES, ISSUE]
-            .into_iter()
-            .flatten()
-            .filter_map(|item| item.command.strip_prefix("page:"))
-            .collect();
+        let page_ids: Vec<&str> = [
+            FILE,
+            GO_LEVELS,
+            GO_MOVES,
+            LIST_LAYOUTS,
+            LIST_TOOLBAR,
+            LIST_SEEN,
+            ISSUE,
+        ]
+        .into_iter()
+        .flatten()
+        .filter_map(|item| item.command.strip_prefix("page:"))
+        .collect();
         assert_eq!(
             page_ids,
             [
                 "list.new",
                 "view.new",
+                "palette.open",
+                "go.everything",
+                "go.recent",
+                "go.pinned",
+                "view.previous",
+                "view.next",
                 "view.layout.list",
                 "view.layout.board",
                 "view.layout.table",
@@ -244,12 +272,7 @@ mod tests {
                 "toolbar.filter",
                 "toolbar.me",
                 "toolbar.search",
-                "palette.open",
-                "go.everything",
-                "go.recent",
-                "go.pinned",
-                "view.previous",
-                "view.next",
+                "recent.markAllSeen",
                 "issue.open",
                 "issue.togglePeek",
                 "issue.openEpic",
@@ -258,7 +281,6 @@ mod tests {
                 "issue.copyUrl",
                 "issue.togglePin",
                 "issue.markSeen",
-                "recent.markAllSeen",
             ]
         );
     }
@@ -312,24 +334,62 @@ mod tests {
     }
 
     #[test]
-    fn the_view_menu_carries_the_sync_items_with_their_accelerators() {
+    fn the_view_menu_holds_only_window_appearance() {
         let found: Vec<(&str, &str, Option<&str>)> = VIEW
             .iter()
             .map(|item| (item.label, item.command, item.accelerator))
             .collect();
         assert_eq!(
             found,
+            [(
+                "Toggle Sidebar",
+                "view:toggleSidebar",
+                Some("CmdOrCtrl+Backslash")
+            )]
+        );
+        for item in VIEW {
+            assert!(!item.command.starts_with("page:"), "{}", item.command);
+            assert!(!item.command.starts_with("sync:"), "{}", item.command);
+        }
+        assert_eq!(RELOAD.accelerator, Some("CmdOrCtrl+Alt+R"));
+    }
+
+    #[test]
+    fn the_file_menu_holds_refresh_full_sync_and_close_window() {
+        let sync: Vec<(&str, &str, Option<&str>)> = FILE_SYNC
+            .iter()
+            .map(|item| (item.label, item.command, item.accelerator))
+            .collect();
+        assert_eq!(
+            sync,
             [
-                (
-                    "Toggle Sidebar",
-                    "view:toggleSidebar",
-                    Some("CmdOrCtrl+Backslash")
-                ),
                 ("Refresh", "sync:refresh", Some("CmdOrCtrl+R")),
                 ("Full Sync", "sync:full", Some("CmdOrCtrl+Shift+R")),
             ]
         );
-        assert_eq!(RELOAD.accelerator, Some("CmdOrCtrl+Alt+R"));
+        assert_eq!(CLOSE.label, "Close Window");
+        assert_eq!(CLOSE.command, "window:close");
+    }
+
+    #[test]
+    fn mark_all_seen_lives_in_the_list_menu_not_in_issue() {
+        fn commands(items: &[Item]) -> Vec<&str> {
+            items.iter().map(|item| item.command).collect()
+        }
+        assert_eq!(commands(LIST_SEEN), ["page:recent.markAllSeen"]);
+        assert!(!commands(ISSUE).contains(&"page:recent.markAllSeen"));
+    }
+
+    #[test]
+    fn reset_cache_opens_settings_at_the_sync_caches_section_without_a_key() {
+        let bus = registered();
+        assert_eq!(RESET_CACHE.label, "Reset Cache…");
+        assert_eq!(RESET_CACHE.command, "app:settings:sync:cache");
+        assert_eq!(RESET_CACHE.accelerator, None);
+        assert!(bus.knows(RESET_CACHE.command));
+        let info = bus.info(RESET_CACHE.command).unwrap();
+        assert_eq!(info.title, "Settings Page");
+        assert!(info.hidden);
     }
 
     #[test]
