@@ -121,7 +121,8 @@ src-tauri/
   src/adf/                   Atlassian Document Format to HTML for descriptions, rich fields and comments (pure)
   src/filter/                filter conditions: the model, SQL compiler, conditions in words
   src/lists/ views/          the sidebar tree with counts and defaults; the view tabs and the view query (filter,
-                             group, sort, rows, columns); order.rs keeps positions; look.rs the tiles' icon and color
+                             group, sort, rows, columns; subtasks.rs how subtasks show); order.rs keeps positions;
+                             look.rs the tiles' icon and color
   src/search/                full-text search: safe FTS5 queries, the palette's issues and lists, the text field
   src/pins/                  local pins (Bookmarks in the UI): durations to local midnights, the Bookmarks view, Add to Home
   src/changes/               unseen (unread) changes: the change chip and Since-yesterday words, read and unread
@@ -144,7 +145,8 @@ src/
   queries/                   TanStack Query hooks and the event → query-key map (ADR 0018)
   state/store.ts slices/     UI-only state (zustand)
   shell/                     the main window frame: sidebar and content panel
-  shell/toolbar/             the view toolbar: Group menu, Columns and Filter popovers, Me chip, text filter
+  shell/toolbar/             the view toolbar: Group menu, Columns popover, Subtasks menu, Filter popover, Me chip,
+                             text filter
   views/list/ views/table/   the List and Table layouts over the view query's rows (views/board/ the Board)
   issue/                     the Issue view, the preview (Peek.tsx), activity; hoverPeek/ the ⌥ + hover Peek
   pins/ palette/             Bookmarks; the command palette

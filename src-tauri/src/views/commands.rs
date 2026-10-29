@@ -4,7 +4,9 @@ use tauri::State;
 
 use chrono::Utc;
 
-use super::{BoardData, Column, GroupBy, IssueOpening, Layout, Narrowing, Sort, View, ViewData};
+use super::{
+    BoardData, Column, GroupBy, IssueOpening, Layout, Narrowing, Sort, SubtaskMode, View, ViewData,
+};
 use crate::error::AppResult;
 use crate::filter::Filter;
 use crate::lists::Viewer;
@@ -100,6 +102,16 @@ pub async fn view_set_open_with(
     open_with: Option<IssueOpening>,
 ) -> AppResult<View> {
     super::view_set_open_with(&state.db, id, open_with).await
+}
+
+/// How the view shows subtasks; the Board ignores it.
+#[tauri::command]
+pub async fn view_set_subtasks(
+    state: State<'_, AppState>,
+    id: i64,
+    mode: SubtaskMode,
+) -> AppResult<View> {
+    super::view_set_subtasks(&state.db, id, mode).await
 }
 
 /// The view's own conditions, ANDed with its list's.

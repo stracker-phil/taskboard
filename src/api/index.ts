@@ -43,6 +43,7 @@ import type {
   SpaceUpdate,
   Column,
   StatusStyleRow,
+  SubtaskMode,
   Style,
   SyncOverview,
   SyncSettings,
@@ -139,6 +140,8 @@ export const api = {
   viewSetWrap: (id: number, wrap: boolean) => invoke<View>("view_set_wrap", { id, wrap }),
   /** Labels as tags after the title while the view has no Labels column. */
   viewSetInlineLabels: (id: number, inline: boolean) => invoke<View>("view_set_inline_labels", { id, inline }),
+  /** How the view shows subtasks; the Board ignores it. */
+  viewSetSubtasks: (id: number, mode: SubtaskMode) => invoke<View>("view_set_subtasks", { id, mode }),
   /** No icon shows the layout's; no color shows the icon plain. */
   viewSetLook: (id: number, icon: string | null, color: string | null) => invoke<View>("view_set_look", { id, icon, color }),
   /** Null follows Settings → General. */

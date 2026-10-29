@@ -1,10 +1,10 @@
-//! How a view shows beyond columns and grouping: wrapped titles, inline labels, where a click opens an issue,
-//! its tab's look.
+//! How a view shows beyond columns and grouping: wrapped titles, inline labels, subtasks, where a click opens
+//! an issue, its tab's look.
 
 use rusqlite::{Connection, params};
 
 use super::edit::edit;
-use super::model::{IssueOpening, View, to_text};
+use super::model::{IssueOpening, SubtaskMode, View, to_text};
 use crate::db::Db;
 use crate::error::AppResult;
 use crate::look::{clean_color, clean_icon};
@@ -37,6 +37,14 @@ pub(super) fn write_open_with(
     Ok(())
 }
 
+pub(super) fn write_subtasks(conn: &Connection, id: i64, mode: SubtaskMode) -> AppResult<()> {
+    conn.execute(
+        "UPDATE view SET subtasks = ?2 WHERE id = ?1",
+        params![id, to_text(mode)],
+    )?;
+    Ok(())
+}
+
 pub async fn view_set_wrap(db: &Db, id: i64, wrap: bool) -> AppResult<View> {
     edit(db, id, move |conn| write_wrap(conn, id, wrap)).await
 }
@@ -52,6 +60,10 @@ pub async fn view_set_open_with(
     open_with: Option<IssueOpening>,
 ) -> AppResult<View> {
     edit(db, id, move |conn| write_open_with(conn, id, open_with)).await
+}
+
+pub async fn view_set_subtasks(db: &Db, id: i64, mode: SubtaskMode) -> AppResult<View> {
+    edit(db, id, move |conn| write_subtasks(conn, id, mode)).await
 }
 
 pub(super) fn write_look(

@@ -531,7 +531,7 @@ mod demo_answers {
             .await
             .unwrap();
 
-        assert_eq!(count, 21 + 12 + 6 + 2 + 9 + 2 + 11 + 2 + 8 + 1);
+        assert_eq!(count, 26 + 12 + 6 + 2 + 11 + 2 + 12 + 2 + 8 + 1);
     }
 
     #[tokio::test]

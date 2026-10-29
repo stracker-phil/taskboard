@@ -15,6 +15,7 @@ export function view(patch: Partial<View> = {}): View {
     wrapTitles: true,
     inlineLabels: true,
     openWith: null,
+    subtasks: "hidden",
     collapsed: {},
     position: 0,
     isDefault: false,

@@ -1,4 +1,4 @@
-//! The other Spaces (open counts from the mockup sidebar: NWS 6, LUM 9, FBA 11, INT 8) and the
+//! The other Spaces (open counts in the sidebar, subtasks left out: NWS 6, LUM 9, FBA 10, INT 8) and the
 //! untracked archive project.
 
 use super::catalog::Kind::{Bug, Story, Subtask, Task};
@@ -24,6 +24,8 @@ pub fn issues() -> Vec<IssueSpec> {
         issue("LUM-318", Bug, ToDo, "Widget crash on iPad").to(AM).by(SB).prio(Highest).labels(&["ios", "crash"]).sprints(&[38]).at("2026-10-28 09:20", "2026-10-28 09:20").desc("The home screen widget crashes on iPad when the app has not been opened since the update."),
         issue("LUM-301", Story, InProgress, "Dark mode for onboarding screens").to(SB).by(SB).labels(&["ios"]).fix("3.3.0").sprints(&[37, 38]).points(5.0).at("2026-10-01 10:00", "2026-10-27 12:30"),
         issue("LUM-305", Story, InProgress, "Offline queue for journal entries").to(AM).by(SB).prio(High).labels(&["ios"]).fix("3.3.0").sprints(&[38]).points(8.0).reviewer(SB).at("2026-10-06 09:30", "2026-10-27 18:20"),
+        issue("LUM-319", Subtask, InReview, "Retry queued entries after signing in").to(SB).by(AM).parent("LUM-305").sprints(&[38]).at("2026-10-16 09:00", "2026-10-27 10:20"),
+        issue("LUM-320", Subtask, ToDo, "Conflict banner for entries edited on two devices").to(AL).by(AM).parent("LUM-305").at("2026-10-16 09:10", "2026-10-23 16:00"),
         issue("LUM-309", Bug, InReview, "Crash when rotating during photo import").to(SB).by(AL).prio(High).labels(&["ios", "crash"]).fix("3.3.0").sprints(&[38]).points(2.0).reviewer(AM).at("2026-10-12 15:00", "2026-10-26 10:40"),
         issue("LUM-314", Task, Blocked, "Migrate analytics to the new SDK").to(SB).by(SB).fix("3.3.0").sprints(&[38]).points(3.0).at("2026-10-14 11:00", "2026-10-21 09:15"),
         issue("LUM-310", Task, ToDo, "Localize App Store screenshots (DE, FR)").to(AL).by(SB).prio(Low).fix("3.3.0").at("2026-10-09 14:00", "2026-10-09 14:00"),
@@ -36,6 +38,7 @@ pub fn issues() -> Vec<IssueSpec> {
         // Fernweh booking API: 11 open, 2 done in scope
         issue("FBA-87", Story, InProgress, "Idempotency keys for booking requests").to(AM).by(LN).prio(High).labels(&["backend"]).points(5.0).reviewer(LN).at("2026-10-07 09:00", "2026-10-27 11:00"),
         issue("FBA-99", Subtask, ToDo, "Keep idempotency keys for 24 hours").to(AM).by(AM).parent("FBA-87").at("2026-10-27 11:00", "2026-10-27 11:00"),
+        issue("FBA-100", Subtask, InReview, "Return the first response for a repeated key").to(LN).by(AM).parent("FBA-87").at("2026-10-22 10:00", "2026-10-27 14:40"),
         issue("FBA-88", Bug, InReview, "Return 409 for double-booked rooms").to(LN).by(LN).prio(High).labels(&["backend"]).reviewer(AM).at("2026-10-13 14:30", "2026-10-27 15:20"),
         issue("FBA-93", Bug, InProgress, "Timeouts when the channel manager is slow").to(LN).by(AM).prio(Highest).labels(&["backend"]).at("2026-10-20 08:10", "2026-10-28 08:45"),
         issue("FBA-92", Story, Blocked, "Cancellation fees per tariff").to(AM).by(LN).prio(High).labels(&["client"]).at("2026-10-16 10:00", "2026-10-26 16:10"),

@@ -18,6 +18,7 @@ pub const LOCAL: &[&str] = &[
     include_str!("../../migrations/local/0010_tile_looks.sql"),
     include_str!("../../migrations/local/0011_view_inline_labels.sql"),
     include_str!("../../migrations/local/0012_view_filter.sql"),
+    include_str!("../../migrations/local/0013_view_subtasks.sql"),
 ];
 pub const CACHE: &[&str] = &[
     include_str!("../../migrations/cache/0001_init.sql"),

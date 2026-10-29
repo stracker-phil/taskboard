@@ -43,6 +43,7 @@ export function ListView({ listId, viewId, narrowing, wrapTitles = true, openWit
 const measure = canvasMeasure();
 const NO_COLUMNS: Column[] = [];
 const NO_TOGGLED: Record<string, boolean> = {};
+const NO_PARENTS: string[] = [];
 /** The list's side padding plus a row's: what the grid can't use. */
 const GRID_INSET = 52 + 24 + 32;
 
@@ -68,6 +69,7 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
   const placeKey = narrowingKey(listId, viewId);
   const loaded = useStore((s) => placeKey in s.places);
   const toggled = useStore((s) => s.places[placeKey]?.toggled) ?? NO_TOGGLED;
+  const collapsedParents = useStore((s) => s.places[placeKey]?.collapsedParents) ?? NO_PARENTS;
   const selected = useStore((s) => s.places[placeKey]?.selectedId ?? null);
   const peekOpen = useStore((s) => s.places[placeKey]?.peekOpen ?? false);
   const loadPlace = useStore((s) => s.loadPlace);
@@ -95,7 +97,10 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
   const columns = data.columns.slice(0, shown);
 
   // A collapsing group keeps its rows until they have shrunk away.
-  const items = useMemo(() => flatten(data, (group: Group) => isOpen(group, toggled) || group.key in factors), [data, toggled, factors]);
+  const items = useMemo(
+    () => flatten(data, (group: Group) => isOpen(group, toggled) || group.key in factors, collapsedParents),
+    [data, toggled, factors, collapsedParents],
+  );
   const { virtualizer, groupStartsMoving, itemProps } = useRowSizing(items, factors, wrapTitles, scrollRef);
 
   // Back to where the owner left this view, once its place has loaded.
@@ -113,6 +118,13 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
     animate(group.key, opening);
   };
 
+  // Collapsing a parent moves the selection from its hidden subtask onto it.
+  const setSubtasksOpen = (id: string, open: boolean) => {
+    setPlace({ collapsedParents: open ? collapsedParents.filter((p) => p !== id) : [...collapsedParents, id] });
+    if (!open && selected && data.rows[selected]?.parentId === id) setPlace({ selectedId: id });
+  };
+  const subtasksOpen = (id: string) => !collapsedParents.includes(id);
+
   const rowIds = items.flatMap((item) => (item.kind === "row" ? [item.row.id] : []));
   const select = (id: string, openPeek: boolean) => {
     setPlace({ selectedId: id, peekOpen: openPeek });
@@ -123,7 +135,7 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
 
   // The keys reach this render's state through a ref the effect below keeps current.
   const open = (id: string) => openIssue(id, { listId, viewId });
-  const current = { items, rowIds, selected, peekOpen, data, select, toggle, actions, virtualizer, setPlace, open };
+  const current = { items, rowIds, selected, peekOpen, data, select, toggle, setSubtasksOpen, subtasksOpen, actions, virtualizer, setPlace, open };
   const keyState = useRef(current);
   useEffect(() => {
     keyState.current = current;
@@ -147,8 +159,17 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
         );
       },
       setGroupOpen: (open) => {
-        const { items, selected, toggle } = keyState.current;
+        const { items, selected, toggle, select, peekOpen, setSubtasksOpen, subtasksOpen } = keyState.current;
         const row = items.find((item) => item.kind === "row" && item.row.id === selected);
+        // In Hierarchy ← on a subtask selects its parent, and ←/→ on a parent closes or opens its subtasks.
+        if (row?.kind === "row" && row.nesting === "child" && !open && row.row.parentId) {
+          select(row.row.parentId, peekOpen);
+          return;
+        }
+        if (row?.kind === "row" && row.nesting === "parent" && subtasksOpen(row.row.id) !== open) {
+          setSubtasksOpen(row.row.id, open);
+          return;
+        }
         const header = row && items.find((item) => item.kind === "group" && item.group.key === itemGroupKey(row));
         if (header?.kind === "group" && header.open !== open) toggle(header.group);
       },
@@ -229,6 +250,10 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
                   }}
                   onOpen={open}
                   actions={actions}
+                  nesting={item.nesting}
+                  subtasksOpen={subtasksOpen(item.row.id)}
+                  onToggleSubtasks={(id) => setSubtasksOpen(id, !subtasksOpen(id))}
+                  subtaskChip={data.subtasks === "hidden" || (item.nesting === "parent" && !subtasksOpen(item.row.id))}
                 />
               )}
             </div>

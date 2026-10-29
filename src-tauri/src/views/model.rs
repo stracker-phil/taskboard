@@ -77,6 +77,20 @@ pub enum IssueOpening {
     Preview,
 }
 
+/// How a view shows subtasks (ADR 0037); the Board always hides them.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq, TS)]
+#[ts(export, export_to = "src/api/types.gen.ts")]
+#[serde(rename_all = "camelCase")]
+pub enum SubtaskMode {
+    /// Top-level issues only; a parent shows how many subtasks it has.
+    #[default]
+    Hidden,
+    /// Only parents go through the filter; each one's subtasks follow it, indented.
+    Hierarchy,
+    /// Subtasks are rows of their own, filtered and grouped on their own values.
+    List,
+}
+
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
 #[ts(export, export_to = "src/api/types.gen.ts")]
 #[serde(rename_all = "camelCase")]
@@ -102,6 +116,7 @@ pub struct View {
     pub collapsed: BTreeMap<String, bool>,
     /// What a click on an issue opens here; none follows Settings → General.
     pub open_with: Option<IssueOpening>,
+    pub subtasks: SubtaskMode,
     /// The tab's icon (`look`); none shows the layout's.
     pub icon: Option<String>,
     /// The icon's tile color; none shows the icon plain.

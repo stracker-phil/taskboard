@@ -3,22 +3,34 @@ import type { Group, Row, ViewData } from "../../api";
 /** Where a row sits in its group's card, which decides its corners and edges. */
 export type CardPosition = "first" | "middle" | "last" | "only";
 
+/** How a row shows its subtasks in Hierarchy: a parent's caret, a subtask's indent (ADR 0037). */
+export type Nesting = "parent" | "child" | null;
+
 /** One line of the virtual list: a group's header (tab and column headers) or an issue row. An ungrouped
  *  view has one header without a tab. */
 export type Item =
   | { kind: "group"; group: Group; open: boolean; first: boolean; tab: boolean }
-  | { kind: "row"; row: Row; groupKey: string; position: CardPosition };
+  | { kind: "row"; row: Row; groupKey: string; position: CardPosition; nesting: Nesting };
 
-export function flatten(data: ViewData, isOpen: (group: Group) => boolean): Item[] {
+/** The rows of open groups; in Hierarchy without the subtasks of `collapsedParents`. */
+export function flatten(data: ViewData, isOpen: (group: Group) => boolean, collapsedParents: readonly string[] = []): Item[] {
   const items: Item[] = [];
   const grouped = data.groupBy !== "none";
+  const hierarchy = data.subtasks === "hierarchy";
+  const nesting = (row: Row): Nesting => {
+    if (!hierarchy) return null;
+    if (row.isSubtask) return "child";
+    return row.subtaskCount > 0 ? "parent" : null;
+  };
   data.groups.forEach((group, index) => {
     const open = !grouped || isOpen(group);
     items.push({ kind: "group", group, open, first: index === 0, tab: grouped });
     if (!open) return;
-    const rows = group.rowIds.flatMap((id) => data.rows[id] ?? []);
+    const rows = group.rowIds
+      .flatMap((id) => data.rows[id] ?? [])
+      .filter((row) => !(hierarchy && row.isSubtask && row.parentId !== null && collapsedParents.includes(row.parentId)));
     rows.forEach((row, at) => {
-      items.push({ kind: "row", row, groupKey: group.key, position: position(at, rows.length) });
+      items.push({ kind: "row", row, groupKey: group.key, position: position(at, rows.length), nesting: nesting(row) });
     });
   });
   return items;

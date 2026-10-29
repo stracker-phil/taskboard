@@ -81,6 +81,38 @@ describe("flatten", () => {
   });
 });
 
+describe("flatten subtasks", () => {
+  const PARENT = row({ id: "10", key: "NW-10", subtaskCount: 2 });
+  const STEP_A = row({ id: "11", key: "NW-11", isSubtask: true, parentId: "10" });
+  const STEP_B = row({ id: "12", key: "NW-12", isSubtask: true, parentId: "10" });
+  const PLAIN = row({ id: "13", key: "NW-13" });
+  const all = [PARENT, STEP_A, STEP_B, PLAIN];
+  const hierarchy = () => viewData([groupOf(all, { key: "g" })], all, { subtasks: "hierarchy" });
+  const nestings = (items: ReturnType<typeof flatten>) => items.flatMap((i) => (i.kind === "row" ? [i.nesting] : []));
+
+  it("marks parents and their subtasks in Hierarchy and leaves other rows plain", () => {
+    expect(nestings(flatten(hierarchy(), () => true))).toEqual(["parent", "child", "child", null]);
+  });
+
+  it.each(["hidden", "list"] as const)("marks no row as nested in %s mode", (subtasks) => {
+    const data = { ...hierarchy(), subtasks };
+
+    expect(nestings(flatten(data, () => true))).toEqual([null, null, null, null]);
+    expect(kinds(flatten(data, () => true, ["10"]))).toEqual(["group:g", "row:10", "row:11", "row:12", "row:13"]);
+  });
+
+  it("leaves out the subtasks of a collapsed parent in Hierarchy", () => {
+    const items = flatten(hierarchy(), () => true, ["10"]);
+
+    expect(kinds(items)).toEqual(["group:g", "row:10", "row:13"]);
+    expect(positions(items)).toEqual(["first", "last"]);
+  });
+
+  it("keeps the subtasks of parents that are not collapsed", () => {
+    expect(kinds(flatten(hierarchy(), () => true, ["99"]))).toEqual(["group:g", "row:10", "row:11", "row:12", "row:13"]);
+  });
+});
+
 describe("itemHeight", () => {
   it("gives rows their height and later groups an extra gap", () => {
     const [first, row1, , second] = flatten(data(), () => true);

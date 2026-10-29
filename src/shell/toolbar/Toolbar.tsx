@@ -12,6 +12,7 @@ import { EpicNarrowingChip } from "./EpicChip";
 import { FilterPopover } from "./FilterPopover";
 import type { Collapsible } from "./fit";
 import { GROUP_NAMES, groupMenu } from "./groupMenu";
+import { SubtasksButton, subtasksMenu } from "./SubtasksButton";
 import { MeChip } from "./MeChip";
 import { TextFilter } from "./TextFilter";
 import { useToolbarFit } from "./useToolbarFit";
@@ -27,7 +28,9 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
   const filterRef = useRef<HTMLButtonElement>(null);
   const moreRef = useRef<HTMLButtonElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
-  const { hidden, measure } = useToolbarFit(barRef);
+  // The Board always hides subtasks, so its bar has no Subtasks button.
+  const hasSubtasks = view.layout !== "board";
+  const { hidden, measure } = useToolbarFit(barRef, hasSubtasks ? [] : ["subtasks"]);
   const edit = useViewEdit();
   const key = narrowingKey(view.listId, view.id);
   const narrowing = useStore((s) => s.narrowings[key]) ?? NO_NARROWING;
@@ -65,12 +68,14 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
     if (anchor) openMenu(groupEntries(), anchor, "Group");
   };
 
+  const subtaskEntries = () => subtasksMenu(view.subtasks, (mode) => edit(api.viewSetSubtasks(view.id, mode), "Could not change how subtasks show"));
+
   const space = spaceOf(level);
   // Both layers count: the filter list's own conditions and the view's.
   const own = (level.kind === "space" ? 0 : level.node.ownConditions) + view.ownConditions;
   const listName = level.kind === "space" ? level.space.name : level.node.name;
   const columnsLabel = view.layout === "board" ? "Card fields" : "Columns";
-  const shows = (item: Collapsible) => !hidden.includes(item);
+  const shows = (item: Collapsible) => !hidden.includes(item) && (item !== "subtasks" || hasSubtasks);
 
   usePageAction("toolbar.me", () => setNarrowing(key, { me: !narrowing.me }));
   usePageAction("toolbar.search", () => {
@@ -86,6 +91,8 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
       switch (item) {
         case "columns":
           return { text: `${columnsLabel}…`, run: () => setOpen("columns") };
+        case "subtasks":
+          return { text: "Subtasks", items: subtaskEntries() };
         case "filter":
           return { text: own > 0 ? `Filter · ${own}…` : "Filter…", run: () => setOpen("filter") };
         case "group":
@@ -131,6 +138,7 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
           {columnsPopover(columnsRef)}
         </span>
       )}
+      {shows("subtasks") && <SubtasksButton ref={measure("subtasks")} mode={view.subtasks} entries={subtaskEntries} />}
       <span className="toolbar__spacer" />
       {shows("filter") && (
         <span ref={measure("filter")} className="toolbar__anchor toolbar__anchor--end">

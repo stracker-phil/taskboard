@@ -4,7 +4,9 @@
 use rusqlite::Connection;
 use rusqlite::types::Value as SqlValue;
 
-use super::display::{write_inline_labels, write_look, write_open_with, write_wrap};
+use super::display::{
+    write_inline_labels, write_look, write_open_with, write_subtasks, write_wrap,
+};
 use super::edit::{
     insert_view, list_views, read_view, siblings, write_collapsed, write_sort, write_widths,
 };
@@ -35,6 +37,7 @@ fn copy_view(conn: &Connection, view: &View, list_id: i64, name: &str) -> AppRes
     write_wrap(conn, id, view.wrap_titles)?;
     write_inline_labels(conn, id, view.inline_labels)?;
     write_open_with(conn, id, view.open_with)?;
+    write_subtasks(conn, id, view.subtasks)?;
     write_look(conn, id, view.icon.as_deref(), view.color.as_deref())?;
     write_filter(conn, id, view.filter.as_deref())?;
     Ok(id)

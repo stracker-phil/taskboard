@@ -15,7 +15,7 @@ import { CurrentPeek } from "./CurrentPeek";
 const mocked = vi.mocked(api, true);
 
 const AT_LIST: Nav = { location: { listId: 11, viewId: 101 }, expanded: [] };
-const PLACE = { scrollTop: 0, toggled: {}, selectedId: "10042", peekOpen: true, onlyMine: false, text: "" };
+const PLACE = { scrollTop: 0, toggled: {}, collapsedParents: [], selectedId: "10042", peekOpen: true, onlyMine: false, text: "" };
 
 const detail = (): IssueDetail => ({
   id: "10042",

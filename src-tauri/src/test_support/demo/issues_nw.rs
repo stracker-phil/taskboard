@@ -1,5 +1,6 @@
 //! Website relaunch (`NW`): every issue the mockup shows, filled up to its sidebar counts
-//! (21 open, 12 done in scope: Current sprint 8, Epics 5, Code reviews 2, Release 2.4.0 9, Open bugs 3).
+//! (20 open, 12 done in scope: Current sprint 8, Epics 5, Code reviews 2, Release 2.4.0 9, Open bugs 3; the
+//! sidebar leaves the subtasks out).
 
 use super::catalog::Kind::{Bug, Epic, Story, Subtask, Task};
 use super::catalog::Priority::{High, Highest, Low};
@@ -56,6 +57,12 @@ pub fn issues() -> Vec<IssueSpec> {
         issue("NW-1058", Story, ToDo, "Abandoned cart reminder email").to(JR).parent("NW-1005").fix("2.5.0").points(5.0).at("2026-10-23 10:00", "2026-10-26 09:30"),
         issue("NW-1040", Story, ToDo, "Contrast audit for product cards").to(AL).by(AL).parent("NW-1004").labels(&["frontend"]).fix("2.5.0").points(3.0).at("2026-10-09 13:00", "2026-10-20 14:00"),
         issue("NW-1059", Subtask, ToDo, "Add Liechtenstein postcode rule").to(AM).by(AM).parent("NW-1042").at("2026-10-28 11:50", "2026-10-28 11:50"),
+        // Subtasks with other statuses, people and sprints than their parents (ADR 0037)
+        issue("NW-1060", Subtask, InReview, "Screen reader hint for the postcode field").to(MK).by(AM).parent("NW-1042").sprints(&[22]).at("2026-10-24 09:20", "2026-10-27 15:30"),
+        issue("NW-1061", Subtask, ToDo, "Round totals on the server only").to(JR).by(AM).parent("NW-1047").sprints(&[22]).at("2026-10-24 10:00", "2026-10-26 11:15"),
+        issue("NW-1062", Subtask, InProgress, "Drop the legacy totals cache").to(AM).by(AM).parent("NW-1047").at("2026-10-24 10:05", "2026-10-27 17:10"),
+        issue("NW-1063", Subtask, Blocked, "Regression test for switching the shipping country").to(JR).by(MK).parent("NW-1038").sprints(&[22]).at("2026-10-25 09:00", "2026-10-27 10:40"),
+        issue("NW-1064", Subtask, ToDo, "Apple Pay domain verification file").to(AL).by(AM).prio(High).parent("NW-1049").sprints(&[22]).at("2026-10-25 11:30", "2026-10-26 09:00"),
         // Done within the last 90 days
         issue("NW-1029", Bug, Done, "PayPal button missing for logged-in users").to(AM).prio(High).parent("NW-1002").labels(&["frontend"]).fix("2.3.1").sprints(&[21]).points(3.0).reviewer(JR).at("2026-09-28 14:00", "2026-10-21 16:30"),
         issue("NW-1031", Story, Done, "Address autocomplete for DE").to(AM).parent("NW-1020").labels(&["frontend"]).fix("2.4.0").sprints(&[21, 22]).points(3.0).at("2026-10-02 11:00", "2026-10-27 10:15"),

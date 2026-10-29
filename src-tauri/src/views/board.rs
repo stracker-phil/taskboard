@@ -10,7 +10,7 @@ use ts_rs::TS;
 
 use super::groups::{Facts, GroupMark, Lookup, group};
 use super::lookup::{spaces, versions};
-use super::model::{GroupBy, View};
+use super::model::{GroupBy, SubtaskMode, View};
 use super::query::{Fetched, Narrowing, fetch_view};
 use super::rows::Row;
 use crate::db::Db;
@@ -106,7 +106,16 @@ pub async fn view_board(
     narrowing: Narrowing,
 ) -> AppResult<BoardData> {
     db.read(move |conn| {
-        let Fetched { view, items, ctx } = fetch_view(conn, &viewer, list_id, view_id, &narrowing)?;
+        let Fetched {
+            view, items, ctx, ..
+        } = fetch_view(
+            conn,
+            &viewer,
+            list_id,
+            view_id,
+            &narrowing,
+            Some(SubtaskMode::Hidden),
+        )?;
         let columns = match view.group_by {
             GroupBy::Status | GroupBy::None => status_columns(conn, &view, &items)?,
             by => {

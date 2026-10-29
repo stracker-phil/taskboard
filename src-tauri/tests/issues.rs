@@ -1143,11 +1143,11 @@ async fn a_task_lists_its_subtasks_open_and_done() {
 
     let children = site.related("NW-1042").await.children;
 
-    assert_eq!(keys(&children.open), ["NW-1059"]);
+    assert_eq!(keys(&children.open), ["NW-1060", "NW-1059"]);
     assert_eq!(keys(&children.done), ["NW-1043", "NW-1045"]);
-    assert_eq!(children.open[0].issue_type, "Subtask");
-    assert_eq!(children.open[0].style, Style::Todo);
-    assert_eq!(children.open[0].assignee, Some(alex()));
+    assert_eq!(children.open[1].issue_type, "Subtask");
+    assert_eq!(children.open[1].style, Style::Todo);
+    assert_eq!(children.open[1].assignee, Some(alex()));
 }
 
 #[tokio::test]
@@ -1155,7 +1155,7 @@ async fn a_task_lists_its_subtasks_open_and_done() {
 async fn an_issue_without_children_or_links_has_nothing_related() {
     let site = Site::new().await;
 
-    let related = site.related("NW-1049").await;
+    let related = site.related("NW-1046").await;
 
     assert!(related.children.open.is_empty());
     assert!(related.children.done.is_empty());

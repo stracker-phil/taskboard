@@ -24,9 +24,9 @@ use taskboard_lib::test_support::{FakeSecrets, temp_config_dir};
 use taskboard_lib::views::groups::{Group, GroupMark};
 use taskboard_lib::views::rows::{Cell, Row};
 use taskboard_lib::views::{
-    BoardColumn, BoardData, GroupBy, Narrowing, Sort, SortBy, ViewData, columns_catalogue,
-    view_board, view_rows, view_set_column_collapsed, view_set_columns, view_set_filter,
-    view_set_group, view_set_sort, views_of,
+    BoardColumn, BoardData, GroupBy, Narrowing, Sort, SortBy, SubtaskMode, ViewData,
+    columns_catalogue, view_board, view_rows, view_set_column_collapsed, view_set_columns,
+    view_set_filter, view_set_group, view_set_sort, view_set_subtasks, views_of,
 };
 
 const ME_ACCOUNT_ID: &str = "712020:5a1e0c3f-8d2b-4f61-9c7e-1b2a3c4d5e01";
@@ -281,14 +281,17 @@ mod grouping {
 
     #[tokio::test]
     #[ignore = "syncs the demo site into a temp database"]
-    async fn the_groups_of_a_space_hold_every_visible_issue_of_the_project() {
+    async fn the_groups_of_a_space_hold_every_top_level_issue_of_the_project() {
         let site = Site::new().await;
 
         let data = site.nw_data(Narrowing::default()).await;
 
         let in_cache = number(
             site.db(),
-            format!("SELECT COUNT(*) FROM cache.issue WHERE project_id = '{NW}' AND gone = 0"),
+            format!(
+                "SELECT COUNT(*) FROM cache.issue
+                 WHERE project_id = '{NW}' AND gone = 0 AND type_is_subtask = 0"
+            ),
         )
         .await;
         let in_groups: usize = data.groups.iter().map(|g| g.count).sum();
@@ -590,7 +593,8 @@ mod narrowing {
             site.db(),
             format!(
                 "SELECT COUNT(*) FROM cache.issue
-                 WHERE project_id = '{NW}' AND gone = 0 AND assignee_id = '{ME_ACCOUNT_ID}'"
+                 WHERE project_id = '{NW}' AND gone = 0 AND type_is_subtask = 0
+                   AND assignee_id = '{ME_ACCOUNT_ID}'"
             ),
         )
         .await;
@@ -639,7 +643,8 @@ mod narrowing {
             site.db(),
             format!(
                 "SELECT key FROM cache.issue
-                 WHERE project_id = '{NW}' AND gone = 0 AND key LIKE '%NW-104%' ORDER BY key"
+                 WHERE project_id = '{NW}' AND gone = 0 AND type_is_subtask = 0
+                   AND key LIKE '%NW-104%' ORDER BY key"
             ),
         )
         .await;
@@ -1040,7 +1045,10 @@ mod board {
 
         let in_cache = number(
             site.db(),
-            format!("SELECT COUNT(*) FROM cache.issue WHERE project_id = '{NW}' AND gone = 0"),
+            format!(
+                "SELECT COUNT(*) FROM cache.issue
+                 WHERE project_id = '{NW}' AND gone = 0 AND type_is_subtask = 0"
+            ),
         )
         .await;
         assert_eq!(shown(&board) as i64, in_cache);
@@ -1076,7 +1084,8 @@ mod board {
             site.db(),
             format!(
                 "SELECT key FROM cache.issue
-                 WHERE project_id = '{NW}' AND gone = 0 AND key LIKE '%NW-104%' ORDER BY key"
+                 WHERE project_id = '{NW}' AND gone = 0 AND type_is_subtask = 0
+                   AND key LIKE '%NW-104%' ORDER BY key"
             ),
         )
         .await;
@@ -1501,6 +1510,476 @@ mod view_filters {
         assert_eq!(failed.kind(), ErrorKind::InvalidInput);
         assert_eq!(board.kind(), ErrorKind::InvalidInput);
         assert!(!working.rows.is_empty());
+    }
+}
+
+mod subtasks {
+    use super::*;
+
+    async fn nw_view(site: &Site, mode: SubtaskMode) -> (i64, i64) {
+        let (space, view) = site.nw().await;
+        view_set_subtasks(site.db(), view, mode).await.unwrap();
+        (space, view)
+    }
+
+    async fn level_view(site: &Site, name: &str, mode: SubtaskMode) -> (i64, i64) {
+        let space = site.nw_space().await;
+        let list = number(
+            site.db(),
+            format!("SELECT id FROM filter_list WHERE name = '{name}' AND parent_id = {space}"),
+        )
+        .await;
+        let view = site.first_view(list).await;
+        view_set_subtasks(site.db(), view, mode).await.unwrap();
+        (list, view)
+    }
+
+    async fn column_of(site: &Site, column: &str, key: &str) -> String {
+        text(
+            site.db(),
+            format!("SELECT {column} FROM cache.issue WHERE key = '{key}'"),
+        )
+        .await
+    }
+
+    fn subtask_keys(data: &ViewData) -> Vec<String> {
+        let mut keys: Vec<String> = data
+            .rows
+            .values()
+            .filter(|row| row.is_subtask)
+            .map(|row| row.key.clone())
+            .collect();
+        keys.sort();
+        keys
+    }
+
+    fn has(data: &ViewData, key: &str) -> bool {
+        data.rows.values().any(|row| row.key == key)
+    }
+
+    fn group_holding<'a>(data: &'a ViewData, key: &str) -> &'a Group {
+        data.groups
+            .iter()
+            .find(|group| group_keys(data, group).iter().any(|k| k == key))
+            .unwrap_or_else(|| panic!("no group holds {key}"))
+    }
+
+    /// The subtasks listed right after `parent` in its group.
+    fn followers(data: &ViewData, parent: &str) -> Vec<String> {
+        group_keys(data, group_holding(data, parent))
+            .into_iter()
+            .skip_while(|key| key != parent)
+            .skip(1)
+            .take_while(|key| row_of(data, key).is_subtask)
+            .collect()
+    }
+
+    fn only(condition: Condition) -> Filter {
+        Filter {
+            conditions: vec![condition],
+        }
+    }
+
+    fn mine() -> Narrowing {
+        Narrowing {
+            me: true,
+            ..Narrowing::default()
+        }
+    }
+
+    async fn sort_by_key(site: &Site, view: i64, descending: bool) {
+        view_set_sort(
+            site.db(),
+            view,
+            Sort {
+                by: SortBy::Key,
+                descending,
+            },
+        )
+        .await
+        .unwrap();
+    }
+
+    mod hidden {
+        use super::*;
+
+        #[tokio::test]
+        #[ignore = "syncs the demo site into a temp database"]
+        async fn is_the_mode_of_a_view_nobody_changed_and_leaves_subtasks_out_of_rows_and_groups() {
+            let site = Site::new().await;
+
+            let data = site.nw_data(Narrowing::default()).await;
+
+            assert_eq!(data.subtasks, SubtaskMode::Hidden);
+            assert_eq!(subtask_keys(&data), Vec::<String>::new());
+            assert_consistent(&data);
+        }
+
+        #[tokio::test]
+        #[ignore = "syncs the demo site into a temp database"]
+        async fn a_parent_counts_all_its_subtasks_done_ones_included() {
+            let site = Site::new().await;
+
+            let data = site.nw_data(Narrowing::default()).await;
+
+            for (key, count) in [
+                ("NW-1042", 4),
+                ("NW-1047", 2),
+                ("NW-1038", 1),
+                ("NW-1049", 1),
+                ("NW-1051", 0),
+            ] {
+                assert_eq!(row_of(&data, key).subtask_count, count, "{key}");
+            }
+        }
+
+        #[tokio::test]
+        #[ignore = "syncs the demo site into a temp database"]
+        async fn the_subtask_count_ignores_the_views_filter() {
+            let site = Site::new().await;
+            let (space, view) = site.nw().await;
+            view_set_filter(
+                site.db(),
+                viewer(),
+                view,
+                only(Condition::is(Field::Type, "Story")),
+            )
+            .await
+            .unwrap();
+
+            let data = site.data(space, view, Narrowing::default()).await;
+
+            assert_eq!(row_of(&data, "NW-1042").subtask_count, 4);
+            assert!(data.rows.values().all(|row| !row.is_subtask));
+        }
+
+        #[tokio::test]
+        #[ignore = "syncs the demo site into a temp database"]
+        async fn a_row_of_a_top_level_issue_is_no_subtask_and_has_no_parent_id() {
+            let site = Site::new().await;
+
+            let data = site.nw_data(Narrowing::default()).await;
+
+            let row = row_of(&data, "NW-1042");
+            assert_eq!((row.is_subtask, row.parent_id.clone()), (false, None));
+        }
+    }
+
+    mod list {
+        use super::*;
+
+        #[tokio::test]
+        #[ignore = "syncs the demo site into a temp database"]
+        async fn filters_each_subtask_on_its_own_values() {
+            let site = Site::new().await;
+            let (list, view) = level_view(&site, "Current sprint", SubtaskMode::List).await;
+
+            let data = site.data(list, view, Narrowing::default()).await;
+
+            assert_eq!(data.subtasks, SubtaskMode::List);
+            for key in ["NW-1060", "NW-1061", "NW-1063", "NW-1064"] {
+                assert!(has(&data, key), "{key}");
+            }
+            for key in ["NW-1059", "NW-1062"] {
+                assert!(!has(&data, key), "{key}");
+            }
+            assert_consistent(&data);
+        }
+
+        #[tokio::test]
+        #[ignore = "syncs the demo site into a temp database"]
+        async fn subtask_rows_carry_their_parent_and_the_flag() {
+            let site = Site::new().await;
+            let (list, view) = level_view(&site, "Current sprint", SubtaskMode::List).await;
+
+            let data = site.data(list, view, Narrowing::default()).await;
+
+            let subtask = row_of(&data, "NW-1063");
+            assert!(subtask.is_subtask);
+            assert_eq!(
+                subtask.parent_id.as_deref(),
+                Some(site.issue_id("NW-1038").await.as_str())
+            );
+            let parent = row_of(&data, "NW-1038");
+            assert_eq!((parent.is_subtask, parent.parent_id.clone()), (false, None));
+            assert_eq!(parent.subtask_count, 1);
+        }
+
+        #[tokio::test]
+        #[ignore = "syncs the demo site into a temp database"]
+        async fn groups_a_subtask_by_its_own_status() {
+            let site = Site::new().await;
+            let (list, view) = level_view(&site, "Current sprint", SubtaskMode::List).await;
+
+            let data = site.data(list, view, Narrowing::default()).await;
+
+            assert_eq!(
+                group_holding(&data, "NW-1063").key,
+                column_of(&site, "status_id", "NW-1063").await
+            );
+            assert_ne!(
+                group_holding(&data, "NW-1063").key,
+                group_holding(&data, "NW-1038").key
+            );
+        }
+
+        #[tokio::test]
+        #[ignore = "syncs the demo site into a temp database"]
+        async fn groups_a_subtask_by_its_own_assignee() {
+            let site = Site::new().await;
+            let (list, view) = level_view(&site, "Current sprint", SubtaskMode::List).await;
+            view_set_group(site.db(), view, GroupBy::Assignee)
+                .await
+                .unwrap();
+
+            let data = site.data(list, view, Narrowing::default()).await;
+
+            assert_eq!(
+                group_holding(&data, "NW-1060").key,
+                column_of(&site, "assignee_id", "NW-1060").await
+            );
+            assert_eq!(group_holding(&data, "NW-1042").key, ME_ACCOUNT_ID);
+            assert_consistent(&data);
+        }
+
+        #[tokio::test]
+        #[ignore = "syncs the demo site into a temp database"]
+        async fn group_counts_count_every_row() {
+            let site = Site::new().await;
+            let (list, view) = level_view(&site, "Current sprint", SubtaskMode::List).await;
+
+            let data = site.data(list, view, Narrowing::default()).await;
+
+            let counted: usize = data.groups.iter().map(|group| group.count).sum();
+            assert_eq!(counted, data.rows.len());
+            assert!(!subtask_keys(&data).is_empty());
+        }
+
+        #[tokio::test]
+        #[ignore = "syncs the demo site into a temp database"]
+        async fn applies_me_to_each_subtask() {
+            let site = Site::new().await;
+            let (list, view) = level_view(&site, "Current sprint", SubtaskMode::List).await;
+
+            let data = site.data(list, view, mine()).await;
+
+            assert!(has(&data, "NW-1043"));
+            for key in ["NW-1060", "NW-1061"] {
+                assert!(!has(&data, key), "{key}");
+            }
+        }
+
+        #[tokio::test]
+        #[ignore = "syncs the demo site into a temp database"]
+        async fn applies_the_text_to_each_subtask() {
+            let site = Site::new().await;
+            let (list, view) = level_view(&site, "Current sprint", SubtaskMode::List).await;
+
+            let data = site.data(list, view, narrowing_text("postcode")).await;
+
+            assert_eq!(
+                sorted_keys(&data),
+                ["NW-1042", "NW-1043", "NW-1045", "NW-1060"]
+            );
+        }
+
+        #[tokio::test]
+        #[ignore = "syncs the demo site into a temp database"]
+        async fn applies_the_views_filter_to_each_subtask() {
+            let site = Site::new().await;
+            let (list, view) = level_view(&site, "Current sprint", SubtaskMode::List).await;
+            view_set_filter(
+                site.db(),
+                viewer(),
+                view,
+                only(Condition::is(Field::Type, "Subtask")),
+            )
+            .await
+            .unwrap();
+
+            let data = site.data(list, view, Narrowing::default()).await;
+
+            assert!(has(&data, "NW-1060"));
+            assert!(!has(&data, "NW-1062"));
+            assert!(data.rows.values().all(|row| row.is_subtask));
+        }
+    }
+
+    mod hierarchy {
+        use super::*;
+
+        #[tokio::test]
+        #[ignore = "syncs the demo site into a temp database"]
+        async fn lists_every_subtask_of_a_parent_right_after_it_in_its_group() {
+            let site = Site::new().await;
+            let (space, view) = nw_view(&site, SubtaskMode::Hierarchy).await;
+            sort_by_key(&site, view, false).await;
+
+            let data = site.data(space, view, Narrowing::default()).await;
+
+            assert_eq!(data.subtasks, SubtaskMode::Hierarchy);
+            assert_eq!(
+                followers(&data, "NW-1042"),
+                ["NW-1043", "NW-1045", "NW-1059", "NW-1060"]
+            );
+            assert_eq!(followers(&data, "NW-1047"), ["NW-1061", "NW-1062"]);
+            assert_eq!(followers(&data, "NW-1038"), ["NW-1063"]);
+            assert_eq!(
+                group_holding(&data, "NW-1060").key,
+                group_holding(&data, "NW-1042").key
+            );
+        }
+
+        #[tokio::test]
+        #[ignore = "syncs the demo site into a temp database"]
+        async fn group_counts_count_top_level_rows_only() {
+            let site = Site::new().await;
+            let (space, view) = nw_view(&site, SubtaskMode::Hierarchy).await;
+
+            let data = site.data(space, view, Narrowing::default()).await;
+
+            for group in &data.groups {
+                let top_level = group_keys(&data, group)
+                    .iter()
+                    .filter(|key| !row_of(&data, key).is_subtask)
+                    .count();
+                assert_eq!(group.count, top_level, "{}", group.label);
+            }
+            assert!(
+                data.groups
+                    .iter()
+                    .any(|group| group.row_ids.len() > group.count)
+            );
+        }
+
+        #[tokio::test]
+        #[ignore = "syncs the demo site into a temp database"]
+        async fn follows_a_parent_with_the_subtasks_the_level_filter_would_drop() {
+            let site = Site::new().await;
+            let (list, view) = level_view(&site, "Current sprint", SubtaskMode::Hierarchy).await;
+            sort_by_key(&site, view, false).await;
+
+            let data = site.data(list, view, Narrowing::default()).await;
+
+            assert_eq!(followers(&data, "NW-1047"), ["NW-1061", "NW-1062"]);
+            assert!(has(&data, "NW-1062"));
+        }
+
+        #[tokio::test]
+        #[ignore = "syncs the demo site into a temp database"]
+        async fn leaves_out_the_subtasks_of_parents_the_filter_drops() {
+            let site = Site::new().await;
+            let (list, view) = level_view(&site, "Open bugs", SubtaskMode::Hierarchy).await;
+
+            let data = site.data(list, view, Narrowing::default()).await;
+
+            assert_eq!(subtask_keys(&data), ["NW-1063"]);
+            assert!(has(&data, "NW-1038"));
+            assert!(!has(&data, "NW-1042"));
+        }
+
+        #[tokio::test]
+        #[ignore = "syncs the demo site into a temp database"]
+        async fn keeps_the_subtasks_of_a_parent_that_matches_me() {
+            let site = Site::new().await;
+            let (list, view) = level_view(&site, "Current sprint", SubtaskMode::Hierarchy).await;
+            sort_by_key(&site, view, false).await;
+
+            let data = site.data(list, view, mine()).await;
+
+            assert_eq!(followers(&data, "NW-1047"), ["NW-1061", "NW-1062"]);
+            assert_eq!(
+                followers(&data, "NW-1042"),
+                ["NW-1043", "NW-1045", "NW-1059", "NW-1060"]
+            );
+            assert!(
+                data.rows
+                    .values()
+                    .filter(|row| !row.is_subtask)
+                    .all(|row| row.assignees.first().map(|p| p.account_id.as_str())
+                        == Some(ME_ACCOUNT_ID))
+            );
+        }
+
+        #[tokio::test]
+        #[ignore = "syncs the demo site into a temp database"]
+        async fn keeps_the_subtasks_of_a_parent_that_matches_the_text() {
+            let site = Site::new().await;
+            let (space, view) = nw_view(&site, SubtaskMode::Hierarchy).await;
+
+            let data = site.data(space, view, narrowing_text("store api")).await;
+
+            assert_eq!(sorted_keys(&data), ["NW-1047", "NW-1061", "NW-1062"]);
+        }
+
+        #[tokio::test]
+        #[ignore = "syncs the demo site into a temp database"]
+        async fn sorts_the_subtasks_of_a_parent_by_the_views_sort() {
+            let site = Site::new().await;
+            let (space, view) = nw_view(&site, SubtaskMode::Hierarchy).await;
+
+            sort_by_key(&site, view, false).await;
+            let ascending = site.data(space, view, Narrowing::default()).await;
+            sort_by_key(&site, view, true).await;
+            let descending = site.data(space, view, Narrowing::default()).await;
+
+            assert_eq!(
+                followers(&ascending, "NW-1042"),
+                ["NW-1043", "NW-1045", "NW-1059", "NW-1060"]
+            );
+            assert_eq!(
+                followers(&descending, "NW-1042"),
+                ["NW-1060", "NW-1059", "NW-1045", "NW-1043"]
+            );
+        }
+    }
+
+    mod board {
+        use super::*;
+
+        #[tokio::test]
+        #[ignore = "syncs the demo site into a temp database"]
+        async fn ignores_the_views_mode_and_never_shows_subtask_cards() {
+            let site = Site::new().await;
+            let (space, view) = site.nw().await;
+            let hidden = view_board(site.db(), viewer(), space, view, Narrowing::default())
+                .await
+                .unwrap();
+
+            for mode in [SubtaskMode::Hierarchy, SubtaskMode::List] {
+                view_set_subtasks(site.db(), view, mode).await.unwrap();
+
+                let board = view_board(site.db(), viewer(), space, view, Narrowing::default())
+                    .await
+                    .unwrap();
+
+                assert!(board.rows.values().all(|row| !row.is_subtask), "{mode:?}");
+                assert_eq!(board, hidden, "{mode:?}");
+            }
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn the_view_data_says_which_mode_the_rows_follow() {
+        let site = Site::new().await;
+        let (space, view) = site.nw().await;
+
+        for (mode, name) in [
+            (SubtaskMode::Hidden, "hidden"),
+            (SubtaskMode::Hierarchy, "hierarchy"),
+            (SubtaskMode::List, "list"),
+        ] {
+            view_set_subtasks(site.db(), view, mode).await.unwrap();
+
+            let data = site.data(space, view, Narrowing::default()).await;
+
+            assert_eq!(data.subtasks, mode, "{name}");
+            assert_eq!(
+                serde_json::to_value(&data).unwrap()["subtasks"],
+                serde_json::json!(name)
+            );
+        }
     }
 }
 

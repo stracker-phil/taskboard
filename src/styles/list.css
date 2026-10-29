@@ -100,3 +100,10 @@
 .list-row--wrap .list-row__key { line-height: 22px; }
 .list-row--wrap .status-square { margin-top: 6px; }
 .list-row--wrap .change-chip, .list-row--wrap .comment-count { margin-top: 2px; }
+
+/* Hierarchy (ADR 0037): a parent's caret sits in the row's left padding; its subtasks indent by one level. */
+.list-row__name > .subtask-caret { position: absolute; left: -17px; top: 50%; transform: translateY(-50%); }
+.list-row--child .list-row__name { padding-left: 24px; }
+.list-row--wrap .list-row__name > .subtask-caret { top: 3px; transform: none; }
+.list-row--wrap .subtask-icon { margin-top: 4px; }
+.list-row--wrap .subtask-count { margin-top: 2px; }

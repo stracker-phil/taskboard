@@ -46,5 +46,6 @@ stands in Taskboard. The numbers in this table are Taskboard's.
 | [0034](0034-menus-are-drawn-in-the-page.md) | Menus are drawn in the page | Accepted (2026-10-29) |
 | [0035](0035-attachments-preview-in-quick-look.md) | Attachments preview in Quick Look | Accepted (2026-10-29) |
 | [0036](0036-rich-text-renders-from-adf-not-renderedfields.md) | Rich text renders from ADF, not renderedFields | Accepted (2026-10-29) |
+| [0037](0037-views-choose-how-subtasks-show.md) | Views choose how subtasks show | Accepted (2026-10-29) |
 
 Open: integrations with Daybook and TimeTracker.

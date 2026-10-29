@@ -33,6 +33,11 @@ pub struct Row {
     pub due: Option<String>,
     /// Custom column values by field id; a field without a value is absent.
     pub custom: BTreeMap<String, Cell>,
+    /// All its subtasks in the cache, whatever the view's filter.
+    pub subtask_count: i64,
+    pub is_subtask: bool,
+    /// A subtask's parent; none on other issues.
+    pub parent_id: Option<String>,
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq, Eq, TS)]

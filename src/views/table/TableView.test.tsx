@@ -366,4 +366,55 @@ describe("TableView", () => {
       expect(screen.queryByText("Redesign the pricing page")).not.toBeInTheDocument();
     });
   });
+
+  describe("subtasks", () => {
+    const PARENT = row({ id: "1", key: "NW-1042", summary: "Redesign the pricing page", subtaskCount: 2 });
+    const STEP = row({ id: "11", key: "NW-1043", summary: "Draft the price table", isSubtask: true, parentId: "1" });
+    const LAST_STEP = row({ id: "12", key: "NW-1044", summary: "Review the price table", isSubtask: true, parentId: "1" });
+    const modeData = (subtasks: ViewData["subtasks"], rows = [PARENT, STEP, LAST_STEP]) => viewData([groupOf(rows)], rows, { groupBy: "none", subtasks });
+    const rowOf = (key: RegExp) => screen.getByRole("row", { name: key });
+
+    it("shows a hidden-mode parent's subtask count as a chip after its summary", async () => {
+      await renderTable(modeData("hidden", [PARENT]));
+
+      expect(within(await screen.findByRole("row", { name: /NW-1042/ })).getByLabelText("2 subtasks")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /subtasks$/ })).not.toBeInTheDocument();
+    });
+
+    it("indents the subtasks of a parent in Hierarchy and gives the parent a caret", async () => {
+      await renderTable(modeData("hierarchy"));
+
+      expect(await screen.findByRole("row", { name: /NW-1043/ })).toHaveClass("table-row--child");
+      expect(rowOf(/NW-1042/)).not.toHaveClass("table-row--child");
+      expect(within(rowOf(/NW-1042/)).getByRole("button", { name: "Collapse subtasks" })).toHaveAttribute("aria-expanded", "true");
+    });
+
+    it("collapses and expands the subtasks with the caret, keeping the collapse in the view's place", async () => {
+      await renderTable(modeData("hierarchy"));
+
+      await userEvent.click(await screen.findByRole("button", { name: "Collapse subtasks" }));
+
+      expect(screen.queryByText("Draft the price table")).not.toBeInTheDocument();
+      expect(useStore.getState().places["11:101"].collapsedParents).toEqual(["1"]);
+      expect(within(rowOf(/NW-1042/)).getByLabelText("2 subtasks")).toBeInTheDocument();
+      expect(rowOf(/NW-1042/)).toHaveAttribute("aria-selected", "false");
+
+      await userEvent.click(screen.getByRole("button", { name: "Expand subtasks" }));
+
+      expect(await screen.findByText("Draft the price table")).toBeInTheDocument();
+      expect(useStore.getState().places["11:101"].collapsedParents).toEqual([]);
+    });
+
+    it("shows the subtask icon before the summary of a subtask in List mode, with no caret", async () => {
+      await renderTable(modeData("list"));
+
+      const step = await screen.findByRole("row", { name: /NW-1043/ });
+      const icon = step.querySelector(".subtask-icon");
+      const title = within(step).getByText("Draft the price table");
+      expect(icon).not.toBeNull();
+      expect(icon!.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(step).not.toHaveClass("table-row--child");
+      expect(screen.queryByRole("button", { name: /subtasks$/ })).not.toBeInTheDocument();
+    });
+  });
 });

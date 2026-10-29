@@ -289,6 +289,9 @@ mod tests {
             sprint: None,
             due: None,
             custom: BTreeMap::new(),
+            subtask_count: 0,
+            is_subtask: false,
+            parent_id: None,
         }
     }
 

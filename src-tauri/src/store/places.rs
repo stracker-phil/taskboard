@@ -20,6 +20,8 @@ pub struct ViewPlace {
     pub scroll_top: f64,
     /// Groups the owner opened (`true`) or closed (`false`); the others keep their default.
     pub toggled: BTreeMap<String, bool>,
+    /// Parents whose subtasks the owner collapsed in Hierarchy (ADR 0037); the others show them.
+    pub collapsed_parents: Vec<String>,
     pub selected_id: Option<String>,
     pub peek_open: bool,
     /// The toolbar's Me chip, kept per view.
@@ -204,6 +206,7 @@ mod tests {
             serde_json::json!({
                 "scrollTop": 12.5,
                 "toggled": { "done": false, "review": true },
+                "collapsedParents": [],
                 "selectedId": "10042",
                 "peekOpen": true,
                 "onlyMine": true,
@@ -272,8 +275,37 @@ mod tests {
                 peek_open: true,
                 only_mine: false,
                 text: String::new(),
+                collapsed_parents: Vec::new(),
             })
         );
+    }
+
+    #[tokio::test]
+    async fn collapsed_parents_persist_across_reopen() {
+        let dir = temp_config_dir();
+        let saved = ViewPlace {
+            collapsed_parents: vec!["10042".to_string(), "10047".to_string()],
+            ..place(7.0, "10042")
+        };
+        PlaceStore::open(dir.path())
+            .set(1, 2, saved.clone())
+            .await
+            .unwrap();
+
+        assert_eq!(PlaceStore::open(dir.path()).get(1, 2), Some(saved));
+    }
+
+    #[test]
+    fn collapsed_parents_serialize_in_camel_case_and_default_to_empty() {
+        let value = serde_json::to_value(ViewPlace {
+            collapsed_parents: vec!["10042".to_string()],
+            ..ViewPlace::default()
+        })
+        .unwrap();
+        let parsed: ViewPlace = serde_json::from_str(r#"{"scrollTop": 5}"#).unwrap();
+
+        assert_eq!(value["collapsedParents"], serde_json::json!(["10042"]));
+        assert!(parsed.collapsed_parents.is_empty());
     }
 
     #[test]

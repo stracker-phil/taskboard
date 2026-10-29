@@ -72,7 +72,7 @@ unique across sources (Jira's numeric ids; another source prefixes its own):
 |---|---|
 | `space` | a tracked project as the sidebar shows it: name, icon, color (`1`–`12`), client, position, `default_columns` for new views; its Space settings (`local/0007`): `layouts` (JSON array of the layouts its views offer; null = all), `default_layout` and `default_group` for new views |
 | `filter_list` | WHICH issues: the sidebar tree (`kind` everything, space, list, recent, pinned); a JSON filter ANDed with its ancestors |
-| `view` | HOW to show a list: one tab; layout, columns, grouping, sort; `filter` (`local/0012`): its own conditions, ANDed with its list's ([ADR 0033](adr/0033-views-can-hold-their-own-filter.md)) |
+| `view` | HOW to show a list: one tab; layout, columns, grouping, sort; `filter` (`local/0012`): its own conditions, ANDed with its list's ([ADR 0033](adr/0033-views-can-hold-their-own-filter.md)); `subtasks` (`local/0013`): how subtasks show ([ADR 0037](adr/0037-views-choose-how-subtasks-show.md)) |
 | `pin` | pinned issues, comments and lists, with an optional reason and expiry; active while not unpinned and not expired (`pins::active`); ended pins stay in Recently unpinned for 7 days |
 | `space_status_style` | overrides the detected style of a status in one Space (`local/0007`; the old app-wide `status_style` rows were copied to every Space) |
 | `space_field` | how a custom field shows in one Space: `hiddenInList`, `hiddenInDetail` or `hidden`; no row = visible (`space_config`) |
@@ -119,11 +119,20 @@ views and pins; a level keeps at least one view.
 
 ### Group and sort keys
 
-`view_rows(listId, viewId, narrowing)` returns the view's issues as `ViewData { groupBy, groups, rows,
-columns }`: the level's filter, plus the view's own conditions, plus the kind's own rule (Unread: issues with unseen changes or marked
+`view_rows(listId, viewId, narrowing)` returns the view's issues as `ViewData { groupBy, subtasks, groups,
+rows, columns }`: the level's filter, plus the view's own conditions, plus the kind's own rule (Unread: issues with unseen changes or marked
 unread, open or done, plus those read since the owner came to this place; Bookmarks: the actively bookmarked
 issues), plus the narrowing (`me`, `text` in the key or summary ignoring
 case and accents, `epic`).
+
+Subtasks (`cache.issue.type_is_subtask = 1`) follow `view.subtasks` (migration `local/0013`, `view_set_subtasks`,
+[ADR 0037](adr/0037-views-choose-how-subtasks-show.md); null reads `hidden`; duplicating copies it):
+`hidden` leaves them out and each row's `subtaskCount` counts all its subtasks in the cache; `list` filters,
+groups and sorts each subtask on its own values; `hierarchy` filters top-level issues only and puts every
+subtask of a shown parent right after it in the parent's group (`views/subtasks.rs`), sorted by the view's sort,
+with the group's count counting the parents. Rows carry `isSubtask` and a subtask's `parentId`. `view_board`
+always hides subtasks. The sidebar counts top-level issues only (`filter::TOP_LEVEL`). `places.json` keeps a
+view's collapsed parents (`ViewPlace.collapsedParents`).
 
 | `groupBy` | Groups, in order |
 |---|---|

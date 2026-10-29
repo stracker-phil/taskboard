@@ -1,4 +1,4 @@
-//! The sidebar tree with open-issue counts, counted in one pass over the cache.
+//! The sidebar tree with open-issue counts (subtasks left out), counted in one pass over the cache.
 
 use rusqlite::{Connection, params_from_iter};
 use serde::Serialize;
@@ -9,7 +9,9 @@ use super::nodes::{Kind, Node, all_nodes, scope_of};
 use crate::changes::UNSEEN;
 use crate::db::Db;
 use crate::error::AppResult;
-use crate::filter::{Compiled, Ctx, Names, OPEN_ISSUES, TRACKED_ISSUES, compile, describe};
+use crate::filter::{
+    Compiled, Ctx, Names, OPEN_ISSUES, TOP_LEVEL, TRACKED_ISSUES, compile, describe,
+};
 use crate::pins::active;
 use crate::sync::map::format_utc;
 
@@ -205,14 +207,14 @@ fn active_pin_count(conn: &Connection, viewer: &Viewer) -> AppResult<i64> {
     )?)
 }
 
-/// Unread counts its unseen issues, open or not.
+/// Unread counts its unseen top-level issues, open or not.
 fn unseen_count(conn: &Connection, nodes: &[Node], id: i64, ctx: &Ctx) -> AppResult<Option<i64>> {
     let Some(node) = nodes.iter().find(|n| n.id == id) else {
         return Ok(None);
     };
     let compiled = compile(&scope_of(nodes, node).all()?, ctx)?;
     let sql = format!(
-        "SELECT COUNT(*) FROM cache.issue i WHERE {} AND {UNSEEN}",
+        "SELECT COUNT(*) FROM cache.issue i WHERE {} AND {UNSEEN} AND {TOP_LEVEL}",
         compiled.where_clause()
     );
     Ok(Some(conn.query_row(
@@ -273,7 +275,7 @@ impl Counter {
             .map(|(_, c)| format!("COUNT(*) FILTER (WHERE {})", c.condition))
             .collect();
         let sql = format!(
-            "SELECT {} FROM cache.issue i WHERE {TRACKED_ISSUES} AND {OPEN_ISSUES}",
+            "SELECT {} FROM cache.issue i WHERE {TRACKED_ISSUES} AND {OPEN_ISSUES} AND {TOP_LEVEL}",
             columns.join(", ")
         );
         let params = self.nodes.iter().flat_map(|(_, c)| c.params.iter());

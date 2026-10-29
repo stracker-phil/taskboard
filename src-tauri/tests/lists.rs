@@ -29,10 +29,11 @@ use taskboard_lib::test_support::demo::{DEMO_NOW, ME_EMAIL};
 use taskboard_lib::test_support::fake_jira::{DEMO_TOKEN, FakeJira};
 use taskboard_lib::test_support::{FakeSecrets, temp_config_dir};
 use taskboard_lib::views::{
-    DEFAULT_COLUMNS, GroupBy, IssueOpening, Layout, Sort, SortBy, View, space_default_columns,
-    view_create, view_delete, view_duplicate, view_move, view_rename, view_set_column_collapsed,
-    view_set_columns, view_set_filter, view_set_group, view_set_inline_labels, view_set_layout,
-    view_set_look, view_set_open_with, view_set_sort, view_set_widths, view_set_wrap, views_of,
+    DEFAULT_COLUMNS, GroupBy, IssueOpening, Layout, Sort, SortBy, SubtaskMode, View,
+    space_default_columns, view_create, view_delete, view_duplicate, view_move, view_rename,
+    view_set_column_collapsed, view_set_columns, view_set_filter, view_set_group,
+    view_set_inline_labels, view_set_layout, view_set_look, view_set_open_with, view_set_sort,
+    view_set_subtasks, view_set_widths, view_set_wrap, views_of,
 };
 
 const ME_ACCOUNT_ID: &str = "712020:5a1e0c3f-8d2b-4f61-9c7e-1b2a3c4d5e01";
@@ -541,14 +542,14 @@ mod the_tree_on_the_demo_site {
         assert_eq!(
             counts,
             [
-                ("NW", "Website relaunch", 21),
+                ("NW", "Website relaunch", 20),
                 ("NWS", "Northwind support", 6),
                 ("LUM", "Lumen iOS app", 9),
-                ("FBA", "Fernweh booking API", 11),
+                ("FBA", "Fernweh booking API", 10),
                 ("INT", "Internal tools", 8),
             ]
         );
-        assert_eq!(tree.everything.count, Some(55));
+        assert_eq!(tree.everything.count, Some(53));
         assert_eq!(
             tree.spaces
                 .iter()
@@ -556,6 +557,37 @@ mod the_tree_on_the_demo_site {
                 .collect::<Vec<_>>(),
             PROJECT_IDS
         );
+    }
+
+    #[tokio::test]
+    async fn subtasks_count_nowhere_in_the_sidebar_whatever_their_views_show() {
+        let site = Synced::new().await;
+        let nw = space_node_id(site.db(), NW).await;
+        let open_in_nw = number(
+            site.db(),
+            "SELECT COUNT(*) FROM cache.issue WHERE project_id = '10001' AND status_category != 'done'",
+        )
+        .await;
+        let open_subtasks_in_nw = number(
+            site.db(),
+            "SELECT COUNT(*) FROM cache.issue
+             WHERE project_id = '10001' AND status_category != 'done' AND type_is_subtask = 1",
+        )
+        .await;
+        let before = site.tree().await;
+
+        for view in views_of(site.db(), nw).await.unwrap() {
+            view_set_subtasks(site.db(), view.id, SubtaskMode::List)
+                .await
+                .unwrap();
+        }
+
+        assert_eq!(open_subtasks_in_nw, 6);
+        assert_eq!(
+            find_space(&before, "NW").open_count,
+            open_in_nw - open_subtasks_in_nw
+        );
+        assert_eq!(site.tree().await, before);
     }
 
     #[tokio::test]
@@ -695,7 +727,7 @@ mod the_tree_on_the_demo_site {
 
         assert_eq!(
             (everything_in_the_space.open, everything_in_the_space.total),
-            (21, 33)
+            (26, 38)
         );
         assert_eq!(bugs_in_the_space.open, open_bugs);
         assert_eq!(bugs_in_the_space.total, all_bugs);
@@ -734,8 +766,8 @@ mod the_tree_on_the_demo_site {
         .await
         .unwrap();
 
-        assert_eq!(count.open, 55);
-        assert_eq!(count.total, 74);
+        assert_eq!(count.open, 63);
+        assert_eq!(count.total, 82);
     }
 
     #[tokio::test]
@@ -2129,6 +2161,7 @@ mod editing_views {
                 "inlineLabels": true,
                 "collapsed": {},
                 "openWith": null,
+                "subtasks": "hidden",
                 "icon": null,
                 "color": null,
                 "position": 0,
@@ -2291,6 +2324,89 @@ mod editing_views {
         assert_eq!(
             views_of(&db, copied_list).await.unwrap()[0].open_with,
             Some(IssueOpening::Preview)
+        );
+    }
+
+    #[tokio::test]
+    async fn a_new_view_hides_subtasks() {
+        let (_dir, db) = tracked_lab().await;
+
+        assert!(
+            space_views(&db)
+                .await
+                .iter()
+                .all(|view| view.subtasks == SubtaskMode::Hidden)
+        );
+    }
+
+    #[tokio::test]
+    async fn the_subtask_mode_is_stored_per_view() {
+        let (_dir, db) = tracked_lab().await;
+        let id = space_views(&db).await[2].id;
+
+        for mode in [
+            SubtaskMode::Hierarchy,
+            SubtaskMode::List,
+            SubtaskMode::Hidden,
+        ] {
+            let saved = view_set_subtasks(&db, id, mode).await.unwrap();
+
+            assert_eq!(saved.subtasks, mode, "{mode:?}");
+            assert_eq!(space_views(&db).await[2].subtasks, mode, "{mode:?}");
+            assert_eq!(
+                space_views(&db).await[0].subtasks,
+                SubtaskMode::Hidden,
+                "{mode:?}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn the_subtask_mode_of_an_unknown_view_is_not_found() {
+        let (_dir, db) = tracked_lab().await;
+
+        let err = view_set_subtasks(&db, 9999, SubtaskMode::List)
+            .await
+            .unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::NotFound);
+    }
+
+    #[tokio::test]
+    async fn a_duplicate_view_and_a_duplicate_list_keep_the_subtask_mode() {
+        let (_dir, db) = tracked_lab().await;
+        let table = space_views(&db).await[2].id;
+        view_set_subtasks(&db, table, SubtaskMode::Hierarchy)
+            .await
+            .unwrap();
+        let epics = list_id(&db, "Epics").await;
+        let epics_view = views_of(&db, epics).await.unwrap()[0].id;
+        view_set_subtasks(&db, epics_view, SubtaskMode::List)
+            .await
+            .unwrap();
+
+        let copy = view_duplicate(&db, table).await.unwrap();
+        let copied_list = list_duplicate(&db, epics).await.unwrap();
+
+        assert_eq!(copy.subtasks, SubtaskMode::Hierarchy);
+        assert_eq!(
+            views_of(&db, copied_list).await.unwrap()[0].subtasks,
+            SubtaskMode::List
+        );
+    }
+
+    #[tokio::test]
+    async fn the_subtask_mode_serializes_in_camel_case() {
+        let (_dir, db) = tracked_lab().await;
+        let id = space_views(&db).await[0].id;
+
+        let saved = view_set_subtasks(&db, id, SubtaskMode::Hierarchy)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            serde_json::to_value(&saved).unwrap()["subtasks"],
+            json!("hierarchy")
         );
     }
 

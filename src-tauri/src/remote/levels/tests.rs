@@ -90,6 +90,7 @@ fn view(id: i64, name: &str, layout: Layout, is_default: bool) -> View {
         inline_labels: true,
         collapsed: Default::default(),
         open_with: None,
+        subtasks: Default::default(),
         icon: None,
         color: None,
         position: id,

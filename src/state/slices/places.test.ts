@@ -8,7 +8,7 @@ import { EMPTY_PLACE } from "./places";
 
 const mocked = vi.mocked(api, true);
 
-const SAVED: ViewPlace = { scrollTop: 320, toggled: { "status:done": true }, selectedId: "10042", peekOpen: true, onlyMine: false, text: "" };
+const SAVED: ViewPlace = { scrollTop: 320, toggled: { "status:done": true }, collapsedParents: [], selectedId: "10042", peekOpen: true, onlyMine: false, text: "" };
 const KEY = "11:101";
 const place = () => useStore.getState().places[KEY];
 const toasts = () => useStore.getState().toasts.map((t) => [t.kind, t.message]);

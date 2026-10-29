@@ -3,6 +3,7 @@ import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Group, Narrowing, View, ViewData } from "../../api";
 import { refreshIssueExtras } from "../../queries/issues";
 import { useViewRows } from "../../queries/views";
+import { narrowingKey } from "../../state/slices/narrowing";
 import { useStore } from "../../state/store";
 import { EmptyLevel } from "../../shell/EmptyLevel";
 import { flatten, itemKey, type Item } from "../list/flatten";
@@ -20,6 +21,7 @@ import { columnWidth, SUMMARY_MIN_WIDTH } from "./widths";
 const TABLE_ROW_HEIGHT = 30;
 const HEADER_HEIGHT = 34;
 const SIDE_PADDING = 24;
+const NO_PARENTS: string[] = [];
 
 const isOpen = (group: Group, toggled: Record<string, boolean>) => toggled[group.key] ?? !group.collapsedByDefault;
 
@@ -49,6 +51,10 @@ function Table({ view, data }: { view: View; data: ViewData }) {
   const resize = useColumnResize((id, width) => void settings.setWidth(id, width));
   const opening = useIssueOpening(view.openWith);
   const updatePlace = useStore((s) => s.updatePlace);
+  const collapsedParents = useStore((s) => s.places[narrowingKey(view.listId, view.id)]?.collapsedParents) ?? NO_PARENTS;
+  const subtasksOpen = (id: string) => !collapsedParents.includes(id);
+  const toggleSubtasks = (id: string) =>
+    updatePlace(view.listId, view.id, { collapsedParents: subtasksOpen(id) ? [...collapsedParents, id] : collapsedParents.filter((p) => p !== id) });
   const openIssue = useStore((s) => s.openIssue);
   const open = (id: string) => openIssue(id, { listId: view.listId, viewId: view.id });
   const select = (id: string) => {
@@ -68,8 +74,8 @@ function Table({ view, data }: { view: View; data: ViewData }) {
   // The Table's own header names the columns, so an ungrouped view needs no group header. A collapsing group
   // keeps its rows until they have shrunk away.
   const items = useMemo(
-    () => flatten(data, (group: Group) => isOpen(group, toggled) || group.key in factors).filter((item) => item.kind === "row" || item.tab),
-    [data, toggled, factors],
+    () => flatten(data, (group: Group) => isOpen(group, toggled) || group.key in factors, collapsedParents).filter((item) => item.kind === "row" || item.tab),
+    [data, toggled, factors, collapsedParents],
   );
   const heightOf = (index: number) => TABLE_ROW_HEIGHT * openness(items[index], factors);
   const virtualizer = useVirtualizer({
@@ -129,7 +135,19 @@ function Table({ view, data }: { view: View; data: ViewData }) {
                     onToggle={() => toggle(item.group)}
                   />
                 ) : (
-                  <TableRow row={item.row} columns={columns} widthOf={widthOf} selected={selected === item.row.id} onSelect={select} onOpen={open} inlineLabels={inlineLabels} />
+                  <TableRow
+                    row={item.row}
+                    columns={columns}
+                    widthOf={widthOf}
+                    selected={selected === item.row.id}
+                    onSelect={select}
+                    onOpen={open}
+                    inlineLabels={inlineLabels}
+                    nesting={item.nesting}
+                    subtasksOpen={subtasksOpen(item.row.id)}
+                    onToggleSubtasks={toggleSubtasks}
+                    subtaskChip={data.subtasks === "hidden" || (item.nesting === "parent" && !subtasksOpen(item.row.id))}
+                  />
                 )}
               </div>
             );

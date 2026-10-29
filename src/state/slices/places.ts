@@ -12,7 +12,7 @@ export interface PlacesSlice {
   updatePlace: (listId: number, viewId: number, patch: Partial<ViewPlace>) => void;
 }
 
-export const EMPTY_PLACE: ViewPlace = { scrollTop: 0, toggled: {}, selectedId: null, peekOpen: false, onlyMine: false, text: "" };
+export const EMPTY_PLACE: ViewPlace = { scrollTop: 0, toggled: {}, collapsedParents: [], selectedId: null, peekOpen: false, onlyMine: false, text: "" };
 
 const SAVE_DELAY_MS = 300;
 const pending = new Map<string, ReturnType<typeof setTimeout>>();

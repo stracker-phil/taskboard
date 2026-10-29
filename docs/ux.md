@@ -189,6 +189,13 @@ one group, Board column or pill per style, whatever the status is called; the Bo
   off, both stay on the row's one line and are cut at the cell's edge.
 - Rows are virtualized (`@tanstack/react-virtual`): a card is drawn from its pieces (the header item, then
   rows that know whether they are first, middle, last or the only one).
+- **Subtasks** follow the view's mode ([ADR 0037](adr/0037-views-choose-how-subtasks-show.md)). The subtask
+  glyph (`components/issue/SubtaskIcon.tsx`: a circle top left, a line down bending right into a circle bottom
+  right, lucide style) marks them. Hidden: a parent shows "⟨glyph⟩ 3" after its title, muted 12px like the
+  comment count (display only). List: a subtask is a row like any other, with the glyph before its title.
+  Hierarchy: a parent's subtasks follow it, indented 24 (`list-row--child`), each with the glyph; a 16px caret in
+  the parent row's left padding (`SubtaskCaret`) collapses or expands them, and a collapsed parent shows the
+  count chip. Collapsed parents are kept per view (`places.json`); expanded is the default.
 
 ## Peek
 
@@ -410,6 +417,10 @@ button, Escape and a press outside close it, focus goes back to the button).
 - **Group: Status** (30 high, `--border`, 8 radius): a [menu](#menus) of the groupings (Status, Space, Client,
   Assignee, Epic, Release, Priority, Due date, None) with Sort by ▸ (Updated, Created, Priority, Key, Due date,
   Summary, Status; Ascending, Descending). Saves to the view.
+- **Subtasks** (List and Table only, right after Columns; active style while not Hidden): a [menu](#menus)
+  captioned "Subtasks" with Hidden ("Only top-level issues"), Hierarchy ("Under their parent") and List ("As
+  separate rows"), the current one checked (`SubtasksButton.tsx`). Saves to the view; the Board always hides
+  subtasks and has no button.
 - **Columns** ("Card fields" on a board): the *Columns for this view* popover (340 wide): a "Search fields" box
   (name, Jira id or hint; while it filters, the order can't be dragged), Jira fields (Status first: a text pill
   beside the row's own square), then "Custom fields · this project" with the field id as `cf_N`; a row per field
@@ -430,8 +441,8 @@ button, Escape and a press outside close it, focus goes back to the button).
 - **Me** chip (on: `--accent-soft-*` pill with the `--avatar-1` avatar and "Me ×") and **Filter this view**
   (190 wide, filters by key or summary as you type). Both narrow only the current view and stay with its place
   (`places.json`).
-- When the bar is narrow, the text filter shrinks to 96 first; then Columns, Filter, Group and finally the Me
-  chip move into a "…" menu (`fit.ts`, `useToolbarFit`), and come back as soon as they fit.
+- When the bar is narrow, the text filter shrinks to 96 first; then Columns, Subtasks, Filter, Group and finally
+  the Me chip move into a "…" menu (`fit.ts`, `useToolbarFit`), and come back as soon as they fit.
 
 ## Board view
 
@@ -465,7 +476,8 @@ again flips the direction (`aria-sort`, ↑/↓); a 6px handle at each header's 
 (48–800), saved on the view. Grouped tables keep the list's group headers; the table scrolls sideways when the
 columns are wider than the window. Groups open and close with the List's animation (`useGroupMotion`). Rows
 never grow: inline labels after the summary are cut at the cell's edge, and the Labels cell keeps its chips on
-one line that scrolls sideways inside the cell (an overlay scrollbar, [below](#scrollbars)).
+one line that scrolls sideways inside the cell (an overlay scrollbar, [below](#scrollbars)). Subtasks show as in
+the List: the caret, the indent (`table-row--child`), the glyph and the count chip sit in the Summary cell.
 
 ## Tokens
 
@@ -616,7 +628,8 @@ global shortcuts.
 - A command has one binding; ⌘1–⌘9 open the nth view tab.
 - **Issues** (`commands/issueKeys.ts`, registered by the shown List, Board or Issue view): J or ↓ and K or ↑
   move (on the Board through a column's cards, ← and → to the neighboring column; in a List ← and → close and
-  open the row's group), Space opens or closes the preview (the Board opens the Issue view), ↩ opens the Issue
+  open the row's group; in Hierarchy ← on a subtask selects its parent and ←/→ on a parent collapse or expand its
+  subtasks first), Space opens or closes the preview (the Board opens the Issue view), ↩ opens the Issue
   view, E the epic, P adds or removes a bookmark (default duration), M marks read or unread, ⌘C copies the key (only with no text
   field focused and no text selected), ⌘⇧C the URL, ⌘↩ opens it in Jira, esc closes the preview or goes back.
 - `app:settings:<page>` opens Settings at a page or section (Settings → Projects is `app:settings:projects`).

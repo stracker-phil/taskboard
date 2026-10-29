@@ -215,7 +215,7 @@ describe("MainBody", () => {
   });
 
   describe("saved place", () => {
-    const SAVED = { scrollTop: 0, toggled: {}, selectedId: null, peekOpen: false, onlyMine: true, text: "pricing" };
+    const SAVED = { scrollTop: 0, toggled: {}, collapsedParents: [], selectedId: null, peekOpen: false, onlyMine: true, text: "pricing" };
 
     beforeEach(() => {
       mocked.navCurrent.mockResolvedValue({ location: { listId: 11, viewId: 101 }, expanded: [] });

@@ -318,7 +318,7 @@ describe("ListView", () => {
       groupOf([OPEN], { key: "status:progress", label: "In Progress" }),
       groupOf([DONE], { key: "status:done", label: "Done", collapsedByDefault: true }),
     ];
-    const saved: ViewPlace = { scrollTop: 0, toggled: { "status:done": true, "status:progress": false }, selectedId: "2", peekOpen: false, onlyMine: false, text: "" };
+    const saved: ViewPlace = { scrollTop: 0, toggled: { "status:done": true, "status:progress": false }, collapsedParents: [], selectedId: "2", peekOpen: false, onlyMine: false, text: "" };
 
     it("restores the selection and the opened and closed groups", async () => {
       mocked.placeGet.mockResolvedValue(saved);
@@ -342,6 +342,172 @@ describe("ListView", () => {
 
       expect(place().toggled).toEqual({ "status:done": true });
       await waitFor(() => expect(mocked.placeSet).toHaveBeenCalledWith(11, 101, expect.objectContaining({ toggled: { "status:done": true } })));
+    });
+  });
+
+  describe("subtasks", () => {
+    const PARENT = row({ id: "1", key: "NW-1042", summary: "Redesign the pricing page", subtaskCount: 2 });
+    const STEP = row({ id: "11", key: "NW-1043", summary: "Draft the price table", isSubtask: true, parentId: "1" });
+    const LAST_STEP = row({ id: "12", key: "NW-1044", summary: "Review the price table", isSubtask: true, parentId: "1" });
+    const OTHER = row({ id: "2", key: "NW-1001", summary: "Publish the launch notes" });
+    const modeData = (subtasks: ViewData["subtasks"], rows = [PARENT, STEP, LAST_STEP, OTHER]) => viewData([groupOf(rows)], rows, { subtasks });
+    const rowOf = (key: RegExp) => screen.getByRole("row", { name: key });
+    const caret = (name: "Collapse subtasks" | "Expand subtasks") => screen.findByRole("button", { name });
+
+    it("shows a parent's subtask count as a chip after its title in Hidden", async () => {
+      const single = row({ id: "3", key: "NW-1003", summary: "Fix the footer links", subtaskCount: 1 });
+      await renderList(modeData("hidden", [PARENT, single, OTHER]));
+
+      expect(within(await screen.findByRole("row", { name: /NW-1042/ })).getByLabelText("2 subtasks")).toBeInTheDocument();
+      expect(within(rowOf(/NW-1003/)).getByLabelText("1 subtask")).toBeInTheDocument();
+      expect(within(rowOf(/NW-1001/)).queryByLabelText(/subtask/)).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /subtasks$/ })).not.toBeInTheDocument();
+    });
+
+    it("indents the subtasks and gives the parent a caret in Hierarchy", async () => {
+      await renderList(modeData("hierarchy"));
+
+      expect(await screen.findByRole("row", { name: /NW-1043/ })).toHaveClass("list-row--child");
+      expect(rowOf(/NW-1044/)).toHaveClass("list-row--child");
+      expect(rowOf(/NW-1042/)).not.toHaveClass("list-row--child");
+      expect(rowOf(/NW-1001/)).not.toHaveClass("list-row--child");
+      expect(within(rowOf(/NW-1042/)).getByRole("button", { name: "Collapse subtasks" })).toHaveAttribute("aria-expanded", "true");
+      expect(within(rowOf(/NW-1042/)).queryByLabelText("2 subtasks")).not.toBeInTheDocument();
+      expect(within(rowOf(/NW-1001/)).queryByRole("button", { name: /subtasks$/ })).not.toBeInTheDocument();
+    });
+
+    it("shows the subtask icon before the title of a subtask in every mode, and no indent in List", async () => {
+      await renderList(modeData("list"));
+
+      const step = await screen.findByRole("row", { name: /NW-1043/ });
+      const icon = step.querySelector(".subtask-icon");
+      expect(icon).not.toBeNull();
+      expect(icon!.compareDocumentPosition(within(step).getByText("Draft the price table")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(step).not.toHaveClass("list-row--child");
+      expect(rowOf(/NW-1042/).querySelector(".subtask-icon")).toBeNull();
+      expect(screen.queryByRole("button", { name: /subtasks$/ })).not.toBeInTheDocument();
+    });
+
+    it("collapses a parent's subtasks with the caret and leaves its count as a chip", async () => {
+      await renderList(modeData("hierarchy"));
+
+      await userEvent.click(await caret("Collapse subtasks"));
+
+      expect(screen.queryByText("Draft the price table")).not.toBeInTheDocument();
+      expect(screen.queryByText("Review the price table")).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Expand subtasks" })).toHaveAttribute("aria-expanded", "false");
+      expect(within(rowOf(/NW-1042/)).getByLabelText("2 subtasks")).toBeInTheDocument();
+      expect(rowOf(/NW-1042/)).toHaveAttribute("aria-selected", "false");
+    });
+
+    it("expands them again with the caret", async () => {
+      await renderList(modeData("hierarchy"));
+      await userEvent.click(await caret("Collapse subtasks"));
+
+      await userEvent.click(await caret("Expand subtasks"));
+
+      expect(await screen.findByText("Draft the price table")).toBeInTheDocument();
+      expect(screen.getByText("Review the price table")).toBeInTheDocument();
+      expect(screen.queryByLabelText("2 subtasks")).not.toBeInTheDocument();
+    });
+
+    it("saves the collapsed parents in the view's place", async () => {
+      await renderList(modeData("hierarchy"));
+
+      await userEvent.click(await caret("Collapse subtasks"));
+
+      expect(place().collapsedParents).toEqual(["1"]);
+      await waitFor(() => expect(mocked.placeSet).toHaveBeenCalledWith(11, 101, expect.objectContaining({ collapsedParents: ["1"] })));
+    });
+
+    it("restores a saved collapse", async () => {
+      mocked.placeGet.mockResolvedValue({ scrollTop: 0, toggled: {}, collapsedParents: ["1"], selectedId: null, peekOpen: false, onlyMine: false, text: "" });
+      await renderList(modeData("hierarchy"));
+
+      expect(await screen.findByRole("button", { name: "Expand subtasks" })).toBeInTheDocument();
+      expect(screen.queryByText("Draft the price table")).not.toBeInTheDocument();
+    });
+
+    describe("keys", () => {
+      const press = (id: string) => act(async () => void (await getCommand(id)?.run()));
+      const selectedKeys = () =>
+        screen
+          .getAllByRole("row")
+          .filter((r) => r.getAttribute("aria-selected") === "true")
+          .map((r) => /NW-\d+/.exec(r.textContent ?? "")?.[0]);
+
+      beforeEach(() => {
+        installCommands("main");
+      });
+
+      it("walks into the subtask rows with next and back out with previous", async () => {
+        await renderList(modeData("hierarchy"));
+        await userEvent.click(await screen.findByText("Redesign the pricing page"));
+
+        await press("issue.next");
+        expect(selectedKeys()).toEqual(["NW-1043"]);
+        await press("issue.next");
+        expect(selectedKeys()).toEqual(["NW-1044"]);
+        await press("issue.next");
+        expect(selectedKeys()).toEqual(["NW-1001"]);
+        await press("issue.previous");
+        await press("issue.previous");
+        expect(selectedKeys()).toEqual(["NW-1043"]);
+      });
+
+      it("skips the subtasks of a collapsed parent", async () => {
+        await renderList(modeData("hierarchy"));
+        await userEvent.click(await caret("Collapse subtasks"));
+        await userEvent.click(screen.getByText("Redesign the pricing page"));
+
+        await press("issue.next");
+
+        expect(selectedKeys()).toEqual(["NW-1001"]);
+      });
+
+      it("selects the parent when the subtask is selected and left is pressed", async () => {
+        await renderList(modeData("hierarchy"));
+        await userEvent.click(await screen.findByText("Review the price table"));
+
+        await press("group.collapse");
+
+        expect(selectedKeys()).toEqual(["NW-1042"]);
+        expect(screen.getByText("Review the price table")).toBeInTheDocument();
+      });
+
+      it("collapses the subtasks of the selected parent on left and expands them on right", async () => {
+        await renderList(modeData("hierarchy"));
+        await userEvent.click(await screen.findByText("Redesign the pricing page"));
+
+        await press("group.collapse");
+        expect(screen.queryByText("Draft the price table")).not.toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Collapse In Progress" })).toBeInTheDocument();
+
+        await press("group.expand");
+        expect(await screen.findByText("Draft the price table")).toBeInTheDocument();
+      });
+
+      it("closes the group on left once the parent's subtasks are already collapsed", async () => {
+        const groups = [groupOf([PARENT, STEP, LAST_STEP], { key: "a", label: "Alpha" }), groupOf([OTHER], { key: "b", label: "Beta" })];
+        await renderList(viewData(groups, [PARENT, STEP, LAST_STEP, OTHER], { subtasks: "hierarchy" }));
+        await userEvent.click(await screen.findByText("Redesign the pricing page"));
+        await press("group.collapse");
+
+        await press("group.collapse");
+
+        expect(screen.queryByText("Redesign the pricing page")).not.toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Expand Alpha" })).toBeInTheDocument();
+      });
+
+      it("closes the group on left from a subtask in List mode, where it has no parent to go to", async () => {
+        await renderList(modeData("list"));
+        await userEvent.click(await screen.findByText("Review the price table"));
+
+        await press("group.collapse");
+
+        expect(screen.queryByText("Review the price table")).not.toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Expand In Progress" })).toBeInTheDocument();
+      });
     });
   });
 

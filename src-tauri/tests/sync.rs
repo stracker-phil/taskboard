@@ -33,8 +33,8 @@ const SEARCH_PATH: &str = "/rest/api/3/search/jql";
 const PAGE: u32 = 7;
 const PROJECT_IDS: [&str; 5] = ["10001", "10002", "10003", "10004", "10005"];
 /// In Space order: what the demo site holds in scope per tracked project.
-const COUNTS: [(&str, u32); 5] = [("NW", 33), ("NWS", 8), ("LUM", 11), ("FBA", 13), ("INT", 9)];
-const TOTAL: i64 = 74;
+const COUNTS: [(&str, u32); 5] = [("NW", 38), ("NWS", 8), ("LUM", 13), ("FBA", 14), ("INT", 9)];
+const TOTAL: i64 = 82;
 const NW_1042: &str = "101042";
 const NW_1044: &str = "101044";
 const NW_1049: &str = "101049";
@@ -581,7 +581,7 @@ mod the_full_sync {
                 |row| row.get::<_, String>(0)
             )
             .await,
-            ["NW-1043", "NW-1045", "NW-1059"]
+            ["NW-1043", "NW-1045", "NW-1059", "NW-1060"]
         );
         assert_eq!(
             text_of(
@@ -717,13 +717,14 @@ mod the_full_sync {
             count(db, "SELECT COUNT(*) FROM cache.issue_seen").await,
             TOTAL
         );
-        let seen = count(
+        let unseen = rows(
             db,
-            "SELECT COUNT(*) FROM cache.issue_seen s JOIN cache.issue i ON i.id = s.issue_id
-             WHERE i.key LIKE 'NW-106%'",
+            "SELECT i.id FROM cache.issue i LEFT JOIN cache.issue_seen s ON s.issue_id = i.id
+             WHERE s.issue_id IS NULL",
+            |row| row.get::<_, String>(0),
         )
         .await;
-        assert_eq!(seen, 0);
+        assert_eq!(unseen, [new_id]);
         let scope = state_rows(db).await.pop().unwrap();
         assert_eq!(scope.2.as_deref(), Some(LATER_UTC));
     }
@@ -1102,10 +1103,10 @@ mod the_overview {
         assert_eq!(
             summaries(&report),
             vec![
-                summary("10001", "NW", "Website relaunch", 33, 21, true),
+                summary("10001", "NW", "Website relaunch", 38, 26, true),
                 summary("10002", "NWS", "Northwind support", 8, 6, true),
-                summary("10003", "LUM", "Lumen iOS app", 11, 9, true),
-                summary("10004", "FBA", "Fernweh booking API", 13, 11, true),
+                summary("10003", "LUM", "Lumen iOS app", 13, 11, true),
+                summary("10004", "FBA", "Fernweh booking API", 14, 12, true),
                 summary("10005", "INT", "Internal tools", 9, 8, true),
             ]
         );
@@ -1186,7 +1187,7 @@ mod the_overview {
 
         assert_eq!(
             (report.projects[0].cached, report.projects[0].open),
-            (33, 20)
+            (38, 25)
         );
     }
 

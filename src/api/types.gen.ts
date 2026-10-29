@@ -525,7 +525,15 @@ due: string | null,
 /**
  * Custom column values by field id; a field without a value is absent.
  */
-custom: { [key in string]: Cell }, };
+custom: { [key in string]: Cell }, 
+/**
+ * All its subtasks in the cache, whatever the view's filter.
+ */
+subtaskCount: number, isSubtask: boolean, 
+/**
+ * A subtask's parent; none on other issues.
+ */
+parentId: string | null, };
 
 export type ScopeView = { 
 /**
@@ -646,6 +654,11 @@ issues: number, };
  */
 export type Style = "progress" | "review" | "blocked" | "todo" | "backlog" | "done";
 
+/**
+ * How a view shows subtasks (ADR 0037); the Board always hides them.
+ */
+export type SubtaskMode = "hidden" | "hierarchy" | "list";
+
 export type SyncOverview = { state: SyncState, lastFullAt: string | null, projects: Array<ProjectCounts>, };
 
 /**
@@ -727,7 +740,7 @@ collapsed: { [key in string]: boolean },
 /**
  * What a click on an issue opens here; none follows Settings → General.
  */
-openWith: IssueOpening | null, 
+openWith: IssueOpening | null, subtasks: SubtaskMode, 
 /**
  * The tab's icon (`look`); none shows the layout's.
  */
@@ -745,13 +758,17 @@ isDefault: boolean,
  */
 ownConditions: number, };
 
-export type ViewData = { groupBy: GroupBy, groups: Array<Group>, rows: { [key in string]: Row }, columns: Array<string>, };
+export type ViewData = { groupBy: GroupBy, subtasks: SubtaskMode, groups: Array<Group>, rows: { [key in string]: Row }, columns: Array<string>, };
 
 export type ViewPlace = { scrollTop: number, 
 /**
  * Groups the owner opened (`true`) or closed (`false`); the others keep their default.
  */
-toggled: { [key in string]: boolean }, selectedId: string | null, peekOpen: boolean, 
+toggled: { [key in string]: boolean }, 
+/**
+ * Parents whose subtasks the owner collapsed in Hierarchy (ADR 0037); the others show them.
+ */
+collapsedParents: Array<string>, selectedId: string | null, peekOpen: boolean, 
 /**
  * The toolbar's Me chip, kept per view.
  */

@@ -11,6 +11,7 @@ import { installCommands, useCommandKeys } from "../../commands";
 import { runPageAction } from "../../commands/pageActions";
 import { createQueryClient } from "../../queries/queryClient";
 import { resetStore } from "../../state/store";
+import type { View } from "../../api";
 import { space } from "../../test/spaces";
 import { listNode, view } from "../../test/views";
 import type { Level } from "../levels";
@@ -21,15 +22,15 @@ const mocked = vi.mocked(api, true);
 const LIST_LEVEL: Level = { kind: "list", space: space(), node: listNode() };
 const SPACE_LEVEL: Level = { kind: "space", space: space() };
 
-function Harness({ level, ownConditions }: { level: Level; ownConditions: number }) {
+function Harness({ level, ownConditions, patch }: { level: Level; ownConditions: number; patch: Partial<View> }) {
   useCommandKeys();
-  return <Toolbar level={level} view={view({ groupBy: "status", ownConditions })} />;
+  return <Toolbar level={level} view={view({ groupBy: "status", ownConditions, ...patch })} />;
 }
 
-function renderToolbar(level: Level = LIST_LEVEL, ownConditions = 0) {
+function renderToolbar(level: Level = LIST_LEVEL, ownConditions = 0, patch: Partial<View> = {}) {
   render(
     <QueryClientProvider client={createQueryClient()}>
-      <Harness level={level} ownConditions={ownConditions} />
+      <Harness level={level} ownConditions={ownConditions} patch={patch} />
       <MenuHost />
     </QueryClientProvider>,
   );
@@ -191,6 +192,54 @@ describe("Toolbar page actions", () => {
       await userEvent.click(await screen.findByRole("menuitemradio", { name: "Priority" }));
 
       expect(mocked.viewSetGroup).toHaveBeenCalledWith(expect.any(Number), "priority");
+    });
+  });
+
+  describe("Subtasks button", () => {
+    const subtasksButton = () => screen.getByRole("button", { name: "Subtasks" });
+
+    it("sits right after the Columns button", () => {
+      renderToolbar();
+
+      expect(subtasksButton().previousElementSibling).toContainElement(screen.getByRole("button", { name: /^Columns/ }));
+    });
+
+    it("is absent on a Board view", () => {
+      renderToolbar(LIST_LEVEL, 0, { layout: "board" });
+
+      expect(screen.queryByRole("button", { name: "Subtasks" })).not.toBeInTheDocument();
+    });
+
+    it.each([
+      ["hidden", false],
+      ["hierarchy", true],
+      ["list", true],
+    ] as const)("styles the button as active only when subtasks show (%s)", (subtasks, active) => {
+      renderToolbar(LIST_LEVEL, 0, { subtasks });
+
+      expect(subtasksButton().classList.contains("toolbar-btn--active")).toBe(active);
+    });
+
+    it("offers the three modes with a check on the current one", async () => {
+      renderToolbar(LIST_LEVEL, 0, { subtasks: "hierarchy" });
+
+      await userEvent.click(subtasksButton());
+
+      const menu = within(await screen.findByRole("menu", { name: "Subtasks" }));
+      expect(menu.getByRole("menuitemradio", { name: /^Hidden/ })).toHaveAttribute("aria-checked", "false");
+      expect(menu.getByRole("menuitemradio", { name: /^Hierarchy/ })).toHaveAttribute("aria-checked", "true");
+      expect(menu.getByRole("menuitemradio", { name: /^List/ })).toHaveAttribute("aria-checked", "false");
+      expect(menu.getByText("Under their parent")).toBeInTheDocument();
+    });
+
+    it("saves the chosen mode on the view", async () => {
+      mocked.viewSetSubtasks.mockResolvedValue(view({ subtasks: "list" }));
+      renderToolbar();
+      await userEvent.click(subtasksButton());
+
+      await userEvent.click(await screen.findByRole("menuitemradio", { name: /^List/ }));
+
+      expect(mocked.viewSetSubtasks).toHaveBeenCalledWith(101, "list");
     });
   });
 
