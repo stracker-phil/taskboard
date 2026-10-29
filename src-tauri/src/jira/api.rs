@@ -3,7 +3,7 @@
 use super::client::JiraClient;
 use super::dto::{
     ApproximateCount, BulkFetch, Comment, CommentPage, Field, Issue, Myself, ParsedQueries,
-    Project, ProjectPage, SearchPage, Status, TenantInfo, Version,
+    Project, ProjectPage, RemoteLink, SearchPage, Status, TenantInfo, Version,
 };
 use super::gateway::{Endpoint, FieldIds, IssueRef, IssueRefs, Jql, ProjectKey};
 use super::paging::{SearchPages, SearchRequest};
@@ -95,6 +95,14 @@ impl JiraClient {
                 return Ok(comments);
             }
         }
+    }
+
+    /// The issue's web links (remote links), in Jira's order.
+    pub async fn remote_links(&self, issue_id: &str) -> AppResult<Vec<RemoteLink>> {
+        let issue = IssueRef::parse(issue_id)?;
+        self.gateway()
+            .send(Endpoint::IssueRemoteLinks { issue })
+            .await
     }
 
     /// The custom fields the project's most recently updated issues have a value in.

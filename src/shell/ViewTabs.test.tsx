@@ -118,6 +118,17 @@ describe("ViewTabs", () => {
       expect(mocked.popupMenu).not.toHaveBeenCalled();
     });
 
+    it("offers only the layouts the Space offers", async () => {
+      await renderTabs([view({ id: 101, name: "List", layouts: ["list", "table"] }), view({ id: 103, name: "Overview", layout: "table", layouts: ["list", "table"] })]);
+
+      await userEvent.click(screen.getByRole("button", { name: "+ View" }));
+
+      const dialog = screen.getByRole("dialog", { name: "New view" });
+      expect(within(dialog).getByRole("button", { name: /^List/ })).toBeInTheDocument();
+      expect(within(dialog).getByRole("button", { name: /^Table/ })).toBeInTheDocument();
+      expect(within(dialog).queryByRole("button", { name: /^Board/ })).not.toBeInTheDocument();
+    });
+
     it("closes the dialog on Escape", async () => {
       await renderTabs();
       await userEvent.click(screen.getByRole("button", { name: "+ View" }));
@@ -292,6 +303,15 @@ describe("ViewTabs", () => {
       expect(mocked.viewSetLayout).toHaveBeenCalledWith(102, "table");
     });
 
+    it("lists only the layouts the Space offers under Change layout", async () => {
+      await renderTabs([view({ id: 101, name: "List", layouts: ["list", "table"] })]);
+      await userEvent.pointer({ keys: "[MouseRight]", target: screen.getByRole("tab", { name: "List" }) });
+
+      const layouts = entriesOf(entry("Change layout").items!).map((e) => e.text);
+
+      expect(layouts).toEqual(["List", "Table"]);
+    });
+
     it("disables Delete for the only view", async () => {
       await renderTabs([LIST]);
 
@@ -459,6 +479,22 @@ describe("ViewTabs", () => {
         run("view.layout.table");
 
         await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not change the layout: Disk full"));
+      });
+
+      it("offers the actions of the Space's layouts only", async () => {
+        const restricted = (patch: Parameters<typeof view>[0]) => view({ layouts: ["list", "table"], ...patch });
+        await renderTabs([restricted({ id: 101, name: "List" }), restricted({ id: 103, name: "Overview", layout: "table" })], 101);
+
+        expect(run("view.layout.board")).toBe(false);
+        expect(run("view.layout.table")).toBe(true);
+        expect(mocked.viewSetLayout).toHaveBeenCalledWith(101, "table");
+      });
+
+      it("switches a table view back to list when the Space offers list", async () => {
+        await renderTabs([view({ id: 101, name: "List", layout: "table", layouts: ["list", "table"] })], 101);
+
+        expect(run("view.layout.list")).toBe(true);
+        expect(mocked.viewSetLayout).toHaveBeenCalledWith(101, "list");
       });
 
       it.each(["view.layout.list", "view.layout.board", "view.layout.table"])("%s is not offered when the current view is not among the tabs", async (id) => {

@@ -23,6 +23,7 @@ import {
   type ScopeView,
   type Settings,
   type SidebarTree,
+  type SpaceConfig,
   type SyncOverview,
   type SyncSettings,
   type UiState,
@@ -31,6 +32,7 @@ import {
 import { filterOptions } from "./filters";
 import { issueDetail } from "./issues";
 import { settings } from "./settings";
+import { spaceConfig } from "./spaces";
 
 type Api = typeof realApi;
 
@@ -104,6 +106,9 @@ export function createApiMock(): Api {
     spaceMove: vi.fn(),
     spaceUpdate: vi.fn(),
     spaceDefaultColumns: vi.fn(),
+    spaceConfig: vi.fn(async (projectId: string): Promise<SpaceConfig> => spaceConfig({ projectId })),
+    spaceSetLayouts: vi.fn(),
+    spaceSetField: vi.fn(),
     navCurrent: vi.fn(async (): Promise<Nav> => ({ location: null, expanded: [] })),
     navGo: vi.fn(async (listId: number, viewId: number | null): Promise<Nav> => ({ location: { listId, viewId: viewId ?? 0 }, expanded: [] })),
     navSetExpanded: vi.fn(async (expanded: number[]): Promise<Nav> => ({ location: null, expanded })),
@@ -125,6 +130,8 @@ export function createApiMock(): Api {
     issueGet: vi.fn(async (id: string): Promise<IssueDetail> => issueDetail({ id })),
     issueActivity: vi.fn().mockResolvedValue([]),
     issueRelated: vi.fn(async (): Promise<Related> => ({ children: { open: [], done: [] }, links: [] })),
+    issueWebLinks: vi.fn().mockResolvedValue([]),
+    issueSyncWebLinks: vi.fn().mockResolvedValue(false),
     issueForget: vi.fn().mockResolvedValue(undefined),
     issueSyncComments: vi.fn().mockResolvedValue(false),
     issuesMarkSeen: vi.fn().mockResolvedValue(undefined),

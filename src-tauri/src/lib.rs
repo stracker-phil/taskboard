@@ -30,6 +30,7 @@ pub mod pins;
 mod remote;
 pub mod search;
 pub mod secrets;
+pub mod space_config;
 pub mod state;
 pub mod status_style;
 pub mod store;

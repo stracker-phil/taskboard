@@ -1,18 +1,26 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, ChevronRight, ChevronUp } from "lucide-react";
-import { useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { api, type SpaceNode } from "../../../api";
 import { fail } from "../../../state/store";
 import { SIDEBAR_KEY, useSpaces } from "../../../queries/sidebar";
-import { SpaceFields } from "../../SpaceEditor";
 import { SpaceTile } from "../../SpaceTile";
-import { Group } from "../controls";
+import { SPACE_TARGET } from "../../../registry/settingsPages";
+import { Group, SectionTarget } from "../controls";
+import { SpaceSettings } from "../spaces/SpaceSettings";
 
-/** The tracked Spaces in sidebar order: a row each to open its fields and move it. */
+/** The tracked Spaces in sidebar order: a row each to open its settings and move it. `space:<projectId>` opens one
+ *  Space's settings directly (its sidebar menu's Space Settings…). */
 export function SpacesPage() {
   const client = useQueryClient();
   const { data: spaces = [] } = useSpaces();
+  const target = useContext(SectionTarget);
   const [open, setOpen] = useState<string | null>(null);
+  useEffect(() => {
+    if (target?.startsWith(SPACE_TARGET)) setOpen(target.slice(SPACE_TARGET.length));
+  }, [target]);
+  const opened = spaces.find((space) => space.projectId === open);
+  if (opened) return <SpaceSettings space={opened} onBack={() => setOpen(null)} />;
 
   const move = (space: SpaceNode, position: number) =>
     void api.spaceMove(space.projectId, position).then(
@@ -28,15 +36,14 @@ export function SpacesPage() {
         </div>
       )}
       {spaces.map((space, index) => {
-        const expanded = open === space.projectId;
         return (
           <div key={space.projectId} className="space-settings-item">
             <div className="settings-row">
               <button
                 type="button"
                 className="space-settings-toggle"
-                aria-expanded={expanded}
-                onClick={() => setOpen(expanded ? null : space.projectId)}
+                aria-label={`${space.name} settings`}
+                onClick={() => setOpen(space.projectId)}
               >
                 <ChevronRight size={14} className="space-settings-chevron" aria-hidden="true" />
                 <SpaceTile space={space} size={22} />
@@ -63,7 +70,6 @@ export function SpacesPage() {
                 </button>
               </div>
             </div>
-            {expanded && <SpaceFields space={space} />}
           </div>
         );
       })}

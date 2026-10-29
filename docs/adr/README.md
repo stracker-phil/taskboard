@@ -39,5 +39,6 @@ stands in Taskboard. The numbers in this table are Taskboard's.
 | [0027](0027-jira-html-is-sanitised-and-shows-no-remote-content.md) | Jira HTML is sanitised and shows no remote content | Accepted (2026-10-28) |
 | [0028](0028-automatic-light-or-dark-with-one-palette-each.md) | Automatic, light or dark, with one palette each | Accepted (2026-10-29) |
 | [0029](0029-issues-come-from-a-source-jira-is-the-first.md) | Issues come from a source; Jira is the first | Accepted (2026-10-29) |
+| [0030](0030-a-space-carries-its-own-settings.md) | A Space carries its own settings | Accepted (2026-10-29) |
 
 Open: integrations with Daybook and TimeTracker.

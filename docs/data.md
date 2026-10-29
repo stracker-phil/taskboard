@@ -42,7 +42,7 @@ commands, which validate them. Tracking a project writes `local.space`, not the 
 
 ## Tables
 
-**cache** (the tracker's data, plus our derived columns). `space`, `issue` and `comment` carry `source` (`jira`
+**cache** (the tracker's data, plus our derived columns). `space`, `issue`, `comment` and `remote_link` carry `source` (`jira`
 today; migration `cache/0003`, [ADR 0029](adr/0029-issues-come-from-a-source-jira-is-the-first.md)); ids are
 unique across sources (Jira's numeric ids; another source prefixes its own):
 
@@ -54,6 +54,7 @@ unique across sources (Jira's numeric ids; another source prefixes its own):
 | `issue_change` | what the sync saw change (status, assignee, due date, priority, comments, created) |
 | `issue_seen` | when the owner last looked at an issue: changes after it are unseen (`changes::UNSEEN`) |
 | `comment` | `body_html` from Jira, `body_text` (ours) for search |
+| `remote_link` | an issue's web links (migration `cache/0004`): `issue_id` (cascades), `id`, `position`, `url` (untrusted), `title`, `application`, `relationship`, `source`; replaced as a whole when the issue is opened (`issues::issue_sync_web_links`) |
 | `version`, `user`, `field` | releases, people, custom field names (`field.shown` is ours; `field.used`, migration `cache/0002`: a tracked project's recent issues fill it, so the Columns popover and the filter editor offer it, `filter::RELEVANT_FIELD`) |
 | `sync_state` | one row per sync scope, or per project for the full sync's cursor |
 | `issue_fts` | FTS5 over key, summary, description and comments; rowid = the issue id; keeps its text for snippets; `remove_diacritics 2`. Queried by the palette and the `text` filter field, always through `search::match_expression` (quoted prefix terms, so typed FTS5 syntax stays literal) |
@@ -62,11 +63,12 @@ unique across sources (Jira's numeric ids; another source prefixes its own):
 
 | Table | Notes |
 |---|---|
-| `space` | a tracked project as the sidebar shows it: name, icon, colour, client, position, `default_columns` for new views |
+| `space` | a tracked project as the sidebar shows it: name, icon, colour (`1`–`12`), client, position, `default_columns` for new views; its Space settings (`local/0007`): `layouts` (JSON array of the layouts its views offer; null = all), `default_layout` and `default_group` for new views |
 | `filter_list` | WHICH issues: the sidebar tree (`kind` everything, space, list, recent, pinned); a JSON filter ANDed with its ancestors |
 | `view` | HOW to show a list: one tab; layout, columns, grouping, sort; never a filter |
 | `pin` | pinned issues, comments and lists, with an optional reason and expiry; active while not unpinned and not expired (`pins::active`); ended pins stay in Recently unpinned for 7 days |
-| `status_style` | overrides the detected style of a status |
+| `space_status_style` | overrides the detected style of a status in one Space (`local/0007`; the old app-wide `status_style` rows were copied to every Space) |
+| `space_field` | how a custom field shows in one Space: `hiddenInList`, `hiddenInDetail` or `hidden`; no row = visible (`space_config`) |
 
 Project ids in `local` point into `cache`; SQLite can't enforce that across files, so code cleans up.
 
@@ -122,8 +124,8 @@ case and accents, `epic`).
 project), `due`, `summary`, `status`; empty priorities and due dates sort last either way; ties keep the
 issue id order. Columns are standard ids (`assignee`, `epic`, `release`, `priority`, `labels`, `sprint`,
 `due`) or a Jira custom field id (`columns_catalogue` lists them; Jira's internal `any` fields and the sprint
-field are left out). `view.widths` (migration `local/0003`) holds the Table layout's column widths by column id; `view.wrap_titles` (`local/0004`, default on) whether the List wraps long titles; `filter_list.icon` (`local/0006`) the list's icon name (null: the funnel); `view.collapsed` (`local/0005`) a Board's collapsed or expanded columns by status id (the rest: Done collapsed). `view_board` returns one column per status shown, in the Board order (To do, In progress, Blocked, In review, Done, then Jira's status order).
-`status_style` holds the owner's style per status (`status_style_set`).
+field are left out). `view.widths` (migration `local/0003`) holds the Table layout's column widths by column id; `view.wrap_titles` (`local/0004`, default on) whether the List wraps long titles; `filter_list.icon` (`local/0006`) the list's icon name (null: the funnel); `view.collapsed` (`local/0005`) a Board's collapsed or expanded columns by group key (a status id when grouped by status; the rest keep their default, Done collapsed). `view_board` returns one column per group of the view's `group_by`: by status (also for `none`) in the Board order (To do, In progress, Blocked, In review, Done, then Jira's status order), otherwise the List's groups (`views::groups::group`) in their order. `read_view` and `list_views` fit a view to its Space (`space_config`): a layout the Space switched off shows as its default layout, `View.layouts` lists the offered ones, and columns of fields the Space hides from lists are left out; `columns_catalogue(list_id)` leaves them out too (outside the Spaces only fields every Space hides).
+`space_status_style` holds the owner's style per Space and status (`status_style_set`); `status_style::Styles::of` resolves an issue's style with its own Space's choice.
 
 ## Rules
 

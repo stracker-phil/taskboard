@@ -18,6 +18,7 @@ import { pinItem, pins } from "../test/pins";
 import { settings } from "../test/settings";
 import { sidebarTree, space } from "../test/spaces";
 import { listNode, view } from "../test/views";
+import { pullRequestLink } from "../test/webLinks";
 import { IssueView } from "./IssueView";
 
 const mocked = vi.mocked(api, true);
@@ -224,6 +225,14 @@ describe("IssueView", () => {
 
       expect(await screen.findByText("This issue is no longer in the cache.")).toBeInTheDocument();
       expect(screen.queryByRole("heading", { level: 1 })).not.toBeInTheDocument();
+    });
+
+    it("lists the issue's web links", async () => {
+      mocked.issueWebLinks.mockResolvedValue([pullRequestLink()]);
+      renderIssue();
+
+      const section = within(await screen.findByRole("region", { name: "Web links" }));
+      expect(section.getByRole("button", { name: /Validate DACH postcodes/ })).toHaveTextContent("shop#481");
     });
 
     it("asks Rust to sync the issue's comments", async () => {

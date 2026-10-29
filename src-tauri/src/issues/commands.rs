@@ -3,7 +3,7 @@
 use chrono::Utc;
 use tauri::State;
 
-use super::{ActivityItem, IssueDetail, Related};
+use super::{ActivityItem, IssueDetail, Related, WebLink};
 use crate::error::AppResult;
 use crate::lists::Viewer;
 use crate::state::AppState;
@@ -44,4 +44,18 @@ pub async fn issue_sync_comments(state: State<'_, AppState>, id: String) -> AppR
     let connection = state.settings.get().connection;
     let source = crate::sync::source_for(&state.jira, &connection)?;
     super::issue_sync_comments(&state.db, source.as_ref(), id).await
+}
+
+/// The cached web links (pull requests, documents).
+#[tauri::command]
+pub async fn issue_web_links(state: State<'_, AppState>, id: String) -> AppResult<Vec<WebLink>> {
+    super::issue_web_links(&state.db, id).await
+}
+
+/// Fetches the issue's web links; true when they changed.
+#[tauri::command]
+pub async fn issue_sync_web_links(state: State<'_, AppState>, id: String) -> AppResult<bool> {
+    let connection = state.settings.get().connection;
+    let source = crate::sync::source_for(&state.jira, &connection)?;
+    super::issue_sync_web_links(&state.db, source.as_ref(), id).await
 }

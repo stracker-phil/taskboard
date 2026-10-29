@@ -18,14 +18,14 @@ const STYLE_ORDER = Object.keys(STYLE_NAMES) as Style[];
 const CATEGORY_NAMES: Record<string, string> = { new: "To do", indeterminate: "In progress", done: "Done" };
 const CATEGORY_ORDER = ["new", "indeterminate", "done"];
 
-/** The tracked projects' statuses by Jira category, searchable, each with its issue count and style. */
-export function StatusesPage() {
+/** A Space's statuses by Jira category, searchable, each with its issue count and its style in this Space. */
+export function SpaceStatuses({ projectId }: { projectId: string }) {
   const client = useQueryClient();
-  const { data: statuses = [] } = useStatusStyles();
+  const { data: statuses = [] } = useStatusStyles(projectId);
 
   const choose = (status: StatusStyleRow, style: Style | null) =>
-    void api.statusStyleSet(status.id, style).then(
-      (rows) => client.setQueryData(STATUS_STYLES_KEY, rows),
+    void api.statusStyleSet(projectId, status.id, style).then(
+      (rows) => client.setQueryData([...STATUS_STYLES_KEY, projectId], rows),
       (e: unknown) => fail(e, `Could not change ${status.name}`),
     );
 
@@ -44,7 +44,7 @@ export function StatusesPage() {
   const sections = CATEGORY_ORDER.map((category) => ({ category, rows: shown.filter((s) => s.category === category) })).filter((s) => s.rows.length > 0);
 
   return (
-    <Group title="Statuses" anchor="statuses" description="The statuses your tracked projects use, in the style each one shows in. Automatic picks a style from the Jira category and the name.">
+    <Group title="Statuses" description="The statuses this Space's issues are in, in the style each one shows in here. Automatic picks a style from the Jira category and the name.">
       {statuses.length === 0 ? (
         <div className="settings-row">
           <span className="settings-empty">Statuses appear after the first sync.</span>

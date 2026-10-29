@@ -35,7 +35,14 @@ fn space(id: i64, key: &str, name: &str, client: Option<&str>, open: i64, curren
     })
 }
 
-fn level(id: i64, kind: &str, name: &str, space: Option<&str>, open: Option<i64>, current: bool) -> Value {
+fn level(
+    id: i64,
+    kind: &str,
+    name: &str,
+    space: Option<&str>,
+    open: Option<i64>,
+    current: bool,
+) -> Value {
     json!({
         "id": id, "kind": kind, "name": name, "space": space, "open": open, "current": current
     })
@@ -118,7 +125,8 @@ fn a_level_without_views_prints_only_its_header() {
 
 #[test]
 fn go_prints_where_the_window_went() {
-    let reply = json!({ "listId": 2, "level": "NW Website relaunch", "viewId": 6, "view": "Board" });
+    let reply =
+        json!({ "listId": 2, "level": "NW Website relaunch", "viewId": 6, "view": "Board" });
     assert_eq!(printed(&go(), reply), "NW Website relaunch › Board");
 }
 
@@ -148,7 +156,10 @@ fn search_without_a_match_says_so() {
 #[test]
 fn reset_cache_prints_the_apps_text_as_it_is() {
     assert_eq!(
-        printed(&IpcMessage::ResetCache, json!("Emptied the cache; fetching again")),
+        printed(
+            &IpcMessage::ResetCache,
+            json!("Emptied the cache; fetching again")
+        ),
         "Emptied the cache; fetching again"
     );
 }

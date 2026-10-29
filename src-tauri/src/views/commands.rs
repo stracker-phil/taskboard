@@ -135,6 +135,6 @@ pub async fn view_board(
 }
 
 #[tauri::command]
-pub async fn columns_catalogue(state: State<'_, AppState>) -> AppResult<Vec<Column>> {
-    super::columns_catalogue(&state.db).await
+pub async fn columns_catalogue(state: State<'_, AppState>, list_id: i64) -> AppResult<Vec<Column>> {
+    super::columns_catalogue(&state.db, list_id).await
 }

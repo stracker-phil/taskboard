@@ -49,9 +49,13 @@ export function ViewTabs({ listId, viewId }: { listId: number; viewId: number })
     if (left && view.id === viewId) await open(listId);
   };
 
+  // The layouts the level's Space offers (all of them outside the Spaces); every view of a level carries them.
+  const offered = views[0]?.layouts ?? LAYOUT_ORDER;
+  const offers = (layout: Layout) => offered.includes(layout);
+
   const openMenu = (e: MouseEvent, view: View) => {
     e.preventDefault();
-    const layouts: MenuEntry[] = LAYOUT_ORDER.map((layout) => ({
+    const layouts: MenuEntry[] = offered.map((layout) => ({
       text: LAYOUTS[layout].name,
       enabled: layout !== view.layout,
       run: () => void attempt(api.viewSetLayout(view.id, layout), "Could not change the layout"),
@@ -85,9 +89,9 @@ export function ViewTabs({ listId, viewId }: { listId: number; viewId: number })
   usePageAction("view.new", addMenu);
   usePageAction("view.next", views.length > 1 ? () => step(1) : null);
   usePageAction("view.previous", views.length > 1 ? () => step(-1) : null);
-  usePageAction("view.layout.list", current >= 0 ? () => setLayout("list") : null);
-  usePageAction("view.layout.board", current >= 0 ? () => setLayout("board") : null);
-  usePageAction("view.layout.table", current >= 0 ? () => setLayout("table") : null);
+  usePageAction("view.layout.list", current >= 0 && offers("list") ? () => setLayout("list") : null);
+  usePageAction("view.layout.board", current >= 0 && offers("board") ? () => setLayout("board") : null);
+  usePageAction("view.layout.table", current >= 0 && offers("table") ? () => setLayout("table") : null);
 
   return (
     <div className="view-tabs" role="tablist" aria-label="Views" ref={containerRef}>
@@ -140,7 +144,7 @@ export function ViewTabs({ listId, viewId }: { listId: number; viewId: number })
         {adding && (
           <Popover label="New view" anchor={addRef} onClose={() => setAdding(false)} className="view-add">
             <span className="popover__caps">New view</span>
-            {LAYOUT_ORDER.map((layout) => {
+            {offered.map((layout) => {
               const { icon: Icon, name } = LAYOUTS[layout];
               return (
                 <button

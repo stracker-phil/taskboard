@@ -534,10 +534,7 @@ mod tests {
                 IpcMessage::Sync { full: false },
                 serde_json::json!({ "type": "sync", "full": false }),
             ),
-            (
-                IpcMessage::Spaces,
-                serde_json::json!({ "type": "spaces" }),
-            ),
+            (IpcMessage::Spaces, serde_json::json!({ "type": "spaces" })),
             (
                 IpcMessage::Filters { space: None },
                 serde_json::json!({ "type": "filters", "space": null }),

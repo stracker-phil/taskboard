@@ -11,6 +11,7 @@ mod people;
 mod render;
 mod spec;
 mod synthetic;
+mod web_links;
 
 use std::collections::BTreeMap;
 
@@ -51,6 +52,8 @@ pub struct JiraData {
     pub issues: Vec<Value>,
     /// Issue id to `GET /issue/{key}/comment?expand=renderedBody` `comments`, oldest first
     pub comments: BTreeMap<String, Vec<Value>>,
+    /// Issue id to `GET /issue/{id}/remotelink`
+    pub remote_links: BTreeMap<String, Vec<Value>>,
 }
 
 /// The mockup's site, with every time as it was at [`DEMO_NOW`].
@@ -64,7 +67,10 @@ pub fn demo_at(now: DateTime<Utc>) -> JiraData {
     specs.extend(issues_more::issues());
     let mut comments = issues_nw::comments();
     comments.extend(issues_more::comments());
-    site(&specs, &comments, &Clock::new(now))
+    JiraData {
+        remote_links: web_links::remote_links(),
+        ..site(&specs, &comments, &Clock::new(now))
+    }
 }
 
 fn site(specs: &[IssueSpec], comments: &[CommentSpec], clock: &Clock) -> JiraData {
@@ -90,5 +96,6 @@ fn site(specs: &[IssueSpec], comments: &[CommentSpec], clock: &Clock) -> JiraDat
         versions,
         issues,
         comments,
+        remote_links: BTreeMap::new(),
     }
 }

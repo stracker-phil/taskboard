@@ -1,7 +1,5 @@
 //! The issues around one issue: its children (an epic's issues or a task's subtasks) and its links.
 
-use std::collections::HashMap;
-
 use rusqlite::{Connection, OptionalExtension};
 use serde::Serialize;
 use serde_json::Value;
@@ -11,7 +9,7 @@ use crate::changes::UNSEEN;
 use crate::db::Db;
 use crate::error::AppResult;
 use crate::lists::Viewer;
-use crate::status_style::{Style, detect, styles};
+use crate::status_style::{Style, Styles, detect};
 use crate::views::rows::{self, Person};
 
 /// One issue as the Child issues and Links sections list it.
@@ -71,7 +69,7 @@ pub async fn issue_related(db: &Db, viewer: Viewer, id: String) -> AppResult<Rel
 fn related_sql(condition: &str) -> String {
     format!(
         "SELECT i.id, i.key, i.summary, i.status_id, COALESCE(st.name, ''), i.status_category,
-            i.issue_type, i.assignee_id, u.name, {UNSEEN}
+            i.issue_type, i.assignee_id, u.name, {UNSEEN}, i.project_id
         FROM cache.issue i
         LEFT JOIN cache.status st ON st.id = i.status_id
         LEFT JOIN cache.user u ON u.account_id = i.assignee_id
@@ -81,7 +79,7 @@ fn related_sql(condition: &str) -> String {
 
 fn related_from(
     r: &rusqlite::Row,
-    styles: &HashMap<String, Style>,
+    styles: &Styles,
     me: Option<&str>,
 ) -> rusqlite::Result<RelatedIssue> {
     let status_id: String = r.get(3)?;
@@ -93,10 +91,12 @@ fn related_from(
         id: Some(r.get(0)?),
         key: r.get(1)?,
         summary: r.get(2)?,
-        style: styles
-            .get(&status_id)
-            .copied()
-            .unwrap_or_else(|| detect(&category, &status_name)),
+        style: styles.of(
+            &r.get::<_, String>(10)?,
+            &status_id,
+            &category,
+            &status_name,
+        ),
         issue_type: r.get(6)?,
         assignee: assignee.map(|a| rows::person(&a, name.as_deref().unwrap_or(&a), me)),
         changed: r.get(9)?,
@@ -104,7 +104,7 @@ fn related_from(
 }
 
 fn children(conn: &Connection, id: &str, me: Option<&str>) -> AppResult<Children> {
-    let styles = styles(conn)?;
+    let styles = Styles::load(conn)?;
     let mut query = conn.prepare(&related_sql("i.parent_id = ?1 AND i.gone = 0"))?;
     let all = query
         .query_map([id], |r| related_from(r, &styles, me))?
@@ -136,7 +136,7 @@ fn links(conn: &Connection, id: &str, me: Option<&str>) -> AppResult<Vec<IssueLi
     let raw: Value = raw
         .and_then(|r| serde_json::from_str(&r).ok())
         .unwrap_or(Value::Null);
-    let styles = styles(conn)?;
+    let styles = Styles::load(conn)?;
     let mut links = Vec::new();
     for link in raw["fields"]["issuelinks"].as_array().into_iter().flatten() {
         let (side, words) = if link["outwardIssue"].is_object() {
@@ -181,7 +181,7 @@ fn links(conn: &Connection, id: &str, me: Option<&str>) -> AppResult<Vec<IssueLi
 fn related_by_key(
     conn: &Connection,
     key: &str,
-    styles: &HashMap<String, Style>,
+    styles: &Styles,
     me: Option<&str>,
 ) -> AppResult<Option<RelatedIssue>> {
     Ok(conn

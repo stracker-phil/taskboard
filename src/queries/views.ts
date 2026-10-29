@@ -28,9 +28,14 @@ export const useViewBoard = (listId: number, viewId: number, narrowing: Narrowin
   });
 
 /** Every column a view can show, for the column names. */
-export const useColumnsCatalogue = () => useQuery({ queryKey: COLUMNS_KEY, queryFn: api.columnsCatalogue });
+export const useColumnsCatalogue = (listId: number) =>
+  useQuery({ queryKey: [...COLUMNS_KEY, listId], queryFn: () => api.columnsCatalogue(listId) });
 
-export const useStatusStyles = () => useQuery({ queryKey: STATUS_STYLES_KEY, queryFn: api.statusStylesList });
+export const useStatusStyles = (projectId: string) =>
+  useQuery({ queryKey: [...STATUS_STYLES_KEY, projectId], queryFn: () => api.statusStylesList(projectId) });
+export const SPACE_CONFIG_KEY = ["spaceConfig"] as const;
+export const useSpaceConfig = (projectId: string) =>
+  useQuery({ queryKey: [...SPACE_CONFIG_KEY, projectId], queryFn: () => api.spaceConfig(projectId) });
 
 /** A level's locked and own conditions, for the Filter popover. */
 export const LIST_CONDITIONS_KEY = ["listConditions"] as const;

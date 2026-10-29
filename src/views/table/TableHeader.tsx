@@ -6,6 +6,7 @@ import { sortByOf } from "./sortable";
 const FIXED_NAMES: Record<string, string> = { key: "Key", summary: "Summary", status: "Status" };
 
 interface Props {
+  listId: number;
   columns: string[];
   sort: Sort;
   widthOf: (id: string) => number;
@@ -14,8 +15,8 @@ interface Props {
 }
 
 /** The sticky header row: every sortable name sorts on click, every column but Summary resizes at its edge. */
-export function TableHeader({ columns, sort, widthOf, onSort, onResizeStart }: Props) {
-  const { data: catalogue = [] } = useColumnsCatalogue();
+export function TableHeader({ listId, columns, sort, widthOf, onSort, onResizeStart }: Props) {
+  const { data: catalogue = [] } = useColumnsCatalogue(listId);
   const name = (id: string) => FIXED_NAMES[id] ?? catalogue.find((c) => c.id === id)?.name ?? id;
 
   return (

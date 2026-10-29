@@ -38,8 +38,8 @@ describe("SettingsApp", () => {
 
     const nav = screen.getByRole("navigation", { name: "Settings pages" });
     const entries = within(nav).getAllByRole("button").map((b) => b.textContent?.trim());
-    expect(entries).toEqual(["Connection", "Projects", "Spaces", "Statuses", "Sync", "General", "Appearance", "Shortcuts", "Status"]);
-    expect(nav.textContent).toMatch(/Jira.*Connection.*Projects.*Spaces.*Statuses.*Sync.*System.*General.*Appearance.*Shortcuts.*Status/);
+    expect(entries).toEqual(["Connection", "Projects", "Spaces", "Sync", "General", "Appearance", "Shortcuts", "Status"]);
+    expect(nav.textContent).toMatch(/Jira.*Connection.*Projects.*Spaces.*Sync.*System.*General.*Appearance.*Shortcuts.*Status/);
     expect(screen.getByRole("heading", { name: "Connection" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Connection/ })).toHaveAttribute("aria-current", "page");
   });
@@ -53,16 +53,16 @@ describe("SettingsApp", () => {
     expect(await screen.findByRole("button", { name: "Reset Cache" })).toBeInTheDocument();
   });
 
-  it("shows the Statuses page when chosen in the page list", async () => {
-    await renderSettings();
-
-    await userEvent.click(screen.getByRole("button", { name: /Statuses/ }));
-
-    expect(screen.getByRole("button", { name: /Statuses/ })).toHaveAttribute("aria-current", "page");
-    expect(await screen.findByText("Statuses appear after the first sync.")).toBeInTheDocument();
-  });
-
   describe("search", () => {
+    it.each(["Custom fields", "Layouts", "Statuses"])("finds the Spaces page by its %s section", async (text) => {
+      await renderSettings();
+
+      await userEvent.type(screen.getByRole("searchbox", { name: "Search Settings" }), text);
+
+      const nav = screen.getByRole("navigation", { name: "Settings pages" });
+      expect(within(nav).getAllByRole("button").map((b) => b.textContent?.trim())).toEqual([expect.stringContaining("Spaces")]);
+    });
+
     it("leaves no page when the text matches nothing", async () => {
       await renderSettings();
 

@@ -1,5 +1,5 @@
 /** The core settings pages. Modules register their own pages from their install function. */
-import { Activity, CircleDot, FolderKanban, Keyboard, LayoutGrid, Palette, PlugZap, RefreshCw, SlidersHorizontal } from "lucide-react";
+import { Activity, FolderKanban, Keyboard, LayoutGrid, Palette, PlugZap, RefreshCw, SlidersHorizontal } from "lucide-react";
 import { registerSettingsPage } from "../../registry/settingsPages";
 import { AppearancePage } from "./AppearancePage";
 import { GeneralPage } from "./GeneralPage";
@@ -7,7 +7,6 @@ import { ShortcutsPage } from "./ShortcutsPage";
 import { ConnectionPage } from "./jira/ConnectionPage";
 import { ProjectsPage } from "./jira/ProjectsPage";
 import { SpacesPage } from "./jira/SpacesPage";
-import { StatusesPage } from "./jira/StatusesPage";
 import { SyncPage } from "./jira/SyncPage";
 import { StatusPage } from "./status/StatusPage";
 
@@ -40,24 +39,21 @@ export function registerCoreSettingsPages() {
     label: "Spaces",
     icon: LayoutGrid,
     order: 2,
-    sections: [{ id: "spaces", title: "Spaces" }],
+    // A Space's own settings open from its row; these titles let the search find them.
+    sections: [
+      { id: "spaces", title: "Spaces" },
+      { id: "layouts", title: "Layouts" },
+      { id: "statuses", title: "Statuses" },
+      { id: "fields", title: "Custom fields" },
+    ],
     Body: SpacesPage,
-  });
-  registerSettingsPage({
-    id: "statuses",
-    group: "Jira",
-    label: "Statuses",
-    icon: CircleDot,
-    order: 3,
-    sections: [{ id: "statuses", title: "Statuses" }],
-    Body: StatusesPage,
   });
   registerSettingsPage({
     id: "sync",
     group: "Jira",
     label: "Sync",
     icon: RefreshCw,
-    order: 4,
+    order: 3,
     sections: [
       { id: "scope", title: "Scope" },
       { id: "intervals", title: "Intervals" },

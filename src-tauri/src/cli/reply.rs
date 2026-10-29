@@ -54,7 +54,10 @@ fn status_text(report: &StatusReport) -> String {
         format!("window: {window}"),
         format!(
             "at: {}",
-            report.place.as_ref().map_or("nothing open".into(), listing::place)
+            report
+                .place
+                .as_ref()
+                .map_or("nothing open".into(), listing::place)
         ),
         format!("sync: {}", sync_text(&report.sync.state)),
         format!(
@@ -165,9 +168,8 @@ mod tests {
             view_id: 5,
             view: "Board".into(),
         };
-        let reply =
-            serde_json::to_value(status(true, overview(idle(), None, vec![]), Some(place)))
-                .unwrap();
+        let reply = serde_json::to_value(status(true, overview(idle(), None, vec![]), Some(place)))
+            .unwrap();
         assert_eq!(
             status_text_of(&reply),
             "Taskboard 1.2.3\nwindow: visible\nat: NW Website relaunch › Board\nsync: idle\nlast full sync: never"

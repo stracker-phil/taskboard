@@ -621,7 +621,7 @@ mod projects {
     }
 
     #[tokio::test]
-    async fn the_tile_colors_cycle_after_five_spaces() {
+    async fn the_tile_colors_run_through_twelve_before_they_cycle() {
         let (_dir, db, fake) = open().await;
         refresh_projects(&db, &fake.client(TokenKind::Classic))
             .await
@@ -636,7 +636,7 @@ mod projects {
             .into_iter()
             .map(|row| row.3.unwrap())
             .collect();
-        assert_eq!(colors, ["1", "2", "3", "4", "5", "1"]);
+        assert_eq!(colors, ["1", "2", "3", "4", "5", "6"]);
     }
 
     #[tokio::test]

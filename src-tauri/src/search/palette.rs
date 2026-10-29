@@ -1,7 +1,5 @@
 //! What the command palette finds for the typed text: issues by key and full text, and filter lists by name.
 
-use std::collections::HashMap;
-
 use rusqlite::{Connection, params};
 use serde::Serialize;
 use ts_rs::TS;
@@ -9,7 +7,7 @@ use ts_rs::TS;
 use super::fts::{KeyHint, key_hint, match_expression};
 use crate::db::Db;
 use crate::error::AppResult;
-use crate::status_style::{Style, detect, styles};
+use crate::status_style::{Style, Styles};
 use crate::views::fold;
 
 const ISSUE_LIMIT: usize = 8;
@@ -80,7 +78,7 @@ pub async fn palette_query(db: &Db, text: String) -> AppResult<PaletteResults> {
 }
 
 pub fn query(conn: &Connection, text: &str) -> AppResult<PaletteResults> {
-    let styles = styles(conn)?;
+    let styles = Styles::load(conn)?;
     let mut issues: Vec<IssueHit> = Vec::new();
     for id in key_matches(conn, text)? {
         if let Some(hit) = plain_hit(conn, &styles, &id)? {
@@ -120,18 +118,7 @@ fn key_matches(conn: &Connection, text: &str) -> AppResult<Vec<String>> {
     Ok(ids.collect::<Result<_, _>>()?)
 }
 
-fn style_of(styles: &HashMap<String, Style>, status_id: &str, name: &str, category: &str) -> Style {
-    styles
-        .get(status_id)
-        .copied()
-        .unwrap_or_else(|| detect(category, name))
-}
-
-fn plain_hit(
-    conn: &Connection,
-    styles: &HashMap<String, Style>,
-    id: &str,
-) -> AppResult<Option<IssueHit>> {
+fn plain_hit(conn: &Connection, styles: &Styles, id: &str) -> AppResult<Option<IssueHit>> {
     let mut query = conn.prepare(
         "SELECT i.key, i.summary, i.status_id, COALESCE(st.name, ''), i.status_category, i.gone, i.project_id
          FROM cache.issue i LEFT JOIN cache.status st ON st.id = i.status_id WHERE i.id = ?1",
@@ -150,7 +137,7 @@ fn plain_hit(
             text: r.get(1)?,
             strong: false,
         }],
-        style: style_of(styles, &status_id, &status_name, &category),
+        style: styles.of(&r.get::<_, String>(6)?, &status_id, &category, &status_name),
         status_name,
         matched_in: MatchedIn::Key,
         comment: None,
@@ -160,11 +147,7 @@ fn plain_hit(
 }
 
 /// Key and summary weigh most; the best ones first.
-fn text_matches(
-    conn: &Connection,
-    styles: &HashMap<String, Style>,
-    expression: &str,
-) -> AppResult<Vec<IssueHit>> {
+fn text_matches(conn: &Connection, styles: &Styles, expression: &str) -> AppResult<Vec<IssueHit>> {
     let mut query = conn.prepare(&format!(
         "SELECT i.id, i.key,
            highlight(issue_fts, 0, ?2, ?3), highlight(issue_fts, 1, ?2, ?3), highlight(issue_fts, 2, ?2, ?3),
@@ -201,7 +184,12 @@ fn text_matches(
                 id: r.get(0)?,
                 key: r.get(1)?,
                 summary: parts(&summary),
-                style: style_of(styles, &status_id, &status_name, &category),
+                style: styles.of(
+                    &r.get::<_, String>(10)?,
+                    &status_id,
+                    &category,
+                    &status_name,
+                ),
                 status_name,
                 comment: (matched_in == MatchedIn::Comment)
                     .then(|| comments.as_deref().map(parts))

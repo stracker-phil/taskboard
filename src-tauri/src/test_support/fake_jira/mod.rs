@@ -187,6 +187,16 @@ impl FakeJira {
         self.content().now = now;
     }
 
+    /// Replaces the issue's remote links (`GET /issue/{id}/remotelink` answers); `updated` stays.
+    pub fn set_remote_links(&self, id_or_key: &str, links: Vec<Value>) {
+        let mut content = self.content();
+        let id = issue_mut(&mut content.data, id_or_key)["id"]
+            .as_str()
+            .unwrap_or_default()
+            .to_string();
+        content.data.remote_links.insert(id, links);
+    }
+
     /// Adds a comment by `author` (a user object) and stamps `updated`.
     pub fn add_comment(&self, id_or_key: &str, author: Value, text: &str) {
         let mut content = self.content();

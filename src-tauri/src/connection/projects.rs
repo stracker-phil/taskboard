@@ -12,7 +12,7 @@ use crate::lists::ensure_space;
 use crate::sync::store::store_versions;
 
 /// How many Space tile colours the palette has (`--space-tile-*`).
-const SPACE_COLORS: i64 = 5;
+const SPACE_COLORS: i64 = 12;
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
 #[ts(export, export_to = "src/api/types.gen.ts")]

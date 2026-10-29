@@ -68,6 +68,10 @@ pub enum Endpoint {
         issue: IssueRef,
         start_at: u32,
     },
+    /// The issue's web links (Jira's remote links), all in one answer.
+    IssueRemoteLinks {
+        issue: IssueRef,
+    },
     /// Strict validation of a query.
     JqlParse {
         jql: Jql,
@@ -139,6 +143,9 @@ impl Endpoint {
                     .query("orderBy", "created")
                     .query("expand", "renderedBody")
                     .plan(site)
+            }
+            Self::IssueRemoteLinks { issue } => {
+                Rest::get(&["issue", issue.as_str(), "remotelink"]).plan(site)
             }
             Self::FieldUsage { project } => Rest::read_post(
                 &["search", "jql"],

@@ -181,12 +181,7 @@ fn json_is_accepted_before_or_after_the_subcommand() {
 
 #[test]
 fn only_show_focus_open_and_go_may_start_the_app() {
-    let starting = [
-        &["show"][..],
-        &["focus"],
-        &["open", "NW-12"],
-        &["go", "NW"],
-    ];
+    let starting = [&["show"][..], &["focus"], &["open", "NW-12"], &["go", "NW"]];
     for args in starting {
         assert!(
             matches!(parse_args(args), CliOutcome::Remote(_)),
@@ -288,7 +283,11 @@ fn me_sets_or_flips_the_chip() {
         (&["me", "off"], Some(false)),
         (&["me", "Off"], Some(false)),
     ] {
-        assert_eq!(parse_args(args), ask(IpcMessage::Me { on }, false), "{args:?}");
+        assert_eq!(
+            parse_args(args),
+            ask(IpcMessage::Me { on }, false),
+            "{args:?}"
+        );
     }
 }
 

@@ -42,7 +42,7 @@ pub const FILE_SYNC: &[Item] = &[
     item("Full Sync", "sync:full", "CmdOrCtrl+Shift+R"),
 ];
 /// Opens Settings at the Cache group, which asks before it empties the cache.
-pub const RESET_CACHE: Item = plain("Reset Cache…", "app:settings:sync:cache");
+pub const RESET_CACHE: Item = plain("Reset Cache…", "app:settings:cache");
 pub const CLOSE: Item = item("Close Window", "window:close", "CmdOrCtrl+W");
 pub const GO_LEVELS: &[Item] = &[
     item("Command Palette…", "page:palette.open", "CmdOrCtrl+K"),
@@ -58,8 +58,16 @@ pub const GO_MOVES: &[Item] = &[
 ];
 pub const LIST_LAYOUTS: &[Item] = &[
     item("Show as List", "page:view.layout.list", "CmdOrCtrl+Ctrl+1"),
-    item("Show as Board", "page:view.layout.board", "CmdOrCtrl+Ctrl+2"),
-    item("Show as Table", "page:view.layout.table", "CmdOrCtrl+Ctrl+3"),
+    item(
+        "Show as Board",
+        "page:view.layout.board",
+        "CmdOrCtrl+Ctrl+2",
+    ),
+    item(
+        "Show as Table",
+        "page:view.layout.table",
+        "CmdOrCtrl+Ctrl+3",
+    ),
 ];
 pub const LIST_TOOLBAR: &[Item] = &[
     item("Group and Sort…", "page:toolbar.group", "CmdOrCtrl+Alt+G"),
@@ -381,10 +389,10 @@ mod tests {
     }
 
     #[test]
-    fn reset_cache_opens_settings_at_the_sync_caches_section_without_a_key() {
+    fn reset_cache_opens_settings_at_the_cache_section_without_a_key() {
         let bus = registered();
         assert_eq!(RESET_CACHE.label, "Reset Cache…");
-        assert_eq!(RESET_CACHE.command, "app:settings:sync:cache");
+        assert_eq!(RESET_CACHE.command, "app:settings:cache");
         assert_eq!(RESET_CACHE.accelerator, None);
         assert!(bus.knows(RESET_CACHE.command));
         let info = bus.info(RESET_CACHE.command).unwrap();

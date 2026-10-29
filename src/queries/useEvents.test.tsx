@@ -105,7 +105,7 @@ describe("useEvents", () => {
     function RowsHarness() {
       useEvents();
       const { data: view } = useViewRows(11, 101);
-      const { data: styles } = useStatusStyles();
+      const { data: styles } = useStatusStyles("10001");
       return (
         <>
           <p>Rows: {view ? Object.values(view.rows).map((r) => r.key).join(", ") || "none" : "loading"}</p>

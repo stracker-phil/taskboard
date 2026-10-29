@@ -18,6 +18,7 @@ import type {
   EventPayloads,
   Filter,
   GroupBy,
+  FieldVisibility,
   Keybindings,
   LaunchEvent,
   Layout,
@@ -28,6 +29,8 @@ import type {
   Narrowing,
   Nav,
   PaletteResults,
+  SpaceConfig,
+  SpaceLayouts,
   PinDuration,
   PinKind,
   Pins,
@@ -47,6 +50,7 @@ import type {
   View,
   ViewData,
   ViewPlace,
+  WebLink,
 } from "./types";
 
 export * from "./types";
@@ -180,15 +184,24 @@ export const api = {
   listMarkAllSeen: (listId: number) => invoke<void>("list_mark_all_seen", { listId }),
   /** Fetches the issue's comments from Jira when the cached ones may be behind. */
   issueSyncComments: (id: string) => invoke<boolean>("issue_sync_comments", { id }),
+  /** The issue's cached web links (pull requests, documents). */
+  issueWebLinks: (id: string) => invoke<WebLink[]>("issue_web_links", { id }),
+  /** Fetches the issue's web links from Jira; true when they changed. */
+  issueSyncWebLinks: (id: string) => invoke<boolean>("issue_sync_web_links", { id }),
   placeGet: (listId: number, viewId: number) => invoke<ViewPlace | null>("place_get", { listId, viewId }),
   placeSet: (listId: number, viewId: number, place: ViewPlace) => invoke<void>("place_set", { listId, viewId, place }),
   /** The system clipboard; only text. */
   copyText: (text: string) => navigator.clipboard.writeText(text),
   /** Every column a view can show: the standard ones, then the site's custom fields. */
-  columnsCatalogue: () => invoke<Column[]>("columns_catalogue"),
-  statusStylesList: () => invoke<StatusStyleRow[]>("status_styles_list"),
+  columnsCatalogue: (listId: number) => invoke<Column[]>("columns_catalogue", { listId }),
+  statusStylesList: (projectId: string) => invoke<StatusStyleRow[]>("status_styles_list", { projectId }),
   /** `style` null: back to the detected style. */
-  statusStyleSet: (statusId: string, style: Style | null) => invoke<StatusStyleRow[]>("status_style_set", { statusId, style }),
+  statusStyleSet: (projectId: string, statusId: string, style: Style | null) =>
+    invoke<StatusStyleRow[]>("status_style_set", { projectId, statusId, style }),
+  spaceConfig: (projectId: string) => invoke<SpaceConfig>("space_config", { projectId }),
+  spaceSetLayouts: (projectId: string, layouts: SpaceLayouts) => invoke<SpaceConfig>("space_set_layouts", { projectId, layouts }),
+  spaceSetField: (projectId: string, fieldId: string, visibility: FieldVisibility) =>
+    invoke<SpaceConfig>("space_set_field", { projectId, fieldId, visibility }),
   /** Shows a native context menu at the mouse; the chosen entry's `run` is called. */
   popupMenu: async (entries: MenuEntry[]): Promise<void> => {
     const menu = await Menu.new({ items: entries.map(nativeEntry) });

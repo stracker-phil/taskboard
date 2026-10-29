@@ -597,10 +597,31 @@ describe("Sidebar", () => {
       fireEvent.contextMenu(spaceButton("Website relaunch"));
     });
 
-    it("offers Rename, Colour and icon, Client label and Stop tracking", () => {
+    it("offers Rename, Colour and icon, Client label, Space Settings and Stop tracking", () => {
       const entries: MenuEntry[] = mocked.popupMenu.mock.calls[0][0];
 
-      expect(entries.map((e) => (e === "separator" ? e : e.text))).toEqual(["Rename", "Colour and icon…", "Client label…", "separator", "Stop tracking"]);
+      expect(entries.map((e) => (e === "separator" ? e : e.text))).toEqual([
+        "Rename",
+        "Colour and icon…",
+        "Client label…",
+        "Space Settings…",
+        "separator",
+        "Stop tracking",
+      ]);
+    });
+
+    it("opens the Space's settings through the bus command", async () => {
+      await chooseFromMenu("Space Settings…");
+
+      expect(mocked.runCommand).toHaveBeenCalledWith("app:settings:space:10001");
+    });
+
+    it("shows an error toast when the settings cannot be opened", async () => {
+      mocked.runCommand.mockRejectedValue({ kind: "io", message: "No window", code: null });
+
+      await chooseFromMenu("Space Settings…");
+
+      expect(await screen.findByText("Could not open the Space's settings: No window")).toBeInTheDocument();
     });
 
     it("renames the Space in place, keeping its icon, colour and client", async () => {

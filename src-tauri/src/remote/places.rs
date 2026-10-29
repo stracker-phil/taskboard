@@ -75,7 +75,10 @@ pub async fn place(app: &AppHandle) -> AppResult<Option<PlaceReport>> {
         return Ok(None);
     };
     let tree = tree(&state).await?;
-    let views = state.db.read(move |conn| list_views(conn, at.list_id)).await?;
+    let views = state
+        .db
+        .read(move |conn| list_views(conn, at.list_id))
+        .await?;
     Ok(Some(PlaceReport {
         list_id: at.list_id,
         level: level_label(&tree, at.list_id).unwrap_or_default(),

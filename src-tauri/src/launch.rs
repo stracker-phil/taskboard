@@ -130,7 +130,10 @@ mod tests {
             })
         );
         for (on, wire) in [
-            (Some(true), serde_json::json!({ "type": "onlyMine", "on": true })),
+            (
+                Some(true),
+                serde_json::json!({ "type": "onlyMine", "on": true }),
+            ),
             (None, serde_json::json!({ "type": "onlyMine", "on": null })),
         ] {
             assert_eq!(

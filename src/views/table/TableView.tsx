@@ -83,6 +83,7 @@ function Table({ view, data }: { view: View; data: ViewData }) {
     <div ref={scrollRef} className="table-scroll" role="grid" aria-rowcount={items.length}>
       <div className="table-content" style={{ minWidth }}>
         <TableHeader
+          listId={view.listId}
           columns={headerColumns}
           sort={view.sort}
           widthOf={widthOf}

@@ -23,7 +23,11 @@ pub fn spaces(rows: &[SpaceRow]) -> String {
     let id = width(rows, |r| r.id.to_string().len());
     let key = width(rows, |r| r.key.len());
     lines(rows.iter().map(|r| {
-        let client = r.client.as_deref().map(|c| format!(" ({c})")).unwrap_or_default();
+        let client = r
+            .client
+            .as_deref()
+            .map(|c| format!(" ({c})"))
+            .unwrap_or_default();
         format!(
             "{}{:>id$}  {:<key$}  {}{client} · {} open",
             marker(r.current),

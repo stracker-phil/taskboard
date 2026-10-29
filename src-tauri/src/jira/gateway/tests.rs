@@ -151,6 +151,22 @@ fn allowlist() -> Vec<(Endpoint, Method, &'static str, Option<Value>)> {
             None,
         ),
         (
+            Endpoint::IssueRemoteLinks {
+                issue: issue("NW-1042"),
+            },
+            Method::GET,
+            "issue/NW-1042/remotelink",
+            None,
+        ),
+        (
+            Endpoint::IssueRemoteLinks {
+                issue: issue("10001"),
+            },
+            Method::GET,
+            "issue/10001/remotelink",
+            None,
+        ),
+        (
             Endpoint::JqlParse { jql: jql(QUERY) },
             Method::POST,
             "jql/parse?validation=strict",
@@ -344,6 +360,7 @@ fn the_guard_accepts_the_allowed_requests_when_built_by_hand() {
             ),
             (Method::GET, "rest/api/3/project/LUM/versions"),
             (Method::GET, "rest/api/3/issue/NW-1/comment"),
+            (Method::GET, "rest/api/3/issue/NW-1/remotelink"),
             (Method::POST, "rest/api/3/search/jql"),
             (Method::POST, "rest/api/3/jql/parse"),
         ] {
@@ -430,6 +447,17 @@ fn paths_methods_and_queries_outside_the_table_are_refused() {
         (Method::GET, "rest/api/3/issue/NW-/comment"),
         (Method::GET, "rest/api/3/issue/-1/comment"),
         (Method::GET, "rest/api/3/issue/nw-1/comment"),
+        (Method::POST, "rest/api/3/issue/NW-1/remotelink"),
+        (Method::PUT, "rest/api/3/issue/NW-1/remotelink"),
+        (Method::DELETE, "rest/api/3/issue/NW-1/remotelink"),
+        (Method::GET, "rest/api/3/issue/NW-1/remotelink?globalId=x"),
+        (Method::GET, "rest/api/3/issue/NW-1/remotelink/70001"),
+        (Method::DELETE, "rest/api/3/issue/NW-1/remotelink/70001"),
+        (Method::GET, "rest/api/3/issue/NW-1/remotelink/"),
+        (Method::GET, "rest/api/3/issue/%2e%2e/remotelink"),
+        (Method::GET, "rest/api/3/issue/nw-1/remotelink"),
+        (Method::GET, "rest/api/3/issue//remotelink"),
+        (Method::GET, "rest/api/3/issue/-1/remotelink"),
     ];
     for (label, site) in sites() {
         for (method, relative) in &cases {

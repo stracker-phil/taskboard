@@ -80,6 +80,7 @@ fn view(id: i64, name: &str, layout: Layout, is_default: bool) -> View {
         list_id: 10,
         name: name.into(),
         layout,
+        layouts: vec![Layout::List, Layout::Board, Layout::Table],
         columns: vec![],
         group_by: GroupBy::None,
         sort: Sort::default(),
@@ -141,14 +142,21 @@ fn a_filter_list_name_used_in_one_space_needs_no_key() {
 fn a_filter_list_name_used_in_two_spaces_is_ambiguous_and_names_both_with_their_ids() {
     assert_eq!(
         find_level(&tree(), "Open bugs"),
-        Err("“Open bugs” could be NW/Open bugs (11), NWS/Open bugs (21); name one by its id."
-            .into())
+        Err(
+            "“Open bugs” could be NW/Open bugs (11), NWS/Open bugs (21); name one by its id."
+                .into()
+        )
     );
 }
 
 #[test]
 fn a_unique_start_of_a_name_is_enough() {
-    for (word, id) in [("launch", 12), ("Weekly", 4), ("web", 10), ("northwind", 20)] {
+    for (word, id) in [
+        ("launch", 12),
+        ("Weekly", 4),
+        ("web", 10),
+        ("northwind", 20),
+    ] {
         assert_eq!(find_level(&tree(), word), Ok(id), "{word}");
     }
 }
@@ -157,9 +165,11 @@ fn a_unique_start_of_a_name_is_enough() {
 fn a_start_shared_by_several_levels_is_ambiguous() {
     assert_eq!(
         find_level(&tree(), "w"),
-        Err("“w” could be Weekly review (4), NW (10), NWS/Waiting on customer (22); \
+        Err(
+            "“w” could be Weekly review (4), NW (10), NWS/Waiting on customer (22); \
              name one by its id."
-            .into())
+                .into()
+        )
     );
 }
 
@@ -221,7 +231,9 @@ fn an_unknown_view_is_an_error_pointing_to_the_listing() {
     for word in ["Gantt", "99"] {
         assert_eq!(
             find_view(&views(), word),
-            Err(format!("No view is called “{word}”; see `taskboard views`.")),
+            Err(format!(
+                "No view is called “{word}”; see `taskboard views`."
+            )),
             "{word}"
         );
     }
@@ -238,11 +250,7 @@ fn levels_are_labelled_the_way_messages_show_them() {
         (22, Some("NWS/Waiting on customer")),
         (99, None),
     ] {
-        assert_eq!(
-            level_label(&tree(), id),
-            label.map(String::from),
-            "{id}"
-        );
+        assert_eq!(level_label(&tree(), id), label.map(String::from), "{id}");
     }
 }
 
@@ -307,7 +315,14 @@ fn level_rows_list_home_first_then_every_spaces_lists_under_their_key() {
             level_row(11, Kind::List, "Open bugs", Some("NW"), Some(12), true),
             level_row(12, Kind::List, "Launch blockers", Some("NW"), None, false),
             level_row(21, Kind::List, "Open bugs", Some("NWS"), Some(3), false),
-            level_row(22, Kind::List, "Waiting on customer", Some("NWS"), Some(1), false),
+            level_row(
+                22,
+                Kind::List,
+                "Waiting on customer",
+                Some("NWS"),
+                Some(1),
+                false
+            ),
         ]
     );
 }
@@ -318,7 +333,14 @@ fn level_rows_for_one_space_leave_out_home_and_the_other_spaces() {
         level_rows(&tree(), Some(20), None),
         vec![
             level_row(21, Kind::List, "Open bugs", Some("NWS"), Some(3), false),
-            level_row(22, Kind::List, "Waiting on customer", Some("NWS"), Some(1), false),
+            level_row(
+                22,
+                Kind::List,
+                "Waiting on customer",
+                Some("NWS"),
+                Some(1),
+                false
+            ),
         ]
     );
 }

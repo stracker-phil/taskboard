@@ -86,6 +86,7 @@ One method on `JiraClient` each (`jira/api.rs`), one `Endpoint` each; the answer
 | `bulk_fetch` | `POST issue/bulkfetch`, up to `BULK_FETCH_MAX` ids | `BulkFetch`: issues and the ids Jira refused |
 | `approximate_count` | `POST search/approximate-count` | a count |
 | `comments` | `GET issue/{key}/comment`, every page, `expand=renderedBody` | `Comment` with ADF and HTML |
+| `remote_links` | `GET issue/{id}/remotelink` | `RemoteLink`: web links (url, title, application, relationship; the icon is read but never loaded) |
 | `check_jql` | `POST jql/parse?validation=strict` | Jira's messages; empty when valid |
 | `used_custom_fields` | `POST search/jql`: `project = "KEY" ORDER BY updated DESC`, one page of 100, `*all` without the large system fields | the custom field ids with a value |
 
@@ -143,8 +144,9 @@ but answers `401` without one.
   a search and is an error in `jql/parse`.
 - Knobs: `set_page_size`, `cap_max_results`, `fail_next(count, status, retry_after)`, `answer_next`,
   `set_latency`, `go_offline` / `go_online` (the port refuses connections), `advance` (the clock), and data
-  changes: `edit_issue`, `move_issue` (same id, new key), `delete_issue`, `revoke_access`.
+  changes: `edit_issue`, `move_issue` (same id, new key), `delete_issue`, `revoke_access`, `set_remote_links`.
 - `requests()` and `paths()` return what it was asked, with the `Authorization` header and the JSON body.
 
-The demo site (`test_support/demo/`) is made up and matches the mockup; `synthetic(n)` builds `n` issues on the
+The demo site (`test_support/demo/`) is made up and matches the mockup (`demo/web_links.rs` gives a few issues
+pull request and document links); `synthetic(n)` builds `n` issues on the
 same site for performance tests.

@@ -68,6 +68,8 @@ pub fn handlers() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
         crate::issues::commands::issue_activity,
         crate::issues::commands::issue_related,
         crate::issues::commands::issue_sync_comments,
+        crate::issues::commands::issue_web_links,
+        crate::issues::commands::issue_sync_web_links,
         views::views_of,
         views::view_create,
         views::view_rename,
@@ -87,6 +89,9 @@ pub fn handlers() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
         views::columns_catalogue,
         crate::status_style::commands::status_styles_list,
         crate::status_style::commands::status_style_set,
+        crate::space_config::commands::space_config,
+        crate::space_config::commands::space_set_layouts,
+        crate::space_config::commands::space_set_field,
         bus::app::run_command,
     ]
 }

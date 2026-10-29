@@ -1788,6 +1788,7 @@ mod editing_views {
                 "listId": space,
                 "name": "All issues",
                 "layout": "list",
+                "layouts": ["list", "board", "table"],
                 "columns": ["assignee", "epic", "release", "priority"],
                 "groupBy": "status",
                 "sort": { "by": "updated", "descending": true },
@@ -2093,10 +2094,10 @@ mod editing_spaces {
     }
 
     #[tokio::test]
-    async fn a_color_must_be_a_tile_number_from_one_to_five() {
+    async fn a_color_must_be_a_tile_number_from_one_to_twelve() {
         let (_dir, db) = tracked_lab().await;
 
-        for color in ["7", "0", "6", "red", "-1"] {
+        for color in ["13", "0", "red", "-1"] {
             let err = space_update(
                 &db,
                 NW.into(),
@@ -2113,7 +2114,7 @@ mod editing_spaces {
                 "{color}: {err:?}"
             );
         }
-        for color in ["1", "5"] {
+        for color in ["1", "5", "6", "7", "12"] {
             space_update(
                 &db,
                 NW.into(),

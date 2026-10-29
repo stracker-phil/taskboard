@@ -6,7 +6,7 @@ import { NAV_KEY, SIDEBAR_KEY, VIEWS_KEY } from "./sidebar";
 import { SYNC_KEY } from "./sync";
 import { ISSUE_KEY } from "./issues";
 import { PINS_KEY } from "./pins";
-import { COLUMNS_KEY, FILTER_OPTIONS_KEY, LIST_CONDITIONS_KEY, STATUS_STYLES_KEY, VIEW_ROWS_KEY } from "./views";
+import { COLUMNS_KEY, FILTER_OPTIONS_KEY, LIST_CONDITIONS_KEY, SPACE_CONFIG_KEY, STATUS_STYLES_KEY, VIEW_ROWS_KEY } from "./views";
 
 /** The query keys each Rust event makes stale. Features add their events and keys here. */
 export const INVALIDATIONS: Partial<Record<EventName, QueryKey[]>> = {
@@ -14,7 +14,7 @@ export const INVALIDATIONS: Partial<Record<EventName, QueryKey[]>> = {
   // Tracking a project changes the Spaces; a cache reset (issues_changed with all) empties the project list.
   // A deleted list or view moves the place, so Rust's place is asked again too. Rows depend on the lists, the
   // views, the Spaces and the status styles.
-  local_changed: [SETTINGS_KEYS.projects, SETTINGS_KEYS.scope, SIDEBAR_KEY, VIEWS_KEY, NAV_KEY, VIEW_ROWS_KEY, STATUS_STYLES_KEY, LIST_CONDITIONS_KEY, FILTER_OPTIONS_KEY, ISSUE_KEY, PINS_KEY],
+  local_changed: [SETTINGS_KEYS.projects, SETTINGS_KEYS.scope, SIDEBAR_KEY, VIEWS_KEY, NAV_KEY, VIEW_ROWS_KEY, COLUMNS_KEY, SPACE_CONFIG_KEY, STATUS_STYLES_KEY, LIST_CONDITIONS_KEY, FILTER_OPTIONS_KEY, ISSUE_KEY, PINS_KEY],
   issues_changed: [SETTINGS_KEYS.projects, SETTINGS_KEYS.scope, SYNC_KEY, SIDEBAR_KEY, VIEW_ROWS_KEY, COLUMNS_KEY, STATUS_STYLES_KEY, LIST_CONDITIONS_KEY, FILTER_OPTIONS_KEY, ISSUE_KEY, PINS_KEY],
   sync_state: [SYNC_KEY],
   keybindings_changed: [SETTINGS_KEYS.keybindings],

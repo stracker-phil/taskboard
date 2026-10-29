@@ -801,7 +801,7 @@ mod status_styles {
         let before = group_of(&site.nw_data(Narrowing::default()).await);
         assert_eq!(style_of(&before), Some(Style::Review));
 
-        let rows = status_style_set(site.db(), status.clone(), Some(Style::Blocked))
+        let rows = status_style_set(site.db(), NW.into(), status.clone(), Some(Style::Blocked))
             .await
             .unwrap();
         let chosen = site.nw_data(Narrowing::default()).await;
@@ -818,20 +818,77 @@ mod status_styles {
         );
         assert_eq!(moved.row_ids, before.row_ids);
         assert_eq!(row_of(&chosen, "NW-1038").style, Style::Blocked);
-        let listed = status_styles_list(site.db()).await.unwrap();
+        let listed = status_styles_list(site.db(), NW.into()).await.unwrap();
         assert_eq!(
             listed.iter().find(|r| r.id == status).unwrap().chosen,
             Some(Style::Blocked)
         );
         assert_eq!(listed.iter().filter(|r| r.chosen.is_some()).count(), 1);
 
-        status_style_set(site.db(), status.clone(), None)
+        status_style_set(site.db(), NW.into(), status.clone(), None)
             .await
             .unwrap();
         let restored = group_of(&site.nw_data(Narrowing::default()).await);
 
         assert_eq!(restored, before);
-        let listed = status_styles_list(site.db()).await.unwrap();
+        let listed = status_styles_list(site.db(), NW.into()).await.unwrap();
+        assert!(listed.iter().all(|r| r.chosen.is_none()));
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn a_style_chosen_in_one_space_leaves_the_same_status_in_another_space_detected() {
+        let site = Site::new().await;
+        let shared = text(
+            site.db(),
+            format!(
+                "SELECT a.status_id FROM cache.issue a JOIN cache.issue b ON b.status_id = a.status_id
+                 WHERE a.project_id = '{NW}' AND b.project_id = '10002' AND a.gone = 0 AND b.gone = 0
+                 ORDER BY a.status_id LIMIT 1"
+            ),
+        )
+        .await;
+        let in_nw = text(
+            site.db(),
+            format!(
+                "SELECT key FROM cache.issue
+                 WHERE project_id = '{NW}' AND status_id = '{shared}' AND gone = 0 ORDER BY key LIMIT 1"
+            ),
+        )
+        .await;
+        let in_other = text(
+            site.db(),
+            format!(
+                "SELECT key FROM cache.issue
+                 WHERE project_id = '10002' AND status_id = '{shared}' AND gone = 0 ORDER BY key LIMIT 1"
+            ),
+        )
+        .await;
+        let other_space = number(
+            site.db(),
+            "SELECT id FROM filter_list WHERE kind = 'space' AND project_id = '10002'",
+        )
+        .await;
+        let other_view = site.first_view(other_space).await;
+        let detected = row_of(
+            &site
+                .data(other_space, other_view, Narrowing::default())
+                .await,
+            &in_other,
+        )
+        .style;
+
+        status_style_set(site.db(), NW.into(), shared.clone(), Some(Style::Blocked))
+            .await
+            .unwrap();
+
+        let nw = site.nw_data(Narrowing::default()).await;
+        let other = site
+            .data(other_space, other_view, Narrowing::default())
+            .await;
+        assert_eq!(row_of(&nw, &in_nw).style, Style::Blocked);
+        assert_eq!(row_of(&other, &in_other).style, detected);
+        let listed = status_styles_list(site.db(), "10002".into()).await.unwrap();
         assert!(listed.iter().all(|r| r.chosen.is_none()));
     }
 
@@ -840,7 +897,7 @@ mod status_styles {
     async fn styling_an_unknown_status_is_not_found() {
         let site = Site::new().await;
 
-        let err = status_style_set(site.db(), "99999".into(), Some(Style::Done))
+        let err = status_style_set(site.db(), NW.into(), "99999".into(), Some(Style::Done))
             .await
             .unwrap_err();
 
@@ -878,7 +935,7 @@ mod board {
         board
             .columns
             .iter()
-            .find(|c| c.status_id == status_id)
+            .find(|c| c.key == status_id)
             .unwrap_or_else(|| panic!("no column {status_id}"))
     }
 
@@ -924,11 +981,11 @@ mod board {
         let keys: Vec<(u8, i64)> = board
             .columns
             .iter()
-            .map(|c| (rank(c.style), positions[&c.status_id]))
+            .map(|c| (rank(c.style), positions[&c.key]))
             .collect();
         assert!(keys.windows(2).all(|w| w[0] < w[1]), "{keys:?}");
         let ids: std::collections::HashSet<&str> =
-            board.columns.iter().map(|c| c.status_id.as_str()).collect();
+            board.columns.iter().map(|c| c.key.as_str()).collect();
         assert_eq!(ids.len(), board.columns.len());
     }
 
@@ -936,6 +993,9 @@ mod board {
         async fn everything_board(&self) -> BoardData {
             let everything = self.everything().await;
             let view = self.first_view(everything).await;
+            view_set_group(self.db(), view, GroupBy::Status)
+                .await
+                .unwrap();
             self.board(everything, view, Narrowing::default()).await
         }
     }
@@ -1065,19 +1125,19 @@ mod board {
             .find(|c| c.style == Style::Done)
             .unwrap();
 
-        view_set_column_collapsed(site.db(), view, open.status_id.clone(), true)
+        view_set_column_collapsed(site.db(), view, open.key.clone(), true)
             .await
             .unwrap();
-        view_set_column_collapsed(site.db(), view, done.status_id.clone(), false)
+        view_set_column_collapsed(site.db(), view, done.key.clone(), false)
             .await
             .unwrap();
 
         for _ in 0..2 {
             let after = site.board(space, view, Narrowing::default()).await;
             for c in &after.columns {
-                let expected = match &c.status_id {
-                    id if *id == open.status_id => true,
-                    id if *id == done.status_id => false,
+                let expected = match &c.key {
+                    id if *id == open.key => true,
+                    id if *id == done.key => false,
                     _ => c.style == Style::Done,
                 };
                 assert_eq!(c.collapsed, expected, "{}", c.name);
@@ -1087,11 +1147,11 @@ mod board {
                 before.columns.iter().map(|c| &c.ids).collect::<Vec<_>>()
             );
         }
-        view_set_column_collapsed(site.db(), view, open.status_id.clone(), false)
+        view_set_column_collapsed(site.db(), view, open.key.clone(), false)
             .await
             .unwrap();
         let reopened = site.board(space, view, Narrowing::default()).await;
-        assert!(!column(&reopened, &open.status_id).collapsed);
+        assert!(!column(&reopened, &open.key).collapsed);
     }
 
     #[tokio::test]
@@ -1114,7 +1174,7 @@ mod board {
         let site = Site::new().await;
         let (space, view) = site.nw().await;
         let all = site.board(space, view, Narrowing::default()).await;
-        let status = all.columns[0].status_id.clone();
+        let status = all.columns[0].key.clone();
         view_set_column_collapsed(site.db(), view, status.clone(), true)
             .await
             .unwrap();
@@ -1169,9 +1229,102 @@ mod board {
         let value = serde_json::to_value(&board).unwrap();
         assert_eq!(value["cardFields"], serde_json::json!(board.card_fields));
         let first = &value["columns"][0];
-        assert_eq!(first["statusId"], board.columns[0].status_id.as_str());
+        assert_eq!(first["key"], board.columns[0].key.as_str());
+        assert_eq!(first["name"], board.columns[0].name.as_str());
         assert_eq!(first["collapsed"], board.columns[0].collapsed);
         assert_eq!(first["ids"], serde_json::json!(board.columns[0].ids));
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn grouping_by_assignee_gives_one_column_per_person_and_one_for_unassigned() {
+        let site = Site::new().await;
+        let (space, view) = site.nw().await;
+        view_set_group(site.db(), view, GroupBy::Assignee)
+            .await
+            .unwrap();
+
+        let board = site.board(space, view, Narrowing::default()).await;
+        let list = site.data(space, view, Narrowing::default()).await;
+
+        assert_eq!(board.columns.len(), list.groups.len());
+        for (column, group) in board.columns.iter().zip(&list.groups) {
+            assert_eq!(column.key, group.key);
+            assert_eq!(column.name, group.label);
+            assert_eq!(column.mark, group.mark);
+            assert_eq!(column.ids, group.row_ids);
+            assert_eq!(column.style, Style::Todo);
+        }
+        assert_eq!(board.columns[0].key, ME_ACCOUNT_ID);
+        assert!(matches!(
+            board.columns[0].mark,
+            Some(GroupMark::Person { .. })
+        ));
+        assert_eq!(shown(&board), board.rows.len());
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn grouping_by_priority_gives_one_column_per_level() {
+        let site = Site::new().await;
+        let (space, view) = site.nw().await;
+        view_set_group(site.db(), view, GroupBy::Priority)
+            .await
+            .unwrap();
+
+        let board = site.board(space, view, Narrowing::default()).await;
+
+        let levels: Vec<u8> = board
+            .columns
+            .iter()
+            .filter_map(|c| match c.mark {
+                Some(GroupMark::Priority { level }) => Some(level),
+                _ => None,
+            })
+            .collect();
+        assert!(levels.len() > 1);
+        assert!(levels.windows(2).all(|w| w[0] < w[1]), "{levels:?}");
+        assert_eq!(column(&board, "Highest").name, "Highest");
+        assert!(board.columns.iter().all(|c| c.style == Style::Todo));
+        assert_eq!(shown(&board), board.rows.len());
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn collapsing_a_group_column_persists_by_the_groups_key() {
+        let site = Site::new().await;
+        let (space, view) = site.nw().await;
+        view_set_group(site.db(), view, GroupBy::Assignee)
+            .await
+            .unwrap();
+        let before = site.board(space, view, Narrowing::default()).await;
+        assert!(before.columns.iter().all(|c| !c.collapsed));
+
+        view_set_column_collapsed(site.db(), view, ME_ACCOUNT_ID.into(), true)
+            .await
+            .unwrap();
+
+        for _ in 0..2 {
+            let after = site.board(space, view, Narrowing::default()).await;
+            for c in &after.columns {
+                assert_eq!(c.collapsed, c.key == ME_ACCOUNT_ID, "{}", c.name);
+            }
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn an_ungrouped_view_still_shows_status_columns() {
+        let site = Site::new().await;
+        let (space, view) = site.nw().await;
+        let by_status = site.board(space, view, Narrowing::default()).await;
+        view_set_group(site.db(), view, GroupBy::None)
+            .await
+            .unwrap();
+
+        let ungrouped = site.board(space, view, Narrowing::default()).await;
+
+        assert_eq!(ungrouped, by_status);
     }
 }
 
@@ -1183,7 +1336,9 @@ mod catalogue {
     async fn the_standard_columns_come_first_then_the_custom_fields() {
         let site = Site::new().await;
 
-        let columns = columns_catalogue(site.db()).await.unwrap();
+        let columns = columns_catalogue(site.db(), site.everything().await)
+            .await
+            .unwrap();
 
         let ids: Vec<&str> = columns.iter().map(|c| c.id.as_str()).collect();
         assert_eq!(
@@ -1205,7 +1360,9 @@ mod catalogue {
     async fn internal_fields_and_the_sprint_field_are_left_out() {
         let site = Site::new().await;
 
-        let columns = columns_catalogue(site.db()).await.unwrap();
+        let columns = columns_catalogue(site.db(), site.everything().await)
+            .await
+            .unwrap();
 
         for id in [
             "customfield_10020",

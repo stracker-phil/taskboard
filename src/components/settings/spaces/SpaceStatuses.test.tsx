@@ -10,7 +10,7 @@ import { createQueryClient } from "../../../queries/queryClient";
 import { resetStore } from "../../../state/store";
 import { statusStyle } from "../../../test/issues";
 import { Toasts } from "../../Toasts";
-import { StatusesPage } from "./StatusesPage";
+import { SpaceStatuses } from "./SpaceStatuses";
 
 const mocked = vi.mocked(api, true);
 
@@ -19,11 +19,11 @@ const IN_PROGRESS = statusStyle();
 const IN_REVIEW = statusStyle({ id: "4", name: "Code Review", category: "indeterminate", detected: "review", chosen: "blocked" });
 const DONE = statusStyle({ id: "5", name: "Shipped", category: "done", detected: "done" });
 
-async function renderPage(rows: StatusStyleRow[]) {
+async function renderStatuses(rows: StatusStyleRow[], projectId = "10001") {
   mocked.statusStylesList.mockResolvedValue(rows);
   render(
     <QueryClientProvider client={createQueryClient()}>
-      <StatusesPage />
+      <SpaceStatuses projectId={projectId} />
       <Toasts />
     </QueryClientProvider>,
   );
@@ -42,15 +42,22 @@ beforeEach(() => {
   resetStore();
 });
 
-describe("StatusesPage", () => {
+describe("SpaceStatuses", () => {
+  it("lists the statuses of the given Space", async () => {
+    await renderStatuses([IN_PROGRESS], "10002");
+
+    expect(await screen.findByText("In Progress")).toBeInTheDocument();
+    expect(mocked.statusStylesList).toHaveBeenCalledWith("10002");
+  });
+
   it("says statuses appear after the first sync when there are none", async () => {
-    await renderPage([]);
+    await renderStatuses([]);
 
     expect(screen.getByText("Statuses appear after the first sync.")).toBeInTheDocument();
   });
 
   it("groups the statuses under their Jira category in the order To do, In progress, Done", async () => {
-    await renderPage([DONE, IN_PROGRESS, TO_DO]);
+    await renderStatuses([DONE, IN_PROGRESS, TO_DO]);
 
     await screen.findByRole("region", { name: "Done" });
     const names = screen.getAllByRole("region").map((r) => r.getAttribute("aria-label"));
@@ -62,7 +69,7 @@ describe("StatusesPage", () => {
   });
 
   it("leaves out a category without statuses", async () => {
-    await renderPage([IN_PROGRESS]);
+    await renderStatuses([IN_PROGRESS]);
 
     await screen.findByRole("region", { name: "In progress" });
     expect(screen.queryByRole("region", { name: "Done" })).not.toBeInTheDocument();
@@ -74,13 +81,13 @@ describe("StatusesPage", () => {
     [1, "1 issue"],
     [12, "12 issues"],
   ])("shows %i issues in a status as %s", async (issues, text) => {
-    await renderPage([statusStyle({ issues })]);
+    await renderStatuses([statusStyle({ issues })]);
 
     expect(await screen.findByText(text)).toBeInTheDocument();
   });
 
   it("labels the button with the detected style without a choice and with the chosen style's name otherwise", async () => {
-    await renderPage([IN_PROGRESS, IN_REVIEW]);
+    await renderStatuses([IN_PROGRESS, IN_REVIEW]);
 
     expect(await screen.findByRole("button", { name: "Style of In Progress" })).toHaveTextContent("Automatic · In progress");
     expect(screen.getByRole("button", { name: "Style of Code Review" })).toHaveTextContent(/^Blocked$/);
@@ -88,7 +95,7 @@ describe("StatusesPage", () => {
 
   describe("search", () => {
     it("keeps only the statuses whose name contains the text, ignoring case", async () => {
-      await renderPage([IN_PROGRESS, IN_REVIEW, DONE]);
+      await renderStatuses([IN_PROGRESS, IN_REVIEW, DONE]);
 
       await userEvent.type(await screen.findByRole("textbox", { name: "Search statuses" }), "REVIEW");
 
@@ -98,7 +105,7 @@ describe("StatusesPage", () => {
     });
 
     it("says no status matches when nothing does", async () => {
-      await renderPage([IN_PROGRESS]);
+      await renderStatuses([IN_PROGRESS]);
 
       await userEvent.type(await screen.findByRole("textbox", { name: "Search statuses" }), "zzz");
 
@@ -107,14 +114,14 @@ describe("StatusesPage", () => {
     });
 
     it("has no search field without statuses", async () => {
-      await renderPage([]);
+      await renderStatuses([]);
 
       expect(screen.queryByRole("textbox", { name: "Search statuses" })).not.toBeInTheDocument();
     });
   });
 
   it("offers Automatic with the detected style, then the five styles", async () => {
-    await renderPage([IN_REVIEW]);
+    await renderStatuses([IN_REVIEW]);
 
     await userEvent.click(await screen.findByRole("button", { name: "Style of Code Review" }));
 
@@ -129,30 +136,30 @@ describe("StatusesPage", () => {
     ]);
   });
 
-  it("sets the chosen style and shows the rows Rust returns", async () => {
-    await renderPage([IN_PROGRESS]);
+  it("sets the chosen style for the Space and shows the rows Rust returns", async () => {
+    await renderStatuses([IN_PROGRESS], "10002");
     mocked.statusStyleSet.mockResolvedValue([{ ...IN_PROGRESS, chosen: "blocked" }]);
     await userEvent.click(await screen.findByRole("button", { name: "Style of In Progress" }));
 
     await runEntry("Blocked");
 
-    expect(mocked.statusStyleSet).toHaveBeenCalledWith("3", "blocked");
+    expect(mocked.statusStyleSet).toHaveBeenCalledWith("10002", "3", "blocked");
     expect(await screen.findByRole("button", { name: "Style of In Progress" })).toHaveTextContent("Blocked");
   });
 
   it("goes back to Automatic by sending no style", async () => {
-    await renderPage([IN_REVIEW]);
+    await renderStatuses([IN_REVIEW]);
     mocked.statusStyleSet.mockResolvedValue([{ ...IN_REVIEW, chosen: null }]);
     await userEvent.click(await screen.findByRole("button", { name: "Style of Code Review" }));
 
     await runEntry("Automatic (In review)");
 
-    expect(mocked.statusStyleSet).toHaveBeenCalledWith("4", null);
+    expect(mocked.statusStyleSet).toHaveBeenCalledWith("10001", "4", null);
     expect(await screen.findByRole("button", { name: "Style of Code Review" })).toHaveTextContent("Automatic · In review");
   });
 
   it("reports a failed change and keeps the old choice", async () => {
-    await renderPage([IN_PROGRESS]);
+    await renderStatuses([IN_PROGRESS]);
     mocked.statusStyleSet.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
     await userEvent.click(await screen.findByRole("button", { name: "Style of In Progress" }));
 

@@ -56,7 +56,12 @@ pub fn find_level(tree: &SidebarTree, word: &str) -> Result<i64, String> {
             .map(|level| level.id)
             .ok_or_else(|| format!("No sidebar level has the id {id}; see `taskboard filters`."));
     }
-    pick(&levels, word, "Space or filter list", "`taskboard spaces` and `taskboard filters`")
+    pick(
+        &levels,
+        word,
+        "Space or filter list",
+        "`taskboard spaces` and `taskboard filters`",
+    )
 }
 
 /// The view's id, or why the word names none or several of `views`.
@@ -100,7 +105,10 @@ fn pick(candidates: &[Named], word: &str, what: &str, listing: &str) -> Result<i
                 .iter()
                 .map(|c| format!("{} ({})", c.words[0], c.id))
                 .collect();
-            Err(format!("“{word}” could be {}; name one by its id.", names.join(", ")))
+            Err(format!(
+                "“{word}” could be {}; name one by its id.",
+                names.join(", ")
+            ))
         }
     }
 }

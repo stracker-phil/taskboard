@@ -24,7 +24,7 @@ interface Props {
 
 /** "Columns for this view": a toggle per field and drag handles for the order; every change saves to the view. */
 export function ColumnsPopover({ view, spaceProjectId, anchor, onClose }: Props) {
-  const { data: catalogue = [] } = useColumnsCatalogue();
+  const { data: catalogue = [] } = useColumnsCatalogue(view.listId);
   const [search, setSearch] = useState("");
   const edit = useViewEdit();
   const toast = useStore((s) => s.toast);

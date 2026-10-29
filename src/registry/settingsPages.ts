@@ -54,7 +54,11 @@ export function settingsPages(): SettingsPage[] {
   return [...pages.values()].sort(compare);
 }
 
-export const hasSection = (page: SettingsPage, id: string | undefined) => page.sections?.some((section) => section.id === id) ?? false;
+/** `space:<projectId>` opens one Space's settings on the Spaces page. */
+export const SPACE_TARGET = "space:";
+
+export const hasSection = (page: SettingsPage, id: string | undefined) =>
+  (page.id === "spaces" && id?.startsWith(SPACE_TARGET)) || (page.sections?.some((section) => section.id === id) ?? false);
 
 /** The named page, the page holding the named section, or the first when the name is absent or unknown. */
 export function resolveSettingsPage(id: string | undefined): SettingsPage | undefined {

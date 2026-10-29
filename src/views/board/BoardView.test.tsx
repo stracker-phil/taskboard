@@ -21,9 +21,9 @@ const mocked = vi.mocked(api, true);
 const BOARD = view({ layout: "board" });
 const PRICING = row({ id: "1", key: "NW-1042", summary: "Redesign the pricing page" });
 const NOTES = row({ id: "2", key: "NW-1001", summary: "Publish the launch notes", style: "done", statusName: "Done" });
-const TODO = boardColumn({ statusId: "1", name: "To Do", style: "todo" });
-const PROGRESS = boardColumn({ statusId: "3", name: "In Progress", style: "progress", ids: ["1"] });
-const DONE = boardColumn({ statusId: "5", name: "Done", style: "done", ids: ["2"] });
+const TODO = boardColumn({ key: "1", name: "To Do", style: "todo", mark: { kind: "status", style: "todo" } });
+const PROGRESS = boardColumn({ key: "3", name: "In Progress", style: "progress", ids: ["1"] });
+const DONE = boardColumn({ key: "5", name: "Done", style: "done", mark: { kind: "status", style: "done" }, ids: ["2"] });
 
 const CARD_HEIGHT = 110;
 let spies: { mockRestore: () => void }[] = [];
@@ -141,6 +141,53 @@ describe("BoardView", () => {
       await userEvent.click(within(screen.getByRole("listitem", { name: "In Progress" })).getByRole("button", { name: "Collapse column" }));
 
       expect(mocked.viewSetColumnCollapsed).toHaveBeenCalledWith(BOARD.id, "3", true);
+    });
+  });
+
+  describe("columns of another grouping", () => {
+    const ALEX_COLUMN = boardColumn({ key: "demo-account-1", name: "Alex Morgan", mark: { kind: "person", person: ALEX }, ids: ["1"] });
+    const SAM_COLUMN = boardColumn({ key: "demo-account-2", name: "Sam Lee", mark: { kind: "person", person: SAM }, ids: ["2"] });
+    const NOBODY = boardColumn({ key: "none", name: "Unassigned", mark: null, ids: [] });
+
+    it("renders one column per person with their name and avatar, and a neutral pill instead of a status pill", async () => {
+      await renderBoard(boardData([ALEX_COLUMN, SAM_COLUMN, NOBODY], [PRICING, NOTES]));
+
+      expect(screen.getAllByRole("listitem").map((c) => c.getAttribute("aria-label"))).toEqual(["Alex Morgan", "Sam Lee", "Unassigned"]);
+      const alex = screen.getByRole("listitem", { name: "Alex Morgan" });
+      expect(within(alex).getByRole("img", { name: "Alex Morgan" })).toBeInTheDocument();
+      expect(within(alex).getByText("Alex Morgan", { selector: ".status-pill" })).toHaveClass("status-pill--todo");
+      expect(within(alex).getByText("Redesign the pricing page")).toBeInTheDocument();
+    });
+
+    it("shows a column without a mark as its name alone", async () => {
+      await renderBoard(boardData([NOBODY]));
+
+      const column = screen.getByRole("listitem", { name: "Unassigned" });
+      expect(within(column).getByText("Unassigned")).toHaveClass("status-pill");
+      expect(within(column).queryByRole("img")).not.toBeInTheDocument();
+    });
+
+    it("writes a collapsed column's name vertically in the neutral pill", async () => {
+      await renderBoard(boardData([{ ...ALEX_COLUMN, collapsed: true }], [PRICING]));
+
+      const pill = within(screen.getByRole("button", { name: "Expand Alex Morgan (1)" })).getByText("Alex Morgan", { selector: ".status-pill" });
+      expect(pill).toHaveClass("status-pill--vertical");
+    });
+
+    it("collapses a column by its group key", async () => {
+      await renderBoard(boardData([ALEX_COLUMN, SAM_COLUMN], [PRICING, NOTES]));
+
+      await userEvent.click(within(screen.getByRole("listitem", { name: "Sam Lee" })).getByRole("button", { name: "Collapse column" }));
+
+      expect(mocked.viewSetColumnCollapsed).toHaveBeenCalledWith(BOARD.id, "demo-account-2", true);
+    });
+
+    it("expands a collapsed column by its group key", async () => {
+      await renderBoard(boardData([{ ...ALEX_COLUMN, collapsed: true }], [PRICING]));
+
+      await userEvent.click(screen.getByRole("button", { name: "Expand Alex Morgan (1)" }));
+
+      expect(mocked.viewSetColumnCollapsed).toHaveBeenCalledWith(BOARD.id, "demo-account-1", false);
     });
   });
 
@@ -269,11 +316,11 @@ describe("BoardView", () => {
     const done = [row({ id: "6", key: "NW-106", summary: "Register the domain" })];
     const rows = [...todo, ...progress, ...review, ...done];
 
-    const BACKLOG = boardColumn({ statusId: "10", name: "Backlog", style: "todo", ids: [] });
-    const TODO_COLUMN = boardColumn({ statusId: "1", name: "To Do", style: "todo", ids: ["1", "2", "3"] });
-    const REVIEW_COLUMN = boardColumn({ statusId: "4", name: "In Review", style: "progress", ids: ["7"], collapsed: true });
-    const PROGRESS_COLUMN = boardColumn({ statusId: "3", name: "In Progress", style: "progress", ids: ["4", "5"] });
-    const DONE_COLUMN = boardColumn({ statusId: "5", name: "Done", style: "done", ids: ["6"] });
+    const BACKLOG = boardColumn({ key: "10", name: "Backlog", style: "todo", ids: [] });
+    const TODO_COLUMN = boardColumn({ key: "1", name: "To Do", style: "todo", ids: ["1", "2", "3"] });
+    const REVIEW_COLUMN = boardColumn({ key: "4", name: "In Review", style: "progress", ids: ["7"], collapsed: true });
+    const PROGRESS_COLUMN = boardColumn({ key: "3", name: "In Progress", style: "progress", ids: ["4", "5"] });
+    const DONE_COLUMN = boardColumn({ key: "5", name: "Done", style: "done", ids: ["6"] });
     const FULL_BOARD = boardData([BACKLOG, TODO_COLUMN, REVIEW_COLUMN, PROGRESS_COLUMN, DONE_COLUMN], rows);
 
     function Keys() {

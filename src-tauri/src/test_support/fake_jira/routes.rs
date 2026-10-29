@@ -50,6 +50,7 @@ pub fn route(site: &Content, request: &Recorded) -> Response {
         }
         ("POST", ["issue", "bulkfetch"]) => bulk_fetch(site, &request.body),
         ("GET", ["issue", key, "comment"]) => comments(site, key, request),
+        ("GET", ["issue", key, "remotelink"]) => remote_links(site, key),
         ("POST", ["jql", "parse"]) => parse_jql(&request.body),
         _ => not_found(),
     }
@@ -248,6 +249,15 @@ fn comments(site: &Content, id_or_key: &str, request: &Recorded) -> Response {
         200,
         json!({ "comments": page, "startAt": start, "maxResults": size, "total": all.len() }),
     )
+}
+
+fn remote_links(site: &Content, id_or_key: &str) -> Response {
+    let Some(issue) = find_issue(site, id_or_key) else {
+        return not_found();
+    };
+    let id = issue["id"].as_str().unwrap_or_default();
+    let links = site.data.remote_links.get(id).cloned().unwrap_or_default();
+    Response::json(200, json!(links))
 }
 
 fn parse_jql(body: &Value) -> Response {

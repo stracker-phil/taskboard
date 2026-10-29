@@ -13,7 +13,8 @@ use crate::db::Db;
 use crate::error::{AppError, AppResult};
 use crate::jira::is_filled;
 use crate::lists::Viewer;
-use crate::status_style::{Style, detect, styles};
+use crate::space_config::{Place, hidden_fields};
+use crate::status_style::{Style, Styles};
 use crate::sync::store::{forget_issue, shown_fields};
 use crate::views::columns::custom_columns;
 use crate::views::rows::{self, Cell, EpicChip, Label, Person, Priority};
@@ -74,7 +75,7 @@ pub async fn issue_get(db: &Db, viewer: Viewer, id: String) -> AppResult<IssueDe
 const SELECT: &str = "SELECT i.id, i.key, i.issue_type, i.summary, i.status_id, COALESCE(st.name, ''),
     i.status_category, e.id, e.summary, e.epic_color, i.fix_versions, i.priority, i.assignee_id, a.name,
     i.reporter_id, r.name, i.sprint, i.labels, i.due_date, i.created_at, i.updated_at, i.description_html,
-    i.comment_count, i.is_epic, i.gone, i.raw, i.synced_at
+    i.comment_count, i.is_epic, i.gone, i.raw, i.synced_at, i.project_id
     FROM cache.issue i
     LEFT JOIN cache.status st ON st.id = i.status_id
     LEFT JOIN cache.user a ON a.account_id = i.assignee_id
@@ -85,7 +86,7 @@ const SELECT: &str = "SELECT i.id, i.key, i.issue_type, i.summary, i.status_id, 
 fn read(conn: &Connection, viewer: &Viewer, id: &str) -> AppResult<IssueDetail> {
     let ctx = viewer.ctx(conn)?;
     let me = ctx.me.as_deref();
-    let styles = styles(conn)?;
+    let styles = Styles::load(conn)?;
     let versions = version_names(conn)?;
     let person = |id: Option<String>, name: Option<String>| {
         id.map(|id| rows::person(&id, name.as_deref().unwrap_or(&id), me))
@@ -110,10 +111,12 @@ fn read(conn: &Connection, viewer: &Viewer, id: &str) -> AppResult<IssueDetail> 
             key: r.get(1)?,
             issue_type: r.get(2)?,
             summary: r.get(3)?,
-            style: styles
-                .get(&status_id)
-                .copied()
-                .unwrap_or_else(|| detect(&category, &status_name)),
+            style: styles.of(
+                &r.get::<_, String>(27)?,
+                &status_id,
+                &category,
+                &status_name,
+            ),
             status_name,
             epic,
             releases: string_list(r.get(10)?)
@@ -146,11 +149,12 @@ fn read(conn: &Connection, viewer: &Viewer, id: &str) -> AppResult<IssueDetail> 
             since: None,
         };
         let raw: String = r.get(25)?;
-        Ok((detail, raw))
+        let project_id: String = r.get(27)?;
+        Ok((detail, raw, project_id))
     })
     .optional()?
-    .map(|(mut detail, raw)| -> AppResult<IssueDetail> {
-        detail.custom = custom_fields(conn, &raw, me)?;
+    .map(|(mut detail, raw, project_id)| -> AppResult<IssueDetail> {
+        detail.custom = custom_fields(conn, &project_id, &raw, me)?;
         detail.since = since_banner(conn, viewer, id)?;
         Ok(detail)
     })
@@ -171,16 +175,27 @@ fn since_banner(conn: &Connection, viewer: &Viewer, id: &str) -> AppResult<Optio
     since(conn, viewer, id, &names)
 }
 
-/// The custom fields the owner shows (always, empty or not), then every other one the issue fills, by name.
-fn custom_fields(conn: &Connection, raw: &str, me: Option<&str>) -> AppResult<Vec<CustomField>> {
+/// The custom fields the owner shows (always, empty or not), then every other one the issue fills, by name;
+/// none its Space hides from the Issue view.
+fn custom_fields(
+    conn: &Connection,
+    project_id: &str,
+    raw: &str,
+    me: Option<&str>,
+) -> AppResult<Vec<CustomField>> {
     let raw: serde_json::Value = serde_json::from_str(raw).unwrap_or_default();
-    let shown = shown_fields(conn)?;
+    let hidden = hidden_fields(conn, project_id, Place::Detail)?;
+    let mut shown = shown_fields(conn)?;
+    shown.retain(|id| !hidden.contains(id));
     let filled: Vec<String> = raw["fields"]
         .as_object()
         .into_iter()
         .flatten()
         .filter(|(id, value)| {
-            id.starts_with("customfield_") && !shown.contains(id) && is_filled(value)
+            id.starts_with("customfield_")
+                && !shown.contains(id)
+                && !hidden.contains(id.as_str())
+                && is_filled(value)
         })
         .map(|(id, _)| id.clone())
         .collect();
@@ -271,6 +286,7 @@ mod tests {
     const NOTES: &str = "customfield_10003";
     const RANK: &str = "customfield_10019";
     const SPRINT: &str = "customfield_10020";
+    const PROJECT: &str = "10001";
 
     async fn lab() -> (TempDir, Db) {
         let dir = temp_config_dir();
@@ -302,7 +318,7 @@ mod tests {
     }
 
     async fn custom(db: &Db, raw: Value) -> Vec<CustomField> {
-        db.read(move |conn| custom_fields(conn, &raw.to_string(), None))
+        db.read(move |conn| custom_fields(conn, PROJECT, &raw.to_string(), None))
             .await
             .unwrap()
     }
@@ -432,5 +448,60 @@ mod tests {
         } });
 
         assert_eq!(custom(&db, raw).await, []);
+    }
+
+    async fn set_visibility(
+        db: &Db,
+        project: &'static str,
+        field: &'static str,
+        visibility: &'static str,
+    ) {
+        db.write(move |tx, _| {
+            tx.execute(
+                "INSERT INTO space_field (project_id, field_id, visibility) VALUES (?1, ?2, ?3)",
+                [project, field, visibility],
+            )?;
+            Ok(())
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn fields_the_space_hides_from_the_detail_are_left_out_filled_or_shown() {
+        for (visibility, listed) in [
+            ("hiddenInDetail", false),
+            ("hidden", false),
+            ("hiddenInList", true),
+        ] {
+            let (_dir, db) = lab().await;
+            show(&db, ZONE).await;
+            set_visibility(&db, PROJECT, ZONE, visibility).await;
+            set_visibility(&db, PROJECT, NOTES, visibility).await;
+            let raw = json!({ "fields": { ZONE: null, NOTES: "Late", ALPHA: "First" } });
+
+            let found = custom(&db, raw).await;
+
+            let expected = if listed {
+                vec![
+                    empty(ZONE, "Zone"),
+                    text(ALPHA, "alpha", "First"),
+                    text(NOTES, "Notes", "Late"),
+                ]
+            } else {
+                vec![text(ALPHA, "alpha", "First")]
+            };
+            assert_eq!(found, expected, "{visibility}");
+        }
+    }
+
+    #[tokio::test]
+    async fn another_spaces_hidden_fields_do_not_affect_the_issue() {
+        let (_dir, db) = lab().await;
+        set_visibility(&db, "10002", NOTES, "hidden").await;
+
+        let found = custom(&db, json!({ "fields": { NOTES: "Late" } })).await;
+
+        assert_eq!(found, [text(NOTES, "Notes", "Late")]);
     }
 }

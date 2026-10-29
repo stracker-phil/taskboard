@@ -1,7 +1,5 @@
 //! The Pinned view: active pins, newest first, and the ones that ended in the last 7 days.
 
-use std::collections::HashMap;
-
 use chrono::{DateTime, Duration, Utc};
 use rusqlite::{Connection, OptionalExtension};
 use serde::Serialize;
@@ -12,7 +10,7 @@ use super::store::active;
 use crate::db::Db;
 use crate::error::AppResult;
 use crate::lists::Viewer;
-use crate::status_style::{Style, detect, styles};
+use crate::status_style::{Style, Styles};
 use crate::sync::map::format_utc;
 use crate::views::rows::{self, Person};
 
@@ -85,7 +83,7 @@ pub async fn pins_list(db: &Db, viewer: Viewer) -> AppResult<Pins> {
     db.read(move |conn| {
         let now = format_utc(viewer.now);
         let since = format_utc(viewer.now - Duration::days(RECENT_DAYS));
-        let style_map = styles(conn)?;
+        let style_map = Styles::load(conn)?;
         let active_rows = read(
             conn,
             &format!("{} ORDER BY p.created_at DESC, p.id DESC", active("?1")),
@@ -114,7 +112,7 @@ pub async fn pins_list(db: &Db, viewer: Viewer) -> AppResult<Pins> {
 fn resolve(
     conn: &Connection,
     viewer: &Viewer,
-    style_map: &HashMap<String, Style>,
+    style_map: &Styles,
     rows: Vec<Row>,
 ) -> AppResult<Vec<PinItem>> {
     let mut items = Vec::new();
@@ -160,14 +158,10 @@ fn read(
 
 // The targets below are none when they no longer exist (a comment Jira deleted, a list the owner removed).
 
-fn issue_target(
-    conn: &Connection,
-    style_map: &HashMap<String, Style>,
-    id: &str,
-) -> AppResult<Option<Pinned>> {
+fn issue_target(conn: &Connection, style_map: &Styles, id: &str) -> AppResult<Option<Pinned>> {
     Ok(conn
         .query_row(
-            "SELECT i.key, i.summary, i.status_id, COALESCE(st.name, ''), i.status_category, i.gone
+            "SELECT i.key, i.summary, i.status_id, COALESCE(st.name, ''), i.status_category, i.gone, i.project_id
              FROM cache.issue i LEFT JOIN cache.status st ON st.id = i.status_id WHERE i.id = ?1",
             [id],
             |r| {
@@ -178,10 +172,7 @@ fn issue_target(
                     id: id.to_string(),
                     key: r.get(0)?,
                     summary: r.get(1)?,
-                    style: style_map
-                        .get(&status_id)
-                        .copied()
-                        .unwrap_or_else(|| detect(&category, &name)),
+                    style: style_map.of(&r.get::<_, String>(6)?, &status_id, &category, &name),
                     gone: r.get::<_, i64>(5)? != 0,
                 })
             },

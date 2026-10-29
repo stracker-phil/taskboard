@@ -23,7 +23,7 @@ use crate::filter::{Ctx, compile};
 use crate::issues::status_names;
 use crate::lists::{Kind, Viewer, all_nodes, scope_of};
 use crate::pins::active;
-use crate::status_style::{Style, detect, styles};
+use crate::status_style::Styles;
 use crate::sync::map::format_utc;
 
 /// The toolbar's quick narrowing on top of the level's filter.
@@ -84,7 +84,7 @@ pub(super) fn fetch_view(
     let versions = versions(conn)?;
     let source = Source {
         ctx: &ctx,
-        styles: styles(conn)?,
+        styles: Styles::load(conn)?,
         versions: &versions,
         custom: custom_columns(conn, &view.columns)?,
     };
@@ -207,7 +207,7 @@ fn conditions(
 /// What turning a result row into a `Row` looks up.
 struct Source<'a> {
     ctx: &'a Ctx,
-    styles: HashMap<String, Style>,
+    styles: Styles,
     versions: &'a HashMap<String, Version>,
     custom: Vec<CustomColumn>,
 }
@@ -278,11 +278,12 @@ fn row_from(r: &rusqlite::Row, source: &Source) -> AppResult<(Row, Facts)> {
         id: r.get(0)?,
         key: r.get(1)?,
         summary: r.get(2)?,
-        style: source
-            .styles
-            .get(&status_id)
-            .copied()
-            .unwrap_or_else(|| detect(&category, &status_name)),
+        style: source.styles.of(
+            &r.get::<_, String>(19)?,
+            &status_id,
+            &category,
+            &status_name,
+        ),
         status_name,
         comment_count: r.get(6)?,
         changed: false,
@@ -356,7 +357,7 @@ fn space_letter(icon: Option<String>, name: &str) -> String {
         .unwrap_or_else(|| name.chars().take(1).flat_map(char::to_uppercase).collect())
 }
 
-fn spaces(conn: &Connection) -> AppResult<HashMap<String, SpaceInfo>> {
+pub(super) fn spaces(conn: &Connection) -> AppResult<HashMap<String, SpaceInfo>> {
     let mut query = conn.prepare(
         "SELECT s.project_id, COALESCE(s.name, p.name), s.icon, s.color, s.client
          FROM space s JOIN cache.space p ON p.id = s.project_id
@@ -384,7 +385,7 @@ fn spaces(conn: &Connection) -> AppResult<HashMap<String, SpaceInfo>> {
     Ok(spaces)
 }
 
-fn versions(conn: &Connection) -> AppResult<HashMap<String, Version>> {
+pub(super) fn versions(conn: &Connection) -> AppResult<HashMap<String, Version>> {
     let mut query = conn.prepare("SELECT id, name, release_date FROM cache.version")?;
     let rows = query.query_map([], |row| {
         Ok((

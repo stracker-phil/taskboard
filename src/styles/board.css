@@ -60,3 +60,6 @@
 .board-card:hover .row-actions, .board-card:focus-within .row-actions { opacity: 1; pointer-events: auto; }
 .board-strip__item { display: flex; flex: none; }
 .board-card--selected { border-color: var(--accent); box-shadow: var(--shadow-hover); }
+
+/* A column of a grouping other than status: the neutral pill with the List's group mark (avatar, flag) before the name. */
+.board-column__group { display: inline-flex; align-items: center; gap: 6px; }

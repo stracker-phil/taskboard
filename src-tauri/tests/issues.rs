@@ -9,13 +9,15 @@ use taskboard_lib::connection::{
     ConnectionInput, JiraAccess, fetch_versions, refresh_projects, save, track_project,
 };
 use taskboard_lib::db::Db;
-use taskboard_lib::error::ErrorKind;
+use taskboard_lib::error::{AppResult, ErrorKind};
 use taskboard_lib::issues::{
-    ActivityItem, ChangeValue, CustomField, IssueDetail, IssueLink, RelatedIssue, issue_activity,
-    issue_forget, issue_get, issue_related, issue_sync_comments,
+    ActivityItem, ChangeValue, CustomField, IssueDetail, IssueLink, RelatedIssue, WebLink,
+    WebLinkKind, issue_activity, issue_forget, issue_get, issue_related, issue_sync_comments,
+    issue_sync_web_links, issue_web_links,
 };
 use taskboard_lib::jira::{Limiter, TokenKind};
 use taskboard_lib::lists::Viewer;
+use taskboard_lib::space_config::{FieldVisibility, space_set_field};
 use taskboard_lib::status_style::{Style, status_style_set};
 use taskboard_lib::store::settings::SettingsStore;
 use taskboard_lib::sync::{Emit, SyncContext, full_sync, source_for};
@@ -142,6 +144,22 @@ impl Site {
         issue_sync_comments(self.db(), source.as_ref(), id)
             .await
             .unwrap()
+    }
+
+    async fn try_sync_web_links(&self, key: &str) -> AppResult<bool> {
+        let id = self.id_of(key).await;
+        let connection = self.ctx.settings.get().connection;
+        let source = source_for(&self.ctx.access, &connection).unwrap();
+        issue_sync_web_links(self.db(), source.as_ref(), id).await
+    }
+
+    async fn sync_web_links(&self, key: &str) -> bool {
+        self.try_sync_web_links(key).await.unwrap()
+    }
+
+    async fn web_links(&self, key: &str) -> Vec<WebLink> {
+        let id = self.id_of(key).await;
+        issue_web_links(self.db(), id).await.unwrap()
     }
 
     async fn resync(&self) {
@@ -306,13 +324,20 @@ async fn statuses_in_review_and_done_get_their_styles() {
 async fn a_chosen_status_style_wins_over_the_detected_one() {
     let site = Site::new().await;
     let status = site.status_of("NW-1038").await;
-    status_style_set(site.db(), status.clone(), Some(Style::Blocked))
-        .await
-        .unwrap();
+    status_style_set(
+        site.db(),
+        NW_PROJECT_ID.into(),
+        status.clone(),
+        Some(Style::Blocked),
+    )
+    .await
+    .unwrap();
 
     assert_eq!(site.detail("NW-1038").await.style, Style::Blocked);
 
-    status_style_set(site.db(), status, None).await.unwrap();
+    status_style_set(site.db(), NW_PROJECT_ID.into(), status, None)
+        .await
+        .unwrap();
 
     assert_eq!(site.detail("NW-1038").await.style, Style::Review);
 }
@@ -676,9 +701,14 @@ async fn a_status_edited_on_the_site_shows_as_a_change_with_names_and_styles() {
 async fn a_chosen_status_style_colours_the_status_change() {
     let site = Site::new().await;
     let status = site.status_of("NW-1044").await;
-    status_style_set(site.db(), status, Some(Style::Blocked))
-        .await
-        .unwrap();
+    status_style_set(
+        site.db(),
+        NW_PROJECT_ID.into(),
+        status,
+        Some(Style::Blocked),
+    )
+    .await
+    .unwrap();
     site.fake.set_now(later());
     site.fake
         .edit_issue("NW-1044", |fields| fields["status"] = done_status());
@@ -945,6 +975,230 @@ async fn an_unknown_issue_is_not_fetched() {
     assert!(!fetched);
 }
 
+fn remote_link(id: u64, url: &str, title: Option<&str>) -> serde_json::Value {
+    let mut object = serde_json::json!({ "url": url });
+    if let Some(title) = title {
+        object["title"] = title.into();
+    }
+    serde_json::json!({ "id": id, "object": object })
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn syncing_web_links_stores_the_issues_links_in_the_trackers_order() {
+    let site = Site::new().await;
+    assert_eq!(site.web_links("NW-1042").await, []);
+
+    assert!(site.sync_web_links("NW-1042").await);
+
+    assert_eq!(
+        site.web_links("NW-1042").await,
+        [
+            WebLink {
+                id: "70001".into(),
+                url: "https://github.com/example/shop/pull/481".into(),
+                title: "Validate DACH postcodes".into(),
+                host: Some("github.com".into()),
+                kind: WebLinkKind::PullRequest,
+                reference: Some("shop#481".into()),
+                openable: true,
+            },
+            WebLink {
+                id: "70002".into(),
+                url: "https://docs.example.com/checkout/postcode-rules".into(),
+                title: "Postcode rules for the checkout".into(),
+                host: Some("docs.example.com".into()),
+                kind: WebLinkKind::Link,
+                reference: None,
+                openable: true,
+            },
+        ]
+    );
+    assert_eq!(site.web_links("NW-1038").await, []);
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn syncing_unchanged_web_links_again_reports_no_change() {
+    let site = Site::new().await;
+    assert!(site.sync_web_links("NW-1042").await);
+    let before = site.web_links("NW-1042").await;
+
+    assert!(!site.sync_web_links("NW-1042").await);
+
+    assert_eq!(site.web_links("NW-1042").await, before);
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn changed_web_links_replace_the_cached_ones() {
+    let site = Site::new().await;
+    assert!(site.sync_web_links("NW-1042").await);
+    site.fake.set_remote_links(
+        "NW-1042",
+        vec![
+            remote_link(
+                70_010,
+                "https://gitlab.example.com/shop/store-api/-/merge_requests/58",
+                Some("Cart totals from the Store API"),
+            ),
+            remote_link(
+                70_001,
+                "https://github.com/example/shop/pull/481",
+                Some("Validate DACH postcodes"),
+            ),
+        ],
+    );
+
+    assert!(site.sync_web_links("NW-1042").await);
+
+    let links = site.web_links("NW-1042").await;
+    let ids: Vec<&str> = links.iter().map(|link| link.id.as_str()).collect();
+    assert_eq!(ids, ["70010", "70001"]);
+    assert_eq!(links[0].reference.as_deref(), Some("store-api#58"));
+    assert!(!site.sync_web_links("NW-1042").await);
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn web_links_removed_on_the_site_are_removed_from_the_cache() {
+    let site = Site::new().await;
+    assert!(site.sync_web_links("NW-1042").await);
+    site.fake.set_remote_links("NW-1042", vec![]);
+
+    assert!(site.sync_web_links("NW-1042").await);
+
+    assert_eq!(site.web_links("NW-1042").await, []);
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn a_failed_web_link_fetch_keeps_the_cached_links() {
+    let site = Site::new().await;
+    assert!(site.sync_web_links("NW-1042").await);
+    let before = site.web_links("NW-1042").await;
+    site.fake.set_remote_links("NW-1042", vec![]);
+    site.fake.fail_next(1, 500, None);
+
+    let err = site.try_sync_web_links("NW-1042").await.unwrap_err();
+
+    assert_eq!(err.kind(), ErrorKind::Internal);
+    assert_eq!(site.web_links("NW-1042").await, before);
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn an_offline_site_fails_the_web_link_fetch_and_keeps_the_cached_links() {
+    let site = Site::new().await;
+    assert!(site.sync_web_links("NW-1042").await);
+    let before = site.web_links("NW-1042").await;
+    site.fake.go_offline().await;
+
+    let err = site.try_sync_web_links("NW-1042").await.unwrap_err();
+
+    assert_eq!(err.kind(), ErrorKind::Offline);
+    assert_eq!(site.web_links("NW-1042").await, before);
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn web_links_of_an_unknown_issue_are_not_fetched() {
+    let site = Site::new().await;
+    let connection = site.ctx.settings.get().connection;
+    let source = source_for(&site.ctx.access, &connection).unwrap();
+    let fetches_before = site.fake.paths().len();
+
+    let changed = issue_sync_web_links(site.db(), source.as_ref(), "99999999".into())
+        .await
+        .unwrap();
+
+    assert!(!changed);
+    assert_eq!(site.fake.paths().len(), fetches_before);
+    assert_eq!(
+        issue_web_links(site.db(), "99999999".into()).await.unwrap(),
+        []
+    );
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn web_links_of_an_issue_gone_from_the_site_are_not_fetched() {
+    let site = Site::new().await;
+    site.execute("UPDATE cache.issue SET gone = 1 WHERE key = 'NW-1042'")
+        .await;
+
+    assert!(!site.sync_web_links("NW-1042").await);
+
+    assert_eq!(site.web_links("NW-1042").await, []);
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn a_web_link_without_a_title_shows_its_address_and_one_without_an_address_is_left_out() {
+    let site = Site::new().await;
+    site.fake.set_remote_links(
+        "NW-1042",
+        vec![
+            remote_link(1, "https://example.com/untitled", None),
+            remote_link(2, "https://example.com/blank", Some("  ")),
+            remote_link(3, "", Some("No address")),
+            remote_link(4, "https://example.com/named", Some("Named")),
+        ],
+    );
+
+    assert!(site.sync_web_links("NW-1042").await);
+
+    let shown: Vec<(&str, String)> = vec![
+        ("1", "https://example.com/untitled".into()),
+        ("2", "https://example.com/blank".into()),
+        ("4", "Named".into()),
+    ];
+    let links = site.web_links("NW-1042").await;
+    let found: Vec<(&str, String)> = links
+        .iter()
+        .map(|link| (link.id.as_str(), link.title.clone()))
+        .collect();
+    assert_eq!(found, shown);
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn web_links_that_are_not_https_are_listed_but_not_openable() {
+    let site = Site::new().await;
+    site.fake.set_remote_links(
+        "NW-1042",
+        vec![
+            remote_link(1, "http://wiki.example.com/postcodes", Some("Wiki")),
+            remote_link(2, "javascript:alert(1)", Some("Script")),
+        ],
+    );
+
+    assert!(site.sync_web_links("NW-1042").await);
+
+    let links = site.web_links("NW-1042").await;
+    let found: Vec<(Option<&str>, bool)> = links
+        .iter()
+        .map(|link| (link.host.as_deref(), link.openable))
+        .collect();
+    assert_eq!(found, [(Some("wiki.example.com"), false), (None, false)]);
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn forgetting_an_issue_drops_its_web_links() {
+    let site = Site::new().await;
+    assert!(site.sync_web_links("NW-1042").await);
+    let id = site.id_of("NW-1042").await;
+    site.execute("UPDATE cache.issue SET gone = 1 WHERE key = 'NW-1042'")
+        .await;
+    let count = format!("SELECT COUNT(*) FROM cache.remote_link WHERE issue_id = '{id}'");
+    assert_eq!(site.count_rows(count.clone()).await, 2);
+
+    issue_forget(site.db(), id).await.unwrap();
+
+    assert_eq!(site.count_rows(count).await, 0);
+}
+
 #[tokio::test]
 #[ignore = "syncs the demo site into a temp database"]
 async fn the_custom_fields_an_issue_fills_are_listed_by_name_without_being_shown() {
@@ -965,6 +1219,35 @@ async fn the_custom_fields_an_issue_fills_are_listed_by_name_without_being_shown
         ]
     );
     assert_eq!(detail.custom[0].value, Some(Cell::Person(marta())));
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn a_field_the_space_hides_from_the_detail_is_left_out_of_its_issues() {
+    let site = Site::new().await;
+
+    for (visibility, listed) in [
+        (FieldVisibility::HiddenInDetail, false),
+        (FieldVisibility::Hidden, false),
+        (FieldVisibility::HiddenInList, true),
+        (FieldVisibility::Visible, true),
+    ] {
+        space_set_field(site.db(), NW_PROJECT_ID.into(), REVIEWER.into(), visibility)
+            .await
+            .unwrap();
+
+        let detail = site.detail("NW-1042").await;
+
+        assert_eq!(
+            detail.custom.iter().any(|f| f.id == REVIEWER),
+            listed,
+            "{visibility:?}"
+        );
+        assert!(
+            detail.custom.iter().any(|f| f.id == "customfield_10016"),
+            "{visibility:?}"
+        );
+    }
 }
 
 #[tokio::test]

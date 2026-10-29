@@ -9,7 +9,9 @@ use chrono::{DateTime, Utc};
 use serde_json::{Value, json};
 
 use taskboard_lib::error::{AppError, ErrorKind};
-use taskboard_lib::jira::dto::{Issue, parse_jira_time};
+use taskboard_lib::jira::dto::{
+    Issue, RemoteApplication, RemoteIcon, RemoteLink, RemoteObject, parse_jira_time,
+};
 use taskboard_lib::jira::jql::{and_updated_since, date_literal, default_scope};
 use taskboard_lib::jira::{JiraClient, Limiter, SearchRequest, TokenKind};
 use taskboard_lib::test_support::FakeSecrets;
@@ -548,6 +550,98 @@ mod demo_answers {
         let asked = &fake.requests()[0];
         assert_eq!(asked.query_value("expand"), Some("renderedBody"));
         assert_eq!(asked.query_value("orderBy"), Some("created"));
+    }
+
+    #[tokio::test]
+    async fn remote_links_map_the_demo_links_of_an_issue_in_order() {
+        let fake = FakeJira::start_demo().await;
+
+        let links = fake
+            .client(TokenKind::Classic)
+            .remote_links(NW_1042_ID)
+            .await
+            .unwrap();
+
+        let icon = |title: &str| {
+            Some(RemoteIcon {
+                url16x16: Some("https://example.com/favicon.ico".into()),
+                title: Some(title.into()),
+            })
+        };
+        assert_eq!(
+            links,
+            [
+                RemoteLink {
+                    id: 70_001,
+                    relationship: Some("mentioned in".into()),
+                    application: Some(RemoteApplication {
+                        kind: Some("com.github.integration".into()),
+                        name: Some("GitHub".into()),
+                    }),
+                    object: RemoteObject {
+                        url: "https://github.com/example/shop/pull/481".into(),
+                        title: Some("Validate DACH postcodes".into()),
+                        icon: icon("Validate DACH postcodes"),
+                    },
+                },
+                RemoteLink {
+                    id: 70_002,
+                    relationship: Some("relates to".into()),
+                    application: None,
+                    object: RemoteObject {
+                        url: "https://docs.example.com/checkout/postcode-rules".into(),
+                        title: Some("Postcode rules for the checkout".into()),
+                        icon: icon("Postcode rules for the checkout"),
+                    },
+                },
+            ]
+        );
+        assert_eq!(
+            fake.paths(),
+            [format!("/rest/api/3/issue/{NW_1042_ID}/remotelink")]
+        );
+    }
+
+    #[tokio::test]
+    async fn an_issue_without_web_links_has_no_remote_links() {
+        let fake = FakeJira::start_demo().await;
+
+        let links = fake
+            .client(TokenKind::Classic)
+            .remote_links(NW_1020_ID)
+            .await
+            .unwrap();
+
+        assert_eq!(links, []);
+    }
+
+    #[tokio::test]
+    async fn a_remote_link_with_only_an_id_and_an_address_leaves_the_rest_empty() {
+        let fake = FakeJira::start_demo().await;
+        fake.answer_next(
+            200,
+            json!([{ "id": 5, "object": { "url": "https://example.com/spec" } }]),
+        );
+
+        let links = fake
+            .client(TokenKind::Classic)
+            .remote_links(NW_1042_ID)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            links,
+            [RemoteLink {
+                id: 5,
+                relationship: None,
+                application: None,
+                object: RemoteObject {
+                    url: "https://example.com/spec".into(),
+                    title: None,
+                    icon: None,
+                },
+            }]
+        );
     }
 
     #[tokio::test]

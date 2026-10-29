@@ -64,7 +64,7 @@ function Rows({ listId, viewId, data, wrapTitles }: { listId: number; viewId: nu
   const actions = useIssueActions();
   const client = useQueryClient();
   const width = useElementWidth(scrollRef);
-  const { data: catalogue = NO_COLUMNS } = useColumnsCatalogue();
+  const { data: catalogue = NO_COLUMNS } = useColumnsCatalogue(listId);
 
   useEffect(() => {
     void loadPlace(listId, viewId);

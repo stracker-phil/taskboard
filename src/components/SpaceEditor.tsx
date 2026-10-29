@@ -10,13 +10,20 @@ import { BufferedInput, FieldError, TextField } from "./settings/fields";
 import { fieldErrorOf, type FieldErrors } from "./settings/useBusyAction";
 import { SpaceTile } from "./SpaceTile";
 
-/** The Space palette (`--space-tile-1..5`), by the colour number Rust stores. */
+/** The Space palette (`--space-tile-1..12`), by the colour number Rust stores. */
 const SPACE_COLORS = [
   { id: "1", label: "Blue" },
   { id: "2", label: "Slate" },
   { id: "3", label: "Violet" },
   { id: "4", label: "Teal" },
   { id: "5", label: "Amber" },
+  { id: "6", label: "Red" },
+  { id: "7", label: "Pink" },
+  { id: "8", label: "Green" },
+  { id: "9", label: "Indigo" },
+  { id: "10", label: "Cyan" },
+  { id: "11", label: "Orange" },
+  { id: "12", label: "Stone" },
 ] as const;
 
 /** Which fields show: all of them (the settings page), or one popover's. */

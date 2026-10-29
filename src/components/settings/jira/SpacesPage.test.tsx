@@ -10,15 +10,18 @@ import { createQueryClient } from "../../../queries/queryClient";
 import { resetStore } from "../../../state/store";
 import { lumenSpace, sidebarTree, space } from "../../../test/spaces";
 import { Toasts } from "../../Toasts";
+import { SectionTarget } from "../controls";
 import { SpacesPage } from "./SpacesPage";
 
 const mocked = vi.mocked(api, true);
 
-async function renderPage(spaces: SpaceNode[]) {
+async function renderPage(spaces: SpaceNode[], target?: string) {
   mocked.sidebarTree.mockResolvedValue(sidebarTree(spaces));
   render(
     <QueryClientProvider client={createQueryClient()}>
-      <SpacesPage />
+      <SectionTarget.Provider value={target}>
+        <SpacesPage />
+      </SectionTarget.Provider>
       <Toasts />
     </QueryClientProvider>,
   );
@@ -44,52 +47,52 @@ describe("SpacesPage", () => {
   it("lists the Spaces in sidebar order with name, key and client", async () => {
     await renderPage([NORTHWIND(), lumenSpace()]);
 
-    const toggles = await screen.findAllByRole("button", { expanded: false });
-    expect(toggles.map((t) => t.textContent)).toEqual([expect.stringContaining("Website relaunch"), expect.stringContaining("Lumen iOS app")]);
-    expect(toggles[0]).toHaveTextContent("NW · Northwind");
-    expect(toggles[1]).toHaveTextContent("LUM");
-    expect(toggles[1]).not.toHaveTextContent("·");
+    const rows = await screen.findAllByRole("button", { name: /settings$/ });
+    expect(rows.map((t) => t.textContent)).toEqual([expect.stringContaining("Website relaunch"), expect.stringContaining("Lumen iOS app")]);
+    expect(rows[0]).toHaveTextContent("NW · Northwind");
+    expect(rows[1]).toHaveTextContent("LUM");
+    expect(rows[1]).not.toHaveTextContent("·");
     expect(screen.queryByText("Track projects under Projects to get Spaces.")).not.toBeInTheDocument();
   });
 
-  describe("row toggle", () => {
-    it("shows the Space's fields when opened and hides them when clicked again", async () => {
-      await renderPage([NORTHWIND()]);
-      const toggle = await screen.findByRole("button", { name: /^Website relaunch/, expanded: false });
-      expect(screen.queryByLabelText("Client")).not.toBeInTheDocument();
+  describe("opening a Space", () => {
+    it("opens the Space's settings when its row is clicked, and returns to the list with Spaces", async () => {
+      await renderPage([NORTHWIND(), lumenSpace()]);
 
-      await userEvent.click(toggle);
+      await userEvent.click(await screen.findByRole("button", { name: "Lumen iOS app settings" }));
 
-      expect(toggle).toHaveAttribute("aria-expanded", "true");
-      expect(screen.getByLabelText("Name")).toBeInTheDocument();
-      expect(screen.getByLabelText("Icon letter")).toBeInTheDocument();
-      expect(screen.getByRole("group", { name: "Colour" })).toBeInTheDocument();
-      expect(await screen.findByLabelText("Client")).toHaveValue("Northwind");
+      expect(await screen.findByRole("heading", { name: "Lumen iOS app" })).toBeInTheDocument();
+      expect(await screen.findByRole("region", { name: "Layouts" })).toBeInTheDocument();
+      expect(mocked.spaceConfig).toHaveBeenCalledWith("10002");
+      expect(screen.queryByRole("button", { name: "Website relaunch settings" })).not.toBeInTheDocument();
 
-      await userEvent.click(toggle);
+      await userEvent.click(screen.getByRole("button", { name: "Spaces" }));
 
-      expect(toggle).toHaveAttribute("aria-expanded", "false");
-      expect(screen.queryByLabelText("Client")).not.toBeInTheDocument();
-    });
-
-    it("keeps one Space open at a time", async () => {
-      await renderPage([space(), lumenSpace()]);
-
-      await userEvent.click(await screen.findByRole("button", { name: /^Website relaunch/ }));
-      await userEvent.click(screen.getByRole("button", { name: /^Lumen iOS app/ }));
-
-      expect(screen.getByRole("button", { name: /^Website relaunch/ })).toHaveAttribute("aria-expanded", "false");
-      expect(screen.getAllByLabelText("Client")).toHaveLength(1);
+      expect(await screen.findByRole("button", { name: "Website relaunch settings" })).toBeInTheDocument();
+      expect(screen.queryByRole("region", { name: "Layouts" })).not.toBeInTheDocument();
     });
 
     it("saves a changed client for the opened Space", async () => {
       await renderPage([space(), lumenSpace()]);
-      await userEvent.click(await screen.findByRole("button", { name: /^Lumen iOS app/ }));
+      await userEvent.click(await screen.findByRole("button", { name: "Lumen iOS app settings" }));
 
       await userEvent.type(await screen.findByLabelText("Client"), "Contoso");
       await userEvent.tab();
 
       expect(mocked.spaceUpdate).toHaveBeenCalledWith("10002", { name: null, icon: null, color: "1", client: "Contoso" });
+    });
+
+    it("opens the Space named by a space:<projectId> target directly", async () => {
+      await renderPage([space(), lumenSpace()], "space:10002");
+
+      expect(await screen.findByRole("heading", { name: "Lumen iOS app" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Website relaunch settings" })).not.toBeInTheDocument();
+    });
+
+    it("stays on the list for a target naming no tracked Space", async () => {
+      await renderPage([space()], "space:99999");
+
+      expect(await screen.findByRole("button", { name: "Website relaunch settings" })).toBeInTheDocument();
     });
   });
 

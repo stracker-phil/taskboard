@@ -7,6 +7,7 @@ export function view(patch: Partial<View> = {}): View {
     listId: 11,
     name: "List",
     layout: "list",
+    layouts: ["list", "board", "table"],
     columns: [],
     groupBy: "status",
     sort: { by: "updated", descending: true },

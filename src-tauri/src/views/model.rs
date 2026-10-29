@@ -70,6 +70,8 @@ pub struct View {
     pub list_id: i64,
     pub name: String,
     pub layout: Layout,
+    /// The layouts its Space offers; `layout` is always one of them.
+    pub layouts: Vec<Layout>,
     /// Column ids in order (`assignee`, `customfield_10071`); a board's card fields.
     pub columns: Vec<String>,
     pub group_by: GroupBy,

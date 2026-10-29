@@ -235,6 +235,10 @@ async fn count(db: &Db, sql: &'static str) -> i64 {
     rows(db, sql, |row| row.get::<_, i64>(0)).await[0]
 }
 
+async fn everything(db: &Db) -> i64 {
+    count(db, "SELECT id FROM filter_list WHERE kind = 'everything'").await
+}
+
 async fn issues_per_project(db: &Db) -> BTreeMap<String, i64> {
     rows(
         db,
@@ -432,7 +436,7 @@ mod the_full_sync {
 
         rig.full_sync().await;
 
-        let columns: Vec<String> = columns_catalogue(&rig.ctx.db)
+        let columns: Vec<String> = columns_catalogue(&rig.ctx.db, everything(&rig.ctx.db).await)
             .await
             .unwrap()
             .into_iter()
@@ -466,8 +470,9 @@ mod the_full_sync {
         let offered = |columns: Vec<taskboard_lib::views::Column>, id: &str| {
             columns.iter().any(|c| c.id == id)
         };
+        let everything = everything(&rig.ctx.db).await;
         assert!(!offered(
-            columns_catalogue(&rig.ctx.db).await.unwrap(),
+            columns_catalogue(&rig.ctx.db, everything).await.unwrap(),
             "customfield_10090"
         ));
 
@@ -484,7 +489,7 @@ mod the_full_sync {
             .unwrap();
         rig.full_sync().await;
 
-        let columns = columns_catalogue(&rig.ctx.db).await.unwrap();
+        let columns = columns_catalogue(&rig.ctx.db, everything).await.unwrap();
         assert!(offered(columns.clone(), "customfield_10090"));
         assert!(!offered(columns, "customfield_10091"));
     }

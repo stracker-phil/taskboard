@@ -7,6 +7,7 @@ use ts_rs::TS;
 use crate::db::Db;
 use crate::error::AppResult;
 use crate::filter::RELEVANT_FIELD;
+use crate::space_config::hidden_columns;
 
 /// Standard column ids with their names, in the Columns popover's order.
 const STANDARD: [(&str, &str); 8] = [
@@ -39,10 +40,12 @@ pub struct CustomColumn {
 
 /// Custom fields with a value a cell can show. Jira's `any` fields (rank, epic colour) are internal, and the
 /// sprint field is the standard Sprint column.
-const SHOWABLE: &str =
+pub const SHOWABLE: &str =
     "id LIKE 'customfield\\_%' ESCAPE '\\' AND COALESCE(type, '') <> 'any' AND name <> 'Sprint'";
 
-pub fn catalogue(conn: &Connection) -> AppResult<Vec<Column>> {
+/// The columns a level's views can show: the standard ones and the custom fields its Space doesn't hide.
+pub fn catalogue(conn: &Connection, list_id: i64) -> AppResult<Vec<Column>> {
+    let hidden = hidden_columns(conn, list_id)?;
     let mut columns: Vec<Column> = STANDARD
         .iter()
         .map(|(id, name)| Column {
@@ -62,7 +65,12 @@ pub fn catalogue(conn: &Connection) -> AppResult<Vec<Column>> {
             custom: true,
         })
     })?;
-    columns.extend(custom.collect::<Result<Vec<_>, _>>()?);
+    columns.extend(
+        custom
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .filter(|column| !hidden.contains(&column.id)),
+    );
     Ok(columns)
 }
 
@@ -83,6 +91,128 @@ pub fn custom_columns(conn: &Connection, ids: &[String]) -> AppResult<Vec<Custom
     Ok(found)
 }
 
-pub async fn columns_catalogue(db: &Db) -> AppResult<Vec<Column>> {
-    db.read(catalogue).await
+pub async fn columns_catalogue(db: &Db, list_id: i64) -> AppResult<Vec<Column>> {
+    db.read(move |conn| catalogue(conn, list_id)).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::space_config::{FieldVisibility, space_set_field};
+
+    const ZONE: &str = "customfield_10001";
+    const BETA: &str = "customfield_10003";
+
+    async fn lab() -> (tempfile::TempDir, Db) {
+        let dir = crate::test_support::temp_config_dir();
+        let db = Db::open(dir.path()).unwrap();
+        db.write(|tx, _| {
+            tx.execute_batch(
+                "INSERT INTO cache.space (id, key, name, raw) VALUES
+                   ('10001', 'NW', 'Website relaunch', '{}'), ('10002', 'NWS', 'Northwind support', '{}');
+                 INSERT INTO cache.field (id, name, type, used) VALUES
+                   ('customfield_10001', 'Zone', 'string', 1),
+                   ('customfield_10003', 'Beta', 'string', 1),
+                   ('customfield_10019', 'Rank', 'any', 1)",
+            )?;
+            Ok(())
+        })
+        .await
+        .unwrap();
+        for id in ["10001", "10002"] {
+            crate::connection::track_project(&db, id.into(), true)
+                .await
+                .unwrap();
+        }
+        (dir, db)
+    }
+
+    async fn level(db: &Db, clause: &str) -> i64 {
+        let sql = format!("SELECT id FROM filter_list WHERE {clause} ORDER BY id LIMIT 1");
+        db.read(move |conn| Ok(conn.query_row(&sql, [], |r| r.get(0))?))
+            .await
+            .unwrap()
+    }
+
+    async fn custom_ids(db: &Db, list_id: i64) -> Vec<String> {
+        columns_catalogue(db, list_id)
+            .await
+            .unwrap()
+            .into_iter()
+            .filter(|c| c.custom)
+            .map(|c| c.id)
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn the_standard_columns_come_first_and_internal_fields_are_left_out() {
+        let (_dir, db) = lab().await;
+        let everything = level(&db, "kind = 'everything'").await;
+
+        let columns = columns_catalogue(&db, everything).await.unwrap();
+
+        let ids: Vec<&str> = columns.iter().map(|c| c.id.as_str()).collect();
+        assert_eq!(
+            ids,
+            [
+                "status", "assignee", "epic", "release", "priority", "labels", "sprint", "due",
+                BETA, ZONE
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn a_space_leaves_out_the_custom_fields_it_hides_from_lists() {
+        let (_dir, db) = lab().await;
+        let space_a = level(&db, "kind = 'space' AND project_id = '10001'").await;
+        let list_in_a = level(
+            &db,
+            "kind = 'list' AND parent_id IN
+               (SELECT id FROM filter_list WHERE kind = 'space' AND project_id = '10001')",
+        )
+        .await;
+        let space_b = level(&db, "kind = 'space' AND project_id = '10002'").await;
+        space_set_field(
+            &db,
+            "10001".into(),
+            ZONE.into(),
+            FieldVisibility::HiddenInList,
+        )
+        .await
+        .unwrap();
+        space_set_field(
+            &db,
+            "10001".into(),
+            BETA.into(),
+            FieldVisibility::HiddenInDetail,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(custom_ids(&db, space_a).await, [BETA]);
+        assert_eq!(custom_ids(&db, list_in_a).await, [BETA]);
+        assert_eq!(custom_ids(&db, space_b).await, [BETA, ZONE]);
+    }
+
+    #[tokio::test]
+    async fn outside_the_spaces_a_field_stays_while_one_space_shows_it() {
+        let (_dir, db) = lab().await;
+        let everything = level(&db, "kind = 'everything'").await;
+        space_set_field(&db, "10001".into(), ZONE.into(), FieldVisibility::Hidden)
+            .await
+            .unwrap();
+
+        assert_eq!(custom_ids(&db, everything).await, [BETA, ZONE]);
+
+        space_set_field(
+            &db,
+            "10002".into(),
+            ZONE.into(),
+            FieldVisibility::HiddenInList,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(custom_ids(&db, everything).await, [BETA]);
+    }
 }

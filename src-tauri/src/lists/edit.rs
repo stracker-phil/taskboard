@@ -15,7 +15,7 @@ use crate::order::Siblings;
 use crate::views::{clean_name, copy_views};
 
 /// The Space tile colours the palette has (`--space-tile-*`).
-const SPACE_COLORS: u8 = 5;
+const SPACE_COLORS: u8 = 12;
 
 /// Only filter lists can be renamed, duplicated, moved, filtered or deleted here.
 fn filter_list(conn: &Connection, id: i64) -> AppResult<Node> {

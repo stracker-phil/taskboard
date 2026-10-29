@@ -50,7 +50,19 @@ seenAfterSeconds: number,
  */
 pinDefault: PinDuration, };
 
-export type BoardColumn = { statusId: string, name: string, style: Style, 
+export type BoardColumn = { 
+/**
+ * The group's key: a status id when grouped by status.
+ */
+key: string, name: string, 
+/**
+ * What the header draws before the name; a status shows as its pill.
+ */
+mark: GroupMark | null, 
+/**
+ * The column's tint: its status's style, or To do's neutral one for any other grouping.
+ */
+style: Style, 
 /**
  * Shown as a 48px strip.
  */
@@ -151,6 +163,13 @@ export type ErrorKind = "io" | "invalid_input" | "not_found" | "not_connected" |
  * is reported when the filter is compiled.
  */
 export type Field = string;
+
+export type FieldSetting = { id: string, name: string, visibility: FieldVisibility, };
+
+/**
+ * Where a custom field shows in a Space; `Visible` is the default.
+ */
+export type FieldVisibility = "visible" | "hiddenInList" | "hiddenInDetail" | "hidden";
 
 export type Filter = { conditions: Array<Condition>, };
 
@@ -495,6 +514,32 @@ export type Sort = { by: SortBy, descending: boolean, };
 
 export type SortBy = "updated" | "created" | "priority" | "due" | "key" | "summary" | "status";
 
+/**
+ * A Space's settings page, apart from its name and look (`SpaceUpdate`) and its statuses.
+ */
+export type SpaceConfig = { projectId: string, layouts: SpaceLayouts, 
+/**
+ * The custom fields worth a setting (`RELEVANT_FIELD`), by name.
+ */
+fields: Array<FieldSetting>, };
+
+/**
+ * The layouts a Space's views offer, and how its new views start.
+ */
+export type SpaceLayouts = { 
+/**
+ * The layouts its views can show, in List, Board, Table order; never empty.
+ */
+layouts: Array<Layout>, 
+/**
+ * One of `layouts`: what a new view gets, and what a view in a switched-off layout shows.
+ */
+defaultLayout: Layout, 
+/**
+ * How new views group.
+ */
+defaultGroup: GroupBy, };
+
 export type SpaceNode = { 
 /**
  * The Space's own node; its views hang off it.
@@ -528,11 +573,11 @@ export type StatusStyleRow = { id: string, name: string,
  */
 category: string, detected: Style, 
 /**
- * The owner's choice; none = Automatic.
+ * The owner's choice in this Space; none = Automatic.
  */
 chosen: Style | null, 
 /**
- * Issues of the tracked projects in this status.
+ * The Space's issues in this status.
  */
 issues: number, };
 
@@ -591,6 +636,10 @@ export type ValueKind = "status" | "statusCategory" | "type" | "user" | "priorit
 
 export type View = { id: number, listId: number, name: string, layout: Layout, 
 /**
+ * The layouts its Space offers; `layout` is always one of them.
+ */
+layouts: Array<Layout>, 
+/**
  * Column ids in order (`assignee`, `customfield_10071`); a board's card fields.
  */
 columns: Array<string>, groupBy: GroupBy, sort: Sort, 
@@ -627,3 +676,19 @@ onlyMine: boolean,
  * The toolbar's "Filter this view" text, kept per view.
  */
 text: string, };
+
+export type WebLink = { id: string, url: string, 
+/**
+ * The link's title, else its address.
+ */
+title: string, host: string | null, kind: WebLinkKind, 
+/**
+ * `repo#481` for a pull request.
+ */
+reference: string | null, 
+/**
+ * Only https links open; the rest show as text.
+ */
+openable: boolean, };
+
+export type WebLinkKind = "pullRequest" | "link";

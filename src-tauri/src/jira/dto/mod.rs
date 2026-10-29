@@ -3,6 +3,7 @@
 mod comment;
 mod issue;
 mod meta;
+mod remote_link;
 
 pub use comment::Comment;
 pub(crate) use comment::{CommentPage, ParsedQueries};
@@ -10,6 +11,7 @@ pub use issue::{ApproximateCount, BulkFetch, Issue, SearchPage, parse_jira_time}
 pub use meta::{
     Field, FieldSchema, Myself, Project, Status, StatusCategory, TenantInfo, User, Version,
 };
+pub use remote_link::{RemoteApplication, RemoteIcon, RemoteLink, RemoteObject};
 
 use serde::Deserialize;
 

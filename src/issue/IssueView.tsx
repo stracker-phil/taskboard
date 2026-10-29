@@ -23,6 +23,7 @@ import { FieldGrid } from "./FieldGrid";
 import { JiraHtml } from "./JiraHtml";
 import { RichFields } from "./RichFields";
 import { Children, Links } from "./Related";
+import { WebLinks } from "./WebLinks";
 
 /** The issue's neighbours in the view it was opened from, for the previous/next arrows and J/K. */
 function useNeighbours(origin: IssueOrigin, id: string): { previous: string | null; next: string | null } {
@@ -155,6 +156,7 @@ function IssueMain({ issue, origin }: { issue: IssueDetail; origin: IssueOrigin 
         )}
       </section>
       <RichFields fields={issue.custom} variant="issue" />
+      <WebLinks id={issue.id} variant="issue" />
       {related && <Children related={related} isEpic={issue.isEpic} onOpen={openRelated} onOpenAsList={openAsList} />}
     </div>
   );

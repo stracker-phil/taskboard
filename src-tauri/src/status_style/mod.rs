@@ -47,9 +47,9 @@ pub struct StatusStyleRow {
     /// Jira's status category: `new`, `indeterminate` or `done`.
     pub category: String,
     pub detected: Style,
-    /// The owner's choice; none = Automatic.
+    /// The owner's choice in this Space; none = Automatic.
     pub chosen: Option<Style>,
-    /// Issues of the tracked projects in this status.
+    /// The Space's issues in this status.
     pub issues: i64,
 }
 
@@ -59,19 +59,20 @@ impl StatusStyleRow {
     }
 }
 
-/// The statuses the tracked projects' issues are in (the rest of the site's workflows don't matter here), by
-/// Jira category (to do, in progress, done), then name.
-pub fn status_rows(conn: &Connection) -> AppResult<Vec<StatusStyleRow>> {
+/// The statuses a Space's issues are in (the rest of the site's workflows don't matter here), by Jira category
+/// (to do, in progress, done), then name.
+pub fn status_rows(conn: &Connection, project_id: &str) -> AppResult<Vec<StatusStyleRow>> {
     let mut query = conn.prepare(&format!(
         "SELECT s.id, s.name, s.category, o.style, used.issues
          FROM cache.status s
-         JOIN (SELECT i.status_id, COUNT(*) AS issues FROM cache.issue i WHERE {TRACKED_ISSUES}
+         JOIN (SELECT i.status_id, COUNT(*) AS issues FROM cache.issue i
+               WHERE {TRACKED_ISSUES} AND i.project_id = ?1
                GROUP BY i.status_id) used ON used.status_id = s.id
-         LEFT JOIN status_style o ON o.status_id = s.id
+         LEFT JOIN space_status_style o ON o.status_id = s.id AND o.project_id = ?1
          ORDER BY CASE s.category WHEN 'new' THEN 0 WHEN 'indeterminate' THEN 1 ELSE 2 END,
                   s.name COLLATE NOCASE, s.id"
     ))?;
-    let rows = query.query_map([], |row| {
+    let rows = query.query_map([project_id], |row| {
         let name: String = row.get(1)?;
         let category: String = row.get(2)?;
         let chosen: Option<String> = row.get(3)?;
@@ -87,21 +88,46 @@ pub fn status_rows(conn: &Connection) -> AppResult<Vec<StatusStyleRow>> {
     Ok(rows.collect::<Result<_, _>>()?)
 }
 
-/// Each cached status's style.
-pub fn styles(conn: &Connection) -> AppResult<HashMap<String, Style>> {
-    Ok(status_rows(conn)?
-        .into_iter()
-        .map(|row| (row.id.clone(), row.style()))
-        .collect())
+/// The owner's style choices of every Space; a status without one shows its detected style.
+pub struct Styles(HashMap<(String, String), Style>);
+
+impl Styles {
+    pub fn load(conn: &Connection) -> AppResult<Self> {
+        let mut query =
+            conn.prepare("SELECT project_id, status_id, style FROM space_status_style")?;
+        let rows = query.query_map([], |row| {
+            Ok((
+                (row.get::<_, String>(0)?, row.get::<_, String>(1)?),
+                row.get::<_, String>(2)?,
+            ))
+        })?;
+        let mut chosen = HashMap::new();
+        for row in rows {
+            let (key, style) = row?;
+            if let Some(style) = from_text(&style) {
+                chosen.insert(key, style);
+            }
+        }
+        Ok(Self(chosen))
+    }
+
+    /// A status's style in a Space: the owner's choice there, else detected from its category and name.
+    pub fn of(&self, project_id: &str, status_id: &str, category: &str, name: &str) -> Style {
+        self.0
+            .get(&(project_id.to_string(), status_id.to_string()))
+            .copied()
+            .unwrap_or_else(|| detect(category, name))
+    }
 }
 
-pub async fn status_styles_list(db: &Db) -> AppResult<Vec<StatusStyleRow>> {
-    db.read(status_rows).await
+pub async fn status_styles_list(db: &Db, project_id: String) -> AppResult<Vec<StatusStyleRow>> {
+    db.read(move |conn| status_rows(conn, &project_id)).await
 }
 
 /// `None` goes back to the detected style.
 pub async fn status_style_set(
     db: &Db,
+    project_id: String,
     status_id: String,
     style: Option<Style>,
 ) -> AppResult<Vec<StatusStyleRow>> {
@@ -118,17 +144,17 @@ pub async fn status_style_set(
         }
         match style {
             Some(style) => tx.execute(
-                "INSERT INTO status_style (status_id, style) VALUES (?1, ?2)
-                 ON CONFLICT (status_id) DO UPDATE SET style = excluded.style",
-                params![status_id, to_text(style)],
+                "INSERT INTO space_status_style (project_id, status_id, style) VALUES (?1, ?2, ?3)
+                 ON CONFLICT (project_id, status_id) DO UPDATE SET style = excluded.style",
+                params![project_id, status_id, to_text(style)],
             )?,
             None => tx.execute(
-                "DELETE FROM status_style WHERE status_id = ?1",
-                [&status_id],
+                "DELETE FROM space_status_style WHERE project_id = ?1 AND status_id = ?2",
+                [&project_id, &status_id],
             )?,
         };
         changes.local_changed(LocalPart::Styles);
-        status_rows(tx)
+        status_rows(tx, &project_id)
     })
     .await
 }
@@ -250,7 +276,7 @@ mod tests {
     async fn a_status_only_untracked_projects_use_is_not_listed() {
         let (_dir, db) = lab().await;
 
-        let rows = status_styles_list(&db).await.unwrap();
+        let rows = status_styles_list(&db, "10001".into()).await.unwrap();
 
         assert!(rows.iter().all(|r| r.id != "s6"), "{rows:?}");
     }
@@ -259,7 +285,7 @@ mod tests {
     async fn a_status_without_issues_is_not_listed() {
         let (_dir, db) = lab().await;
 
-        let rows = status_styles_list(&db).await.unwrap();
+        let rows = status_styles_list(&db, "10001".into()).await.unwrap();
 
         assert!(rows.iter().all(|r| r.id != "s7"), "{rows:?}");
     }
@@ -268,7 +294,7 @@ mod tests {
     async fn a_status_only_gone_issues_use_is_not_listed_and_gone_issues_do_not_count() {
         let (_dir, db) = lab().await;
 
-        let rows = status_styles_list(&db).await.unwrap();
+        let rows = status_styles_list(&db, "10001".into()).await.unwrap();
 
         assert!(rows.iter().all(|r| r.id != "s8"), "{rows:?}");
         let done = rows.iter().find(|r| r.id == "s4").unwrap();
@@ -279,7 +305,7 @@ mod tests {
     async fn the_count_is_the_tracked_issues_in_each_status() {
         let (_dir, db) = lab().await;
 
-        let rows = status_styles_list(&db).await.unwrap();
+        let rows = status_styles_list(&db, "10001".into()).await.unwrap();
 
         let by_id = |id: &str| rows.iter().find(|r| r.id == id).unwrap().issues;
         assert_eq!(
@@ -298,7 +324,7 @@ mod tests {
     async fn statuses_are_ordered_by_category_then_name_ignoring_case() {
         let (_dir, db) = lab().await;
 
-        let rows = status_styles_list(&db).await.unwrap();
+        let rows = status_styles_list(&db, "10001".into()).await.unwrap();
 
         assert_eq!(
             named_counts(&rows),
@@ -316,7 +342,7 @@ mod tests {
     async fn setting_a_style_on_a_listed_status_returns_the_list_with_the_choice() {
         let (_dir, db) = lab().await;
 
-        let rows = status_style_set(&db, "s3".into(), Some(Style::Blocked))
+        let rows = status_style_set(&db, "10001".into(), "s3".into(), Some(Style::Blocked))
             .await
             .unwrap();
 
@@ -336,7 +362,78 @@ mod tests {
             .map(|r| (r.id.as_str(), r.chosen))
             .collect();
         assert_eq!(chosen, [("s3", Some(Style::Blocked))]);
-        let reset = status_style_set(&db, "s3".into(), None).await.unwrap();
+        let reset = status_style_set(&db, "10001".into(), "s3".into(), None)
+            .await
+            .unwrap();
         assert!(reset.iter().all(|r| r.chosen.is_none()));
+    }
+
+    #[tokio::test]
+    async fn the_list_holds_the_statuses_of_that_spaces_issues_only() {
+        let (_dir, db) = lab().await;
+        crate::connection::track_project(&db, "10002".into(), true)
+            .await
+            .unwrap();
+
+        let rows = status_styles_list(&db, "10002".into()).await.unwrap();
+
+        assert_eq!(named_counts(&rows), [("To Do", 1), ("Archived", 1)]);
+    }
+
+    #[tokio::test]
+    async fn a_style_chosen_in_one_space_does_not_reach_the_same_status_in_another() {
+        let (_dir, db) = lab().await;
+        crate::connection::track_project(&db, "10002".into(), true)
+            .await
+            .unwrap();
+
+        let in_a = status_style_set(&db, "10001".into(), "s1".into(), Some(Style::Blocked))
+            .await
+            .unwrap();
+        let in_b = status_styles_list(&db, "10002".into()).await.unwrap();
+        let styles = db.read(Styles::load).await.unwrap();
+
+        let chosen = |rows: &[StatusStyleRow]| rows.iter().find(|r| r.id == "s1").unwrap().chosen;
+        assert_eq!(chosen(&in_a), Some(Style::Blocked));
+        assert_eq!(chosen(&in_b), None);
+        assert_eq!(styles.of("10001", "s1", "new", "To Do"), Style::Blocked);
+        assert_eq!(styles.of("10002", "s1", "new", "To Do"), Style::Todo);
+        assert_eq!(
+            styles.of("10001", "s2", "indeterminate", "Testing"),
+            Style::Progress
+        );
+    }
+
+    #[tokio::test]
+    async fn the_same_status_can_be_styled_differently_in_two_spaces_and_reset_on_its_own() {
+        let (_dir, db) = lab().await;
+        crate::connection::track_project(&db, "10002".into(), true)
+            .await
+            .unwrap();
+        status_style_set(&db, "10001".into(), "s1".into(), Some(Style::Blocked))
+            .await
+            .unwrap();
+        status_style_set(&db, "10002".into(), "s1".into(), Some(Style::Review))
+            .await
+            .unwrap();
+
+        status_style_set(&db, "10001".into(), "s1".into(), None)
+            .await
+            .unwrap();
+
+        let styles = db.read(Styles::load).await.unwrap();
+        assert_eq!(styles.of("10001", "s1", "new", "To Do"), Style::Todo);
+        assert_eq!(styles.of("10002", "s1", "new", "To Do"), Style::Review);
+    }
+
+    #[tokio::test]
+    async fn styling_an_unknown_status_is_not_found() {
+        let (_dir, db) = lab().await;
+
+        let err = status_style_set(&db, "10001".into(), "nope".into(), Some(Style::Done))
+            .await
+            .unwrap_err();
+
+        assert_eq!(err.kind(), crate::error::ErrorKind::NotFound);
     }
 }

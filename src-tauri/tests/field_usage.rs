@@ -73,9 +73,21 @@ fn marked(items: &[(&str, i64)]) -> Vec<(String, i64)> {
         .collect()
 }
 
+async fn everything(db: &Db) -> i64 {
+    db.read(|conn| {
+        Ok(conn.query_row(
+            "SELECT id FROM filter_list WHERE kind = 'everything'",
+            [],
+            |row| row.get(0),
+        )?)
+    })
+    .await
+    .unwrap()
+}
+
 /// The custom fields the Columns popover offers, then the ones the filter editor offers.
 async fn offered(db: &Db) -> (Vec<String>, Vec<String>) {
-    let columns = columns_catalogue(db)
+    let columns = columns_catalogue(db, everything(db).await)
         .await
         .unwrap()
         .into_iter()

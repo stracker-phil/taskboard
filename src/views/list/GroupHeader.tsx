@@ -57,8 +57,8 @@ function tabClass(mark: GroupMark | null, open: boolean): string {
   return ["status-pill", "status-pill--tab", `status-pill--${style}`, !open && "status-pill--closed"].filter(Boolean).join(" ");
 }
 
-/** What a non-status grouping shows inside its tab. */
-function Mark({ mark }: { mark: GroupMark | null }) {
+/** What a non-status grouping shows inside its tab (the List's group tab, a Board column's title). */
+export function Mark({ mark }: { mark: GroupMark | null }) {
   switch (mark?.kind) {
     case "space":
       return (

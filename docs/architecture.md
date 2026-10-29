@@ -121,7 +121,8 @@ src-tauri/
   src/search/                full-text search: safe FTS5 queries, the palette's issues and lists, the text field
   src/pins/                  local pins: durations to local midnights, the Pinned view, Pin to Home
   src/changes/               unseen changes: the change chip and Since-yesterday words, Mark seen
-  src/status_style/          the five status styles: detection and the owner's overrides
+  src/status_style/          the five status styles: detection and the owner's overrides per Space
+  src/space_config/          a Space's own settings: offered layouts, new views' layout and grouping, field visibility
   src/nav/                   where the main window is (level and view, nav.json); previous/next Space
   src/<feature>/             one folder per feature: types, pure logic, commands.rs, tests
   src/window/ menu/          the main and Settings windows, the native app menu

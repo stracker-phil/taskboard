@@ -2,7 +2,7 @@
    sidebar's small popover. */
 .space-icon-input.input { width: 44px; text-align: center; }
 .space-colors { display: flex; align-items: center; gap: 12px; }
-.space-swatches { display: flex; gap: 6px; }
+.space-swatches { display: flex; flex-wrap: wrap; gap: 6px; }
 .space-swatch { width: 18px; height: 18px; padding: 0; border: none; border-radius: 50%; }
 .space-swatch[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--panel-bg), 0 0 0 4px var(--settings-text-tertiary); }
 .space-swatch:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--panel-bg), 0 0 0 4px var(--settings-focus-ring); }
@@ -22,8 +22,6 @@
   text-align: left;
 }
 .space-settings-chevron { flex: none; color: var(--settings-text-secondary); }
-.space-settings-toggle[aria-expanded="true"] .space-settings-chevron { transform: rotate(90deg); }
-.space-settings-item .space-fields { margin-left: 56px; border-top: 1px solid var(--settings-hairline); }
 
 /* The sidebar's "Colour and icon…" and "Client label…" popover (the design spec's popovers: r12, the popover
    shadow), next to the top of the content panel. */
@@ -51,3 +49,8 @@
 .space-popover .settings-input .input { width: 160px; }
 .space-popover-actions { display: flex; justify-content: flex-end; margin-top: 6px; }
 .space-popover-actions .btn { height: 28px; min-width: 70px; border-radius: 8px; }
+
+/* One Space's settings page: a way back to the list, then the Space's tile and name. */
+.space-settings-head { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; }
+.space-settings-back { gap: 2px; padding-left: 6px; }
+.space-settings-head__name { margin: 0; font-size: 15px; font-weight: 600; }

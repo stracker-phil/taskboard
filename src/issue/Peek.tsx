@@ -13,6 +13,7 @@ import { RichFields } from "./RichFields";
 import { GoneNotice } from "./GoneNotice";
 import { SinceBanner } from "./SinceBanner";
 import { useSeenAfter } from "./useSeenAfter";
+import { WebLinks } from "./WebLinks";
 import { PinButton } from "../pins/PinButton";
 import { useIssueActions } from "../views/list/useIssueActions";
 
@@ -104,6 +105,7 @@ function Body({ issue, onExpand, onClose }: { issue: IssueDetail; onExpand: () =
         <p className="peek__empty">No description.</p>
       )}
       <RichFields fields={issue.custom} variant="peek" />
+      <WebLinks id={issue.id} variant="peek" />
       {latest.length > 0 && (
         <section className="peek__activity" aria-label="Latest activity">
           <header className="peek__activity-header">

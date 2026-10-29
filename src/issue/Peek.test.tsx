@@ -12,6 +12,7 @@ import { connectionView } from "../test/jira";
 import { ALEX, changeItem, commentItem } from "../test/issues";
 import { commentTarget, pinItem, pins } from "../test/pins";
 import { settings } from "../test/settings";
+import { pullRequestLink } from "../test/webLinks";
 import { Peek } from "./Peek";
 
 const mocked = vi.mocked(api, true);
@@ -127,6 +128,14 @@ describe("Peek", () => {
 
     await screen.findByRole("heading", { name: "Redesign the pricing page" });
     expect(screen.queryByRole("region", { name: "Steps to reproduce" })).not.toBeInTheDocument();
+  });
+
+  it("lists the issue's web links", async () => {
+    mocked.issueWebLinks.mockResolvedValue([pullRequestLink()]);
+    renderPeek();
+
+    const section = within(await screen.findByRole("region", { name: "Web links" }));
+    expect(section.getByRole("button", { name: /Validate DACH postcodes/ })).toHaveTextContent("shop#481");
   });
 
   it("leaves out the epic, release and priority an issue does not have", async () => {

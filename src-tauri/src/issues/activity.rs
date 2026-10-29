@@ -10,7 +10,7 @@ use crate::changes::unseen_since;
 use crate::db::Db;
 use crate::error::AppResult;
 use crate::lists::Viewer;
-use crate::status_style::{Style, detect, styles};
+use crate::status_style::{Style, Styles};
 use crate::views::rows::{self, Person};
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
@@ -105,7 +105,12 @@ fn comments(conn: &Connection, id: &str, me: Option<&str>) -> AppResult<Vec<Acti
 /// `comment_added` is left out: the comment itself is in the feed.
 fn changes(conn: &Connection, id: &str, me: Option<&str>) -> AppResult<Vec<ActivityItem>> {
     let statuses = status_names(conn)?;
-    let styles = styles(conn)?;
+    let styles = Styles::load(conn)?;
+    let project_id: String = conn.query_row(
+        "SELECT project_id FROM cache.issue WHERE id = ?1",
+        [id],
+        |r| r.get(0),
+    )?;
     let people = user_names(conn)?;
     let value = |field: &str, raw: Option<String>| -> Option<ChangeValue> {
         let raw = raw?;
@@ -115,10 +120,7 @@ fn changes(conn: &Connection, id: &str, me: Option<&str>) -> AppResult<Vec<Activ
                     .get(&raw)
                     .cloned()
                     .unwrap_or((raw.clone(), String::new()));
-                let style = styles
-                    .get(&raw)
-                    .copied()
-                    .unwrap_or_else(|| detect(&category, &name));
+                let style = styles.of(&project_id, &raw, &category, &name);
                 ChangeValue::Status { name, style }
             }
             "assignee" => ChangeValue::Person(rows::person(

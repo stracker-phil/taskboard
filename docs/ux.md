@@ -106,8 +106,8 @@ padding, 2px gap, a `--hairline` bottom line.
 
 One language for every Jira status (`src-tauri/src/status_style/`): five styles, To do, In progress, In
 review, Blocked and Done. Jira's category decides To do (`new`) and Done (`done`); otherwise a name containing
-"review" is In review, one containing "block" is Blocked, everything else In progress. Settings → Statuses
-overrides it per status.
+"review" is In review, one containing "block" is Blocked, everything else In progress. A Space's settings
+(Settings → Spaces → the Space → Statuses) override it per status for that Space only.
 
 - **StatusSquare** (`components/issue/StatusSquare.tsx`): the only status marker, a filled 10 × 10 square,
   radius 3, in `--status-*-square` (To do grey). No rings or outlines anywhere.
@@ -154,7 +154,7 @@ columns that no longer fit beside a 240px title, rightmost first, until it close
 
 - Header 50: mono key · type text, then Pin (with pins), Open in Jira, Full view, Close.
 - Body: title 22/750, one line of chips (status pill `peek`, epic chip, release outline chip, priority,
-  assignee), the sanitised description, the latest three activity items with "All activity".
+  assignee), the sanitised description, web links, the latest three activity items with "All activity".
 - Footer 36: the keys.
 - Hovering a row shows its toolbar at the end of the title: Mark seen (changed rows), Copy key, Pin, Open in
   Jira (`RowActions`).
@@ -242,7 +242,10 @@ view with its place intact).
   that opens the epic here, Release, Priority, Sprint, then the custom fields shown as columns or marked shown,
   then every other custom field the issue fills, by name), links ("blocks", "is blocked by"), the description,
   then each rich text custom field with content (acceptance criteria, steps to reproduce) as its own section
-  under its Jira name (`RichFields`; the peek shows them under its description too), and Child issues (epics) or Subtasks, when there are any:
+  under its Jira name (`RichFields`; the peek shows them under its description too), Web links when there are
+  any (`WebLinks`, also in the peek: a pull request icon and `repo#481` for GitHub, GitLab and Bitbucket pull or
+  merge requests, else a link icon and the host; a row opens its address in the browser through `open_url`, only
+  when it is https, otherwise it is plain text; no remote icon loads), and Child issues (epics) or Subtasks, when there are any:
   open first, done behind "Show N done"; "Open as list view" narrows the origin view to the epic (a removable
   chip in the toolbar, never saved).
 - Activity (400 wide, `--panel-subtle-bg`): All / Comments / Changes, comment cards and change lines (status
@@ -315,7 +318,9 @@ button, Escape and a press outside close it, focus goes back to the button).
 
 `src/views/board/`, read-only (no drag and drop before writes), styled in `styles/board.css`.
 
-- Columns scroll sideways (padding 6 20 20 24, gap 12), one per status in the Board order. An open column is
+- Columns scroll sideways (padding 6 20 20 24, gap 12), one per group of the view's Group by: per status in the
+  Board order (also when ungrouped), else one per person, priority, epic, release, due bucket or Space as the List
+  groups them, on the neutral To do tint with a grey pill holding the List's group mark (avatar, flag). An open column is
   300 wide, 12px radius, on its status tint (`--status-*-tint`), with the header pill, the count in
   `--status-*-count` and a collapse button; a collapsed one is a 48 × 300 strip with the header pill turned 90° (`status-pill--vertical`: the
   same 26px and padding, centred; owner, 2026-10-29) and the
@@ -438,16 +443,20 @@ no separate Settings design; owner, 2026-10-28). Its colours are the `--settings
   - **Projects**: Refresh after a successful test, "N of M tracked", a filter field (every word in the name or
     key, ignoring case) and a Track switch per project.
   - **Spaces** (`SpacesPage`): the tracked Spaces in sidebar order, each a row with its tile, name, key and
-    client and Move Up / Move Down buttons; clicking the row opens its fields below it (`SpaceFields` in
-    `components/SpaceEditor.tsx`): Name (empty uses the project's), Icon letter (one letter or digit), Colour
-    (five swatches of `--space-tile-1..5` beside a preview tile) and Client (empty means internal). Each field
+    client and Move Up / Move Down buttons; clicking the row opens that Space's own page (`spaces/SpaceSettings`,
+    ClickUp's Space settings; also the sidebar menu's Space Settings…, `app:settings:space:<projectId>`), with
+    "‹ Spaces" back to the list. *General*: its fields (`SpaceFields` in `components/SpaceEditor.tsx`): Name
+    (empty uses the project's), Icon letter (one letter or digit), Colour (twelve swatches of
+    `--space-tile-1..12` beside a preview tile) and Client (empty means internal). *Layouts*: a switch per layout
+    its views offer (one stays on), the default layout of new views and their grouping. *Statuses*: only the
+    statuses this Space's issues are in, under a section per Jira category, with a search field; a row: the pill,
+    "N issues", and a button (the style's square and "Automatic · X" or the style's name) with a native menu of
+    Automatic and the five styles. *Custom fields*: a row per field with a menu of Visible, Hidden in list (no
+    column choice), Hidden in detail (not in the Issue view) and Hidden everywhere. Each field
     saves on its own with Rust's field error under it. "Track projects under Projects to get Spaces." when none
     is tracked. The sidebar's "Colour and icon…" and "Client label…" items open `SpacePopover` (300px, 12px
     radius, `--shadow-popover`, at the top left of the content panel) with the same fields; Esc, Done or a
     click outside close it.
-  - **Statuses**: only the statuses the tracked projects' issues are in, under a section per Jira category,
-    with a search field. A row: the pill, "N issues", and a button (the style's square and "Automatic · X" or
-    the style's name) with a native menu of Automatic and the five styles.
   - **Sync**: *Scope* (the effective JQL in a monospaced field; Validate, Save, Reset to Default), *Intervals*
     (minutes in front and in the background, days to keep done issues) and *Cache* (the sync state line with
     Sync Now, one row per tracked project with its key, last full sync and "N issues · M open", then Reset
