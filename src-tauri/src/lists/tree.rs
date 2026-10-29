@@ -18,7 +18,7 @@ use crate::sync::map::format_utc;
 #[serde(rename_all = "camelCase")]
 pub struct SidebarTree {
     pub everything: ListNode,
-    /// Recently changed, Pinned and global filter lists, in order.
+    /// Unread, Bookmarks and global filter lists, in order.
     pub home: Vec<ListNode>,
     /// Space lists pinned to Home, newest pin first.
     pub pinned_lists: Vec<ListNode>,
@@ -33,7 +33,7 @@ pub struct ListNode {
     pub id: i64,
     pub kind: Kind,
     pub name: String,
-    /// Open issues; for Recently changed its unseen issues (the badge), for Pinned its active pins; none for a
+    /// Open issues; for Unread its unseen issues (the badge), for Bookmarks its active pins; none for a
     /// filter that can't be compiled.
     pub count: Option<i64>,
     /// Conditions of its own, for the Filter button's badge.
@@ -202,7 +202,7 @@ fn active_pin_count(conn: &Connection, viewer: &Viewer) -> AppResult<i64> {
     )?)
 }
 
-/// Recently changed counts its unseen issues, open or not.
+/// Unread counts its unseen issues, open or not.
 fn unseen_count(conn: &Connection, nodes: &[Node], id: i64, ctx: &Ctx) -> AppResult<Option<i64>> {
     let Some(node) = nodes.iter().find(|n| n.id == id) else {
         return Ok(None);

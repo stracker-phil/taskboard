@@ -22,7 +22,7 @@ const LIST_LEVEL: Level = { kind: "list", space: space(), node: listNode() };
 const EVERYTHING: Level = { kind: "home", node: listNode({ id: 1, kind: "everything", name: "Everything" }) };
 const PINNED: Level = { kind: "home", node: listNode({ id: 3, kind: "pinned", name: "Pinned" }) };
 
-const recent = (count: number | null): Level => ({ kind: "home", node: listNode({ id: 2, kind: "recent", name: "Recently changed", count }) });
+const recent = (count: number | null): Level => ({ kind: "home", node: listNode({ id: 2, kind: "recent", name: "Unread", count }) });
 
 async function renderHeader(level: Level) {
   render(
@@ -77,11 +77,18 @@ describe("Header", () => {
     });
   });
 
-  describe("Mark all seen", () => {
-    it("marks every issue of Recently changed seen", async () => {
+  describe("Mark all as read", () => {
+    it("is offered by the header of the Unread level", async () => {
       await renderHeader(recent(3));
 
-      await userEvent.click(screen.getByRole("button", { name: "Mark all seen" }));
+      expect(screen.getByRole("heading", { level: 1, name: "Unread" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Mark all as read" })).toBeEnabled();
+    });
+
+    it("marks every issue of Unread read", async () => {
+      await renderHeader(recent(3));
+
+      await userEvent.click(screen.getByRole("button", { name: "Mark all as read" }));
 
       expect(mocked.listMarkAllSeen).toHaveBeenCalledWith(2);
     });
@@ -89,7 +96,7 @@ describe("Header", () => {
     it.each([0, null])("is disabled when the unseen count is %s", async (count) => {
       await renderHeader(recent(count));
 
-      expect(screen.getByRole("button", { name: "Mark all seen" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Mark all as read" })).toBeDisabled();
     });
 
     it.each([
@@ -99,16 +106,16 @@ describe("Header", () => {
     ])("is absent on %s", async (_name, level) => {
       await renderHeader(level);
 
-      expect(screen.queryByRole("button", { name: "Mark all seen" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Mark all as read" })).not.toBeInTheDocument();
     });
 
     it("shows an error toast when marking fails", async () => {
       mocked.listMarkAllSeen.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
       await renderHeader(recent(3));
 
-      await userEvent.click(screen.getByRole("button", { name: "Mark all seen" }));
+      await userEvent.click(screen.getByRole("button", { name: "Mark all as read" }));
 
-      await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not mark them seen: Disk full"));
+      await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not mark them read: Disk full"));
     });
 
     describe("as a page action (recent.markAllSeen)", () => {
@@ -120,7 +127,7 @@ describe("Header", () => {
         return offered;
       };
 
-      it("marks every issue of Recently changed seen", async () => {
+      it("marks every issue of Unread read", async () => {
         await renderHeader(recent(3));
 
         expect(run()).toBe(true);
@@ -144,7 +151,7 @@ describe("Header", () => {
         expect(run()).toBe(false);
       });
 
-      it("is withdrawn once every issue is seen", async () => {
+      it("is withdrawn once every issue is read", async () => {
         const view = render(
           <QueryClientProvider client={createQueryClient()}>
             <Header level={recent(3)} />
@@ -167,7 +174,7 @@ describe("Header", () => {
 
         run();
 
-        await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not mark them seen: Disk full"));
+        await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not mark them read: Disk full"));
       });
     });
   });

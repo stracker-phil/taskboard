@@ -4,7 +4,7 @@ import { onIssueKeys } from "../../commands/issueKeys";
 import type { RowActionHandlers } from "../list/RowActions";
 
 /** The Board's issue keys: J/K (↓/↑) move through a column's cards, ←/→ to the neighbouring open column, ↩
- *  opens; Copy, Pin, Mark seen and Open in Jira act on the current card. Returns the current card's id. */
+ *  opens; Copy, Bookmark, the read toggle and Open in Jira act on the current card. Returns the current card's id. */
 export function useBoardKeys(data: BoardData, open: (id: string) => void, actions: RowActionHandlers & { copyUrl: (key: string) => void }) {
   const [selected, setSelected] = useState<string | null>(null);
   const state = useRef({ data, selected, open, actions });
@@ -50,8 +50,11 @@ export function useBoardKeys(data: BoardData, open: (id: string) => void, action
       togglePin: () => {
         if (state.current.selected) state.current.actions.togglePin(state.current.selected);
       },
-      markSeen: () => {
-        if (state.current.selected) state.current.actions.markSeen(state.current.selected);
+      toggleRead: () => {
+        const { selected, actions, data } = state.current;
+        if (!selected) return;
+        if (data.rows[selected]?.changed) actions.markSeen(selected);
+        else actions.markUnread(selected);
       },
       togglePeek: () => {
         if (state.current.selected) state.current.open(state.current.selected);

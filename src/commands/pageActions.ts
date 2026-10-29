@@ -52,7 +52,7 @@ export const PAGE_ACTION_COMMANDS: Command[] = [
   action("toolbar.columns", "Columns…", "Mod+Alt+C"),
   action("toolbar.group", "Group and Sort…", "Mod+Alt+G"),
   action("go.everything", "Go to Everything", "Mod+Shift+E"),
-  action("go.recent", "Go to Recently Changed", "Mod+Shift+U"),
-  action("go.pinned", "Go to Pinned", "Mod+Shift+P"),
-  action("recent.markAllSeen", "Mark All Seen", "Mod+Shift+A"),
+  action("go.recent", "Go to Unread", "Mod+Shift+U"),
+  action("go.pinned", "Go to Bookmarks", "Mod+Shift+P"),
+  action("recent.markAllSeen", "Mark All as Read", "Mod+Shift+A"),
 ];

@@ -240,6 +240,90 @@ mod going_to_a_level {
     }
 }
 
+mod issues_read_here {
+    use super::*;
+
+    fn ids(list: &[&str]) -> Vec<String> {
+        list.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[tokio::test]
+    async fn a_fresh_store_keeps_no_issue() {
+        let (dir, _db) = lab().await;
+        let nav = NavStore::open(dir.path());
+
+        assert_eq!(nav.read_here_ids(), Vec::<String>::new());
+    }
+
+    #[tokio::test]
+    async fn kept_issues_are_listed_once_in_order() {
+        let (dir, _db) = lab().await;
+        let nav = NavStore::open(dir.path());
+
+        nav.keep_read(&ids(&["b", "a"]));
+        nav.keep_read(&ids(&["b", "c"]));
+
+        assert_eq!(nav.read_here_ids(), ids(&["a", "b", "c"]));
+    }
+
+    #[tokio::test]
+    async fn going_to_the_same_place_keeps_them() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        let recent = recent(&db).await;
+        let at = nav.go(&db, recent, None).await.unwrap();
+        nav.keep_read(&ids(&["a"]));
+
+        nav.go(&db, recent, None).await.unwrap();
+        nav.go(&db, recent, at.location.map(|l| l.view_id))
+            .await
+            .unwrap();
+
+        assert_eq!(nav.read_here_ids(), ids(&["a"]));
+    }
+
+    #[tokio::test]
+    async fn going_to_another_list_clears_them() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        nav.go(&db, recent(&db).await, None).await.unwrap();
+        nav.keep_read(&ids(&["a"]));
+
+        nav.go(&db, everything(&db).await, None).await.unwrap();
+
+        assert_eq!(nav.read_here_ids(), Vec::<String>::new());
+    }
+
+    #[tokio::test]
+    async fn going_to_another_view_of_the_same_list_clears_them() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        let nw = space(&db, NW).await;
+        nav.go(&db, nw, Some(default_view(&db, nw).await))
+            .await
+            .unwrap();
+        nav.keep_read(&ids(&["a"]));
+
+        nav.go(&db, nw, Some(view_named(&db, nw, "Board").await))
+            .await
+            .unwrap();
+
+        assert_eq!(nav.read_here_ids(), Vec::<String>::new());
+    }
+
+    #[tokio::test]
+    async fn a_failed_go_keeps_them() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        nav.go(&db, recent(&db).await, None).await.unwrap();
+        nav.keep_read(&ids(&["a"]));
+
+        nav.go(&db, 9999, None).await.unwrap_err();
+
+        assert_eq!(nav.read_here_ids(), ids(&["a"]));
+    }
+}
+
 mod remembering_views {
     use super::*;
 

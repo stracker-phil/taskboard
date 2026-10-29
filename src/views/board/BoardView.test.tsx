@@ -534,13 +534,25 @@ describe("BoardView", () => {
         expect(mocked.pinToggleIssue).toHaveBeenCalledWith("2");
       });
 
-      it("M marks the card's issue seen", async () => {
-        await renderKeyed();
+      it("M marks the card's unread issue read", async () => {
+        const unread = [row({ id: "1", key: "NW-101", summary: "Draft the sitemap", changed: true })];
+        await renderKeyed(boardData([boardColumn({ key: "1", name: "To Do", style: "todo", ids: ["1"] })], unread));
         await userEvent.keyboard("j");
 
         await userEvent.keyboard("m");
 
         expect(mocked.issuesMarkSeen).toHaveBeenCalledWith(["1"]);
+        expect(mocked.issueMarkUnread).not.toHaveBeenCalled();
+      });
+
+      it("M marks the card's read issue unread", async () => {
+        await renderKeyed();
+        await userEvent.keyboard("j");
+
+        await userEvent.keyboard("m");
+
+        expect(mocked.issueMarkUnread).toHaveBeenCalledWith("1");
+        expect(mocked.issuesMarkSeen).not.toHaveBeenCalled();
       });
 
       it("⌘C copies the card's key", async () => {
@@ -566,6 +578,7 @@ describe("BoardView", () => {
         expect(useStore.getState().issueView).toBeNull();
         expect(mocked.pinToggleIssue).not.toHaveBeenCalled();
         expect(mocked.issuesMarkSeen).not.toHaveBeenCalled();
+        expect(mocked.issueMarkUnread).not.toHaveBeenCalled();
         expect(mocked.copyText).not.toHaveBeenCalled();
       });
     });
@@ -581,29 +594,46 @@ describe("BoardView", () => {
       expect(useStore.getState().issueView).toBeNull();
     });
 
-    it("pins an unpinned issue without opening the card", async () => {
+    it("bookmarks an issue without opening the card", async () => {
       await renderBoard(boardData([PROGRESS], [PRICING]));
 
-      await userEvent.click(screen.getByRole("button", { name: "Pin NW-1042" }));
+      await userEvent.click(screen.getByRole("button", { name: "Bookmark NW-1042" }));
 
       expect(mocked.pinToggleIssue).toHaveBeenCalledWith("1");
       expect(useStore.getState().issueView).toBeNull();
     });
 
-    it("offers Unpin for a pinned issue", async () => {
+    it("offers Remove the bookmark of a bookmarked issue", async () => {
       mocked.pinsList.mockResolvedValue(pins([pinItem({ target: issueTarget({ id: "1", key: "NW-1042" }) })]));
       await renderBoard(boardData([PROGRESS], [PRICING]));
 
-      expect(await screen.findByRole("button", { name: "Unpin NW-1042" })).toHaveAttribute("aria-pressed", "true");
+      expect(await screen.findByRole("button", { name: "Remove the bookmark of NW-1042" })).toHaveAttribute("aria-pressed", "true");
     });
 
-    it("offers Mark seen only on a changed card, and marks it seen", async () => {
+    it("offers Mark as read on an unread card and Mark as unread on a read one", async () => {
       await renderBoard(boardData([PROGRESS, DONE], [{ ...PRICING, changed: true }, NOTES]));
 
-      await userEvent.click(screen.getByRole("button", { name: "Mark NW-1042 seen" }));
+      expect(screen.getByRole("button", { name: "Mark NW-1042 as read" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Mark NW-1042 as unread" })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Mark NW-1001 as unread" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Mark NW-1001 as read" })).not.toBeInTheDocument();
+    });
+
+    it("marks an unread card read", async () => {
+      await renderBoard(boardData([PROGRESS, DONE], [{ ...PRICING, changed: true }, NOTES]));
+
+      await userEvent.click(screen.getByRole("button", { name: "Mark NW-1042 as read" }));
 
       expect(mocked.issuesMarkSeen).toHaveBeenCalledWith(["1"]);
-      expect(screen.queryByRole("button", { name: "Mark NW-1001 seen" })).not.toBeInTheDocument();
+    });
+
+    it("marks a read card unread without opening it", async () => {
+      await renderBoard(boardData([PROGRESS, DONE], [{ ...PRICING, changed: true }, NOTES]));
+
+      await userEvent.click(screen.getByRole("button", { name: "Mark NW-1001 as unread" }));
+
+      expect(mocked.issueMarkUnread).toHaveBeenCalledWith("2");
+      expect(useStore.getState().issueView).toBeNull();
     });
   });
 });

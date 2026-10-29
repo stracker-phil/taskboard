@@ -6,11 +6,12 @@ use std::sync::Arc;
 use chrono::{DateTime, NaiveDate, Utc};
 use tempfile::TempDir;
 
-use taskboard_lib::changes::{Since, mark_all_seen, mark_seen};
+use taskboard_lib::changes::{Since, mark_all_seen, mark_seen, mark_unread};
 use taskboard_lib::connection::{
     ConnectionInput, JiraAccess, fetch_versions, refresh_projects, save, track_project,
 };
 use taskboard_lib::db::Db;
+use taskboard_lib::error::ErrorKind;
 use taskboard_lib::issues::{ActivityItem, issue_activity, issue_get, issue_related};
 use taskboard_lib::jira::{Limiter, TokenKind};
 use taskboard_lib::lists::{Kind, Viewer, sidebar_tree};
@@ -207,6 +208,11 @@ impl Site {
             .await;
     }
 
+    async fn detail_unread(&self, key: &str) -> bool {
+        let id = self.id_of(key).await;
+        issue_get(self.db(), viewer(), id).await.unwrap().unread
+    }
+
     async fn detail_since(&self, key: &str) -> Option<Since> {
         let id = self.id_of(key).await;
         issue_get(self.db(), viewer(), id).await.unwrap().since
@@ -401,7 +407,7 @@ mod marking_seen {
         site.comment_after_seen("LUM-318").await;
         let nw = site.nw_list().await;
 
-        mark_all_seen(
+        let mut marked = mark_all_seen(
             site.db(),
             move |conn| unseen_ids(conn, &viewer(), nw),
             LATER.into(),
@@ -409,6 +415,10 @@ mod marking_seen {
         .await
         .unwrap();
 
+        let mut expected = vec![site.id_of("NW-1042").await, site.id_of("NW-1044").await];
+        expected.sort();
+        marked.sort();
+        assert_eq!(marked, expected);
         let data = site.nw_data().await;
         assert_eq!(state(row_of(&data, "NW-1042")), (false, None));
         assert_eq!(state(row_of(&data, "NW-1044")), (false, None));
@@ -491,6 +501,238 @@ mod recently_changed {
         let tree = sidebar_tree(site.db(), viewer()).await.unwrap();
         let badge = tree.home.iter().find(|n| n.kind == Kind::Recent).unwrap();
         assert_eq!(badge.count, Some(1));
+    }
+}
+
+mod marking_unread {
+    use super::*;
+
+    async fn unread_flag(site: &Site, key: &str) -> bool {
+        site.detail_unread(key).await
+    }
+
+    async fn badge(site: &Site) -> Option<i64> {
+        let tree = sidebar_tree(site.db(), viewer()).await.unwrap();
+        tree.home
+            .iter()
+            .find(|n| n.kind == Kind::Recent)
+            .unwrap()
+            .count
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn an_issue_without_any_change_becomes_unread_everywhere() {
+        let site = Site::new().await;
+        let id = site.id_of("NW-1042").await;
+        assert!(!unread_flag(&site, "NW-1042").await);
+
+        mark_unread(site.db(), id, None).await.unwrap();
+
+        let nw = site.nw_data().await;
+        assert!(row_of(&nw, "NW-1042").changed);
+        assert!(!row_of(&nw, "NW-1044").changed);
+        assert_eq!(sorted_keys(&site.recent_data().await), ["NW-1042"]);
+        assert_eq!(badge(&site).await, Some(1));
+        assert!(unread_flag(&site, "NW-1042").await);
+        assert!(!unread_flag(&site, "NW-1044").await);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn without_a_time_the_seen_time_and_the_activity_stay_as_they_were() {
+        let site = Site::new().await;
+        site.set_seen("NW-1042", TEN).await;
+        let id = site.id_of("NW-1042").await;
+
+        mark_unread(site.db(), id.clone(), None).await.unwrap();
+
+        assert_eq!(site.seen_at("NW-1042").await, TEN);
+        let found = issue_activity(site.db(), viewer(), id).await.unwrap();
+        assert!(!found.is_empty());
+        for item in &found {
+            let (ActivityItem::Comment { at, fresh, .. } | ActivityItem::Change { at, fresh, .. }) =
+                item;
+            assert_eq!(*fresh, at.as_str() > TEN, "{at}");
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn marking_a_never_seen_issue_unread_lists_it() {
+        let site = Site::new().await;
+        site.forget_seen("NW-1042").await;
+        let id = site.id_of("NW-1042").await;
+
+        mark_unread(site.db(), id, None).await.unwrap();
+
+        assert_eq!(sorted_keys(&site.recent_data().await), ["NW-1042"]);
+        assert!(unread_flag(&site, "NW-1042").await);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn mark_seen_clears_the_unread_flag_again() {
+        let site = Site::new().await;
+        let id = site.id_of("NW-1042").await;
+        mark_unread(site.db(), id, None).await.unwrap();
+
+        site.mark(&["NW-1042"], LATER).await;
+
+        assert!(!unread_flag(&site, "NW-1042").await);
+        assert!(site.recent_data().await.rows.is_empty());
+        assert!(!row_of(&site.nw_data().await, "NW-1042").changed);
+        assert_eq!(badge(&site).await, Some(0));
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn mark_all_seen_clears_unread_flags_of_the_list() {
+        let site = Site::new().await;
+        let id = site.id_of("NW-1042").await;
+        mark_unread(site.db(), id.clone(), None).await.unwrap();
+        let nw = site.nw_list().await;
+
+        let marked = mark_all_seen(
+            site.db(),
+            move |conn| unseen_ids(conn, &viewer(), nw),
+            LATER.into(),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(marked, [id]);
+        assert!(site.recent_data().await.rows.is_empty());
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn from_an_activity_time_that_item_and_newer_ones_are_fresh() {
+        let site = Site::new().await;
+        site.record_change(
+            "NW-1042",
+            "due_date",
+            Some("2026-10-30"),
+            Some("2026-11-02"),
+            EIGHT,
+        )
+        .await;
+        site.record_change(
+            "NW-1042",
+            "due_date",
+            Some("2026-11-02"),
+            Some("2026-11-05"),
+            TEN,
+        )
+        .await;
+        site.set_seen("NW-1042", LATER).await;
+        let id = site.id_of("NW-1042").await;
+
+        mark_unread(site.db(), id.clone(), Some(TEN.into()))
+            .await
+            .unwrap();
+
+        assert_eq!(site.seen_at("NW-1042").await, "2026-10-28T09:59:59.999Z");
+        let found = issue_activity(site.db(), viewer(), id).await.unwrap();
+        let mut changes: Vec<(String, bool)> = found
+            .iter()
+            .filter_map(|item| match item {
+                ActivityItem::Change { at, fresh, .. } => Some((at.clone(), *fresh)),
+                ActivityItem::Comment { .. } => None,
+            })
+            .collect();
+        changes.sort();
+        assert_eq!(
+            changes,
+            [(EIGHT.to_string(), false), (TEN.to_string(), true)]
+        );
+        assert_eq!(sorted_keys(&site.recent_data().await), ["NW-1042"]);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn a_time_after_the_seen_time_never_moves_it_forward() {
+        let site = Site::new().await;
+        site.set_seen("NW-1042", EIGHT).await;
+        let id = site.id_of("NW-1042").await;
+
+        mark_unread(site.db(), id, Some(LATER.into()))
+            .await
+            .unwrap();
+
+        assert_eq!(site.seen_at("NW-1042").await, EIGHT);
+        assert!(unread_flag(&site, "NW-1042").await);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn a_time_that_is_not_rfc_3339_is_invalid_input() {
+        let site = Site::new().await;
+        let id = site.id_of("NW-1042").await;
+
+        let err = mark_unread(site.db(), id, Some("yesterday".into()))
+            .await
+            .unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::InvalidInput);
+        assert!(!unread_flag(&site, "NW-1042").await);
+    }
+}
+
+mod read_here {
+    use super::*;
+
+    async fn data_keeping(site: &Site, kind: &str, keys: &[&str]) -> ViewData {
+        let list = site.list_of_kind(kind).await;
+        let view = views_of(site.db(), list).await.unwrap()[0].id;
+        let mut read_here = Vec::new();
+        for key in keys {
+            read_here.push(site.id_of(key).await);
+        }
+        let narrowing = Narrowing {
+            read_here,
+            ..Narrowing::default()
+        };
+        view_rows(site.db(), viewer(), list, view, narrowing)
+            .await
+            .unwrap()
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn unread_keeps_listing_an_issue_read_here_as_not_changed() {
+        let site = Site::new().await;
+        site.comment_after_seen("NW-1042").await;
+        site.comment_after_seen("NW-1044").await;
+        site.mark(&["NW-1042"], LATER).await;
+
+        let data = data_keeping(&site, "recent", &["NW-1042"]).await;
+
+        assert_eq!(sorted_keys(&data), ["NW-1042", "NW-1044"]);
+        assert!(!row_of(&data, "NW-1042").changed);
+        assert!(row_of(&data, "NW-1044").changed);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn unread_without_read_here_drops_the_read_issue() {
+        let site = Site::new().await;
+        site.comment_after_seen("NW-1042").await;
+        site.mark(&["NW-1042"], LATER).await;
+
+        let data = data_keeping(&site, "recent", &[]).await;
+
+        assert!(data.rows.is_empty());
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn other_levels_ignore_read_here() {
+        let site = Site::new().await;
+
+        let bookmarks = data_keeping(&site, "pinned", &["NW-1042"]).await;
+
+        assert!(bookmarks.rows.is_empty());
     }
 }
 

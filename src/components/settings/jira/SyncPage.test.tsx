@@ -181,7 +181,7 @@ describe("SyncPage", () => {
       await userEvent.click(screen.getByRole("button", { name: "Reset Cache" }));
 
       const dialog = screen.getByRole("alertdialog", { name: "Reset the cache?" });
-      expect(dialog).toHaveTextContent("Spaces, filter lists, views and pins stay");
+      expect(dialog).toHaveTextContent("Spaces, filter lists, views and bookmarks stay");
       expect(mocked.cacheReset).not.toHaveBeenCalled();
     });
 

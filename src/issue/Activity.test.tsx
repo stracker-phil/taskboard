@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -7,6 +7,7 @@ vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await impo
 
 import { api, type ActivityItem } from "../api";
 import { createQueryClient } from "../queries/queryClient";
+import { resetStore, useStore } from "../state/store";
 import { ALEX, SAM, changeItem, commentItem } from "../test/issues";
 import { Activity } from "./Activity";
 
@@ -25,6 +26,7 @@ const created = () => changeItem({ field: "created", from: null, to: null });
 
 beforeEach(() => {
   vi.clearAllMocks();
+  resetStore();
 });
 
 describe("Activity", () => {
@@ -93,6 +95,49 @@ describe("Activity", () => {
 
       await screen.findByText("Old note");
       expect(screen.queryByRole("separator")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("mark unread from here", () => {
+    it("marks the issue unread from a comment's time", async () => {
+      renderActivity([commentItem({ at: "2026-10-05T10:00:00Z" })]);
+
+      await userEvent.click(await screen.findByRole("button", { name: "Mark unread from here" }));
+
+      expect(mocked.issueMarkUnread).toHaveBeenCalledWith("10042", "2026-10-05T10:00:00Z");
+    });
+
+    it("marks the issue unread from a change line's time", async () => {
+      renderActivity([changeItem({ at: "2026-10-06T11:00:00Z" })]);
+
+      await userEvent.click(await screen.findByRole("button", { name: "Mark unread from here" }));
+
+      expect(mocked.issueMarkUnread).toHaveBeenCalledWith("10042", "2026-10-06T11:00:00Z");
+    });
+
+    it("offers the button on every comment and change", async () => {
+      renderActivity([changeItem(), commentItem({ id: "1" }), created()]);
+
+      await screen.findByText("Sam Lee");
+      expect(screen.getAllByRole("button", { name: "Mark unread from here" })).toHaveLength(3);
+    });
+
+    it("sends the time of the item whose button was clicked", async () => {
+      renderActivity([commentItem({ id: "2", at: "2026-10-07T08:00:00Z" }), commentItem({ id: "1", at: "2026-10-05T10:00:00Z" })]);
+
+      const buttons = await screen.findAllByRole("button", { name: "Mark unread from here" });
+      await userEvent.click(buttons[1]);
+
+      expect(mocked.issueMarkUnread).toHaveBeenCalledWith("10042", "2026-10-05T10:00:00Z");
+    });
+
+    it("shows an error toast when marking unread fails", async () => {
+      mocked.issueMarkUnread.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
+      renderActivity([commentItem()]);
+
+      await userEvent.click(await screen.findByRole("button", { name: "Mark unread from here" }));
+
+      await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not mark it unread: Disk full"));
     });
   });
 

@@ -42,6 +42,7 @@ function detail(patch: Partial<IssueDetail> = {}): IssueDetail {
     gone: false,
     custom: [],
     since: null,
+    unread: false,
     ...patch,
   };
 }
@@ -154,20 +155,20 @@ describe("Peek", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it("opens the pin dialog from the Pin this issue button and pins the issue", async () => {
+  it("opens the bookmark dialog from the Bookmark this issue button and bookmarks the issue", async () => {
     renderPeek();
 
-    await userEvent.click(await screen.findByRole("button", { name: "Pin this issue" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Bookmark this issue" }));
     await userEvent.type(screen.getByLabelText(/Reason/), "Needs a decision{Enter}");
 
     expect(mocked.pinCreate).toHaveBeenCalledWith("issue", "10042", "untilUnpinned", "Needs a decision");
   });
 
-  it("offers Unpin instead when the issue is pinned", async () => {
+  it("offers Remove bookmark instead when the issue is bookmarked", async () => {
     mocked.pinsList.mockResolvedValue(pins([pinItem({ id: 4 })]));
     renderPeek();
 
-    await userEvent.click(await screen.findByRole("button", { name: "Unpin" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Remove bookmark" }));
 
     expect(mocked.pinRemove).toHaveBeenCalledWith(4);
   });
@@ -181,20 +182,20 @@ describe("Peek", () => {
     expect(screen.getByText("1d left")).toBeInTheDocument();
   });
 
-  it("shows Pinned on a pinned comment without a reason", async () => {
+  it("shows Bookmarked on a bookmarked comment without a reason", async () => {
     mocked.issueActivity.mockResolvedValue([commentItem({ id: "20001" })]);
     mocked.pinsList.mockResolvedValue(pins([pinItem({ target: commentTarget(), reason: null, timeLeft: "" })]));
     renderPeek();
 
-    expect(await screen.findByText("Pinned")).toBeInTheDocument();
+    expect(await screen.findByText("Bookmarked")).toBeInTheDocument();
   });
 
-  it("offers Pin comment on a comment and pins it with the comment's id", async () => {
+  it("offers Bookmark comment on a comment and bookmarks it with the comment's id", async () => {
     mocked.issueActivity.mockResolvedValue([commentItem({ id: "20001" })]);
     renderPeek();
 
-    await userEvent.click(await screen.findByRole("button", { name: "Pin comment" }));
-    await userEvent.click(screen.getByRole("button", { name: "Pin" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Bookmark comment" }));
+    await userEvent.click(screen.getByRole("button", { name: "Bookmark" }));
 
     expect(mocked.pinCreate).toHaveBeenCalledWith("comment", "20001", "untilUnpinned", null);
   });
@@ -208,18 +209,18 @@ describe("Peek", () => {
     expect(onExpand).toHaveBeenCalled();
   });
 
-  describe("unseen changes", () => {
+  describe("unread changes", () => {
     const SINCE = { label: "Since yesterday", text: "2 new comments, moved to Review." };
 
-    it("shows the banner of what changed, without a Mark seen button", async () => {
-      mocked.issueGet.mockResolvedValue(detail({ since: SINCE }));
+    it("shows the banner of what changed, without a Mark as read button", async () => {
+      mocked.issueGet.mockResolvedValue(detail({ since: SINCE, unread: true }));
       renderPeek();
 
       expect(await screen.findByRole("status")).toHaveTextContent("Since yesterday: 2 new comments, moved to Review.");
-      expect(screen.queryByRole("button", { name: "Mark seen" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Mark as read" })).not.toBeInTheDocument();
     });
 
-    it("shows no banner for an issue without unseen changes", async () => {
+    it("shows no banner for an issue without unread changes", async () => {
       renderPeek();
 
       await screen.findByRole("heading", { name: "Redesign the pricing page" });
@@ -259,7 +260,7 @@ describe("Peek", () => {
     }
 
     function serveByKey() {
-      mocked.issueGet.mockImplementation(async (id) => detail({ id, key: id === "10042" ? "NW-1042" : "NW-1043", summary: `Issue ${id}`, since: id === "10042" ? SINCE : null }));
+      mocked.issueGet.mockImplementation(async (id) => detail({ id, key: id === "10042" ? "NW-1042" : "NW-1043", summary: `Issue ${id}`, since: id === "10042" ? SINCE : null, unread: id === "10042" }));
     }
 
     it("marks the issue seen once it has been open for the default two seconds", async () => {

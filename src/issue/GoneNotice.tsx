@@ -3,7 +3,7 @@ import { formatLocalDate } from "../lib/time";
 import { usePinOf } from "../queries/pins";
 import { attempt } from "../state/requests";
 
-/** An issue Jira deleted or hid from the owner (artboard 8, card 6): the cached copy, Remove from cache, Unpin. */
+/** An issue Jira deleted or hid from the owner (artboard 8, card 6): the cached copy, Remove from cache, Remove bookmark. */
 export function GoneNotice({ issue, onRemoved }: { issue: IssueDetail; onRemoved: () => void }) {
   const pin = usePinOf("issue", issue.id);
   const remove = async () => {
@@ -17,8 +17,8 @@ export function GoneNotice({ issue, onRemoved }: { issue: IssueDetail; onRemoved
           Remove from cache
         </button>
         {pin && (
-          <button type="button" className="empty-level__ghost" onClick={() => void attempt(api.pinRemove(pin.id), "Could not unpin it")}>
-            Unpin
+          <button type="button" className="empty-level__ghost" onClick={() => void attempt(api.pinRemove(pin.id), "Could not remove the bookmark")}>
+            Remove bookmark
           </button>
         )}
       </div>

@@ -25,7 +25,7 @@ function renderPinned() {
   );
 }
 
-const pinnedTable = () => screen.findByRole("table", { name: "Pinned" });
+const pinnedTable = () => screen.findByRole("table", { name: "Bookmarked" });
 const rowOf = async (text: RegExp) => within(await pinnedTable()).getByRole("row", { name: text });
 
 beforeEach(() => {
@@ -49,12 +49,12 @@ describe("PinnedView", () => {
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
   });
 
-  it("shows the Pinned, Reason and Time left columns", async () => {
+  it("shows the Bookmarked, Reason and Time left columns", async () => {
     mocked.pinsList.mockResolvedValue(pins([ISSUE]));
     renderPinned();
 
     const table = within(await pinnedTable());
-    expect(table.getAllByRole("columnheader").map((h) => h.textContent)).toEqual(["Pinned", "Reason", "Time left"]);
+    expect(table.getAllByRole("columnheader").map((h) => h.textContent)).toEqual(["Bookmarked", "Reason", "Time left"]);
   });
 
   describe("rows", () => {
@@ -142,37 +142,37 @@ describe("PinnedView", () => {
     });
   });
 
-  describe("unpinning", () => {
-    it("ends the pin from the row's Unpin button without opening the row", async () => {
+  describe("removing a bookmark", () => {
+    it("ends the bookmark from the row's Remove bookmark button without opening the row", async () => {
       mocked.pinsList.mockResolvedValue(pins([ISSUE, COMMENT]));
       renderPinned();
 
-      await userEvent.click(within(await rowOf(/Sam Lee/)).getByRole("button", { name: "Unpin" }));
+      await userEvent.click(within(await rowOf(/Sam Lee/)).getByRole("button", { name: "Remove bookmark" }));
 
       expect(mocked.pinRemove).toHaveBeenCalledWith(2);
       expect(useStore.getState().issueView).toBeNull();
     });
   });
 
-  describe("recently unpinned", () => {
-    it("is left out when no pin ended", async () => {
+  describe("recently removed", () => {
+    it("is left out when no bookmark ended", async () => {
       mocked.pinsList.mockResolvedValue(pins([ISSUE]));
       renderPinned();
 
       await pinnedTable();
-      expect(screen.queryByRole("region", { name: "Recently unpinned" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("region", { name: "Recently removed" })).not.toBeInTheDocument();
     });
 
-    it("lists the ended pins below, without Unpin buttons or time left", async () => {
+    it("lists the ended bookmarks below, without Remove bookmark buttons or time left", async () => {
       const ended = pinItem({ id: 5, target: issueTarget({ id: "10099", key: "NW-1099", summary: "Archive the old banner" }), reason: "Done with it", timeLeft: "" });
       mocked.pinsList.mockResolvedValue(pins([ISSUE], [ended]));
       renderPinned();
 
-      const section = within(await screen.findByRole("region", { name: "Recently unpinned" }));
+      const section = within(await screen.findByRole("region", { name: "Recently removed" }));
       const row = within(section.getByRole("row", { name: /NW-1099/ }));
       expect(row.getByText("Archive the old banner")).toBeInTheDocument();
       expect(row.getByText("Done with it")).toBeInTheDocument();
-      expect(row.queryByRole("button", { name: "Unpin" })).not.toBeInTheDocument();
+      expect(row.queryByRole("button", { name: "Remove bookmark" })).not.toBeInTheDocument();
     });
 
     it("shows the empty state above it when only ended pins exist", async () => {
@@ -180,14 +180,14 @@ describe("PinnedView", () => {
       renderPinned();
 
       expect(await screen.findByText(/^Nothing pinned/)).toBeInTheDocument();
-      expect(screen.getByRole("region", { name: "Recently unpinned" })).toBeInTheDocument();
+      expect(screen.getByRole("region", { name: "Recently removed" })).toBeInTheDocument();
     });
 
-    it("opens the issue of an ended pin when its row is clicked", async () => {
+    it("opens the issue of an ended bookmark when its row is clicked", async () => {
       mocked.pinsList.mockResolvedValue(pins([], [pinItem({ id: 5 })]));
       renderPinned();
 
-      await userEvent.click(within(await screen.findByRole("region", { name: "Recently unpinned" })).getByRole("row", { name: /NW-1042/ }));
+      await userEvent.click(within(await screen.findByRole("region", { name: "Recently removed" })).getByRole("row", { name: /NW-1042/ }));
 
       expect(useStore.getState().issueView?.stack).toEqual(["10042"]);
     });

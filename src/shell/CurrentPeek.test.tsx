@@ -41,6 +41,7 @@ const detail = (): IssueDetail => ({
   gone: false,
   custom: [],
   since: null,
+  unread: false,
 });
 
 function renderPeek() {

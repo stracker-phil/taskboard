@@ -47,8 +47,8 @@ pub const CLOSE: Item = item("Close Window", "window:close", "CmdOrCtrl+W");
 pub const GO_LEVELS: &[Item] = &[
     item("Command Palette…", "page:palette.open", "CmdOrCtrl+K"),
     item("Everything", "page:go.everything", "CmdOrCtrl+Shift+E"),
-    item("Recently Changed", "page:go.recent", "CmdOrCtrl+Shift+U"),
-    item("Pinned", "page:go.pinned", "CmdOrCtrl+Shift+P"),
+    item("Unread", "page:go.recent", "CmdOrCtrl+Shift+U"),
+    item("Bookmarks", "page:go.pinned", "CmdOrCtrl+Shift+P"),
 ];
 pub const GO_MOVES: &[Item] = &[
     item("Previous Space", "nav:previousSpace", "CmdOrCtrl+Alt+Up"),
@@ -77,7 +77,7 @@ pub const LIST_TOOLBAR: &[Item] = &[
     item("Filter This View", "page:toolbar.search", "CmdOrCtrl+F"),
 ];
 pub const LIST_SEEN: &[Item] = &[item(
-    "Mark All Seen",
+    "Mark All as Read",
     "page:recent.markAllSeen",
     "CmdOrCtrl+Shift+A",
 )];
@@ -88,8 +88,8 @@ pub const ISSUE: &[Item] = &[
     item("Open in Jira", "page:issue.openInJira", "CmdOrCtrl+Enter"),
     plain("Copy Key", "page:issue.copyKey"),
     item("Copy Link", "page:issue.copyUrl", "CmdOrCtrl+Shift+C"),
-    plain("Pin or Unpin", "page:issue.togglePin"),
-    plain("Mark Seen", "page:issue.markSeen"),
+    plain("Add or Remove Bookmark", "page:issue.togglePin"),
+    plain("Mark as Read or Unread", "page:issue.markSeen"),
 ];
 /// The window's appearance only; what the page shows lives in Go, List and Issue.
 pub const VIEW: &[Item] = &[item(
@@ -386,6 +386,30 @@ mod tests {
         }
         assert_eq!(commands(LIST_SEEN), ["page:recent.markAllSeen"]);
         assert!(!commands(ISSUE).contains(&"page:recent.markAllSeen"));
+    }
+
+    #[test]
+    fn unread_and_bookmark_items_carry_their_labels() {
+        let label_of = |items: &[Item], command: &str| {
+            items
+                .iter()
+                .find(|item| item.command == command)
+                .map(|item| item.label)
+        };
+        assert_eq!(label_of(GO_LEVELS, "page:go.recent"), Some("Unread"));
+        assert_eq!(label_of(GO_LEVELS, "page:go.pinned"), Some("Bookmarks"));
+        assert_eq!(
+            label_of(LIST_SEEN, "page:recent.markAllSeen"),
+            Some("Mark All as Read")
+        );
+        assert_eq!(
+            label_of(ISSUE, "page:issue.markSeen"),
+            Some("Mark as Read or Unread")
+        );
+        assert_eq!(
+            label_of(ISSUE, "page:issue.togglePin"),
+            Some("Add or Remove Bookmark")
+        );
     }
 
     #[test]

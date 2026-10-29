@@ -116,8 +116,9 @@ pub async fn view_rows(
     state: State<'_, AppState>,
     list_id: i64,
     view_id: i64,
-    narrowing: Narrowing,
+    mut narrowing: Narrowing,
 ) -> AppResult<ViewData> {
+    narrowing.read_here = state.nav.read_here_ids();
     let viewer = Viewer::of(&state.settings.get().connection, Utc::now());
     super::view_rows(&state.db, viewer, list_id, view_id, narrowing).await
 }
@@ -128,8 +129,9 @@ pub async fn view_board(
     state: State<'_, AppState>,
     list_id: i64,
     view_id: i64,
-    narrowing: Narrowing,
+    mut narrowing: Narrowing,
 ) -> AppResult<BoardData> {
+    narrowing.read_here = state.nav.read_here_ids();
     let viewer = Viewer::of(&state.settings.get().connection, Utc::now());
     super::view_board(&state.db, viewer, list_id, view_id, narrowing).await
 }

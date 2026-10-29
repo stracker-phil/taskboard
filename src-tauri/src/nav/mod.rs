@@ -3,8 +3,9 @@
 
 pub mod commands;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
+use std::sync::{Arc, Mutex};
 
 use rusqlite::{Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
@@ -48,6 +49,8 @@ struct Saved {
 #[derive(Clone)]
 pub struct NavStore {
     store: JsonStore<Saved>,
+    /// Issues read while the owner stays at this place: Unread keeps showing them until the place changes.
+    read_here: Arc<Mutex<BTreeSet<String>>>,
 }
 
 const NAV_FILE: &str = "nav.json";
@@ -56,6 +59,7 @@ impl NavStore {
     pub fn open(dir: &Path) -> Self {
         Self {
             store: JsonStore::open(dir.join(NAV_FILE)),
+            read_here: Arc::default(),
         }
     }
 
@@ -82,6 +86,7 @@ impl NavStore {
     /// Opens `list_id` at `view_id`, or at the view it showed last, or its default view.
     pub async fn go(&self, db: &Db, list_id: i64, view_id: Option<i64>) -> AppResult<Nav> {
         let saved = self.store.read(Saved::clone);
+        let before = saved.location;
         let found = db
             .read(move |conn| {
                 node(conn, list_id)?;
@@ -89,6 +94,9 @@ impl NavStore {
             })
             .await?;
         if let Some(at) = found {
+            if before != Some(at) {
+                self.read_here().clear();
+            }
             self.store
                 .update_async(move |s| {
                     s.location = Some(at);
@@ -126,6 +134,18 @@ impl NavStore {
             Some(id) => self.go(db, id, None).await,
             None => self.current(db).await,
         }
+    }
+
+    pub fn keep_read(&self, ids: &[String]) {
+        self.read_here().extend(ids.iter().cloned());
+    }
+
+    pub fn read_here_ids(&self) -> Vec<String> {
+        self.read_here().iter().cloned().collect()
+    }
+
+    fn read_here(&self) -> std::sync::MutexGuard<'_, BTreeSet<String>> {
+        self.read_here.lock().unwrap_or_else(|e| e.into_inner())
     }
 
     pub async fn set_expanded(&self, db: &Db, expanded: Vec<i64>) -> AppResult<Nav> {

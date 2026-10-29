@@ -94,8 +94,8 @@ JSON; no condition is stored as null:
   time zone).
 - `value`: a string, a list of strings or a number of days, as the operator needs.
 
-Built in (migration `local/0002`): Everything (one "All issues" view grouped by Space), and under Home Recently
-changed and Pinned. Tracking a project (`lists::ensure_space`) adds its Space node with three views (All issues,
+Built in (migration `local/0002`): Everything (one "All issues" view grouped by Space), and under Home Unread
+(kind `recent`) and Bookmarks (kind `pinned`; renamed by `local/0008`). Tracking a project (`lists::ensure_space`) adds its Space node with three views (All issues,
 Board, Table; grouped by status; the Space's default columns, else Assignee, Epic, Release, Priority) and the
 filter lists Current sprint, Epics, Release *next unreleased version* (when the project has one), Open bugs, each
 with one List view. Positions among siblings stay 0, 1, 2, … (`order.rs`). Deleting a filter list deletes its
@@ -104,8 +104,9 @@ views and pins; a level keeps at least one view.
 ### Group and sort keys
 
 `view_rows(listId, viewId, narrowing)` returns the view's issues as `ViewData { groupBy, groups, rows,
-columns }`: the level's filter, plus the kind's own rule (Recently changed: issues with unseen changes,
-open or done; Pinned: the actively pinned issues), plus the narrowing (`me`, `text` in the key or summary ignoring
+columns }`: the level's filter, plus the kind's own rule (Unread: issues with unseen changes or marked
+unread, open or done, plus those read since the owner came to this place; Bookmarks: the actively bookmarked
+issues), plus the narrowing (`me`, `text` in the key or summary ignoring
 case and accents, `epic`).
 
 | `groupBy` | Groups, in order |

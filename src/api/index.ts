@@ -172,6 +172,8 @@ export const api = {
   paletteQuery: (text: string) => invoke<PaletteResults>("palette_query", { text }),
   /** Their highlight and change chip clear. */
   issuesMarkSeen: (ids: string[]) => invoke<void>("issues_mark_seen", { ids }),
+  /** Unread again: from the activity item at `from` (its time) on, or the whole issue. */
+  issueMarkUnread: (id: string, from: string | null = null) => invoke<void>("issue_mark_unread", { id, from }),
   pinsList: () => invoke<Pins>("pins_list"),
   /** Pins the target, or changes the duration and reason of its pin. */
   pinCreate: (kind: PinKind, target: string, duration: PinDuration, reason: string | null) =>

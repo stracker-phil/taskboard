@@ -1,6 +1,6 @@
 import type { Since } from "../api";
 
-/** The blue summary of what changed since the owner last looked; the Issue view adds Mark seen. */
+/** The blue summary of what changed since the owner last looked; the Issue view adds Mark as read. */
 export function SinceBanner({ since, onMarkSeen }: { since: Since; onMarkSeen?: () => void }) {
   return (
     <div className={onMarkSeen ? "since-banner since-banner--detail" : "since-banner"} role="status">
@@ -10,7 +10,7 @@ export function SinceBanner({ since, onMarkSeen }: { since: Since; onMarkSeen?: 
       </span>
       {onMarkSeen && (
         <button type="button" className="since-banner__btn" onClick={onMarkSeen}>
-          Mark seen
+          Mark as read
         </button>
       )}
     </div>

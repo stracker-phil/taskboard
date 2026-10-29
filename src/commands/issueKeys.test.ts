@@ -21,7 +21,7 @@ function handlers(patch: Partial<IssueKeyHandlers> = {}) {
     open: vi.fn(),
     openEpic: vi.fn(),
     togglePin: vi.fn(),
-    markSeen: vi.fn(),
+    toggleRead: vi.fn(),
     togglePeek: vi.fn(),
     hasSelection: () => true,
     peekOpen: () => true,
@@ -156,8 +156,8 @@ describe("issue keys", () => {
     });
   });
 
-  describe("pinning", () => {
-    it("P pins or unpins the selected issue", () => {
+  describe("bookmarking", () => {
+    it("P bookmarks the selected issue or removes its bookmark", () => {
       const h = handlers();
       register(h);
 
@@ -173,14 +173,18 @@ describe("issue keys", () => {
     });
   });
 
-  describe("marking seen", () => {
-    it("M marks the selected issue seen", () => {
+  describe("marking read or unread", () => {
+    it("M toggles the selected issue between read and unread", () => {
       const h = handlers();
       register(h);
 
       void press("m")?.run();
 
-      expect(h.markSeen).toHaveBeenCalled();
+      expect(h.toggleRead).toHaveBeenCalled();
+    });
+
+    it("titles M's command as marking the issue read or unread", () => {
+      expect(getCommand("issue.markSeen")?.title).toBe("Mark the issue as read or unread");
     });
 
     it("ignores M without a selected row", () => {

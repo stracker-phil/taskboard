@@ -8,7 +8,7 @@ use serde::Serialize;
 use ts_rs::TS;
 
 use super::{status_names, user_names};
-use crate::changes::{Names, Since, since};
+use crate::changes::{Names, Since, since, unseen_since};
 use crate::db::Db;
 use crate::error::{AppError, AppResult};
 use crate::jira::is_filled;
@@ -55,6 +55,8 @@ pub struct IssueDetail {
     pub custom: Vec<CustomField>,
     /// The banner over an issue with unseen changes.
     pub since: Option<Since>,
+    /// Unseen changes, or marked unread by the owner.
+    pub unread: bool,
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
@@ -147,6 +149,7 @@ fn read(conn: &Connection, viewer: &Viewer, id: &str) -> AppResult<IssueDetail> 
             synced_at: r.get(26)?,
             custom: Vec::new(),
             since: None,
+            unread: false,
         };
         let raw: String = r.get(25)?;
         let project_id: String = r.get(27)?;
@@ -156,6 +159,7 @@ fn read(conn: &Connection, viewer: &Viewer, id: &str) -> AppResult<IssueDetail> 
     .map(|(mut detail, raw, project_id)| -> AppResult<IssueDetail> {
         detail.custom = custom_fields(conn, &project_id, &raw, me)?;
         detail.since = since_banner(conn, viewer, id)?;
+        detail.unread = unseen_since(conn, id)?.is_some();
         Ok(detail)
     })
     .transpose()?

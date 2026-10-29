@@ -23,7 +23,7 @@ function About() {
 }
 
 const PIN_DURATIONS = ["today", "twoDays", "week", "untilUnpinned"] as const satisfies readonly PinDuration[];
-const PIN_LABELS: Record<PinDuration, string> = { today: "Today", twoDays: "2 days", week: "1 week", untilUnpinned: "Until unpinned" };
+const PIN_LABELS: Record<PinDuration, string> = { today: "Today", twoDays: "2 days", week: "1 week", untilUnpinned: "Until removed" };
 
 /** When an open issue counts as seen, and what a new pin starts with. */
 function Behaviour() {
@@ -32,9 +32,9 @@ function Behaviour() {
   const save = (patch: Partial<BehaviourSettings>) =>
     void attempt(api.behaviourSet({ ...settings.behaviour, ...patch }), "Could not save the setting");
   return (
-    <Group title="Behaviour" anchor="behaviour">
+    <Group title="Behavior" anchor="behaviour">
       <NumberField
-        label="Count an issue as seen after"
+        label="Count an issue as read after"
         description="How long it stays open in the peek or the Issue view; 0 marks it at once."
         suffix="seconds"
         min={0}
@@ -43,8 +43,8 @@ function Behaviour() {
         onCommit={(seenAfterSeconds) => save({ seenAfterSeconds })}
       />
       <Segmented
-        label="Pin for"
-        description="What a new pin starts with; the pin popover can change it."
+        label="Bookmark for"
+        description="What a new bookmark starts with; the bookmark popover can change it."
         options={PIN_DURATIONS}
         labels={PIN_LABELS}
         value={settings.behaviour.pinDefault}

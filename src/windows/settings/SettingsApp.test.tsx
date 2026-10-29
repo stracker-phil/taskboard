@@ -87,10 +87,10 @@ describe("SettingsApp", () => {
       window.history.replaceState({}, "", "/?page=general");
     });
 
-    it("shows the Behaviour group before the About group", async () => {
+    it("shows the Behavior group before the About group", async () => {
       await renderSettings();
 
-      const behaviour = await screen.findByText("Count an issue as seen after");
+      const behaviour = await screen.findByText("Count an issue as read after");
       const about = await screen.findByText("Version 4.5.6");
       expect(behaviour.compareDocumentPosition(about) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });

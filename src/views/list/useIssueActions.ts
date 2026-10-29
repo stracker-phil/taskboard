@@ -5,7 +5,7 @@ import { useConnection } from "../../queries/settings";
 import { attempt } from "../../state/requests";
 import { useStore } from "../../state/store";
 
-/** Copy key, copy URL, Open in Jira, Mark seen and the pin toggle; the URL ones are null without a Jira site. */
+/** Copy key, copy URL, Open in Jira, the read toggle and the pin toggle; the URL ones are null without a Jira site. */
 export function useIssueActions() {
   const { data: connection } = useConnection();
   const toast = useStore((s) => s.toast);
@@ -24,8 +24,9 @@ export function useIssueActions() {
         if (url) copy(url, `Copied the link to ${key}`);
       },
       openInJira: site ? (key: string) => void attempt(api.openUrl(urlOf(key) ?? ""), "Could not open Jira") : null,
-      markSeen: (id: string) => void attempt(api.issuesMarkSeen([id]), "Could not mark it seen"),
-      togglePin: (id: string) => void attempt(api.pinToggleIssue(id), "Could not change the pin"),
+      markSeen: (id: string) => void attempt(api.issuesMarkSeen([id]), "Could not mark it read"),
+      markUnread: (id: string) => void attempt(api.issueMarkUnread(id), "Could not mark it unread"),
+      togglePin: (id: string) => void attempt(api.pinToggleIssue(id), "Could not change the bookmark"),
     };
   }, [site, toast]);
 }

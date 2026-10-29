@@ -81,13 +81,13 @@ fn no_spaces_say_where_to_pick_them() {
 #[test]
 fn filters_prefix_a_spaces_lists_with_its_key_and_leave_home_lists_plain() {
     let reply = json!([
-        level(3, "recent", "Recently changed", None, Some(4), false),
+        level(3, "recent", "Unread", None, Some(4), false),
         level(12, "list", "Open bugs", Some("NW"), Some(12), true),
         level(13, "list", "Broken", Some("NWS"), None, false),
     ]);
     assert_eq!(
         printed(&filters(), reply),
-        "   3  Recently changed · 4 open\n\
+        "   3  Unread · 4 open\n\
          * 12  NW/Open bugs · 12 open\n\
          \u{20} 13  NWS/Broken · filter can't be used"
     );

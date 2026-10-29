@@ -11,7 +11,7 @@ use serde::Serialize;
 use ts_rs::TS;
 
 pub use facts::{Names, chip, facts};
-pub use seen::{mark_all_seen, mark_seen};
+pub use seen::{mark_all_seen, mark_seen, mark_unread};
 pub use unseen::{UNSEEN, seen_at, unseen_changes, unseen_since};
 
 use facts::sentence;

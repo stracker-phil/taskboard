@@ -1,4 +1,4 @@
-import { Pin } from "lucide-react";
+import { Bookmark } from "lucide-react";
 import { useState, type RefObject } from "react";
 import { api, type PinDuration, type PinKind } from "../api";
 import { Popover } from "../components/Popover";
@@ -9,7 +9,7 @@ const DURATIONS: { id: PinDuration; label: string }[] = [
   { id: "today", label: "Today" },
   { id: "twoDays", label: "2 days" },
   { id: "week", label: "1 week" },
-  { id: "untilUnpinned", label: "Until unpinned" },
+  { id: "untilUnpinned", label: "Until removed" },
 ];
 
 /** The owner's default duration (Settings → General); the popover starts on it and ⌥-click pins with it. */
@@ -28,12 +28,12 @@ interface Props {
   onClose: () => void;
 }
 
-/** "Keep pinned for" and an optional reason; ↩ pins. */
+/** "Keep bookmarked for" and an optional reason; ↩ bookmarks. */
 export function PinPopover({ title, meta, kind, target, anchor, onClose }: Props) {
   const [duration, setDuration] = useState<PinDuration>(usePinDefault());
   const [reason, setReason] = useState("");
   const pin = () => {
-    void attempt(api.pinCreate(kind, target, duration, reason.trim() || null), "Could not pin it");
+    void attempt(api.pinCreate(kind, target, duration, reason.trim() || null), "Could not bookmark it");
     onClose();
   };
   return (
@@ -51,11 +51,11 @@ export function PinPopover({ title, meta, kind, target, anchor, onClose }: Props
         }}
       >
         <header className="pin-popover__head">
-          <Pin className="pin-popover__icon" size={16} strokeWidth={1.9} aria-hidden="true" />
+          <Bookmark className="pin-popover__icon" size={16} strokeWidth={1.9} aria-hidden="true" />
           <span className="pin-popover__title">{title}</span>
           {meta && <span className="pin-popover__meta">{meta}</span>}
         </header>
-        <span className="pin-popover__caps">Keep pinned for</span>
+        <span className="pin-popover__caps">Keep bookmarked for</span>
         <div className="pin-popover__chips" role="group" aria-label="Duration">
           {DURATIONS.map((d) => (
             <button key={d.id} type="button" className="pin-chip" aria-pressed={duration === d.id} onClick={() => setDuration(d.id)}>
@@ -74,7 +74,7 @@ export function PinPopover({ title, meta, kind, target, anchor, onClose }: Props
             Cancel
           </button>
           <button type="submit" className="btn-primary-dark">
-            Pin
+            Bookmark
           </button>
         </div>
       </form>

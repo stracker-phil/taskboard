@@ -18,8 +18,8 @@ support. To build it or port it, point a coding agent at [AGENTS.md](AGENTS.md).
   sorted and with their own columns. Filters run locally, so they are instant.
 - **Space settings:** per Space, the layouts its views offer and how new views start, its own status colours
   (six status types from Backlog to Done, which views can also group by) and where each custom field shows.
-- **What changed:** Recently changed collects new comments, status and assignee changes since you last looked;
-  pins keep issues at hand for a while.
+- **What changed:** Unread collects new comments, status and assignee changes since you last looked, and
+  anything you mark unread; bookmarks keep issues at hand for a while.
 - **The Issue view:** description, the filled custom fields (acceptance criteria, steps to reproduce),
   web links (pull requests show as such), related issues and the activity, with Jira's HTML sanitised and
   links opened in the browser.
@@ -29,7 +29,7 @@ support. To build it or port it, point a coding agent at [AGENTS.md](AGENTS.md).
 | | |
 |---|---|
 | ![The Board layout of a Space](docs/screens/board.png) | ![An issue in the full Issue view](docs/screens/issue.png) |
-| ![Recently changed, with unseen changes](docs/screens/recent.png) | ![The command palette](docs/screens/palette.png) |
+| ![Unread, with new changes](docs/screens/recent.png) | ![The command palette](docs/screens/palette.png) |
 | ![A Space's settings](docs/screens/space-settings.png) | ![The Table layout](docs/screens/table.png) |
 
 All screenshots show made-up demo data from the debug build.

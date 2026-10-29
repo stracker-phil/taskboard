@@ -229,7 +229,11 @@ custom: Array<CustomField>,
 /**
  * The banner over an issue with unseen changes.
  */
-since: Since | null, };
+since: Since | null, 
+/**
+ * Unseen changes, or marked unread by the owner.
+ */
+unread: boolean, };
 
 export type IssueHit = { id: string, key: string, 
 /**
@@ -308,7 +312,7 @@ export type ListKind = "everything" | "space" | "list" | "recent" | "pinned";
 
 export type ListNode = { id: number, kind: ListKind, name: string, 
 /**
- * Open issues; for Recently changed its unseen issues (the badge), for Pinned its active pins; none for a
+ * Open issues; for Unread its unseen issues (the badge), for Bookmarks its active pins; none for a
  * filter that can't be compiled.
  */
 count: number | null, 
@@ -485,7 +489,7 @@ sync: SyncSettings, appearance: Appearance, behaviour: Behaviour, };
 
 export type SidebarTree = { everything: ListNode, 
 /**
- * Recently changed, Pinned and global filter lists, in order.
+ * Unread, Bookmarks and global filter lists, in order.
  */
 home: Array<ListNode>, 
 /**

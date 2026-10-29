@@ -41,8 +41,8 @@ an item.
 - **Traffic-light strip** (18px, a drag region) for the native window buttons.
 - **Search**: 34px, 9px radius, a `--border` frame on `--panel-bg`, `--text-muted`; Search icon 15/2, the
   label, a "⌘K" key hint (11px, `--fill-subtle`, 5px radius). Disabled until the palette exists.
-- **Home** (`HomeRows`): Everything (`Layers2`), then the Home lists in Rust's order: Recently changed
-  (`History`), Pinned (`Pin`) and global filter lists (`Funnel`). 34px rows, 10px padding and gap, 8px radius,
+- **Home** (`HomeRows`): Everything (`Layers2`), then the Home lists in Rust's order: Unread
+  (`History`), Bookmarks (`Bookmark`) and global filter lists (`Funnel`). 34px rows, 10px padding and gap, 8px radius,
   `--text-strong-body`; icons 17/1.8; the count 12px `--text-muted`, hidden while Rust has none. Recently
   changed has no count: while it has unseen issues its label is 600 and a badge (20px, `--accent`, white
   11/700) shows how many.
@@ -63,8 +63,8 @@ an item.
   `--sync-busy`, `--sync-offline` or `--sync-error-dot` by state; the state in words from
   `describeSyncState`; a refresh icon 14/2; a click syncs now) and Settings (34px, gear 17/1.8).
 - **Hover**: rows, "+", the chip and Settings take `--fill-hover`; the selected row keeps its fill.
-- **Context menus** are native (`api.popupMenu`). A filter list: Rename, Duplicate, Pin to Home (disabled
-  until pins), Delete. A Space: Rename, Colour and icon…, Client label…, Stop tracking.
+- **Context menus** are native (`api.popupMenu`). A filter list: Rename, Duplicate, Add to Home (disabled
+  until bookmarks), Delete. A Space: Rename, Colour and icon…, Client label…, Stop tracking.
 - **Renaming** (`components/InlineRename.tsx`): the name turns into a field with a 2px `--focus-ring`; ↩ or
   leaving the field saves a changed, non-empty name, esc cancels.
 - **Reordering** (`useDragReorder`): drag a Space, or a filter list within its Space, with the mouse; after
@@ -80,7 +80,7 @@ an item.
   `--text-tertiary`, opens the Space), "/" in `--text-faint`, the funnel 15/2 in `--text-tertiary`, then the
   list name (19/700).
 - Everything and the Home lists: their sidebar icon (20/1.8, `--text-tertiary`) and name.
-- **Mark all seen** on the right for Recently changed: 28px, 7px radius, a `--border` frame, 12/600; disabled
+- **Mark all as read** on the right for Unread: 28px, 7px radius, a `--border` frame, 12/600; disabled
   while nothing is unseen.
 - **Open in Jira ↗** on the right for a Space and its lists: 32px, 12px padding, 8px radius, a `--border`
   frame, 13px `--text-secondary`; opens `<site>/browse/<KEY>`. Hidden elsewhere and without a site.
@@ -154,28 +154,35 @@ one group, Board column or pill per style, whatever the status is called; the Bo
 the content panel's full height; header, tabs, toolbar and view narrow beside it and the List hides the
 columns that no longer fit beside a 240px title, rightmost first, until it closes. It slides in.
 
-- Header 50: mono key · type text, then Pin (with pins), Open in Jira, Full view, Close.
+- Header 50: mono key · type text, then Bookmark (with bookmarks), Open in Jira, Full view, Close.
 - Body: title 22/750, one line of chips (status pill `peek`, epic chip, release outline chip, priority,
   assignee), the sanitised description, web links, the latest three activity items with "All activity".
 - Footer 36: the keys.
-- Hovering a row shows its toolbar at the end of the title: Mark seen (changed rows), Copy key, Pin, Open in
-  Jira (`RowActions`).
+- Hovering a row shows its toolbar at the end of the title: Mark as read (unread rows) or Mark as unread, Copy
+  key, Bookmark, Open in Jira (`RowActions`).
 
 ## Change tracking
 
-An issue is changed while the sync recorded a change after the owner last saw it (`src-tauri/src/changes/`).
+An issue is unread while the sync recorded a change after the owner last read it, or while the owner marked it
+unread (`src-tauri/src/changes/`). The UI says read and unread; the code says seen and unseen.
 
 - Changed rows: `--changed-bg`, a 600 summary and the change chip with the most important change ("New",
   "2 new comments", "Moved to Review", "Priority raised", "Assigned to you", "Due date changed"; "+N" for
   more kinds). Changed epic children in the Issue view get the same background.
 - The Since-yesterday banner (`SinceBanner`, `--banner-info-*`) in the peek and the Issue view: "Since
   yesterday:" (or "Since you last looked:" when that was over a day ago) and every change in words; the Issue
-  view adds Mark seen.
+  view adds Mark as read.
 - Activity after the last look (`fresh`, decided in Rust) sits under a "New since yesterday" divider
   (`--accent-text`, `--changed-border` lines); new comments and changes have `--changed-bg`.
-- An issue open in the peek or the Issue view for the owner's delay (Settings → General → Behaviour, 0–10 s,
-  default 2) counts as seen (`useSeenAfter`); leaving sooner doesn't. Mark seen, Mark all seen and the row's
-  Mark seen clear it at once.
+- An issue open in the peek or the Issue view for the owner's delay (Settings → General → Behavior, 0–10 s,
+  default 2) counts as read (`useSeenAfter`); leaving sooner doesn't. Mark as read, Mark all as read and M
+  clear it at once.
+- Mark as unread (row toolbar, the Issue view header, M on a read issue) makes the issue unread
+  (`issue_seen.unread`). Hovering a comment or change in the activity shows Mark unread from here: that item
+  and everything newer count as new again. An issue marked unread while it is open stays unread until it is
+  opened again (`holdUnread`).
+- Unread keeps the issues read there (`NavStore` remembers them) until the owner goes to another level or
+  view; they lose the unread look but don't vanish.
 
 ## Command palette
 
@@ -192,23 +199,25 @@ An issue is changed while the sync recorded a change after the owner last saw it
 - Keys: ↑↓ move (wrapping), ↩ opens (an issue in the full Issue view over its Space's view, its row selected; a list; an action), ⌘C copies
   the key, esc or a click outside closes. The active row is `--palette-active-bg`. Footer 38 lists the keys.
 
-## Pins
+## Bookmarks
 
-Local only (`src-tauri/src/pins/`, `src/pins/`). Issues, comments and filter lists can be pinned.
+Local only (`src-tauri/src/pins/`, `src/pins/`; the code calls them pins). Issues, comments and filter lists can be
+bookmarked; a filter list's bookmark puts it under Home.
 
-- `PinButton` in the peek and Issue view headers ("Pin this issue") and on each comment opens `PinPopover`
-  (340px): "Keep pinned for" chips (Today, 2 days, 1 week, Until unpinned; the owner's default from Settings
-  → General preselected, Until unpinned unless changed; the chosen one `--button-primary-bg`), an optional
-  one-line reason, Cancel and Pin; ↩ pins. ⌥-click pins at once with the default; a pinned target's button is
-  amber and unpins on click.
-- The row toolbar's Pin and P toggle the issue's pin (with the default duration) without the popover; the filter-list
-  context menu has Pin to Home / Unpin from Home, and pinned Space lists appear under Home.
+- `PinButton` (the `Bookmark` icon) in the peek and Issue view headers ("Bookmark this issue") and on each
+  comment (on hover) opens `PinPopover` (340px): "Keep bookmarked for" chips (Today, 2 days, 1 week, Until
+  removed; the owner's default from Settings → General preselected, Until removed unless changed; the chosen one
+  `--button-primary-bg`), an optional one-line reason, Cancel and Bookmark; ↩ bookmarks. ⌥-click bookmarks at
+  once with the default; a bookmarked target's button is amber and removes the bookmark on click.
+- The row toolbar's Bookmark and P toggle the issue's bookmark (with the default duration) without the popover;
+  the filter-list context menu has Add to Home / Remove from Home.
 - Today ends at local midnight, 2 days at the end of tomorrow, 1 week seven midnights on. The page refreshes
-  when the next pin runs out (`usePinExpiry`).
-- A pinned comment shows the amber strip (`--pin-bg`, `--pin-text`): pin icon, the reason, the time left.
-- The Pinned page (`PinnedView`, no tabs or toolbar): one card with the pinned issue (status square, key,
+  when the next bookmark runs out (`usePinExpiry`).
+- A bookmarked comment shows the amber strip (`--pin-bg`, `--pin-text`): bookmark icon, the reason, the time left.
+- The Bookmarks page (`PinnedView`, no tabs or toolbar): one card with the bookmarked issue (status square, key,
   summary), comment (author, excerpt, issue key) or list (Space / name), Reason and Time left; hover shows ×
-  to unpin. "Recently unpinned" lists what ended in the last 7 days. The Home row counts the active pins.
+  to remove the bookmark. "Recently removed" lists what ended in the last 7 days. The Home row counts the active
+  bookmarks.
 
 ## States
 
@@ -222,7 +231,7 @@ Local only (`src-tauri/src/pins/`, `src/pins/`). Issues, comments and filter lis
   "Clear Me filter" while Me is on.
 - **Gone issue** (`GoneNotice`, peek and Issue view): the title struck through in `--text-muted`, the notice
   on `--notice-neutral-*` ("Deleted in Jira or you lost access. Last synced <day>. This is the cached copy."),
-  Remove from cache (`issue_forget`, gone issues only) and Unpin while pinned.
+  Remove from cache (`issue_forget`, gone issues only) and Remove bookmark while bookmarked.
 
 ## Sync chip and token banners
 
@@ -239,7 +248,7 @@ Full view button or E (the selected issue's epic); esc goes back one step (an op
 view with its place intact).
 
 - Header 50: back, breadcrumb (Space tile and name / list or view / key), "Updated …", previous and next in the
-  view's order (also J/K), Pin (with pins), **Open in Jira** (primary).
+  view's order (also J/K), Mark as read or unread, Bookmark (with bookmarks), **Open in Jira** (primary).
 - Main column: type badge · key · comment count, the 30/750 title, the field grid (Status, Assignee, Epic chip
   that opens the epic here, Release, Priority, Sprint, then the custom fields shown as columns or marked shown,
   then every other custom field the issue fills, by name), links ("blocks", "is blocked by"), the description,
@@ -265,7 +274,7 @@ views), also across restarts.
 
 Buttons, tabs, chips, pills, column headers and table cells stay on one line (`base.css`); long text
 truncates with an ellipsis. When space runs out the flexible element shrinks (the text filter, a title), never
-a button. Only descriptions, comment bodies, pin reasons and empty-state text may wrap.
+a button. Only descriptions, comment bodies, bookmark reasons and empty-state text may wrap.
 
 ## Tooltips
 
@@ -463,7 +472,7 @@ no separate Settings design; owner, 2026-10-28). Its colours are the `--settings
     (minutes in front and in the background, days to keep done issues) and *Cache* (the sync state line with
     Sync Now, one row per tracked project with its key, last full sync and "N issues · M open", then Reset
     Cache, confirmed in a sheet). It stays as the diagnostics view of the cache.
-  - **General** (System): *Behaviour* (seen delay, default pin duration) and *About* (version, log folder).
+  - **General** (System): *Behavior* (read delay, default bookmark duration) and *About* (version, log folder).
   - **Appearance**: Automatic, Light or Dark. **Shortcuts**: every command and its key, rebindable.
   - **Status** (`components/settings/status/`, Daybook's Status page): `diagnostics_get` reports groups of
     rows, each a value with a tone icon (ok, warning, error, info) and maybe a bus command as a button: *Jira*
@@ -484,10 +493,10 @@ global shortcuts.
 - **Menus** (`src-tauri/src/menu/`), in the Mac order: Taskboard, File, Edit, Go, List, Issue, View, Window, Help.
   File holds the core actions (New Filter List ⌘N, New View ⌘T; Refresh ⌘R, Full Sync ⇧⌘R; Reset Cache…,
   which opens Settings → Sync → Cache to confirm; Close Window ⌘W). Go moves around (Command Palette ⌘K,
-  Everything ⇧⌘E, Recently Changed ⇧⌘U, Pinned ⇧⌘P, Previous/Next Space ⌥⌘↑/↓, Previous/Next View ⌃⇧⇥/⌃⇥).
+  Everything ⇧⌘E, Unread ⇧⌘U, Bookmarks ⇧⌘P, Previous/Next Space ⌥⌘↑/↓, Previous/Next View ⌃⇧⇥/⌃⇥).
   List acts on the shown issues (Show as List / Board / Table ⌃⌘1–3; Group and Sort… ⌥⌘G, Columns… ⌥⌘C, Edit
   Filter… ⌥⌘F, Only My Issues ⇧⌘M, Filter This View ⌘F; Mark All Seen ⇧⌘A). Issue acts on the selected one
-  (Open, Open or Close Peek, Open Epic, Open in Jira ⌘↩, Copy Key, Copy Link ⇧⌘C, Pin or Unpin, Mark Seen).
+  (Open, Open or Close Peek, Open Epic, Open in Jira ⌘↩, Copy Key, Copy Link ⇧⌘C, Add or Remove Bookmark, Mark as Read or Unread).
   View is the window's appearance only (Toggle Sidebar ⌘\, Enter Full Screen; the debug build's Reload ⌥⌘R),
   never what the page shows. Help has Open Log Folder and Show Data Folder. Plain-letter keys stay off menu
   items so they never take a typed letter; Copy Key has no ⌘C there because Edit → Copy owns it.
@@ -497,7 +506,7 @@ global shortcuts.
 - **Issues** (`commands/issueKeys.ts`, registered by the shown List, Board or Issue view): J or ↓ and K or ↑
   move (on the Board through a column's cards, ← and → to the neighbouring column; in a List ← and → close and
   open the row's group), Space opens or closes the peek (the Board opens the Issue view), ↩ opens the Issue
-  view, E the epic, P pins or unpins (default duration), M marks seen, ⌘C copies the key (only with no text
+  view, E the epic, P adds or removes a bookmark (default duration), M marks read or unread, ⌘C copies the key (only with no text
   field focused and no text selected), ⌘⇧C the URL, ⌘↩ opens it in Jira, esc closes the peek or goes back.
 - `app:settings:<page>` opens Settings at a page or section (the Spaces "+" uses `app:settings:projects`).
 

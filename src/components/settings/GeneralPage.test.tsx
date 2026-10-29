@@ -22,7 +22,7 @@ async function renderPage(current: Behaviour = behaviour()) {
       <GeneralPage />
     </QueryClientProvider>,
   );
-  return screen.findByLabelText("Count an issue as seen after");
+  return screen.findByLabelText("Count an issue as read after");
 }
 
 beforeEach(() => {
@@ -33,8 +33,8 @@ beforeEach(() => {
 });
 
 describe("GeneralPage", () => {
-  describe("Behaviour", () => {
-    it("shows the seconds before an issue counts as seen", async () => {
+  describe("Behavior", () => {
+    it("shows the seconds before an issue counts as read", async () => {
       const field = await renderPage(behaviour({ seenAfterSeconds: 4 }));
 
       expect(field).toHaveValue(4);
@@ -50,7 +50,7 @@ describe("GeneralPage", () => {
       expect(mocked.behaviourSet).toHaveBeenCalledWith({ seenAfterSeconds: 5, pinDefault: "week" });
     });
 
-    it("accepts 0 to count an issue as seen at once", async () => {
+    it("accepts 0 to count an issue as read at once", async () => {
       const field = await renderPage();
 
       await userEvent.clear(field);
@@ -69,11 +69,11 @@ describe("GeneralPage", () => {
       expect(field).toHaveValue(2);
     });
 
-    it("offers Today, 2 days, 1 week and Until unpinned with the saved one pressed", async () => {
+    it("offers Today, 2 days, 1 week and Until removed with the saved one pressed", async () => {
       await renderPage(behaviour({ pinDefault: "week" }));
 
-      const group = screen.getByRole("group", { name: "Pin for" });
-      expect(within(group).getAllByRole("button").map((b) => b.textContent)).toEqual(["Today", "2 days", "1 week", "Until unpinned"]);
+      const group = screen.getByRole("group", { name: "Bookmark for" });
+      expect(within(group).getAllByRole("button").map((b) => b.textContent)).toEqual(["Today", "2 days", "1 week", "Until removed"]);
       expect(within(group).getByRole("button", { pressed: true })).toHaveTextContent("1 week");
     });
 
@@ -84,7 +84,7 @@ describe("GeneralPage", () => {
     ])("sends %s as the pin default together with the current delay", async (label, pinDefault) => {
       await renderPage(behaviour({ seenAfterSeconds: 7 }));
 
-      await userEvent.click(within(screen.getByRole("group", { name: "Pin for" })).getByRole("button", { name: label }));
+      await userEvent.click(within(screen.getByRole("group", { name: "Bookmark for" })).getByRole("button", { name: label }));
 
       expect(mocked.behaviourSet).toHaveBeenCalledWith({ seenAfterSeconds: 7, pinDefault });
     });
@@ -93,7 +93,7 @@ describe("GeneralPage", () => {
       mocked.behaviourSet.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
       await renderPage();
 
-      await userEvent.click(within(screen.getByRole("group", { name: "Pin for" })).getByRole("button", { name: "Today" }));
+      await userEvent.click(within(screen.getByRole("group", { name: "Bookmark for" })).getByRole("button", { name: "Today" }));
 
       await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not save the setting: Disk full"));
     });

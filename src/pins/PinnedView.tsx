@@ -28,7 +28,7 @@ export function PinnedView({ listId, viewId }: Props) {
       {data.active.length === 0 ? (
         <p className="pinned__empty">Nothing pinned. Press P on an issue, or pin a comment or a filter list.</p>
       ) : (
-        <PinTable label="Pinned" pins={data.active} onOpen={open} onUnpin={(pin) => void attempt(api.pinRemove(pin.id), "Could not unpin it")} />
+        <PinTable label="Bookmarked" pins={data.active} onOpen={open} onUnpin={(pin) => void attempt(api.pinRemove(pin.id), "Could not remove the bookmark")} />
       )}
       {data.recentlyUnpinned.length > 0 && (
         <section className="pinned__recent" aria-labelledby="pinned-recent">
@@ -42,7 +42,7 @@ export function PinnedView({ listId, viewId }: Props) {
   );
 }
 
-const RECENT = "Recently unpinned";
+const RECENT = "Recently removed";
 
 interface TableProps {
   label: string;
@@ -56,7 +56,7 @@ function PinTable({ label, pins, onOpen, onUnpin }: TableProps) {
   return (
     <div className={onUnpin ? "pin-table" : "pin-table pin-table--ended"} role="table" aria-label={label}>
       <div className="pin-table__head" role="row">
-        <span role="columnheader">Pinned</span>
+        <span role="columnheader">Bookmarked</span>
         <span role="columnheader">Reason</span>
         <span role="columnheader">{onUnpin ? "Time left" : ""}</span>
       </div>
@@ -93,8 +93,8 @@ function UnpinButton({ onUnpin }: { onUnpin: () => void }) {
     <button
       type="button"
       className="pin-table__unpin"
-      aria-label="Unpin"
-      title="Unpin"
+      aria-label="Remove bookmark"
+      title="Remove bookmark"
       onClick={(e) => {
         e.stopPropagation();
         onUnpin();

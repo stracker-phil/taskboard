@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowLeft, ArrowUp, ExternalLink } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, CheckCheck, CircleDot, ExternalLink } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { api, type IssueDetail } from "../api";
 import { onIssueKeys } from "../commands/issueKeys";
@@ -18,7 +18,7 @@ import { useIssueActions } from "../views/list/useIssueActions";
 import { Activity } from "./Activity";
 import { GoneNotice } from "./GoneNotice";
 import { SinceBanner } from "./SinceBanner";
-import { useSeenAfter } from "./useSeenAfter";
+import { holdUnread, useSeenAfter } from "./useSeenAfter";
 import { FieldGrid } from "./FieldGrid";
 import { JiraHtml } from "./JiraHtml";
 import { RichFields } from "./RichFields";
@@ -40,7 +40,7 @@ export function IssueView({ id, origin }: { id: string; origin: IssueOrigin }) {
   const { data: issue, isError } = useIssue(id);
   const back = useStore((s) => s.issueBack);
   const neighbours = useNeighbours(origin, id);
-  useSeenAfter(id, Boolean(issue?.since));
+  useSeenAfter(id, issue?.unread ?? false);
 
   useEffect(() => {
     // Comments may be newer in Jira than in the cache; a failure (offline) leaves the cached ones.
@@ -108,7 +108,8 @@ function IssueHeader({
       <button type="button" className="issue-header__nav" aria-label="Next issue" title="Next (J)" disabled={!neighbours.next} onClick={() => neighbours.next && showIssue(neighbours.next)}>
         <ArrowDown size={14} strokeWidth={2} aria-hidden="true" />
       </button>
-      {issue && <PinButton kind="issue" target={issue.id} label="Pin this issue" meta={issue.key} className="issue-header__nav" />}
+      {issue && <ReadToggle issue={issue} />}
+      {issue && <PinButton kind="issue" target={issue.id} label="Bookmark this issue" meta={issue.key} className="issue-header__nav" />}
       {issue && actions.openInJira && (
         <button type="button" className="btn-primary-dark issue-header__jira" onClick={() => actions.openInJira?.(issue.key)}>
           Open in Jira
@@ -144,7 +145,7 @@ function IssueMain({ issue, origin }: { issue: IssueDetail; origin: IssueOrigin 
       </div>
       <h1 className={issue.gone ? "issue-main__title issue-title--gone" : "issue-main__title"}>{issue.summary}</h1>
       {issue.gone && <GoneNotice issue={issue} onRemoved={closeIssue} />}
-      {issue.since && <SinceBanner since={issue.since} onMarkSeen={() => void attempt(api.issuesMarkSeen([issue.id]), "Could not mark it seen")} />}
+      {issue.since && <SinceBanner since={issue.since} onMarkSeen={() => void attempt(api.issuesMarkSeen([issue.id]), "Could not mark it read")} />}
       <FieldGrid issue={issue} onOpenEpic={openRelated} />
       {related && <Links links={related.links} onOpen={openRelated} />}
       <section className="issue-main__description" aria-label="Description">
@@ -159,6 +160,26 @@ function IssueMain({ issue, origin }: { issue: IssueDetail; origin: IssueOrigin 
       <WebLinks id={issue.id} variant="issue" />
       {related && <Children related={related} isEpic={issue.isEpic} onOpen={openRelated} onOpenAsList={openAsList} />}
     </div>
+  );
+}
+
+/** Read marks it read now; unread keeps it unread while it stays open. */
+function toggleRead(issue: IssueDetail) {
+  if (issue.unread) {
+    void attempt(api.issuesMarkSeen([issue.id]), "Could not mark it read");
+    return;
+  }
+  holdUnread(issue.id);
+  void attempt(api.issueMarkUnread(issue.id), "Could not mark it unread");
+}
+
+function ReadToggle({ issue }: { issue: IssueDetail }) {
+  const label = issue.unread ? "Mark as read" : "Mark as unread";
+  const Icon = issue.unread ? CheckCheck : CircleDot;
+  return (
+    <button type="button" className="issue-header__nav" aria-label={label} title={`${label} (M)`} onClick={() => toggleRead(issue)}>
+      <Icon size={14} strokeWidth={2} aria-hidden="true" />
+    </button>
   );
 }
 
@@ -195,9 +216,9 @@ function IssueKeys({ issue, neighbours }: { issue: IssueDetail | undefined; neig
         const id = state.current.issue?.id;
         if (id) state.current.actions.togglePin(id);
       },
-      markSeen: () => {
-        const id = state.current.issue?.id;
-        if (id) state.current.actions.markSeen(id);
+      toggleRead: () => {
+        const issue = state.current.issue;
+        if (issue) toggleRead(issue);
       },
       hasSelection: () => state.current.issue !== undefined,
       peekOpen: () => false,

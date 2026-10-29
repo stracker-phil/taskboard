@@ -60,31 +60,31 @@ describe("GoneNotice", () => {
     expect(onRemoved).not.toHaveBeenCalled();
   });
 
-  describe("Unpin", () => {
+  describe("Remove bookmark", () => {
     it("is not offered while the issue is not pinned", async () => {
       renderNotice();
 
       await waitFor(() => expect(mocked.pinsList).toHaveBeenCalled());
-      expect(screen.queryByText("Unpin")).not.toBeInTheDocument();
+      expect(screen.queryByText("Remove bookmark")).not.toBeInTheDocument();
     });
 
     it("removes the issue's pin when it is pinned", async () => {
       mocked.pinsList.mockResolvedValue(pins([pinItem({ id: 7 })]));
       renderNotice();
 
-      await userEvent.click(await screen.findByText("Unpin"));
+      await userEvent.click(await screen.findByText("Remove bookmark"));
 
       expect(mocked.pinRemove).toHaveBeenCalledWith(7);
     });
 
-    it("shows a toast when unpinning fails", async () => {
+    it("shows a toast when removing the bookmark fails", async () => {
       mocked.pinsList.mockResolvedValue(pins([pinItem({ id: 7 })]));
       mocked.pinRemove.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
       renderNotice();
 
-      await userEvent.click(await screen.findByText("Unpin"));
+      await userEvent.click(await screen.findByText("Remove bookmark"));
 
-      await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not unpin it: Disk full"));
+      await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not remove the bookmark: Disk full"));
     });
   });
 });

@@ -698,6 +698,7 @@ mod narrowing {
                 me: true,
                 text: "checkout".into(),
                 epic: Some(epic),
+                ..Narrowing::default()
             })
             .await;
 

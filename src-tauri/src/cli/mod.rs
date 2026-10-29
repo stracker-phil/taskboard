@@ -44,7 +44,7 @@ const EXAMPLES: &str = "Examples:
   taskboard filters NW               a Space's filter lists with their ids
   taskboard go NW Board              open a Space at one of its views
   taskboard go \"NW/Open bugs\"        open a filter list
-  taskboard go recent                open Recently changed
+  taskboard go recent                open Unread
   taskboard me on                    show only my issues in the current view
   taskboard layout table             show the current view as a table
   taskboard search \"login page\" --json
@@ -99,12 +99,12 @@ enum Command {
     },
     /// List a level's views with their ids (default: the open level)
     Views {
-        /// everything, recent, pinned, a Space's key or name, a filter list's name (KEY/name) or an id
+        /// everything, recent (Unread), pinned (Bookmarks), a Space's key or name, a filter list's name (KEY/name) or an id
         level: Option<String>,
     },
     /// Open a Space, a filter list or a Home list, at a view or its last one; starts the app when it isn't running
     Go {
-        /// everything, recent, pinned, a Space's key or name, a filter list's name (KEY/name) or an id
+        /// everything, recent (Unread), pinned (Bookmarks), a Space's key or name, a filter list's name (KEY/name) or an id
         level: String,
         /// A view's name or id (default: the one it showed last)
         view: Option<String>,
@@ -131,7 +131,7 @@ enum Command {
         #[arg(long)]
         full: bool,
     },
-    /// Empty the local copy of Jira and fetch it again; Spaces, filter lists, views and pins stay
+    /// Empty the local copy of Jira and fetch it again; Spaces, filter lists, views and bookmarks stay
     ResetCache {
         /// Confirm it
         #[arg(long, required = true)]

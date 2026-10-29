@@ -126,6 +126,16 @@ describe("page action commands", () => {
 
 });
 
+describe("page action titles", () => {
+  it.each([
+    ["go.recent", "Go to Unread"],
+    ["go.pinned", "Go to Bookmarks"],
+    ["recent.markAllSeen", "Mark All as Read"],
+  ])("name %s %s", (id, title) => {
+    expect(getCommand(id)?.title).toBe(title);
+  });
+});
+
 describe("default bindings of the main window", () => {
   it("parse for every command that has one", () => {
     const unparsable = allCommands().filter((c) => c.defaultBinding && bindingFor(c.id) === null);

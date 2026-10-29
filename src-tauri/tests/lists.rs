@@ -412,8 +412,8 @@ mod the_seeded_levels {
         assert_eq!(
             home,
             [
-                (Kind::Recent, "Recently changed", Some(0)),
-                (Kind::Pinned, "Pinned", Some(0))
+                (Kind::Recent, "Unread", Some(0)),
+                (Kind::Pinned, "Bookmarks", Some(0))
             ]
         );
         assert!(tree.pinned_lists.is_empty());
@@ -1055,7 +1055,7 @@ mod editing_filter_lists {
                 .iter()
                 .map(|n| n.name.as_str())
                 .collect::<Vec<_>>(),
-            ["Recently changed", "Pinned", "My bugs"]
+            ["Unread", "Bookmarks", "My bugs"]
         );
         assert_eq!(tree.home[2].kind, Kind::List);
         assert_eq!(
@@ -1277,7 +1277,7 @@ mod editing_filter_lists {
             |row| Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?)),
         )
         .await;
-        assert_eq!(names(&home), ["Recently changed", "Pinned", "Second"]);
+        assert_eq!(names(&home), ["Unread", "Bookmarks", "Second"]);
         assert_dense(&positions(&home));
     }
 

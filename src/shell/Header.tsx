@@ -9,7 +9,7 @@ import { attempt } from "../state/requests";
 import { HOME_ICONS, spaceOf, type Level } from "./levels";
 
 /** The content header: the level's tile or icon and name (a filter list as Space / funnel / name), then Mark all
- *  seen for Recently changed and Open in Jira for a Space and its lists. */
+ *  as read for Unread and Open in Jira for a Space and its lists. */
 export function Header({ level }: { level: Level }) {
   return (
     <header className="content-header">
@@ -57,13 +57,13 @@ function Title({ level }: { level: Level }) {
   }
 }
 
-/** Recently changed's header action; disabled while nothing is unseen. */
+/** Unread's header action; disabled while nothing is unread. */
 function MarkAllSeen({ listId, unseen }: { listId: number; unseen: number }) {
-  const markAll = () => void attempt(api.listMarkAllSeen(listId), "Could not mark them seen");
+  const markAll = () => void attempt(api.listMarkAllSeen(listId), "Could not mark them read");
   usePageAction("recent.markAllSeen", unseen > 0 ? markAll : null);
   return (
     <button type="button" className="content-header__action" disabled={unseen === 0} onClick={markAll}>
-      Mark all seen
+      Mark all as read
     </button>
   );
 }

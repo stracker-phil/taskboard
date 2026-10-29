@@ -8,11 +8,12 @@ vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await impo
 import { api, type IssueDetail, type Row } from "../api";
 import { installCommands } from "../commands";
 import { getCommand, resolveKeydown } from "../commands/registry";
+import { issueKey } from "../queries/issues";
 import { createQueryClient } from "../queries/queryClient";
 import type { IssueOrigin } from "../state/slices/issueView";
 import { narrowingKey } from "../state/slices/narrowing";
 import { resetStore, useStore } from "../state/store";
-import { groupOf, issueDetail, related, relatedIssue, row, SAM, viewData } from "../test/issues";
+import { commentItem, groupOf, issueDetail, related, relatedIssue, row, SAM, viewData } from "../test/issues";
 import { connectionView } from "../test/jira";
 import { pinItem, pins } from "../test/pins";
 import { settings } from "../test/settings";
@@ -36,11 +37,13 @@ function serve(...issues: IssueDetail[]) {
 
 function renderIssue(id = "10042", origin = ORIGIN) {
   resetStore({ issueView: { origin, stack: [id] } });
-  return render(
-    <QueryClientProvider client={createQueryClient()}>
+  const client = createQueryClient();
+  const view = render(
+    <QueryClientProvider client={client}>
       <IssueView id={id} origin={origin} />
     </QueryClientProvider>,
   );
+  return { ...view, client };
 }
 
 const stack = () => useStore.getState().issueView?.stack;
@@ -66,21 +69,21 @@ beforeEach(() => {
 
 describe("IssueView", () => {
   describe("header", () => {
-    it("pins the issue from the Pin this issue button", async () => {
+    it("bookmarks the issue from the Bookmark this issue button", async () => {
       renderIssue();
 
-      await userEvent.click(await screen.findByRole("button", { name: "Pin this issue" }));
-      await userEvent.click(screen.getByRole("button", { name: "Until unpinned" }));
-      await userEvent.click(screen.getByRole("button", { name: "Pin" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Bookmark this issue" }));
+      await userEvent.click(screen.getByRole("button", { name: "Until removed" }));
+      await userEvent.click(screen.getByRole("button", { name: "Bookmark" }));
 
       expect(mocked.pinCreate).toHaveBeenCalledWith("issue", "10042", "untilUnpinned", null);
     });
 
-    it("unpins a pinned issue from the same button", async () => {
+    it("removes the bookmark of a bookmarked issue from the same button", async () => {
       mocked.pinsList.mockResolvedValue(pins([pinItem({ id: 6 })]));
       renderIssue();
 
-      await userEvent.click(await screen.findByRole("button", { name: "Unpin" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Remove bookmark" }));
 
       expect(mocked.pinRemove).toHaveBeenCalledWith(6);
     });
@@ -281,12 +284,12 @@ describe("IssueView", () => {
       expect(useStore.getState().issueView).not.toBeNull();
     });
 
-    it("offers Unpin in the notice for a pinned issue", async () => {
+    it("offers Remove bookmark in the notice for a pinned issue", async () => {
       serve(GONE);
       mocked.pinsList.mockResolvedValue(pins([pinItem({ id: 6 })]));
       renderIssue();
 
-      await userEvent.click(await screen.findByText("Unpin"));
+      await userEvent.click(await screen.findByText("Remove bookmark"));
 
       expect(mocked.pinRemove).toHaveBeenCalledWith(6);
     });
@@ -299,50 +302,133 @@ describe("IssueView", () => {
     });
   });
 
-  describe("unseen changes", () => {
+  describe("unread changes", () => {
     const SINCE = { label: "Since you last looked", text: "Moved to Review." };
+    const UNREAD = issueDetail({ since: SINCE, unread: true });
 
     afterEach(() => {
       vi.useRealTimers();
     });
 
-    it("shows the banner with Mark seen, which marks the issue seen", async () => {
-      serve(issueDetail({ since: SINCE }));
+    it("shows the banner with Mark as read, which marks the issue read", async () => {
+      serve(UNREAD);
       renderIssue();
 
       expect(await screen.findByRole("status")).toHaveTextContent("Since you last looked: Moved to Review.");
-      await userEvent.click(screen.getByRole("button", { name: "Mark seen" }));
+      await userEvent.click(within(screen.getByRole("status")).getByRole("button", { name: "Mark as read" }));
 
       expect(mocked.issuesMarkSeen).toHaveBeenCalledWith(["10042"]);
     });
 
-    it("shows an error toast when marking seen fails", async () => {
-      serve(issueDetail({ since: SINCE }));
+    it("shows an error toast when marking read fails", async () => {
+      serve(UNREAD);
       mocked.issuesMarkSeen.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
       renderIssue();
 
-      await userEvent.click(await screen.findByRole("button", { name: "Mark seen" }));
+      await userEvent.click(within(await screen.findByRole("status")).getByRole("button", { name: "Mark as read" }));
 
-      await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not mark it seen: Disk full"));
+      await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not mark it read: Disk full"));
     });
 
-    it("shows no banner for an issue without unseen changes", async () => {
+    it("shows no banner for an issue without unread changes", async () => {
       renderIssue();
 
       await title("Checkout: address validation for DACH postcodes");
       expect(screen.queryByRole("status")).not.toBeInTheDocument();
     });
 
+    describe("the header toggle", () => {
+      it("reads Mark as read on an unread issue and marks it read", async () => {
+        serve(issueDetail({ unread: true }));
+        renderIssue();
+
+        await userEvent.click(await screen.findByRole("button", { name: "Mark as read" }));
+
+        expect(mocked.issuesMarkSeen).toHaveBeenCalledWith(["10042"]);
+      });
+
+      it("reads Mark as unread on a read issue and marks it unread", async () => {
+        renderIssue();
+
+        await userEvent.click(await screen.findByRole("button", { name: "Mark as unread" }));
+
+        expect(mocked.issueMarkUnread).toHaveBeenCalledWith("10042");
+        expect(screen.queryByRole("button", { name: "Mark as read" })).not.toBeInTheDocument();
+      });
+
+      it("shows an error toast when marking unread fails", async () => {
+        mocked.issueMarkUnread.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
+        renderIssue();
+
+        await userEvent.click(await screen.findByRole("button", { name: "Mark as unread" }));
+
+        await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not mark it unread: Disk full"));
+      });
+    });
+
+    describe("marking unread while the issue is open", () => {
+      async function markUnreadAndRefresh(client: ReturnType<typeof renderIssue>["client"]) {
+        await userEvent.click(await screen.findByRole("button", { name: "Mark as unread" }));
+        serve(issueDetail({ unread: true }), EPIC);
+        await act(() => client.invalidateQueries({ queryKey: issueKey("10042") }));
+        await screen.findByRole("button", { name: "Mark as read" });
+      }
+
+      it("keeps the issue unread instead of marking it read after the delay", async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        const { client } = renderIssue();
+
+        await markUnreadAndRefresh(client);
+        await vi.advanceTimersByTimeAsync(5000);
+
+        expect(mocked.issuesMarkSeen).not.toHaveBeenCalled();
+      });
+
+      it("keeps the issue unread when an activity item is marked unread", async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        mocked.issueActivity.mockResolvedValue([commentItem()]);
+        const { client } = renderIssue();
+
+        await userEvent.click(await screen.findByRole("button", { name: "Mark unread from here" }));
+        serve(issueDetail({ unread: true }), EPIC);
+        await act(() => client.invalidateQueries({ queryKey: issueKey("10042") }));
+        await screen.findByRole("button", { name: "Mark as read" });
+        await vi.advanceTimersByTimeAsync(5000);
+
+        expect(mocked.issuesMarkSeen).not.toHaveBeenCalled();
+      });
+
+      it("marks the issue read as usual once another issue was shown in between", async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        const { client, rerender } = renderIssue();
+        await markUnreadAndRefresh(client);
+        const show = (id: string) =>
+          rerender(
+            <QueryClientProvider client={client}>
+              <IssueView id={id} origin={ORIGIN} />
+            </QueryClientProvider>,
+          );
+
+        show("10001");
+        await title("Checkout");
+        await vi.advanceTimersByTimeAsync(3000);
+        show("10042");
+        await vi.advanceTimersByTimeAsync(2500);
+
+        expect(mocked.issuesMarkSeen).toHaveBeenCalledWith(["10042"]);
+      });
+    });
+
     async function openUnseen() {
       vi.useFakeTimers({ shouldAdvanceTime: true });
-      serve(issueDetail({ since: SINCE }));
+      serve(UNREAD);
       const view = renderIssue();
       await screen.findByRole("status");
       await vi.advanceTimersByTimeAsync(0);
       return view;
     }
 
-    it("marks the issue seen once it has been open for the default two seconds", async () => {
+    it("marks the issue read once it has been open for the default two seconds", async () => {
       await openUnseen();
 
       await vi.advanceTimersByTimeAsync(1500);
@@ -352,7 +438,18 @@ describe("IssueView", () => {
       expect(mocked.issuesMarkSeen).toHaveBeenCalledWith(["10042"]);
     });
 
-    it("marks the issue seen at once when the delay in the settings is 0", async () => {
+    it("marks an unread issue read after the delay even without a banner", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      serve(issueDetail({ unread: true, since: null }));
+      renderIssue();
+      await screen.findByRole("button", { name: "Mark as read" });
+
+      await vi.advanceTimersByTimeAsync(2500);
+
+      expect(mocked.issuesMarkSeen).toHaveBeenCalledWith(["10042"]);
+    });
+
+    it("marks the issue read at once when the delay in the settings is 0", async () => {
       mocked.getSettings.mockResolvedValue(settings({ behaviour: { seenAfterSeconds: 0, pinDefault: "untilUnpinned" } }));
 
       await openUnseen();
@@ -361,7 +458,7 @@ describe("IssueView", () => {
       expect(mocked.issuesMarkSeen).toHaveBeenCalledWith(["10042"]);
     });
 
-    it("does not mark the issue seen when the view is left before the delay", async () => {
+    it("does not mark the issue read when the view is left before the delay", async () => {
       const { unmount } = await openUnseen();
 
       await vi.advanceTimersByTimeAsync(1000);
@@ -371,7 +468,7 @@ describe("IssueView", () => {
       expect(mocked.issuesMarkSeen).not.toHaveBeenCalled();
     });
 
-    it("never marks an issue without unseen changes", async () => {
+    it("never marks a read issue", async () => {
       vi.useFakeTimers({ shouldAdvanceTime: true });
       renderIssue();
       await title("Checkout: address validation for DACH postcodes");
@@ -583,23 +680,46 @@ describe("IssueView", () => {
       installCommands("main");
     });
 
-    it("M marks the shown issue seen", async () => {
+    it("M marks an unread issue read", async () => {
+      serve(issueDetail({ unread: true }));
       renderIssue("10042");
       await title("Checkout: address validation for DACH postcodes");
 
       await press("issue.markSeen");
 
       expect(mocked.issuesMarkSeen).toHaveBeenCalledWith(["10042"]);
+      expect(mocked.issueMarkUnread).not.toHaveBeenCalled();
     });
 
-    it("shows an error toast when M cannot mark the issue seen", async () => {
+    it("M marks a read issue unread", async () => {
+      renderIssue("10042");
+      await title("Checkout: address validation for DACH postcodes");
+
+      await press("issue.markSeen");
+
+      expect(mocked.issueMarkUnread).toHaveBeenCalledWith("10042");
+      expect(mocked.issuesMarkSeen).not.toHaveBeenCalled();
+    });
+
+    it("shows an error toast when M cannot mark the issue read", async () => {
+      serve(issueDetail({ unread: true }));
       mocked.issuesMarkSeen.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
       renderIssue("10042");
       await title("Checkout: address validation for DACH postcodes");
 
       await press("issue.markSeen");
 
-      await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not mark it seen: Disk full"));
+      await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not mark it read: Disk full"));
+    });
+
+    it("shows an error toast when M cannot mark the issue unread", async () => {
+      mocked.issueMarkUnread.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
+      renderIssue("10042");
+      await title("Checkout: address validation for DACH postcodes");
+
+      await press("issue.markSeen");
+
+      await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not mark it unread: Disk full"));
     });
 
     it.each([

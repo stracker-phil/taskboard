@@ -83,7 +83,7 @@ fn pin(
 ) -> AppResult<()> {
     if !target_exists(conn, kind, target)? {
         return Err(AppError::NotFound(format!(
-            "Nothing to pin: {} {target}",
+            "Nothing to bookmark: {} {target}",
             kind.as_str()
         )));
     }

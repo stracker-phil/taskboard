@@ -81,8 +81,27 @@ describe("useIssueActions", () => {
     });
   });
 
+  describe("markUnread", () => {
+    it("marks the whole issue unread", async () => {
+      const actions = await renderActions("");
+
+      actions.current.markUnread("10042");
+
+      expect(mocked.issueMarkUnread).toHaveBeenCalledWith("10042");
+    });
+
+    it("shows an error when marking fails", async () => {
+      mocked.issueMarkUnread.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
+      const actions = await renderActions("");
+
+      actions.current.markUnread("10042");
+
+      await waitFor(() => expect(toasts()).toEqual([["error", "Could not mark it unread: Disk full"]]));
+    });
+  });
+
   describe("markSeen", () => {
-    it("marks the issue seen", async () => {
+    it("marks the issue read", async () => {
       const actions = await renderActions("");
 
       actions.current.markSeen("10042");
@@ -96,7 +115,7 @@ describe("useIssueActions", () => {
 
       actions.current.markSeen("10042");
 
-      await waitFor(() => expect(toasts()).toEqual([["error", "Could not mark it seen: Disk full"]]));
+      await waitFor(() => expect(toasts()).toEqual([["error", "Could not mark it read: Disk full"]]));
     });
   });
 

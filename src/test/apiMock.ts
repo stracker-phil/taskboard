@@ -135,6 +135,7 @@ export function createApiMock(): Api {
     issueForget: vi.fn().mockResolvedValue(undefined),
     issueSyncComments: vi.fn().mockResolvedValue(false),
     issuesMarkSeen: vi.fn().mockResolvedValue(undefined),
+    issueMarkUnread: vi.fn().mockResolvedValue(undefined),
     listMarkAllSeen: vi.fn().mockResolvedValue(undefined),
     pinsList: vi.fn(async (): Promise<Pins> => ({ active: [], recentlyUnpinned: [] })),
     pinCreate: vi.fn().mockResolvedValue(undefined),

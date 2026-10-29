@@ -12,17 +12,17 @@ describe("SinceBanner", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Since yesterday: 2 new comments, moved to Review.");
   });
 
-  it("offers no Mark seen without a handler", () => {
+  it("offers no Mark as read without a handler", () => {
     render(<SinceBanner since={SINCE} />);
 
-    expect(screen.queryByRole("button", { name: "Mark seen" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Mark as read" })).not.toBeInTheDocument();
   });
 
-  it("calls the handler when Mark seen is clicked", async () => {
+  it("calls the handler when Mark as read is clicked", async () => {
     const onMarkSeen = vi.fn();
     render(<SinceBanner since={SINCE} onMarkSeen={onMarkSeen} />);
 
-    await userEvent.click(screen.getByRole("button", { name: "Mark seen" }));
+    await userEvent.click(screen.getByRole("button", { name: "Mark as read" }));
 
     expect(onMarkSeen).toHaveBeenCalled();
   });

@@ -81,8 +81,8 @@ async function renderSidebar(tree: SidebarTree = treeWith(), nav: Nav = navAt(nu
 }
 
 // A row's label and count are adjacent spans, so its accessible name is the label followed by the count, no space.
-// Recently changed shows its count as a badge labelled "<n> unseen".
-const named = (label: string) => new RegExp(`^${label}\\s*(\\d+( unseen)?)?$`);
+// Recently changed shows its count as a badge labelled "<n> unread".
+const named = (label: string) => new RegExp(`^${label}\\s*(\\d+( unread)?)?$`);
 const spaceButton = (label: string) => screen.getByRole("button", { name: named(label) });
 
 function menuEntry(text: string) {
@@ -129,10 +129,10 @@ describe("Sidebar", () => {
       expect(within(within(home).getByRole("button", { name: named("Recently changed") })).getByText("8")).toBeInTheDocument();
     });
 
-    it("show Recently changed's count as an unseen badge", async () => {
+    it("show Recently changed's count as an unread badge", async () => {
       await renderSidebar();
 
-      expect(within(screen.getByRole("navigation", { name: "Home" })).getByLabelText("8 unseen")).toHaveTextContent("8");
+      expect(within(screen.getByRole("navigation", { name: "Home" })).getByLabelText("8 unread")).toHaveTextContent("8");
     });
 
     it.each([0, null])("show no badge and no count on Recently changed when its count is %s", async (count) => {
@@ -142,7 +142,7 @@ describe("Sidebar", () => {
 
       const row = within(screen.getByRole("navigation", { name: "Home" })).getByRole("button", { name: "Recently changed" });
       expect(row).toHaveTextContent(/^Recently changed$/);
-      expect(screen.queryByLabelText(/unseen/)).not.toBeInTheDocument();
+      expect(screen.queryByLabelText(/unread/)).not.toBeInTheDocument();
     });
 
     it("show no count when it is null", async () => {
@@ -434,15 +434,15 @@ describe("Sidebar", () => {
       await waitFor(() => expect(mocked.pinsList).toHaveBeenCalled());
     });
 
-    it("offers Unpin from Home instead of Pin to Home and ends the pin", async () => {
+    it("offers Remove from Home instead of Add to Home and ends the pin", async () => {
       await waitFor(() => {
         mocked.popupMenu.mockClear();
         fireEvent.contextMenu(screen.getByRole("button", { name: named("Epics") }));
-        expect(menuEntry("Unpin from Home")).toBeDefined();
+        expect(menuEntry("Remove from Home")).toBeDefined();
       });
-      expect(menuEntry("Pin to Home")).toBeUndefined();
+      expect(menuEntry("Add to Home")).toBeUndefined();
 
-      await chooseFromMenu("Unpin from Home");
+      await chooseFromMenu("Remove from Home");
 
       expect(mocked.pinRemove).toHaveBeenCalledWith(9);
     });
@@ -454,15 +454,15 @@ describe("Sidebar", () => {
       fireEvent.contextMenu(await screen.findByRole("button", { name: named("Epics") }));
     });
 
-    it("offers Rename, Duplicate, Pin to Home and Delete", () => {
+    it("offers Rename, Duplicate, Add to Home and Delete", () => {
       const entries: MenuEntry[] = mocked.popupMenu.mock.calls[0][0];
 
-      expect(entries.map((e) => (e === "separator" ? e : e.text))).toEqual(["Rename", "Duplicate", "Pin to Home", "separator", "Delete"]);
-      expect(menuEntry("Pin to Home")).not.toMatchObject({ enabled: false });
+      expect(entries.map((e) => (e === "separator" ? e : e.text))).toEqual(["Rename", "Duplicate", "Add to Home", "separator", "Delete"]);
+      expect(menuEntry("Add to Home")).not.toMatchObject({ enabled: false });
     });
 
-    it("pins the list to Home until unpinned, without a reason", async () => {
-      await chooseFromMenu("Pin to Home");
+    it("adds the list to Home until removed, without a reason", async () => {
+      await chooseFromMenu("Add to Home");
 
       expect(mocked.pinCreate).toHaveBeenCalledWith("filterList", String(EPICS.id), "untilUnpinned", null);
     });

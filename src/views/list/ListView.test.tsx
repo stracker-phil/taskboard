@@ -116,21 +116,33 @@ describe("ListView", () => {
       expect(screen.getByRole("row", { name: /NW-1042/ })).not.toHaveClass("list-row--changed");
     });
 
-    it("offers Mark seen on a changed row, which marks it seen without selecting it", async () => {
+    it("offers Mark as read on an unread row, which marks it read without selecting it", async () => {
       const changed = row({ id: "3", key: "NW-1003", summary: "Fix the footer links", changed: true, changeNote: "2 new comments" });
       await renderList(viewData([groupOf([OPEN, changed])], [OPEN, changed]));
 
-      await userEvent.click(await screen.findByRole("button", { name: "Mark NW-1003 seen" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Mark NW-1003 as read" }));
 
       expect(mocked.issuesMarkSeen).toHaveBeenCalledWith(["3"]);
       expect(screen.getByRole("row", { name: /NW-1003/ })).toHaveAttribute("aria-selected", "false");
     });
 
-    it("offers no Mark seen on an unchanged row", async () => {
+    it("offers Mark as unread on a read row, which marks it unread without selecting it", async () => {
       await renderList(viewData([groupOf([OPEN])], [OPEN]));
 
-      await screen.findByRole("row", { name: /NW-1042/ });
-      expect(screen.queryByRole("button", { name: /Mark .* seen/ })).not.toBeInTheDocument();
+      await userEvent.click(await screen.findByRole("button", { name: "Mark NW-1042 as unread" }));
+
+      expect(mocked.issueMarkUnread).toHaveBeenCalledWith("1");
+      expect(mocked.issuesMarkSeen).not.toHaveBeenCalled();
+      expect(screen.getByRole("row", { name: /NW-1042/ })).toHaveAttribute("aria-selected", "false");
+    });
+
+    it("offers only one of Mark as read and Mark as unread on a row", async () => {
+      const changed = row({ id: "3", key: "NW-1003", summary: "Fix the footer links", changed: true });
+      await renderList(viewData([groupOf([OPEN, changed])], [OPEN, changed]));
+
+      await screen.findByRole("row", { name: /NW-1003/ });
+      expect(screen.queryByRole("button", { name: "Mark NW-1003 as unread" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Mark NW-1042 as read" })).not.toBeInTheDocument();
     });
 
     it("selects the row that is clicked", async () => {
@@ -240,22 +252,22 @@ describe("ListView", () => {
       expect(screen.queryByRole("button", { name: /in Jira$/ })).not.toBeInTheDocument();
     });
 
-    it("toggles the issue's pin without selecting the row", async () => {
+    it("toggles the issue's bookmark without selecting the row", async () => {
       await renderList(viewData([groupOf([OPEN])], [OPEN]));
 
-      await userEvent.click(await action("Pin NW-1042"));
+      await userEvent.click(await action("Bookmark NW-1042"));
 
       expect(mocked.pinToggleIssue).toHaveBeenCalledWith("1");
       expect(screen.getByRole("row", { name: /NW-1042/ })).toHaveAttribute("aria-selected", "false");
       expect(place().selectedId).toBeNull();
     });
 
-    it("reads Unpin for an issue that is pinned", async () => {
+    it("reads Remove the bookmark of an issue that is bookmarked", async () => {
       mocked.pinsList.mockResolvedValue(pins([pinItem({ target: issueTarget({ id: "1", key: "NW-1042" }) })]));
       await renderList(viewData([groupOf([OPEN])], [OPEN]));
 
-      expect(await action("Unpin NW-1042")).toHaveAttribute("aria-pressed", "true");
-      expect(screen.queryByRole("button", { name: "Pin NW-1042" })).not.toBeInTheDocument();
+      expect(await action("Remove the bookmark of NW-1042")).toHaveAttribute("aria-pressed", "true");
+      expect(screen.queryByRole("button", { name: "Bookmark NW-1042" })).not.toBeInTheDocument();
     });
   });
 
@@ -340,22 +352,36 @@ describe("ListView", () => {
       expect(useStore.getState().issueView).toEqual({ origin: { listId: 11, viewId: 101 }, stack: ["3"] });
     });
 
-    it("marks the selected issue seen", async () => {
-      await renderList(viewData([groupOf(rows)], rows));
+    it("marks the selected unread issue read", async () => {
+      const unread = row({ id: "3", key: "NW-1003", summary: "Fix the footer links", changed: true });
+      const unreadRows = [OPEN, unread, LAST];
+      await renderList(viewData([groupOf(unreadRows)], unreadRows));
       await userEvent.click(await screen.findByText("Fix the footer links"));
 
       await press("issue.markSeen");
 
       expect(mocked.issuesMarkSeen).toHaveBeenCalledWith(["3"]);
+      expect(mocked.issueMarkUnread).not.toHaveBeenCalled();
     });
 
-    it("marks nothing seen without a selected issue", async () => {
+    it("marks the selected read issue unread", async () => {
+      await renderList(viewData([groupOf(rows)], rows));
+      await userEvent.click(await screen.findByText("Fix the footer links"));
+
+      await press("issue.markSeen");
+
+      expect(mocked.issueMarkUnread).toHaveBeenCalledWith("3");
+      expect(mocked.issuesMarkSeen).not.toHaveBeenCalled();
+    });
+
+    it("marks nothing without a selected issue", async () => {
       await renderList(viewData([groupOf(rows)], rows));
       await screen.findByRole("row", { name: /NW-1042/ });
 
       await press("issue.markSeen");
 
       expect(mocked.issuesMarkSeen).not.toHaveBeenCalled();
+      expect(mocked.issueMarkUnread).not.toHaveBeenCalled();
     });
 
     it("closes the selected issue's peek and opens it again", async () => {

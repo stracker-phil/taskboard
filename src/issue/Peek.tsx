@@ -22,7 +22,7 @@ export function Peek({ id, onClose, onExpand }: { id: string; onClose: () => voi
   const { data: issue, isError } = useIssue(id);
   const actions = useIssueActions();
   const bodyRef = useRef<HTMLDivElement>(null);
-  useSeenAfter(id, Boolean(issue?.since));
+  useSeenAfter(id, issue?.unread ?? false);
 
   useEffect(() => {
     if (bodyRef.current) bodyRef.current.scrollTop = 0;
@@ -41,7 +41,7 @@ export function Peek({ id, onClose, onExpand }: { id: string; onClose: () => voi
           </>
         )}
         <span className="peek__spacer" />
-        {issue && <PinButton kind="issue" target={issue.id} label="Pin this issue" meta={issue.key} className="peek__btn" />}
+        {issue && <PinButton kind="issue" target={issue.id} label="Bookmark this issue" meta={issue.key} className="peek__btn" />}
         {issue && actions.openInJira && (
           <button type="button" className="peek__btn" aria-label="Open in Jira" title="Open in Jira (⌘↩)" onClick={() => actions.openInJira?.(issue.key)}>
             <ExternalLink size={14} strokeWidth={1.9} aria-hidden="true" />
@@ -115,7 +115,7 @@ function Body({ issue, onExpand, onClose }: { issue: IssueDetail; onExpand: () =
             </button>
           </header>
           {latest.map((item, i) => (
-            <ActivityEntry key={i} item={item} />
+            <ActivityEntry key={i} item={item} issueId={issue.id} />
           ))}
         </section>
       )}

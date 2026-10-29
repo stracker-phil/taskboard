@@ -39,6 +39,11 @@
 }
 .comment-card__pin:hover { color: var(--text-tertiary); background: var(--hover-bg); }
 .comment-card__pin[aria-pressed="true"], .comment-card__pin[aria-expanded="true"] { background: var(--pin-bg); color: var(--pin-icon); }
+/* Activity actions appear on hover; an open pin popover keeps its button. */
+.comment-card .comment-card__pin, .change-line .comment-card__pin { opacity: 0; transition: opacity var(--motion-fast) var(--ease-out); }
+.comment-card:hover .comment-card__pin, .change-line:hover .comment-card__pin, .comment-card__pin:focus-visible,
+.comment-card__pin[aria-expanded="true"] { opacity: 1; }
+.change-line__action { width: 22px; height: 22px; margin-top: -1px; }
 .pin-strip {
   display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 7px; background: var(--pin-bg);
   color: var(--pin-text); font-size: 12px; animation: fade-in var(--motion-base) var(--ease-out);

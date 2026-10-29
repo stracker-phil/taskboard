@@ -9,8 +9,8 @@ interface Props {
   open: (listId: number) => void;
 }
 
-/** Everything, Recently changed, Pinned and the global filter lists: icon, label, count. Recently changed shows
- *  its unseen issues as a badge instead. */
+/** Everything, Unread, Bookmarks and the global filter lists: icon, label, count. Unread shows
+ *  its unread issues as a badge instead. */
 export function HomeRows({ rows, activeId, open }: Props) {
   return (
     <nav className="sb-home" aria-label="Home">
@@ -31,7 +31,7 @@ export function HomeRows({ rows, activeId, open }: Props) {
             <Icon size={17} strokeWidth={1.8} aria-hidden="true" />
             <span className="sb-row__label">{node.name}</span>
             {unread ? (
-              <span className="sb-row__badge" aria-label={`${node.count} unseen`}>
+              <span className="sb-row__badge" aria-label={`${node.count} unread`}>
                 {node.count}
               </span>
             ) : (

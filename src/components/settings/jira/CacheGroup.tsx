@@ -7,7 +7,7 @@ import { ConfirmSheet } from "../../ConfirmSheet";
 import { Group, Row } from "../controls";
 import { useBusyAction } from "../useBusyAction";
 
-const WHAT_STAYS = "Taskboard deletes its copy of your Jira issues and fetches them again. Spaces, filter lists, views and pins stay.";
+const WHAT_STAYS = "Taskboard deletes its copy of your Jira issues and fetches them again. Spaces, filter lists, views and bookmarks stay.";
 
 const issues = (n: number) => (n === 1 ? "1 issue" : `${n} issues`);
 

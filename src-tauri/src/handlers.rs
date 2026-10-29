@@ -28,6 +28,7 @@ pub fn handlers() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
         commands::log_frontend_error,
         commands::take_launch_events,
         changes::issues_mark_seen,
+        changes::issue_mark_unread,
         pins::pins_list,
         search::palette_query,
         pins::pin_create,

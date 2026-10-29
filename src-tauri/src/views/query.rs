@@ -37,6 +37,10 @@ pub struct Narrowing {
     pub text: String,
     /// Only children of this epic.
     pub epic: Option<String>,
+    /// Unread keeps these read issues (read since the owner came here); set by Rust, never by the page.
+    #[serde(skip)]
+    #[ts(skip)]
+    pub read_here: Vec<String>,
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
@@ -152,7 +156,7 @@ fn mark_changed(conn: &Connection, me: Option<&str>, items: &mut [(Row, Facts)])
     Ok(())
 }
 
-/// The filter list's issues with unseen changes, for Mark all seen.
+/// The filter list's unread issues, for Mark all as read.
 pub fn unseen_ids(conn: &Connection, viewer: &Viewer, list_id: i64) -> AppResult<Vec<String>> {
     let ctx = viewer.ctx(conn)?;
     let (condition, params) = conditions(conn, viewer, &ctx, list_id, &Narrowing::default())?;
@@ -181,8 +185,9 @@ fn conditions(
     let mut params = compiled.params;
     match node.kind {
         Kind::Recent => {
-            condition.push_str(" AND ");
-            condition.push_str(UNSEEN);
+            let kept = vec!["?"; narrowing.read_here.len()].join(", ");
+            condition.push_str(&format!(" AND ({UNSEEN} OR i.id IN ({kept}))"));
+            params.extend(narrowing.read_here.iter().map(|id| id.clone().into()));
         }
         Kind::Pinned => {
             condition.push_str(&format!(

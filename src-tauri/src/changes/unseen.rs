@@ -1,5 +1,6 @@
 //! Which recorded changes the owner hasn't seen: those after the issue's `issue_seen` time, or all of them
-//! when it has none (the first sync marks every issue it finds as seen).
+//! when it has none (the first sync marks every issue it finds as seen). An issue the owner marked unread
+//! counts as unseen too, changes or not.
 
 use std::collections::HashMap;
 
@@ -7,10 +8,11 @@ use rusqlite::{Connection, OptionalExtension, params};
 
 use crate::error::AppResult;
 
-/// An issue (alias `i`) with a change recorded after the owner last saw it.
-pub const UNSEEN: &str = "EXISTS (SELECT 1 FROM cache.issue_change c
+/// An issue (alias `i`) with a change recorded after the owner last saw it, or marked unread.
+pub const UNSEEN: &str = "(EXISTS (SELECT 1 FROM cache.issue_change c
     LEFT JOIN cache.issue_seen s ON s.issue_id = c.issue_id
-    WHERE c.issue_id = i.id AND c.field != 'gone' AND (s.seen_at IS NULL OR c.changed_at > s.seen_at))";
+    WHERE c.issue_id = i.id AND c.field != 'gone' AND (s.seen_at IS NULL OR c.changed_at > s.seen_at))
+    OR EXISTS (SELECT 1 FROM cache.issue_seen u WHERE u.issue_id = i.id AND u.unread = 1))";
 
 /// One row of `issue_change`.
 #[derive(Debug, Clone, PartialEq)]
@@ -31,7 +33,7 @@ fn change(r: &rusqlite::Row, from: usize) -> rusqlite::Result<Change> {
     })
 }
 
-/// Every issue's unseen changes, oldest first.
+/// Every issue's unseen changes, oldest first; an issue marked unread without any has an empty list.
 pub fn unseen_changes(conn: &Connection) -> AppResult<HashMap<String, Vec<Change>>> {
     let mut query = conn.prepare(
         "SELECT c.issue_id, c.field, c.old_value, c.new_value, c.changed_at FROM cache.issue_change c
@@ -44,6 +46,10 @@ pub fn unseen_changes(conn: &Connection) -> AppResult<HashMap<String, Vec<Change
     for row in rows {
         let (id, change) = row?;
         by_issue.entry(id).or_default().push(change);
+    }
+    let mut marked = conn.prepare("SELECT issue_id FROM cache.issue_seen WHERE unread = 1")?;
+    for id in marked.query_map([], |r| r.get::<_, String>(0))? {
+        by_issue.entry(id?).or_default();
     }
     Ok(by_issue)
 }

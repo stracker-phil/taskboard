@@ -15,10 +15,10 @@ export interface IssueKeyHandlers {
   open?: () => void;
   /** E: the selected issue's epic in the Issue view. */
   openEpic: () => void;
-  /** P: pins the selected issue for the default duration, or unpins it. */
+  /** P: bookmarks the selected issue for the default duration, or removes its bookmark. */
   togglePin: () => void;
-  /** M: the selected issue counts as seen. */
-  markSeen: () => void;
+  /** M: the selected issue is marked read, or unread again when it is read. */
+  toggleRead: () => void;
   /** Space: opens or closes the selected issue's peek; absent where there is none, so Space scrolls. */
   togglePeek?: () => void;
   hasSelection: () => boolean;
@@ -51,8 +51,8 @@ export const ISSUE_KEY_COMMANDS: Command[] = [
   { id: "issue.copyUrl", title: "Copy issue URL", scope: "main", defaultBinding: "Mod+Shift+C", when: selected, run: () => handlers?.copyUrl() },
   { id: "issue.open", title: "Open the issue", scope: "main", defaultBinding: "Enter", when: () => selected() && handlers?.open !== undefined, run: () => handlers?.open?.() },
   { id: "issue.openEpic", title: "Open the issue's epic", scope: "main", defaultBinding: "E", when: selected, run: () => handlers?.openEpic() },
-  { id: "issue.togglePin", title: "Pin or unpin the issue", scope: "main", defaultBinding: "P", when: selected, run: () => handlers?.togglePin() },
-  { id: "issue.markSeen", title: "Mark the issue seen", scope: "main", defaultBinding: "M", when: selected, run: () => handlers?.markSeen() },
+  { id: "issue.togglePin", title: "Bookmark the issue or remove its bookmark", scope: "main", defaultBinding: "P", when: selected, run: () => handlers?.togglePin() },
+  { id: "issue.markSeen", title: "Mark the issue as read or unread", scope: "main", defaultBinding: "M", when: selected, run: () => handlers?.toggleRead() },
   { id: "issue.togglePeek", title: "Open or close the peek", scope: "main", defaultBinding: "Space", when: () => selected() && handlers?.togglePeek !== undefined, run: () => handlers?.togglePeek?.() },
   {
     id: "issue.back",

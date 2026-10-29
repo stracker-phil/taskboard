@@ -77,8 +77,8 @@ function FilterListRow({ list, active, renaming, onOpen, onRename, onRenameDone,
       { text: "Rename", run: onRename },
       { text: "Duplicate", run: () => void attempt(api.listDuplicate(list.id), "Could not duplicate the filter list") },
       pin
-        ? { text: "Unpin from Home", run: () => void attempt(api.pinRemove(pin.id), "Could not unpin the filter list") }
-        : { text: "Pin to Home", run: () => void attempt(api.pinCreate("filterList", String(list.id), "untilUnpinned", null), "Could not pin the filter list") },
+        ? { text: "Remove from Home", run: () => void attempt(api.pinRemove(pin.id), "Could not remove the filter list from Home") }
+        : { text: "Add to Home", run: () => void attempt(api.pinCreate("filterList", String(list.id), "untilUnpinned", null), "Could not add the filter list to Home") },
       "separator",
       { text: "Delete", run: () => void deleteList(list) },
     ]);
@@ -141,7 +141,7 @@ function FilterListRow({ list, active, renaming, onOpen, onRename, onRenameDone,
 async function deleteList(list: ListNode) {
   const confirmed = await useStore.getState().confirm({
     title: `Delete the filter list “${list.name}”?`,
-    text: "Its conditions, its views and its pins go. The issues stay in Jira and in the Space.",
+    text: "Its conditions, its views and its bookmarks go. The issues stay in Jira and in the Space.",
     action: "Delete Filter List",
   });
   if (confirmed) await attempt(api.listDelete(list.id), "Could not delete the filter list");
