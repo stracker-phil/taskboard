@@ -208,7 +208,7 @@
 }
 .sb-list__icon:hover, .sb-list__icon[aria-expanded="true"] { background: var(--fill-hover); color: var(--text); }
 .sb-list-row[data-dragging] { opacity: 0.5; }
-.icon-picker { left: 0; top: calc(100% + 4px); width: 252px; padding: 10px; gap: 6px; }
+.icon-picker { position: fixed; width: 252px; padding: 10px; gap: 6px; }
 .icon-picker__grid { display: grid; grid-template-columns: repeat(8, 28px); gap: 2px; }
 .icon-picker__option {
   display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 7px;

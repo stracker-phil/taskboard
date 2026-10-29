@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { isRecordingTarget } from "../commands/registry";
 
 interface Props {
@@ -7,6 +7,7 @@ interface Props {
   anchor: RefObject<HTMLElement | null>;
   onClose: () => void;
   className: string;
+  style?: CSSProperties;
   children: ReactNode;
 }
 
@@ -14,7 +15,7 @@ const FOCUSABLE = 'button:not(:disabled), input:not(:disabled), select:not(:disa
 
 /** A panel under its toolbar button. Escape and a press outside close it; focus moves in and goes back to the
  *  button when it closes. */
-export function Popover({ label, anchor, onClose, className, children }: Props) {
+export function Popover({ label, anchor, onClose, className, style, children }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
   useEffect(() => {
@@ -52,7 +53,7 @@ export function Popover({ label, anchor, onClose, className, children }: Props) 
   }, [anchor]);
 
   return (
-    <div ref={ref} className={`popover ${className}`} role="dialog" aria-label={label}>
+    <div ref={ref} className={`popover ${className}`} style={style} role="dialog" aria-label={label}>
       {children}
     </div>
   );
