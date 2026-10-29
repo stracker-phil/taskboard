@@ -13,6 +13,7 @@ import "./table.css";
 import "./toolbar.css";
 import "./peek.css";
 import "./hover-peek.css";
+import "./look.css";
 import "./issue-view.css";
 import "./changes.css";
 import "./pins.css";

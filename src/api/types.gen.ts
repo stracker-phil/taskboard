@@ -338,9 +338,13 @@ description: string,
  */
 error: string | null, 
 /**
- * The icon the owner picked for a filter list; none shows the funnel.
+ * The icon the owner picked for a filter list (`look`); none shows the funnel.
  */
-icon: string | null, };
+icon: string | null, 
+/**
+ * Its tile color; none shows the icon plain.
+ */
+color: string | null, };
 
 /**
  * Payload of `local_changed`.
@@ -572,11 +576,11 @@ color: string | null, client: string | null, openCount: number, lists: Array<Lis
  */
 export type SpaceUpdate = { name: string | null, 
 /**
- * One letter or digit.
+ * One letter, digit or emoji, or a line icon's name (`look`).
  */
 icon: string | null, 
 /**
- * A Space tile colour number (`SPACE_COLORS`).
+ * A tile color number (`look::TILE_COLORS`).
  */
 color: string | null, client: string | null, };
 
@@ -676,7 +680,15 @@ collapsed: { [key in string]: boolean },
 /**
  * What a click on an issue opens here; none follows Settings → General.
  */
-openWith: IssueOpening | null, position: number, 
+openWith: IssueOpening | null, 
+/**
+ * The tab's icon (`look`); none shows the layout's.
+ */
+icon: string | null, 
+/**
+ * The icon's tile color; none shows the icon plain.
+ */
+color: string | null, position: number, 
 /**
  * The tab a level opens with.
  */

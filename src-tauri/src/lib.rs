@@ -22,6 +22,7 @@ pub mod jira;
 pub mod launch;
 pub mod lists;
 pub mod lock;
+pub mod look;
 pub mod menu;
 pub mod nav;
 pub mod net;

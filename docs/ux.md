@@ -58,14 +58,14 @@ an item.
   rows, 9px gap, `--text-secondary`, the list's icon 15/2 (the funnel unless one was picked), name and count (`ListCount`; a list whose filter can't be
   used shows a muted `CircleAlert` with the reason as its tooltip instead). The current list is selected like
   a Space, 600. A Space without filter lists shows "+ New filter list" (30px, 13px, `--text-muted`); it and
-  the Space row's + create "New filter list", open it and start renaming it. A click on a list's icon opens `IconPicker` (a grid of `components/listIcons.ts`; the
-  funnel resets), saved with `list_set_icon`; the header and Home show the same icon.
+  the Space row's + create "New filter list", open it and start renaming it. A click on a list's icon opens the look editor (`LookPopover`), saved with
+  `list_set_look`; the header and Home show the same tile.
 - **Footer** (`SidebarFooter`): the sync chip (34px, 13px `--text-tertiary`; a 7px dot in `--sync-ok`,
   `--sync-busy`, `--sync-offline` or `--sync-error-dot` by state; the state in words from
   `describeSyncState`; a refresh icon 14/2; a click syncs now) and Settings (34px, gear 17/1.8).
 - **Hover**: rows, "+", the chip and Settings take `--fill-hover`; the selected row keeps its fill.
 - **Context menus** are native (`api.popupMenu`). A filter list: Rename, Duplicate, Add to Home (disabled
-  until bookmarks), Delete. A Space: Rename, Colour and icon…, Client label…, Stop tracking.
+  until bookmarks), Delete. A Space: Rename, Icon and Color…, Client label…, Stop tracking.
 - **Renaming** (`components/InlineRename.tsx`): the name turns into a field with a 2px `--focus-ring`; ↩ or
   leaving the field saves a changed, non-empty name, esc cancels.
 - **Reordering** (`useDragReorder`): drag a Space, or a filter list within its Space, with the mouse; after
@@ -85,6 +85,18 @@ an item.
   while nothing is unseen.
 - **Open in Jira ↗** on the right for a Space and its lists: 32px, 12px padding, 8px radius, a `--border`
   frame, 13px `--text-secondary`; opens `<site>/browse/<KEY>`. Hidden elsewhere and without a site.
+
+## Tiles and the look editor
+
+Spaces, filter lists and views share one look (`components/look/`, Rust `look.rs`): an icon and a tile color.
+The icon is one letter, digit or emoji (the first grapheme typed; ⌃⌘Space opens macOS's emoji picker) or the
+name of a line icon from `components/look/icons.ts`; the color is one of the twelve `--space-tile-N`. `Tile`
+draws the icon in `--text-on-accent` (white) on the color with a 5–8px radius; without a color (lists and views
+only) the icon stands alone in the text color. A Space without an icon shows its name's first letter, a list
+the funnel, a view its layout's tile. `LookEditor`: a 32px preview, Icon / Letter or emoji, Reset, the 8-column
+icon grid or the text field, then the swatches ("No color" first where allowed). `LookPopover` puts it under the
+element it changes: a list's icon in the sidebar, a view tab ("Icon and Color…" in its context menu); Space
+settings show it inline.
 
 ## View tabs
 
@@ -388,7 +400,7 @@ low strength), and both pass the same contrast checks.
 | Accent | `--accent`, `--accent-text`, `--selection-bg`/`--selection-text`, `--accent-soft-bg`/`-border`/`-text`, `--button-primary-bg`/`-text`, `--spinner-track`, `--focus-ring` | blue 600, blue 700, `#E3EBFD`, … |
 | Changed | `--changed-bg`, `--changed-border`, `--changed-chip-bg`/`-text`, `--changed-dot` | light blues |
 | Status | `--status-{todo,progress,review,blocked,done}-{bg,fg,border,square,tint,count}`, `--status-todo-tab-{bg,fg}` | grey, blue, violet, red, green |
-| Data | `--flag-*`, `--epic-{1..5}-{bg,fg}`, `--label-{1,2,neutral}-{bg,fg}`, `--avatar-{1..4}`, `--avatar-ring`, `--space-tile-{1..5}`, `--view-{list,board,table}` | |
+| Data | `--flag-*`, `--epic-{1..5}-{bg,fg}`, `--label-{1,2,neutral}-{bg,fg}`, `--avatar-{1..4}`, `--avatar-ring`, `--space-tile-{1..12}`, `--view-{list,board,table}` | |
 | Messages | `--banner-{info,warn,error}-*`, `--notice-neutral-*`, `--pin-*`, `--pr-open-*`, `--sync-*`, `--progress-done` | |
 | Shadows | `--shadow-{panel,popover,palette,peek,raised,card,knob,group-card,hover,hover-toolbar}` | |
 | Hover, list | `--hover-bg`, `--row-hover-bg`, `--list-bg` | `#F4F4F5`, `#FAFAFB`, `#F7F7F8` |
@@ -475,15 +487,14 @@ no separate Settings design; owner, 2026-10-28). Its colours are the `--settings
     client and Move Up / Move Down buttons; clicking the row opens that Space's own page (`spaces/SpaceSettings`,
     ClickUp's Space settings; also the sidebar menu's Space Settings…, `app:settings:space:<projectId>`), with
     "‹ Spaces" back to the list. *General*: its fields (`SpaceFields` in `components/SpaceEditor.tsx`): Name
-    (empty uses the project's), Icon letter (one letter or digit), Colour (twelve swatches of
-    `--space-tile-1..12` beside a preview tile) and Client (empty means internal). *Layouts*: a switch per layout
+    (empty uses the project's), Icon and color (the look editor; a Space always has a color) and Client (empty means internal). *Layouts*: a switch per layout
     its views offer (one stays on), the default layout of new views and their grouping. *Statuses*: only the
     statuses this Space's issues are in, under a section per Jira category, with a search field; a row: the pill,
     "N issues", and a button (the style's square and "Automatic · X" or the style's name) with a native menu of
     Automatic and the six styles. *Custom fields*: a row per field with a menu of Visible, Hidden in list (no
     column choice), Hidden in detail (not in the Issue view) and Hidden everywhere. Each field
     saves on its own with Rust's field error under it. "Track projects under Projects to get Spaces." when none
-    is tracked. The sidebar's "Colour and icon…" and "Client label…" items open `SpacePopover` (300px, 12px
+    is tracked. The sidebar's "Icon and Color…" and "Client label…" items open `SpacePopover` (300px, 12px
     radius, `--shadow-popover`, at the top left of the content panel) with the same fields; Esc, Done or a
     click outside close it.
   - **Sync**: *Scope* (the effective JQL in a monospaced field; Validate, Save, Reset to Default), *Intervals*

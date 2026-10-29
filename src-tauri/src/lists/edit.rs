@@ -11,11 +11,9 @@ use super::nodes::{Kind, Node, all_nodes, node, scope_of};
 use crate::db::{Changes, Db, LocalPart};
 use crate::error::{AppError, AppResult};
 use crate::filter::{Field, Filter, OPEN_ISSUES, compile};
+use crate::look::{clean_color, clean_icon};
 use crate::order::Siblings;
 use crate::views::{clean_name, copy_views};
-
-/// The Space tile colours the palette has (`--space-tile-*`).
-const SPACE_COLORS: u8 = 12;
 
 /// Only filter lists can be renamed, duplicated, moved, filtered or deleted here.
 fn filter_list(conn: &Connection, id: i64) -> AppResult<Node> {
@@ -106,28 +104,20 @@ pub async fn list_rename(db: &Db, id: i64, name: String) -> AppResult<()> {
     .await
 }
 
-/// The longest icon name the app's icon set uses, with room to spare.
-const ICON_MAX: usize = 40;
-
-/// A filter list's icon, by name (lowercase letters, digits and dashes); `None` goes back to the funnel.
-pub async fn list_set_icon(db: &Db, id: i64, icon: Option<String>) -> AppResult<()> {
-    if let Some(name) = &icon {
-        let valid = !name.is_empty()
-            && name.len() <= ICON_MAX
-            && name
-                .chars()
-                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-');
-        if !valid {
-            return Err(AppError::InvalidInput(format!(
-                "“{name}” isn't an icon name"
-            )));
-        }
-    }
+/// A filter list's look; no icon is the funnel, no color shows the icon plain.
+pub async fn list_set_look(
+    db: &Db,
+    id: i64,
+    icon: Option<String>,
+    color: Option<String>,
+) -> AppResult<()> {
+    let icon = clean_icon(icon)?;
+    let color = clean_color(color)?;
     db.write(move |tx, changes| {
         filter_list(tx, id)?;
         tx.execute(
-            "UPDATE filter_list SET icon = ?2 WHERE id = ?1",
-            params![id, icon],
+            "UPDATE filter_list SET icon = ?2, color = ?3 WHERE id = ?1",
+            params![id, icon, color],
         )?;
         changes.local_changed(LocalPart::Lists);
         Ok(())
@@ -141,12 +131,15 @@ pub async fn list_duplicate(db: &Db, id: i64) -> AppResult<i64> {
         let original = filter_list(tx, id)?;
         let order = list_siblings(original.parent_id);
         tx.execute(
-            "INSERT INTO filter_list (parent_id, kind, name, filter, position) VALUES (?1, 'list', ?2, ?3, ?4)",
+            "INSERT INTO filter_list (parent_id, kind, name, filter, position, icon, color)
+             VALUES (?1, 'list', ?2, ?3, ?4, ?5, ?6)",
             params![
                 original.parent_id,
                 format!("{} copy", original.name),
                 original.filter,
-                order.end(tx)?
+                order.end(tx)?,
+                original.icon,
+                original.color
             ],
         )?;
         let copy = tx.last_insert_rowid();
@@ -261,9 +254,9 @@ pub async fn space_move(db: &Db, project_id: String, position: i64) -> AppResult
 #[serde(rename_all = "camelCase")]
 pub struct SpaceUpdate {
     pub name: Option<String>,
-    /// One letter or digit.
+    /// One letter, digit or emoji, or a line icon's name (`look`).
     pub icon: Option<String>,
-    /// A Space tile colour number (`SPACE_COLORS`).
+    /// A tile color number (`look::TILE_COLORS`).
     pub color: Option<String>,
     pub client: Option<String>,
 }
@@ -274,14 +267,8 @@ pub async fn space_update(db: &Db, project_id: String, update: SpaceUpdate) -> A
             .map(|v| v.trim().to_string())
             .filter(|v| !v.is_empty())
     };
-    let icon = blank_is_none(update.icon);
-    let color = blank_is_none(update.color);
-    if let Some(icon) = &icon {
-        validate_icon(icon)?;
-    }
-    if let Some(color) = &color {
-        validate_color(color)?;
-    }
+    let icon = clean_icon(update.icon)?;
+    let color = clean_color(update.color)?;
     let name = blank_is_none(update.name);
     let client = blank_is_none(update.client);
     db.write(move |tx, changes| {
@@ -303,29 +290,6 @@ pub async fn space_update(db: &Db, project_id: String, update: SpaceUpdate) -> A
         Ok(())
     })
     .await
-}
-
-fn validate_icon(icon: &str) -> AppResult<()> {
-    if icon.chars().count() != 1 || !icon.chars().all(char::is_alphanumeric) {
-        return Err(AppError::InvalidField {
-            field: "icon".into(),
-            message: "Use one letter or digit".into(),
-        });
-    }
-    Ok(())
-}
-
-fn validate_color(color: &str) -> AppResult<()> {
-    if !color
-        .parse::<u8>()
-        .is_ok_and(|n| (1..=SPACE_COLORS).contains(&n))
-    {
-        return Err(AppError::InvalidField {
-            field: "color".into(),
-            message: format!("Use a colour from 1 to {SPACE_COLORS}"),
-        });
-    }
-    Ok(())
 }
 
 fn require_space(conn: &Connection, project_id: &str) -> AppResult<()> {

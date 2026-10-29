@@ -1,8 +1,9 @@
 import { type HTMLAttributes, type MouseEvent, useRef, useState } from "react";
 import { api, type ListNode, type SpaceNode } from "../../api";
-import { IconPicker } from "../../components/IconPicker";
 import { InlineRename } from "../../components/InlineRename";
-import { listIcon } from "../../components/listIcons";
+import { Funnel } from "lucide-react";
+import { LookPopover } from "../../components/look/LookPopover";
+import { Tile } from "../../components/look/Tile";
 import { usePinOf } from "../../queries/pins";
 import { attempt } from "../../state/requests";
 import { useStore } from "../../state/store";
@@ -87,8 +88,7 @@ function FilterListRow({ list, active, renaming, onOpen, onRename, onRenameDone,
       { text: "Delete", run: () => void deleteList(list) },
     ]);
   };
-  const Icon = listIcon(list.icon);
-  const icon = <Icon size={15} strokeWidth={2} aria-hidden="true" />;
+  const icon = <Tile icon={list.icon} color={list.color} fallback={Funnel} size={list.color ? 16 : 15} />;
   const [picking, setPicking] = useState(false);
   const iconRef = useRef<HTMLButtonElement>(null);
   if (renaming) {
@@ -118,23 +118,26 @@ function FilterListRow({ list, active, renaming, onOpen, onRename, onRenameDone,
         <span className="sb-row__label">{list.name}</span>
         <ListCount list={list} />
       </button>
-      {/* The icon sits over the row's icon slot: a click on it picks another icon (ClickUp style). */}
+      {/* The icon sits over the row's icon slot: a click on it changes the look (ClickUp style). */}
       <button
         ref={iconRef}
         type="button"
         className="sb-list__icon"
-        title="Change icon"
-        aria-label={`Change the icon of ${list.name}`}
+        title="Icon and color"
+        aria-label={`Change the icon and color of ${list.name}`}
         aria-expanded={picking}
         onClick={() => setPicking((was) => !was)}
       >
         {icon}
       </button>
       {picking && (
-        <IconPicker
-          value={list.icon}
+        <LookPopover
+          title="Icon and color"
+          look={{ icon: list.icon, color: list.color }}
+          fallback={Funnel}
+          colorOptional
           anchor={iconRef}
-          onPick={(name) => void attempt(api.listSetIcon(list.id, name), "Could not change the icon")}
+          onChange={(look) => void attempt(api.listSetLook(list.id, look.icon, look.color), "Could not change the icon")}
           onClose={() => setPicking(false)}
         />
       )}

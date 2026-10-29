@@ -72,6 +72,17 @@ pub async fn view_set_wrap(state: State<'_, AppState>, id: i64, wrap: bool) -> A
     super::view_set_wrap(&state.db, id, wrap).await
 }
 
+/// The tab's icon and tile color; no icon shows the layout's.
+#[tauri::command]
+pub async fn view_set_look(
+    state: State<'_, AppState>,
+    id: i64,
+    icon: Option<String>,
+    color: Option<String>,
+) -> AppResult<View> {
+    super::view_set_look(&state.db, id, icon, color).await
+}
+
 #[tauri::command]
 pub async fn view_set_open_with(
     state: State<'_, AppState>,

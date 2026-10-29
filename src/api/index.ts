@@ -140,7 +140,8 @@ export const api = {
   /** The Space nodes the owner expanded in the sidebar. */
   navSetExpanded: (expanded: number[]) => invoke<Nav>("nav_set_expanded", { expanded }),
   /** A filter list's icon by name; null goes back to the funnel. */
-  listSetIcon: (id: number, icon: string | null) => invoke<void>("list_set_icon", { id, icon }),
+  /** No icon is the funnel; no color shows the icon plain. */
+  listSetLook: (id: number, icon: string | null, color: string | null) => invoke<void>("list_set_look", { id, icon, color }),
   viewsOf: (listId: number) => invoke<View[]>("views_of", { listId }),
   viewCreate: (listId: number, name: string, layout: Layout) => invoke<View>("view_create", { listId, name, layout }),
   viewRename: (id: number, name: string) => invoke<View>("view_rename", { id, name }),
@@ -150,6 +151,8 @@ export const api = {
   viewSetGroup: (id: number, groupBy: GroupBy) => invoke<View>("view_set_group", { id, groupBy }),
   viewSetSort: (id: number, sort: Sort) => invoke<View>("view_set_sort", { id, sort }),
   viewSetWrap: (id: number, wrap: boolean) => invoke<View>("view_set_wrap", { id, wrap }),
+  /** No icon shows the layout's; no color shows the icon plain. */
+  viewSetLook: (id: number, icon: string | null, color: string | null) => invoke<View>("view_set_look", { id, icon, color }),
   /** Null follows Settings → General. */
   viewSetOpenWith: (id: number, openWith: IssueOpening | null) => invoke<View>("view_set_open_with", { id, openWith }),
   /** The Table layout's column widths by column id; Rust clamps them to 48–800. */

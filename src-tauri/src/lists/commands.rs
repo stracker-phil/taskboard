@@ -33,14 +33,15 @@ pub async fn list_rename(state: State<'_, AppState>, id: i64, name: String) -> A
     super::list_rename(&state.db, id, name).await
 }
 
-/// The filter list's icon by name; none goes back to the funnel.
+/// The filter list's icon and tile color; no icon is the funnel, no color shows it plain.
 #[tauri::command]
-pub async fn list_set_icon(
+pub async fn list_set_look(
     state: State<'_, AppState>,
     id: i64,
     icon: Option<String>,
+    color: Option<String>,
 ) -> AppResult<()> {
-    super::list_set_icon(&state.db, id, icon).await
+    super::list_set_look(&state.db, id, icon, color).await
 }
 
 #[tauri::command]

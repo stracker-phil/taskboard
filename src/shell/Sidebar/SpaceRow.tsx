@@ -40,7 +40,7 @@ export function SpaceRow({ space, active, holdsActive, expanded, renaming, onOpe
     e.preventDefault();
     void api.popupMenu([
       { text: "Rename", run: onRename },
-      { text: "Colour and icon…", run: () => onEdit("appearance") },
+      { text: "Icon and Color…", run: () => onEdit("appearance") },
       { text: "Client label…", run: () => onEdit("client") },
       { text: "Space Settings…", run: () => runBusCommand(`app:settings:space:${space.projectId}`, "Could not open the Space's settings") },
       "separator",

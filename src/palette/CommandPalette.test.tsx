@@ -17,7 +17,7 @@ import { CommandPalette } from "./CommandPalette";
 
 const mocked = vi.mocked(api, true);
 
-const SPRINT: ListNode = { id: 21, kind: "list", name: "Current sprint", count: null, ownConditions: 1, description: "", error: null, icon: null };
+const SPRINT: ListNode = { id: 21, kind: "list", name: "Current sprint", count: null, ownConditions: 1, description: "", error: null, icon: null, color: null };
 const TREE: SidebarTree = sidebarTree([space({ lists: [SPRINT] })]);
 const NW_ID = 11;
 const NEW_LIST_ID = 31;

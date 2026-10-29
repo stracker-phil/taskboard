@@ -4,6 +4,8 @@ import { api, type Layout, type MenuEntry, type View } from "../api";
 import { usePageAction } from "../commands/pageActions";
 import { onSelectView } from "../commands/viewKeys";
 import { InlineRename } from "../components/InlineRename";
+import { LookPopover } from "../components/look/LookPopover";
+import { Tile } from "../components/look/Tile";
 import { Popover } from "../components/Popover";
 import { useDragReorder } from "./Sidebar/useDragReorder";
 import { useNavGo, useViews } from "../queries/sidebar";
@@ -23,6 +25,13 @@ export function ViewTabs({ listId, viewId }: { listId: number; viewId: number })
   const { data: views = [] } = useViews(listId);
   const open = useNavGo();
   const [renamingId, setRenamingId] = useState<number | null>(null);
+  const [lookingId, setLookingId] = useState<number | null>(null);
+  const lookAnchor = useRef<HTMLElement | null>(null);
+  const looking = views.find((view) => view.id === lookingId);
+  const editLook = (view: View) => {
+    lookAnchor.current = document.querySelector<HTMLElement>(`[data-view-id="${view.id}"]`);
+    setLookingId(view.id);
+  };
 
   useEffect(
     () =>
@@ -62,6 +71,7 @@ export function ViewTabs({ listId, viewId }: { listId: number; viewId: number })
     }));
     void api.popupMenu([
       { text: "Rename", run: () => setRenamingId(view.id) },
+      { text: "Icon and Color…", run: () => editLook(view) },
       { text: "Duplicate", run: () => void attempt(api.viewDuplicate(view.id), "Could not duplicate the view") },
       { text: "Change layout", items: layouts },
       "separator",
@@ -97,11 +107,15 @@ export function ViewTabs({ listId, viewId }: { listId: number; viewId: number })
     <div className="view-tabs" role="tablist" aria-label="Views" ref={containerRef}>
       {views.map((view, index) => {
         const { icon: Icon } = LAYOUTS[view.layout];
-        const tile = (
-          <span className="view-tab__tile" data-layout={view.layout} aria-hidden="true">
-            <Icon size={11} strokeWidth={2.8} />
-          </span>
-        );
+        // An own look replaces the layout's tile.
+        const tile =
+          view.icon || view.color ? (
+            <Tile icon={view.icon} color={view.color} fallback={Icon} size={view.color ? 18 : 15} />
+          ) : (
+            <span className="view-tab__tile" data-layout={view.layout} aria-hidden="true">
+              <Icon size={11} strokeWidth={2.8} />
+            </span>
+          );
         if (view.id === renamingId) {
           return (
             <div key={view.id} className="view-tab" data-active={view.id === viewId || undefined} {...item(index)}>
@@ -127,6 +141,7 @@ export function ViewTabs({ listId, viewId }: { listId: number; viewId: number })
             onClick={() => void open(listId, view.id)}
             onDoubleClick={() => setRenamingId(view.id)}
             onContextMenu={(e) => openMenu(e, view)}
+            data-view-id={view.id}
             {...item(index)}
             {...handle(index)}
           >
@@ -167,6 +182,17 @@ export function ViewTabs({ listId, viewId }: { listId: number; viewId: number })
           </Popover>
         )}
       </span>
+      {looking && (
+        <LookPopover
+          title="Icon and color"
+          look={{ icon: looking.icon, color: looking.color }}
+          fallback={LAYOUTS[looking.layout].icon}
+          colorOptional
+          anchor={lookAnchor}
+          onChange={(look) => void attempt(api.viewSetLook(looking.id, look.icon, look.color), "Could not change the view's icon")}
+          onClose={() => setLookingId(null)}
+        />
+      )}
     </div>
   );
 }

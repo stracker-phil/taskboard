@@ -9,6 +9,7 @@ const listNode = (patch: Partial<ListNode> = {}): ListNode => ({
   description: "",
   error: null,
   icon: null,
+  color: null,
   ...patch,
 });
 

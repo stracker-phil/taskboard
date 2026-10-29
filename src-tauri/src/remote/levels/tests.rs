@@ -13,6 +13,7 @@ fn node(id: i64, kind: Kind, name: &str, count: Option<i64>) -> ListNode {
         description: String::new(),
         error: None,
         icon: None,
+        color: None,
     }
 }
 
@@ -88,6 +89,8 @@ fn view(id: i64, name: &str, layout: Layout, is_default: bool) -> View {
         wrap_titles: false,
         collapsed: Default::default(),
         open_with: None,
+        icon: None,
+        color: None,
         position: id,
         is_default,
     }

@@ -28,8 +28,10 @@ pub struct Node {
     pub name: String,
     pub filter: Option<String>,
     pub position: i64,
-    /// A filter list's icon name; none shows the funnel.
+    /// A filter list's icon; none shows the funnel.
     pub icon: Option<String>,
+    /// Its tile color (`look`); none shows the icon plain.
+    pub color: Option<String>,
 }
 
 /// Which issues a node holds: the conditions it inherits (locked in the Filter popover) and its own.
@@ -47,7 +49,7 @@ impl Scope {
     }
 }
 
-const COLUMNS: &str = "id, parent_id, kind, project_id, name, filter, position, icon";
+const COLUMNS: &str = "id, parent_id, kind, project_id, name, filter, position, icon, color";
 
 fn from_row(row: &Row) -> rusqlite::Result<Node> {
     Ok(Node {
@@ -59,6 +61,7 @@ fn from_row(row: &Row) -> rusqlite::Result<Node> {
         filter: row.get(5)?,
         position: row.get(6)?,
         icon: row.get(7)?,
+        color: row.get(8)?,
     })
 }
 

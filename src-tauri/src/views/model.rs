@@ -99,6 +99,10 @@ pub struct View {
     pub collapsed: BTreeMap<String, bool>,
     /// What a click on an issue opens here; none follows Settings → General.
     pub open_with: Option<IssueOpening>,
+    /// The tab's icon (`look`); none shows the layout's.
+    pub icon: Option<String>,
+    /// The icon's tile color; none shows the icon plain.
+    pub color: Option<String>,
     pub position: i64,
     /// The tab a level opens with.
     pub is_default: bool,

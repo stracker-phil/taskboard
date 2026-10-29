@@ -85,6 +85,23 @@ describe("ViewTabs", () => {
     });
   });
 
+  describe("tab tile", () => {
+    it("shows the layout's icon for a view without a look of its own", async () => {
+      await renderTabs();
+
+      const tab = screen.getByRole("tab", { name: "List" });
+      expect(tab.querySelector("svg")).toBeInTheDocument();
+    });
+
+    it("shows the view's own letter in place of the layout's icon", async () => {
+      await renderTabs([view({ id: 101, name: "List", icon: "q", color: "3" }), BOARD]);
+
+      const tab = screen.getByRole("tab", { name: "List" });
+      expect(tab).toHaveTextContent("QList");
+      expect(tab.querySelector("svg")).not.toBeInTheDocument();
+    });
+  });
+
   describe("keys", () => {
     it("opens the second view on ⌘2", async () => {
       await renderTabs();
@@ -288,6 +305,73 @@ describe("ViewTabs", () => {
       await choose("Duplicate");
 
       expect(mocked.viewDuplicate).toHaveBeenCalledWith(102);
+    });
+
+    describe("Icon and Color…", () => {
+      async function openLook(views = [LIST, BOARD], tab = "Sprint board") {
+        mocked.viewSetLook.mockResolvedValue(views.find((v) => v.name === tab)!);
+        await renderTabs(views);
+        await userEvent.pointer({ keys: "[MouseRight]", target: screen.getByRole("tab", { name: tab }) });
+        await choose("Icon and Color…");
+        return screen.findByRole("dialog", { name: "Icon and color" });
+      }
+
+      it("opens the Icon and color dialog, with No color for a view without one", async () => {
+        const dialog = await openLook();
+
+        expect(within(dialog).getByRole("radio", { name: "No color", checked: true })).toBeInTheDocument();
+        expect(within(dialog).getByRole("radiogroup", { name: "Icon" })).toBeInTheDocument();
+      });
+
+      it("shows the view's own icon and color as the current ones", async () => {
+        const dialog = await openLook([LIST, view({ ...BOARD, icon: "rocket", color: "6" })]);
+
+        expect(within(dialog).getByRole("radio", { name: "rocket", checked: true })).toBeInTheDocument();
+        expect(within(dialog).getByRole("radio", { name: "Red", checked: true })).toBeInTheDocument();
+      });
+
+      it("saves the picked icon for that view, keeping its color", async () => {
+        const dialog = await openLook([LIST, view({ ...BOARD, color: "6" })]);
+
+        await userEvent.click(within(dialog).getByRole("radio", { name: "bug" }));
+
+        expect(mocked.viewSetLook).toHaveBeenCalledWith(102, "bug", "6");
+      });
+
+      it("saves the picked color, keeping the icon", async () => {
+        const dialog = await openLook([LIST, view({ ...BOARD, icon: "rocket" })]);
+
+        await userEvent.click(within(dialog).getByRole("radio", { name: "Green" }));
+
+        expect(mocked.viewSetLook).toHaveBeenCalledWith(102, "rocket", "8");
+      });
+
+      it("saves no color for No color, and no icon for Reset", async () => {
+        const dialog = await openLook([LIST, view({ ...BOARD, icon: "rocket", color: "6" })]);
+
+        await userEvent.click(within(dialog).getByRole("radio", { name: "No color" }));
+        expect(mocked.viewSetLook).toHaveBeenLastCalledWith(102, "rocket", null);
+        await userEvent.click(within(dialog).getByRole("button", { name: "Reset" }));
+
+        expect(mocked.viewSetLook).toHaveBeenLastCalledWith(102, null, "6");
+      });
+
+      it("closes on Escape", async () => {
+        await openLook();
+
+        await userEvent.keyboard("{Escape}");
+
+        expect(screen.queryByRole("dialog", { name: "Icon and color" })).not.toBeInTheDocument();
+      });
+
+      it("shows an error toast when the look cannot be saved", async () => {
+        const dialog = await openLook();
+        mocked.viewSetLook.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
+
+        await userEvent.click(within(dialog).getByRole("radio", { name: "Red" }));
+
+        await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not change the view's icon: Disk full"));
+      });
     });
 
     it("changes a view's layout, with its current layout disabled", async () => {

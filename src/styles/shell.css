@@ -77,18 +77,6 @@
 .sync-status__bar { grid-column: 1 / -1; height: 4px; overflow: hidden; border-radius: 2px; background: var(--fill-subtle); }
 .sync-status__bar-done { height: 100%; background: var(--accent); }
 
-/* A Space's letter on its colour: 22 in the sidebar, 28 in the content header, 20 in the breadcrumb. */
-.space-tile {
-  display: flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-on-accent);
-  font-weight: 800;
-}
-.space-tile--20 { width: 20px; height: 20px; border-radius: 6px; font-size: 10px; }
-.space-tile--22 { width: 22px; height: 22px; border-radius: 6px; font-size: 11px; }
-.space-tile--28 { width: 28px; height: 28px; border-radius: 8px; font-size: 14px; }
 
 /* A name edited in place (sidebar rows, view tabs). */
 .inline-rename {

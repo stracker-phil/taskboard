@@ -17,7 +17,7 @@ pub use context::Viewer;
 pub use defaults::{LIST_VIEW, ensure_space};
 pub use edit::{
     MatchCount, SpaceUpdate, ensure_tracked_spaces, list_create, list_delete, list_duplicate,
-    list_match_count, list_move, list_rename, list_set_filter, list_set_icon, space_move,
+    list_match_count, list_move, list_rename, list_set_filter, list_set_look, space_move,
     space_update,
 };
 pub use nodes::{Kind, all_nodes, node, scope_of};

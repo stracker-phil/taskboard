@@ -25,7 +25,7 @@ function renderWithClient(ui: React.ReactNode) {
 
 async function renderFields(s: SpaceNode, focus?: SpaceFieldsFocus) {
   renderWithClient(<SpaceFields space={s} focus={focus} />);
-  await screen.findAllByRole("textbox");
+  await screen.findAllByRole(focus === "client" ? "textbox" : "radiogroup");
 }
 
 beforeEach(() => {
@@ -36,12 +36,12 @@ beforeEach(() => {
 });
 
 describe("SpaceFields", () => {
-  it("shows Name, Icon letter, Colour and Client when no focus is given", async () => {
+  it("shows Name, Icon and color and Client when no focus is given", async () => {
     await renderFields(space());
 
     expect(screen.getByLabelText("Name")).toBeInTheDocument();
-    expect(screen.getByLabelText("Icon letter")).toBeInTheDocument();
-    expect(screen.getByRole("group", { name: "Colour" })).toBeInTheDocument();
+    expect(screen.getByRole("radiogroup", { name: "Icon" })).toBeInTheDocument();
+    expect(screen.getByRole("radiogroup", { name: "Color" })).toBeInTheDocument();
     expect(screen.getByLabelText("Client")).toBeInTheDocument();
   });
 
@@ -108,17 +108,33 @@ describe("SpaceFields", () => {
     });
   });
 
-  describe("Icon letter", () => {
-    it("sends null when the icon is cleared", async () => {
+  describe("Icon", () => {
+    it("sends the picked line icon, keeping the color and client", async () => {
+      await renderFields(space({ color: "3", client: "Northwind" }));
+
+      await userEvent.click(screen.getByRole("radio", { name: "rocket" }));
+
+      expect(mocked.spaceUpdate).toHaveBeenCalledWith("10001", { name: null, icon: "rocket", color: "3", client: "Northwind" });
+    });
+
+    it("sends the typed letter or emoji, keeping only its first character", async () => {
+      await renderFields(space({ color: "3" }));
+
+      await userEvent.click(screen.getByRole("button", { name: "Letter or emoji" }));
+      await userEvent.type(screen.getByRole("textbox", { name: "Letter or emoji" }), "wx{Enter}");
+
+      expect(mocked.spaceUpdate).toHaveBeenCalledWith("10001", { name: null, icon: "w", color: "3", client: null });
+    });
+
+    it("sends null on Reset", async () => {
       await renderFields(space({ icon: "W" }));
 
-      await userEvent.clear(screen.getByLabelText("Icon letter"));
-      await userEvent.tab();
+      await userEvent.click(screen.getByRole("button", { name: "Reset" }));
 
       expect(mocked.spaceUpdate).toHaveBeenCalledWith("10001", expect.objectContaining({ icon: null }));
     });
 
-    it("shows the message of Rust's field error and marks the input invalid", async () => {
+    it("shows the message of Rust's field error and no toast", async () => {
       mocked.spaceUpdate.mockRejectedValue({
         kind: "invalid_input",
         message: "Invalid input",
@@ -126,37 +142,35 @@ describe("SpaceFields", () => {
       });
       await renderFields(space());
 
-      await userEvent.type(screen.getByLabelText("Icon letter"), "!");
-      await userEvent.tab();
+      await userEvent.click(screen.getByRole("radio", { name: "rocket" }));
 
       expect(await screen.findByText("Use one letter or digit")).toBeInTheDocument();
-      expect(screen.getByLabelText("Icon letter")).toHaveAttribute("aria-invalid", "true");
       expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    });
-
-    it("is not marked invalid without an error", async () => {
-      await renderFields(space());
-
-      expect(screen.getByLabelText("Icon letter")).not.toHaveAttribute("aria-invalid");
     });
   });
 
-  describe("Colour", () => {
-    it("sends the colour number of the clicked swatch", async () => {
+  describe("Color", () => {
+    it("sends the color number of the clicked swatch, keeping the icon and client", async () => {
       await renderFields(space({ icon: "W", client: "Northwind" }));
 
-      await userEvent.click(screen.getByRole("button", { name: "Teal" }));
+      await userEvent.click(screen.getByRole("radio", { name: "Teal" }));
 
       expect(mocked.spaceUpdate).toHaveBeenCalledWith("10001", { name: null, icon: "W", color: "4", client: "Northwind" });
     });
 
-    it("marks only the current colour's swatch as pressed", async () => {
+    it("checks only the current color's swatch", async () => {
       await renderFields(space({ color: "5" }));
 
-      expect(screen.getByRole("button", { name: "Amber" })).toHaveAttribute("aria-pressed", "true");
+      expect(screen.getByRole("radio", { name: "Amber", checked: true })).toBeInTheDocument();
       for (const other of ["Blue", "Slate", "Violet", "Teal"]) {
-        expect(screen.getByRole("button", { name: other })).toHaveAttribute("aria-pressed", "false");
+        expect(screen.getByRole("radio", { name: other, checked: false })).toBeInTheDocument();
       }
+    });
+
+    it("offers no No color option", async () => {
+      await renderFields(space());
+
+      expect(screen.queryByRole("radio", { name: "No color" })).not.toBeInTheDocument();
     });
   });
 
@@ -164,17 +178,17 @@ describe("SpaceFields", () => {
     mocked.spaceUpdate.mockRejectedValue({ kind: "db", message: "Database is locked" });
     await renderFields(space());
 
-    await userEvent.click(screen.getByRole("button", { name: "Teal" }));
+    await userEvent.click(screen.getByRole("radio", { name: "Teal" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Could not change Website relaunch: Database is locked");
   });
 
   describe("focus", () => {
-    it("appearance shows only Icon letter and Colour", async () => {
+    it("appearance shows only Icon and Color", async () => {
       await renderFields(space(), "appearance");
 
-      expect(screen.getByLabelText("Icon letter")).toBeInTheDocument();
-      expect(screen.getByRole("group", { name: "Colour" })).toBeInTheDocument();
+      expect(screen.getByRole("radiogroup", { name: "Icon" })).toBeInTheDocument();
+      expect(screen.getByRole("radiogroup", { name: "Color" })).toBeInTheDocument();
       expect(screen.queryByLabelText("Name")).not.toBeInTheDocument();
       expect(screen.queryByLabelText("Client")).not.toBeInTheDocument();
     });
@@ -184,8 +198,8 @@ describe("SpaceFields", () => {
 
       expect(screen.getByLabelText("Client")).toBeInTheDocument();
       expect(screen.queryByLabelText("Name")).not.toBeInTheDocument();
-      expect(screen.queryByLabelText("Icon letter")).not.toBeInTheDocument();
-      expect(screen.queryByRole("group", { name: "Colour" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("radiogroup", { name: "Icon" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("radiogroup", { name: "Color" })).not.toBeInTheDocument();
     });
   });
 });
@@ -203,15 +217,16 @@ describe("SpacePopover", () => {
   }
 
   it.each([
-    ["appearance", "Colour and icon", ["Icon letter"], ["Client", "Name"]],
-    ["client", "Client label", ["Client"], ["Icon letter", "Name"]],
+    ["appearance", "Icon and color", ["Color"], ["Client", "Name"]],
+    ["client", "Client label", ["Client"], ["Color", "Name"]],
   ] as const)("with %s focus titles the dialog %j and shows only its fields", (focus, title, shown, hidden) => {
     renderPopover(focus);
 
     const dialog = screen.getByRole("dialog", { name: title });
     expect(dialog).toBeInTheDocument();
-    for (const label of shown) expect(screen.getByLabelText(label)).toBeInTheDocument();
-    for (const label of hidden) expect(screen.queryByLabelText(label)).not.toBeInTheDocument();
+    const has = (label: string) => screen.queryByLabelText(label) ?? screen.queryByRole("radiogroup", { name: label });
+    for (const label of shown) expect(has(label)).toBeInTheDocument();
+    for (const label of hidden) expect(has(label)).not.toBeInTheDocument();
   });
 
   it("closes on Escape", async () => {
@@ -241,8 +256,8 @@ describe("SpacePopover", () => {
   it("stays open on a mousedown inside", async () => {
     renderPopover("appearance");
 
-    await userEvent.click(screen.getByRole("heading", { name: "Colour and icon" }));
-    await userEvent.click(screen.getByRole("button", { name: "Teal" }));
+    await userEvent.click(screen.getByRole("heading", { name: "Icon and color" }));
+    await userEvent.click(screen.getByRole("radio", { name: "Teal" }));
 
     expect(onClose).not.toHaveBeenCalled();
   });

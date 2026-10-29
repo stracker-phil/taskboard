@@ -38,6 +38,7 @@ const list = (id: number, name: string, patch: Partial<ListNode> = {}): ListNode
   description: "",
   error: null,
   icon: null,
+  color: null,
   ...patch,
 });
 
@@ -545,76 +546,104 @@ describe("Sidebar", () => {
     });
   });
 
-  describe("filter list icon", () => {
-    const changeIcon = (name: string) => screen.findByRole("button", { name: `Change the icon of ${name}` });
+  describe("filter list look", () => {
+    const changeLook = (name: string) => screen.findByRole("button", { name: `Change the icon and color of ${name}` });
+    const withList = (patch: Partial<ListNode>) => treeWith({ nw: { lists: [list(21, "Current sprint", patch), EPICS] } });
 
     beforeEach(() => {
-      mocked.listSetIcon.mockResolvedValue(undefined);
+      mocked.listSetLook.mockResolvedValue(undefined);
     });
 
-    it("opens the Icon dialog from the icon button without opening the list", async () => {
+    it("opens the Icon and color dialog from the icon button without opening the list", async () => {
       await renderSidebar(treeWith(), navAt(null, [NW_ID]));
 
-      await userEvent.click(await changeIcon("Epics"));
+      await userEvent.click(await changeLook("Epics"));
 
-      const dialog = screen.getByRole("dialog", { name: "Icon" });
-      expect(within(dialog).getAllByRole("radio").length).toBeGreaterThan(1);
+      const dialog = screen.getByRole("dialog", { name: "Icon and color" });
+      expect(within(dialog).getByRole("radiogroup", { name: "Icon" })).toBeInTheDocument();
+      expect(within(dialog).getByRole("radiogroup", { name: "Color" })).toBeInTheDocument();
       expect(mocked.navGo).not.toHaveBeenCalled();
     });
 
-    it("marks the funnel as the current icon of a list without one", async () => {
-      await renderSidebar(treeWith(), navAt(null, [NW_ID]));
+    it("marks the list's own icon and color as the current ones", async () => {
+      await renderSidebar(withList({ icon: "rocket", color: "4" }), navAt(null, [NW_ID]));
 
-      await userEvent.click(await changeIcon("Epics"));
-
-      expect(screen.getByRole("radio", { name: "funnel", checked: true })).toBeInTheDocument();
-      expect(screen.getByRole("radio", { name: "rocket", checked: false })).toBeInTheDocument();
-    });
-
-    it("marks the list's own icon as the current one", async () => {
-      const tree = treeWith({ nw: { lists: [list(21, "Current sprint", { icon: "rocket" }), EPICS] } });
-      await renderSidebar(tree, navAt(null, [NW_ID]));
-
-      await userEvent.click(await changeIcon("Current sprint"));
+      await userEvent.click(await changeLook("Current sprint"));
 
       expect(screen.getByRole("radio", { name: "rocket", checked: true })).toBeInTheDocument();
-      expect(screen.getByRole("radio", { name: "funnel", checked: false })).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: "Teal", checked: true })).toBeInTheDocument();
     });
 
-    it("checks the funnel in the picker for a name this build does not know", async () => {
-      const tree = treeWith({ nw: { lists: [list(21, "Current sprint", { icon: "no-such-icon" }), EPICS] } });
-      await renderSidebar(tree, navAt(null, [NW_ID]));
-
-      await userEvent.click(await changeIcon("Current sprint"));
-
-      expect(screen.getByRole("radio", { name: "funnel", checked: true })).toBeInTheDocument();
-      expect(screen.getAllByRole("radio", { checked: true })).toHaveLength(1);
-    });
-
-    it("saves the picked icon and closes the dialog", async () => {
+    it("checks No color for a list without a color", async () => {
       await renderSidebar(treeWith(), navAt(null, [NW_ID]));
-      await userEvent.click(await changeIcon("Epics"));
 
-      await userEvent.click(screen.getByRole("radio", { name: "rocket" }));
+      await userEvent.click(await changeLook("Epics"));
 
-      expect(mocked.listSetIcon).toHaveBeenCalledWith(EPICS.id, "rocket");
-      expect(screen.queryByRole("dialog", { name: "Icon" })).not.toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: "No color", checked: true })).toBeInTheDocument();
+      expect(within(screen.getByRole("radiogroup", { name: "Icon" })).queryAllByRole("radio", { checked: true })).toHaveLength(0);
     });
 
-    it("saves no icon when the funnel is picked", async () => {
-      const tree = treeWith({ nw: { lists: [list(21, "Current sprint", { icon: "rocket" }), EPICS] } });
-      await renderSidebar(tree, navAt(null, [NW_ID]));
-      await userEvent.click(await changeIcon("Current sprint"));
-
-      await userEvent.click(screen.getByRole("radio", { name: "funnel" }));
-
-      expect(mocked.listSetIcon).toHaveBeenCalledWith(21, null);
-    });
-
-    it("shows an error toast when the icon cannot be saved", async () => {
-      mocked.listSetIcon.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
+    it("lists No color first among the colors", async () => {
       await renderSidebar(treeWith(), navAt(null, [NW_ID]));
-      await userEvent.click(await changeIcon("Epics"));
+
+      await userEvent.click(await changeLook("Epics"));
+
+      const names = within(screen.getByRole("radiogroup", { name: "Color" })).getAllByRole("radio").map((r) => r.getAttribute("aria-label"));
+      expect(names.slice(0, 2)).toEqual(["No color", "Blue"]);
+      expect(names).toHaveLength(13);
+    });
+
+    it("saves the picked icon, keeping the color, and leaves the dialog open", async () => {
+      await renderSidebar(withList({ color: "4" }), navAt(null, [NW_ID]));
+      await userEvent.click(await changeLook("Current sprint"));
+
+      await userEvent.click(screen.getByRole("radio", { name: "check circle" }));
+
+      expect(mocked.listSetLook).toHaveBeenCalledWith(21, "check-circle", "4");
+      expect(screen.getByRole("dialog", { name: "Icon and color" })).toBeInTheDocument();
+    });
+
+    it("saves the picked color, keeping the icon", async () => {
+      await renderSidebar(withList({ icon: "rocket" }), navAt(null, [NW_ID]));
+      await userEvent.click(await changeLook("Current sprint"));
+
+      await userEvent.click(screen.getByRole("radio", { name: "Red" }));
+
+      expect(mocked.listSetLook).toHaveBeenCalledWith(21, "rocket", "6");
+    });
+
+    it("saves no color when No color is picked, keeping the icon", async () => {
+      await renderSidebar(withList({ icon: "rocket", color: "6" }), navAt(null, [NW_ID]));
+      await userEvent.click(await changeLook("Current sprint"));
+
+      await userEvent.click(screen.getByRole("radio", { name: "No color" }));
+
+      expect(mocked.listSetLook).toHaveBeenCalledWith(21, "rocket", null);
+    });
+
+    it("saves no icon on Reset, keeping the color", async () => {
+      await renderSidebar(withList({ icon: "rocket", color: "6" }), navAt(null, [NW_ID]));
+      await userEvent.click(await changeLook("Current sprint"));
+
+      await userEvent.click(screen.getByRole("button", { name: "Reset" }));
+
+      expect(mocked.listSetLook).toHaveBeenCalledWith(21, null, "6");
+    });
+
+    it("saves a typed letter or emoji, keeping the color", async () => {
+      await renderSidebar(withList({ color: "2" }), navAt(null, [NW_ID]));
+      await userEvent.click(await changeLook("Current sprint"));
+
+      await userEvent.click(screen.getByRole("button", { name: "Letter or emoji" }));
+      await userEvent.type(screen.getByRole("textbox", { name: "Letter or emoji" }), "q{Enter}");
+
+      expect(mocked.listSetLook).toHaveBeenCalledWith(21, "q", "2");
+    });
+
+    it("shows an error toast when the look cannot be saved", async () => {
+      mocked.listSetLook.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
+      await renderSidebar(treeWith(), navAt(null, [NW_ID]));
+      await userEvent.click(await changeLook("Epics"));
 
       await userEvent.click(screen.getByRole("radio", { name: "star" }));
 
@@ -628,12 +657,12 @@ describe("Sidebar", () => {
       fireEvent.contextMenu(spaceButton("Website relaunch"));
     });
 
-    it("offers Rename, Colour and icon, Client label, Space Settings and Stop tracking", () => {
+    it("offers Rename, Icon and Color, Client label, Space Settings and Stop tracking", () => {
       const entries: MenuEntry[] = mocked.popupMenu.mock.calls[0][0];
 
       expect(entries.map((e) => (e === "separator" ? e : e.text))).toEqual([
         "Rename",
-        "Colour and icon…",
+        "Icon and Color…",
         "Client label…",
         "Space Settings…",
         "separator",
@@ -674,7 +703,7 @@ describe("Sidebar", () => {
     });
 
     it.each([
-      ["Colour and icon…", "Colour and icon"],
+      ["Icon and Color…", "Icon and color"],
       ["Client label…", "Client label"],
     ])("opens the %s dialog", async (entry, dialog) => {
       await chooseFromMenu(entry);

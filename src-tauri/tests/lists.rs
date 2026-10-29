@@ -21,7 +21,7 @@ use taskboard_lib::lists::{
     Kind, LIST_VIEW, ListConditions, ListNode, LockedCondition, SidebarTree, SpaceNode,
     SpaceUpdate, ValueKind, Viewer, ensure_tracked_spaces, filter_options, list_conditions,
     list_create, list_delete, list_duplicate, list_match_count, list_move, list_rename,
-    list_set_filter, sidebar_tree, space_move, space_update,
+    list_set_filter, list_set_look, sidebar_tree, space_move, space_update,
 };
 use taskboard_lib::store::settings::SettingsStore;
 use taskboard_lib::sync::{Emit, SyncContext, full_sync};
@@ -31,8 +31,8 @@ use taskboard_lib::test_support::{FakeSecrets, temp_config_dir};
 use taskboard_lib::views::{
     DEFAULT_COLUMNS, GroupBy, IssueOpening, Layout, Sort, SortBy, View, space_default_columns,
     view_create, view_delete, view_duplicate, view_move, view_rename, view_set_column_collapsed,
-    view_set_columns, view_set_group, view_set_layout, view_set_open_with, view_set_sort,
-    view_set_widths, view_set_wrap, views_of,
+    view_set_columns, view_set_group, view_set_layout, view_set_look, view_set_open_with,
+    view_set_sort, view_set_widths, view_set_wrap, views_of,
 };
 
 const ME_ACCOUNT_ID: &str = "712020:5a1e0c3f-8d2b-4f61-9c7e-1b2a3c4d5e01";
@@ -1385,6 +1385,104 @@ mod editing_filter_lists {
     }
 }
 
+mod the_look_of_filter_lists {
+    use super::*;
+
+    async fn nw_list(db: &Db, name: &str) -> ListNode {
+        let tree = sidebar_tree(db, viewer(None)).await.unwrap();
+        find_list(find_space(&tree, "NW"), name).clone()
+    }
+
+    #[tokio::test]
+    async fn a_new_list_has_no_look() {
+        let (_dir, db) = tracked_lab().await;
+
+        let epics = nw_list(&db, "Epics").await;
+
+        assert_eq!((epics.icon, epics.color), (None, None));
+    }
+
+    #[tokio::test]
+    async fn icon_and_color_are_stored_trimmed_and_shown_in_the_tree() {
+        let (_dir, db) = tracked_lab().await;
+        let epics = list_id(&db, "Epics").await;
+
+        list_set_look(&db, epics, Some(" rocket ".into()), Some("5".into()))
+            .await
+            .unwrap();
+
+        let node = nw_list(&db, "Epics").await;
+        assert_eq!(node.icon.as_deref(), Some("rocket"));
+        assert_eq!(node.color.as_deref(), Some("5"));
+        let other = nw_list(&db, "Open bugs").await;
+        assert_eq!((other.icon, other.color), (None, None));
+    }
+
+    #[tokio::test]
+    async fn none_and_blank_values_clear_the_look() {
+        let (_dir, db) = tracked_lab().await;
+        let epics = list_id(&db, "Epics").await;
+        list_set_look(&db, epics, Some("🚀".into()), Some("5".into()))
+            .await
+            .unwrap();
+
+        list_set_look(&db, epics, Some("  ".into()), None)
+            .await
+            .unwrap();
+
+        let node = nw_list(&db, "Epics").await;
+        assert_eq!((node.icon, node.color), (None, None));
+    }
+
+    #[tokio::test]
+    async fn an_invalid_look_is_rejected_and_the_old_one_stays() {
+        let (_dir, db) = tracked_lab().await;
+        let epics = list_id(&db, "Epics").await;
+        list_set_look(&db, epics, Some("rocket".into()), Some("5".into()))
+            .await
+            .unwrap();
+
+        let bad_icon = list_set_look(&db, epics, Some("ab c".into()), Some("6".into()))
+            .await
+            .unwrap_err();
+        let bad_color = list_set_look(&db, epics, Some("star".into()), Some("0".into()))
+            .await
+            .unwrap_err();
+
+        assert!(matches!(&bad_icon, AppError::InvalidField { field, .. } if field == "icon"));
+        assert!(matches!(&bad_color, AppError::InvalidField { field, .. } if field == "color"));
+        let node = nw_list(&db, "Epics").await;
+        assert_eq!(node.icon.as_deref(), Some("rocket"));
+        assert_eq!(node.color.as_deref(), Some("5"));
+    }
+
+    #[tokio::test]
+    async fn a_duplicated_list_keeps_its_icon_and_color() {
+        let (_dir, db) = tracked_lab().await;
+        let epics = list_id(&db, "Epics").await;
+        list_set_look(&db, epics, Some("🚀".into()), Some("7".into()))
+            .await
+            .unwrap();
+
+        list_duplicate(&db, epics).await.unwrap();
+
+        let copy = nw_list(&db, "Epics copy").await;
+        assert_eq!(copy.icon.as_deref(), Some("🚀"));
+        assert_eq!(copy.color.as_deref(), Some("7"));
+    }
+
+    #[tokio::test]
+    async fn the_look_of_an_unknown_list_is_not_found() {
+        let (_dir, db) = tracked_lab().await;
+
+        let err = list_set_look(&db, 9999, Some("rocket".into()), None)
+            .await
+            .unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::NotFound);
+    }
+}
+
 mod editing_views {
     use super::*;
 
@@ -1796,6 +1894,8 @@ mod editing_views {
                 "wrapTitles": true,
                 "collapsed": {},
                 "openWith": null,
+                "icon": null,
+                "color": null,
                 "position": 0,
                 "isDefault": true,
             })
@@ -1909,6 +2009,101 @@ mod editing_views {
             views_of(&db, copied_list).await.unwrap()[0].open_with,
             Some(IssueOpening::Preview)
         );
+    }
+
+    #[tokio::test]
+    async fn a_new_view_has_no_look() {
+        let (_dir, db) = tracked_lab().await;
+
+        assert!(
+            space_views(&db)
+                .await
+                .iter()
+                .all(|view| view.icon.is_none() && view.color.is_none())
+        );
+    }
+
+    #[tokio::test]
+    async fn a_views_look_is_stored_trimmed_and_cleared_with_none() {
+        let (_dir, db) = tracked_lab().await;
+        let views = space_views(&db).await;
+        let id = views[1].id;
+
+        let saved = view_set_look(&db, id, Some(" rocket ".into()), Some("4".into()))
+            .await
+            .unwrap();
+        let emoji = view_set_look(&db, id, Some("🚀".into()), None)
+            .await
+            .unwrap();
+        let read_back = space_views(&db).await;
+        let cleared = view_set_look(&db, id, None, None).await.unwrap();
+
+        assert_eq!(saved.icon.as_deref(), Some("rocket"));
+        assert_eq!(saved.color.as_deref(), Some("4"));
+        assert_eq!(emoji.icon.as_deref(), Some("🚀"));
+        assert_eq!(emoji.color, None);
+        assert_eq!(read_back[1].icon.as_deref(), Some("🚀"));
+        assert_eq!(
+            (read_back[0].icon.clone(), read_back[0].color.clone()),
+            (None, None)
+        );
+        assert_eq!((cleared.icon, cleared.color), (None, None));
+    }
+
+    #[tokio::test]
+    async fn an_invalid_view_look_is_rejected_and_the_old_one_stays() {
+        let (_dir, db) = tracked_lab().await;
+        let id = space_views(&db).await[1].id;
+        view_set_look(&db, id, Some("rocket".into()), Some("4".into()))
+            .await
+            .unwrap();
+
+        let bad_icon = view_set_look(&db, id, Some("AB".into()), Some("5".into()))
+            .await
+            .unwrap_err();
+        let bad_color = view_set_look(&db, id, Some("star".into()), Some("13".into()))
+            .await
+            .unwrap_err();
+
+        assert!(matches!(&bad_icon, AppError::InvalidField { field, .. } if field == "icon"));
+        assert!(matches!(&bad_color, AppError::InvalidField { field, .. } if field == "color"));
+        let view = space_views(&db).await.remove(1);
+        assert_eq!(view.icon.as_deref(), Some("rocket"));
+        assert_eq!(view.color.as_deref(), Some("4"));
+    }
+
+    #[tokio::test]
+    async fn the_look_of_an_unknown_view_is_not_found() {
+        let (_dir, db) = tracked_lab().await;
+
+        let err = view_set_look(&db, 9999, Some("rocket".into()), None)
+            .await
+            .unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::NotFound);
+    }
+
+    #[tokio::test]
+    async fn a_duplicate_view_and_a_duplicate_list_keep_the_look() {
+        let (_dir, db) = tracked_lab().await;
+        let table = space_views(&db).await[2].id;
+        view_set_look(&db, table, Some("check-circle".into()), Some("2".into()))
+            .await
+            .unwrap();
+        let epics = list_id(&db, "Epics").await;
+        let epics_view = views_of(&db, epics).await.unwrap()[0].id;
+        view_set_look(&db, epics_view, Some("🚀".into()), Some("7".into()))
+            .await
+            .unwrap();
+
+        let copy = view_duplicate(&db, table).await.unwrap();
+        let copied_list = list_duplicate(&db, epics).await.unwrap();
+
+        assert_eq!(copy.icon.as_deref(), Some("check-circle"));
+        assert_eq!(copy.color.as_deref(), Some("2"));
+        let copied_view = views_of(&db, copied_list).await.unwrap().remove(0);
+        assert_eq!(copied_view.icon.as_deref(), Some("🚀"));
+        assert_eq!(copied_view.color.as_deref(), Some("7"));
     }
 
     fn overrides(pairs: &[(&str, bool)]) -> BTreeMap<String, bool> {
@@ -2121,10 +2316,10 @@ mod editing_spaces {
     }
 
     #[tokio::test]
-    async fn an_icon_must_be_one_letter_or_digit() {
+    async fn an_icon_must_be_one_letter_digit_or_emoji_or_a_line_icon_name() {
         let (_dir, db) = tracked_lab().await;
 
-        for icon in ["AB", "!", "ÄÖ", "1 2"] {
+        for icon in ["AB", "ÄÖ", "1 2"] {
             let err = space_update(
                 &db,
                 NW.into(),
@@ -2141,7 +2336,7 @@ mod editing_spaces {
                 "{icon}: {err:?}"
             );
         }
-        for icon in ["7", "ä"] {
+        for icon in ["7", "ä", "🚀", "rocket", "check-circle"] {
             space_update(
                 &db,
                 NW.into(),
@@ -2152,6 +2347,9 @@ mod editing_spaces {
             )
             .await
             .unwrap();
+
+            let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
+            assert_eq!(find_space(&tree, "NW").icon.as_deref(), Some(icon));
         }
     }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LIST_ICONS, listIcon } from "./listIcons";
+import { LIST_ICONS, listIcon } from "./icons";
 
 describe("listIcon", () => {
   it("returns the icon stored under a known name", () => {

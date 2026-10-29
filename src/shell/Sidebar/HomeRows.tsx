@@ -1,5 +1,5 @@
 import type { ListNode } from "../../api";
-import { listIcon } from "../../components/listIcons";
+import { Tile } from "../../components/look/Tile";
 import { HOME_ICONS } from "../levels";
 import { ListCount } from "./ListCount";
 
@@ -15,7 +15,6 @@ export function HomeRows({ rows, activeId, open }: Props) {
   return (
     <nav className="sb-home" aria-label="Home">
       {rows.map((node) => {
-        const Icon = node.kind === "list" ? listIcon(node.icon) : HOME_ICONS[node.kind];
         const active = node.id === activeId;
         const unread = node.kind === "recent" && (node.count ?? 0) > 0;
         return (
@@ -28,7 +27,11 @@ export function HomeRows({ rows, activeId, open }: Props) {
             aria-current={active ? "page" : undefined}
             onClick={() => open(node.id)}
           >
-            <Icon size={17} strokeWidth={1.8} aria-hidden="true" />
+            {node.kind === "list" ? (
+              <Tile icon={node.icon} color={node.color} fallback={HOME_ICONS.list} size={node.color ? 18 : 17} />
+            ) : (
+              <HomeIcon kind={node.kind} />
+            )}
             <span className="sb-row__label">{node.name}</span>
             {unread ? (
               <span className="sb-row__badge" aria-label={`${node.count} unread`}>
@@ -42,4 +45,9 @@ export function HomeRows({ rows, activeId, open }: Props) {
       })}
     </nav>
   );
+}
+
+function HomeIcon({ kind }: { kind: ListNode["kind"] }) {
+  const Icon = HOME_ICONS[kind];
+  return <Icon size={17} strokeWidth={1.8} aria-hidden="true" />;
 }
