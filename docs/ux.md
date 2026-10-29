@@ -418,9 +418,12 @@ button, Escape and a press outside close it, focus goes back to the button).
 - **Group: Status** (30 high, `--border`, 8 radius): a [menu](#menus) of the groupings (Status, Space, Client,
   Assignee, Epic, Release, Priority, Due date, None) with Sort by ▸ (Updated, Created, Priority, Key, Due date,
   Summary, Status; Ascending, Descending). Saves to the view.
-- **Subtasks** (List and Table only, right after Columns; active style while not Hidden): a [menu](#menus)
-  captioned "Subtasks" with Hidden ("Only top-level issues"), Hierarchy ("Under their parent") and List ("As
-  separate rows"), the current one checked (`SubtasksButton.tsx`). Saves to the view; the Board always hides
+- **Subtasks** (List and Table only, right after Columns; `SubtasksButton.tsx`): the subtask icon, labeled by
+  the mode: icon only while hidden ("Subtasks: Hidden" to assistive tech, "Subtasks" as its tooltip), "Subtasks"
+  in Hierarchy and "As items" in List, both in the active style. A [menu](#menus) captioned "Subtasks" offers
+  Hide subtasks ("Top-level issues only"), Show under parent ("Indented below their parent") and Show as items
+  ("Separate rows, filtered on their own"), the current one checked; folded into the "…" menu it reads
+  "Subtasks" with the mode as its hint. Saves to the view; the Board always hides
   subtasks and has no button.
 - **Columns** ("Card fields" on a board): the *Columns for this view* popover (340 wide): a "Search fields" box
   (name, Jira id or hint; while it filters, the order can't be dragged), Jira fields (Status first: a text pill

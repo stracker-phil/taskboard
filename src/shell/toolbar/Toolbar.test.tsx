@@ -213,7 +213,8 @@ describe("Toolbar page actions", () => {
   });
 
   describe("Subtasks button", () => {
-    const subtasksButton = () => screen.getByRole("button", { name: "Subtasks" });
+    const BUTTON_NAME = /^(Subtasks|As items)/;
+    const subtasksButton = () => screen.getByRole("button", { name: BUTTON_NAME });
 
     it("sits right after the Columns button", () => {
       renderToolbar();
@@ -224,7 +225,25 @@ describe("Toolbar page actions", () => {
     it("is absent on a Board view", () => {
       renderToolbar(LIST_LEVEL, 0, { layout: "board" });
 
-      expect(screen.queryByRole("button", { name: "Subtasks" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: BUTTON_NAME })).not.toBeInTheDocument();
+    });
+
+    it("shows only its icon, labeled Subtasks: Hidden, while subtasks are hidden", () => {
+      renderToolbar(LIST_LEVEL, 0, { subtasks: "hidden" });
+
+      const button = screen.getByRole("button", { name: "Subtasks: Hidden" });
+      expect(button).toHaveTextContent("");
+      expect(button).toHaveAttribute("title", "Subtasks");
+      expect(button.classList.contains("toolbar-btn--icon")).toBe(true);
+    });
+
+    it.each([
+      ["hierarchy", "Subtasks"],
+      ["list", "As items"],
+    ] as const)("labels the button by the mode when subtasks show (%s)", (subtasks, label) => {
+      renderToolbar(LIST_LEVEL, 0, { subtasks });
+
+      expect(screen.getByRole("button", { name: label })).toHaveTextContent(label);
     });
 
     it.each([
@@ -243,20 +262,35 @@ describe("Toolbar page actions", () => {
       await userEvent.click(subtasksButton());
 
       const menu = within(await screen.findByRole("menu", { name: "Subtasks" }));
-      expect(menu.getByRole("menuitemradio", { name: /^Hidden/ })).toHaveAttribute("aria-checked", "false");
-      expect(menu.getByRole("menuitemradio", { name: /^Hierarchy/ })).toHaveAttribute("aria-checked", "true");
-      expect(menu.getByRole("menuitemradio", { name: /^List/ })).toHaveAttribute("aria-checked", "false");
-      expect(menu.getByText("Under their parent")).toBeInTheDocument();
+      expect(menu.getByRole("menuitemradio", { name: /^Hide subtasks/ })).toHaveAttribute("aria-checked", "false");
+      expect(menu.getByRole("menuitemradio", { name: /^Show under parent/ })).toHaveAttribute("aria-checked", "true");
+      expect(menu.getByRole("menuitemradio", { name: /^Show as items/ })).toHaveAttribute("aria-checked", "false");
     });
 
-    it("saves the chosen mode on the view", async () => {
-      mocked.viewSetSubtasks.mockResolvedValue(view({ subtasks: "list" }));
+    it.each([
+      ["Top-level issues only"],
+      ["Indented below their parent"],
+      ["Separate rows, filtered on their own"],
+    ])("explains each mode with the hint %s", async (hint) => {
       renderToolbar();
+
       await userEvent.click(subtasksButton());
 
-      await userEvent.click(await screen.findByRole("menuitemradio", { name: /^List/ }));
+      expect(within(await screen.findByRole("menu", { name: "Subtasks" })).getByText(hint)).toBeInTheDocument();
+    });
 
-      expect(mocked.viewSetSubtasks).toHaveBeenCalledWith(101, "list");
+    it.each([
+      ["Hide subtasks", "hidden"],
+      ["Show under parent", "hierarchy"],
+      ["Show as items", "list"],
+    ] as const)("saves the mode on the view when %s is chosen", async (entry, mode) => {
+      mocked.viewSetSubtasks.mockResolvedValue(view({ subtasks: mode }));
+      renderToolbar(LIST_LEVEL, 0, { subtasks: mode === "hidden" ? "list" : "hidden" });
+      await userEvent.click(subtasksButton());
+
+      await userEvent.click(await screen.findByRole("menuitemradio", { name: new RegExp(`^${entry}`) }));
+
+      expect(mocked.viewSetSubtasks).toHaveBeenCalledWith(101, mode);
     });
   });
 

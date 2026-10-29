@@ -12,7 +12,7 @@ import { EpicNarrowingChip } from "./EpicChip";
 import { FilterPopover } from "./FilterPopover";
 import type { Collapsible } from "./fit";
 import { GROUP_NAMES, groupMenu } from "./groupMenu";
-import { SubtasksButton, subtasksMenu } from "./SubtasksButton";
+import { MODE_NAMES, SubtasksButton, subtasksMenu } from "./SubtasksButton";
 import { MeChip } from "./MeChip";
 import { TextFilter } from "./TextFilter";
 import { SaveViewButton } from "./SaveViewButton";
@@ -99,7 +99,7 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
         case "columns":
           return { text: `${columnsLabel}…`, run: () => setOpen("columns") };
         case "subtasks":
-          return { text: "Subtasks", items: subtaskEntries() };
+          return { text: "Subtasks", hint: MODE_NAMES[view.subtasks], items: subtaskEntries() };
         case "filter":
           return { text: own > 0 ? `Filter · ${own}…` : "Filter…", run: () => setOpen("filter") };
         case "group":
