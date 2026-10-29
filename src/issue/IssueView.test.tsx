@@ -399,9 +399,9 @@ describe("IssueView", () => {
       serve(
         issueDetail({
           custom: [
-            { id: "customfield_10071", name: "Reviewer", value: { kind: "person", value: SAM } },
-            { id: "customfield_10072", name: "Story points", value: { kind: "text", value: "5" } },
-            { id: "customfield_10073", name: "Client", value: null },
+            { id: "customfield_10071", name: "Reviewer", value: { kind: "person", value: SAM }, html: null },
+            { id: "customfield_10072", name: "Story points", value: { kind: "text", value: "5" }, html: null },
+            { id: "customfield_10073", name: "Client", value: null, html: null },
           ],
         }),
       );
@@ -414,6 +414,31 @@ describe("IssueView", () => {
       expect(screen.getByText("Story points")).toBeInTheDocument();
       expect(screen.getByText("5")).toBeInTheDocument();
       expect(screen.getByText("Client")).toBeInTheDocument();
+    });
+
+    it("shows a rich text custom field as a section after the description, not in the grid", async () => {
+      serve(
+        issueDetail({
+          custom: [{ id: "customfield_10080", name: "Acceptance criteria", value: null, html: "<p>Postcodes <strong>validate</strong> on blur.</p><script>alert(1)</script>" }],
+        }),
+      );
+      renderIssue();
+
+      await title("Checkout: address validation for DACH postcodes");
+      const section = screen.getByRole("region", { name: "Acceptance criteria" });
+      expect(within(section).getByRole("heading", { name: "Acceptance criteria" })).toBeInTheDocument();
+      expect(section).toHaveTextContent("Postcodes validate on blur.");
+      expect(screen.queryByText(/alert/)).not.toBeInTheDocument();
+      expect(screen.getByRole("region", { name: "Description" }).compareDocumentPosition(section) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(screen.getAllByText("Acceptance criteria")).toHaveLength(1);
+    });
+
+    it.each(["", "   ", "<p> </p>"])("shows no section for a rich text custom field whose html is %j", async (html) => {
+      serve(issueDetail({ custom: [{ id: "customfield_10080", name: "Acceptance criteria", value: null, html }] }));
+      renderIssue();
+
+      await title("Checkout: address validation for DACH postcodes");
+      expect(screen.queryByRole("region", { name: "Acceptance criteria" })).not.toBeInTheDocument();
     });
 
     it("leaves out Epic and Sprint for an epic", async () => {

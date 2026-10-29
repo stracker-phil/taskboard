@@ -27,15 +27,16 @@ directly.
 **Full** (`full.rs`):
 
 1. Metadata: `/field` (the site's Sprint and Epic Color fields are found by their custom type), projects,
-   statuses, versions of every tracked project, `/myself` (account id, name, time zone).
+   statuses, versions of every tracked project, `/myself` (account id, name, time zone). Then field usage: per
+   tracked project, `used_custom_fields` samples its 100 newest issues and `field.used` marks the custom fields
+   any of them fills, so this run already fetches them. A failed sample keeps the last marks and doesn't fail
+   the sync.
 2. Per tracked project, in Space order: Jira's approximate count of `(<scope>) AND project = KEY`, then that
    query `ORDER BY updated ASC` with `expand=renderedFields` and `SEARCH_FIELDS` plus the sprint, epic colour
-   and the custom fields that are `shown` or a view's column. Every page is stored in one transaction and announced as `sync_progress`.
+   and the custom fields that are `shown`, a view's column or filled by the tracked projects (`fetched_fields`). Every page is stored in one transaction and announced as `sync_progress`.
 3. A `sync_state` row `full:<project id>` after each project; the `scope` row (`last_full_at`, and
    `last_delta_at` = the newest `updated` stored) after all of them. A failed page ends the job before its
    cursors move; the next run repeats it.
-4. Field usage: per tracked project, `used_custom_fields` samples its 100 newest issues; `field.used` marks the
-   custom fields any of them fills. A failed sample keeps the last marks and doesn't fail the sync.
 
 **Delta** (`delta.rs`): `(<scope>) AND updated >= "<cursor − 2 min>" ORDER BY updated ASC`, the date literal in
 the Jira user's time zone from `/myself` (Jira reads JQL dates there, at minute precision). Pages are stored

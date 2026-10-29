@@ -187,7 +187,7 @@ An issue is changed while the sync recorded a change after the owner last saw it
 - Filter lists (max 6): Spaces and lists whose name holds the text; Space tile and "Space › List".
 - Actions (max 6): Open KEY in Jira (⌘↩), Save “text” as a filter list (⌘S; a `text contains` list under the
   current Space or Everything, opened), Refresh now (⌘R), Full sync, Group by …, then every titled command.
-- Keys: ↑↓ move (wrapping), ↩ opens (an issue in its Space's view with the peek; a list; an action), ⌘C copies
+- Keys: ↑↓ move (wrapping), ↩ opens (an issue in the full Issue view over its Space's view, its row selected; a list; an action), ⌘C copies
   the key, esc or a click outside closes. The active row is `--palette-active-bg`. Footer 38 lists the keys.
 
 ## Pins
@@ -239,8 +239,10 @@ view with its place intact).
 - Header 50: back, breadcrumb (Space tile and name / list or view / key), "Updated …", previous and next in the
   view's order (also J/K), Pin (with pins), **Open in Jira** (primary).
 - Main column: type badge · key · comment count, the 30/750 title, the field grid (Status, Assignee, Epic chip
-  that opens the epic here, Release, Priority, Sprint, then the custom fields shown as columns or marked shown),
-  links ("blocks", "is blocked by"), the description, and Child issues (epics) or Subtasks, when there are any:
+  that opens the epic here, Release, Priority, Sprint, then the custom fields shown as columns or marked shown,
+  then every other custom field the issue fills, by name), links ("blocks", "is blocked by"), the description,
+  then each rich text custom field with content (acceptance criteria, steps to reproduce) as its own section
+  under its Jira name (`RichFields`; the peek shows them under its description too), and Child issues (epics) or Subtasks, when there are any:
   open first, done behind "Show N done"; "Open as list view" narrows the origin view to the epic (a removable
   chip in the toolbar, never saved).
 - Activity (400 wide, `--panel-subtle-bg`): All / Comments / Changes, comment cards and change lines (status
@@ -323,7 +325,8 @@ button, Escape and a press outside close it, focus goes back to the button).
   that always wraps and never truncates, then avatars, release chip, comment count and priority flag. Card
   fields (the Columns button reads "Card fields") choose epic, assignee, release and priority. Changed cards
   use `--changed-bg` and `--changed-border`. Hover shows the row toolbar in the top-right corner.
-- A card opens the full Issue view (the mockup's behaviour; List rows open the peek).
+- A card opens the full Issue view (the mockup's behaviour; List rows open the peek). A Board never shows the
+  peek (`CurrentPeek`), whatever opened it.
 - Each column virtualises its cards (`BoardColumnCards`, measured heights), so a Space with thousands of
   issues mounts only the cards on screen; the keyboard's card scrolls into view.
 

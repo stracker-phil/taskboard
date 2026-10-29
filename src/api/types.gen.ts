@@ -120,7 +120,11 @@ export type ConnectionTest = { displayName: string, accountId: string, timeZone:
  */
 export type ConnectionView = { connection: Connection, hasToken: boolean, expiry: TokenExpiry, };
 
-export type CustomField = { id: string, name: string, value: Cell | null, };
+export type CustomField = { id: string, name: string, value: Cell | null, 
+/**
+ * Jira's rendered HTML for a rich text field (acceptance criteria, steps to reproduce); `value` is then empty.
+ */
+html: string | null, };
 
 export type DiagnosticGroup = { title: string, rows: Array<DiagnosticRow>, };
 

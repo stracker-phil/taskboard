@@ -21,6 +21,7 @@ import { SinceBanner } from "./SinceBanner";
 import { useSeenAfter } from "./useSeenAfter";
 import { FieldGrid } from "./FieldGrid";
 import { JiraHtml } from "./JiraHtml";
+import { RichFields } from "./RichFields";
 import { Children, Links } from "./Related";
 
 /** The issue's neighbours in the view it was opened from, for the previous/next arrows and J/K. */
@@ -153,6 +154,7 @@ function IssueMain({ issue, origin }: { issue: IssueDetail; origin: IssueOrigin 
           <p className="issue-main__empty">No description.</p>
         )}
       </section>
+      <RichFields fields={issue.custom} variant="issue" />
       {related && <Children related={related} isEpic={issue.isEpic} onOpen={openRelated} onOpenAsList={openAsList} />}
     </div>
   );

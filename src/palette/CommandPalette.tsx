@@ -33,6 +33,7 @@ function Palette() {
   const close = useStore((s) => s.setPaletteOpen);
   const updatePlace = useStore((s) => s.updatePlace);
   const loadPlace = useStore((s) => s.loadPlace);
+  const showIssue = useStore((s) => s.openIssue);
   const [text, setText] = useState("");
   const [active, setActive] = useState(0);
   const { data: tree } = useSidebar();
@@ -74,7 +75,7 @@ function Palette() {
 
   const dismiss = () => close(false);
 
-  /** In its Space's last view with the peek open. */
+  /** In the full Issue view, over its Space's last view (where the row stays selected). */
   const openIssue = async (hit: IssueHit) => {
     const space = tree?.spaces.find((s) => s.projectId === hit.projectId);
     dismiss();
@@ -83,7 +84,8 @@ function Palette() {
     const location = client.getQueryData<Nav>(NAV_KEY)?.location;
     if (!location) return;
     await loadPlace(location.listId, location.viewId);
-    updatePlace(location.listId, location.viewId, { selectedId: hit.id, peekOpen: true });
+    updatePlace(location.listId, location.viewId, { selectedId: hit.id, peekOpen: false });
+    showIssue(hit.id, { listId: location.listId, viewId: location.viewId });
   };
   const run = async (item: Item | undefined) => {
     if (!item) return;

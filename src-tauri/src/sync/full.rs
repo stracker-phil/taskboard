@@ -6,7 +6,7 @@ use chrono::Utc;
 
 use super::map::{FieldIds, format_utc};
 use super::store::{
-    has_project_sync, record_project_sync, record_scope_sync, shown_fields, store_field_usage,
+    fetched_fields, has_project_sync, record_project_sync, record_scope_sync, store_field_usage,
     store_fields, store_page, store_statuses, store_versions,
 };
 use super::{Job, SyncContext, SyncEvent, SyncProgress};
@@ -59,6 +59,8 @@ pub async fn full_sync(
     if scope.is_empty() || tracked.is_empty() {
         return Ok(());
     }
+    // First, so this run already fetches the fields the projects fill.
+    refresh_field_usage(ctx, &client, &tracked).await?;
     let fields = search_fields(ctx, &ids).await?;
     let run = Run {
         ctx,
@@ -76,16 +78,15 @@ pub async fn full_sync(
     let scope = run.scope;
     ctx.db
         .write(move |tx, _| record_scope_sync(tx, &scope, &now, newest.as_deref()))
-        .await?;
-    refresh_field_usage(ctx, &run.client, &tracked).await
+        .await
 }
 
 /// What a search asks for: the mapped fields, the site's sprint and epic colour fields, and the custom fields
-/// shown in the field grid or as a column.
+/// shown in the field grid or as a column or filled by the tracked projects (the Issue view shows those).
 pub(super) async fn search_fields(ctx: &SyncContext, ids: &FieldIds) -> AppResult<Vec<String>> {
     let mut fields: Vec<String> = SEARCH_FIELDS.iter().map(|f| f.to_string()).collect();
     fields.extend(ids.sprint.iter().chain(&ids.epic_color).cloned());
-    fields.extend(ctx.db.read(shown_fields).await?);
+    fields.extend(ctx.db.read(fetched_fields).await?);
     Ok(fields)
 }
 

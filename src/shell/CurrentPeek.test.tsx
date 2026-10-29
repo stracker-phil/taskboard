@@ -9,6 +9,7 @@ import { api, type IssueDetail, type Nav } from "../api";
 import { createQueryClient } from "../queries/queryClient";
 import { resetStore, useStore } from "../state/store";
 import { connectionView } from "../test/jira";
+import { view } from "../test/views";
 import { CurrentPeek } from "./CurrentPeek";
 
 const mocked = vi.mocked(api, true);
@@ -55,6 +56,7 @@ beforeEach(() => {
   resetStore();
   mocked.navCurrent.mockResolvedValue(AT_LIST);
   mocked.issueGet.mockResolvedValue(detail());
+  mocked.viewsOf.mockResolvedValue([view()]);
   mocked.connectionGet.mockResolvedValue(connectionView({ siteUrl: "" }));
 });
 
@@ -88,6 +90,26 @@ describe("CurrentPeek", () => {
 
     await waitFor(() => expect(mocked.navCurrent).toHaveBeenCalled());
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it("renders nothing in a Board view even when its place has a peek open", async () => {
+    mocked.viewsOf.mockResolvedValue([view({ layout: "board" })]);
+    resetStore({ places: { "11:101": PLACE } });
+
+    const { container } = renderPeek();
+
+    await waitFor(() => expect(mocked.viewsOf).toHaveBeenCalledWith(11));
+    await waitFor(() => expect(container).toBeEmptyDOMElement());
+    expect(mocked.issueGet).not.toHaveBeenCalled();
+  });
+
+  it.each(["list", "table"] as const)("shows the peek in a %s view", async (layout) => {
+    mocked.viewsOf.mockResolvedValue([view({ layout })]);
+    resetStore({ places: { "11:101": PLACE } });
+
+    renderPeek();
+
+    expect(await screen.findByRole("heading", { name: "Redesign the pricing page" })).toBeInTheDocument();
   });
 
   it("shows the selected issue of the current view when its peek is open", async () => {

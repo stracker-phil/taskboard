@@ -7,7 +7,7 @@ use tempfile::TempDir;
 
 use taskboard_lib::db::Db;
 use taskboard_lib::lists::filter_options;
-use taskboard_lib::sync::store::store_field_usage;
+use taskboard_lib::sync::store::{fetched_fields, store_field_usage};
 use taskboard_lib::test_support::temp_config_dir;
 use taskboard_lib::views::columns_catalogue;
 
@@ -164,6 +164,77 @@ mod the_marks {
         mark_used(&db, &["customfield_99999"]).await;
 
         assert_eq!(marks(&db).await.len(), 6);
+    }
+}
+
+mod the_fetched_fields {
+    use super::*;
+
+    async fn fetched(db: &Db) -> Vec<String> {
+        let mut ids = db.read(fetched_fields).await.unwrap();
+        ids.sort();
+        ids
+    }
+
+    fn ids(items: &[&str]) -> Vec<String> {
+        items.iter().map(|id| id.to_string()).collect()
+    }
+
+    #[tokio::test]
+    async fn only_the_shown_fields_are_fetched_before_any_sampling() {
+        let (_dir, db) = lab().await;
+        execute(
+            &db,
+            "UPDATE cache.field SET shown = 1 WHERE id = 'customfield_10090'",
+        )
+        .await;
+
+        assert_eq!(fetched(&db).await, ids(&[COST_CENTRE]));
+    }
+
+    #[tokio::test]
+    async fn nothing_is_fetched_before_any_sampling_when_nothing_is_shown() {
+        let (_dir, db) = lab().await;
+
+        assert_eq!(fetched(&db).await, Vec::<String>::new());
+    }
+
+    #[tokio::test]
+    async fn the_sampled_used_fields_are_fetched_with_the_shown_ones_and_the_view_columns() {
+        let (_dir, db) = lab().await;
+        mark_used(&db, &[STORY_POINTS, REVIEWER]).await;
+        execute(
+            &db,
+            "UPDATE cache.field SET shown = 1 WHERE id = 'customfield_10090';
+             UPDATE view SET columns = '[\"status\",\"customfield_10091\"]'",
+        )
+        .await;
+
+        assert_eq!(
+            fetched(&db).await,
+            ids(&[STORY_POINTS, REVIEWER, COST_CENTRE, LEGAL_APPROVAL])
+        );
+    }
+
+    #[tokio::test]
+    async fn a_field_that_is_shown_and_used_is_fetched_once() {
+        let (_dir, db) = lab().await;
+        mark_used(&db, &[REVIEWER]).await;
+        execute(
+            &db,
+            "UPDATE cache.field SET shown = 1 WHERE id = 'customfield_10071'",
+        )
+        .await;
+
+        assert_eq!(fetched(&db).await, ids(&[REVIEWER]));
+    }
+
+    #[tokio::test]
+    async fn system_fields_and_unused_fields_are_not_added() {
+        let (_dir, db) = lab().await;
+        mark_used(&db, &[COST_CENTRE]).await;
+
+        assert_eq!(fetched(&db).await, ids(&[COST_CENTRE]));
     }
 }
 

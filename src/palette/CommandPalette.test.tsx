@@ -300,14 +300,15 @@ describe("CommandPalette", () => {
   });
 
   describe("choosing an entry", () => {
-    it("opens an issue's Space with the issue selected and its peek open", async () => {
+    it("opens an issue in the full Issue view over its Space's view, with the issue selected and no peek", async () => {
       await renderPalette({ results: { issues: [issueHit()], lists: [] } });
       await search("contact");
       await screen.findByRole("option", { name: /NW-43/ });
 
       await userEvent.keyboard("{Enter}");
 
-      await waitFor(() => expect(useStore.getState().places["11:0"]).toMatchObject({ selectedId: "10043", peekOpen: true }));
+      await waitFor(() => expect(useStore.getState().issueView).toEqual({ origin: { listId: NW_ID, viewId: 0 }, stack: ["10043"] }));
+      expect(useStore.getState().places["11:0"]).toMatchObject({ selectedId: "10043", peekOpen: false });
       expect(mocked.navGo).toHaveBeenCalledWith(NW_ID, null);
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     });
@@ -321,6 +322,7 @@ describe("CommandPalette", () => {
 
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
       expect(mocked.navGo).not.toHaveBeenCalled();
+      expect(useStore.getState().issueView).toBeNull();
     });
 
     it("opens a filter list", async () => {

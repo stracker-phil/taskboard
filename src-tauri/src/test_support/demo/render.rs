@@ -6,7 +6,7 @@ use serde_json::{Value, json};
 
 use super::catalog::{Kind, project, project_ref, sprint_json, version, version_json};
 use super::clock::Clock;
-use super::fields::{EPIC_COLOR, REVIEWER, SPRINT, STORY_POINTS};
+use super::fields::{ACCEPTANCE, EPIC_COLOR, REVIEWER, SPRINT, STEPS, STORY_POINTS};
 use super::people::user;
 use super::spec::{CommentSpec, IssueSpec};
 use super::{SITE_URL, adf};
@@ -183,15 +183,39 @@ fn issue_json(
     if let Some(parent) = parent {
         fields["parent"] = parent;
     }
+    let mut rendered = json!({
+        "description": spec.description.as_deref().map(adf::html),
+        "comment": page(comments.iter().map(|c| c.html.clone()).collect()),
+    });
+    // Bugs follow the template with rich text fields, as Jira sends them: ADF in `fields`, HTML in `renderedFields`.
+    if spec.kind == Kind::Bug {
+        for (id, text) in bug_template(&spec.summary) {
+            fields[id] = adf::doc(&text);
+            rendered[id] = json!(adf::html(&text));
+        }
+    }
     json!({
         "expand": "renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations",
         "id": id,
         "self": format!("{SITE_URL}/rest/api/3/issue/{id}"),
         "key": spec.key,
         "fields": fields,
-        "renderedFields": {
-            "description": spec.description.as_deref().map(adf::html),
-            "comment": page(comments.iter().map(|c| c.html.clone()).collect()),
-        },
+        "renderedFields": rendered,
     })
+}
+
+fn bug_template(summary: &str) -> [(&'static str, String); 2] {
+    [
+        (
+            STEPS,
+            format!(
+                "- Open the page where it happens\n- {summary}\n- Compare with the expected result"
+            ),
+        ),
+        (
+            ACCEPTANCE,
+            "- The problem no longer happens in the latest build\n- A test covers the case"
+                .to_string(),
+        ),
+    ]
 }

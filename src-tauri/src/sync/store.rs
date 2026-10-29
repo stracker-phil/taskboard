@@ -47,7 +47,26 @@ pub fn store_field_usage(conn: &Connection, used: &BTreeSet<String>) -> AppResul
     Ok(())
 }
 
-/// Custom fields fetched with every issue: those the owner marked `shown` and those a view shows as a column.
+/// Custom fields fetched with every issue: the `shown_fields`, and the ones the tracked projects fill (once a
+/// sample has marked some unused; before that `used` is 1 for every field of the site).
+pub fn fetched_fields(conn: &Connection) -> AppResult<Vec<String>> {
+    let mut query = conn.prepare(
+        "SELECT id FROM cache.field
+         WHERE used = 1 AND id LIKE 'customfield\\_%' ESCAPE '\\'
+           AND EXISTS (SELECT 1 FROM cache.field WHERE used = 0)",
+    )?;
+    let used = query.query_map([], |row| row.get::<_, String>(0))?;
+    let mut ids = shown_fields(conn)?;
+    for id in used {
+        let id = id?;
+        if !ids.contains(&id) {
+            ids.push(id);
+        }
+    }
+    Ok(ids)
+}
+
+/// Custom fields shown with every issue: those the owner marked `shown` and those a view shows as a column.
 pub fn shown_fields(conn: &Connection) -> AppResult<Vec<String>> {
     let mut query = conn.prepare(
         "SELECT id FROM cache.field WHERE shown = 1

@@ -944,10 +944,81 @@ async fn an_unknown_issue_is_not_fetched() {
 
 #[tokio::test]
 #[ignore = "syncs the demo site into a temp database"]
-async fn custom_fields_are_empty_until_one_is_shown_as_a_column() {
+async fn the_custom_fields_an_issue_fills_are_listed_by_name_without_being_shown() {
     let site = Site::new().await;
 
-    assert_eq!(site.detail("NW-1042").await.custom, []);
+    let detail = site.detail("NW-1042").await;
+
+    let found: Vec<(&str, &str)> = detail
+        .custom
+        .iter()
+        .map(|f| (f.id.as_str(), f.name.as_str()))
+        .collect();
+    assert_eq!(
+        found,
+        [
+            (REVIEWER, "Reviewer"),
+            ("customfield_10016", "Story points")
+        ]
+    );
+    assert_eq!(detail.custom[0].value, Some(Cell::Person(marta())));
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn an_issue_that_fills_no_custom_field_lists_none_until_one_is_shown() {
+    let site = Site::new().await;
+
+    assert_eq!(site.detail("NW-1056").await.custom, []);
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn a_bug_lists_its_template_rich_text_fields_with_their_rendered_html() {
+    let site = Site::new().await;
+    let raw: serde_json::Value = serde_json::from_str(
+        &site
+            .db()
+            .read(|conn| {
+                Ok(conn.query_row(
+                    "SELECT raw FROM cache.issue WHERE key = 'NW-1038'",
+                    [],
+                    |r| r.get::<_, String>(0),
+                )?)
+            })
+            .await
+            .unwrap(),
+    )
+    .unwrap();
+    let html = |id: &str| raw["renderedFields"][id].as_str().unwrap().to_string();
+
+    let detail = site.detail("NW-1038").await;
+
+    let rich: Vec<&CustomField> = detail.custom.iter().filter(|f| f.html.is_some()).collect();
+    assert_eq!(
+        rich,
+        [
+            &CustomField {
+                id: "customfield_10081".into(),
+                name: "Acceptance criteria".into(),
+                value: None,
+                html: Some(html("customfield_10081")),
+            },
+            &CustomField {
+                id: "customfield_10080".into(),
+                name: "Steps to reproduce".into(),
+                value: None,
+                html: Some(html("customfield_10080")),
+            },
+        ]
+    );
+    assert!(
+        site.detail("NW-1042")
+            .await
+            .custom
+            .iter()
+            .all(|f| f.html.is_none())
+    );
 }
 
 #[tokio::test]
@@ -959,12 +1030,13 @@ async fn a_custom_column_shows_up_in_the_detail_with_its_name_and_value() {
     let detail = site.detail("NW-1042").await;
 
     assert_eq!(
-        detail.custom,
-        [CustomField {
+        detail.custom[0],
+        CustomField {
             id: REVIEWER.into(),
             name: "Reviewer".into(),
             value: Some(Cell::Person(marta())),
-        }]
+            html: None,
+        }
     );
 }
 
@@ -977,11 +1049,12 @@ async fn a_custom_field_without_a_value_is_listed_with_no_value() {
     let detail = site.detail("NW-1049").await;
 
     assert_eq!(
-        detail.custom,
-        [CustomField {
+        detail.custom[0],
+        CustomField {
             id: REVIEWER.into(),
             name: "Reviewer".into(),
             value: None,
-        }]
+            html: None,
+        }
     );
 }

@@ -131,7 +131,8 @@ fn filled_custom_fields(issues: &[Issue]) -> BTreeSet<String> {
         .collect()
 }
 
-fn is_filled(value: &Value) -> bool {
+/// A value worth showing: not null, and not an empty text, list or object.
+pub fn is_filled(value: &Value) -> bool {
     match value {
         Value::Null => false,
         Value::String(text) => !text.is_empty(),

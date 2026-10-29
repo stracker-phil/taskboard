@@ -11,6 +11,7 @@ use super::{status_names, user_names};
 use crate::changes::{Names, Since, since};
 use crate::db::Db;
 use crate::error::{AppError, AppResult};
+use crate::jira::is_filled;
 use crate::lists::Viewer;
 use crate::status_style::{Style, detect, styles};
 use crate::sync::store::{forget_issue, shown_fields};
@@ -62,6 +63,8 @@ pub struct CustomField {
     pub id: String,
     pub name: String,
     pub value: Option<Cell>,
+    /// Jira's rendered HTML for a rich text field (acceptance criteria, steps to reproduce); `value` is then empty.
+    pub html: Option<String>,
 }
 
 pub async fn issue_get(db: &Db, viewer: Viewer, id: String) -> AppResult<IssueDetail> {
@@ -168,21 +171,56 @@ fn since_banner(conn: &Connection, viewer: &Viewer, id: &str) -> AppResult<Optio
     since(conn, viewer, id, &names)
 }
 
+/// The custom fields the owner shows (always, empty or not), then every other one the issue fills, by name.
 fn custom_fields(conn: &Connection, raw: &str, me: Option<&str>) -> AppResult<Vec<CustomField>> {
     let raw: serde_json::Value = serde_json::from_str(raw).unwrap_or_default();
+    let shown = shown_fields(conn)?;
+    let filled: Vec<String> = raw["fields"]
+        .as_object()
+        .into_iter()
+        .flatten()
+        .filter(|(id, value)| {
+            id.starts_with("customfield_") && !shown.contains(id) && is_filled(value)
+        })
+        .map(|(id, _)| id.clone())
+        .collect();
     let mut names = conn.prepare("SELECT name FROM cache.field WHERE id = ?1")?;
-    let mut fields = Vec::new();
-    for column in custom_columns(conn, &shown_fields(conn)?)? {
+    let mut field = |id: String, kind: &str| -> AppResult<CustomField> {
         let name: String = names
-            .query_row([&column.id], |r| r.get(0))
+            .query_row([&id], |r| r.get(0))
             .optional()?
-            .unwrap_or_else(|| column.id.clone());
-        fields.push(CustomField {
-            value: rows::cell(&column.kind, &raw["fields"][&column.id], me),
+            .unwrap_or_else(|| id.clone());
+        let value = &raw["fields"][&id];
+        // Rich text arrives as an ADF document; Jira's rendering of it is in `renderedFields`.
+        let html = (value["type"] == "doc")
+            .then(|| raw["renderedFields"][&id].as_str())
+            .flatten()
+            .filter(|html| !html.trim().is_empty())
+            .map(str::to_string);
+        Ok(CustomField {
+            value: if html.is_some() || value["type"] == "doc" {
+                None
+            } else {
+                rows::cell(kind, value, me)
+            },
+            html,
             name,
-            id: column.id,
-        });
+            id,
+        })
+    };
+    let mut fields = Vec::new();
+    for column in custom_columns(conn, &shown)? {
+        fields.push(field(column.id, &column.kind)?);
     }
+    let mut extra = Vec::new();
+    for column in custom_columns(conn, &filled)? {
+        let found = field(column.id, &column.kind)?;
+        if found.value.is_some() || found.html.is_some() {
+            extra.push(found);
+        }
+    }
+    extra.sort_by_key(|f| f.name.to_lowercase());
+    fields.extend(extra);
     Ok(fields)
 }
 
@@ -218,4 +256,181 @@ pub async fn issue_forget(db: &Db, id: String) -> AppResult<()> {
         }
     })
     .await
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::{Value, json};
+    use tempfile::TempDir;
+
+    use super::*;
+    use crate::test_support::temp_config_dir;
+
+    const ZONE: &str = "customfield_10001";
+    const ALPHA: &str = "customfield_10002";
+    const NOTES: &str = "customfield_10003";
+    const RANK: &str = "customfield_10019";
+    const SPRINT: &str = "customfield_10020";
+
+    async fn lab() -> (TempDir, Db) {
+        let dir = temp_config_dir();
+        let db = Db::open(dir.path()).unwrap();
+        db.write(|tx, _| {
+            tx.execute_batch(
+                "INSERT INTO cache.field (id, name, type) VALUES
+                   ('summary', 'Summary', 'string'),
+                   ('customfield_10001', 'Zone', 'string'),
+                   ('customfield_10002', 'alpha', 'string'),
+                   ('customfield_10003', 'Notes', 'string'),
+                   ('customfield_10019', 'Rank', 'any'),
+                   ('customfield_10020', 'Sprint', 'array')",
+            )?;
+            Ok(())
+        })
+        .await
+        .unwrap();
+        (dir, db)
+    }
+
+    async fn show(db: &Db, id: &'static str) {
+        db.write(move |tx, _| {
+            tx.execute("UPDATE cache.field SET shown = 1 WHERE id = ?1", [id])?;
+            Ok(())
+        })
+        .await
+        .unwrap();
+    }
+
+    async fn custom(db: &Db, raw: Value) -> Vec<CustomField> {
+        db.read(move |conn| custom_fields(conn, &raw.to_string(), None))
+            .await
+            .unwrap()
+    }
+
+    fn text(id: &str, name: &str, value: &str) -> CustomField {
+        CustomField {
+            id: id.into(),
+            name: name.into(),
+            value: Some(Cell::Text(value.into())),
+            html: None,
+        }
+    }
+
+    fn empty(id: &str, name: &str) -> CustomField {
+        CustomField {
+            id: id.into(),
+            name: name.into(),
+            value: None,
+            html: None,
+        }
+    }
+
+    fn doc() -> Value {
+        json!({ "type": "doc", "version": 1, "content": [] })
+    }
+
+    #[tokio::test]
+    async fn an_unshown_field_the_issue_fills_is_listed() {
+        let (_dir, db) = lab().await;
+
+        let found = custom(&db, json!({ "fields": { ZONE: "North" } })).await;
+
+        assert_eq!(found, [text(ZONE, "Zone", "North")]);
+    }
+
+    #[tokio::test]
+    async fn an_unshown_field_the_issue_leaves_empty_is_not_listed() {
+        let (_dir, db) = lab().await;
+
+        let found = custom(
+            &db,
+            json!({ "fields": { ZONE: null, ALPHA: "", NOTES: [] } }),
+        )
+        .await;
+
+        assert_eq!(found, []);
+    }
+
+    #[tokio::test]
+    async fn a_shown_field_is_listed_even_when_the_issue_leaves_it_empty() {
+        let (_dir, db) = lab().await;
+        show(&db, ZONE).await;
+
+        let found = custom(&db, json!({ "fields": { ZONE: null } })).await;
+
+        assert_eq!(found, [empty(ZONE, "Zone")]);
+    }
+
+    #[tokio::test]
+    async fn a_rich_text_field_gives_its_rendered_html_and_no_value() {
+        let (_dir, db) = lab().await;
+        let raw = json!({
+            "fields": { NOTES: doc() },
+            "renderedFields": { NOTES: "<p>Check the totals</p>" },
+        });
+
+        let found = custom(&db, raw).await;
+
+        assert_eq!(
+            found,
+            [CustomField {
+                id: NOTES.into(),
+                name: "Notes".into(),
+                value: None,
+                html: Some("<p>Check the totals</p>".into()),
+            }]
+        );
+    }
+
+    #[tokio::test]
+    async fn an_unshown_rich_text_field_with_blank_html_is_left_out() {
+        let (_dir, db) = lab().await;
+
+        for rendered in [json!({ NOTES: "  " }), json!({})] {
+            let raw = json!({ "fields": { NOTES: doc() }, "renderedFields": rendered });
+
+            assert_eq!(custom(&db, raw.clone()).await, [], "{raw}");
+        }
+    }
+
+    #[tokio::test]
+    async fn a_shown_rich_text_field_with_blank_html_is_listed_without_value_or_html() {
+        let (_dir, db) = lab().await;
+        show(&db, NOTES).await;
+        let raw = json!({ "fields": { NOTES: doc() }, "renderedFields": { NOTES: "" } });
+
+        let found = custom(&db, raw).await;
+
+        assert_eq!(found, [empty(NOTES, "Notes")]);
+    }
+
+    #[tokio::test]
+    async fn the_shown_fields_come_first_then_the_others_by_name_ignoring_case() {
+        let (_dir, db) = lab().await;
+        show(&db, ZONE).await;
+        let raw = json!({ "fields": { ZONE: "North", NOTES: "Late", ALPHA: "First" } });
+
+        let found = custom(&db, raw).await;
+
+        assert_eq!(
+            found,
+            [
+                text(ZONE, "Zone", "North"),
+                text(ALPHA, "alpha", "First"),
+                text(NOTES, "Notes", "Late"),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn internal_fields_the_sprint_field_and_system_fields_stay_out() {
+        let (_dir, db) = lab().await;
+        let raw = json!({ "fields": {
+            RANK: "0|i0001:",
+            SPRINT: [{ "name": "Sprint 22" }],
+            "summary": "Checkout",
+        } });
+
+        assert_eq!(custom(&db, raw).await, []);
+    }
 }

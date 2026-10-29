@@ -109,6 +109,26 @@ describe("Peek", () => {
     expect(await screen.findByText("No description.")).toBeInTheDocument();
   });
 
+  it("shows a rich text custom field as a section under its name", async () => {
+    mocked.issueGet.mockResolvedValue(
+      detail({ custom: [{ id: "customfield_10080", name: "Steps to reproduce", value: null, html: "<ol><li>Open the form</li></ol><script>alert(1)</script>" }] }),
+    );
+    renderPeek();
+
+    const section = await screen.findByRole("region", { name: "Steps to reproduce" });
+    expect(within(section).getByRole("heading", { name: "Steps to reproduce" })).toBeInTheDocument();
+    expect(within(section).getByText("Open the form")).toBeInTheDocument();
+    expect(screen.queryByText(/alert/)).not.toBeInTheDocument();
+  });
+
+  it.each(["", "  ", "<p> </p>"])("shows no section for a rich text custom field whose html is %j", async (html) => {
+    mocked.issueGet.mockResolvedValue(detail({ custom: [{ id: "customfield_10080", name: "Steps to reproduce", value: null, html }] }));
+    renderPeek();
+
+    await screen.findByRole("heading", { name: "Redesign the pricing page" });
+    expect(screen.queryByRole("region", { name: "Steps to reproduce" })).not.toBeInTheDocument();
+  });
+
   it("leaves out the epic, release and priority an issue does not have", async () => {
     mocked.issueGet.mockResolvedValue(detail({ epic: null, releases: [], priority: null, assignees: [] }));
     renderPeek();

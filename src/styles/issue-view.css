@@ -120,3 +120,11 @@
 
 .epic-narrowing { gap: 6px; padding: 0 10px; max-width: 220px; }
 .epic-narrowing__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+/* Rich text custom fields (acceptance criteria, steps to reproduce): sections like the description. */
+.rich-field { display: flex; flex-direction: column; gap: 10px; }
+.rich-field h2 { margin: 0; font-weight: 700; }
+.rich-field--issue { padding-top: 14px; border-top: 1px solid var(--hairline); }
+.rich-field--issue h2 { font-size: 16px; }
+.rich-field--peek h2 { font-size: 13px; color: var(--text-secondary); }
+.rich-field--peek .jira-html { font-size: 14px; }

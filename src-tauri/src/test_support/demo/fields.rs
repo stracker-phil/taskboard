@@ -6,6 +6,9 @@ pub const SPRINT: &str = "customfield_10020";
 pub const EPIC_COLOR: &str = "customfield_10017";
 pub const STORY_POINTS: &str = "customfield_10016";
 pub const REVIEWER: &str = "customfield_10071";
+/// Rich text fields of the bug template.
+pub const STEPS: &str = "customfield_10080";
+pub const ACCEPTANCE: &str = "customfield_10081";
 
 pub fn fields() -> Vec<Value> {
     let mut all: Vec<Value> = SYSTEM
@@ -36,6 +39,18 @@ pub fn fields() -> Vec<Value> {
             "Reviewer",
             json!({ "type": "user" }),
             "com.atlassian.jira.plugin.system.customfieldtypes:userpicker",
+        ),
+        custom(
+            10080,
+            "Steps to reproduce",
+            json!({ "type": "string" }),
+            "com.atlassian.jira.plugin.system.customfieldtypes:textarea",
+        ),
+        custom(
+            10081,
+            "Acceptance criteria",
+            json!({ "type": "string" }),
+            "com.atlassian.jira.plugin.system.customfieldtypes:textarea",
         ),
         // Company-wide fields no tracked project fills: the field pickers leave them out.
         custom(

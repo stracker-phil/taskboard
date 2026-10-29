@@ -79,7 +79,7 @@ export function FieldGrid({ issue, onOpenEpic }: { issue: IssueDetail; onOpenEpi
           {issue.sprint ?? NONE}
         </Field>
       )}
-      {issue.custom.map((field) => (
+      {issue.custom.filter((field) => !field.html).map((field) => (
         <Field key={field.id} label={field.name}>
           <CellValue cell={field.value} />
         </Field>

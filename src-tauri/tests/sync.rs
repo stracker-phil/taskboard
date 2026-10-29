@@ -345,7 +345,6 @@ fn expected_progress(page_size: u32) -> Vec<SyncProgress> {
     all
 }
 
-/// Runs `act` as soon as the fake has been asked for one more search page than it had at the call.
 /// The per-project field-usage sample, as opposed to a page of the sync's own search.
 fn is_field_sample(body: &Value) -> bool {
     body["jql"]
@@ -353,6 +352,21 @@ fn is_field_sample(body: &Value) -> bool {
         .is_some_and(|jql| jql.ends_with("ORDER BY updated DESC"))
 }
 
+/// Runs `act` as soon as a full sync that started at the call has sent its samples (one per tracked project)
+/// and one search page after them.
+async fn after_the_first_page_request(rig: &Rig, act: impl FnOnce()) {
+    let first_page = rig.searches() + COUNTS.len();
+    tokio::time::timeout(Duration::from_secs(30), async {
+        while rig.searches() <= first_page {
+            tokio::time::sleep(Duration::from_millis(1)).await;
+        }
+    })
+    .await
+    .expect("the sync never searched a page");
+    act();
+}
+
+/// Runs `act` as soon as the fake has been asked for one more search request than it had at the call.
 async fn after_the_next_search_request(rig: &Rig, act: impl FnOnce()) {
     let baseline = rig.searches();
     tokio::time::timeout(Duration::from_secs(30), async {
@@ -433,7 +447,15 @@ mod the_full_sync {
             .map(|f| f.id)
             .filter(custom)
             .collect();
-        assert_eq!(columns, ["customfield_10071", "customfield_10016"]);
+        assert_eq!(
+            columns,
+            [
+                "customfield_10081",
+                "customfield_10071",
+                "customfield_10080",
+                "customfield_10016",
+            ]
+        );
         assert_eq!(filters, columns);
     }
 
@@ -710,7 +732,7 @@ mod the_full_sync {
 
         let (result, ()) = tokio::join!(
             full_sync(&rig.ctx, &*emit),
-            after_the_next_search_request(&rig, || rig.fake.fail_next(1, 429, Some("0")))
+            after_the_first_page_request(&rig, || rig.fake.fail_next(1, 429, Some("0")))
         );
 
         assert_eq!(result, Ok(()));
@@ -757,7 +779,7 @@ mod the_full_sync {
     }
 
     #[tokio::test]
-    async fn samples_the_fields_of_each_tracked_project_once_after_its_pages() {
+    async fn samples_the_fields_of_each_tracked_project_once_before_its_pages() {
         let rig = Rig::connected().await;
 
         rig.full_sync().await;
@@ -773,15 +795,43 @@ mod the_full_sync {
             .map(|(key, _)| format!("project = \"{key}\" ORDER BY updated DESC"))
             .collect();
         assert_eq!(samples, expected);
-        let last_page = requests
+        let last_sample = requests
             .iter()
-            .rposition(|r| r.path == SEARCH_PATH && !is_field_sample(&r.body))
+            .rposition(|r| r.path == SEARCH_PATH && is_field_sample(&r.body))
             .unwrap();
-        let first_sample = requests
+        let first_page = requests
             .iter()
-            .position(|r| r.path == SEARCH_PATH && is_field_sample(&r.body))
+            .position(|r| r.path == SEARCH_PATH && !is_field_sample(&r.body))
             .unwrap();
-        assert!(last_page < first_sample);
+        assert!(last_sample < first_page);
+    }
+
+    #[tokio::test]
+    async fn the_first_sync_already_stores_the_rich_text_fields_the_bugs_fill() {
+        let rig = Rig::connected().await;
+
+        rig.full_sync().await;
+
+        let db = &rig.ctx.db;
+        let bug: Value = serde_json::from_str(
+            &text_of(db, "SELECT raw FROM cache.issue WHERE key = 'NW-1038'").await,
+        )
+        .unwrap();
+        let story: Value = serde_json::from_str(
+            &text_of(db, "SELECT raw FROM cache.issue WHERE key = 'NW-1042'").await,
+        )
+        .unwrap();
+        for id in ["customfield_10080", "customfield_10081"] {
+            assert_eq!(bug["fields"][id]["type"], "doc", "{id}");
+            assert!(
+                bug["renderedFields"][id]
+                    .as_str()
+                    .is_some_and(|html| !html.trim().is_empty()),
+                "{id}"
+            );
+        }
+        assert!(story["fields"]["customfield_10080"].is_null());
+        assert!(story["fields"]["customfield_10081"].is_null());
     }
 
     #[tokio::test]
@@ -811,7 +861,7 @@ mod the_full_sync {
         let first_run_samples = samples_so_far();
         let emit = rig.emit();
 
-        // Once the first sample of this run is in, only samples are left, so the failure hits the second one.
+        // The run starts with its samples, so the failure hits the second one.
         let (result, ()) = tokio::join!(full_sync(&rig.ctx, &*emit), async {
             tokio::time::timeout(Duration::from_secs(30), async {
                 while samples_so_far() == first_run_samples {
@@ -895,7 +945,7 @@ mod running_a_job {
 
         let (state, ()) = tokio::join!(
             run_job(&rig.ctx, Job::Full, &*emit, None),
-            after_the_next_search_request(&rig, || rig.fake.fail_next(1, 500, None))
+            after_the_first_page_request(&rig, || rig.fake.fail_next(1, 500, None))
         );
 
         match state {
@@ -926,7 +976,7 @@ mod running_a_job {
 
         let (state, ()) = tokio::join!(
             run_job(&rig.ctx, Job::Full, &*emit, None),
-            after_the_next_search_request(&rig, || rig.fake.fail_next(1, 500, None))
+            after_the_first_page_request(&rig, || rig.fake.fail_next(1, 500, None))
         );
 
         assert!(matches!(state, SyncState::Error { .. }), "{state:?}");

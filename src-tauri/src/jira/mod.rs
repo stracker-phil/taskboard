@@ -11,6 +11,7 @@ pub mod paging;
 pub mod retry;
 pub mod site;
 
+pub use api::is_filled;
 pub use client::JiraClient;
 pub use gateway::BULK_FETCH_MAX;
 pub use limiter::Limiter;
