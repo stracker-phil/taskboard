@@ -1,11 +1,42 @@
 # Taskboard
 
-My task and project manager for macOS: a local-first Jira Cloud client. It mirrors my Jira issues into a
-local SQLite cache and shows them in a fast UI with Spaces, filter lists and views, so nothing waits on the
-network. Work in progress.
+My task and project manager for macOS: a local-first, read-only Jira Cloud client. It mirrors my Jira issues
+into a local SQLite cache and shows them in a fast, native-looking window with Spaces, filter lists and views,
+so nothing waits on the network.
 
 It is a local tool for one person on one Mac. Published as source, as-is: no releases, no binaries, no
 support. To build it or port it, point a coding agent at [AGENTS.md](AGENTS.md).
+
+![A Space's issues in the List layout, grouped by status](docs/screens/list.png)
+
+## What it does
+
+- **A local mirror of Jira:** a full sync of the chosen projects, then quick change syncs; it works offline
+  and shows what is cached. It reads only: nothing is written back to Jira.
+- **Spaces, filter lists and views:** each tracked project is a Space with its own filter lists (current
+  sprint, open bugs, a release); every list has views as tabs, shown as a List, a Board or a Table, grouped,
+  sorted and with their own columns. Filters run locally, so they are instant.
+- **What changed:** Recently changed collects new comments, status and assignee changes since you last looked;
+  pins keep issues at hand for a while.
+- **The Issue view:** description, the filled custom fields (acceptance criteria, steps to reproduce),
+  related issues and the activity, with Jira's HTML sanitised and links opened in the browser.
+- **Keyboard first:** ⌘K finds issues by key or text, J/K move, every action has a menu item and a
+  rebindable key, and the `taskboard` command line drives the window from scripts.
+
+| | |
+|---|---|
+| ![The Board layout of a Space](docs/screens/board.png) | ![An issue in the full Issue view](docs/screens/issue.png) |
+| ![Recently changed, with unseen changes](docs/screens/recent.png) | ![The command palette](docs/screens/palette.png) |
+
+All screenshots show made-up demo data from the debug build.
+
+## Privacy
+
+- The API token lives only in the macOS Keychain; it is never written to the settings, the cache or the logs.
+- Network traffic goes only to your Jira site and `api.atlassian.com`, through one allowlisted gateway that
+  refuses anything but the read requests Taskboard needs.
+- The cache stays on your Mac (`~/Library/Application Support/com.philippstracker.taskboard/`). Settings →
+  Sync → Cache, File → Reset Cache… or `taskboard reset-cache --yes` empties it.
 
 ## Install
 
