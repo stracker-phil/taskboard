@@ -149,7 +149,7 @@ function Table({ view, data }: { view: View; data: ViewData }) {
                     nesting={item.nesting}
                     subtasksOpen={subtasksOpen(item.row.id)}
                     onToggleSubtasks={toggleSubtasks}
-                    subtaskChip={data.subtasks === "hidden" || (item.nesting === "parent" && !subtasksOpen(item.row.id))}
+                    childChip={data.subtasks === "hidden" || (item.nesting?.parent === true && !subtasksOpen(item.row.id))}
                   />
                 )}
               </div>

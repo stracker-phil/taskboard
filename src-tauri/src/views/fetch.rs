@@ -26,10 +26,9 @@ pub(super) struct Source<'a> {
 /// The columns `row_from` reads, by position; the custom fields' values follow from `CUSTOM_AT`.
 const SELECT: &str = "i.id, i.key, i.summary, i.status_id, COALESCE(st.name, ''), i.status_category,
     i.comment_count, i.assignee_id, u.name, e.id, e.summary, e.epic_color, i.fix_versions, i.priority,
-    i.labels, i.sprint, i.due_date, i.updated_at, i.created_at, i.project_id, i.type_is_subtask,
-    CASE WHEN i.type_is_subtask = 1 THEN i.parent_id END,
-    (SELECT COUNT(*) FROM cache.issue s WHERE s.parent_id = i.id AND s.type_is_subtask = 1 AND s.gone = 0)";
-const CUSTOM_AT: usize = 23;
+    i.labels, i.sprint, i.due_date, i.updated_at, i.created_at, i.project_id, i.parent_id,
+    (SELECT COUNT(*) FROM cache.issue c WHERE c.parent_id = i.id AND c.gone = 0)";
+const CUSTOM_AT: usize = 22;
 
 pub(super) fn fetch(
     conn: &Connection,
@@ -122,9 +121,10 @@ fn row_from(r: &rusqlite::Row, source: &Source) -> AppResult<(Row, Facts)> {
         sprint: r.get(15)?,
         due: due_date.map(|d| rows::format_due(d, source.ctx.today)),
         custom: custom_cells(r, source)?,
-        is_subtask: r.get(20)?,
-        parent_id: r.get(21)?,
-        subtask_count: r.get(22)?,
+        is_subtask: false,
+        parent_id: r.get(20)?,
+        child_count: r.get(21)?,
+        depth: 0,
     };
     let facts = Facts {
         status_id,

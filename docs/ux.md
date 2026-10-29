@@ -97,7 +97,7 @@ with a 10px gap.
   tile or funnel opens `LookPopover` under it.
 - Everything and the Home lists: their sidebar icon (20/1.8, `--text-tertiary`) and name.
 - **Mark all as read** on the right for Unread: 28px, 7px radius, a `--border` frame, 12/600; disabled
-  while nothing is unseen.
+  while nothing is unseen. It marks what the current view shows, in its subtask mode and with its drafts.
 - **Open in Jira ↗** on the right for a Space and its lists: 32px, 12px padding, 8px radius, a `--border`
   frame, 13px `--text-secondary`; opens `<site>/browse/<KEY>`. Hidden elsewhere and without a site.
 
@@ -190,13 +190,15 @@ one group, Board column or pill per style, whatever the status is called; the Bo
   only when the cell is narrower than the title itself, and inline labels fill what it leaves.
 - Rows are virtualized (`@tanstack/react-virtual`): a card is drawn from its pieces (the header item, then
   rows that know whether they are first, middle, last or the only one).
-- **Subtasks** follow the view's mode ([ADR 0037](adr/0037-views-choose-how-subtasks-show.md)). The subtask
-  glyph (`components/issue/SubtaskIcon.tsx`: a circle top left, a line down bending right into a circle bottom
-  right, lucide style) marks them. Hidden: a parent shows "⟨glyph⟩ 3" after its title, muted 12px like the
-  comment count (display only). List: a subtask is a row like any other, with the glyph before its title.
-  Hierarchy: a parent's subtasks follow it, indented 24 (`list-row--child`), each with the glyph; a 16px caret in
-  the parent row's left padding (`SubtaskCaret`) collapses or expands them, and a collapsed parent shows the
-  count chip. Collapsed parents are kept per view (`places.json`); expanded is the default.
+- **Subtasks** are the children of the view's results at any depth and of any type, and follow the view's
+  mode ([ADR 0040](adr/0040-subtasks-are-the-children-of-a-views-results.md)). Hidden: a row with children shows
+  "⟨glyph⟩ 3" after its title (`ChildCount`; the subtask glyph of `components/issue/SubtaskIcon.tsx`, a circle top
+  left, a line down bending right into a circle bottom right, lucide style), muted 12px like the comment count,
+  "3 child issues" as its tooltip. List: a subtask is a row like any other, with the glyph before its title.
+  Hierarchy: each result's subtree follows it, every level indented 24 more (`list-row--child`, the row's
+  `--depth`); a 16px caret just left of a row's indent (`SubtaskCaret`) collapses or expands its subtree at any
+  level, and a collapsed row shows the count chip. Collapsed rows are kept per view (`places.json`); expanded is
+  the default.
 
 ## Peek
 
@@ -427,8 +429,8 @@ button, Escape and a press outside close it, focus goes back to the button).
 - **Subtasks** (List and Table only, right after Columns; `SubtasksButton.tsx`): the subtask icon, labeled by
   the mode: icon only while hidden ("Subtasks: Hidden" to assistive tech, "Subtasks" as its tooltip), "Subtasks"
   in Hierarchy and "As items" in List, both in the active style. A [menu](#menus) captioned "Subtasks" offers
-  Hide subtasks ("Top-level issues only"), Show under parent ("Indented below their parent") and Show as items
-  ("Separate rows, filtered on their own"), the current one checked; folded into the "…" menu it reads
+  Hide subtasks ("Matching issues only"), Show under parent ("Indented below their parent") and Show as items
+  ("Separate rows, grouped on their own"), the current one checked; folded into the "…" menu it reads
   "Subtasks" with the mode as its hint. Saves to the view; the Board always hides
   subtasks and has no button.
 - **Columns** ("Card fields" on a board): the *Columns for this view* popover (340 wide): a "Search fields" box
@@ -447,7 +449,7 @@ button, Escape and a press outside close it, focus goes back to the button).
   at once as drafts and are not saved ([ADR 0038](adr/0038-filter-changes-are-drafts-until-the-view-is-saved.md)):
   the footer says "Changes show until you leave this view.", and while something differs from what's saved "Not
   saved: Save View keeps it." with Save View as a link. The live count follows the drafts and the Me chip (not
-  the text filter, a search) and counts top-level issues, like the sidebar. On Everything and a Space "Save as filter list" turns the view's (drafted)
+  the text filter, a search) and counts every matching issue, like the sidebar. On Everything and a Space "Save as filter list" turns the view's (drafted)
   conditions into a new list and opens it. A picked field's value opens a
   list with a search box and a checkbox per value (`ValuePicker`); every tick applies at once, and several values
   are stored as `in` / `not in` (shown as "is" / "is not").
@@ -501,9 +503,9 @@ columns are wider than the window. Groups open and close with the List's animati
 never grow: inline labels after the summary fill what the title leaves and are cut at the cell's edge (the
 title truncates only when the cell is narrower than the title), and the Labels cell keeps its chips on
 one line that scrolls sideways inside the cell (an overlay scrollbar, [below](#scrollbars)). Subtasks show as in
-the List: the caret, the indent (`table-row--child`), the glyph and the count chip sit in the Summary cell. In
-Hierarchy every row leaves the caret's room before its title (`table-row--tree`), so titles line up whether a
-row has subtasks or not, and the Summary header lines up with them; subtasks indent one level further.
+the List: the caret, the indent, the glyph and the count chip sit in the Summary cell. In Hierarchy every row
+leaves the caret's room before its title (`table-row--tree`), so titles line up whether a row has children or
+not, and the Summary header lines up with them; each level indents one caret's room (23) further.
 
 ## Tokens
 
@@ -654,8 +656,8 @@ global shortcuts.
 - A command has one binding; ⌘1–⌘9 open the nth view tab.
 - **Issues** (`commands/issueKeys.ts`, registered by the shown List, Board or Issue view): J or ↓ and K or ↑
   move (on the Board through a column's cards, ← and → to the neighboring column; in a List ← and → close and
-  open the row's group; in Hierarchy ← on a subtask selects its parent and ←/→ on a parent collapse or expand its
-  subtasks first), Space opens or closes the preview (the Board opens the Issue view), ↩ opens the Issue
+  open the row's group; in Hierarchy ←/→ on a row with children collapse or expand its subtree first, at any
+  level, and ← on a nested row selects its parent), Space opens or closes the preview (the Board opens the Issue view), ↩ opens the Issue
   view, E the epic, P adds or removes a bookmark (default duration), M marks read or unread, ⌘C copies the key (only with no text
   field focused and no text selected), ⌘⇧C the URL, ⌘↩ opens it in Jira, esc closes the preview or goes back.
 - **A click on an issue key copies it** ("Copied NW-1042", `components/issue/CopyKey.tsx`): in List and Table rows,

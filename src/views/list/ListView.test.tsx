@@ -346,21 +346,23 @@ describe("ListView", () => {
   });
 
   describe("subtasks", () => {
-    const PARENT = row({ id: "1", key: "NW-1042", summary: "Redesign the pricing page", subtaskCount: 2 });
-    const STEP = row({ id: "11", key: "NW-1043", summary: "Draft the price table", isSubtask: true, parentId: "1" });
-    const LAST_STEP = row({ id: "12", key: "NW-1044", summary: "Review the price table", isSubtask: true, parentId: "1" });
+    const PARENT = row({ id: "1", key: "NW-1042", summary: "Redesign the pricing page", childCount: 2 });
+    const STEP = row({ id: "11", key: "NW-1043", summary: "Draft the price table", isSubtask: true, parentId: "1", depth: 1 });
+    const LAST_STEP = row({ id: "12", key: "NW-1044", summary: "Review the price table", isSubtask: true, parentId: "1", depth: 1 });
     const OTHER = row({ id: "2", key: "NW-1001", summary: "Publish the launch notes" });
     const modeData = (subtasks: ViewData["subtasks"], rows = [PARENT, STEP, LAST_STEP, OTHER]) => viewData([groupOf(rows)], rows, { subtasks });
     const rowOf = (key: RegExp) => screen.getByRole("row", { name: key });
     const caret = (name: "Collapse subtasks" | "Expand subtasks") => screen.findByRole("button", { name });
 
-    it("shows a parent's subtask count as a chip after its title in Hidden", async () => {
-      const single = row({ id: "3", key: "NW-1003", summary: "Fix the footer links", subtaskCount: 1 });
-      await renderList(modeData("hidden", [PARENT, single, OTHER]));
+    it("shows a parent's child count as a chip after its title in Hidden", async () => {
+      const single = row({ id: "3", key: "NW-1003", summary: "Fix the footer links", childCount: 1 });
+      const many = row({ id: "4", key: "NW-1004", summary: "Migrate the blog posts", childCount: 76 });
+      await renderList(modeData("hidden", [PARENT, single, many, OTHER]));
 
-      expect(within(await screen.findByRole("row", { name: /NW-1042/ })).getByLabelText("2 subtasks")).toBeInTheDocument();
-      expect(within(rowOf(/NW-1003/)).getByLabelText("1 subtask")).toBeInTheDocument();
-      expect(within(rowOf(/NW-1001/)).queryByLabelText(/subtask/)).not.toBeInTheDocument();
+      expect(within(await screen.findByRole("row", { name: /NW-1042/ })).getByLabelText("2 child issues")).toBeInTheDocument();
+      expect(within(rowOf(/NW-1003/)).getByLabelText("1 child issue")).toBeInTheDocument();
+      expect(within(rowOf(/NW-1004/)).getByLabelText("76 child issues")).toBeInTheDocument();
+      expect(within(rowOf(/NW-1001/)).queryByLabelText(/child issue/)).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: /subtasks$/ })).not.toBeInTheDocument();
     });
 
@@ -372,8 +374,115 @@ describe("ListView", () => {
       expect(rowOf(/NW-1042/)).not.toHaveClass("list-row--child");
       expect(rowOf(/NW-1001/)).not.toHaveClass("list-row--child");
       expect(within(rowOf(/NW-1042/)).getByRole("button", { name: "Collapse subtasks" })).toHaveAttribute("aria-expanded", "true");
-      expect(within(rowOf(/NW-1042/)).queryByLabelText("2 subtasks")).not.toBeInTheDocument();
+      expect(within(rowOf(/NW-1042/)).queryByLabelText("2 child issues")).not.toBeInTheDocument();
       expect(within(rowOf(/NW-1001/)).queryByRole("button", { name: /subtasks$/ })).not.toBeInTheDocument();
+    });
+
+    describe("with several levels in Hierarchy", () => {
+      const TOP = row({ id: "20", key: "NW-2001", summary: "Launch the help center", childCount: 2 });
+      const MID = row({ id: "21", key: "NW-2002", summary: "Write the onboarding articles", parentId: "20", depth: 1, childCount: 1 });
+      const LEAF = row({ id: "22", key: "NW-2003", summary: "Proofread the welcome article", parentId: "21", depth: 2, childCount: 1 });
+      const DEEP = row({ id: "23", key: "NW-2004", summary: "Check the screenshots", parentId: "22", depth: 3 });
+      const SIBLING = row({ id: "24", key: "NW-2005", summary: "Set up the search index", parentId: "20", depth: 1 });
+      const NEXT = row({ id: "25", key: "NW-2006", summary: "Plan the support rota" });
+      const tree = [TOP, MID, LEAF, DEEP, SIBLING, NEXT];
+      const depthOf = (key: RegExp) => rowOf(key).style.getPropertyValue("--depth");
+      const press = (id: string) => act(async () => void (await getCommand(id)?.run()));
+      const selectedKeys = () =>
+        screen
+          .getAllByRole("row")
+          .filter((r) => r.getAttribute("aria-selected") === "true")
+          .map((r) => /NW-\d+/.exec(r.textContent ?? "")?.[0]);
+
+      beforeEach(() => {
+        installCommands("main");
+      });
+
+      it("indents every row by its depth", async () => {
+        await renderList(modeData("hierarchy", tree));
+
+        await screen.findByRole("row", { name: /NW-2001/ });
+        expect([/NW-2001/, /NW-2002/, /NW-2003/, /NW-2004/, /NW-2005/, /NW-2006/].map(depthOf)).toEqual(["0", "1", "2", "3", "1", "0"]);
+      });
+
+      it("gives a caret to every row with children at any level, and none to the leaves", async () => {
+        await renderList(modeData("hierarchy", tree));
+
+        await screen.findByRole("row", { name: /NW-2001/ });
+        for (const key of [/NW-2001/, /NW-2002/, /NW-2003/]) {
+          expect(within(rowOf(key)).getByRole("button", { name: "Collapse subtasks" })).toBeInTheDocument();
+        }
+        for (const key of [/NW-2004/, /NW-2005/, /NW-2006/]) {
+          expect(within(rowOf(key)).queryByRole("button", { name: /subtasks$/ })).not.toBeInTheDocument();
+        }
+      });
+
+      it("collapses only the subtree of a mid-level row and leaves its siblings and the rest", async () => {
+        await renderList(modeData("hierarchy", tree));
+
+        await userEvent.click(within(await screen.findByRole("row", { name: /NW-2002/ })).getByRole("button", { name: "Collapse subtasks" }));
+
+        expect(screen.queryByText("Proofread the welcome article")).not.toBeInTheDocument();
+        expect(screen.queryByText("Check the screenshots")).not.toBeInTheDocument();
+        expect(screen.getByText("Write the onboarding articles")).toBeInTheDocument();
+        expect(screen.getByText("Set up the search index")).toBeInTheDocument();
+        expect(screen.getByText("Plan the support rota")).toBeInTheDocument();
+        expect(within(rowOf(/NW-2002/)).getByLabelText("1 child issue")).toBeInTheDocument();
+      });
+
+      it("moves the selection onto the collapsed row when it held the selected row", async () => {
+        await renderList(modeData("hierarchy", tree));
+        await userEvent.click(await screen.findByText("Check the screenshots"));
+
+        await userEvent.click(within(rowOf(/NW-2002/)).getByRole("button", { name: "Collapse subtasks" }));
+
+        expect(selectedKeys()).toEqual(["NW-2002"]);
+      });
+
+      it("collapses an open mid-level row on left and expands it on right", async () => {
+        await renderList(modeData("hierarchy", tree));
+        await userEvent.click(await screen.findByText("Write the onboarding articles"));
+
+        await press("group.collapse");
+        expect(screen.queryByText("Proofread the welcome article")).not.toBeInTheDocument();
+        expect(screen.getByText("Set up the search index")).toBeInTheDocument();
+
+        await press("group.expand");
+        expect(await screen.findByText("Proofread the welcome article")).toBeInTheDocument();
+      });
+
+      it("selects the parent on left from a nested leaf", async () => {
+        await renderList(modeData("hierarchy", tree));
+        await userEvent.click(await screen.findByText("Check the screenshots"));
+
+        await press("group.collapse");
+
+        expect(selectedKeys()).toEqual(["NW-2003"]);
+      });
+
+      it("selects the parent on left from a mid-level row whose subtree is already collapsed", async () => {
+        await renderList(modeData("hierarchy", tree));
+        await userEvent.click(await screen.findByText("Write the onboarding articles"));
+        await press("group.collapse");
+
+        await press("group.collapse");
+
+        expect(selectedKeys()).toEqual(["NW-2001"]);
+      });
+
+      it("walks the visible rows with next and previous, skipping a collapsed subtree", async () => {
+        await renderList(modeData("hierarchy", tree));
+        await userEvent.click(within(await screen.findByRole("row", { name: /NW-2002/ })).getByRole("button", { name: "Collapse subtasks" }));
+        await userEvent.click(screen.getByText("Write the onboarding articles"));
+
+        await press("issue.next");
+        expect(selectedKeys()).toEqual(["NW-2005"]);
+        await press("issue.next");
+        expect(selectedKeys()).toEqual(["NW-2006"]);
+        await press("issue.previous");
+        await press("issue.previous");
+        expect(selectedKeys()).toEqual(["NW-2002"]);
+      });
     });
 
     it("shows the subtask icon before the title of a subtask in every mode, and no indent in List", async () => {
@@ -396,7 +505,7 @@ describe("ListView", () => {
       expect(screen.queryByText("Draft the price table")).not.toBeInTheDocument();
       expect(screen.queryByText("Review the price table")).not.toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Expand subtasks" })).toHaveAttribute("aria-expanded", "false");
-      expect(within(rowOf(/NW-1042/)).getByLabelText("2 subtasks")).toBeInTheDocument();
+      expect(within(rowOf(/NW-1042/)).getByLabelText("2 child issues")).toBeInTheDocument();
       expect(rowOf(/NW-1042/)).toHaveAttribute("aria-selected", "false");
     });
 
@@ -408,7 +517,7 @@ describe("ListView", () => {
 
       expect(await screen.findByText("Draft the price table")).toBeInTheDocument();
       expect(screen.getByText("Review the price table")).toBeInTheDocument();
-      expect(screen.queryByLabelText("2 subtasks")).not.toBeInTheDocument();
+      expect(screen.queryByLabelText("2 child issues")).not.toBeInTheDocument();
     });
 
     it("saves the collapsed parents in the view's place", async () => {

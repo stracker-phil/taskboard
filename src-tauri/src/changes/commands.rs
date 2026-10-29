@@ -8,6 +8,7 @@ use crate::error::AppResult;
 use crate::lists::Viewer;
 use crate::state::AppState;
 use crate::sync::map::format_utc;
+use crate::views::{Narrowing, ViewAt};
 
 #[tauri::command]
 pub async fn issues_mark_seen(state: State<'_, AppState>, ids: Vec<String>) -> AppResult<()> {
@@ -25,14 +26,23 @@ pub async fn issue_mark_unread(
     super::mark_unread(&state.db, id, from).await
 }
 
-/// Marks every unseen issue of the filter list seen.
+/// Marks the unseen issues the view shows seen; without a view, every unseen issue of the filter list.
 #[tauri::command]
-pub async fn list_mark_all_seen(state: State<'_, AppState>, list_id: i64) -> AppResult<()> {
+pub async fn list_mark_all_seen(
+    state: State<'_, AppState>,
+    list_id: i64,
+    view_id: Option<i64>,
+    narrowing: Option<Narrowing>,
+) -> AppResult<()> {
     let viewer = Viewer::of(&state.settings.get().connection, Utc::now());
     let now = format_utc(viewer.now);
     let nav = state.nav.clone();
+    let view = view_id.map(|view_id| ViewAt {
+        view_id,
+        narrowing: narrowing.unwrap_or_default(),
+    });
     let unseen = move |conn: &_| {
-        let ids = crate::views::unseen_ids(conn, &viewer, list_id)?;
+        let ids = crate::views::unseen_ids(conn, &viewer, list_id, view.as_ref())?;
         nav.keep_read(&ids);
         Ok(ids)
     };

@@ -10,7 +10,7 @@ use super::defaults::{ensure_space, insert_list, list_siblings};
 use super::nodes::{Kind, Node, all_nodes, node, scope_of};
 use crate::db::{Changes, Db, LocalPart};
 use crate::error::{AppError, AppResult};
-use crate::filter::{Field, Filter, OPEN_ISSUES, TOP_LEVEL, compile};
+use crate::filter::{Field, Filter, OPEN_ISSUES, compile};
 use crate::look::{clean_color, clean_icon};
 use crate::order::Siblings;
 use crate::views::{clean_name, copy_views};
@@ -204,7 +204,7 @@ pub struct MatchCount {
 
 /// The Filter popover's live count: what `node_id` inherits ANDed with `draft` in place of its own
 /// conditions, with `me` narrowed as `view_rows` narrows `Narrowing::me`. On a Space or Everything the draft is
-/// a new filter list's. Top-level issues only, like the sidebar's counts (ADR 0037).
+/// a new filter list's. Every matching issue, like the sidebar's counts (ADR 0040).
 pub async fn list_match_count(
     db: &Db,
     viewer: Viewer,
@@ -226,7 +226,7 @@ pub async fn list_match_count(
             params.push(ctx.me.unwrap_or_default().into());
         }
         let sql = format!(
-            "SELECT COUNT(*) FILTER (WHERE {OPEN_ISSUES}), COUNT(*) FROM cache.issue i WHERE {condition} AND {TOP_LEVEL}"
+            "SELECT COUNT(*) FILTER (WHERE {OPEN_ISSUES}), COUNT(*) FROM cache.issue i WHERE {condition}"
         );
         Ok(
             conn.query_row(&sql, params_from_iter(&params), |row| {

@@ -77,17 +77,17 @@ pub enum IssueOpening {
     Preview,
 }
 
-/// How a view shows subtasks (ADR 0037); the Board always hides them.
+/// How a view shows subtasks, the descendants of its results (ADR 0040); the Board always hides them.
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq, TS)]
 #[ts(export, export_to = "src/api/types.gen.ts")]
 #[serde(rename_all = "camelCase")]
 pub enum SubtaskMode {
-    /// Top-level issues only; a parent shows how many subtasks it has.
+    /// The results only; each shows how many children it has.
     #[default]
     Hidden,
-    /// Only parents go through the filter; each one's subtasks follow it, indented.
+    /// Each result's descendants follow it, indented and unfiltered; a result below another nests under it.
     Hierarchy,
-    /// Subtasks are rows of their own, filtered and grouped on their own values.
+    /// The results' descendants are rows of their own, narrowed, grouped and sorted on their own values.
     List,
 }
 

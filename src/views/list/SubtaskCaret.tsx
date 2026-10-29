@@ -1,6 +1,6 @@
 import { ChevronDown } from "lucide-react";
 
-/** A parent's disclosure in Hierarchy: collapses or expands its subtasks without selecting the row. */
+/** A row's disclosure in Hierarchy: collapses or expands its subtree without selecting the row. */
 export function SubtaskCaret({ open, onToggle }: { open: boolean; onToggle: () => void }) {
   return (
     <button

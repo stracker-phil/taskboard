@@ -1,4 +1,4 @@
-//! The other Spaces (open counts in the sidebar, subtasks left out: NWS 6, LUM 9, FBA 10, INT 8) and the
+//! The other Spaces (open counts in the sidebar, subtasks included: NWS 6, LUM 11, FBA 12, INT 8) and the
 //! untracked archive project.
 
 use super::catalog::Kind::{Bug, Story, Subtask, Task};
@@ -20,7 +20,7 @@ pub fn issues() -> Vec<IssueSpec> {
         issue("NWS-201", Bug, Done, "Broken link in the footer imprint").to(JR).by(MK).prio(Low).labels(&["support"]).at("2026-10-05 10:00", "2026-10-08 11:30"),
         issue("NWS-205", Task, Done, "Add the new shipping partner logo").to(AM).by(MK).prio(Low).labels(&["client"]).at("2026-10-15 14:10", "2026-10-23 10:00"),
         issue("NWS-190", Bug, Done, "Typo in the returns policy").to(MK).by(MK).prio(Lowest).labels(&["support"]).at("2026-06-02 09:00", "2026-06-03 10:00"),
-        // Lumen iOS app: 9 open, 2 done in scope, 1 old
+        // Lumen iOS app: 11 open, 2 done in scope, 1 old
         issue("LUM-318", Bug, ToDo, "Widget crash on iPad").to(AM).by(SB).prio(Highest).labels(&["ios", "crash"]).sprints(&[38]).at("2026-10-28 09:20", "2026-10-28 09:20").desc("The home screen widget crashes on iPad when the app has not been opened since the update."),
         issue("LUM-301", Story, InProgress, "Dark mode for onboarding screens").to(SB).by(SB).labels(&["ios"]).fix("3.3.0").sprints(&[37, 38]).points(5.0).at("2026-10-01 10:00", "2026-10-27 12:30"),
         issue("LUM-305", Story, InProgress, "Offline queue for journal entries").to(AM).by(SB).prio(High).labels(&["ios"]).fix("3.3.0").sprints(&[38]).points(8.0).reviewer(SB).at("2026-10-06 09:30", "2026-10-27 18:20"),
@@ -35,7 +35,7 @@ pub fn issues() -> Vec<IssueSpec> {
         issue("LUM-296", Bug, Done, "Reminder notifications late after the clock change").to(SB).by(AL).prio(High).labels(&["ios"]).fix("3.2.0").sprints(&[37]).points(3.0).at("2026-09-29 09:00", "2026-10-14 16:00"),
         issue("LUM-299", Task, Done, "Submit 3.2.0 for App Store review").to(AM).by(SB).fix("3.2.0").sprints(&[37]).points(1.0).at("2026-10-10 10:00", "2026-10-15 09:30"),
         issue("LUM-280", Task, Done, "Upgrade the project to Swift 6").to(SB).by(SB).at("2026-06-10 09:00", "2026-07-15 17:00"),
-        // Fernweh booking API: 11 open, 2 done in scope
+        // Fernweh booking API: 12 open, 2 done in scope
         issue("FBA-87", Story, InProgress, "Idempotency keys for booking requests").to(AM).by(LN).prio(High).labels(&["backend"]).points(5.0).reviewer(LN).at("2026-10-07 09:00", "2026-10-27 11:00"),
         issue("FBA-99", Subtask, ToDo, "Keep idempotency keys for 24 hours").to(AM).by(AM).parent("FBA-87").at("2026-10-27 11:00", "2026-10-27 11:00"),
         issue("FBA-100", Subtask, InReview, "Return the first response for a repeated key").to(LN).by(AM).parent("FBA-87").at("2026-10-22 10:00", "2026-10-27 14:40"),

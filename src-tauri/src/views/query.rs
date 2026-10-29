@@ -15,10 +15,10 @@ use super::fetch::{Source, fetch};
 use super::filter::view_conditions;
 use super::groups::{Facts, Group, Lookup, group};
 use super::lookup::{spaces, versions};
-use super::model::{GroupBy, SubtaskMode, View};
+use super::model::{GroupBy, Layout, SubtaskMode, View};
 use super::rows::Row;
 use super::sorting::{fold, sort};
-use super::subtasks::{nest, subtasks_of, top_level_only};
+use super::subtasks::{Nested, as_items, descendants, expand, nest};
 use crate::changes::{Names, UNSEEN, chip, facts, unseen_changes};
 use crate::db::Db;
 use crate::error::{AppError, AppResult};
@@ -77,10 +77,20 @@ pub(super) struct Fetched {
     pub view: View,
     /// The subtask mode the rows follow.
     pub mode: SubtaskMode,
+    /// What the view groups: the results in Hidden, the roots in Hierarchy, the results and their descendants
+    /// in List (ADR 0040).
     pub items: Vec<(Row, Facts)>,
-    /// In Hierarchy, every subtask of the items, sorted; they never went through the filter.
-    pub subtasks: Vec<(Row, Facts)>,
+    /// In Hierarchy, each root's subtree in depth order; it never went through the filter.
+    pub below: HashMap<String, Vec<Row>>,
     pub ctx: Ctx,
+}
+
+impl Fetched {
+    /// Every issue the view shows, collapsed subtrees included.
+    pub fn ids(&self) -> impl Iterator<Item = &str> {
+        let items = self.items.iter().map(|(row, _)| row.id.as_str());
+        items.chain(self.below.values().flatten().map(|row| row.id.as_str()))
+    }
 }
 
 /// `mode` overrides the view's subtask mode (the Board always hides subtasks).
@@ -107,32 +117,79 @@ pub(super) fn fetch_view(
         custom: custom_columns(conn, &view.columns)?,
     };
     let mode = mode.unwrap_or(view.subtasks);
-    let (mut condition, params) = conditions(conn, viewer, &ctx, list_id, Some(&view), narrowing)?;
-    if let Some(top_level) = top_level_only(mode) {
-        condition.push_str(&format!(" AND {top_level}"));
-    }
-    let mut items = fetch(conn, &source, &condition, params)?;
-    let needle = fold(narrowing.text.trim());
-    if !needle.is_empty() {
-        items.retain(|(row, _)| {
-            fold(&row.key).contains(&needle) || fold(&row.summary).contains(&needle)
-        });
-    }
-    let mut subtasks = match mode {
-        SubtaskMode::Hierarchy => subtasks_of(conn, &source, &items)?,
-        _ => Vec::new(),
+    // In List the Me chip and the text narrow every row on its own, descendants too; elsewhere the results.
+    let narrowed = RowNarrowing::new(narrowing, ctx.me.as_deref());
+    let base = Narrowing {
+        me: narrowing.me && mode != SubtaskMode::List,
+        ..narrowing.clone()
     };
-    mark_changed(conn, ctx.me.as_deref(), &mut items)?;
-    mark_changed(conn, ctx.me.as_deref(), &mut subtasks)?;
-    sort(&mut items, view.sort.by, view.sort.descending);
-    sort(&mut subtasks, view.sort.by, view.sort.descending);
+    let (condition, params) = conditions(conn, viewer, &ctx, list_id, Some(&view), &base)?;
+    let mut results = fetch(conn, &source, &condition, params)?;
+    if mode != SubtaskMode::List {
+        results.retain(|item| narrowed.text_matches(item));
+    }
+    let mut descendants = match mode {
+        SubtaskMode::Hidden => Vec::new(),
+        _ => descendants(conn, &source, &results)?,
+    };
+    mark_changed(conn, ctx.me.as_deref(), &mut results)?;
+    mark_changed(conn, ctx.me.as_deref(), &mut descendants)?;
+    let (by, descending) = (view.sort.by, view.sort.descending);
+    let (items, below) = match mode {
+        SubtaskMode::Hidden => {
+            sort(&mut results, by, descending);
+            (results, HashMap::new())
+        }
+        SubtaskMode::List => {
+            let mut items = as_items(results, descendants);
+            items.retain(|item| narrowed.matches(item));
+            sort(&mut items, by, descending);
+            (items, HashMap::new())
+        }
+        SubtaskMode::Hierarchy => {
+            sort(&mut results, by, descending);
+            sort(&mut descendants, by, descending);
+            let Nested { roots, below } = nest(results, descendants);
+            (roots, below)
+        }
+    };
     Ok(Fetched {
         view,
         mode,
         items,
-        subtasks,
+        below,
         ctx,
     })
+}
+
+/// The Me chip and the text field as a test on one row.
+struct RowNarrowing<'a> {
+    only_mine: bool,
+    me: Option<&'a str>,
+    needle: String,
+}
+
+impl<'a> RowNarrowing<'a> {
+    fn new(narrowing: &Narrowing, me: Option<&'a str>) -> Self {
+        Self {
+            only_mine: narrowing.me,
+            me,
+            needle: fold(narrowing.text.trim()),
+        }
+    }
+
+    fn text_matches(&self, (row, _): &(Row, Facts)) -> bool {
+        self.needle.is_empty()
+            || fold(&row.key).contains(&self.needle)
+            || fold(&row.summary).contains(&self.needle)
+    }
+
+    /// Without a connected account the Me chip matches nobody.
+    fn matches(&self, item: &(Row, Facts)) -> bool {
+        let mine =
+            !self.only_mine || (self.me.is_some() && item.1.assignee_id.as_deref() == self.me);
+        mine && self.text_matches(item)
+    }
 }
 
 fn build(
@@ -146,7 +203,7 @@ fn build(
         view,
         mode,
         items,
-        subtasks,
+        below,
         ctx,
     } = fetch_view(conn, viewer, list_id, view_id, narrowing, None)?;
     let versions = versions(conn)?;
@@ -157,8 +214,7 @@ fn build(
         versions: &versions,
     };
     let mut groups = group(&items, view.group_by, &lookup);
-    let subtasks: Vec<Row> = subtasks.into_iter().map(|(row, _)| row).collect();
-    nest(&mut groups, &subtasks);
+    expand(&mut groups, &below);
     Ok(ViewData {
         group_by: view.group_by,
         subtasks: mode,
@@ -166,7 +222,7 @@ fn build(
         rows: items
             .into_iter()
             .map(|(row, _)| row)
-            .chain(subtasks)
+            .chain(below.into_values().flatten())
             .map(|row| (row.id.clone(), row))
             .collect(),
         columns: view.columns,
@@ -197,10 +253,37 @@ fn mark_changed(conn: &Connection, me: Option<&str>, items: &mut [(Row, Facts)])
     Ok(())
 }
 
-/// The filter list's unread issues, for Mark all as read; its views' own conditions don't narrow them.
-pub fn unseen_ids(conn: &Connection, viewer: &Viewer, list_id: i64) -> AppResult<Vec<String>> {
-    let ctx = viewer.ctx(conn)?;
-    let (condition, params) = conditions(conn, viewer, &ctx, list_id, None, &Narrowing::default())?;
+/// The view of a level and how the toolbar narrows it.
+pub struct ViewAt {
+    pub view_id: i64,
+    pub narrowing: Narrowing,
+}
+
+/// The unread issues Mark all as read marks: exactly those the view shows in its mode (ADR 0040), collapsed
+/// subtrees included; without a view, every unread issue of the filter list.
+pub fn unseen_ids(
+    conn: &Connection,
+    viewer: &Viewer,
+    list_id: i64,
+    view: Option<&ViewAt>,
+) -> AppResult<Vec<String>> {
+    let (condition, params) = match view {
+        Some(at) => {
+            let board = read_view(conn, at.view_id)?.layout == Layout::Board;
+            let mode = board.then_some(SubtaskMode::Hidden);
+            let fetched = fetch_view(conn, viewer, list_id, at.view_id, &at.narrowing, mode)?;
+            let ids: Vec<&str> = fetched.ids().collect();
+            let ids = serde_json::to_string(&ids)?;
+            (
+                "i.id IN (SELECT value FROM json_each(?))".to_string(),
+                vec![ids.into()],
+            )
+        }
+        None => {
+            let ctx = viewer.ctx(conn)?;
+            conditions(conn, viewer, &ctx, list_id, None, &Narrowing::default())?
+        }
+    };
     let mut query = conn.prepare(&format!(
         "SELECT i.id FROM cache.issue i WHERE {condition} AND {UNSEEN}"
     ))?;

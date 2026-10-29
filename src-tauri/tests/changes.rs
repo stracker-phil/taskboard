@@ -1,5 +1,5 @@
 //! Unseen changes on the demo site synced from the in-process fake Jira into a temp database: the highlight and
-//! chip on rows, Recently changed and its badge, Mark seen and Mark all seen, and the Since banner of an issue.
+//! chip on rows, Unread and its badge, Mark seen and Mark all seen, and the Since banner of an issue.
 
 use std::sync::Arc;
 
@@ -12,16 +12,20 @@ use taskboard_lib::connection::{
 };
 use taskboard_lib::db::Db;
 use taskboard_lib::error::ErrorKind;
+use taskboard_lib::filter::{Condition, Field, Filter};
 use taskboard_lib::issues::{ActivityItem, issue_activity, issue_get, issue_related};
 use taskboard_lib::jira::{Limiter, TokenKind};
-use taskboard_lib::lists::{Kind, Viewer, sidebar_tree};
+use taskboard_lib::lists::{Kind, Viewer, list_create, sidebar_tree};
 use taskboard_lib::store::settings::SettingsStore;
 use taskboard_lib::sync::{Emit, Job, SyncContext, full_sync, run_job};
 use taskboard_lib::test_support::demo::{self, DEMO_NOW, ME_EMAIL};
 use taskboard_lib::test_support::fake_jira::{DEMO_TOKEN, FakeJira};
 use taskboard_lib::test_support::{FakeSecrets, temp_config_dir};
 use taskboard_lib::views::rows::Row;
-use taskboard_lib::views::{Narrowing, ViewData, unseen_ids, view_rows, views_of};
+use taskboard_lib::views::{
+    Narrowing, SubtaskMode, ViewAt, ViewData, unseen_ids, view_rows, view_set_filter,
+    view_set_subtasks, views_of,
+};
 
 const ME_ACCOUNT_ID: &str = "712020:5a1e0c3f-8d2b-4f61-9c7e-1b2a3c4d5e01";
 const PROJECT_IDS: [&str; 5] = ["10001", "10002", "10003", "10004", "10005"];
@@ -217,6 +221,57 @@ impl Site {
         let id = self.id_of(key).await;
         issue_get(self.db(), viewer(), id).await.unwrap().since
     }
+
+    async fn badge(&self, kind: Kind) -> Option<i64> {
+        let tree = sidebar_tree(self.db(), viewer()).await.unwrap();
+        tree.home.iter().find(|n| n.kind == kind).unwrap().count
+    }
+
+    /// The view at `index` of the list, in the given subtask mode.
+    async fn view_in(&self, list: i64, index: usize, mode: SubtaskMode) -> i64 {
+        let view = views_of(self.db(), list).await.unwrap()[index].id;
+        view_set_subtasks(self.db(), view, mode).await.unwrap();
+        view
+    }
+
+    async fn filter_view(&self, view: i64, conditions: Vec<Condition>) {
+        view_set_filter(self.db(), viewer(), view, Filter { conditions })
+            .await
+            .unwrap();
+    }
+
+    /// The keys Mark all as read would mark, sorted.
+    async fn unseen_keys(&self, list: i64, view: Option<ViewAt>) -> Vec<String> {
+        let ids = self
+            .db()
+            .read(move |conn| unseen_ids(conn, &viewer(), list, view.as_ref()))
+            .await
+            .unwrap();
+        let mut keys = Vec::new();
+        for id in ids {
+            keys.push(
+                self.text(format!("SELECT key FROM cache.issue WHERE id = '{id}'"))
+                    .await,
+            );
+        }
+        keys.sort();
+        keys
+    }
+
+    /// A story, its unread subtask and an unread task outside the story's filter.
+    async fn unread_story_subtask_and_task(&self) {
+        self.comment_after_seen("NW-1042").await;
+        self.comment_after_seen("NW-1059").await;
+        self.comment_after_seen("NW-1044").await;
+    }
+}
+
+fn at(view_id: i64, narrowing: Narrowing) -> Option<ViewAt> {
+    Some(ViewAt { view_id, narrowing })
+}
+
+fn of_type(name: &str) -> Vec<Condition> {
+    vec![Condition::is(Field::Type, name)]
 }
 
 fn row_of<'a>(data: &'a ViewData, key: &str) -> &'a Row {
@@ -409,7 +464,7 @@ mod marking_seen {
 
         let mut marked = mark_all_seen(
             site.db(),
-            move |conn| unseen_ids(conn, &viewer(), nw),
+            move |conn| unseen_ids(conn, &viewer(), nw, None),
             LATER.into(),
         )
         .await
@@ -436,7 +491,7 @@ mod marking_seen {
 
         let ids = site
             .db()
-            .read(move |conn| unseen_ids(conn, &viewer(), nw))
+            .read(move |conn| unseen_ids(conn, &viewer(), nw, None))
             .await
             .unwrap();
 
@@ -444,8 +499,196 @@ mod marking_seen {
     }
 }
 
+mod mark_all_as_read_per_view {
+    use super::*;
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn without_a_view_every_unread_issue_of_the_list_counts_subtasks_too() {
+        let site = Site::new().await;
+        site.unread_story_subtask_and_task().await;
+        let nw = site.nw_list().await;
+
+        let keys = site.unseen_keys(nw, None).await;
+
+        assert_eq!(keys, ["NW-1042", "NW-1044", "NW-1059"]);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn a_view_with_its_own_filter_follows_its_subtask_mode() {
+        let site = Site::new().await;
+        site.unread_story_subtask_and_task().await;
+        let nw = site.nw_list().await;
+        let view = site.view_in(nw, 0, SubtaskMode::Hidden).await;
+        site.filter_view(view, of_type("Story")).await;
+
+        for (mode, expected) in [
+            (SubtaskMode::Hidden, vec!["NW-1042"]),
+            (SubtaskMode::Hierarchy, vec!["NW-1042", "NW-1059"]),
+            (SubtaskMode::List, vec!["NW-1042", "NW-1059"]),
+        ] {
+            view_set_subtasks(site.db(), view, mode).await.unwrap();
+
+            let keys = site.unseen_keys(nw, at(view, Narrowing::default())).await;
+
+            assert_eq!(keys, expected, "{mode:?}");
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn a_board_view_counts_as_hidden_whatever_its_subtask_mode() {
+        let site = Site::new().await;
+        site.unread_story_subtask_and_task().await;
+        let nw = site.nw_list().await;
+        let board = site.view_in(nw, 1, SubtaskMode::Hierarchy).await;
+        site.filter_view(board, of_type("Story")).await;
+
+        let keys = site.unseen_keys(nw, at(board, Narrowing::default())).await;
+
+        assert_eq!(keys, ["NW-1042"]);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn the_view_draft_stands_in_for_the_views_own_filter() {
+        let site = Site::new().await;
+        site.unread_story_subtask_and_task().await;
+        let nw = site.nw_list().await;
+        let view = site.view_in(nw, 0, SubtaskMode::Hidden).await;
+        site.filter_view(view, of_type("Story")).await;
+        let narrowing = Narrowing {
+            view_draft: Some(of_type("Task")),
+            ..Narrowing::default()
+        };
+
+        let keys = site.unseen_keys(nw, at(view, narrowing)).await;
+
+        assert_eq!(keys, ["NW-1044"]);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn the_list_draft_stands_in_for_the_filter_lists_own_filter() {
+        let site = Site::new().await;
+        site.unread_story_subtask_and_task().await;
+        let nw = site.nw_list().await;
+        let stories = list_create(
+            site.db(),
+            viewer(),
+            nw,
+            "Stories".into(),
+            Some(Filter {
+                conditions: of_type("Story"),
+            }),
+        )
+        .await
+        .unwrap();
+        let view = site.view_in(stories, 0, SubtaskMode::Hidden).await;
+        let narrowing = Narrowing {
+            list_draft: Some(of_type("Task")),
+            ..Narrowing::default()
+        };
+
+        let saved = site
+            .unseen_keys(stories, at(view, Narrowing::default()))
+            .await;
+        let drafted = site.unseen_keys(stories, at(view, narrowing)).await;
+
+        assert_eq!(saved, ["NW-1042"]);
+        assert_eq!(drafted, ["NW-1044"]);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn the_me_chip_and_the_text_narrow_the_marked_issues() {
+        let site = Site::new().await;
+        site.unread_story_subtask_and_task().await;
+        let nw = site.nw_list().await;
+        let view = site.view_in(nw, 0, SubtaskMode::Hidden).await;
+        let mine = Narrowing {
+            me: true,
+            ..Narrowing::default()
+        };
+        let gallery = Narrowing {
+            text: "gallery".into(),
+            ..Narrowing::default()
+        };
+
+        let assigned_to_me = site.unseen_keys(nw, at(view, mine)).await;
+        let matching_the_text = site.unseen_keys(nw, at(view, gallery)).await;
+
+        assert_eq!(assigned_to_me, ["NW-1042", "NW-1059"]);
+        assert_eq!(matching_the_text, ["NW-1044"]);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn on_unread_a_view_with_its_own_filter_leaves_out_the_unread_issues_outside_it() {
+        let site = Site::new().await;
+        site.unread_story_subtask_and_task().await;
+        let recent = site.list_of_kind("recent").await;
+        let view = site.view_in(recent, 0, SubtaskMode::Hidden).await;
+
+        let everything = site
+            .unseen_keys(recent, at(view, Narrowing::default()))
+            .await;
+        site.filter_view(view, of_type("Story")).await;
+        let stories = site
+            .unseen_keys(recent, at(view, Narrowing::default()))
+            .await;
+        view_set_subtasks(site.db(), view, SubtaskMode::Hierarchy)
+            .await
+            .unwrap();
+        let with_descendants = site
+            .unseen_keys(recent, at(view, Narrowing::default()))
+            .await;
+
+        assert_eq!(everything, ["NW-1042", "NW-1044", "NW-1059"]);
+        assert_eq!(stories, ["NW-1042"]);
+        assert_eq!(with_descendants, ["NW-1042", "NW-1059"]);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn marking_all_as_read_in_a_view_leaves_the_other_unread_issues_unread() {
+        let site = Site::new().await;
+        site.unread_story_subtask_and_task().await;
+        let nw = site.nw_list().await;
+        let view = site.view_in(nw, 0, SubtaskMode::Hidden).await;
+        site.filter_view(view, of_type("Story")).await;
+
+        let marked = mark_all_seen(
+            site.db(),
+            move |conn| unseen_ids(conn, &viewer(), nw, at(view, Narrowing::default()).as_ref()),
+            LATER.into(),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(marked, [site.id_of("NW-1042").await]);
+        assert_eq!(
+            sorted_keys(&site.recent_data().await),
+            ["NW-1044", "NW-1059"]
+        );
+    }
+}
+
 mod recently_changed {
     use super::*;
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn an_unread_subtask_type_issue_is_listed_and_counted() {
+        let site = Site::new().await;
+        site.comment_after_seen("NW-1059").await;
+
+        let data = site.recent_data().await;
+
+        assert_eq!(sorted_keys(&data), ["NW-1059"]);
+        assert_eq!(site.badge(Kind::Recent).await, Some(1));
+    }
 
     #[tokio::test]
     #[ignore = "syncs the demo site into a temp database"]
@@ -595,7 +838,7 @@ mod marking_unread {
 
         let marked = mark_all_seen(
             site.db(),
-            move |conn| unseen_ids(conn, &viewer(), nw),
+            move |conn| unseen_ids(conn, &viewer(), nw, None),
             LATER.into(),
         )
         .await

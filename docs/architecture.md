@@ -125,8 +125,8 @@ src-tauri/
                              media.rs: attached images as placeholders the page fills)
   src/filter/                filter conditions: the model, SQL compiler, conditions in words
   src/lists/ views/          the sidebar tree with counts and defaults; the view tabs and the view query (filter,
-                             group, sort, rows, columns; subtasks.rs how subtasks show); order.rs keeps positions;
-                             look.rs the tiles' icon and color
+                             group, sort, rows, columns; subtasks.rs the results' descendants per subtask mode);
+                             order.rs keeps positions; look.rs the tiles' icon and color
   src/search/                full-text search: safe FTS5 queries, the palette's issues and lists, the text field
   src/pins/                  local pins (Bookmarks in the UI): durations to local midnights, the Bookmarks view, Add to Home
   src/changes/               unseen (unread) changes: the change chip and Since-yesterday words, read and unread

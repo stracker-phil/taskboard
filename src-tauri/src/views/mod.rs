@@ -30,5 +30,5 @@ pub use edit::{
 };
 pub use filter::{seed_only_mine, view_conditions, view_set_filter, view_set_only_mine};
 pub use model::{DEFAULT_COLUMNS, GroupBy, IssueOpening, Layout, Sort, SortBy, SubtaskMode, View};
-pub use query::{Narrowing, ViewData, unseen_ids, view_rows};
+pub use query::{Narrowing, ViewAt, ViewData, unseen_ids, view_rows};
 pub use sorting::fold;

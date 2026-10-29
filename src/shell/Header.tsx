@@ -2,6 +2,8 @@ import { usePageAction } from "../commands/pageActions";
 import { browseUrl } from "../lib/jiraLinks";
 import { api, type SpaceNode } from "../api";
 import { useConnection } from "../queries/settings";
+import { useNav } from "../queries/sidebar";
+import { useRequestNarrowing } from "../queries/views";
 import { attempt } from "../state/requests";
 import { HeaderTitle } from "./HeaderTitle";
 import { spaceOf, type Level } from "./levels";
@@ -19,9 +21,12 @@ export function Header({ level }: { level: Level }) {
   );
 }
 
-/** Unread's header action; disabled while nothing is unread. */
+/** Unread's header action: marks what the current view shows read; disabled while nothing is unread. */
 function MarkAllSeen({ listId, unseen }: { listId: number; unseen: number }) {
-  const markAll = () => void attempt(api.listMarkAllSeen(listId), "Could not mark them read");
+  const { data: nav } = useNav();
+  const viewId = nav?.location?.listId === listId ? nav.location.viewId : null;
+  const narrowing = useRequestNarrowing(listId, viewId ?? -1) ?? null;
+  const markAll = () => void attempt(api.listMarkAllSeen(listId, viewId, viewId === null ? null : narrowing), "Could not mark them read");
   usePageAction("recent.markAllSeen", unseen > 0 ? markAll : null);
   return (
     <button type="button" className="content-header__action" disabled={unseen === 0} onClick={markAll}>

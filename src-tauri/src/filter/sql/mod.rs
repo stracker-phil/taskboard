@@ -23,8 +23,6 @@ pub const RELEVANT_FIELD: &str = "(used = 1 OR shown = 1
 
 /// Issues the sidebar counts.
 pub const OPEN_ISSUES: &str = "i.status_category <> 'done'";
-/// Issues that aren't subtasks: what the sidebar counts and what views show by default (ADR 0037).
-pub const TOP_LEVEL: &str = "i.type_is_subtask = 0";
 
 /// What compiling needs to know beyond the conditions.
 #[derive(Clone, Debug)]

@@ -542,14 +542,14 @@ mod the_tree_on_the_demo_site {
         assert_eq!(
             counts,
             [
-                ("NW", "Website relaunch", 20),
+                ("NW", "Website relaunch", 26),
                 ("NWS", "Northwind support", 6),
-                ("LUM", "Lumen iOS app", 9),
-                ("FBA", "Fernweh booking API", 10),
+                ("LUM", "Lumen iOS app", 11),
+                ("FBA", "Fernweh booking API", 12),
                 ("INT", "Internal tools", 8),
             ]
         );
-        assert_eq!(tree.everything.count, Some(53));
+        assert_eq!(tree.everything.count, Some(63));
         assert_eq!(
             tree.spaces
                 .iter()
@@ -560,7 +560,7 @@ mod the_tree_on_the_demo_site {
     }
 
     #[tokio::test]
-    async fn subtasks_count_nowhere_in_the_sidebar_whatever_their_views_show() {
+    async fn subtasks_count_in_the_sidebar_whatever_their_views_show() {
         let site = Synced::new().await;
         let nw = space_node_id(site.db(), NW).await;
         let open_in_nw = number(
@@ -583,10 +583,8 @@ mod the_tree_on_the_demo_site {
         }
 
         assert_eq!(open_subtasks_in_nw, 6);
-        assert_eq!(
-            find_space(&before, "NW").open_count,
-            open_in_nw - open_subtasks_in_nw
-        );
+        assert_eq!(find_space(&before, "NW").open_count, open_in_nw);
+        assert_eq!(open_in_nw, 26);
         assert_eq!(site.tree().await, before);
     }
 
@@ -605,7 +603,7 @@ mod the_tree_on_the_demo_site {
         assert_eq!(
             lists,
             [
-                ("Current sprint", Some(8)),
+                ("Current sprint", Some(12)),
                 ("Epics", Some(5)),
                 ("Release 2.4.0", Some(9)),
                 ("Open bugs", Some(3)),
@@ -726,19 +724,19 @@ mod the_tree_on_the_demo_site {
                 .await
                 .unwrap();
 
-        let top_level =
-            "FROM cache.issue WHERE project_id = '10001' AND gone = 0 AND type_is_subtask = 0";
+        let in_space = "FROM cache.issue WHERE project_id = '10001' AND gone = 0";
         assert_eq!(
             (everything_in_the_space.open, everything_in_the_space.total),
             (
                 number(
                     site.db(),
-                    format!("SELECT COUNT(*) {top_level} AND status_category <> 'done'")
+                    format!("SELECT COUNT(*) {in_space} AND status_category <> 'done'")
                 )
                 .await,
-                number(site.db(), format!("SELECT COUNT(*) {top_level}")).await
+                number(site.db(), format!("SELECT COUNT(*) {in_space}")).await
             )
         );
+        assert_eq!(everything_in_the_space.open, 26);
         assert_eq!(bugs_in_the_space.open, open_bugs);
         assert_eq!(bugs_in_the_space.total, all_bugs);
     }
@@ -779,44 +777,61 @@ mod the_tree_on_the_demo_site {
         .await
         .unwrap();
 
-        let top_level = "FROM cache.issue WHERE gone = 0 AND type_is_subtask = 0
+        let tracked = "FROM cache.issue WHERE gone = 0
              AND project_id IN (SELECT project_id FROM space WHERE tracked = 1)";
         assert_eq!(
             count.open,
             number(
                 site.db(),
-                format!("SELECT COUNT(*) {top_level} AND status_category <> 'done'")
+                format!("SELECT COUNT(*) {tracked} AND status_category <> 'done'")
             )
             .await
         );
         assert_eq!(
             count.total,
-            number(site.db(), format!("SELECT COUNT(*) {top_level}")).await
+            number(site.db(), format!("SELECT COUNT(*) {tracked}")).await
         );
+        assert_eq!(count.open, 63);
     }
 
     #[tokio::test]
-    async fn the_match_count_leaves_out_subtasks_that_match_the_conditions() {
+    async fn the_match_count_counts_subtask_type_issues_that_match_the_conditions() {
         let site = Synced::new().await;
         let nw = space_node_id(site.db(), NW).await;
-        let subtask_type = text(
-            site.db(),
-            "SELECT issue_type FROM cache.issue
-             WHERE project_id = '10001' AND gone = 0 AND type_is_subtask = 1 LIMIT 1",
-        )
-        .await;
 
         let count = list_match_count(
             site.db(),
             viewer(Some(ME_ACCOUNT_ID)),
             nw,
-            filter(vec![Condition::is(Field::Type, &subtask_type)]),
+            filter(vec![Condition::is(Field::Type, "Subtask")]),
             false,
         )
         .await
         .unwrap();
 
-        assert_eq!(count, MatchCount { open: 0, total: 0 });
+        assert_eq!(count, MatchCount { open: 6, total: 8 });
+    }
+
+    #[tokio::test]
+    async fn a_filter_list_for_subtask_type_issues_counts_them_in_the_sidebar() {
+        let site = Synced::new().await;
+        let nw = space_node_id(site.db(), NW).await;
+
+        list_create(
+            site.db(),
+            viewer(Some(ME_ACCOUNT_ID)),
+            nw,
+            "Small steps".into(),
+            Some(filter(vec![Condition::is(Field::Type, "Subtask")])),
+        )
+        .await
+        .unwrap();
+
+        let tree = site.tree().await;
+        assert_eq!(
+            find_list(find_space(&tree, "NW"), "Small steps").count,
+            Some(6)
+        );
     }
 
     #[tokio::test]
@@ -845,7 +860,7 @@ mod the_tree_on_the_demo_site {
         .unwrap();
 
         let assigned_to_me = format!(
-            "FROM cache.issue WHERE project_id = '10001' AND gone = 0 AND type_is_subtask = 0
+            "FROM cache.issue WHERE project_id = '10001' AND gone = 0
              AND assignee_id = '{ME_ACCOUNT_ID}'"
         );
         assert_eq!(

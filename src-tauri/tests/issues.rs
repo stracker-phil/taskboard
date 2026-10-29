@@ -2101,7 +2101,7 @@ async fn fetching_history_does_not_make_a_seen_issue_unread() {
         .unwrap();
     let unseen = site
         .db()
-        .read(move |conn| unseen_ids(conn, &viewer(), space))
+        .read(move |conn| unseen_ids(conn, &viewer(), space, None))
         .await
         .unwrap();
     assert_eq!(unseen, Vec::<String>::new());
@@ -2113,7 +2113,7 @@ async fn fetching_history_does_not_make_a_seen_issue_unread() {
     assert!(detail.since.is_none());
     let unseen = site
         .db()
-        .read(move |conn| unseen_ids(conn, &viewer(), space))
+        .read(move |conn| unseen_ids(conn, &viewer(), space, None))
         .await
         .unwrap();
     assert_eq!(unseen, Vec::<String>::new());

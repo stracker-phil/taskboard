@@ -185,8 +185,10 @@ export const api = {
   pinRemove: (id: number) => invoke<void>("pin_remove", { id }),
   /** P: unpins the issue, or pins it until unpinned. */
   pinToggleIssue: (id: string) => invoke<void>("pin_toggle_issue", { id }),
-  /** Marks every issue of the filter list with unseen changes seen. */
-  listMarkAllSeen: (listId: number) => invoke<void>("list_mark_all_seen", { listId }),
+  /** Marks the unseen issues the view shows, narrowed as asked, seen; without a view every unseen issue of the
+   *  filter list. */
+  listMarkAllSeen: (listId: number, viewId: number | null, narrowing: Narrowing | null) =>
+    invoke<void>("list_mark_all_seen", { listId, viewId, narrowing }),
   /** Fetches the issue's comments from Jira when the cached ones may be behind. */
   issueSyncComments: (id: string) => invoke<boolean>("issue_sync_comments", { id }),
   /** The issue's cached web links (pull requests, documents). */

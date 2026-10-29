@@ -11,7 +11,7 @@ import { createQueryClient } from "../queries/queryClient";
 import { resetStore, useStore } from "../state/store";
 import { connectionView } from "../test/jira";
 import { space } from "../test/spaces";
-import { listNode } from "../test/views";
+import { listNode, view } from "../test/views";
 import { Header } from "./Header";
 import type { Level } from "./levels";
 
@@ -149,12 +149,34 @@ describe("Header", () => {
       expect(screen.getByRole("button", { name: "Mark all as read" })).toBeEnabled();
     });
 
-    it("marks every issue of Unread read", async () => {
+    it("marks every issue of Unread read when no view of it is open", async () => {
       await renderHeader(recent(3));
 
       await userEvent.click(screen.getByRole("button", { name: "Mark all as read" }));
 
-      expect(mocked.listMarkAllSeen).toHaveBeenCalledWith(2);
+      expect(mocked.listMarkAllSeen).toHaveBeenCalledWith(2, null, null);
+    });
+
+    it("passes the open view and its narrowing when Unread is on screen", async () => {
+      mocked.navCurrent.mockResolvedValue({ location: { listId: 2, viewId: 7 }, expanded: [] });
+      mocked.viewsOf.mockResolvedValue([view({ id: 7, listId: 2, onlyMine: true })]);
+      await renderHeader(recent(3));
+      await waitFor(() => expect(mocked.viewsOf).toHaveBeenCalledWith(2));
+      await act(async () => {});
+
+      await userEvent.click(screen.getByRole("button", { name: "Mark all as read" }));
+
+      expect(mocked.listMarkAllSeen).toHaveBeenCalledWith(2, 7, expect.objectContaining({ me: true, text: "" }));
+    });
+
+    it("passes no view when another level is open", async () => {
+      mocked.navCurrent.mockResolvedValue({ location: { listId: 11, viewId: 101 }, expanded: [] });
+      await renderHeader(recent(3));
+      await act(async () => {});
+
+      await userEvent.click(screen.getByRole("button", { name: "Mark all as read" }));
+
+      expect(mocked.listMarkAllSeen).toHaveBeenCalledWith(2, null, null);
     });
 
     it.each([0, null])("is disabled when the unseen count is %s", async (count) => {
@@ -196,7 +218,7 @@ describe("Header", () => {
 
         expect(run()).toBe(true);
 
-        expect(mocked.listMarkAllSeen).toHaveBeenCalledWith(2);
+        expect(mocked.listMarkAllSeen).toHaveBeenCalledWith(2, null, null);
       });
 
       it.each([0, null])("is not offered when the unseen count is %s", async (count) => {

@@ -103,8 +103,8 @@ JSON; no condition is stored as null:
 
 A view holds the same JSON in `view.filter` (migration `local/0012`, [ADR 0033](adr/0033-views-can-hold-their-own-filter.md)):
 its own conditions, ANDed with its level's chain, so two views of one list can show different issues. Only the
-view's issues are narrowed (`view_rows`, `view_board`, their groups and Board columns); the sidebar counts and
-Mark all as read stay with the level. A view filter that can't be read or compiled is an error of that view only.
+view's issues are narrowed (`view_rows`, `view_board`, their groups and Board columns, and Mark all as read from
+that view); the sidebar counts stay with the level. A view filter that can't be read or compiled is an error of that view only.
 `view_set_filter(id, filter)` compiles it under the level first and marks its custom fields `shown`;
 `list_conditions(id, viewId)` returns the view's conditions next to the level's (`ListConditions.view`,
 `viewError`), and `View.ownConditions` counts them for the Filter badge. Duplicating a view or a filter list
@@ -114,7 +114,7 @@ The page edits both layers and the Me chip as drafts ([ADR 0038](adr/0038-filter
 `Narrowing.listDraft` and `Narrowing.viewDraft` stand in for the filter list's own and the view's stored conditions in
 `view_rows` and `view_board` (a list draft only on a filter list), compiled under the same chain as the setters check
 them, and nothing is written until Save View calls `list_set_filter`, `view_set_filter` and `view_set_only_mine`.
-`list_match_count`, the popover's live count, counts top-level issues only, like the sidebar, and with `me` only
+`list_match_count`, the popover's live count, counts every matching issue, like the sidebar, and with `me` only
 the connected account's issues, like a view's `Narrowing.me`.
 
 Built in (migration `local/0002`): Everything (one "All issues" view grouped by Space), and under Home Unread
@@ -132,14 +132,19 @@ unread, open or done, plus those read since the owner came to this place; Bookma
 issues), plus the narrowing (`me`: the view's Me chip as drafted or saved, `text` in the key or summary ignoring
 case and accents, `epic`, and the draft conditions `listDraft` and `viewDraft`).
 
-Subtasks (`cache.issue.type_is_subtask = 1`) follow `view.subtasks` (migration `local/0013`, `view_set_subtasks`,
-[ADR 0037](adr/0037-views-choose-how-subtasks-show.md); null reads `hidden`; duplicating copies it):
-`hidden` leaves them out and each row's `subtaskCount` counts all its subtasks in the cache; `list` filters,
-groups and sorts each subtask on its own values; `hierarchy` filters top-level issues only and puts every
-subtask of a shown parent right after it in the parent's group (`views/subtasks.rs`), sorted by the view's sort,
-with the group's count counting the parents. Rows carry `isSubtask` and a subtask's `parentId`. `view_board`
-always hides subtasks. The sidebar counts top-level issues only (`filter::TOP_LEVEL`). `places.json` keeps a
-view's collapsed parents (`ViewPlace.collapsedParents`).
+A view's subtasks are the descendants of its results through `cache.issue.parent_id`, of any type
+([ADR 0040](adr/0040-subtasks-are-the-children-of-a-views-results.md); `type_is_subtask` plays no part), down to
+`views::subtasks::MAX_DEPTH` (5) levels, gone and untracked issues left out, fetched in one recursive CTE per
+load (`subtasks::descendants`). They follow `view.subtasks` (migration `local/0013`, `view_set_subtasks`; null
+reads `hidden`; duplicating copies it): `hidden` shows the results only; `list` adds every descendant as a row of
+its own (`Row.isSubtask` when it isn't a result itself), grouped and sorted on its own values, with `me` and
+`text` narrowing every row; `hierarchy` (`subtasks::nest`, `subtasks::expand`) groups the results that have no
+ancestor among the results and puts each one's subtree right after it in depth order (`Row.depth`), unfiltered,
+siblings sorted by the view's sort, with the group's count counting the roots and `me` and `text` narrowing the
+roots only. Every row carries `childCount` (its direct children in the cache) and its `parentId`. `view_board`
+always shows the results only. The sidebar counts the results. `places.json` keeps a view's collapsed rows
+(`ViewPlace.collapsedParents`). `list_mark_all_seen(listId, viewId, narrowing)` marks the unseen issues among
+exactly the rows the view shows (`views::unseen_ids` with a `ViewAt`); without a view, the level's.
 
 | `groupBy` | Groups, in order |
 |---|---|

@@ -21,11 +21,13 @@ export function SubtaskIcon({ size = 14 }: { size?: number }) {
   );
 }
 
-/** A parent's subtasks after its title, in the style of the comment count. */
-export function SubtaskCount({ count }: { count: number }) {
+/** An issue's direct children (an epic's stories, a story's subtasks) after its title, in the style of the
+ *  comment count. */
+export function ChildCount({ count }: { count: number }) {
   if (count <= 0) return null;
+  const label = count === 1 ? "1 child issue" : `${count} child issues`;
   return (
-    <span className="subtask-count" aria-label={count === 1 ? "1 subtask" : `${count} subtasks`}>
+    <span className="subtask-count" aria-label={label} title={label}>
       <SubtaskIcon size={12} />
       {count}
     </span>

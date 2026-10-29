@@ -535,13 +535,21 @@ due: string | null,
  */
 custom: { [key in string]: Cell }, 
 /**
- * All its subtasks in the cache, whatever the view's filter.
+ * Its direct children in the cache (an epic's stories, a story's subtasks), whatever the view's filter.
  */
-subtaskCount: number, isSubtask: boolean, 
+childCount: number, 
 /**
- * A subtask's parent; none on other issues.
+ * Shown in List mode only as a descendant of one of the view's results, not as a result itself (ADR 0040).
  */
-parentId: string | null, };
+isSubtask: boolean, 
+/**
+ * Its parent issue, of any type; none on an issue without one.
+ */
+parentId: string | null, 
+/**
+ * How far below its root it nests in Hierarchy; 0 for a root and in the other modes.
+ */
+depth: number, };
 
 export type ScopeView = { 
 /**
@@ -663,7 +671,7 @@ issues: number, };
 export type Style = "progress" | "review" | "blocked" | "todo" | "backlog" | "done";
 
 /**
- * How a view shows subtasks (ADR 0037); the Board always hides them.
+ * How a view shows subtasks, the descendants of its results (ADR 0040); the Board always hides them.
  */
 export type SubtaskMode = "hidden" | "hierarchy" | "list";
 

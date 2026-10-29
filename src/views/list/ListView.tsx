@@ -8,7 +8,7 @@ import { useColumnsCatalogue, useViewRows } from "../../queries/views";
 import { narrowingKey } from "../../state/slices/narrowing";
 import { useStore } from "../../state/store";
 import { columnDef } from "./columns";
-import { flatten, type Item, itemGroupKey, itemKey } from "./flatten";
+import { flatten, isBelow, type Item, itemGroupKey, itemKey } from "./flatten";
 import { GroupHeader } from "./GroupHeader";
 import { IssueRow } from "./IssueRow";
 import { canvasMeasure, columnWidths, fittingColumns, gridTemplate } from "./measure";
@@ -118,10 +118,10 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
     animate(group.key, opening);
   };
 
-  // Collapsing a parent moves the selection from its hidden subtask onto it.
+  // Collapsing a row moves the selection from its hidden subtree onto it.
   const setSubtasksOpen = (id: string, open: boolean) => {
     setPlace({ collapsedParents: open ? collapsedParents.filter((p) => p !== id) : [...collapsedParents, id] });
-    if (!open && selected && data.rows[selected]?.parentId === id) setPlace({ selectedId: id });
+    if (!open && selected && isBelow(data.rows, selected, id)) setPlace({ selectedId: id });
   };
   const subtasksOpen = (id: string) => !collapsedParents.includes(id);
 
@@ -161,13 +161,14 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
       setGroupOpen: (open) => {
         const { items, selected, toggle, select, peekOpen, setSubtasksOpen, subtasksOpen } = keyState.current;
         const row = items.find((item) => item.kind === "row" && item.row.id === selected);
-        // In Hierarchy ← on a subtask selects its parent, and ←/→ on a parent closes or opens its subtasks.
-        if (row?.kind === "row" && row.nesting === "child" && !open && row.row.parentId) {
-          select(row.row.parentId, peekOpen);
+        // In Hierarchy ←/→ on a row with children closes or opens its subtree, and ← on a nested row selects its
+        // parent.
+        if (row?.kind === "row" && row.nesting?.parent && subtasksOpen(row.row.id) !== open) {
+          setSubtasksOpen(row.row.id, open);
           return;
         }
-        if (row?.kind === "row" && row.nesting === "parent" && subtasksOpen(row.row.id) !== open) {
-          setSubtasksOpen(row.row.id, open);
+        if (row?.kind === "row" && row.nesting && row.nesting.depth > 0 && !open && row.row.parentId) {
+          select(row.row.parentId, peekOpen);
           return;
         }
         const header = row && items.find((item) => item.kind === "group" && item.group.key === itemGroupKey(row));
@@ -253,7 +254,7 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
                   nesting={item.nesting}
                   subtasksOpen={subtasksOpen(item.row.id)}
                   onToggleSubtasks={(id) => setSubtasksOpen(id, !subtasksOpen(id))}
-                  subtaskChip={data.subtasks === "hidden" || (item.nesting === "parent" && !subtasksOpen(item.row.id))}
+                  childChip={data.subtasks === "hidden" || (item.nesting?.parent === true && !subtasksOpen(item.row.id))}
                 />
               )}
             </div>

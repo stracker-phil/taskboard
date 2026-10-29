@@ -4,9 +4,9 @@ import { SubtaskIcon } from "../../components/issue/SubtaskIcon";
 import { openMenu, type MenuEntry } from "../../components/menu";
 
 const MODES: { mode: SubtaskMode; text: string; hint: string }[] = [
-  { mode: "hidden", text: "Hide subtasks", hint: "Top-level issues only" },
+  { mode: "hidden", text: "Hide subtasks", hint: "Matching issues only" },
   { mode: "hierarchy", text: "Show under parent", hint: "Indented below their parent" },
-  { mode: "list", text: "Show as items", hint: "Separate rows, filtered on their own" },
+  { mode: "list", text: "Show as items", hint: "Separate rows, grouped on their own" },
 ];
 
 /** The mode in a word, for the "…" menu. */

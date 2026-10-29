@@ -49,5 +49,6 @@ stands in Taskboard. The numbers in this table are Taskboard's.
 | [0037](0037-views-choose-how-subtasks-show.md) | Views choose how subtasks show | Accepted (2026-10-29) |
 | [0038](0038-filter-changes-are-drafts-until-the-view-is-saved.md) | Filter changes are drafts until the view is saved | Accepted (2026-10-29) |
 | [0039](0039-inline-images-come-from-issue-attachments-through-rust.md) | Inline images come from issue attachments through Rust | Accepted (2026-10-29) |
+| [0040](0040-subtasks-are-the-children-of-a-views-results.md) | Subtasks are the children of a view's results | Accepted (2026-10-29) |
 
 Open: integrations with Daybook and TimeTracker.

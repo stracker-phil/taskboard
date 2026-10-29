@@ -1,6 +1,6 @@
 //! Website relaunch (`NW`): every issue the mockup shows, filled up to its sidebar counts
-//! (20 open, 12 done in scope: Current sprint 8, Epics 5, Code reviews 2, Release 2.4.0 9, Open bugs 3; the
-//! sidebar leaves the subtasks out).
+//! (26 open, 12 done in scope: Current sprint 12, Epics 5, Code reviews 2, Release 2.4.0 9, Open bugs 3; the
+//! sidebar counts the subtasks like any other issue).
 
 use super::catalog::Kind::{Bug, Epic, Story, Subtask, Task};
 use super::catalog::Priority::{High, Highest, Low};

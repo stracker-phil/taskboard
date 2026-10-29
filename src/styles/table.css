@@ -39,11 +39,10 @@
 .table-row__summary { flex: 1; min-width: 240px; font-size: 13px; white-space: nowrap; }
 .table-row__title { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .table-row--changed .table-row__title { font-weight: 600; }
-.table-row--child .table-row__summary { padding-left: 23px; }
-/* Hierarchy: titles line up behind the room of a parent's caret (16 + the 7px gap); subtasks indent one more level. */
-.table-row--tree .table-row__summary { padding-left: 23px; }
-.table-row--tree.table-row--parent .table-row__summary { padding-left: 0; }
-.table-row--tree.table-row--child .table-row__summary { padding-left: 46px; }
+/* Hierarchy (ADR 0040): titles line up behind the room of a caret (16 + the 7px gap); each level indents one
+   step more. */
+.table-row--tree .table-row__summary { padding-left: calc((var(--depth, 0) + 1) * 23px); }
+.table-row--tree.table-row--parent .table-row__summary { padding-left: calc(var(--depth, 0) * 23px); }
 .table-header--tree .table-header__cell--flex { padding-left: 23px; }
 .table-row__status { font-size: 13px; color: var(--text-secondary); white-space: nowrap; }
 /* The Labels cell stays one line; its labels scroll sideways inside it. */

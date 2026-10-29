@@ -281,17 +281,14 @@ mod grouping {
 
     #[tokio::test]
     #[ignore = "syncs the demo site into a temp database"]
-    async fn the_groups_of_a_space_hold_every_top_level_issue_of_the_project() {
+    async fn the_groups_of_a_space_hold_every_issue_of_the_project_whatever_its_type() {
         let site = Site::new().await;
 
         let data = site.nw_data(Narrowing::default()).await;
 
         let in_cache = number(
             site.db(),
-            format!(
-                "SELECT COUNT(*) FROM cache.issue
-                 WHERE project_id = '{NW}' AND gone = 0 AND type_is_subtask = 0"
-            ),
+            format!("SELECT COUNT(*) FROM cache.issue WHERE project_id = '{NW}' AND gone = 0"),
         )
         .await;
         let in_groups: usize = data.groups.iter().map(|g| g.count).sum();
@@ -593,8 +590,7 @@ mod narrowing {
             site.db(),
             format!(
                 "SELECT COUNT(*) FROM cache.issue
-                 WHERE project_id = '{NW}' AND gone = 0 AND type_is_subtask = 0
-                   AND assignee_id = '{ME_ACCOUNT_ID}'"
+                 WHERE project_id = '{NW}' AND gone = 0 AND assignee_id = '{ME_ACCOUNT_ID}'"
             ),
         )
         .await;
@@ -643,7 +639,7 @@ mod narrowing {
             site.db(),
             format!(
                 "SELECT key FROM cache.issue
-                 WHERE project_id = '{NW}' AND gone = 0 AND type_is_subtask = 0
+                 WHERE project_id = '{NW}' AND gone = 0
                    AND key LIKE '%NW-104%' ORDER BY key"
             ),
         )
@@ -1045,10 +1041,7 @@ mod board {
 
         let in_cache = number(
             site.db(),
-            format!(
-                "SELECT COUNT(*) FROM cache.issue
-                 WHERE project_id = '{NW}' AND gone = 0 AND type_is_subtask = 0"
-            ),
+            format!("SELECT COUNT(*) FROM cache.issue WHERE project_id = '{NW}' AND gone = 0"),
         )
         .await;
         assert_eq!(shown(&board) as i64, in_cache);
@@ -1084,7 +1077,7 @@ mod board {
             site.db(),
             format!(
                 "SELECT key FROM cache.issue
-                 WHERE project_id = '{NW}' AND gone = 0 AND type_is_subtask = 0
+                 WHERE project_id = '{NW}' AND gone = 0
                    AND key LIKE '%NW-104%' ORDER BY key"
             ),
         )
@@ -1732,14 +1725,88 @@ mod subtasks {
             .unwrap_or_else(|| panic!("no group holds {key}"))
     }
 
-    /// The subtasks listed right after `parent` in its group.
-    fn followers(data: &ViewData, parent: &str) -> Vec<String> {
-        group_keys(data, group_holding(data, parent))
+    /// The nested rows listed right after `root` in its group, with their depth.
+    fn subtree(data: &ViewData, root: &str) -> Vec<(String, u8)> {
+        let depth = row_of(data, root).depth;
+        group_keys(data, group_holding(data, root))
             .into_iter()
-            .skip_while(|key| key != parent)
+            .skip_while(|key| key != root)
             .skip(1)
-            .take_while(|key| row_of(data, key).is_subtask)
+            .map(|key| row_of(data, &key))
+            .take_while(|row| row.depth > depth)
+            .map(|row| (row.key.clone(), row.depth))
             .collect()
+    }
+
+    fn nested(rows: &[(&str, u8)]) -> Vec<(String, u8)> {
+        rows.iter()
+            .map(|(key, depth)| (key.to_string(), *depth))
+            .collect()
+    }
+
+    fn sorted(keys: &[&str]) -> Vec<String> {
+        let mut keys: Vec<String> = keys.iter().map(|key| key.to_string()).collect();
+        keys.sort();
+        keys
+    }
+
+    /// The Epics filter list of the Website relaunch Space, ordered by key and grouped by status.
+    async fn epics_view(site: &Site, mode: SubtaskMode) -> (i64, i64) {
+        let (list, view) = level_view(site, "Epics", mode).await;
+        sort_by_key(site, view, false).await;
+        view_set_group(site.db(), view, GroupBy::Status)
+            .await
+            .unwrap();
+        (list, view)
+    }
+
+    /// Keys of the epics and everything below them, narrowed by an extra SQL condition.
+    async fn epic_family(site: &Site, extra: &str) -> Vec<String> {
+        let mut keys = strings(
+            site.db(),
+            format!(
+                "WITH RECURSIVE family(id, depth) AS (
+                   SELECT id, 0 FROM cache.issue WHERE issue_type = 'Epic' AND gone = 0
+                   UNION ALL
+                   SELECT c.id, f.depth + 1 FROM family f JOIN cache.issue c ON c.parent_id = f.id
+                   WHERE c.gone = 0 AND f.depth < 5)
+                 SELECT DISTINCT key FROM cache.issue WHERE id IN (SELECT id FROM family) {extra}"
+            ),
+        )
+        .await;
+        keys.sort();
+        keys
+    }
+
+    async fn reparent(site: &Site, child: &str, parent: &str) {
+        let (child, parent) = (child.to_string(), parent.to_string());
+        site.db()
+            .write(move |tx, _| {
+                tx.execute(
+                    "UPDATE cache.issue
+                     SET parent_id = (SELECT id FROM cache.issue WHERE key = ?2) WHERE key = ?1",
+                    [&child, &parent],
+                )?;
+                Ok(())
+            })
+            .await
+            .unwrap();
+    }
+
+    fn ids_in_groups(data: &ViewData) -> Vec<String> {
+        data.groups
+            .iter()
+            .flat_map(|group| group.row_ids.clone())
+            .collect()
+    }
+
+    fn assert_each_issue_once(data: &ViewData) {
+        let mut ids = ids_in_groups(data);
+        ids.sort();
+        let total = ids.len();
+        ids.dedup();
+        assert_eq!(ids.len(), total, "an issue is listed twice");
+        assert_eq!(total, data.rows.len());
     }
 
     fn only(condition: Condition) -> Filter {
@@ -1773,37 +1840,44 @@ mod subtasks {
 
         #[tokio::test]
         #[ignore = "syncs the demo site into a temp database"]
-        async fn is_the_mode_of_a_view_nobody_changed_and_leaves_subtasks_out_of_rows_and_groups() {
+        async fn is_the_mode_of_a_view_nobody_changed_and_shows_exactly_the_results() {
             let site = Site::new().await;
 
             let data = site.nw_data(Narrowing::default()).await;
 
             assert_eq!(data.subtasks, SubtaskMode::Hidden);
-            assert_eq!(subtask_keys(&data), Vec::<String>::new());
+            assert!(has(&data, "NW-1059"));
+            assert!(
+                data.rows
+                    .values()
+                    .all(|row| !row.is_subtask && row.depth == 0)
+            );
             assert_consistent(&data);
         }
 
         #[tokio::test]
         #[ignore = "syncs the demo site into a temp database"]
-        async fn a_parent_counts_all_its_subtasks_done_ones_included() {
+        async fn a_row_counts_its_direct_children_of_any_type_done_ones_included() {
             let site = Site::new().await;
 
             let data = site.nw_data(Narrowing::default()).await;
 
             for (key, count) in [
+                ("NW-1020", 9),
                 ("NW-1042", 4),
                 ("NW-1047", 2),
                 ("NW-1038", 1),
                 ("NW-1049", 1),
                 ("NW-1051", 0),
+                ("NW-1043", 0),
             ] {
-                assert_eq!(row_of(&data, key).subtask_count, count, "{key}");
+                assert_eq!(row_of(&data, key).child_count, count, "{key}");
             }
         }
 
         #[tokio::test]
         #[ignore = "syncs the demo site into a temp database"]
-        async fn the_subtask_count_ignores_the_views_filter() {
+        async fn the_child_count_ignores_the_views_filter() {
             let site = Site::new().await;
             let (space, view) = site.nw().await;
             view_set_filter(
@@ -1817,19 +1891,85 @@ mod subtasks {
 
             let data = site.data(space, view, Narrowing::default()).await;
 
-            assert_eq!(row_of(&data, "NW-1042").subtask_count, 4);
+            assert_eq!(row_of(&data, "NW-1042").child_count, 4);
+            assert!(!has(&data, "NW-1043"));
             assert!(data.rows.values().all(|row| !row.is_subtask));
         }
 
         #[tokio::test]
         #[ignore = "syncs the demo site into a temp database"]
-        async fn a_row_of_a_top_level_issue_is_no_subtask_and_has_no_parent_id() {
+        async fn an_issue_of_the_jira_subtask_type_that_matches_the_filter_is_a_normal_row() {
+            let site = Site::new().await;
+            let (space, view) = site.nw().await;
+            view_set_filter(
+                site.db(),
+                viewer(),
+                view,
+                only(Condition::is(Field::Type, "Subtask")),
+            )
+            .await
+            .unwrap();
+
+            let data = site.data(space, view, Narrowing::default()).await;
+
+            let mut expected = strings(
+                site.db(),
+                format!(
+                    "SELECT key FROM cache.issue
+                     WHERE project_id = '{NW}' AND gone = 0 AND issue_type = 'Subtask'"
+                ),
+            )
+            .await;
+            expected.sort();
+            assert!(expected.len() > 1);
+            assert_eq!(sorted_keys(&data), expected);
+            assert!(
+                data.rows
+                    .values()
+                    .all(|row| !row.is_subtask && row.depth == 0 && row.parent_id.is_some())
+            );
+            assert_consistent(&data);
+        }
+
+        #[tokio::test]
+        #[ignore = "syncs the demo site into a temp database"]
+        async fn a_row_carries_the_parent_of_any_issue_type() {
             let site = Site::new().await;
 
             let data = site.nw_data(Narrowing::default()).await;
 
-            let row = row_of(&data, "NW-1042");
-            assert_eq!((row.is_subtask, row.parent_id.clone()), (false, None));
+            let epic = site.issue_id("NW-1020").await;
+            let story = site.issue_id("NW-1042").await;
+            assert_eq!(row_of(&data, "NW-1020").parent_id, None);
+            assert_eq!(row_of(&data, "NW-1042").parent_id, Some(epic));
+            assert_eq!(row_of(&data, "NW-1043").parent_id, Some(story));
+            assert!(!row_of(&data, "NW-1042").is_subtask);
+        }
+
+        #[tokio::test]
+        #[ignore = "syncs the demo site into a temp database"]
+        async fn an_epics_list_shows_just_the_epics_with_their_children_counted() {
+            let site = Site::new().await;
+            let (list, view) = epics_view(&site, SubtaskMode::Hidden).await;
+
+            let data = site.data(list, view, Narrowing::default()).await;
+
+            assert_eq!(
+                sorted_keys(&data),
+                ["NW-1002", "NW-1003", "NW-1004", "NW-1005", "NW-1020"]
+            );
+            for (key, count) in [
+                ("NW-1002", 4),
+                ("NW-1003", 3),
+                ("NW-1004", 4),
+                ("NW-1005", 4),
+                ("NW-1020", 9),
+            ] {
+                assert_eq!(row_of(&data, key).child_count, count, "{key}");
+            }
+            let counted: usize = data.groups.iter().map(|group| group.count).sum();
+            assert_eq!(counted, 5);
+            assert_consistent(&data);
         }
     }
 
@@ -1838,7 +1978,7 @@ mod subtasks {
 
         #[tokio::test]
         #[ignore = "syncs the demo site into a temp database"]
-        async fn filters_each_subtask_on_its_own_values() {
+        async fn shows_the_results_and_every_descendant_the_filter_would_drop() {
             let site = Site::new().await;
             let (list, view) = level_view(&site, "Current sprint", SubtaskMode::List).await;
 
@@ -1848,47 +1988,79 @@ mod subtasks {
             for key in ["NW-1060", "NW-1061", "NW-1063", "NW-1064"] {
                 assert!(has(&data, key), "{key}");
             }
+            assert!(!row_of(&data, "NW-1060").is_subtask);
             for key in ["NW-1059", "NW-1062"] {
-                assert!(!has(&data, key), "{key}");
+                assert!(row_of(&data, key).is_subtask, "{key}");
             }
             assert_consistent(&data);
         }
 
         #[tokio::test]
         #[ignore = "syncs the demo site into a temp database"]
-        async fn subtask_rows_carry_their_parent_and_the_flag() {
+        async fn an_epics_list_shows_the_epics_and_all_their_descendants_flat() {
             let site = Site::new().await;
-            let (list, view) = level_view(&site, "Current sprint", SubtaskMode::List).await;
+            let (list, view) = epics_view(&site, SubtaskMode::List).await;
 
             let data = site.data(list, view, Narrowing::default()).await;
 
-            let subtask = row_of(&data, "NW-1063");
-            assert!(subtask.is_subtask);
-            assert_eq!(
-                subtask.parent_id.as_deref(),
-                Some(site.issue_id("NW-1038").await.as_str())
-            );
-            let parent = row_of(&data, "NW-1038");
-            assert_eq!((parent.is_subtask, parent.parent_id.clone()), (false, None));
-            assert_eq!(parent.subtask_count, 1);
+            assert_eq!(sorted_keys(&data), epic_family(&site, "").await);
+            let epics = ["NW-1002", "NW-1003", "NW-1004", "NW-1005", "NW-1020"];
+            assert!(data.rows.len() > epics.len());
+            for row in data.rows.values() {
+                assert_eq!(
+                    row.is_subtask,
+                    !epics.contains(&row.key.as_str()),
+                    "{}",
+                    row.key
+                );
+                assert_eq!(row.depth, 0, "{}", row.key);
+            }
+            let counted: usize = data.groups.iter().map(|group| group.count).sum();
+            assert_eq!(counted, data.rows.len());
+            assert_consistent(&data);
         }
 
         #[tokio::test]
         #[ignore = "syncs the demo site into a temp database"]
-        async fn groups_a_subtask_by_its_own_status() {
+        async fn groups_every_descendant_by_its_own_status() {
+            let site = Site::new().await;
+            let (list, view) = epics_view(&site, SubtaskMode::List).await;
+
+            let data = site.data(list, view, Narrowing::default()).await;
+
+            for key in ["NW-1033", "NW-1029", "NW-1042", "NW-1063"] {
+                assert_eq!(
+                    group_holding(&data, key).key,
+                    column_of(&site, "status_id", key).await,
+                    "{key}"
+                );
+            }
+            assert_ne!(
+                group_holding(&data, "NW-1033").key,
+                group_holding(&data, "NW-1002").key
+            );
+        }
+
+        #[tokio::test]
+        #[ignore = "syncs the demo site into a temp database"]
+        async fn a_row_carries_its_parent_whether_or_not_it_is_a_subtask() {
             let site = Site::new().await;
             let (list, view) = level_view(&site, "Current sprint", SubtaskMode::List).await;
 
             let data = site.data(list, view, Narrowing::default()).await;
 
-            assert_eq!(
-                group_holding(&data, "NW-1063").key,
-                column_of(&site, "status_id", "NW-1063").await
-            );
-            assert_ne!(
-                group_holding(&data, "NW-1063").key,
-                group_holding(&data, "NW-1038").key
-            );
+            let story = site.issue_id("NW-1042").await;
+            let epic = site.issue_id("NW-1020").await;
+            let descendant = row_of(&data, "NW-1059");
+            assert_eq!(descendant.parent_id.as_deref(), Some(story.as_str()));
+            assert!(descendant.is_subtask);
+            let matching_child = row_of(&data, "NW-1060");
+            assert_eq!(matching_child.parent_id.as_deref(), Some(story.as_str()));
+            assert!(!matching_child.is_subtask);
+            let result = row_of(&data, "NW-1042");
+            assert_eq!(result.parent_id.as_deref(), Some(epic.as_str()));
+            assert!(!result.is_subtask);
+            assert_eq!(result.child_count, 4);
         }
 
         #[tokio::test]
@@ -1925,51 +2097,94 @@ mod subtasks {
 
         #[tokio::test]
         #[ignore = "syncs the demo site into a temp database"]
-        async fn applies_me_to_each_subtask() {
+        async fn applies_me_to_every_row_on_its_own_descendants_included() {
             let site = Site::new().await;
-            let (list, view) = level_view(&site, "Current sprint", SubtaskMode::List).await;
+            let (list, view) = epics_view(&site, SubtaskMode::List).await;
 
             let data = site.data(list, view, mine()).await;
 
-            assert!(has(&data, "NW-1043"));
-            for key in ["NW-1060", "NW-1061"] {
+            let extra = format!("AND assignee_id = '{ME_ACCOUNT_ID}'");
+            assert_eq!(sorted_keys(&data), epic_family(&site, &extra).await);
+            assert!(row_of(&data, "NW-1043").is_subtask);
+            assert!(has(&data, "NW-1002"));
+            for key in ["NW-1003", "NW-1061"] {
                 assert!(!has(&data, key), "{key}");
             }
+            assert!(
+                data.rows
+                    .values()
+                    .all(|row| row.assignees.first().map(|p| p.account_id.as_str())
+                        == Some(ME_ACCOUNT_ID))
+            );
+            assert_consistent(&data);
         }
 
         #[tokio::test]
         #[ignore = "syncs the demo site into a temp database"]
-        async fn applies_the_text_to_each_subtask() {
+        async fn applies_the_text_to_every_row_on_its_own_descendants_included() {
             let site = Site::new().await;
-            let (list, view) = level_view(&site, "Current sprint", SubtaskMode::List).await;
+            let (list, view) = epics_view(&site, SubtaskMode::List).await;
 
             let data = site.data(list, view, narrowing_text("postcode")).await;
 
             assert_eq!(
                 sorted_keys(&data),
-                ["NW-1042", "NW-1043", "NW-1045", "NW-1060"]
+                sorted(&["NW-1042", "NW-1043", "NW-1045", "NW-1059", "NW-1060"])
             );
+            assert!(data.rows.values().all(|row| row.is_subtask));
         }
 
         #[tokio::test]
         #[ignore = "syncs the demo site into a temp database"]
-        async fn applies_the_views_filter_to_each_subtask() {
+        async fn applies_the_views_filter_to_the_results_only() {
             let site = Site::new().await;
-            let (list, view) = level_view(&site, "Current sprint", SubtaskMode::List).await;
+            let (space, view) = nw_view(&site, SubtaskMode::List).await;
             view_set_filter(
                 site.db(),
                 viewer(),
                 view,
-                only(Condition::is(Field::Type, "Subtask")),
+                only(Condition::is(Field::Type, "Story")),
             )
             .await
             .unwrap();
 
-            let data = site.data(list, view, Narrowing::default()).await;
+            let data = site.data(space, view, Narrowing::default()).await;
 
-            assert!(has(&data, "NW-1060"));
-            assert!(!has(&data, "NW-1062"));
-            assert!(data.rows.values().all(|row| row.is_subtask));
+            assert_eq!(
+                subtask_keys(&data),
+                ["NW-1043", "NW-1045", "NW-1059", "NW-1060", "NW-1064"]
+            );
+            assert!(!row_of(&data, "NW-1042").is_subtask);
+            assert!(!has(&data, "NW-1061"));
+        }
+
+        #[tokio::test]
+        #[ignore = "syncs the demo site into a temp database"]
+        async fn an_epic_narrowing_brings_in_the_epics_grandchildren_as_subtasks() {
+            let site = Site::new().await;
+            let (space, view) = nw_view(&site, SubtaskMode::List).await;
+            let epic = site.issue_id("NW-1020").await;
+
+            let data = site
+                .data(
+                    space,
+                    view,
+                    Narrowing {
+                        epic: Some(epic),
+                        ..Narrowing::default()
+                    },
+                )
+                .await;
+
+            assert_eq!(
+                subtask_keys(&data),
+                [
+                    "NW-1043", "NW-1045", "NW-1059", "NW-1060", "NW-1061", "NW-1062", "NW-1063"
+                ]
+            );
+            assert_eq!(data.rows.len(), 16);
+            assert!(!row_of(&data, "NW-1042").is_subtask);
+            assert_consistent(&data);
         }
     }
 
@@ -1978,127 +2193,388 @@ mod subtasks {
 
         #[tokio::test]
         #[ignore = "syncs the demo site into a temp database"]
-        async fn lists_every_subtask_of_a_parent_right_after_it_in_its_group() {
+        async fn an_epic_is_followed_by_all_its_descendants_depth_first_unfiltered() {
             let site = Site::new().await;
-            let (space, view) = nw_view(&site, SubtaskMode::Hierarchy).await;
-            sort_by_key(&site, view, false).await;
+            let (list, view) = epics_view(&site, SubtaskMode::Hierarchy).await;
 
-            let data = site.data(space, view, Narrowing::default()).await;
+            let data = site.data(list, view, Narrowing::default()).await;
 
             assert_eq!(data.subtasks, SubtaskMode::Hierarchy);
             assert_eq!(
-                followers(&data, "NW-1042"),
-                ["NW-1043", "NW-1045", "NW-1059", "NW-1060"]
+                subtree(&data, "NW-1020"),
+                nested(&[
+                    ("NW-1021", 1),
+                    ("NW-1024", 1),
+                    ("NW-1026", 1),
+                    ("NW-1031", 1),
+                    ("NW-1035", 1),
+                    ("NW-1038", 1),
+                    ("NW-1063", 2),
+                    ("NW-1042", 1),
+                    ("NW-1043", 2),
+                    ("NW-1045", 2),
+                    ("NW-1059", 2),
+                    ("NW-1060", 2),
+                    ("NW-1047", 1),
+                    ("NW-1061", 2),
+                    ("NW-1062", 2),
+                    ("NW-1051", 1),
+                ])
             );
-            assert_eq!(followers(&data, "NW-1047"), ["NW-1061", "NW-1062"]);
-            assert_eq!(followers(&data, "NW-1038"), ["NW-1063"]);
             assert_eq!(
-                group_holding(&data, "NW-1060").key,
-                group_holding(&data, "NW-1042").key
+                subtree(&data, "NW-1002"),
+                nested(&[
+                    ("NW-977", 1),
+                    ("NW-1029", 1),
+                    ("NW-1033", 1),
+                    ("NW-1049", 1),
+                    ("NW-1064", 2),
+                ])
             );
+            assert_eq!(sorted_keys(&data), epic_family(&site, "").await);
+            assert_each_issue_once(&data);
         }
 
         #[tokio::test]
         #[ignore = "syncs the demo site into a temp database"]
-        async fn group_counts_count_top_level_rows_only() {
+        async fn the_descendants_take_the_group_of_their_root_and_the_count_is_roots_only() {
             let site = Site::new().await;
-            let (space, view) = nw_view(&site, SubtaskMode::Hierarchy).await;
+            let (list, view) = epics_view(&site, SubtaskMode::Hierarchy).await;
 
-            let data = site.data(space, view, Narrowing::default()).await;
+            let data = site.data(list, view, Narrowing::default()).await;
 
+            let epic_group = group_holding(&data, "NW-1002").key.clone();
+            for key in ["NW-1033", "NW-1029", "NW-1064"] {
+                assert_eq!(group_holding(&data, key).key, epic_group, "{key}");
+            }
+            assert_ne!(column_of(&site, "status_id", "NW-1033").await, epic_group);
+            let counted: usize = data.groups.iter().map(|group| group.count).sum();
+            assert_eq!(counted, 5);
             for group in &data.groups {
-                let top_level = group_keys(&data, group)
+                let roots = group_keys(&data, group)
                     .iter()
-                    .filter(|key| !row_of(&data, key).is_subtask)
+                    .filter(|key| row_of(&data, key).depth == 0)
                     .count();
-                assert_eq!(group.count, top_level, "{}", group.label);
+                assert_eq!(group.count, roots, "{}", group.label);
             }
             assert!(
                 data.groups
                     .iter()
-                    .any(|group| group.row_ids.len() > group.count)
+                    .all(|group| group.row_ids.len() > group.count)
+            );
+            assert!(data.rows.values().all(|row| !row.is_subtask));
+        }
+
+        #[tokio::test]
+        #[ignore = "syncs the demo site into a temp database"]
+        async fn rows_carry_their_depth_parent_and_child_count_in_the_page_shape() {
+            let site = Site::new().await;
+            let (list, view) = epics_view(&site, SubtaskMode::Hierarchy).await;
+
+            let data = site.data(list, view, Narrowing::default()).await;
+
+            let story = site.issue_id("NW-1042").await;
+            let value = serde_json::to_value(row_of(&data, "NW-1043")).unwrap();
+            assert_eq!(value["depth"], 2);
+            assert_eq!(value["parentId"], story.as_str());
+            assert_eq!(value["childCount"], 0);
+            assert_eq!(
+                serde_json::to_value(row_of(&data, "NW-1042")).unwrap()["childCount"],
+                4
             );
         }
 
         #[tokio::test]
         #[ignore = "syncs the demo site into a temp database"]
-        async fn follows_a_parent_with_the_subtasks_the_level_filter_would_drop() {
+        async fn a_result_below_another_result_nests_once_instead_of_being_a_root() {
             let site = Site::new().await;
-            let (list, view) = level_view(&site, "Current sprint", SubtaskMode::Hierarchy).await;
+            let (space, view) = nw_view(&site, SubtaskMode::Hierarchy).await;
             sort_by_key(&site, view, false).await;
 
-            let data = site.data(list, view, Narrowing::default()).await;
+            let data = site.data(space, view, Narrowing::default()).await;
 
-            assert_eq!(followers(&data, "NW-1047"), ["NW-1061", "NW-1062"]);
-            assert!(has(&data, "NW-1062"));
+            let roots = number(
+                site.db(),
+                format!(
+                    "SELECT COUNT(*) FROM cache.issue
+                     WHERE project_id = '{NW}' AND gone = 0 AND parent_id IS NULL"
+                ),
+            )
+            .await;
+            let counted: usize = data.groups.iter().map(|group| group.count).sum();
+            assert_eq!(counted as i64, roots);
+            assert_each_issue_once(&data);
+            assert_eq!(
+                data.rows.len() as i64,
+                number(
+                    site.db(),
+                    format!(
+                        "SELECT COUNT(*) FROM cache.issue WHERE project_id = '{NW}' AND gone = 0"
+                    )
+                )
+                .await
+            );
+            assert_eq!(row_of(&data, "NW-1042").depth, 1);
+            assert_eq!(row_of(&data, "NW-1043").depth, 2);
+            assert_eq!(row_of(&data, "NW-1020").depth, 0);
+            assert!(subtree(&data, "NW-1020").contains(&("NW-1042".to_string(), 1)));
         }
 
         #[tokio::test]
         #[ignore = "syncs the demo site into a temp database"]
-        async fn leaves_out_the_subtasks_of_parents_the_filter_drops() {
+        async fn a_child_whose_parent_is_not_a_result_stays_a_root_with_its_unfiltered_children() {
             let site = Site::new().await;
             let (list, view) = level_view(&site, "Open bugs", SubtaskMode::Hierarchy).await;
+            sort_by_key(&site, view, false).await;
 
             let data = site.data(list, view, Narrowing::default()).await;
 
-            assert_eq!(subtask_keys(&data), ["NW-1063"]);
-            assert!(has(&data, "NW-1038"));
+            assert_eq!(
+                sorted_keys(&data),
+                sorted(&["NW-1038", "NW-1050", "NW-1053", "NW-1063"])
+            );
+            for key in ["NW-1038", "NW-1050", "NW-1053"] {
+                assert_eq!(row_of(&data, key).depth, 0, "{key}");
+            }
+            assert_eq!(subtree(&data, "NW-1038"), nested(&[("NW-1063", 1)]));
+            let counted: usize = data.groups.iter().map(|group| group.count).sum();
+            assert_eq!(counted, 3);
             assert!(!has(&data, "NW-1042"));
         }
 
         #[tokio::test]
         #[ignore = "syncs the demo site into a temp database"]
-        async fn keeps_the_subtasks_of_a_parent_that_matches_me() {
+        async fn siblings_follow_the_views_sort_at_every_level() {
             let site = Site::new().await;
-            let (list, view) = level_view(&site, "Current sprint", SubtaskMode::Hierarchy).await;
-            sort_by_key(&site, view, false).await;
+            let (list, view) = epics_view(&site, SubtaskMode::Hierarchy).await;
+            sort_by_key(&site, view, true).await;
+
+            let data = site.data(list, view, Narrowing::default()).await;
+
+            assert_eq!(
+                subtree(&data, "NW-1020"),
+                nested(&[
+                    ("NW-1051", 1),
+                    ("NW-1047", 1),
+                    ("NW-1062", 2),
+                    ("NW-1061", 2),
+                    ("NW-1042", 1),
+                    ("NW-1060", 2),
+                    ("NW-1059", 2),
+                    ("NW-1045", 2),
+                    ("NW-1043", 2),
+                    ("NW-1038", 1),
+                    ("NW-1063", 2),
+                    ("NW-1035", 1),
+                    ("NW-1031", 1),
+                    ("NW-1026", 1),
+                    ("NW-1024", 1),
+                    ("NW-1021", 1),
+                ])
+            );
+        }
+
+        #[tokio::test]
+        #[ignore = "syncs the demo site into a temp database"]
+        async fn me_narrows_the_roots_and_keeps_their_whole_subtree() {
+            let site = Site::new().await;
+            let (list, view) = epics_view(&site, SubtaskMode::Hierarchy).await;
 
             let data = site.data(list, view, mine()).await;
 
-            assert_eq!(followers(&data, "NW-1047"), ["NW-1061", "NW-1062"]);
             assert_eq!(
-                followers(&data, "NW-1042"),
-                ["NW-1043", "NW-1045", "NW-1059", "NW-1060"]
+                sorted_keys(&data),
+                sorted(&[
+                    "NW-1002", "NW-977", "NW-1029", "NW-1033", "NW-1049", "NW-1064"
+                ])
             );
-            assert!(
-                data.rows
-                    .values()
-                    .filter(|row| !row.is_subtask)
-                    .all(|row| row.assignees.first().map(|p| p.account_id.as_str())
-                        == Some(ME_ACCOUNT_ID))
+            assert_ne!(
+                row_of(&data, "NW-1064").assignees[0].account_id,
+                ME_ACCOUNT_ID
             );
+            let counted: usize = data.groups.iter().map(|group| group.count).sum();
+            assert_eq!(counted, 1);
         }
 
         #[tokio::test]
         #[ignore = "syncs the demo site into a temp database"]
-        async fn keeps_the_subtasks_of_a_parent_that_matches_the_text() {
+        async fn the_text_narrows_the_roots_and_keeps_their_whole_subtree() {
             let site = Site::new().await;
-            let (space, view) = nw_view(&site, SubtaskMode::Hierarchy).await;
+            let (list, view) = epics_view(&site, SubtaskMode::Hierarchy).await;
 
-            let data = site.data(space, view, narrowing_text("store api")).await;
+            let data = site.data(list, view, narrowing_text("checkout")).await;
 
-            assert_eq!(sorted_keys(&data), ["NW-1047", "NW-1061", "NW-1062"]);
+            let counted: usize = data.groups.iter().map(|group| group.count).sum();
+            assert_eq!(counted, 1);
+            assert_eq!(data.rows.len(), 17);
+            assert_eq!(subtree(&data, "NW-1020").len(), 16);
+            assert!(has(&data, "NW-1061"));
         }
 
         #[tokio::test]
         #[ignore = "syncs the demo site into a temp database"]
-        async fn sorts_the_subtasks_of_a_parent_by_the_views_sort() {
+        async fn a_text_only_a_descendant_matches_shows_nothing() {
+            let site = Site::new().await;
+            let (list, view) = epics_view(&site, SubtaskMode::Hierarchy).await;
+
+            let data = site.data(list, view, narrowing_text("postcode")).await;
+
+            assert!(data.groups.is_empty());
+            assert!(data.rows.is_empty());
+        }
+
+        #[tokio::test]
+        #[ignore = "syncs the demo site into a temp database"]
+        async fn an_epic_narrowing_nests_the_grandchildren_under_the_epics_children() {
             let site = Site::new().await;
             let (space, view) = nw_view(&site, SubtaskMode::Hierarchy).await;
-
             sort_by_key(&site, view, false).await;
-            let ascending = site.data(space, view, Narrowing::default()).await;
-            sort_by_key(&site, view, true).await;
-            let descending = site.data(space, view, Narrowing::default()).await;
+            let epic = site.issue_id("NW-1020").await;
+
+            let data = site
+                .data(
+                    space,
+                    view,
+                    Narrowing {
+                        epic: Some(epic),
+                        ..Narrowing::default()
+                    },
+                )
+                .await;
+
+            assert_eq!(data.rows.len(), 16);
+            let counted: usize = data.groups.iter().map(|group| group.count).sum();
+            assert_eq!(counted, 9);
+            assert_eq!(
+                subtree(&data, "NW-1042"),
+                nested(&[
+                    ("NW-1043", 1),
+                    ("NW-1045", 1),
+                    ("NW-1059", 1),
+                    ("NW-1060", 1)
+                ])
+            );
+            assert_each_issue_once(&data);
+        }
+
+        #[tokio::test]
+        #[ignore = "syncs the demo site into a temp database"]
+        async fn a_cycle_in_the_parent_links_shows_every_issue_once() {
+            let site = Site::new().await;
+            reparent(&site, "NW-1020", "NW-1042").await;
+            let (list, view) = epics_view(&site, SubtaskMode::Hierarchy).await;
+            let (space, space_view) = nw_view(&site, SubtaskMode::Hierarchy).await;
+            sort_by_key(&site, space_view, false).await;
+
+            let epics = site.data(list, view, Narrowing::default()).await;
+            let all = site.data(space, space_view, Narrowing::default()).await;
+
+            assert_each_issue_once(&epics);
+            assert_eq!(row_of(&epics, "NW-1020").depth, 0);
+            assert_eq!(row_of(&epics, "NW-1042").depth, 1);
+            assert_eq!(row_of(&epics, "NW-1043").depth, 2);
+            let counted: usize = epics.groups.iter().map(|group| group.count).sum();
+            assert_eq!(counted, 5);
+            assert_each_issue_once(&all);
+            assert!(has(&all, "NW-1020") && has(&all, "NW-1042"));
+            assert_eq!(row_of(&all, "NW-1020").depth, 0);
+            assert_eq!(row_of(&all, "NW-1042").depth, 1);
+        }
+
+        #[tokio::test]
+        #[ignore = "syncs the demo site into a temp database"]
+        async fn two_issues_that_are_each_others_parent_show_once_each() {
+            let site = Site::new().await;
+            reparent(&site, "NW-1043", "NW-1059").await;
+            reparent(&site, "NW-1059", "NW-1043").await;
+            let (space, view) = nw_view(&site, SubtaskMode::Hierarchy).await;
+            sort_by_key(&site, view, false).await;
+
+            let data = site.data(space, view, Narrowing::default()).await;
+
+            assert_each_issue_once(&data);
+            assert!(has(&data, "NW-1043") && has(&data, "NW-1059"));
+            assert_eq!(
+                data.rows.len() as i64,
+                number(
+                    site.db(),
+                    format!(
+                        "SELECT COUNT(*) FROM cache.issue WHERE project_id = '{NW}' AND gone = 0"
+                    )
+                )
+                .await
+            );
+            assert_eq!(
+                [
+                    row_of(&data, "NW-1043").depth,
+                    row_of(&data, "NW-1059").depth
+                ]
+                .iter()
+                .filter(|depth| **depth == 0)
+                .count(),
+                1
+            );
+        }
+
+        #[tokio::test]
+        #[ignore = "syncs the demo site into a temp database"]
+        async fn a_chain_deeper_than_five_levels_shows_five_below_its_root() {
+            let site = Site::new().await;
+            let chain = [
+                "NW-1005", "NW-1055", "NW-1056", "NW-1058", "NW-1041", "NW-1040", "NW-1039",
+                "NW-1053", "NW-1050",
+            ];
+            for pair in chain.windows(2) {
+                reparent(&site, pair[1], pair[0]).await;
+            }
+            let (list, view) = epics_view(&site, SubtaskMode::Hierarchy).await;
+
+            let data = site.data(list, view, Narrowing::default()).await;
 
             assert_eq!(
-                followers(&ascending, "NW-1042"),
-                ["NW-1043", "NW-1045", "NW-1059", "NW-1060"]
+                subtree(&data, "NW-1005"),
+                nested(&[
+                    ("NW-1055", 1),
+                    ("NW-1056", 2),
+                    ("NW-1058", 3),
+                    ("NW-1041", 4),
+                    ("NW-1040", 5),
+                ])
             );
-            assert_eq!(
-                followers(&descending, "NW-1042"),
-                ["NW-1060", "NW-1059", "NW-1045", "NW-1043"]
-            );
+            for key in ["NW-1039", "NW-1053", "NW-1050"] {
+                assert!(!has(&data, key), "{key}");
+            }
+            assert_each_issue_once(&data);
+        }
+
+        #[tokio::test]
+        #[ignore = "syncs the demo site into a temp database"]
+        async fn an_epic_with_a_hundred_children_loads_with_all_of_them_nested() {
+            let site = Site::new().await;
+            site.db()
+                .write(|tx, _| {
+                    tx.execute_batch(
+                        "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 100)
+                         INSERT INTO cache.issue (id, key, project_id, summary, issue_type, status_id,
+                           status_category, created_at, updated_at, raw, synced_at, parent_id)
+                         SELECT 'bulk-' || n.i, 'NW-' || (9000 + n.i), s.project_id, 'Bulk task ' || n.i,
+                           'Task', s.status_id, s.status_category, s.created_at, s.updated_at, s.raw,
+                           s.synced_at, (SELECT id FROM cache.issue WHERE key = 'NW-1003')
+                         FROM n, cache.issue s WHERE s.key = 'NW-1044'",
+                    )?;
+                    Ok(())
+                })
+                .await
+                .unwrap();
+            let (list, view) = epics_view(&site, SubtaskMode::Hierarchy).await;
+
+            let data = site.data(list, view, Narrowing::default()).await;
+
+            let below = subtree(&data, "NW-1003");
+            assert_eq!(below.len(), 103);
+            assert!(below.iter().all(|(_, depth)| *depth == 1));
+            assert_eq!(row_of(&data, "NW-1003").child_count, 103);
+            assert_each_issue_once(&data);
         }
     }
 
@@ -2107,7 +2583,7 @@ mod subtasks {
 
         #[tokio::test]
         #[ignore = "syncs the demo site into a temp database"]
-        async fn ignores_the_views_mode_and_never_shows_subtask_cards() {
+        async fn always_shows_the_results_as_flat_cards_whatever_the_views_mode() {
             let site = Site::new().await;
             let (space, view) = site.nw().await;
             let hidden = view_board(site.db(), viewer(), space, view, Narrowing::default())
@@ -2121,7 +2597,13 @@ mod subtasks {
                     .await
                     .unwrap();
 
-                assert!(board.rows.values().all(|row| !row.is_subtask), "{mode:?}");
+                assert!(
+                    board
+                        .rows
+                        .values()
+                        .all(|row| !row.is_subtask && row.depth == 0),
+                    "{mode:?}"
+                );
                 assert_eq!(board, hidden, "{mode:?}");
             }
         }

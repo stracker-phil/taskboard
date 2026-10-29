@@ -1,6 +1,6 @@
 //! Pins on a temp database with a small cached project: what pinning an issue, a comment and a filter
 //! list stores and shows, how pins end (unpinned, run out, too old), and the Pinned counts and lists in
-//! the sidebar and the Pinned view.
+//! the sidebar and the Bookmarks view.
 
 use chrono::{DateTime, Utc};
 use tempfile::TempDir;
@@ -706,6 +706,27 @@ mod in_the_pinned_view {
         pin_list(&db, NOW, open_bugs, PinDuration::Week).await;
 
         assert_eq!(shown_ids(&db, NOW).await, ["1001", "1003"]);
+    }
+
+    #[tokio::test]
+    async fn a_bookmarked_subtask_is_shown_and_counted_like_any_other_issue() {
+        let (_dir, db) = lab().await;
+        execute(
+            &db,
+            format!(
+                "INSERT INTO cache.issue (id, key, project_id, summary, issue_type, type_is_subtask,
+                   parent_id, status_id, status_category, created_at, updated_at, raw, synced_at)
+                 VALUES ('1004', 'NW-4', '{NW}', 'Add a regression test', 'Subtask', 1, '1001',
+                   's1', 'new', '2026-10-20T09:00:00.000Z', '2026-10-20T09:00:00.000Z', '{{}}',
+                   '2026-10-20T09:00:00.000Z')"
+            ),
+        )
+        .await;
+
+        pin_issue(&db, NOW, "1004", PinDuration::UntilUnpinned).await;
+
+        assert_eq!(shown_ids(&db, NOW).await, ["1004"]);
+        assert_eq!(home_pinned_count(&tree_at(&db, NOW).await), Some(1));
     }
 
     #[tokio::test]

@@ -33,11 +33,14 @@ pub struct Row {
     pub due: Option<String>,
     /// Custom column values by field id; a field without a value is absent.
     pub custom: BTreeMap<String, Cell>,
-    /// All its subtasks in the cache, whatever the view's filter.
-    pub subtask_count: i64,
+    /// Its direct children in the cache (an epic's stories, a story's subtasks), whatever the view's filter.
+    pub child_count: i64,
+    /// Shown in List mode only as a descendant of one of the view's results, not as a result itself (ADR 0040).
     pub is_subtask: bool,
-    /// A subtask's parent; none on other issues.
+    /// Its parent issue, of any type; none on an issue without one.
     pub parent_id: Option<String>,
+    /// How far below its root it nests in Hierarchy; 0 for a root and in the other modes.
+    pub depth: u8,
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq, Eq, TS)]

@@ -399,16 +399,16 @@ describe("TableView", () => {
   });
 
   describe("subtasks", () => {
-    const PARENT = row({ id: "1", key: "NW-1042", summary: "Redesign the pricing page", subtaskCount: 2 });
-    const STEP = row({ id: "11", key: "NW-1043", summary: "Draft the price table", isSubtask: true, parentId: "1" });
-    const LAST_STEP = row({ id: "12", key: "NW-1044", summary: "Review the price table", isSubtask: true, parentId: "1" });
+    const PARENT = row({ id: "1", key: "NW-1042", summary: "Redesign the pricing page", childCount: 2 });
+    const STEP = row({ id: "11", key: "NW-1043", summary: "Draft the price table", isSubtask: true, parentId: "1", depth: 1 });
+    const LAST_STEP = row({ id: "12", key: "NW-1044", summary: "Review the price table", isSubtask: true, parentId: "1", depth: 1 });
     const modeData = (subtasks: ViewData["subtasks"], rows = [PARENT, STEP, LAST_STEP]) => viewData([groupOf(rows)], rows, { groupBy: "none", subtasks });
     const rowOf = (key: RegExp) => screen.getByRole("row", { name: key });
 
-    it("shows a hidden-mode parent's subtask count as a chip after its summary", async () => {
+    it("shows a hidden-mode parent's child count as a chip after its summary", async () => {
       await renderTable(modeData("hidden", [PARENT]));
 
-      expect(within(await screen.findByRole("row", { name: /NW-1042/ })).getByLabelText("2 subtasks")).toBeInTheDocument();
+      expect(within(await screen.findByRole("row", { name: /NW-1042/ })).getByLabelText("2 child issues")).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: /subtasks$/ })).not.toBeInTheDocument();
     });
 
@@ -418,6 +418,17 @@ describe("TableView", () => {
       expect(await screen.findByRole("row", { name: /NW-1043/ })).toHaveClass("table-row--child");
       expect(rowOf(/NW-1042/)).not.toHaveClass("table-row--child");
       expect(within(rowOf(/NW-1042/)).getByRole("button", { name: "Collapse subtasks" })).toHaveAttribute("aria-expanded", "true");
+    });
+
+    it("indents rows by depth and gives a caret to a mid-level row in a multi-level tree", async () => {
+      const mid = row({ id: "21", key: "NW-2002", summary: "Write the onboarding articles", parentId: "1", depth: 1, childCount: 1 });
+      const leaf = row({ id: "22", key: "NW-2003", summary: "Proofread the welcome article", parentId: "21", depth: 2 });
+      await renderTable(modeData("hierarchy", [PARENT, mid, leaf]));
+
+      await screen.findByRole("row", { name: /NW-2002/ });
+      expect([/NW-1042/, /NW-2002/, /NW-2003/].map((key) => rowOf(key).style.getPropertyValue("--depth"))).toEqual(["0", "1", "2"]);
+      expect(within(rowOf(/NW-2002/)).getByRole("button", { name: "Collapse subtasks" })).toBeInTheDocument();
+      expect(within(rowOf(/NW-2003/)).queryByRole("button", { name: /subtasks$/ })).not.toBeInTheDocument();
     });
 
     it.each([
@@ -442,7 +453,7 @@ describe("TableView", () => {
 
       expect(screen.queryByText("Draft the price table")).not.toBeInTheDocument();
       expect(useStore.getState().places["11:101"].collapsedParents).toEqual(["1"]);
-      expect(within(rowOf(/NW-1042/)).getByLabelText("2 subtasks")).toBeInTheDocument();
+      expect(within(rowOf(/NW-1042/)).getByLabelText("2 child issues")).toBeInTheDocument();
       expect(rowOf(/NW-1042/)).toHaveAttribute("aria-selected", "false");
 
       await userEvent.click(screen.getByRole("button", { name: "Expand subtasks" }));

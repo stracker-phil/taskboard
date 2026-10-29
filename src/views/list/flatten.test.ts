@@ -82,16 +82,55 @@ describe("flatten", () => {
 });
 
 describe("flatten subtasks", () => {
-  const PARENT = row({ id: "10", key: "NW-10", subtaskCount: 2 });
-  const STEP_A = row({ id: "11", key: "NW-11", isSubtask: true, parentId: "10" });
-  const STEP_B = row({ id: "12", key: "NW-12", isSubtask: true, parentId: "10" });
+  const PARENT = row({ id: "10", key: "NW-10", childCount: 2 });
+  const STEP_A = row({ id: "11", key: "NW-11", isSubtask: true, parentId: "10", depth: 1 });
+  const STEP_B = row({ id: "12", key: "NW-12", isSubtask: true, parentId: "10", depth: 1 });
   const PLAIN = row({ id: "13", key: "NW-13" });
   const all = [PARENT, STEP_A, STEP_B, PLAIN];
   const hierarchy = () => viewData([groupOf(all, { key: "g" })], all, { subtasks: "hierarchy" });
   const nestings = (items: ReturnType<typeof flatten>) => items.flatMap((i) => (i.kind === "row" ? [i.nesting] : []));
 
-  it("marks parents and their subtasks in Hierarchy and leaves other rows plain", () => {
-    expect(nestings(flatten(hierarchy(), () => true))).toEqual(["parent", "child", "child", null]);
+  it("gives each row its depth and marks the rows with deeper rows after them as parents in Hierarchy", () => {
+    expect(nestings(flatten(hierarchy(), () => true))).toEqual([
+      { depth: 0, parent: true },
+      { depth: 1, parent: false },
+      { depth: 1, parent: false },
+      { depth: 0, parent: false },
+    ]);
+  });
+
+  describe("with several levels", () => {
+    const TOP = row({ id: "20", key: "NW-20" });
+    const MID = row({ id: "21", key: "NW-21", parentId: "20", depth: 1 });
+    const LEAF_A = row({ id: "22", key: "NW-22", parentId: "21", depth: 2 });
+    const DEEP = row({ id: "23", key: "NW-23", parentId: "22", depth: 3 });
+    const MID_SIBLING = row({ id: "24", key: "NW-24", parentId: "20", depth: 1 });
+    const NEXT_TOP = row({ id: "25", key: "NW-25" });
+    const tree = [TOP, MID, LEAF_A, DEEP, MID_SIBLING, NEXT_TOP];
+    const deep = () => viewData([groupOf(tree, { key: "g" })], tree, { subtasks: "hierarchy" });
+
+    it("carries every row's depth and marks a parent at each level", () => {
+      expect(nestings(flatten(deep(), () => true))).toEqual([
+        { depth: 0, parent: true },
+        { depth: 1, parent: true },
+        { depth: 2, parent: true },
+        { depth: 3, parent: false },
+        { depth: 1, parent: false },
+        { depth: 0, parent: false },
+      ]);
+    });
+
+    it("hides only the subtree of a collapsed mid-level row", () => {
+      expect(kinds(flatten(deep(), () => true, ["21"]))).toEqual(["group:g", "row:20", "row:21", "row:24", "row:25"]);
+    });
+
+    it("hides everything below a collapsed top-level row up to the next top-level row", () => {
+      expect(kinds(flatten(deep(), () => true, ["20"]))).toEqual(["group:g", "row:20", "row:25"]);
+    });
+
+    it("keeps collapsing the outer row when an inner row is collapsed as well", () => {
+      expect(kinds(flatten(deep(), () => true, ["21", "22"]))).toEqual(["group:g", "row:20", "row:21", "row:24", "row:25"]);
+    });
   });
 
   it.each(["hidden", "list"] as const)("marks no row as nested in %s mode", (subtasks) => {

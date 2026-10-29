@@ -268,9 +268,9 @@ describe("Toolbar page actions", () => {
     });
 
     it.each([
-      ["Top-level issues only"],
+      ["Matching issues only"],
       ["Indented below their parent"],
-      ["Separate rows, filtered on their own"],
+      ["Separate rows, grouped on their own"],
     ])("explains each mode with the hint %s", async (hint) => {
       renderToolbar();
 
