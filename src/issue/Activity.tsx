@@ -115,11 +115,6 @@ export function Activity({ id }: { id: string }) {
       <div className="activity__list">
         {shown.length === 0 ? <p className="activity__empty">Nothing here yet.</p> : <ActivityList items={shown} />}
       </div>
-      <div className="activity__composer">
-        <div className="activity__box" aria-disabled="true">
-          Commenting comes later; reply in Jira for now.
-        </div>
-      </div>
     </aside>
   );
 }

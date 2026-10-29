@@ -147,10 +147,11 @@ describe("Activity", () => {
     expect(await screen.findByText("Nothing here yet.")).toBeInTheDocument();
   });
 
-  it("offers a disabled placeholder instead of a comment box", async () => {
+  it("offers no comment box or placeholder about commenting", async () => {
     renderActivity([]);
 
-    expect(screen.getByText(/Commenting comes later/)).toHaveAttribute("aria-disabled", "true");
+    await screen.findByText("Nothing here yet.");
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(screen.queryByText(/commenting|reply in jira/i)).not.toBeInTheDocument();
   });
 });

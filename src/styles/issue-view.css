@@ -112,11 +112,6 @@
 .change-line__text strong { color: var(--text); }
 .change-line__text .status-pill { vertical-align: middle; }
 .change-line__time { padding-top: 3px; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
-.activity__composer { flex: none; padding: 12px 16px 16px; }
-.activity__box {
-  display: flex; align-items: center; height: 44px; padding: 0 14px; box-sizing: border-box; border: 1px solid var(--border);
-  border-radius: 12px; background: var(--panel-bg); font-size: 14px; color: var(--text-muted);
-}
 
 .epic-narrowing { gap: 6px; padding: 0 10px; max-width: 220px; }
 .epic-narrowing__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
