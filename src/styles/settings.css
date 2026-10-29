@@ -175,5 +175,5 @@
 .diagnostic-value[data-tone="warn"] svg { color: var(--banner-warn-dot); }
 .diagnostic-value[data-tone="error"] svg { color: var(--banner-error-dot); }
 .diagnostic-value[data-tone="info"] svg { color: var(--settings-text-tertiary); }
-.settings-row-control:has(.diagnostic-value) { flex: 0 1 auto; min-width: 0; }
+.settings-row-control:has(.diagnostic-value) { flex: 0 1 auto; min-width: 0; margin-left: auto; }
 .settings-row:has(.diagnostic-value) .settings-row-text { flex: none; }
