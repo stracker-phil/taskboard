@@ -682,6 +682,10 @@ widths: { [key in string]: number },
  */
 wrapTitles: boolean, 
 /**
+ * Labels show as tags after the title while the view has no Labels column.
+ */
+inlineLabels: boolean, 
+/**
  * A Board's columns the owner collapsed (true) or expanded (false), by status id; the rest use the
  * default (Done collapsed).
  */

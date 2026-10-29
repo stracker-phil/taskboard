@@ -19,7 +19,9 @@ const FILTERS: { id: Filter; label: string }[] = [
   { id: "changes", label: "Changes" },
 ];
 
-const FIELD_NAMES: Record<string, string> = { status: "status", assignee: "assignee", due_date: "due date", priority: "priority" };
+/** Jira's other field names show lowercased ("Fix Version" → "fix version"). */
+const FIELD_NAMES: Record<string, string> = { due_date: "due date", duedate: "due date" };
+const fieldName = (field: string) => FIELD_NAMES[field] ?? field.toLowerCase();
 
 function Value({ value }: { value: ChangeValue | null }) {
   if (!value) return <strong>none</strong>;
@@ -78,18 +80,29 @@ function CommentCard({ comment, issueId }: { comment: Comment; issueId: string }
   );
 }
 
+type Change = Extract<ActivityItem, { kind: "change" }>;
+
+/** "Created the issue", "Changed status To do → In progress", or without values (long text such as the
+ *  description) "Changed description". After the author's name the verb starts lowercase. */
+function ChangeText({ item, lowercase }: { item: Change; lowercase: boolean }) {
+  const verb = (text: string) => (lowercase ? text.toLowerCase() : text);
+  if (item.field === "created") return <>{verb("Created")} the issue</>;
+  const name = fieldName(item.field);
+  if (item.from === null && item.to === null) return <>{`${verb("Changed")} ${name}`}</>;
+  return (
+    <>
+      {verb("Changed")} {name} <Value value={item.from} /> → <Value value={item.to} />
+    </>
+  );
+}
+
 export function ActivityEntry({ item, issueId }: { item: ActivityItem; issueId: string }) {
   if (item.kind === "comment") return <CommentCard comment={item} issueId={issueId} />;
   return (
     <div className={item.fresh ? "change-line change-line--new" : "change-line"}>
       <span className="change-line__text">
-        {item.field === "created" ? (
-          "Created the issue"
-        ) : (
-          <>
-            Changed {FIELD_NAMES[item.field] ?? item.field} <Value value={item.from} /> → <Value value={item.to} />
-          </>
-        )}
+        {item.author && <strong>{item.author.name} </strong>}
+        <ChangeText item={item} lowercase={item.author !== null} />
       </span>
       <time className="change-line__time" dateTime={item.at}>
         {formatLocalTime(item.at)}

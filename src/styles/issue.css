@@ -37,6 +37,9 @@
 .epic-chip--5 { background: var(--epic-5-bg); color: var(--epic-5-fg); }
 
 .label-chip { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 6px; font-size: 12px; white-space: nowrap; }
+/* Labels as tags after an issue's title (List and Table, while the view has no Labels column). */
+.row-labels { display: inline-flex; flex: none; gap: 4px; }
+.row-labels .label-chip { height: 18px; padding: 0 6px; border-radius: 5px; font-size: 11px; }
 .label-chip--0 { background: var(--label-neutral-bg); color: var(--label-neutral-fg); }
 .label-chip--1 { background: var(--label-1-bg); color: var(--label-1-fg); }
 .label-chip--2 { background: var(--label-2-bg); color: var(--label-2-fg); }

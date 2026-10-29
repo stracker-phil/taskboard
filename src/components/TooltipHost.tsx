@@ -15,6 +15,7 @@ interface Tip {
 /** Takes an element's `title` over as `data-tooltip`, so macOS's own small, slow tooltip never shows. An
  *  element named only by its title keeps that name as `aria-label`. */
 function adopt(element: Element): string | null {
+  if (cutOff(element)) return element.textContent?.trim() || null;
   const title = element.getAttribute("title");
   if (title) {
     element.removeAttribute("title");
@@ -24,10 +25,32 @@ function adopt(element: Element): string | null {
   return element.getAttribute("data-tooltip");
 }
 
-const owner = (target: EventTarget | null) => (target instanceof Element ? target.closest("[title], [data-tooltip]") : null);
+/** How far up from the pointer a cut-off text is looked for (the text sits in a few wrappers at most). */
+const CUT_OFF_DEPTH = 4;
+
+/** Text that doesn't fit: cut with an ellipsis, or clamped to fewer lines. */
+function cutOff(element: Element): boolean {
+  if (!(element instanceof HTMLElement)) return false;
+  const style = getComputedStyle(element);
+  const clamp = style.getPropertyValue("-webkit-line-clamp");
+  if (style.textOverflow === "ellipsis" && element.scrollWidth > element.clientWidth) return true;
+  return clamp !== "" && clamp !== "none" && element.scrollHeight > element.clientHeight;
+}
+
+function cutOffAround(target: Element): Element | null {
+  let element: Element | null = target;
+  for (let depth = 0; element && depth < CUT_OFF_DEPTH; depth += 1, element = element.parentElement) {
+    if (cutOff(element)) return element;
+  }
+  return null;
+}
+
+/** The element whose tooltip shows: a cut-off text shows itself whole, else the nearest title. */
+const owner = (target: EventTarget | null) =>
+  target instanceof Element ? (cutOffAround(target) ?? target.closest("[title], [data-tooltip]")) : null;
 
 /** One tooltip for the whole window: styled, after a short rest, at once while moving between controls, and on
- *  keyboard focus. Any element with a `title` gets it. */
+ *  keyboard focus. Any element with a `title` gets it, and any text cut off with an ellipsis shows in full. */
 export function TooltipHost() {
   const [tip, setTip] = useState<Tip | null>(null);
 

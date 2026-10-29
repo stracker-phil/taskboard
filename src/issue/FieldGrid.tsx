@@ -54,7 +54,7 @@ export function FieldGrid({ issue, onOpenEpic }: { issue: IssueDetail; onOpenEpi
           {issue.epic ? (
             <button type="button" className={`epic-chip epic-chip--detail epic-chip--${issue.epic.color}`} onClick={() => onOpenEpic(issue.epic!.id)}>
               <Zap size={12} strokeWidth={2.4} aria-hidden="true" />
-              {issue.epic.name}
+              <span className="epic-chip__name">{issue.epic.name}</span>
             </button>
           ) : (
             NONE

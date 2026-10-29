@@ -6,6 +6,7 @@ import { PriorityFlag } from "../../components/issue/PriorityFlag";
 import { StatusPill } from "../../components/issue/StatusPill";
 import { STYLE_NAMES } from "../../components/issue/styleNames";
 import { EMPTY, FONT, type MeasureText, widthOf } from "./measure";
+import { LabelChips } from "../../components/issue/LabelChips";
 
 /** A view column: how a row fills it, how wide that draws (the List sizes columns to their content), and the
  *  Table's starting width. */
@@ -54,15 +55,7 @@ const STANDARD: Record<string, ColumnDef> = {
   },
   labels: {
     width: 120,
-    cell: (row) => (
-      <span className="list-cell--labels">
-        {row.labels.map((label) => (
-          <span key={label.name} className={`label-chip label-chip--${label.tint}`}>
-            {label.name}
-          </span>
-        ))}
-      </span>
-    ),
+    cell: (row) => <LabelChips labels={row.labels} className="list-cell--labels" />,
     measure: (row, m) => widthOf.labels(m, row.labels.map((l) => l.name)),
   },
   sprint: {

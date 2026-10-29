@@ -165,6 +165,27 @@ describe("ListView", () => {
 
       expect(place()).toMatchObject({ selectedId: "2", peekOpen: true });
     });
+
+    it("asks Rust to sync the history and web links of the clicked row", async () => {
+      await renderList(viewData([groupOf([OPEN, DONE])], [OPEN, DONE]));
+
+      await userEvent.click(await screen.findByText("Publish the launch notes"));
+
+      expect(mocked.issueSyncHistory).toHaveBeenCalledWith("2");
+      expect(mocked.issueSyncWebLinks).toHaveBeenCalledWith("2");
+    });
+
+    it("shows no toast when syncing the history and web links fails", async () => {
+      mocked.issueSyncHistory.mockRejectedValue({ kind: "network", message: "Offline", code: null });
+      mocked.issueSyncWebLinks.mockRejectedValue({ kind: "network", message: "Offline", code: null });
+      await renderList(viewData([groupOf([OPEN, DONE])], [OPEN, DONE]));
+
+      await userEvent.click(await screen.findByText("Publish the launch notes"));
+
+      await waitFor(() => expect(mocked.issueSyncWebLinks).toHaveBeenCalled());
+      expect(screen.getByRole("row", { name: /NW-1001/ })).toHaveAttribute("aria-selected", "true");
+      expect(useStore.getState().toasts).toEqual([]);
+    });
   });
 
   describe("opening an issue by click", () => {
@@ -233,6 +254,42 @@ describe("ListView", () => {
       renderWith(false);
 
       expect(await screen.findByRole("row", { name: /NW-1042/ })).not.toHaveClass("list-row--wrap");
+    });
+  });
+
+  describe("inline labels", () => {
+    const LABELLED = row({ id: "5", key: "NW-1005", summary: "Update the footer", labels: [{ name: "launch", tint: 1 }] });
+    const renderWith = async (inlineLabels: boolean | undefined, columns: string[]) => {
+      mocked.viewRows.mockResolvedValue(viewData([groupOf([LABELLED])], [LABELLED], { columns }));
+      render(
+        <QueryClientProvider client={createQueryClient()}>
+          <ListView listId={11} viewId={101} inlineLabels={inlineLabels} />
+        </QueryClientProvider>,
+      );
+      const issue = await screen.findByRole("row", { name: /NW-1005/ });
+      return within(issue).getAllByRole("gridcell");
+    };
+
+    it.each([
+      ["by default", undefined],
+      ["when inline labels are on", true],
+    ])("shows the labels after the title %s", async (_, inlineLabels) => {
+      const [title] = await renderWith(inlineLabels, []);
+
+      expect(within(title).getByText("launch")).toBeInTheDocument();
+    });
+
+    it("shows no labels after the title when inline labels are off", async () => {
+      await renderWith(false, []);
+
+      expect(screen.queryByText("launch")).not.toBeInTheDocument();
+    });
+
+    it("shows the labels only in the Labels column when the view has it", async () => {
+      const [title, labels] = await renderWith(true, ["labels"]);
+
+      expect(within(title).queryByText("launch")).not.toBeInTheDocument();
+      expect(within(labels).getByText("launch")).toBeInTheDocument();
     });
   });
 

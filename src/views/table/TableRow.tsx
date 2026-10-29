@@ -1,6 +1,7 @@
 import type { Row } from "../../api";
 import { StatusSquare } from "../../components/issue/StatusSquare";
 import { columnDef } from "../list/columns";
+import { LabelChips } from "../../components/issue/LabelChips";
 
 interface Props {
   row: Row;
@@ -8,10 +9,12 @@ interface Props {
   widthOf: (id: string) => number;
   selected: boolean;
   onSelect: (id: string) => void;
+  /** The labels as tags after the summary. */
+  inlineLabels?: boolean;
 }
 
 /** One issue: key, summary, status, then the view's cells. */
-export function TableRow({ row, columns, widthOf, selected, onSelect }: Props) {
+export function TableRow({ row, columns, widthOf, inlineLabels = false, selected, onSelect }: Props) {
   const className = ["table-row", row.changed && "table-row--changed", selected && "table-row--selected"].filter(Boolean).join(" ");
   return (
     <div className={className} role="row" aria-selected={selected} data-issue-id={row.id} onClick={() => onSelect(row.id)}>
@@ -19,7 +22,8 @@ export function TableRow({ row, columns, widthOf, selected, onSelect }: Props) {
         {row.key}
       </span>
       <span className="table-row__cell table-row__summary" role="gridcell">
-        {row.summary}
+        <span className="table-row__title">{row.summary}</span>
+        {inlineLabels && <LabelChips labels={row.labels} className="row-labels" />}
       </span>
       <span className="table-row__cell table-row__status" role="gridcell" style={{ width: widthOf("status") }}>
         <StatusSquare style={row.style} />

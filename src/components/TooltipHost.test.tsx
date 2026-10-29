@@ -111,6 +111,119 @@ describe("TooltipHost", () => {
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   });
 
+  describe("text cut off with an ellipsis", () => {
+    const TITLE = "A very long issue title that does not fit";
+
+    /** jsdom has no layout: the element reports the widths a browser would give it. */
+    function ellipsis(element: HTMLElement, scrollWidth: number, clientWidth: number) {
+      element.style.textOverflow = "ellipsis";
+      Object.defineProperty(element, "scrollWidth", { configurable: true, value: scrollWidth });
+      Object.defineProperty(element, "clientWidth", { configurable: true, value: clientWidth });
+      return element;
+    }
+
+    const hover = async (element: Element) => {
+      fireEvent.pointerOver(element);
+      await wait(450);
+    };
+
+    it("shows its full text as the tooltip", async () => {
+      render(
+        <>
+          <span>{TITLE}</span>
+          <TooltipHost />
+        </>,
+      );
+
+      await hover(ellipsis(screen.getByText(TITLE), 300, 100));
+
+      expect(screen.getByRole("tooltip")).toHaveTextContent(TITLE);
+    });
+
+    it("shows no tooltip when the text fits", async () => {
+      render(
+        <>
+          <span>{TITLE}</span>
+          <TooltipHost />
+        </>,
+      );
+
+      await hover(ellipsis(screen.getByText(TITLE), 100, 100));
+
+      expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    });
+
+    it("takes precedence over a title around it", async () => {
+      render(
+        <>
+          <button type="button" title="Open the issue">
+            <span>{TITLE}</span>
+          </button>
+          <TooltipHost />
+        </>,
+      );
+
+      await hover(ellipsis(screen.getByText(TITLE), 300, 100));
+
+      expect(screen.getByRole("tooltip")).toHaveTextContent(TITLE);
+    });
+
+    it("falls back to the title when the text fits", async () => {
+      render(
+        <>
+          <button type="button" title="Open the issue">
+            <span>{TITLE}</span>
+          </button>
+          <TooltipHost />
+        </>,
+      );
+
+      await hover(ellipsis(screen.getByText(TITLE), 100, 100));
+
+      expect(screen.getByRole("tooltip")).toHaveTextContent("Open the issue");
+    });
+
+    it("shows the cut-off text when the pointer is on an element inside it", async () => {
+      render(
+        <>
+          <span>
+            <b>Bold</b> {TITLE}
+          </span>
+          <TooltipHost />
+        </>,
+      );
+      const bold = screen.getByText("Bold");
+      ellipsis(bold.parentElement!, 300, 100);
+
+      await hover(bold);
+
+      expect(screen.getByRole("tooltip")).toHaveTextContent(`Bold ${TITLE}`);
+    });
+
+    it("ignores a cut-off text more than three levels above the pointer", async () => {
+      render(
+        <>
+          <div>
+            <div>
+              <div>
+                <div>
+                  <i>Deep</i>
+                </div>
+              </div>
+            </div>
+          </div>
+          <TooltipHost />
+        </>,
+      );
+      const deep = screen.getByText("Deep");
+      ellipsis(deep.parentElement!.parentElement!.parentElement!.parentElement!, 300, 100);
+
+      await hover(deep);
+
+      expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    });
+  });
+
   it.each([
     ["a press", (el: HTMLElement) => fireEvent.pointerDown(el)],
     ["a key", (el: HTMLElement) => fireEvent.keyDown(el, { key: "a" })],

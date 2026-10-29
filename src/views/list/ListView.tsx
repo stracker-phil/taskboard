@@ -3,7 +3,7 @@ import { type CSSProperties, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import type { Column, Group, IssueOpening, Narrowing, ViewData, ViewPlace } from "../../api";
 import { onIssueKeys } from "../../commands/issueKeys";
 import { EmptyLevel } from "../../shell/EmptyLevel";
-import { prefetchIssue } from "../../queries/issues";
+import { prefetchIssue, refreshIssueExtras } from "../../queries/issues";
 import { useColumnsCatalogue, useViewRows } from "../../queries/views";
 import { narrowingKey } from "../../state/slices/narrowing";
 import { useStore } from "../../state/store";
@@ -27,15 +27,17 @@ interface Props {
   wrapTitles?: boolean;
   /** What a click opens; none follows Settings → General. */
   openWith?: IssueOpening | null;
+  /** Labels as tags after the title, unless the view has a Labels column. */
+  inlineLabels?: boolean;
 }
 
 /** The List layout: each group a card under its tab, virtualised. */
-export function ListView({ listId, viewId, narrowing, wrapTitles = true, openWith = null }: Props) {
+export function ListView({ listId, viewId, narrowing, wrapTitles = true, openWith = null, inlineLabels = true }: Props) {
   const { data } = useViewRows(listId, viewId, narrowing);
   const opening = useIssueOpening(openWith);
   if (!data) return null;
   if (Object.keys(data.rows).length === 0) return <EmptyLevel listId={listId} viewId={viewId} />;
-  return <Rows key={`${listId}:${viewId}`} listId={listId} viewId={viewId} data={data} wrapTitles={wrapTitles} opening={opening} />;
+  return <Rows key={`${listId}:${viewId}`} listId={listId} viewId={viewId} data={data} wrapTitles={wrapTitles} opening={opening} inlineLabels={inlineLabels && !data.columns.includes("labels")} />;
 }
 
 const measure = canvasMeasure();
@@ -52,7 +54,16 @@ function itemClass(item: Item): string {
 }
 
 /** Keyed by the view; its open groups, scroll, selection and peek come from the view's remembered place. */
-function Rows({ listId, viewId, data, wrapTitles, opening }: { listId: number; viewId: number; data: ViewData; wrapTitles: boolean; opening: IssueOpening }) {
+interface RowsProps {
+  listId: number;
+  viewId: number;
+  data: ViewData;
+  wrapTitles: boolean;
+  opening: IssueOpening;
+  inlineLabels: boolean;
+}
+
+function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const placeKey = narrowingKey(listId, viewId);
   const loaded = useStore((s) => placeKey in s.places);
@@ -105,6 +116,7 @@ function Rows({ listId, viewId, data, wrapTitles, opening }: { listId: number; v
   const rowIds = items.flatMap((item) => (item.kind === "row" ? [item.row.id] : []));
   const select = (id: string, openPeek: boolean) => {
     setPlace({ selectedId: id, peekOpen: openPeek });
+    refreshIssueExtras(id);
     const at = rowIds.indexOf(id);
     for (const neighbour of [rowIds[at - 1], rowIds[at + 1]]) if (neighbour) prefetchIssue(client, neighbour);
   };
@@ -209,6 +221,7 @@ function Rows({ listId, viewId, data, wrapTitles, opening }: { listId: number; v
                   columns={columns}
                   position={item.position}
                   wrap={wrapTitles}
+                  inlineLabels={inlineLabels}
                   selected={selected === item.row.id}
                   onSelect={(id) => {
                     select(id, opening === "preview");

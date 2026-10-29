@@ -31,8 +31,8 @@ use taskboard_lib::test_support::{FakeSecrets, temp_config_dir};
 use taskboard_lib::views::{
     DEFAULT_COLUMNS, GroupBy, IssueOpening, Layout, Sort, SortBy, View, space_default_columns,
     view_create, view_delete, view_duplicate, view_move, view_rename, view_set_column_collapsed,
-    view_set_columns, view_set_group, view_set_layout, view_set_look, view_set_open_with,
-    view_set_sort, view_set_widths, view_set_wrap, views_of,
+    view_set_columns, view_set_group, view_set_inline_labels, view_set_layout, view_set_look,
+    view_set_open_with, view_set_sort, view_set_widths, view_set_wrap, views_of,
 };
 
 const ME_ACCOUNT_ID: &str = "712020:5a1e0c3f-8d2b-4f61-9c7e-1b2a3c4d5e01";
@@ -1892,6 +1892,7 @@ mod editing_views {
                 "sort": { "by": "updated", "descending": true },
                 "widths": {},
                 "wrapTitles": true,
+                "inlineLabels": true,
                 "collapsed": {},
                 "openWith": null,
                 "icon": null,
@@ -1948,6 +1949,53 @@ mod editing_views {
 
         assert!(!copy.wrap_titles);
         assert!(!views_of(&db, copied_list).await.unwrap()[0].wrap_titles);
+    }
+
+    #[tokio::test]
+    async fn a_new_view_shows_labels_inline() {
+        let (_dir, db) = tracked_lab().await;
+
+        assert!(space_views(&db).await.iter().all(|view| view.inline_labels));
+    }
+
+    #[tokio::test]
+    async fn the_inline_labels_setting_is_stored_per_view_and_read_back_with_the_tabs() {
+        let (_dir, db) = tracked_lab().await;
+        let views = space_views(&db).await;
+
+        let table = view_set_inline_labels(&db, views[2].id, false)
+            .await
+            .unwrap();
+
+        assert!(!table.inline_labels);
+        let after = space_views(&db).await;
+        assert!(!after[2].inline_labels);
+        assert!(after[0].inline_labels);
+
+        let back = view_set_inline_labels(&db, views[2].id, true)
+            .await
+            .unwrap();
+        assert!(back.inline_labels);
+    }
+
+    #[tokio::test]
+    async fn inline_labels_of_an_unknown_view_is_not_found() {
+        let (_dir, db) = tracked_lab().await;
+
+        let err = view_set_inline_labels(&db, 9999, false).await.unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::NotFound);
+    }
+
+    #[tokio::test]
+    async fn a_duplicate_view_keeps_the_inline_labels_setting() {
+        let (_dir, db) = tracked_lab().await;
+        let table = space_views(&db).await[2].id;
+        view_set_inline_labels(&db, table, false).await.unwrap();
+
+        let copy = view_duplicate(&db, table).await.unwrap();
+
+        assert!(!copy.inline_labels);
     }
 
     #[tokio::test]

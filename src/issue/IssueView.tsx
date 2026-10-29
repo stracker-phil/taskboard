@@ -5,7 +5,7 @@ import { onIssueKeys } from "../commands/issueKeys";
 import { SpaceTile } from "../components/SpaceTile";
 import { hasContent } from "../lib/jiraHtml";
 import { formatLocalTime } from "../lib/time";
-import { useIssue, useIssueRelated } from "../queries/issues";
+import { refreshIssueExtras, useIssue, useIssueRelated } from "../queries/issues";
 import { useNavGo, useSidebar, useViews } from "../queries/sidebar";
 import { useViewRows } from "../queries/views";
 import { findLevel, spaceOf } from "../shell/levels";
@@ -45,6 +45,7 @@ export function IssueView({ id, origin }: { id: string; origin: IssueOrigin }) {
   useEffect(() => {
     // Comments may be newer in Jira than in the cache; a failure (offline) leaves the cached ones.
     void api.issueSyncComments(id).catch(() => {});
+    refreshIssueExtras(id);
   }, [id]);
 
   return (

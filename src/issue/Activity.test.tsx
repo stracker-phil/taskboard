@@ -64,6 +64,57 @@ describe("Activity", () => {
     expect(await screen.findByText("Created the issue")).toBeInTheDocument();
   });
 
+  describe("change lines", () => {
+    const text = (value: string) => ({ kind: "text" as const, value });
+
+    it("starts with the author's name in bold and continues in lowercase", async () => {
+      renderActivity([changeItem({ author: SAM })]);
+
+      const author = await screen.findByText("Sam Lee");
+      expect(author.tagName).toBe("STRONG");
+      expect(author.parentElement).toHaveTextContent("Sam Lee changed status In Review → Done");
+    });
+
+    it("starts with a capital Changed when the author is unknown", async () => {
+      renderActivity([changeItem({ author: null })]);
+
+      expect(await screen.findByText(/Changed status/)).toHaveTextContent("Changed status In Review → Done");
+    });
+
+    it("names the author who created the issue", async () => {
+      renderActivity([changeItem({ field: "created", from: null, to: null, author: ALEX })]);
+
+      const author = await screen.findByText("Alex Morgan");
+      expect(author.parentElement).toHaveTextContent("Alex Morgan created the issue");
+    });
+
+    it("names the author of a change without values and shows no none", async () => {
+      renderActivity([changeItem({ field: "description", from: null, to: null, author: ALEX })]);
+
+      const author = await screen.findByText("Alex Morgan");
+      expect(author.parentElement).toHaveTextContent(/^Alex Morgan changed description$/);
+    });
+
+    it("says Changed description without an author and without values", async () => {
+      renderActivity([changeItem({ field: "description", from: null, to: null, author: null })]);
+
+      const line = await screen.findByText("Changed description");
+      expect(line).not.toHaveTextContent("none");
+    });
+
+    it.each([
+      ["due_date", "due date"],
+      ["duedate", "due date"],
+      ["Fix Version", "fix version"],
+      ["status", "status"],
+      ["assignee", "assignee"],
+    ])("shows the field %s as %s", async (field, shown) => {
+      renderActivity([changeItem({ field, from: text("a"), to: text("b"), author: null })]);
+
+      expect(await screen.findByText(`Changed ${shown}`, { exact: false })).toHaveTextContent(`Changed ${shown} a → b`);
+    });
+  });
+
   it("lists the items in the order received, newest first", async () => {
     renderActivity([changeItem(), commentItem({ id: "1", author: SAM }), created()]);
 

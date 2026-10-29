@@ -224,6 +224,33 @@ describe("TableView", () => {
       expect(issue).toHaveTextContent("Done");
     });
 
+    describe("labels", () => {
+      const LABELLED = row({ id: "5", key: "NW-1005", summary: "Update the footer", labels: [{ name: "launch", tint: 1 }] });
+      const renderLabelled = async (inlineLabels: boolean, columns: string[]) => {
+        await renderTable(viewData([groupOf([LABELLED])], [LABELLED], { columns, groupBy: "none" }), view({ layout: "table", inlineLabels }));
+        return within(screen.getByRole("row", { name: /NW-1005/ })).getAllByRole("gridcell");
+      };
+
+      it("shows them after the title when the view shows labels inline", async () => {
+        const [, title] = await renderLabelled(true, []);
+
+        expect(within(title).getByText("launch")).toBeInTheDocument();
+      });
+
+      it("shows none when inline labels are off", async () => {
+        await renderLabelled(false, []);
+
+        expect(screen.queryByText("launch")).not.toBeInTheDocument();
+      });
+
+      it("shows them only in the Labels column when the view has it", async () => {
+        const [, title, , labels] = await renderLabelled(true, ["labels"]);
+
+        expect(within(title).queryByText("launch")).not.toBeInTheDocument();
+        expect(within(labels).getByText("launch")).toBeInTheDocument();
+      });
+    });
+
     it("selects the row that is clicked", async () => {
       await renderTable();
 
@@ -231,6 +258,26 @@ describe("TableView", () => {
 
       expect(screen.getByRole("row", { name: /NW-1001/ })).toHaveAttribute("aria-selected", "true");
       expect(screen.getByRole("row", { name: /NW-1042/ })).toHaveAttribute("aria-selected", "false");
+    });
+
+    it("asks Rust to sync the history and web links of the clicked row", async () => {
+      await renderTable();
+
+      await userEvent.click(await screen.findByText("Publish the launch notes"));
+
+      expect(mocked.issueSyncHistory).toHaveBeenCalledWith("2");
+      expect(mocked.issueSyncWebLinks).toHaveBeenCalledWith("2");
+    });
+
+    it("shows no toast when syncing the history and web links fails", async () => {
+      mocked.issueSyncHistory.mockRejectedValue({ kind: "network", message: "Offline", code: null });
+      mocked.issueSyncWebLinks.mockRejectedValue({ kind: "network", message: "Offline", code: null });
+      await renderTable();
+
+      await userEvent.click(await screen.findByText("Publish the launch notes"));
+
+      await waitFor(() => expect(mocked.issueSyncWebLinks).toHaveBeenCalled());
+      expect(useStore.getState().toasts).toEqual([]);
     });
 
     it("opens the preview of the clicked row when the view opens with the preview", async () => {

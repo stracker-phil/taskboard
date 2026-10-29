@@ -16,3 +16,11 @@ export const useIssue = (id: string | null) =>
 /** Loads an issue ahead, so moving to it shows it without a loading frame. */
 export const prefetchIssue = (client: QueryClient, id: string) =>
   void client.prefetchQuery({ queryKey: issueKey(id), queryFn: () => api.issueGet(id) });
+
+/** Asks Rust to catch up on the issue's Jira history and web links, each at most every 5 minutes; a change comes
+ *  back as `issues_changed`. Selecting a row starts it, so opening the issue finds them fresh. A failure
+ *  (offline) keeps the cached ones. */
+export function refreshIssueExtras(id: string) {
+  void api.issueSyncHistory(id).catch(() => {});
+  void api.issueSyncWebLinks(id).catch(() => {});
+}

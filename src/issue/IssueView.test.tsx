@@ -283,6 +283,23 @@ describe("IssueView", () => {
       await waitFor(() => expect(mocked.issueSyncComments).toHaveBeenCalledWith("10042"));
     });
 
+    it("asks Rust to sync the issue's history and web links", async () => {
+      renderIssue();
+
+      await waitFor(() => expect(mocked.issueSyncHistory).toHaveBeenCalledWith("10042"));
+      expect(mocked.issueSyncWebLinks).toHaveBeenCalledWith("10042");
+    });
+
+    it("shows no toast when the history and web link syncs fail", async () => {
+      mocked.issueSyncHistory.mockRejectedValue({ kind: "network", message: "Offline", code: null });
+      mocked.issueSyncWebLinks.mockRejectedValue({ kind: "network", message: "Offline", code: null });
+      renderIssue();
+
+      expect(await title("Checkout: address validation for DACH postcodes")).toBeInTheDocument();
+      await waitFor(() => expect(mocked.issueSyncHistory).toHaveBeenCalled());
+      expect(useStore.getState().toasts).toEqual([]);
+    });
+
     it("keeps showing the cached issue when the comment sync fails", async () => {
       mocked.issueSyncComments.mockRejectedValue({ kind: "network", message: "Offline", code: null });
       renderIssue();

@@ -1,4 +1,5 @@
-//! How a view shows beyond columns and grouping: wrapped titles, where a click opens an issue, its tab's look.
+//! How a view shows beyond columns and grouping: wrapped titles, inline labels, where a click opens an issue,
+//! its tab's look.
 
 use rusqlite::{Connection, params};
 
@@ -12,6 +13,14 @@ pub(super) fn write_wrap(conn: &Connection, id: i64, wrap: bool) -> AppResult<()
     conn.execute(
         "UPDATE view SET wrap_titles = ?2 WHERE id = ?1",
         params![id, wrap],
+    )?;
+    Ok(())
+}
+
+pub(super) fn write_inline_labels(conn: &Connection, id: i64, inline: bool) -> AppResult<()> {
+    conn.execute(
+        "UPDATE view SET inline_labels = ?2 WHERE id = ?1",
+        params![id, inline],
     )?;
     Ok(())
 }
@@ -30,6 +39,10 @@ pub(super) fn write_open_with(
 
 pub async fn view_set_wrap(db: &Db, id: i64, wrap: bool) -> AppResult<View> {
     edit(db, id, move |conn| write_wrap(conn, id, wrap)).await
+}
+
+pub async fn view_set_inline_labels(db: &Db, id: i64, inline: bool) -> AppResult<View> {
+    edit(db, id, move |conn| write_inline_labels(conn, id, inline)).await
 }
 
 /// None follows Settings → General.

@@ -14,7 +14,7 @@ import { useViewEdit } from "./useViewEdit";
 
 const HINTS: Record<string, string> = { epic: "parent", release: "fix version" };
 /** The popover names the due column in full; the column header stays short. */
-const LABELS: Record<string, string> = { due: "Due date" };
+const LABELS: Record<string, string> = { due: "Due date", labels: "Labels (column)" };
 
 type Opening = IssueOpening | "default";
 const OPENINGS: Opening[] = ["default", "preview", "full"];
@@ -65,6 +65,18 @@ export function ColumnsPopover({ view, spaceProjectId, anchor, onClose }: Props)
         <span className="popover__meta">View: {view.name}</span>
       </div>
       {view.layout !== "board" && <OpenWith view={view} onChange={(openWith) => edit(api.viewSetOpenWith(view.id, openWith), "Could not change how issues open")} />}
+      {view.layout !== "board" && (
+        <button
+          type="button"
+          className="column-row columns-popover__wrap"
+          aria-pressed={view.inlineLabels}
+          onClick={() => edit(api.viewSetInlineLabels(view.id, !view.inlineLabels), "Could not change how labels show")}
+        >
+          <span className="column-row__label">Labels (inline)</span>
+          <span className="column-row__hint">{view.columns.includes("labels") ? "off while the column shows" : "after the title"}</span>
+          <Toggle on={view.inlineLabels} />
+        </button>
+      )}
       {view.layout === "list" && (
         <button
           type="button"

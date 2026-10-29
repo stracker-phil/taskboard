@@ -87,6 +87,7 @@ fn view(id: i64, name: &str, layout: Layout, is_default: bool) -> View {
         sort: Sort::default(),
         widths: Default::default(),
         wrap_titles: false,
+        inline_labels: true,
         collapsed: Default::default(),
         open_with: None,
         icon: None,

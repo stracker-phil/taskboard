@@ -1,6 +1,7 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Group, Narrowing, View, ViewData } from "../../api";
+import { refreshIssueExtras } from "../../queries/issues";
 import { useViewRows } from "../../queries/views";
 import { useStore } from "../../state/store";
 import { EmptyLevel } from "../../shell/EmptyLevel";
@@ -51,6 +52,7 @@ function Table({ view, data }: { view: View; data: ViewData }) {
   const openIssue = useStore((s) => s.openIssue);
   const select = (id: string) => {
     setSelected(id);
+    refreshIssueExtras(id);
     if (opening === "full") openIssue(id, { listId: view.listId, viewId: view.id });
     else updatePlace(view.listId, view.id, { selectedId: id, peekOpen: true });
   };
@@ -58,6 +60,7 @@ function Table({ view, data }: { view: View; data: ViewData }) {
   const widthOf = (id: string) => resize.liveWidth(id) ?? columnWidth(id, view.widths);
   // The Table always has its own Status column; a view's Status column would repeat it.
   const columns = data.columns.filter((id) => id !== "status");
+  const inlineLabels = view.inlineLabels && !data.columns.includes("labels");
   const headerColumns = ["key", "summary", "status", ...columns];
   const minWidth = headerColumns.reduce((sum, id) => sum + (id === "summary" ? SUMMARY_MIN_WIDTH : widthOf(id)), 2 * SIDE_PADDING);
 
@@ -125,7 +128,7 @@ function Table({ view, data }: { view: View; data: ViewData }) {
                     onToggle={() => toggle(item.group)}
                   />
                 ) : (
-                  <TableRow row={item.row} columns={columns} widthOf={widthOf} selected={selected === item.row.id} onSelect={select} />
+                  <TableRow row={item.row} columns={columns} widthOf={widthOf} selected={selected === item.row.id} onSelect={select} inlineLabels={inlineLabels} />
                 )}
               </div>
             );

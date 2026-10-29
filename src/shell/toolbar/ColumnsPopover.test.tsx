@@ -84,13 +84,13 @@ describe("ColumnsPopover", () => {
     const popover = await openColumns();
 
     expect(within(popover).getByRole("button", { name: "Assignee" })).toHaveAttribute("aria-pressed", "true");
-    expect(within(popover).getByRole("button", { name: "Labels" })).toHaveAttribute("aria-pressed", "false");
+    expect(within(popover).getByRole("button", { name: "Labels (column)" })).toHaveAttribute("aria-pressed", "false");
   });
 
   it("saves the view's columns with the toggled-on column added", async () => {
     const popover = await openColumns();
 
-    await userEvent.click(within(popover).getByRole("button", { name: "Labels" }));
+    await userEvent.click(within(popover).getByRole("button", { name: "Labels (column)" }));
 
     expect(mocked.viewSetColumns).toHaveBeenCalledWith(101, ["assignee", "priority", "labels"]);
   });
@@ -107,7 +107,7 @@ describe("ColumnsPopover", () => {
     mocked.viewSetColumns.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
     const popover = await openColumns();
 
-    await userEvent.click(within(popover).getByRole("button", { name: "Labels" }));
+    await userEvent.click(within(popover).getByRole("button", { name: "Labels (column)" }));
 
     await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not change the columns: Disk full"));
   });
@@ -158,6 +158,59 @@ describe("ColumnsPopover", () => {
       const popover = await openColumns(view({ layout }));
 
       expect(within(popover).queryByRole("button", { name: /^Wrap long titles/ })).not.toBeInTheDocument();
+    });
+  });
+
+  describe("Labels (inline)", () => {
+    it("is on, with the hint after the title, for a view that shows labels inline", async () => {
+      const popover = await openColumns(view({ inlineLabels: true }));
+
+      expect(within(popover).getByRole("button", { name: /^Labels \(inline\) ?after the title$/ })).toHaveAttribute("aria-pressed", "true");
+    });
+
+    it("is off for a view that does not show labels inline", async () => {
+      const popover = await openColumns(view({ inlineLabels: false }));
+
+      expect(within(popover).getByRole("button", { name: /^Labels \(inline\)/ })).toHaveAttribute("aria-pressed", "false");
+    });
+
+    it("says it is off while the Labels column shows", async () => {
+      const popover = await openColumns(view({ columns: ["labels"] }));
+
+      expect(within(popover).getByRole("button", { name: /^Labels \(inline\) ?off while the column shows$/ })).toBeInTheDocument();
+    });
+
+    it.each([
+      [true, false],
+      [false, true],
+    ])("saves the opposite of the current setting (%s -> %s)", async (current, next) => {
+      mocked.viewSetInlineLabels.mockResolvedValue(view({ inlineLabels: next }));
+      const popover = await openColumns(view({ inlineLabels: current }));
+
+      await userEvent.click(within(popover).getByRole("button", { name: /^Labels \(inline\)/ }));
+
+      expect(mocked.viewSetInlineLabels).toHaveBeenCalledWith(101, next);
+    });
+
+    it("shows a toast when the setting cannot be saved", async () => {
+      mocked.viewSetInlineLabels.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
+      const popover = await openColumns();
+
+      await userEvent.click(within(popover).getByRole("button", { name: /^Labels \(inline\)/ }));
+
+      await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not change how labels show: Disk full"));
+    });
+
+    it.each(["list", "table"] as const)("is offered in a %s view", async (layout) => {
+      const popover = await openColumns(view({ layout }));
+
+      expect(within(popover).getByRole("button", { name: /^Labels \(inline\)/ })).toBeInTheDocument();
+    });
+
+    it("is not offered in a board view", async () => {
+      const popover = await openColumns(view({ layout: "board" }));
+
+      expect(within(popover).queryByRole("button", { name: /^Labels \(inline\)/ })).not.toBeInTheDocument();
     });
   });
 
@@ -250,7 +303,7 @@ describe("ColumnsPopover", () => {
 
       expect(within(popover).getByRole("button", { name: expected })).toBeInTheDocument();
       expect(within(popover).queryByRole("button", { name: "Assignee" })).not.toBeInTheDocument();
-      expect(within(popover).queryByRole("button", { name: "Labels" })).not.toBeInTheDocument();
+      expect(within(popover).queryByRole("button", { name: "Labels (column)" })).not.toBeInTheDocument();
     });
 
     it("drops the section header of a section without matches", async () => {

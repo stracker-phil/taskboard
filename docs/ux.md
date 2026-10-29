@@ -158,6 +158,9 @@ one group, Board column or pill per style, whatever the status is called; the Bo
   the cells. Long titles wrap onto more lines by default and the row grows (each row is measured); "Wrap long
   titles" in the Columns popover turns that off per view, and titles truncate instead (`view.wrap_titles`). The
   Table always truncates at a fixed row height; Board cards always wrap. A clicked row is selected (`--selection-bg`).
+- An issue's labels show as small tags (`row-labels`, 18px `label-chip`s) after its title in the List and the
+  Table, unless the view has the Labels column. The Columns popover lists the column as "Labels (column)" and
+  has a "Labels (inline)" switch (`view.inline_labels`, on by default) for List and Table views.
 - Rows are virtualised (`@tanstack/react-virtual`): a card is drawn from its pieces (the header item, then
   rows that know whether they are first, middle, last or the only one).
 
@@ -291,7 +294,12 @@ view with its place intact).
 - Activity (400 wide by default, 300–720 by dragging its left edge or ←/→ on the focused edge; saved in
   `ui_state.json` `activityWidth` for every issue, `useActivityWidth`; `--panel-subtle-bg`): All / Comments / Changes, comment cards and change lines (status
   changes as activity pills), newest first; the comment box waits for writes. Opening an issue fetches its
-  comments when the cached ones may be behind (`issue_sync_comments`).
+  comments when the cached ones may be behind (`issue_sync_comments`). Change lines come from Jira's changelog
+  ([ADR 0031](adr/0031-issue-history-comes-from-the-changelog-on-demand.md)) and the sync's own records: "<Author>
+  changed priority Medium → High", "Changed description" for long text without values, other fields by their
+  Jira name in lowercase. Selecting a row (List, Table) or opening an issue asks Rust to fetch the history and
+  the web links (`refreshIssueExtras`; each at most every 5 minutes), so they are usually there by the time the
+  issue opens.
 - Jira's HTML is sanitised (`lib/jiraHtml.ts`, [ADR 0027](adr/0027-jira-html-is-sanitised-and-shows-no-remote-content.md)):
   links open in the browser, images become link chips. The preview shows the same description and the latest
   three activity items.
@@ -311,7 +319,9 @@ a button. Only descriptions, comment bodies, bookmark reasons and empty-state te
 `components/TooltipHost.tsx`, mounted once per window, replaces the native tooltip: it takes any `title` over
 as `data-tooltip` (an icon-only control keeps it as its `aria-label`) and shows a `--tooltip-bg` bubble below
 the control (above when there's no room) after 450 ms, at once while moving between controls within 600 ms,
-and on keyboard focus. A press, a key, the wheel or leaving hides it.
+and on keyboard focus. A press, a key, the wheel or leaving hides it. Text cut off with an ellipsis (or
+clamped to fewer lines) shows its whole text the same way, before any `title` around it; so every label that
+can be cut (titles, names, epic chips, breadcrumbs) uses `text-overflow: ellipsis`, never a bare clip.
 
 ## Motion
 

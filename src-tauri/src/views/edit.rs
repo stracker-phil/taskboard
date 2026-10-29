@@ -5,7 +5,7 @@ use std::collections::{BTreeMap, HashSet};
 use rusqlite::types::Value as SqlValue;
 use rusqlite::{Connection, OptionalExtension, Row, params};
 
-use super::display::{write_look, write_open_with, write_wrap};
+use super::display::{write_inline_labels, write_look, write_open_with, write_wrap};
 use super::model::{DEFAULT_COLUMNS, GroupBy, Layout, Sort, SortBy, View, from_text, to_text};
 use crate::db::{Db, LocalPart};
 use crate::error::{AppError, AppResult};
@@ -13,7 +13,7 @@ use crate::lists::{Kind, node};
 use crate::order::Siblings;
 use crate::space_config::{ALL_LAYOUTS, SpaceLayouts, hidden_columns, level_layouts};
 
-const COLUMNS: &str = "id, list_id, name, layout, columns, group_by, sort_by, sort_order, position, is_default, widths, wrap_titles, collapsed, open_with, icon, color";
+const COLUMNS: &str = "id, list_id, name, layout, columns, group_by, sort_by, sort_order, position, is_default, widths, wrap_titles, collapsed, open_with, icon, color, inline_labels";
 
 fn siblings(list_id: i64) -> Siblings<'static> {
     Siblings {
@@ -56,6 +56,7 @@ fn from_row(row: &Row) -> rusqlite::Result<View> {
             .and_then(|text| from_text(&text)),
         icon: row.get(14)?,
         color: row.get(15)?,
+        inline_labels: row.get(16)?,
     })
 }
 
@@ -146,6 +147,7 @@ fn copy_view(conn: &Connection, view: &View, list_id: i64, name: &str) -> AppRes
     write_widths(conn, id, &view.widths)?;
     write_collapsed(conn, id, &view.collapsed)?;
     write_wrap(conn, id, view.wrap_titles)?;
+    write_inline_labels(conn, id, view.inline_labels)?;
     write_open_with(conn, id, view.open_with)?;
     write_look(conn, id, view.icon.as_deref(), view.color.as_deref())?;
     Ok(id)
