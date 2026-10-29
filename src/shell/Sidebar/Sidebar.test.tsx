@@ -5,7 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../../test/apiMock")).createApiMock() }));
 
-import { api, type ListNode, type MenuEntry, type Nav, type SidebarTree, type SpaceNode } from "../../api";
+import { api, type ListNode, type Nav, type SidebarTree, type SpaceNode } from "../../api";
+import { MenuHost } from "../../components/menu";
 import { installCommands, useCommandKeys } from "../../commands";
 import { runPageAction } from "../../commands/pageActions";
 import { createQueryClient } from "../../queries/queryClient";
@@ -75,6 +76,7 @@ async function renderSidebar(tree: SidebarTree = treeWith(), nav: Nav = navAt(nu
       <Sidebar />
       <Toasts />
       <ConfirmHost />
+      <MenuHost />
     </QueryClientProvider>,
   );
   await screen.findByRole("navigation", { name: "Spaces" });
@@ -86,16 +88,8 @@ async function renderSidebar(tree: SidebarTree = treeWith(), nav: Nav = navAt(nu
 const named = (label: string) => new RegExp(`^${label}\\s*(\\d+( unread)?)?$`);
 const spaceButton = (label: string) => screen.getByRole("button", { name: named(label) });
 
-function menuEntry(text: string) {
-  const entries: MenuEntry[] = mocked.popupMenu.mock.calls.at(-1)?.[0] ?? [];
-  return entries.find((e): e is Exclude<MenuEntry, "separator"> => e !== "separator" && e.text === text);
-}
-
-async function chooseFromMenu(text: string) {
-  const entry = menuEntry(text);
-  expect(entry, `menu entry "${text}"`).toBeDefined();
-  await act(async () => entry?.run?.());
-}
+const menuRows = () => within(screen.getByRole("menu")).getAllByRole("menuitem").map((r) => r.textContent);
+const chooseFromMenu = (text: string) => userEvent.click(within(screen.getByRole("menu")).getByRole("menuitem", { name: text }));
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -468,11 +462,10 @@ describe("Sidebar", () => {
 
     it("offers Remove from Home instead of Add to Home and ends the pin", async () => {
       await waitFor(() => {
-        mocked.popupMenu.mockClear();
         fireEvent.contextMenu(screen.getByRole("button", { name: named("Epics") }));
-        expect(menuEntry("Remove from Home")).toBeDefined();
+        expect(screen.getByRole("menuitem", { name: "Remove from Home" })).toBeInTheDocument();
       });
-      expect(menuEntry("Add to Home")).toBeUndefined();
+      expect(screen.queryByRole("menuitem", { name: "Add to Home" })).not.toBeInTheDocument();
 
       await chooseFromMenu("Remove from Home");
 
@@ -486,11 +479,16 @@ describe("Sidebar", () => {
       fireEvent.contextMenu(await screen.findByRole("button", { name: named("Epics") }));
     });
 
-    it("offers Rename, Duplicate, Add to Home and Delete", () => {
-      const entries: MenuEntry[] = mocked.popupMenu.mock.calls[0][0];
+    it("opens a menu named after the list with Rename, Icon and Color, Duplicate, Add to Home and Delete", () => {
+      expect(screen.getByRole("menu", { name: "Epics" })).toBeInTheDocument();
+      expect(menuRows()).toEqual(["Rename", "Icon and Color…", "Duplicate", "Add to Home", "Delete"]);
+    });
 
-      expect(entries.map((e) => (e === "separator" ? e : e.text))).toEqual(["Rename", "Duplicate", "Add to Home", "separator", "Delete"]);
-      expect(menuEntry("Add to Home")).not.toMatchObject({ enabled: false });
+    it("opens the Icon and color popover for the list", async () => {
+      await chooseFromMenu("Icon and Color…");
+
+      expect(await screen.findByRole("dialog", { name: "Icon and color" })).toBeInTheDocument();
+      expect(mocked.navGo).not.toHaveBeenCalled();
     });
 
     it("adds the list to Home until removed, without a reason", async () => {
@@ -547,15 +545,17 @@ describe("Sidebar", () => {
   });
 
   describe("filter list look", () => {
-    const changeLook = (name: string) => screen.findByRole("button", { name: `Change the icon and color of ${name}` });
+    const changeLook = (name: string) => screen.findByRole("button", { name: `Icon and color of ${name}` });
     const withList = (patch: Partial<ListNode>) => treeWith({ nw: { lists: [list(21, "Current sprint", patch), EPICS] } });
+    const atEpics = navAt(EPICS.id, [NW_ID]);
+    const atSprint = navAt(SPRINT.id, [NW_ID]);
 
     beforeEach(() => {
       mocked.listSetLook.mockResolvedValue(undefined);
     });
 
-    it("opens the Icon and color dialog from the icon button without opening the list", async () => {
-      await renderSidebar(treeWith(), navAt(null, [NW_ID]));
+    it("opens the Icon and color dialog from the current list's icon button without opening the list", async () => {
+      await renderSidebar(treeWith(), atEpics);
 
       await userEvent.click(await changeLook("Epics"));
 
@@ -565,8 +565,17 @@ describe("Sidebar", () => {
       expect(mocked.navGo).not.toHaveBeenCalled();
     });
 
+    it("opens another list from its icon button instead of editing its look", async () => {
+      await renderSidebar(treeWith(), atSprint);
+
+      await userEvent.click(await changeLook("Epics"));
+
+      expect(mocked.navGo).toHaveBeenCalledWith(EPICS.id, null);
+      expect(screen.queryByRole("dialog", { name: "Icon and color" })).not.toBeInTheDocument();
+    });
+
     it("marks the list's own icon and color as the current ones", async () => {
-      await renderSidebar(withList({ icon: "rocket", color: "4" }), navAt(null, [NW_ID]));
+      await renderSidebar(withList({ icon: "rocket", color: "4" }), atSprint);
 
       await userEvent.click(await changeLook("Current sprint"));
 
@@ -575,7 +584,7 @@ describe("Sidebar", () => {
     });
 
     it("checks No color for a list without a color", async () => {
-      await renderSidebar(treeWith(), navAt(null, [NW_ID]));
+      await renderSidebar(treeWith(), atEpics);
 
       await userEvent.click(await changeLook("Epics"));
 
@@ -584,7 +593,7 @@ describe("Sidebar", () => {
     });
 
     it("lists No color first among the colors", async () => {
-      await renderSidebar(treeWith(), navAt(null, [NW_ID]));
+      await renderSidebar(treeWith(), atEpics);
 
       await userEvent.click(await changeLook("Epics"));
 
@@ -594,7 +603,7 @@ describe("Sidebar", () => {
     });
 
     it("saves the picked icon, keeping the color, and leaves the dialog open", async () => {
-      await renderSidebar(withList({ color: "4" }), navAt(null, [NW_ID]));
+      await renderSidebar(withList({ color: "4" }), atSprint);
       await userEvent.click(await changeLook("Current sprint"));
 
       await userEvent.click(screen.getByRole("radio", { name: "check circle" }));
@@ -604,7 +613,7 @@ describe("Sidebar", () => {
     });
 
     it("saves the picked color, keeping the icon", async () => {
-      await renderSidebar(withList({ icon: "rocket" }), navAt(null, [NW_ID]));
+      await renderSidebar(withList({ icon: "rocket" }), atSprint);
       await userEvent.click(await changeLook("Current sprint"));
 
       await userEvent.click(screen.getByRole("radio", { name: "Red" }));
@@ -613,7 +622,7 @@ describe("Sidebar", () => {
     });
 
     it("saves no color when No color is picked, keeping the icon", async () => {
-      await renderSidebar(withList({ icon: "rocket", color: "6" }), navAt(null, [NW_ID]));
+      await renderSidebar(withList({ icon: "rocket", color: "6" }), atSprint);
       await userEvent.click(await changeLook("Current sprint"));
 
       await userEvent.click(screen.getByRole("radio", { name: "No color" }));
@@ -622,7 +631,7 @@ describe("Sidebar", () => {
     });
 
     it("saves no icon on Reset, keeping the color", async () => {
-      await renderSidebar(withList({ icon: "rocket", color: "6" }), navAt(null, [NW_ID]));
+      await renderSidebar(withList({ icon: "rocket", color: "6" }), atSprint);
       await userEvent.click(await changeLook("Current sprint"));
 
       await userEvent.click(screen.getByRole("button", { name: "Reset" }));
@@ -631,7 +640,7 @@ describe("Sidebar", () => {
     });
 
     it("saves a typed letter or emoji, keeping the color", async () => {
-      await renderSidebar(withList({ color: "2" }), navAt(null, [NW_ID]));
+      await renderSidebar(withList({ color: "2" }), atSprint);
       await userEvent.click(await changeLook("Current sprint"));
 
       await userEvent.click(screen.getByRole("button", { name: "Letter or emoji" }));
@@ -642,7 +651,7 @@ describe("Sidebar", () => {
 
     it("shows an error toast when the look cannot be saved", async () => {
       mocked.listSetLook.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
-      await renderSidebar(treeWith(), navAt(null, [NW_ID]));
+      await renderSidebar(treeWith(), atEpics);
       await userEvent.click(await changeLook("Epics"));
 
       await userEvent.click(screen.getByRole("radio", { name: "star" }));
@@ -657,17 +666,9 @@ describe("Sidebar", () => {
       fireEvent.contextMenu(spaceButton("Website relaunch"));
     });
 
-    it("offers Rename, Icon and Color, Client label, Space Settings and Stop tracking", () => {
-      const entries: MenuEntry[] = mocked.popupMenu.mock.calls[0][0];
-
-      expect(entries.map((e) => (e === "separator" ? e : e.text))).toEqual([
-        "Rename",
-        "Icon and Color…",
-        "Client label…",
-        "Space Settings…",
-        "separator",
-        "Stop tracking",
-      ]);
+    it("opens a menu named after the Space with Rename, Icon and Color, Client label, Space Settings and Stop tracking", () => {
+      expect(screen.getByRole("menu", { name: "Website relaunch" })).toBeInTheDocument();
+      expect(menuRows()).toEqual(["Rename", "Icon and Color…", "Client label…", "Space Settings…", "Stop tracking"]);
     });
 
     it("opens the Space's settings through the bus command", async () => {
@@ -727,6 +728,84 @@ describe("Sidebar", () => {
       await userEvent.click(await screen.findByRole("button", { name: "Cancel" }));
 
       expect(mocked.projectTrack).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("clicking a selected row", () => {
+    const iconOf = (name: string) => screen.getByRole("button", { name: `Icon and color of ${name}` });
+
+    describe("filter list", () => {
+      it("starts the inline rename on the current list and saves the new name", async () => {
+        await renderSidebar(treeWith(), navAt(EPICS.id, [NW_ID]));
+
+        await userEvent.click(await screen.findByRole("button", { name: named("Epics") }));
+        const field = screen.getByRole("textbox", { name: "Filter list name" });
+        await userEvent.clear(field);
+        await userEvent.type(field, "Backlog{Enter}");
+
+        expect(mocked.listRename).toHaveBeenCalledWith(EPICS.id, "Backlog");
+        expect(mocked.navGo).not.toHaveBeenCalled();
+      });
+
+      it("opens another list without renaming it", async () => {
+        await renderSidebar(treeWith(), navAt(SPRINT.id, [NW_ID]));
+
+        await userEvent.click(await screen.findByRole("button", { name: named("Epics") }));
+
+        expect(mocked.navGo).toHaveBeenCalledWith(EPICS.id, null);
+        expect(screen.queryByRole("textbox", { name: "Filter list name" })).not.toBeInTheDocument();
+      });
+    });
+
+    describe("Space", () => {
+      it("starts the inline rename on the current Space and saves the new name", async () => {
+        await renderSidebar(treeWith(), navAt(NW_ID));
+        const name = await screen.findByRole("button", { name: named("Website relaunch"), current: "page" });
+
+        await userEvent.click(name);
+        const field = screen.getByRole("textbox", { name: "Space name" });
+        await userEvent.clear(field);
+        await userEvent.type(field, "Public site{Enter}");
+
+        expect(mocked.spaceUpdate).toHaveBeenCalledWith("10001", { name: "Public site", icon: "R", color: "3", client: "Northwind" });
+        expect(mocked.navGo).not.toHaveBeenCalled();
+      });
+
+      it("opens another Space by its name without renaming it", async () => {
+        await renderSidebar(treeWith(), navAt(NW_ID));
+
+        await userEvent.click(spaceButton("Northwind support"));
+
+        expect(mocked.navGo).toHaveBeenCalledWith(NWS_ID, null);
+        expect(screen.queryByRole("textbox", { name: "Space name" })).not.toBeInTheDocument();
+      });
+
+      it("opens the Icon and color popover from the current Space's tile", async () => {
+        await renderSidebar(treeWith(), navAt(NW_ID));
+
+        await userEvent.click(await screen.findByRole("button", { name: "Icon and color of Website relaunch" }));
+
+        expect(screen.getByRole("dialog", { name: "Icon and color" })).toBeInTheDocument();
+        expect(mocked.navGo).not.toHaveBeenCalled();
+      });
+
+      it("opens another Space from its tile instead of editing its look", async () => {
+        await renderSidebar(treeWith(), navAt(NW_ID));
+
+        await userEvent.click(iconOf("Northwind support"));
+
+        expect(mocked.navGo).toHaveBeenCalledWith(NWS_ID, null);
+        expect(screen.queryByRole("dialog", { name: "Icon and color" })).not.toBeInTheDocument();
+      });
+
+      it("saves the picked color for the current Space, keeping its name and client", async () => {
+        await renderSidebar(treeWith(), navAt(NW_ID));
+        await userEvent.click(await screen.findByRole("button", { name: "Icon and color of Website relaunch" }));
+
+        await userEvent.click(screen.getByRole("radio", { name: "Red" }));
+
+        expect(mocked.spaceUpdate).toHaveBeenCalledWith("10001", { name: null, icon: "R", color: "6", client: "Northwind" });
+      });
     });
   });
 

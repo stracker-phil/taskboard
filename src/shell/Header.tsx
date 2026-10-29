@@ -1,61 +1,22 @@
-import { Funnel } from "lucide-react";
 import { usePageAction } from "../commands/pageActions";
 import { browseUrl } from "../lib/jiraLinks";
 import { api, type SpaceNode } from "../api";
-import { Tile } from "../components/look/Tile";
-import { SpaceTile } from "../components/SpaceTile";
 import { useConnection } from "../queries/settings";
-import { useNavGo } from "../queries/sidebar";
 import { attempt } from "../state/requests";
-import { HOME_ICONS, spaceOf, type Level } from "./levels";
+import { HeaderTitle } from "./HeaderTitle";
+import { spaceOf, type Level } from "./levels";
 
 /** The content header: the level's tile or icon and name (a filter list as Space / funnel / name), then Mark all
  *  as read for Unread and Open in Jira for a Space and its lists. */
 export function Header({ level }: { level: Level }) {
   return (
     <header className="content-header">
-      <Title level={level} />
+      <HeaderTitle key={level.kind === "space" ? level.space.listId : level.node.id} level={level} />
       <div className="content-header__spacer" />
       {level.kind === "home" && level.node.kind === "recent" && <MarkAllSeen listId={level.node.id} unseen={level.node.count ?? 0} />}
       <OpenInJira space={spaceOf(level)} />
     </header>
   );
-}
-
-function Title({ level }: { level: Level }) {
-  const open = useNavGo();
-  switch (level.kind) {
-    case "space":
-      return (
-        <>
-          <SpaceTile space={level.space} size={28} />
-          <h1 className="content-header__title">{level.space.name}</h1>
-        </>
-      );
-    case "list":
-      return (
-        <>
-          <button type="button" className="content-header__crumb" onClick={() => void open(level.space.listId)}>
-            <SpaceTile space={level.space} size={20} />
-            {level.space.name}
-          </button>
-          <span className="content-header__slash" aria-hidden="true">
-            /
-          </span>
-          <Tile icon={level.node.icon} color={level.node.color} fallback={Funnel} size={level.node.color ? 20 : 15} />
-          <h1 className="content-header__title">{level.node.name}</h1>
-        </>
-      );
-    case "home": {
-      const Icon = HOME_ICONS[level.node.kind];
-      return (
-        <>
-          <Icon className="content-header__icon" size={20} strokeWidth={1.8} aria-hidden="true" />
-          <h1 className="content-header__title">{level.node.name}</h1>
-        </>
-      );
-    }
-  }
 }
 
 /** Unread's header action; disabled while nothing is unread. */

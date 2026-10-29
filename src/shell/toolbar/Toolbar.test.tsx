@@ -1,11 +1,12 @@
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../../test/apiMock")).createApiMock() }));
 
-import { api, type MenuEntry } from "../../api";
+import { api } from "../../api";
+import { MenuHost } from "../../components/menu";
 import { installCommands, useCommandKeys } from "../../commands";
 import { runPageAction } from "../../commands/pageActions";
 import { createQueryClient } from "../../queries/queryClient";
@@ -29,6 +30,7 @@ function renderToolbar(level: Level = LIST_LEVEL, ownConditions = 0) {
   render(
     <QueryClientProvider client={createQueryClient()}>
       <Harness level={level} ownConditions={ownConditions} />
+      <MenuHost />
     </QueryClientProvider>,
   );
 }
@@ -162,14 +164,33 @@ describe("Toolbar page actions", () => {
   });
 
   describe("toolbar.group", () => {
-    it("opens the group menu with the view's grouping checked", () => {
+    it("opens the group menu with the view's grouping checked", async () => {
       renderToolbar();
 
       run("toolbar.group");
 
-      const entries = mocked.popupMenu.mock.lastCall![0].filter((e: MenuEntry): e is Exclude<MenuEntry, "separator"> => e !== "separator");
-      expect(entries.find((e) => e.checked)?.text).toBe("Status");
-      expect(entries.map((e) => e.text)).toContain("Sort by");
+      const menu = within(await screen.findByRole("menu", { name: "Group" }));
+      expect(menu.getByRole("menuitemradio", { name: "Status" })).toHaveAttribute("aria-checked", "true");
+      expect(menu.getByRole("menuitemradio", { name: "Priority" })).toHaveAttribute("aria-checked", "false");
+      expect(menu.getByRole("menuitem", { name: "Sort by" })).toBeInTheDocument();
+    });
+
+    it("opens the group menu from the Group button", async () => {
+      renderToolbar();
+
+      await userEvent.click(screen.getByRole("button", { name: "Group: Status" }));
+
+      expect(await screen.findByRole("menu", { name: "Group" })).toBeInTheDocument();
+    });
+
+    it("groups by the chosen entry", async () => {
+      mocked.viewSetGroup.mockResolvedValue(view({ groupBy: "priority" }));
+      renderToolbar();
+      run("toolbar.group");
+
+      await userEvent.click(await screen.findByRole("menuitemradio", { name: "Priority" }));
+
+      expect(mocked.viewSetGroup).toHaveBeenCalledWith(expect.any(Number), "priority");
     });
   });
 

@@ -1,11 +1,13 @@
 import { useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { ChevronLeft, ChevronsUpDown } from "lucide-react";
 import { api, type FieldSetting, type FieldVisibility, type GroupBy, type Layout, type SpaceConfig, type SpaceLayouts, type SpaceNode } from "../../../api";
 import { SPACE_CONFIG_KEY, useSpaceConfig } from "../../../queries/views";
 import { GROUP_NAMES } from "../../../shell/toolbar/groupMenu";
 import { fail } from "../../../state/store";
 import { SpaceFields } from "../../SpaceEditor";
-import { SpaceTile } from "../../SpaceTile";
+import { openMenu } from "../../menu";
+import { SpaceLookButton } from "../../SpaceLookButton";
 import { Group, Row, Segmented, SwitchInput } from "../controls";
 import { SpaceStatuses } from "./SpaceStatuses";
 
@@ -29,6 +31,7 @@ const VISIBILITIES = Object.keys(VISIBILITY_NAMES) as FieldVisibility[];
 /** One Space's settings page, opened from the Spaces list or the sidebar's Space Settings…. */
 export function SpaceSettings({ space, onBack }: { space: SpaceNode; onBack: () => void }) {
   const { data: config } = useSpaceConfig(space.projectId);
+  const [editingLook, setEditingLook] = useState(false);
   return (
     <>
       <div className="space-settings-head">
@@ -36,7 +39,7 @@ export function SpaceSettings({ space, onBack }: { space: SpaceNode; onBack: () 
           <ChevronLeft size={14} aria-hidden="true" />
           Spaces
         </button>
-        <SpaceTile space={space} size={22} />
+        <SpaceLookButton space={space} size={22} className="space-settings-head__tile" open={editingLook} onOpenChange={setEditingLook} />
         <h3 className="space-settings-head__name">{space.name}</h3>
         <span className="mono settings-row-desc">{space.key}</span>
       </div>
@@ -69,10 +72,12 @@ function LayoutsGroup({ config }: { config: SpaceConfig }) {
     const defaultLayout = layouts.includes(current.defaultLayout) ? current.defaultLayout : layouts[0];
     set({ ...current, layouts, defaultLayout });
   };
-  const pickGroup = () =>
-    void api
-      .popupMenu(GROUPS.map((group) => ({ text: GROUP_NAMES[group], enabled: group !== current.defaultGroup, run: () => set({ ...current, defaultGroup: group }) })))
-      .catch((e: unknown) => fail(e, "Could not open the menu"));
+  const pickGroup = (button: HTMLElement) =>
+    openMenu(
+      GROUPS.map((group) => ({ text: GROUP_NAMES[group], checked: group === current.defaultGroup, run: () => set({ ...current, defaultGroup: group }) })),
+      button,
+      "Grouping of new views",
+    );
 
   return (
     <Group title="Layouts" anchor="layouts" description="The layouts this Space's views can show. A view in a layout you switch off shows the default layout until you turn it on again.">
@@ -94,7 +99,7 @@ function LayoutsGroup({ config }: { config: SpaceConfig }) {
         onChange={(defaultLayout) => set({ ...current, defaultLayout })}
       />
       <Row label="New views group by" description="Each view can change its own grouping">
-        <button type="button" className="btn status-row__style" aria-label="Grouping of new views" onClick={pickGroup}>
+        <button type="button" className="btn status-row__style" aria-label="Grouping of new views" aria-haspopup="menu" onClick={(e) => pickGroup(e.currentTarget)}>
           {GROUP_NAMES[current.defaultGroup]}
           <ChevronsUpDown size={12} aria-hidden="true" />
         </button>
@@ -105,16 +110,16 @@ function LayoutsGroup({ config }: { config: SpaceConfig }) {
 
 function FieldsGroup({ config }: { config: SpaceConfig }) {
   const save = useSave(config.projectId);
-  const choose = (field: FieldSetting) =>
-    void api
-      .popupMenu(
-        VISIBILITIES.map((visibility) => ({
-          text: VISIBILITY_NAMES[visibility],
-          enabled: visibility !== field.visibility,
-          run: () => save(api.spaceSetField(config.projectId, field.id, visibility), `Could not change ${field.name}`),
-        })),
-      )
-      .catch((e: unknown) => fail(e, "Could not open the menu"));
+  const choose = (field: FieldSetting, button: HTMLElement) =>
+    openMenu(
+      VISIBILITIES.map((visibility) => ({
+        text: VISIBILITY_NAMES[visibility],
+        checked: visibility === field.visibility,
+        run: () => save(api.spaceSetField(config.projectId, field.id, visibility), `Could not change ${field.name}`),
+      })),
+      button,
+      `Visibility of ${field.name}`,
+    );
 
   return (
     <Group title="Custom fields" anchor="fields" description="Where each custom field shows in this Space: as a column choice in its views, in the Issue view, both or neither.">
@@ -125,7 +130,7 @@ function FieldsGroup({ config }: { config: SpaceConfig }) {
       )}
       {config.fields.map((field) => (
         <Row key={field.id} label={field.name} description={VISIBILITY_HELP[field.visibility]}>
-          <button type="button" className="btn status-row__style" aria-label={`Visibility of ${field.name}`} onClick={() => choose(field)}>
+          <button type="button" className="btn status-row__style" aria-label={`Visibility of ${field.name}`} aria-haspopup="menu" onClick={(e) => choose(field, e.currentTarget)}>
             {VISIBILITY_NAMES[field.visibility]}
             <ChevronsUpDown size={12} aria-hidden="true" />
           </button>

@@ -1,14 +1,15 @@
-import { act, render, screen, within } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../../../test/apiMock")).createApiMock() }));
 
-import { api, type MenuEntry, type StatusStyleRow } from "../../../api";
+import { api, type StatusStyleRow } from "../../../api";
 import { createQueryClient } from "../../../queries/queryClient";
 import { resetStore } from "../../../state/store";
 import { statusStyle } from "../../../test/issues";
+import { MenuHost } from "../../menu";
 import { Toasts } from "../../Toasts";
 import { SpaceStatuses } from "./SpaceStatuses";
 
@@ -25,17 +26,17 @@ async function renderStatuses(rows: StatusStyleRow[], projectId = "10001") {
     <QueryClientProvider client={createQueryClient()}>
       <SpaceStatuses projectId={projectId} />
       <Toasts />
+      <MenuHost />
     </QueryClientProvider>,
   );
   await screen.findByRole("region", { name: "Statuses" });
 }
 
-const lastMenu = (): MenuEntry[] => mocked.popupMenu.mock.lastCall![0];
-const runEntry = (text: string) => {
-  const entry = lastMenu().find((e) => e !== "separator" && e.text === text);
-  if (!entry || entry === "separator") throw new Error(`No menu entry "${text}"`);
-  return act(async () => entry.run?.());
-};
+async function openStyleMenu(status: string) {
+  await userEvent.click(await screen.findByRole("button", { name: `Style of ${status}` }));
+  return screen.getByRole("menu", { name: `Style of ${status}` });
+}
+const choose = (menu: HTMLElement, name: string) => userEvent.click(within(menu).getByRole("menuitemradio", { name }));
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -123,11 +124,10 @@ describe("SpaceStatuses", () => {
   it("offers Automatic with the detected style, then the six styles starting with Backlog", async () => {
     await renderStatuses([IN_REVIEW]);
 
-    await userEvent.click(await screen.findByRole("button", { name: "Style of Code Review" }));
+    const menu = await openStyleMenu("Code Review");
 
-    expect(lastMenu().map((e) => (e === "separator" ? e : e.text))).toEqual([
+    expect(within(menu).getAllByRole("menuitemradio").map((r) => r.textContent)).toEqual([
       "Automatic (In review)",
-      "separator",
       "Backlog",
       "To do",
       "In progress",
@@ -137,12 +137,30 @@ describe("SpaceStatuses", () => {
     ]);
   });
 
+  it("checks the chosen style in the menu", async () => {
+    await renderStatuses([IN_REVIEW]);
+
+    const menu = await openStyleMenu("Code Review");
+
+    expect(within(menu).getByRole("menuitemradio", { name: "Blocked" })).toHaveAttribute("aria-checked", "true");
+    expect(within(menu).getByRole("menuitemradio", { name: "Automatic (In review)" })).toHaveAttribute("aria-checked", "false");
+  });
+
+  it("checks Automatic in the menu while no style is chosen", async () => {
+    await renderStatuses([IN_PROGRESS]);
+
+    const menu = await openStyleMenu("In Progress");
+
+    expect(within(menu).getByRole("menuitemradio", { name: /^Automatic/ })).toHaveAttribute("aria-checked", "true");
+    expect(within(menu).getAllByRole("menuitemradio", { checked: true })).toHaveLength(1);
+  });
+
   it("sets the chosen style for the Space and shows the rows Rust returns", async () => {
     await renderStatuses([IN_PROGRESS], "10002");
     mocked.statusStyleSet.mockResolvedValue([{ ...IN_PROGRESS, chosen: "blocked" }]);
-    await userEvent.click(await screen.findByRole("button", { name: "Style of In Progress" }));
+    const menu = await openStyleMenu("In Progress");
 
-    await runEntry("Blocked");
+    await choose(menu, "Blocked");
 
     expect(mocked.statusStyleSet).toHaveBeenCalledWith("10002", "3", "blocked");
     expect(await screen.findByRole("button", { name: "Style of In Progress" })).toHaveTextContent("Blocked");
@@ -151,9 +169,9 @@ describe("SpaceStatuses", () => {
   it("goes back to Automatic by sending no style", async () => {
     await renderStatuses([IN_REVIEW]);
     mocked.statusStyleSet.mockResolvedValue([{ ...IN_REVIEW, chosen: null }]);
-    await userEvent.click(await screen.findByRole("button", { name: "Style of Code Review" }));
+    const menu = await openStyleMenu("Code Review");
 
-    await runEntry("Automatic (In review)");
+    await choose(menu, "Automatic (In review)");
 
     expect(mocked.statusStyleSet).toHaveBeenCalledWith("10001", "4", null);
     expect(await screen.findByRole("button", { name: "Style of Code Review" })).toHaveTextContent("Automatic · In review");
@@ -162,9 +180,9 @@ describe("SpaceStatuses", () => {
   it("reports a failed change and keeps the old choice", async () => {
     await renderStatuses([IN_PROGRESS]);
     mocked.statusStyleSet.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
-    await userEvent.click(await screen.findByRole("button", { name: "Style of In Progress" }));
+    const menu = await openStyleMenu("In Progress");
 
-    await runEntry("Done");
+    await choose(menu, "Done");
 
     expect(await screen.findByText(/Could not change In Progress/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Style of In Progress" })).toHaveTextContent("Automatic");

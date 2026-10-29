@@ -2,9 +2,10 @@ import { Columns3, Ellipsis, Layers, ListFilter } from "lucide-react";
 import { type ReactNode, type RefObject, useCallback, useEffect, useRef, useState } from "react";
 import { usePageAction } from "../../commands/pageActions";
 import { type Presence, usePresence } from "../../lib/motion";
-import { api, type MenuEntry, type View } from "../../api";
+import { api, type View } from "../../api";
+import { openMenu, type MenuEntry } from "../../components/menu";
 import { narrowingKey, NO_NARROWING } from "../../state/slices/narrowing";
-import { fail, useStore } from "../../state/store";
+import { useStore } from "../../state/store";
 import { spaceOf, type Level } from "../levels";
 import { ColumnsPopover } from "./ColumnsPopover";
 import { EpicNarrowingChip } from "./EpicChip";
@@ -53,7 +54,16 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
       (groupBy) => edit(api.viewSetGroup(view.id, groupBy), "Could not change the grouping"),
       (sort) => edit(api.viewSetSort(view.id, sort), "Could not change the sort order"),
     );
-  const popup = (entries: MenuEntry[]) => void api.popupMenu(entries).catch((e: unknown) => fail(e, "Could not open the menu"));
+  const groupRef = useRef<HTMLButtonElement | null>(null);
+  const groupButton = (button: HTMLButtonElement | null) => {
+    measure("group")(button);
+    groupRef.current = button;
+  };
+  // Under the "…" button while the Group button is folded into it.
+  const openGroupMenu = () => {
+    const anchor = groupRef.current ?? moreRef.current;
+    if (anchor) openMenu(groupEntries(), anchor, "Group");
+  };
 
   const space = spaceOf(level);
   // Both layers count: the filter list's own conditions and the view's.
@@ -69,7 +79,7 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
   });
   usePageAction("toolbar.filter", () => setOpen("filter"));
   usePageAction("toolbar.columns", () => setOpen("columns"));
-  usePageAction("toolbar.group", () => popup(groupEntries()));
+  usePageAction("toolbar.group", openGroupMenu);
 
   const moreEntries = (): MenuEntry[] =>
     hidden.map((item): MenuEntry => {
@@ -81,7 +91,7 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
         case "group":
           return { text: `Group: ${GROUP_NAMES[view.groupBy]}`, items: groupEntries() };
         case "me":
-          return { text: "Only my issues", checked: narrowing.me, run: () => setNarrowing(key, { me: !narrowing.me }) };
+          return { text: "Only my issues", checked: narrowing.me, toggle: true, run: () => setNarrowing(key, { me: !narrowing.me }) };
       }
     });
 
@@ -101,7 +111,7 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
   return (
     <div ref={barRef} className="toolbar">
       {shows("group") && (
-        <button ref={measure("group")} type="button" className="toolbar-btn" onClick={() => popup(groupEntries())}>
+        <button ref={groupButton} type="button" className="toolbar-btn" aria-haspopup="menu" onClick={openGroupMenu}>
           <Layers size={14} strokeWidth={2} aria-hidden="true" />
           Group: {GROUP_NAMES[view.groupBy]}
         </button>
@@ -151,7 +161,7 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
       <TextFilter key={key} value={narrowing.text} onChange={setText} inputRef={searchRef} />
       {hidden.length > 0 && (
         <span className="toolbar__anchor toolbar__anchor--end">
-          <button ref={moreRef} type="button" className="toolbar-btn toolbar-btn--icon" aria-label="More toolbar items" onClick={() => popup(moreEntries())}>
+          <button ref={moreRef} type="button" className="toolbar-btn toolbar-btn--icon" aria-label="More toolbar items" aria-haspopup="menu" onClick={(e) => openMenu(moreEntries(), e.currentTarget, "More toolbar items")}>
             <Ellipsis size={14} strokeWidth={2} aria-hidden="true" />
           </button>
           {!shows("columns") && columnsPopover(moreRef)}

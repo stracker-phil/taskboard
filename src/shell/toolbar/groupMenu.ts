@@ -1,4 +1,5 @@
-import type { GroupBy, MenuEntry, Sort, SortBy } from "../../api";
+import type { GroupBy, Sort, SortBy } from "../../api";
+import type { MenuEntry } from "../../components/menu";
 
 export const GROUP_NAMES: Record<GroupBy, string> = {
   status: "Status",

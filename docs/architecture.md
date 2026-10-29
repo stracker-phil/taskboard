@@ -146,7 +146,8 @@ src/
   issue/                     the Issue view, the preview (Peek.tsx), activity; hoverPeek/ the ⌥ + hover Peek
   pins/ palette/             Bookmarks; the command palette
   commands/ registry/        in-window keys; Settings page registry
-  components/ (issue/: rings, pills, chips, avatars) windows/<name>/ lib/ styles/ test/
+  components/ (issue/: rings, pills, chips, avatars; menu/: the one in-app menu; look/: tiles and the look editor)
+  windows/<name>/ lib/ styles/ test/
 docs/                        this folder; adr/ holds the decision records; plan/ (gitignored) the steps
 scripts/*.sh scripts/dev/    install, stop, signing; the dev loop
 .claude/                     rules, agents, skills, settings

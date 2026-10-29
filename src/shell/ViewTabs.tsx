@@ -1,24 +1,15 @@
 import { useEffect, useRef, useState, type MouseEvent } from "react";
-import { Kanban, List, Table2, type LucideIcon } from "lucide-react";
-import { api, type Layout, type MenuEntry, type View } from "../api";
+import { api, type Layout, type View } from "../api";
 import { usePageAction } from "../commands/pageActions";
 import { onSelectView } from "../commands/viewKeys";
-import { InlineRename } from "../components/InlineRename";
 import { LookPopover } from "../components/look/LookPopover";
-import { Tile } from "../components/look/Tile";
-import { Popover } from "../components/Popover";
+import { openContextMenu, openMenu, type MenuEntry } from "../components/menu";
 import { useDragReorder } from "./Sidebar/useDragReorder";
 import { useNavGo, useViews } from "../queries/sidebar";
 import { attempt } from "../state/requests";
 import { useStore } from "../state/store";
-
-const LAYOUTS: Record<Layout, { name: string; icon: LucideIcon }> = {
-  list: { name: "List", icon: List },
-  board: { name: "Board", icon: Kanban },
-  table: { name: "Table", icon: Table2 },
-};
-const LAYOUT_ORDER: Layout[] = ["list", "board", "table"];
-const LAYOUT_HINTS: Record<Layout, string> = { list: "Groups of rows", board: "Status columns", table: "A dense grid" };
+import { LAYOUT_ORDER, LAYOUTS, LayoutTile } from "./viewLayouts";
+import { ViewTab } from "./ViewTab";
 
 /** The level's view tabs (layout tile and name), "+ View", and ⌘1–⌘9 for the nth tab. */
 export function ViewTabs({ listId, viewId }: { listId: number; viewId: number }) {
@@ -28,10 +19,11 @@ export function ViewTabs({ listId, viewId }: { listId: number; viewId: number })
   const [lookingId, setLookingId] = useState<number | null>(null);
   const lookAnchor = useRef<HTMLElement | null>(null);
   const looking = views.find((view) => view.id === lookingId);
-  const editLook = (view: View) => {
-    lookAnchor.current = document.querySelector<HTMLElement>(`[data-view-id="${view.id}"]`);
+  const editLook = (view: View, tile: HTMLElement | null) => {
+    lookAnchor.current = tile;
     setLookingId(view.id);
   };
+  const addRef = useRef<HTMLButtonElement>(null);
 
   useEffect(
     () =>
@@ -62,26 +54,38 @@ export function ViewTabs({ listId, viewId }: { listId: number; viewId: number })
   const offered = views[0]?.layouts ?? LAYOUT_ORDER;
   const offers = (layout: Layout) => offered.includes(layout);
 
-  const openMenu = (e: MouseEvent, view: View) => {
-    e.preventDefault();
-    const layouts: MenuEntry[] = offered.map((layout) => ({
-      text: LAYOUTS[layout].name,
-      enabled: layout !== view.layout,
-      run: () => void attempt(api.viewSetLayout(view.id, layout), "Could not change the layout"),
-    }));
-    void api.popupMenu([
-      { text: "Rename", run: () => setRenamingId(view.id) },
-      { text: "Icon and Color…", run: () => editLook(view) },
-      { text: "Duplicate", run: () => void attempt(api.viewDuplicate(view.id), "Could not duplicate the view") },
-      { text: "Change layout", items: layouts },
-      "separator",
-      { text: "Delete", enabled: views.length > 1, run: () => void remove(view) },
-    ]);
+  const setLayoutOf = (view: View, layout: Layout) => {
+    if (view.layout !== layout) void attempt(api.viewSetLayout(view.id, layout), "Could not change the layout");
   };
+  const tabMenu = (e: MouseEvent, view: View): void =>
+    openContextMenu(
+      e,
+      [
+        { text: "Rename", run: () => setRenamingId(view.id) },
+        { text: "Icon and Color…", run: () => editLook(view, document.querySelector(`[data-view-look="${view.id}"]`)) },
+        { text: "Duplicate", run: () => void attempt(api.viewDuplicate(view.id), "Could not duplicate the view") },
+        { caption: "Layout" },
+        ...offered.map(
+          (layout): MenuEntry => ({
+            text: LAYOUTS[layout].name,
+            icon: <LayoutTile layout={layout} />,
+            checked: layout === view.layout,
+            run: () => setLayoutOf(view, layout),
+          }),
+        ),
+        "separator",
+        { text: "Delete", danger: true, enabled: views.length > 1, run: () => void remove(view) },
+      ],
+      view.name,
+    );
 
-  const [adding, setAdding] = useState(false);
-  const addRef = useRef<HTMLButtonElement>(null);
-  const addMenu = () => setAdding(true);
+  const addMenu = () => {
+    if (!addRef.current) return;
+    const layouts = offered.map(
+      (layout): MenuEntry => ({ text: LAYOUTS[layout].name, icon: <LayoutTile layout={layout} />, hint: LAYOUTS[layout].hint, run: () => void create(layout) }),
+    );
+    openMenu([{ caption: "New view" }, ...layouts], addRef.current, "New view");
+  };
   const { containerRef, item, handle, dropLineY } = useDragReorder<HTMLDivElement>((from, to) => {
     const moved = views[from];
     if (moved) void attempt(api.viewMove(moved.id, to), "Could not move the view");
@@ -94,7 +98,7 @@ export function ViewTabs({ listId, viewId }: { listId: number; viewId: number })
   };
   const setLayout = (layout: Layout) => {
     const view = views[current];
-    if (view && view.layout !== layout) void attempt(api.viewSetLayout(view.id, layout), "Could not change the layout");
+    if (view) setLayoutOf(view, layout);
   };
   usePageAction("view.new", addMenu);
   usePageAction("view.next", views.length > 1 ? () => step(1) : null);
@@ -105,83 +109,25 @@ export function ViewTabs({ listId, viewId }: { listId: number; viewId: number })
 
   return (
     <div className="view-tabs" role="tablist" aria-label="Views" ref={containerRef}>
-      {views.map((view, index) => {
-        const { icon: Icon } = LAYOUTS[view.layout];
-        // An own look replaces the layout's tile.
-        const tile =
-          view.icon || view.color ? (
-            <Tile icon={view.icon} color={view.color} fallback={Icon} size={view.color ? 18 : 15} />
-          ) : (
-            <span className="view-tab__tile" data-layout={view.layout} aria-hidden="true">
-              <Icon size={11} strokeWidth={2.8} />
-            </span>
-          );
-        if (view.id === renamingId) {
-          return (
-            <div key={view.id} className="view-tab" data-active={view.id === viewId || undefined} {...item(index)}>
-              {tile}
-              <InlineRename
-                value={view.name}
-                label="View name"
-                onSave={(name) => void attempt(api.viewRename(view.id, name), "Could not rename the view")}
-                onDone={() => setRenamingId(null)}
-              />
-            </div>
-          );
-        }
-        return (
-          <button
-            key={view.id}
-            type="button"
-            role="tab"
-            className="view-tab"
-            aria-selected={view.id === viewId}
-            data-active={view.id === viewId || undefined}
-            title="Double-click to rename, drag to move"
-            onClick={() => void open(listId, view.id)}
-            onDoubleClick={() => setRenamingId(view.id)}
-            onContextMenu={(e) => openMenu(e, view)}
-            data-view-id={view.id}
-            {...item(index)}
-            {...handle(index)}
-          >
-            {tile}
-            {view.name}
-          </button>
-        );
-      })}
+      {views.map((view, index) => (
+        <ViewTab
+          key={view.id}
+          view={view}
+          active={view.id === viewId}
+          renaming={view.id === renamingId}
+          onOpen={() => void open(listId, view.id)}
+          onRename={() => setRenamingId(view.id)}
+          onRenameDone={() => setRenamingId(null)}
+          onEditLook={(tile) => (lookingId === view.id ? setLookingId(null) : editLook(view, tile))}
+          onMenu={(e) => tabMenu(e, view)}
+          dragProps={view.id === renamingId ? item(index) : { ...item(index), ...handle(index) }}
+        />
+      ))}
       {dropLineY !== null && <span className="view-tabs__drop" style={{ left: dropLineY }} aria-hidden="true" />}
       <span className="view-tabs__separator" aria-hidden="true" />
-      <span className="view-tabs__anchor">
-        <button ref={addRef} type="button" className="view-tabs__add" aria-expanded={adding} onClick={() => setAdding((was) => !was)}>
-          + View
-        </button>
-        {adding && (
-          <Popover label="New view" anchor={addRef} onClose={() => setAdding(false)} className="view-add">
-            <span className="popover__caps">New view</span>
-            {offered.map((layout) => {
-              const { icon: Icon, name } = LAYOUTS[layout];
-              return (
-                <button
-                  key={layout}
-                  type="button"
-                  className="view-add__option"
-                  onClick={() => {
-                    setAdding(false);
-                    void create(layout);
-                  }}
-                >
-                  <span className="view-tab__tile" data-layout={layout} aria-hidden="true">
-                    <Icon size={11} strokeWidth={2.8} />
-                  </span>
-                  {name}
-                  <span className="view-add__hint">{LAYOUT_HINTS[layout]}</span>
-                </button>
-              );
-            })}
-          </Popover>
-        )}
-      </span>
+      <button ref={addRef} type="button" className="view-tabs__add" aria-haspopup="menu" onClick={addMenu}>
+        + View
+      </button>
       {looking && (
         <LookPopover
           title="Icon and color"

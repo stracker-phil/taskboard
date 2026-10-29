@@ -1,7 +1,6 @@
 import { getName, getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { Menu } from "@tauri-apps/api/menu";
 import type {
   ActivityItem,
   AppError,
@@ -55,21 +54,6 @@ import type {
 } from "./types";
 
 export * from "./types";
-
-/** An item of a native context menu: runs `run` when chosen, or opens `items` as a submenu. */
-export type MenuEntry = { text: string; enabled?: boolean; checked?: boolean; run?: () => void; items?: MenuEntry[] } | "separator";
-
-type NativeEntry =
-  | { item: "Separator" }
-  | { text: string; enabled?: boolean; checked?: boolean; action?: () => void; items?: NativeEntry[] };
-
-/** `checked` (true or false) makes a check item. */
-function nativeEntry(entry: MenuEntry): NativeEntry {
-  if (entry === "separator") return { item: "Separator" };
-  if (entry.items) return { text: entry.text, enabled: entry.enabled, items: entry.items.map(nativeEntry) };
-  const item = { text: entry.text, enabled: entry.enabled, action: entry.run };
-  return entry.checked === undefined ? item : { ...item, checked: entry.checked };
-}
 
 /** The app's IPC entry point (ADR 0002). Tests mock this module. */
 export const api = {
@@ -218,11 +202,6 @@ export const api = {
   spaceSetLayouts: (projectId: string, layouts: SpaceLayouts) => invoke<SpaceConfig>("space_set_layouts", { projectId, layouts }),
   spaceSetField: (projectId: string, fieldId: string, visibility: FieldVisibility) =>
     invoke<SpaceConfig>("space_set_field", { projectId, fieldId, visibility }),
-  /** Shows a native context menu at the mouse; the chosen entry's `run` is called. */
-  popupMenu: async (entries: MenuEntry[]): Promise<void> => {
-    const menu = await Menu.new({ items: entries.map(nativeEntry) });
-    await menu.popup();
-  },
   appInfo: async (): Promise<AppInfo> => {
     const [name, version] = await Promise.all([getName(), getVersion()]);
     return { name, version };

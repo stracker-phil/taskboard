@@ -6,6 +6,7 @@ import { STATUS_STYLES_KEY, useStatusStyles } from "../../../queries/views";
 import { fail } from "../../../state/store";
 import { StatusPill } from "../../issue/StatusPill";
 import { STYLE_NAMES, STYLE_ORDER } from "../../issue/styleNames";
+import { openMenu } from "../../menu";
 import { Group } from "../controls";
 
 const CATEGORY_NAMES: Record<string, string> = { new: "To do", indeterminate: "In progress", done: "Done" };
@@ -22,14 +23,21 @@ export function SpaceStatuses({ projectId }: { projectId: string }) {
       (e: unknown) => fail(e, `Could not change ${status.name}`),
     );
 
-  const openMenu = (status: StatusStyleRow) =>
-    void api
-      .popupMenu([
-        { text: `Automatic (${STYLE_NAMES[status.detected]})`, run: () => choose(status, null) },
+  const pickStyle = (status: StatusStyleRow, button: HTMLElement) =>
+    openMenu(
+      [
+        { text: `Automatic (${STYLE_NAMES[status.detected]})`, checked: status.chosen === null, run: () => choose(status, null) },
         "separator",
-        ...STYLE_ORDER.map((style) => ({ text: STYLE_NAMES[style], run: () => choose(status, style) })),
-      ])
-      .catch((e: unknown) => fail(e, "Could not open the menu"));
+        ...STYLE_ORDER.map((style) => ({
+          text: STYLE_NAMES[style],
+          icon: <span className={`status-square status-square--${style}`} />,
+          checked: status.chosen === style,
+          run: () => choose(status, style),
+        })),
+      ],
+      button,
+      `Style of ${status.name}`,
+    );
 
   const [search, setSearch] = useState("");
   const needle = search.trim().toLowerCase();
@@ -65,7 +73,7 @@ export function SpaceStatuses({ projectId }: { projectId: string }) {
                 <StatusPill style={style} name={status.name} />
                 <span className="status-row__count">{status.issues === 1 ? "1 issue" : `${status.issues} issues`}</span>
                 <span className="status-row__spacer" />
-                <button type="button" className="btn status-row__style" aria-label={`Style of ${status.name}`} onClick={() => openMenu(status)}>
+                <button type="button" className="btn status-row__style" aria-label={`Style of ${status.name}`} aria-haspopup="menu" onClick={(e) => pickStyle(status, e.currentTarget)}>
                   <span className={`status-square status-square--${style}`} aria-hidden="true" />
                   {status.chosen ? STYLE_NAMES[status.chosen] : `Automatic · ${STYLE_NAMES[status.detected]}`}
                   <ChevronsUpDown size={12} aria-hidden="true" />

@@ -58,28 +58,35 @@ an item.
   rows, 9px gap, `--text-secondary`, the list's icon 15/2 (the funnel unless one was picked), name and count (`ListCount`; a list whose filter can't be
   used shows a muted `CircleAlert` with the reason as its tooltip instead). The current list is selected like
   a Space, 600. A Space without filter lists shows "+ New filter list" (30px, 13px, `--text-muted`); it and
-  the Space row's + create "New filter list", open it and start renaming it. A click on a list's icon opens the look editor (`LookPopover`), saved with
-  `list_set_look`; the header and Home show the same tile.
+  the Space row's + create "New filter list", open it and start renaming it.
+- **Selected items edit in place**, like Finder: a first click on a Space or list selects it; a click on the
+  selected one's name renames it, one on its tile or icon opens the look editor (`LookPopover`, saved with
+  `space_update` or `list_set_look`) under it. A double-click renames as well. The header and Home show the same
+  tile.
 - **Footer** (`SidebarFooter`): the sync chip (34px, 13px `--text-tertiary`; a 7px dot in `--sync-ok`,
   `--sync-busy`, `--sync-offline` or `--sync-error-dot` by state; the state in words from
   `describeSyncState`; a refresh icon 14/2; a click syncs now) and Settings (34px, gear 17/1.8).
 - **Hover**: rows, "+", the chip and Settings take `--fill-hover`; the selected row keeps its fill.
-- **Context menus** are native (`api.popupMenu`). A filter list: Rename, Duplicate, Add to Home (disabled
-  until bookmarks), Delete. A Space: Rename, Icon and Color…, Client label…, Stop tracking.
-- **Renaming** (`components/InlineRename.tsx`): the name turns into a field with a 2px `--focus-ring`; ↩ or
-  leaving the field saves a changed, non-empty name, esc cancels.
+- **Context menus** ([Menus](#menus)). A filter list: Rename, Icon and Color…, Duplicate, Add to Home or
+  Remove from Home, Delete. A Space: Rename, Icon and Color…, Client label…, Space Settings…, Stop tracking.
+- **Renaming** (`components/InlineRename.tsx`), everywhere a name is renamed: the name turns into a field with
+  a 2px `--focus-ring`; ↩ or leaving the field saves a changed, non-empty name, esc cancels. No rename uses a
+  dialog.
 - **Reordering** (`useDragReorder`): drag a Space, or a filter list within its Space, with the mouse; after
   4px a 2px `--accent` line shows where it lands, and the drop runs `space_move` or `list_move` with the new
   index. The dragged row dims to half.
 
 ## Content header
 
-`src/shell/Header.tsx`, styled in `styles/header.css`: 14px 24px 12px padding, a row with a 10px gap.
+`src/shell/Header.tsx` and `HeaderTitle.tsx`, styled in `styles/header.css`: 14px 24px 12px padding, a row
+with a 10px gap.
 
 - A Space: the 28px tile (8px radius, 14/800) and the name (19/700).
 - A filter list: a breadcrumb button with the 20px tile (6px radius, 10/800) and the Space name (13px
   `--text-tertiary`, opens the Space), "/" in `--text-faint`, the funnel 15/2 in `--text-tertiary`, then the
   list name (19/700).
+- The level shown is the selected one: a click on a Space's or list's name renames it in place, one on its
+  tile or funnel opens `LookPopover` under it.
 - Everything and the Home lists: their sidebar icon (20/1.8, `--text-tertiary`) and name.
 - **Mark all as read** on the right for Unread: 28px, 7px radius, a `--border` frame, 12/600; disabled
   while nothing is unseen.
@@ -95,8 +102,9 @@ draws the icon in `--text-on-accent` (white) on the color with a 5–8px radius;
 only) the icon stands alone in the text color. A Space without an icon shows its name's first letter, a list
 the funnel, a view its layout's tile. `LookEditor`: a 32px preview, Icon / Letter or emoji, Reset, the 8-column
 icon grid or the text field, then the swatches ("No color" first where allowed). `LookPopover` puts it under the
-element it changes: a list's icon in the sidebar, a view tab ("Icon and Color…" in its context menu); Space
-settings show it inline.
+tile it changes: a click on the tile of the selected Space, list or view tab (sidebar, header, tabs; `LookButton`
+and `SpaceLookButton`), on the tile in the Space settings header, or "Icon and Color…" in a context menu. The
+Space settings' General group also shows it inline.
 
 ## View tabs
 
@@ -106,13 +114,15 @@ padding, 2px gap, a `--hairline` bottom line.
 - A tab: 8px padding, 7px gap, `--text-tertiary`; an 18px tile (5px radius) in `--view-list`,
   `--view-board` or `--view-table` with the white `List`, `Kanban` or `Table2` glyph (11/2.8), then the name.
   The current tab is `--text`, 600, with a 2px `--text` underline over the bar's line.
-- After the tabs a 1px `--border` separator (10px inset) and "+ View" (`--text-muted`, also ⌘T): a "New view"
-  popover with a tile per layout (its glyph, name and a one-line hint) that adds a view of that layout named
-  after it and opens it.
-- Double-click a tab to rename it in place; drag a tab sideways to reorder (`useDragReorder` on the x axis,
-  `view_move`), with a 2px `--accent` line where it lands.
-- Right-click a tab: Rename (in place), Duplicate, Change layout ▸ (the other layouts), Delete (disabled for
-  the only view; deleting the current view opens the level's default).
+- After the tabs a 1px `--border` separator (10px inset) and "+ View" (`--text-muted`, also ⌘T): a menu
+  captioned "New view" with a row per layout (its tile, name and a one-line hint) that adds a view of that
+  layout named after it and opens it.
+- A click on a tab opens it; a click on the open tab's name renames it in place (so does a double-click), one
+  on its tile edits the look. Drag a tab sideways to reorder (`useDragReorder` on the x axis, `view_move`), with
+  a 2px `--accent` line where it lands; a drag is never a click.
+- Right-click a tab: Rename (in place), Icon and Color…, Duplicate, a "Layout" group (a row per offered layout
+  with its tile, the current one checked), Delete (red; disabled for the only view; deleting the current view
+  opens the level's default).
 - ⌘1–⌘9 open the nth tab.
 
 ## Status language
@@ -317,6 +327,32 @@ Buttons, tabs, chips, pills, column headers and table cells stay on one line (`b
 truncates with an ellipsis. When space runs out the flexible element shrinks (the text filter, a title), never
 a button. Only descriptions, comment bodies, bookmark reasons and empty-state text may wrap.
 
+## Menus
+
+Every context menu and every pop-up button (Group, "…", "+ View", the pickers in Space settings) is one in-app
+menu ([ADR 0034](adr/0034-menus-are-drawn-in-the-page.md)); only the app's menu bar is native.
+`openMenu(entries, at, label)` or, for a right-click, `openContextMenu(e, entries, label)` from
+`components/menu` asks the store (`state/slices/menu.ts`); `MenuHost`, mounted once per window, draws it.
+
+- **Look**: the popover panel (12px radius, `--border`, `--shadow-popover`, 6px padding), rising in. Rows 30
+  high, 7px radius, 13px `--text`, an optional 18px leading icon or tile, the label, an optional hint or key
+  (12px `--text-muted`) and at the right a check (the current choice) or › (a submenu). The highlighted row takes
+  `--hover-bg`, a disabled one `--text-faint`, a destructive one (Delete, Stop tracking) `--danger-text`. A caps
+  caption (`popover__caps`) starts a group, a hairline separates groups.
+- **Placement** (`components/menu/placement.ts`): a right-click's menu opens at the mouse, a button's under
+  the button, a submenu beside its row; each flips to the other side when the window has no room and then
+  shifts inside it, 6px from the edges.
+- **Closing**: Escape, a press outside, a scroll, the window losing focus or a resize close it, and so does
+  choosing a row. Focus goes back to where it was, unless the row moved it on (a rename field, a sheet). A
+  second press on a menu's button closes it.
+- **Keys**: ↑ ↓ (wrapping), Home and End move through the enabled rows, ↩ or Space runs one, typing a letter
+  jumps to the next row starting with it; → opens a submenu (hovering does too), ← closes it. A menu opened
+  from a button or a key starts on its first row. The command keys stay off while a menu has the focus.
+- **Roles**: `menu` and `menuitem`; a choice is `menuitemradio` (`menuitemcheckbox` for an on/off one) with
+  `aria-checked`; a caption's rows are a `group` named by it; disabled rows are `aria-disabled`.
+- **Choices are inline**: a short set of choices is a captioned group with the current one checked (the view
+  tab's Layout group), not a submenu; long ones (Sort by) stay a submenu.
+
 ## Tooltips
 
 `components/TooltipHost.tsx`, mounted once per window, replaces the native tooltip: it takes any `title` over
@@ -345,7 +381,7 @@ movement is instant and fades are short.
 `src/shell/toolbar/`, 50 high under the tabs, one popover open at a time (`components/Popover.tsx`: under its
 button, Escape and a press outside close it, focus goes back to the button).
 
-- **Group: Status** (30 high, `--border`, 8 radius): a native menu of the groupings (Status, Space, Client,
+- **Group: Status** (30 high, `--border`, 8 radius): a [menu](#menus) of the groupings (Status, Space, Client,
   Assignee, Epic, Release, Priority, Due date, None) with Sort by ▸ (Updated, Created, Priority, Key, Due date,
   Summary, Status; Ascending, Descending). Saves to the view.
 - **Columns** ("Card fields" on a board): the *Columns for this view* popover (340 wide): a "Search fields" box
@@ -411,7 +447,7 @@ low strength), and both pass the same contrast checks.
 | Group | Tokens | Light |
 |---|---|---|
 | Surfaces | `--window-bg`, `--panel-bg`, `--panel-subtle-bg` (popover footers), `--fill-subtle` (key hints, tracks), `--fill-hover`, `--segmented-bg`, `--scrim` | `#F4F4F5`, white, `#FAFAFA`, `#F4F4F5`, `#EBEBEE`, `#EEEEF1`, black 38% |
-| Text | `--text`, `--text-strong-body`, `--text-secondary`, `--text-tertiary`, `--text-muted`, `--text-faint` (decorative glyphs only), `--text-on-accent`, `--link`, `--link-hover` | zinc 900 → 400, white, blue 700, blue 900 |
+| Text | `--text`, `--text-strong-body`, `--text-secondary`, `--text-tertiary`, `--text-muted`, `--text-faint` (decorative glyphs only), `--danger-text` (destructive menu rows), `--text-on-accent`, `--link`, `--link-hover` | zinc 900 → 400, white, blue 700, blue 900 |
 | Lines | `--border` (controls, the tree guide), `--border-strong` (selects, dashed adds), `--hairline` (section edges), `--row-hairline` (between rows), `--card-border` | `#E4E4E7`, `#D4D4D8`, `#EDEDF0`, `#F1F1F3`, `#E9E9EC` |
 | Accent | `--accent`, `--accent-text`, `--selection-bg`/`--selection-text`, `--accent-soft-bg`/`-border`/`-text`, `--button-primary-bg`/`-text`, `--spinner-track`, `--focus-ring` | blue 600, blue 700, `#E3EBFD`, … |
 | Changed | `--changed-bg`, `--changed-border`, `--changed-chip-bg`/`-text`, `--changed-dot` | light blues |
@@ -506,13 +542,13 @@ no separate Settings design; owner, 2026-10-28). Its colors are the `--settings-
     (empty uses the project's), Icon and color (the look editor; a Space always has a color) and Client (empty means internal). *Layouts*: a switch per layout
     its views offer (one stays on), the default layout of new views and their grouping. *Statuses*: only the
     statuses this Space's issues are in, under a section per Jira category, with a search field; a row: the pill,
-    "N issues", and a button (the style's square and "Automatic · X" or the style's name) with a native menu of
-    Automatic and the six styles. *Custom fields*: a row per field with a menu of Visible, Hidden in list (no
-    column choice), Hidden in detail (not in the Issue view) and Hidden everywhere. Each field
-    saves on its own with Rust's field error under it. "Track projects under Projects to get Spaces." when none
-    is tracked. The sidebar's "Icon and Color…" and "Client label…" items open `SpacePopover` (300px, 12px
-    radius, `--shadow-popover`, at the top left of the content panel) with the same fields; Esc, Done or a
-    click outside close it.
+    "N issues", and a button (the style's square and "Automatic · X" or the style's name) with a menu of
+    Automatic and the six styles, the chosen one checked. *Custom fields*: a row per field with a menu of
+    Visible, Hidden in list (no column choice), Hidden in detail (not in the Issue view) and Hidden everywhere.
+    Each field saves on its own with Rust's field error under it. The header's tile opens `LookPopover`.
+    "Track projects under Projects to get Spaces." when none is tracked. The sidebar's "Client label…" item
+    opens `SpacePopover` (300px, 12px radius, `--shadow-popover`, at the top left of the content panel) with the
+    Client field; Esc, Done or a click outside close it.
   - **Sync**: *Scope* (the effective JQL in a monospaced field; Validate, Save, Reset to Default), *Intervals*
     (minutes in front and in the background, days to keep done issues) and *Cache* (the sync state line with
     Sync Now, one row per tracked project with its key, last full sync and "N issues · M open", then Reset

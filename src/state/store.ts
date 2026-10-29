@@ -1,5 +1,6 @@
 import { create, type StoreApi } from "zustand";
 import { confirmSlice, type ConfirmSlice } from "./slices/confirm";
+import { menuSlice, type MenuSlice } from "./slices/menu";
 import { narrowingSlice, type NarrowingSlice } from "./slices/narrowing";
 import { paletteSlice, type PaletteSlice } from "./slices/palette";
 import { issueViewSlice, type IssueViewSlice } from "./slices/issueView";
@@ -11,7 +12,7 @@ export type { Toast, ToastAction } from "./slices/ui";
 export type { Confirmation } from "./slices/confirm";
 
 /** Every slice's members; modules add theirs with `declare module "../state/store" { interface Store { … } }`. */
-export interface Store extends UiSlice, ConfirmSlice, NarrowingSlice, PlacesSlice, IssueViewSlice, PaletteSlice {}
+export interface Store extends UiSlice, ConfirmSlice, NarrowingSlice, PlacesSlice, IssueViewSlice, PaletteSlice, MenuSlice {}
 
 type SetStore = StoreApi<Store>["setState"];
 type GetStore = StoreApi<Store>["getState"];
@@ -44,3 +45,4 @@ registerSlice(narrowingSlice);
 registerSlice(placesSlice);
 registerSlice(issueViewSlice);
 registerSlice(paletteSlice);
+registerSlice(menuSlice);

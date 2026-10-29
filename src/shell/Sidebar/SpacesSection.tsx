@@ -3,7 +3,7 @@ import { Disclosure } from "../../components/Disclosure";
 import { attempt } from "../../state/requests";
 import { DropLine } from "./DropLine";
 import { createList, FilterListTree } from "./FilterListTree";
-import { SpaceRow, type SpaceEditFocus } from "./SpaceRow";
+import { SpaceRow } from "./SpaceRow";
 import { useDragReorder } from "./useDragReorder";
 
 interface Props {
@@ -15,11 +15,11 @@ interface Props {
   setExpanded: (expanded: number[]) => void;
   renamingId: number | null;
   setRenamingId: (id: number | null) => void;
-  onEdit: (space: SpaceNode, focus: SpaceEditFocus) => void;
+  onEditClient: (space: SpaceNode) => void;
 }
 
 /** "Spaces", then each Space with its filter lists while expanded; Spaces are added in Settings → Projects. */
-export function SpacesSection({ spaces, nav, activeSpace, open, setExpanded, renamingId, setRenamingId, onEdit }: Props) {
+export function SpacesSection({ spaces, nav, activeSpace, open, setExpanded, renamingId, setRenamingId, onEditClient }: Props) {
   const { containerRef, item, handle, dropLineY } = useDragReorder<HTMLElement>((from, to) => {
     void attempt(api.spaceMove(spaces[from].projectId, to), "Could not move the Space");
   });
@@ -51,7 +51,7 @@ export function SpacesSection({ spaces, nav, activeSpace, open, setExpanded, ren
               onToggle={(others) => toggle(space, expanded, others)}
               onRename={() => setRenamingId(space.listId)}
               onRenameDone={() => setRenamingId(null)}
-              onEdit={(focus) => onEdit(space, focus)}
+              onEditClient={() => onEditClient(space)}
               onAddList={() => void createList(space, open, setRenamingId)}
               dragHandle={handle(index)}
             />

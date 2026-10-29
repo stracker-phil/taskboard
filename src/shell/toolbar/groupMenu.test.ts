@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import type { GroupBy, MenuEntry, Sort } from "../../api";
+import type { GroupBy, Sort } from "../../api";
+import type { MenuEntry, MenuItem } from "../../components/menu";
 import { groupMenu } from "./groupMenu";
 
-type Entry = Exclude<MenuEntry, "separator">;
-const entriesOf = (entries: MenuEntry[]) => entries.filter((e): e is Entry => e !== "separator");
+const entriesOf = (entries: MenuEntry[]) => entries.filter((e): e is MenuItem => e !== "separator" && !("caption" in e));
 
 function build(groupBy: GroupBy = "status", sort: Sort = { by: "updated", descending: true }) {
   const setGroup = vi.fn();

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -10,7 +10,7 @@ import { createQueryClient } from "../queries/queryClient";
 import { resetStore } from "../state/store";
 import { sidebarTree, space } from "../test/spaces";
 import { Toasts } from "./Toasts";
-import { SpaceFields, SpacePopover, type SpaceFieldsFocus } from "./SpaceEditor";
+import { SpaceFields, SpacePopover } from "./SpaceEditor";
 
 const mocked = vi.mocked(api, true);
 
@@ -23,9 +23,9 @@ function renderWithClient(ui: React.ReactNode) {
   );
 }
 
-async function renderFields(s: SpaceNode, focus?: SpaceFieldsFocus) {
-  renderWithClient(<SpaceFields space={s} focus={focus} />);
-  await screen.findAllByRole(focus === "client" ? "textbox" : "radiogroup");
+async function renderFields(s: SpaceNode, clientOnly = false) {
+  renderWithClient(<SpaceFields space={s} clientOnly={clientOnly} />);
+  await screen.findAllByRole(clientOnly ? "textbox" : "radiogroup");
 }
 
 beforeEach(() => {
@@ -36,7 +36,7 @@ beforeEach(() => {
 });
 
 describe("SpaceFields", () => {
-  it("shows Name, Icon and color and Client when no focus is given", async () => {
+  it("shows Name, Icon and color and Client by default", async () => {
     await renderFields(space());
 
     expect(screen.getByLabelText("Name")).toBeInTheDocument();
@@ -183,54 +183,43 @@ describe("SpaceFields", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Could not change Website relaunch: Database is locked");
   });
 
-  describe("focus", () => {
-    it("appearance shows only Icon and Color", async () => {
-      await renderFields(space(), "appearance");
+  it("shows only Client when clientOnly is set", async () => {
+    await renderFields(space(), true);
 
-      expect(screen.getByRole("radiogroup", { name: "Icon" })).toBeInTheDocument();
-      expect(screen.getByRole("radiogroup", { name: "Color" })).toBeInTheDocument();
-      expect(screen.queryByLabelText("Name")).not.toBeInTheDocument();
-      expect(screen.queryByLabelText("Client")).not.toBeInTheDocument();
-    });
-
-    it("client shows only Client", async () => {
-      await renderFields(space(), "client");
-
-      expect(screen.getByLabelText("Client")).toBeInTheDocument();
-      expect(screen.queryByLabelText("Name")).not.toBeInTheDocument();
-      expect(screen.queryByRole("radiogroup", { name: "Icon" })).not.toBeInTheDocument();
-      expect(screen.queryByRole("radiogroup", { name: "Color" })).not.toBeInTheDocument();
-    });
+    expect(screen.getByLabelText("Client")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Name")).not.toBeInTheDocument();
+    expect(screen.queryByRole("radiogroup", { name: "Icon" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("radiogroup", { name: "Color" })).not.toBeInTheDocument();
   });
 });
 
 describe("SpacePopover", () => {
   const onClose = vi.fn();
 
-  function renderPopover(focus: SpaceFieldsFocus) {
+  function renderPopover() {
     renderWithClient(
       <>
         <button type="button">Outside</button>
-        <SpacePopover space={space()} focus={focus} onClose={onClose} />
+        <SpacePopover space={space()} onClose={onClose} />
       </>,
     );
   }
 
-  it.each([
-    ["appearance", "Icon and color", ["Color"], ["Client", "Name"]],
-    ["client", "Client label", ["Client"], ["Color", "Name"]],
-  ] as const)("with %s focus titles the dialog %j and shows only its fields", (focus, title, shown, hidden) => {
-    renderPopover(focus);
+  beforeEach(() => {
+    onClose.mockClear();
+  });
 
-    const dialog = screen.getByRole("dialog", { name: title });
-    expect(dialog).toBeInTheDocument();
-    const has = (label: string) => screen.queryByLabelText(label) ?? screen.queryByRole("radiogroup", { name: label });
-    for (const label of shown) expect(has(label)).toBeInTheDocument();
-    for (const label of hidden) expect(has(label)).not.toBeInTheDocument();
+  it("is the Client label dialog and shows only the Client field", () => {
+    renderPopover();
+
+    const dialog = screen.getByRole("dialog", { name: "Client label" });
+    expect(within(dialog).getByLabelText("Client")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Name")).not.toBeInTheDocument();
+    expect(screen.queryByRole("radiogroup", { name: "Color" })).not.toBeInTheDocument();
   });
 
   it("closes on Escape", async () => {
-    renderPopover("client");
+    renderPopover();
 
     await userEvent.keyboard("{Escape}");
 
@@ -238,7 +227,7 @@ describe("SpacePopover", () => {
   });
 
   it("closes on Done", async () => {
-    renderPopover("client");
+    renderPopover();
 
     await userEvent.click(screen.getByRole("button", { name: "Done" }));
 
@@ -246,7 +235,7 @@ describe("SpacePopover", () => {
   });
 
   it("closes on a mousedown outside", async () => {
-    renderPopover("client");
+    renderPopover();
 
     await userEvent.click(screen.getByRole("button", { name: "Outside" }));
 
@@ -254,16 +243,16 @@ describe("SpacePopover", () => {
   });
 
   it("stays open on a mousedown inside", async () => {
-    renderPopover("appearance");
+    renderPopover();
 
-    await userEvent.click(screen.getByRole("heading", { name: "Icon and color" }));
-    await userEvent.click(screen.getByRole("radio", { name: "Teal" }));
+    await userEvent.click(screen.getByRole("heading", { name: "Client label" }));
+    await userEvent.click(screen.getByLabelText("Client"));
 
     expect(onClose).not.toHaveBeenCalled();
   });
 
   it("saves the text being typed before closing on Escape", async () => {
-    renderPopover("client");
+    renderPopover();
 
     await userEvent.type(screen.getByLabelText("Client"), "Northwind");
     await userEvent.keyboard("{Escape}");

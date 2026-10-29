@@ -10,7 +10,6 @@ import { NEW_LIST_NAME } from "./FilterListTree";
 import { findLevel, spaceOf } from "../levels";
 import { HomeRows } from "./HomeRows";
 import { SidebarFooter } from "./SidebarFooter";
-import type { SpaceEditFocus } from "./SpaceRow";
 import { SpacesSection } from "./SpacesSection";
 
 /** The main window's sidebar: the traffic-light strip, Search, Home, the Spaces tree and the footer. */
@@ -21,8 +20,8 @@ export function Sidebar() {
   const setExpanded = useSetExpanded();
   const setPaletteOpen = useStore((s) => s.setPaletteOpen);
   const [renamingId, setRenamingId] = useState<number | null>(null);
-  // The Space popover ("Color and icon…", "Client label…") opens from here.
-  const [editing, setEditing] = useState<{ space: SpaceNode; focus: SpaceEditFocus } | null>(null);
+  // The Space menu's "Client label…" popover opens from here.
+  const [editingClient, setEditingClient] = useState<SpaceNode | null>(null);
 
   const currentId = nav?.location?.listId ?? null;
   const activeSpace = tree && currentId !== null ? spaceOf(findLevel(tree, currentId)) : null;
@@ -62,11 +61,11 @@ export function Sidebar() {
           setExpanded={(ids) => void setExpanded(ids)}
           renamingId={renamingId}
           setRenamingId={setRenamingId}
-          onEdit={(space, focus) => setEditing({ space, focus })}
+          onEditClient={setEditingClient}
         />
       )}
       <SidebarFooter />
-      {editing && <SpacePopover space={editing.space} focus={editing.focus} onClose={() => setEditing(null)} />}
+      {editingClient && <SpacePopover space={editingClient} onClose={() => setEditingClient(null)} />}
     </aside>
   );
 }

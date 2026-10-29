@@ -1,14 +1,15 @@
-import { act, render, screen, within } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../../../test/apiMock")).createApiMock() }));
 
-import { api, type MenuEntry, type SpaceConfig, type SpaceLayouts } from "../../../api";
+import { api, type SpaceConfig, type SpaceLayouts } from "../../../api";
 import { createQueryClient } from "../../../queries/queryClient";
 import { resetStore } from "../../../state/store";
 import { space, spaceConfig } from "../../../test/spaces";
+import { MenuHost } from "../../menu";
 import { Toasts } from "../../Toasts";
 import { SpaceSettings } from "./SpaceSettings";
 
@@ -22,18 +23,19 @@ async function renderSettings(config: SpaceConfig = spaceConfig(), onBack = vi.f
     <QueryClientProvider client={createQueryClient()}>
       <SpaceSettings space={space()} onBack={onBack} />
       <Toasts />
+      <MenuHost />
     </QueryClientProvider>,
   );
   await screen.findByRole("region", { name: "Layouts" });
   return onBack;
 }
 
-const lastMenu = (): Exclude<MenuEntry, "separator">[] => mocked.popupMenu.mock.lastCall![0].filter((e): e is Exclude<MenuEntry, "separator"> => e !== "separator");
-const runEntry = (text: string) => {
-  const entry = lastMenu().find((e) => e.text === text);
-  if (!entry) throw new Error(`No menu entry "${text}"`);
-  return act(async () => entry.run?.());
+const openMenuOf = async (buttonName: string) => {
+  await userEvent.click(screen.getByRole("button", { name: buttonName }));
+  return screen.getByRole("menu", { name: buttonName });
 };
+const rowsOf = (menu: HTMLElement) => within(menu).getAllByRole("menuitemradio");
+const choose = (menu: HTMLElement, name: string) => userEvent.click(within(menu).getByRole("menuitemradio", { name }));
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -48,6 +50,17 @@ describe("SpaceSettings", () => {
     for (const name of ["General", "Layouts", "Statuses", "Custom fields"]) expect(await screen.findByRole("region", { name })).toBeInTheDocument();
     expect(mocked.spaceConfig).toHaveBeenCalledWith("10001");
     expect(mocked.statusStylesList).toHaveBeenCalledWith("10001");
+  });
+
+  it("opens the look popover from the header tile and saves the chosen color", async () => {
+    mocked.spaceUpdate.mockResolvedValue(undefined);
+    await renderSettings();
+
+    await userEvent.click(screen.getByRole("button", { name: "Icon and color of Website relaunch" }));
+    const dialog = screen.getByRole("dialog", { name: "Icon and color" });
+    await userEvent.click(within(dialog).getByRole("radio", { name: "Teal" }));
+
+    expect(mocked.spaceUpdate).toHaveBeenCalledWith("10001", expect.objectContaining({ color: "4" }));
   });
 
   it("goes back when the Spaces button is clicked", async () => {
@@ -127,9 +140,10 @@ describe("SpaceSettings", () => {
       const button = screen.getByRole("button", { name: "Grouping of new views" });
       expect(button).toHaveTextContent("Status");
 
-      await userEvent.click(button);
-      expect(lastMenu().find((e) => e.text === "Status")?.enabled).toBe(false);
-      await runEntry("Assignee");
+      const menu = await openMenuOf("Grouping of new views");
+      expect(within(menu).getByRole("menuitemradio", { name: "Status" })).toHaveAttribute("aria-checked", "true");
+      expect(within(menu).getByRole("menuitemradio", { name: "Assignee" })).toHaveAttribute("aria-checked", "false");
+      await choose(menu, "Assignee");
 
       expect(mocked.spaceSetLayouts).toHaveBeenCalledWith("10001", layouts({ defaultGroup: "assignee" }));
       expect(await screen.findByRole("button", { name: "Grouping of new views" })).toHaveTextContent("Assignee");
@@ -139,9 +153,9 @@ describe("SpaceSettings", () => {
       mocked.spaceSetLayouts.mockResolvedValue(spaceConfig({ layouts: layouts({ defaultGroup: "statusType" }) }));
       await renderSettings();
 
-      await userEvent.click(screen.getByRole("button", { name: "Grouping of new views" }));
-      expect(lastMenu().map((e) => e.text).slice(0, 2)).toEqual(["Status", "Status type"]);
-      await runEntry("Status type");
+      const menu = await openMenuOf("Grouping of new views");
+      expect(rowsOf(menu).map((r) => r.textContent).slice(0, 2)).toEqual(["Status", "Status type"]);
+      await choose(menu, "Status type");
 
       expect(mocked.spaceSetLayouts).toHaveBeenCalledWith("10001", layouts({ defaultGroup: "statusType" }));
       expect(await screen.findByRole("button", { name: "Grouping of new views" })).toHaveTextContent("Status type");
@@ -177,25 +191,25 @@ describe("SpaceSettings", () => {
       expect(screen.getByRole("button", { name: "Visibility of Story points" })).toHaveTextContent("Hidden everywhere");
     });
 
-    it("offers the four visibilities with the current one disabled", async () => {
+    it("offers the four visibilities with the current one checked", async () => {
       await renderSettings(spaceConfig({ fields }));
 
-      await userEvent.click(screen.getByRole("button", { name: "Visibility of Reviewer" }));
+      const menu = await openMenuOf("Visibility of Reviewer");
 
-      expect(lastMenu().map((e) => [e.text, e.enabled])).toEqual([
-        ["Visible", false],
-        ["Hidden in list", true],
-        ["Hidden in detail", true],
-        ["Hidden everywhere", true],
+      expect(rowsOf(menu).map((r) => [r.textContent, r.getAttribute("aria-checked")])).toEqual([
+        ["Visible", "true"],
+        ["Hidden in list", "false"],
+        ["Hidden in detail", "false"],
+        ["Hidden everywhere", "false"],
       ]);
     });
 
     it("saves the chosen visibility and shows the config Rust returns", async () => {
       mocked.spaceSetField.mockResolvedValue(spaceConfig({ fields: [{ ...fields[0], visibility: "hiddenInList" }, fields[1]] }));
       await renderSettings(spaceConfig({ fields }));
-      await userEvent.click(screen.getByRole("button", { name: "Visibility of Reviewer" }));
+      const menu = await openMenuOf("Visibility of Reviewer");
 
-      await runEntry("Hidden in list");
+      await choose(menu, "Hidden in list");
 
       expect(mocked.spaceSetField).toHaveBeenCalledWith("10001", "customfield_10071", "hiddenInList");
       expect(await screen.findByRole("button", { name: "Visibility of Reviewer" })).toHaveTextContent("Hidden in list");
@@ -204,9 +218,9 @@ describe("SpaceSettings", () => {
     it("shows an error toast when the visibility cannot be saved", async () => {
       mocked.spaceSetField.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
       await renderSettings(spaceConfig({ fields }));
-      await userEvent.click(screen.getByRole("button", { name: "Visibility of Reviewer" }));
+      const menu = await openMenuOf("Visibility of Reviewer");
 
-      await runEntry("Hidden in detail");
+      await choose(menu, "Hidden in detail");
 
       expect(await screen.findByRole("alert")).toHaveTextContent("Could not change Reviewer: Disk full");
       expect(screen.getByRole("button", { name: "Visibility of Reviewer" })).toHaveTextContent("Visible");

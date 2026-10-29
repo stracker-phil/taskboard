@@ -1,4 +1,4 @@
-/** A Space's name, icon, color and client label: the Spaces settings page and the sidebar's popover. */
+/** A Space's name, icon, color and client label: the Spaces settings page and the sidebar's client label popover. */
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -10,21 +10,14 @@ import { FieldError, TextField } from "./settings/fields";
 import { fieldErrorOf, type FieldErrors } from "./settings/useBusyAction";
 import { LookEditor } from "./look/LookEditor";
 import type { Look } from "./look/Tile";
-
-/** Which fields show: all of them (the settings page), or one popover's. */
-export type SpaceFieldsFocus = "appearance" | "client";
+import { spaceUpdateOf } from "./spaceUpdates";
 
 /** Saves one field with the others as they are; Rust's field errors show under their field. */
 function useSpaceUpdate(space: SpaceNode) {
   const client = useQueryClient();
   const [errors, setErrors] = useState<FieldErrors>({});
   const projectName = space.projectName;
-  const current: SpaceUpdate = {
-    name: space.name === projectName ? null : space.name,
-    icon: space.icon,
-    color: space.color,
-    client: space.client,
-  };
+  const current = spaceUpdateOf(space);
 
   const save = (field: keyof SpaceUpdate, value: string | null) => {
     setErrors((all) => Object.fromEntries(Object.entries(all).filter(([key]) => key !== field)));
@@ -47,13 +40,13 @@ function useSpaceUpdate(space: SpaceNode) {
   return { current, projectName, errors, save, saveLook };
 }
 
-/** The fields of a Space; each saves on its own (text on blur or ↵, the icon and color on click). */
-export function SpaceFields({ space, focus }: { space: SpaceNode; focus?: SpaceFieldsFocus }) {
+/** The fields of a Space, or only its client label; each saves on its own (text on blur or ↵, the icon and color
+ *  on click). */
+export function SpaceFields({ space, clientOnly = false }: { space: SpaceNode; clientOnly?: boolean }) {
   const { current, projectName, errors, save, saveLook } = useSpaceUpdate(space);
-  const showAppearance = focus !== "client";
   return (
     <div className="space-fields">
-      {!focus && (
+      {!clientOnly && (
         <TextField
           label="Name"
           description="Empty uses the Jira project's name."
@@ -63,7 +56,7 @@ export function SpaceFields({ space, focus }: { space: SpaceNode; focus?: SpaceF
           onCommit={(v) => save("name", v)}
         />
       )}
-      {showAppearance && (
+      {!clientOnly && (
         <Row label="Icon and color">
           <div className="settings-field">
             <LookEditor look={{ icon: current.icon, color: current.color ?? "1" }} fallback={space.name.charAt(0)} onChange={saveLook} />
@@ -71,25 +64,21 @@ export function SpaceFields({ space, focus }: { space: SpaceNode; focus?: SpaceF
           </div>
         </Row>
       )}
-      {focus !== "appearance" && (
-        <TextField
-          label="Client"
-          description="Empty marks the Space as internal."
-          placeholder="Internal"
-          value={current.client ?? ""}
-          error={errors.client}
-          onCommit={(v) => save("client", v)}
-        />
-      )}
+      <TextField
+        label="Client"
+        description="Empty marks the Space as internal."
+        placeholder="Internal"
+        value={current.client ?? ""}
+        error={errors.client}
+        onCommit={(v) => save("client", v)}
+      />
     </div>
   );
 }
 
-const POPOVER_TITLES: Record<SpaceFieldsFocus, string> = { appearance: "Icon and color", client: "Client label" };
-
-/** The sidebar's small popover for one Space. Esc, Done or a click outside close it; a field being edited saves
+/** The sidebar's popover for a Space's client label. Esc, Done or a click outside close it; a field being edited saves
  *  first. */
-export function SpacePopover({ space, focus, onClose }: { space: SpaceNode; focus: SpaceFieldsFocus; onClose: () => void }) {
+export function SpacePopover({ space, onClose }: { space: SpaceNode; onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const onCloseRef = useRef(onClose);
@@ -122,8 +111,8 @@ export function SpacePopover({ space, focus, onClose }: { space: SpaceNode; focu
 
   return createPortal(
     <div ref={ref} className="space-popover" role="dialog" aria-labelledby={titleId}>
-      <h2 id={titleId}>{POPOVER_TITLES[focus]}</h2>
-      <SpaceFields space={space} focus={focus} />
+      <h2 id={titleId}>Client label</h2>
+      <SpaceFields space={space} clientOnly />
       <div className="space-popover-actions">
         <button type="button" className="btn btn-primary" onClick={onClose}>
           Done

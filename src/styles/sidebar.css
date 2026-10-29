@@ -96,6 +96,7 @@
   color: inherit;
   text-align: left;
 }
+.sb-space__tile { display: flex; flex: none; padding: 0; border: none; border-radius: 6px; background: none; }
 .sb-space__add {
   display: grid;
   flex: none;

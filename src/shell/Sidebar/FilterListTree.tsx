@@ -1,8 +1,9 @@
-import { type HTMLAttributes, type MouseEvent, useRef, useState } from "react";
+import { type HTMLAttributes, type MouseEvent, useState } from "react";
 import { api, type ListNode, type SpaceNode } from "../../api";
 import { InlineRename } from "../../components/InlineRename";
+import { openContextMenu } from "../../components/menu";
 import { Funnel } from "lucide-react";
-import { LookPopover } from "../../components/look/LookPopover";
+import { LookButton } from "../../components/look/LookButton";
 import { Tile } from "../../components/look/Tile";
 import { usePinOf } from "../../queries/pins";
 import { attempt } from "../../state/requests";
@@ -74,23 +75,26 @@ interface RowProps {
   dragProps: HTMLAttributes<HTMLElement>;
 }
 
+/** A filter list: a click on the current list's name renames it, one on its icon edits the look. */
 function FilterListRow({ list, active, renaming, onOpen, onRename, onRenameDone, dragProps }: RowProps) {
   const pin = usePinOf("filterList", String(list.id));
-  const openMenu = (e: MouseEvent) => {
-    e.preventDefault();
-    void api.popupMenu([
-      { text: "Rename", run: onRename },
-      { text: "Duplicate", run: () => void attempt(api.listDuplicate(list.id), "Could not duplicate the filter list") },
-      pin
-        ? { text: "Remove from Home", run: () => void attempt(api.pinRemove(pin.id), "Could not remove the filter list from Home") }
-        : { text: "Add to Home", run: () => void attempt(api.pinCreate("filterList", String(list.id), "untilUnpinned", null), "Could not add the filter list to Home") },
-      "separator",
-      { text: "Delete", run: () => void deleteList(list) },
-    ]);
-  };
+  const [editingLook, setEditingLook] = useState(false);
+  const openMenu = (e: MouseEvent) =>
+    openContextMenu(
+      e,
+      [
+        { text: "Rename", run: onRename },
+        { text: "Icon and Color…", run: () => setEditingLook(true) },
+        { text: "Duplicate", run: () => void attempt(api.listDuplicate(list.id), "Could not duplicate the filter list") },
+        pin
+          ? { text: "Remove from Home", run: () => void attempt(api.pinRemove(pin.id), "Could not remove the filter list from Home") }
+          : { text: "Add to Home", run: () => void attempt(api.pinCreate("filterList", String(list.id), "untilUnpinned", null), "Could not add the filter list to Home") },
+        "separator",
+        { text: "Delete", danger: true, run: () => void deleteList(list) },
+      ],
+      list.name,
+    );
   const icon = <Tile icon={list.icon} color={list.color} fallback={Funnel} size={list.color ? 16 : 15} />;
-  const [picking, setPicking] = useState(false);
-  const iconRef = useRef<HTMLButtonElement>(null);
   if (renaming) {
     return (
       <div className="sb-row sb-list" {...dragProps}>
@@ -105,42 +109,34 @@ function FilterListRow({ list, active, renaming, onOpen, onRename, onRenameDone,
     );
   }
   return (
-    <div className="sb-list-row" {...dragProps}>
+    <div className="sb-list-row" onContextMenu={openMenu} {...dragProps}>
       <button
         type="button"
         className="sb-row sb-list"
         data-state={active ? "active" : undefined}
         aria-current={active ? "page" : undefined}
-        onClick={onOpen}
-        onContextMenu={openMenu}
+        title={active ? "Click to rename" : undefined}
+        onClick={active ? onRename : onOpen}
+        onDoubleClick={onRename}
       >
         <span className="sb-list__icon-slot" aria-hidden="true" />
         <span className="sb-row__label">{list.name}</span>
         <ListCount list={list} />
       </button>
-      {/* The icon sits over the row's icon slot: a click on it changes the look (ClickUp style). */}
-      <button
-        ref={iconRef}
-        type="button"
+      {/* The icon sits over the row's icon slot (ClickUp style). */}
+      <LookButton
+        label={`Icon and color of ${list.name}`}
         className="sb-list__icon"
-        title="Icon and color"
-        aria-label={`Change the icon and color of ${list.name}`}
-        aria-expanded={picking}
-        onClick={() => setPicking((was) => !was)}
+        look={{ icon: list.icon, color: list.color }}
+        fallback={Funnel}
+        colorOptional
+        open={editingLook}
+        onOpenChange={setEditingLook}
+        onSelect={active ? undefined : onOpen}
+        onChange={(look) => void attempt(api.listSetLook(list.id, look.icon, look.color), "Could not change the icon")}
       >
         {icon}
-      </button>
-      {picking && (
-        <LookPopover
-          title="Icon and color"
-          look={{ icon: list.icon, color: list.color }}
-          fallback={Funnel}
-          colorOptional
-          anchor={iconRef}
-          onChange={(look) => void attempt(api.listSetLook(list.id, look.icon, look.color), "Could not change the icon")}
-          onClose={() => setPicking(false)}
-        />
-      )}
+      </LookButton>
     </div>
   );
 }

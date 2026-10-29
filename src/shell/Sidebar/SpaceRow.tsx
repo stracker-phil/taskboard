@@ -1,17 +1,16 @@
 import { Plus } from "lucide-react";
-import type { HTMLAttributes, MouseEvent } from "react";
+import { useState, type HTMLAttributes, type MouseEvent } from "react";
 import { api, type SpaceNode } from "../../api";
 import { InlineRename } from "../../components/InlineRename";
-import { SpaceTile } from "../../components/SpaceTile";
+import { openContextMenu } from "../../components/menu";
+import { SpaceLookButton } from "../../components/SpaceLookButton";
+import { renameSpace } from "../../components/spaceUpdates";
 import { attempt, runBusCommand } from "../../state/requests";
 import { useStore } from "../../state/store";
 
-/** Which part of a Space the small Space popover opens on. */
-export type SpaceEditFocus = "appearance" | "client";
-
 interface Props {
   space: SpaceNode;
-  /** The Space itself is the current level. */
+  /** The Space itself is the current level: a click on its name renames it, one on its tile edits the look. */
   active: boolean;
   /** One of its filter lists is the current level. */
   holdsActive: boolean;
@@ -22,31 +21,29 @@ interface Props {
   onToggle: (others: boolean) => void;
   onRename: () => void;
   onRenameDone: () => void;
-  onEdit: (focus: SpaceEditFocus) => void;
+  onEditClient: () => void;
   onAddList: () => void;
   /** Pointer handlers that drag the row. */
   dragHandle: HTMLAttributes<HTMLElement>;
 }
 
-function rename(space: SpaceNode, name: string) {
-  const { icon, color, client } = space;
-  void attempt(api.spaceUpdate(space.projectId, { name, icon, color, client }), "Could not rename the Space");
-}
-
 /** A Space in the sidebar: chevron, tile, name and, once it has filter lists, a + for another; the row opens it,
  *  the chevron folds its lists. */
-export function SpaceRow({ space, active, holdsActive, expanded, renaming, onOpen, onToggle, onRename, onRenameDone, onEdit, onAddList, dragHandle }: Props) {
-  const openMenu = (e: MouseEvent) => {
-    e.preventDefault();
-    void api.popupMenu([
-      { text: "Rename", run: onRename },
-      { text: "Icon and Color…", run: () => onEdit("appearance") },
-      { text: "Client label…", run: () => onEdit("client") },
-      { text: "Space Settings…", run: () => runBusCommand(`app:settings:space:${space.projectId}`, "Could not open the Space's settings") },
-      "separator",
-      { text: "Stop tracking", run: () => void stopTracking(space) },
-    ]);
-  };
+export function SpaceRow({ space, active, holdsActive, expanded, renaming, onOpen, onToggle, onRename, onRenameDone, onEditClient, onAddList, dragHandle }: Props) {
+  const [editingLook, setEditingLook] = useState(false);
+  const openMenu = (e: MouseEvent) =>
+    openContextMenu(
+      e,
+      [
+        { text: "Rename", run: onRename },
+        { text: "Icon and Color…", run: () => setEditingLook(true) },
+        { text: "Client label…", run: onEditClient },
+        { text: "Space Settings…", run: () => runBusCommand(`app:settings:space:${space.projectId}`, "Could not open the Space's settings") },
+        "separator",
+        { text: "Stop tracking", danger: true, run: () => void stopTracking(space) },
+      ],
+      space.name,
+    );
   const state = active ? "active" : holdsActive ? "holds-active" : undefined;
   return (
     <div className="sb-row sb-space" data-state={state} onContextMenu={openMenu} {...dragHandle}>
@@ -59,14 +56,27 @@ export function SpaceRow({ space, active, holdsActive, expanded, renaming, onOpe
       >
         <span className="sb-space__glyph" aria-hidden="true">▾</span>
       </button>
+      <SpaceLookButton
+        space={space}
+        size={22}
+        className="sb-space__tile"
+        open={editingLook}
+        onOpenChange={setEditingLook}
+        onSelect={active ? undefined : onOpen}
+      />
       {renaming ? (
         <div className="sb-space__main">
-          <SpaceTile space={space} size={22} />
-          <InlineRename value={space.name} label="Space name" onSave={(name) => rename(space, name)} onDone={onRenameDone} />
+          <InlineRename value={space.name} label="Space name" onSave={(name) => renameSpace(space, name)} onDone={onRenameDone} />
         </div>
       ) : (
-        <button type="button" className="sb-space__main" aria-current={active ? "page" : undefined} onClick={onOpen}>
-          <SpaceTile space={space} size={22} />
+        <button
+          type="button"
+          className="sb-space__main"
+          aria-current={active ? "page" : undefined}
+          title={active ? "Click to rename" : undefined}
+          onClick={active ? onRename : onOpen}
+          onDoubleClick={onRename}
+        >
           <span className="sb-row__label">{space.name}</span>
         </button>
       )}

@@ -53,4 +53,5 @@
 /* One Space's settings page: a way back to the list, then the Space's tile and name. */
 .space-settings-head { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; }
 .space-settings-back { gap: 2px; padding-left: 6px; }
+.space-settings-head__tile { display: flex; flex: none; padding: 0; border: none; border-radius: 6px; background: none; }
 .space-settings-head__name { margin: 0; font-size: 15px; font-weight: 600; }

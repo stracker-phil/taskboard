@@ -5,8 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
 
-import { api, type Layout, type MenuEntry } from "../api";
+import { api, type Layout } from "../api";
 import { ConfirmHost } from "../components/ConfirmSheet";
+import { MenuHost } from "../components/menu";
 import { installCommands, useCommandKeys } from "../commands";
 import { runPageAction } from "../commands/pageActions";
 import { getCommand } from "../commands/registry";
@@ -37,27 +38,23 @@ async function renderTabs(views = [LIST, BOARD], viewId = 101) {
     <QueryClientProvider client={createQueryClient()}>
       <Harness viewId={viewId} />
       <ConfirmHost />
+      <MenuHost />
     </QueryClientProvider>,
   );
   await screen.findByRole("tab", { name: views[0].name });
 }
 
-type Entry = Exclude<MenuEntry, "separator">;
-const entriesOf = (entries: MenuEntry[]) => entries.filter((e): e is Entry => e !== "separator");
+const rightClick = (name: string) => userEvent.pointer({ keys: "[MouseRight]", target: screen.getByRole("tab", { name }) });
 
-/** Runs the entry with this text from the native menu that was last popped up (or from one of its submenus). */
-function choose(text: string, submenu?: string) {
-  const top = entriesOf(mocked.popupMenu.mock.lastCall![0]);
-  const entries = submenu ? entriesOf(top.find((e) => e.text === submenu)!.items!) : top;
-  const entry = entries.find((e) => e.text === text);
-  if (!entry) throw new Error(`No menu entry "${text}"`);
-  return act(async () => entry.run?.());
+/** The row with this name in the open menu, whatever its kind. */
+function row(text: string) {
+  const menu = within(screen.getByRole("menu"));
+  const found = (["menuitem", "menuitemradio", "menuitemcheckbox"] as const).flatMap((role) => menu.queryAllByRole(role, { name: text }));
+  if (found.length !== 1) throw new Error(`Expected one menu row "${text}", found ${found.length}`);
+  return found[0];
 }
-
-const entry = (text: string, submenu?: string) => {
-  const top = entriesOf(mocked.popupMenu.mock.lastCall![0]);
-  return entriesOf(submenu ? top.find((e) => e.text === submenu)!.items! : top).find((e) => e.text === text)!;
-};
+const choose = (text: string) => userEvent.click(row(text));
+const tileOf = (name: string) => screen.getByRole("tab", { name }).querySelector<HTMLElement>(".view-tab__look")!;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -121,18 +118,13 @@ describe("ViewTabs", () => {
   });
 
   describe("+ View", () => {
-    it("opens a New view dialog offering the three layouts, without a native menu", async () => {
+    it("opens a New view menu offering the three layouts", async () => {
       await renderTabs();
 
       await userEvent.click(screen.getByRole("button", { name: "+ View" }));
 
-      const dialog = screen.getByRole("dialog", { name: "New view" });
-      expect(within(dialog).getAllByRole("button").map((b) => b.textContent)).toEqual([
-        "ListGroups of rows",
-        "BoardStatus columns",
-        "TableA dense grid",
-      ]);
-      expect(mocked.popupMenu).not.toHaveBeenCalled();
+      const menu = within(screen.getByRole("menu", { name: "New view" }));
+      expect(menu.getAllByRole("menuitem").map((b) => b.textContent)).toEqual(["ListGroups of rows", "BoardStatus columns", "TableA dense grid"]);
     });
 
     it("offers only the layouts the Space offers", async () => {
@@ -140,19 +132,19 @@ describe("ViewTabs", () => {
 
       await userEvent.click(screen.getByRole("button", { name: "+ View" }));
 
-      const dialog = screen.getByRole("dialog", { name: "New view" });
-      expect(within(dialog).getByRole("button", { name: /^List/ })).toBeInTheDocument();
-      expect(within(dialog).getByRole("button", { name: /^Table/ })).toBeInTheDocument();
-      expect(within(dialog).queryByRole("button", { name: /^Board/ })).not.toBeInTheDocument();
+      const menu = within(screen.getByRole("menu", { name: "New view" }));
+      expect(menu.getByRole("menuitem", { name: /^List/ })).toBeInTheDocument();
+      expect(menu.getByRole("menuitem", { name: /^Table/ })).toBeInTheDocument();
+      expect(menu.queryByRole("menuitem", { name: /^Board/ })).not.toBeInTheDocument();
     });
 
-    it("closes the dialog on Escape", async () => {
+    it("closes the menu on Escape", async () => {
       await renderTabs();
       await userEvent.click(screen.getByRole("button", { name: "+ View" }));
 
       await userEvent.keyboard("{Escape}");
 
-      expect(screen.queryByRole("dialog", { name: "New view" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("menu", { name: "New view" })).not.toBeInTheDocument();
     });
 
     it.each([
@@ -164,11 +156,11 @@ describe("ViewTabs", () => {
       await renderTabs();
       await userEvent.click(screen.getByRole("button", { name: "+ View" }));
 
-      await userEvent.click(within(screen.getByRole("dialog", { name: "New view" })).getByRole("button", { name: new RegExp(`^${name}`) }));
+      await userEvent.click(within(screen.getByRole("menu", { name: "New view" })).getByRole("menuitem", { name: new RegExp(`^${name}`) }));
 
       expect(mocked.viewCreate).toHaveBeenCalledWith(11, name, layout);
       await waitFor(() => expect(mocked.navGo).toHaveBeenCalledWith(11, 200));
-      expect(screen.queryByRole("dialog", { name: "New view" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("menu", { name: "New view" })).not.toBeInTheDocument();
     });
 
     it("shows an error toast and stays put when the view cannot be added", async () => {
@@ -176,10 +168,53 @@ describe("ViewTabs", () => {
       await renderTabs();
       await userEvent.click(screen.getByRole("button", { name: "+ View" }));
 
-      await userEvent.click(within(screen.getByRole("dialog", { name: "New view" })).getByRole("button", { name: /^Board/ }));
+      await userEvent.click(within(screen.getByRole("menu", { name: "New view" })).getByRole("menuitem", { name: /^Board/ }));
 
       await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not add the view: Disk full"));
       expect(mocked.navGo).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("click on a selected tab", () => {
+    it("starts the inline rename and saves the new name", async () => {
+      mocked.viewRename.mockResolvedValue({ ...LIST, name: "Backlog" });
+      await renderTabs();
+
+      await userEvent.click(screen.getByRole("tab", { name: "List" }));
+      const field = await screen.findByRole("textbox", { name: "View name" });
+      expect(field).toHaveValue("List");
+      await userEvent.clear(field);
+      await userEvent.type(field, "Backlog{Enter}");
+
+      expect(mocked.viewRename).toHaveBeenCalledWith(101, "Backlog");
+      expect(mocked.navGo).not.toHaveBeenCalled();
+    });
+
+    it("opens an unselected tab without renaming it", async () => {
+      await renderTabs();
+
+      await userEvent.click(screen.getByRole("tab", { name: "Sprint board" }));
+
+      expect(mocked.navGo).toHaveBeenCalledWith(11, 102);
+      expect(screen.queryByRole("textbox", { name: "View name" })).not.toBeInTheDocument();
+    });
+
+    it("opens the Icon and color popover from the selected tab's tile, without renaming", async () => {
+      await renderTabs();
+
+      await userEvent.click(tileOf("List"));
+
+      expect(await screen.findByRole("dialog", { name: "Icon and color" })).toBeInTheDocument();
+      expect(screen.queryByRole("textbox", { name: "View name" })).not.toBeInTheDocument();
+    });
+
+    it("only opens an unselected tab from its tile", async () => {
+      await renderTabs();
+
+      await userEvent.click(tileOf("Sprint board"));
+
+      expect(mocked.navGo).toHaveBeenCalledWith(11, 102);
+      expect(screen.queryByRole("dialog", { name: "Icon and color" })).not.toBeInTheDocument();
     });
   });
 
@@ -374,34 +409,63 @@ describe("ViewTabs", () => {
       });
     });
 
-    it("changes a view's layout, with its current layout disabled", async () => {
+    it("opens a menu named after the view with its actions", async () => {
+      await renderTabs();
+
+      await rightClick("Sprint board");
+
+      const menu = within(screen.getByRole("menu", { name: "Sprint board" }));
+      expect(menu.getAllByRole("menuitem").map((r) => r.textContent)).toEqual(["Rename", "Icon and Color…", "Duplicate", "Delete"]);
+      expect(menu.getByRole("group", { name: "Layout" })).toBeInTheDocument();
+    });
+
+    it("checks the view's current layout in the Layout group", async () => {
+      await renderTabs();
+
+      await rightClick("Sprint board");
+
+      const group = within(screen.getByRole("group", { name: "Layout" }));
+      expect(group.getAllByRole("menuitemradio").map((r) => [r.textContent, r.getAttribute("aria-checked")])).toEqual([
+        ["List", "false"],
+        ["Board", "true"],
+        ["Table", "false"],
+      ]);
+    });
+
+    it("changes a view's layout", async () => {
       mocked.viewSetLayout.mockResolvedValue({ ...BOARD, layout: "table" });
       await renderTabs();
-      await userEvent.pointer({ keys: "[MouseRight]", target: screen.getByRole("tab", { name: "Sprint board" }) });
+      await rightClick("Sprint board");
 
-      expect(entry("Board", "Change layout").enabled).toBe(false);
-      expect(entry("List", "Change layout").enabled).toBe(true);
-      expect(entry("Table", "Change layout").enabled).toBe(true);
-      await choose("Table", "Change layout");
+      await choose("Table");
 
       expect(mocked.viewSetLayout).toHaveBeenCalledWith(102, "table");
     });
 
-    it("lists only the layouts the Space offers under Change layout", async () => {
+    it("keeps the layout when the checked one is chosen", async () => {
+      await renderTabs();
+      await rightClick("Sprint board");
+
+      await choose("Board");
+
+      expect(mocked.viewSetLayout).not.toHaveBeenCalled();
+    });
+
+    it("lists only the layouts the Space offers in the Layout group", async () => {
       await renderTabs([view({ id: 101, name: "List", layouts: ["list", "table"] })]);
-      await userEvent.pointer({ keys: "[MouseRight]", target: screen.getByRole("tab", { name: "List" }) });
+      await rightClick("List");
 
-      const layouts = entriesOf(entry("Change layout").items!).map((e) => e.text);
+      const layouts = within(screen.getByRole("group", { name: "Layout" })).getAllByRole("menuitemradio");
 
-      expect(layouts).toEqual(["List", "Table"]);
+      expect(layouts.map((r) => r.textContent)).toEqual(["List", "Table"]);
     });
 
     it("disables Delete for the only view", async () => {
       await renderTabs([LIST]);
 
-      await userEvent.pointer({ keys: "[MouseRight]", target: screen.getByRole("tab", { name: "List" }) });
+      await rightClick("List");
 
-      expect(entry("Delete").enabled).toBe(false);
+      expect(row("Delete")).toHaveAttribute("aria-disabled", "true");
     });
 
     it("asks first, then deletes the current view and opens the level's default view", async () => {
@@ -409,7 +473,7 @@ describe("ViewTabs", () => {
       await renderTabs([LIST, BOARD], 101);
       await userEvent.pointer({ keys: "[MouseRight]", target: screen.getByRole("tab", { name: "List" }) });
 
-      expect(entry("Delete").enabled).toBe(true);
+      expect(row("Delete")).not.toHaveAttribute("aria-disabled");
       await choose("Delete");
 
       expect(await screen.findByRole("alertdialog", { name: "Delete the view “List”?" })).toBeInTheDocument();
@@ -467,20 +531,20 @@ describe("ViewTabs", () => {
     };
 
     describe("view.new", () => {
-      it("opens the New view dialog", async () => {
+      it("opens the New view menu", async () => {
         await renderTabs();
 
         run("view.new");
 
-        expect(await screen.findByRole("dialog", { name: "New view" })).toBeInTheDocument();
+        expect(await screen.findByRole("menu", { name: "New view" })).toBeInTheDocument();
       });
 
-      it("opens the New view dialog on ⌘T", async () => {
+      it("opens the New view menu on ⌘T", async () => {
         await renderTabs();
 
         await userEvent.keyboard("{Meta>}t{/Meta}");
 
-        expect(await screen.findByRole("dialog", { name: "New view" })).toBeInTheDocument();
+        expect(await screen.findByRole("menu", { name: "New view" })).toBeInTheDocument();
       });
     });
 
