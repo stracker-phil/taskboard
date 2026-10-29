@@ -4,26 +4,20 @@ use chrono::Utc;
 use rusqlite::{Connection, OptionalExtension, params};
 use serde_json::Value;
 
-use crate::connection::JiraAccess;
 use crate::db::Db;
 use crate::error::AppResult;
 use crate::jira::dto::Comment;
-use crate::store::settings::Connection as JiraConnection;
 use crate::sync::map::{format_utc, html_to_text, utc};
+use crate::sync::source::Source;
 
 /// Fetches the issue's comments unless they were fetched in full after its last update. Returns whether it
 /// fetched; the cache emits `issues_changed` for the issue when it did.
-pub async fn issue_sync_comments(
-    db: &Db,
-    access: &JiraAccess,
-    connection: &JiraConnection,
-    id: String,
-) -> AppResult<bool> {
+pub async fn issue_sync_comments(db: &Db, source: &dyn Source, id: String) -> AppResult<bool> {
     let lookup = id.clone();
     let Some(key) = db.read(move |conn| stale_key(conn, &lookup)).await? else {
         return Ok(false);
     };
-    let comments = access.client(connection)?.comments(&key).await?;
+    let comments = source.comments(&key).await?;
     let now = format_utc(Utc::now());
     db.write(move |tx, changes| {
         store(tx, &id, &comments, &now)?;

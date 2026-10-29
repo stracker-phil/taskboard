@@ -175,7 +175,7 @@ async fn lab() -> (TempDir, Db) {
     let db = Db::open(dir.path()).unwrap();
     execute(
         &db,
-        "INSERT INTO cache.project (id, key, name, raw) VALUES
+        "INSERT INTO cache.space (id, key, name, raw) VALUES
            ('10001', 'NW', 'Website relaunch', '{}'),
            ('10002', 'NWS', 'Northwind support', '{}')",
     )
@@ -241,7 +241,7 @@ mod defaults_on_tracking {
         let db = Db::open(dir.path()).unwrap();
         execute(
             &db,
-            "INSERT INTO cache.project (id, key, name, raw) VALUES ('10001', 'NW', 'Website relaunch', '{}');
+            "INSERT INTO cache.space (id, key, name, raw) VALUES ('10001', 'NW', 'Website relaunch', '{}');
              INSERT INTO cache.version (id, project_id, name, release_date, released) VALUES
                ('20001', '10001', '2.3.1', '2026-09-01', 1),
                ('20002', '10001', '2.5.0', '2026-12-01', 0),
@@ -2216,7 +2216,7 @@ mod editing_spaces {
         let (_dir, db) = two_spaces().await;
         execute(
             &db,
-            "INSERT INTO cache.project (id, key, name, raw) VALUES ('10003', 'LUM', 'Lumen iOS app', '{}')",
+            "INSERT INTO cache.space (id, key, name, raw) VALUES ('10003', 'LUM', 'Lumen iOS app', '{}')",
         )
         .await;
         track_project(&db, LUM.into(), true).await.unwrap();

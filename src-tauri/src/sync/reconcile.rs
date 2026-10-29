@@ -23,9 +23,9 @@ pub async fn reconcile(
     if scope.is_empty() {
         return Ok(());
     }
-    let client = ctx.access.client(&ctx.settings.get().connection)?;
+    let source = ctx.source()?;
     let mut in_scope = HashSet::new();
-    let mut pages = client.search_jql(SearchRequest {
+    let mut pages = source.issues(SearchRequest {
         jql: scope,
         fields: vec!["updated".into()],
         expand: None,
@@ -41,10 +41,10 @@ pub async fn reconcile(
         .filter(|id| !in_scope.contains(id))
         .collect();
     if !missing.is_empty() {
-        let ids = refresh_fields(ctx, &client).await?;
+        let ids = refresh_fields(ctx, source.as_ref()).await?;
         let fields = search_fields(ctx, &ids).await?;
         for batch in missing.chunks(BULK_FETCH_MAX) {
-            let found = client.bulk_fetch(batch, &fields).await?;
+            let found = source.fetch(batch, &fields).await?;
             let returned: HashSet<String> =
                 found.issues.iter().map(|issue| issue.id.clone()).collect();
             let gone: Vec<String> = batch

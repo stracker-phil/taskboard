@@ -238,7 +238,7 @@ async fn count(db: &Db, sql: &'static str) -> i64 {
 async fn issues_per_project(db: &Db) -> BTreeMap<String, i64> {
     rows(
         db,
-        "SELECT p.key, COUNT(*) FROM cache.issue i JOIN cache.project p ON p.id = i.project_id
+        "SELECT p.key, COUNT(*) FROM cache.issue i JOIN cache.space p ON p.id = i.project_id
          GROUP BY p.key",
         |row| Ok((row.get(0)?, row.get(1)?)),
     )
@@ -593,7 +593,7 @@ mod the_full_sync {
         assert_eq!(count(db, "SELECT COUNT(*) FROM cache.status").await, 5);
         let versions: Vec<(String, String)> = rows(
             db,
-            "SELECT p.key, v.name FROM cache.version v JOIN cache.project p ON p.id = v.project_id
+            "SELECT p.key, v.name FROM cache.version v JOIN cache.space p ON p.id = v.project_id
              ORDER BY p.key, v.name",
             |row| Ok((row.get(0)?, row.get(1)?)),
         )
@@ -1608,7 +1608,7 @@ mod reconciliation {
         assert_eq!(
             text_of(
                 db,
-                "SELECT p.key FROM cache.issue i JOIN cache.project p ON p.id = i.project_id
+                "SELECT p.key FROM cache.issue i JOIN cache.space p ON p.id = i.project_id
                  WHERE i.id = '101049'"
             )
             .await,
@@ -1688,5 +1688,29 @@ mod reconciliation {
         assert!(matches!(state, SyncState::Offline { .. }), "{state:?}");
         assert_eq!(rig.requests(), before);
         assert_eq!(gone_flag(&rig.ctx.db, "NW-1044").await, 0);
+    }
+}
+
+mod the_source {
+    use super::*;
+    use taskboard_lib::sync::source::SourceKind;
+    use taskboard_lib::sync::source_for;
+
+    #[tokio::test]
+    async fn for_a_jira_connection_is_a_jira_source_listing_the_demo_spaces() {
+        let rig = Rig::connected().await;
+        let connection = rig.ctx.settings.get().connection;
+
+        let source = source_for(&rig.ctx.access, &connection).unwrap();
+
+        assert_eq!(source.kind(), SourceKind::Jira);
+        let keys: Vec<String> = source
+            .spaces()
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|space| space.key)
+            .collect();
+        assert_eq!(keys, ["NW", "NWS", "LUM", "FBA", "INT", "ARC"]);
     }
 }

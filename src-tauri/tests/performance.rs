@@ -71,7 +71,7 @@ async fn synthetic_site() -> (TempDir, Db) {
     db.write(move |tx, changes| {
         for project in &projects {
             tx.execute(
-                "INSERT INTO cache.project (id, key, name, raw) VALUES (?1, ?2, ?3, ?4)",
+                "INSERT INTO cache.space (id, key, name, raw) VALUES (?1, ?2, ?3, ?4)",
                 rusqlite::params![
                     project.id,
                     project.key,

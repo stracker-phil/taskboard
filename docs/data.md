@@ -11,7 +11,7 @@ All in the config dir (`~/Library/Application Support/com.philippstracker.taskbo
 | File | Holds | Reset cache |
 |---|---|---|
 | `local.sqlite` | The owner's setup: Spaces, filter lists, views, pins, status style overrides | kept |
-| `cache.sqlite` | The Jira mirror: projects, issues, comments, people, versions, fields, change log, seen marks, sync state, search index | deleted and recreated empty |
+| `cache.sqlite` | The tracker mirror (Jira today): spaces, issues, comments, people, versions, fields, change log, seen marks, sync state, search index | deleted and recreated empty |
 | `settings.json`, `keybindings.json`, `ui_state.json`, `places.json` | Settings, key overrides, window layout, each view's remembered place (`store/`) | kept |
 | `nav.json` | The main window's place: the open level and view, each level's last view, the expanded Spaces (`nav/`). A place that no longer exists falls back to the level's default view, then to Everything | kept |
 
@@ -42,11 +42,13 @@ commands, which validate them. Tracking a project writes `local.space`, not the 
 
 ## Tables
 
-**cache** (Jira's data, plus our derived columns):
+**cache** (the tracker's data, plus our derived columns). `space`, `issue` and `comment` carry `source` (`jira`
+today; migration `cache/0003`, [ADR 0029](adr/0029-issues-come-from-a-source-jira-is-the-first.md)); ids are
+unique across sources (Jira's numeric ids; another source prefixes its own):
 
 | Table | Notes |
 |---|---|
-| `project` | Jira fields only (`id, key, name, avatar_url, raw`); the owner's Space settings are in `local.space` |
+| `space` | the tracker's projects (renamed from `project` in `cache/0003`): `id, key, name, avatar_url, raw, source`; the owner's Space settings are in `local.space`, so queries name this one `cache.space` |
 | `status` | `id, name, category` (`new`, `indeterminate`, `done`) |
 | `issue` | keyed by the numeric Jira id (as text), never the key. Normalised columns for everything the UI filters, groups or sorts on, `raw` for the rest. Ours, derived during sync: `status_category`, `type_is_subtask`, `is_epic`, `sprint_id`, `sprint_state`, `comment_count`, `comments_synced_at`, `synced_at`, `gone` |
 | `issue_change` | what the sync saw change (status, assignee, due date, priority, comments, created) |

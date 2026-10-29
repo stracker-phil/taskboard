@@ -38,5 +38,6 @@ stands in Taskboard. The numbers in this table are Taskboard's.
 | [0026](0026-the-debug-build-keeps-its-demo-token-in-memory.md) | The debug build keeps its demo token in memory | Accepted (2026-10-28) |
 | [0027](0027-jira-html-is-sanitised-and-shows-no-remote-content.md) | Jira HTML is sanitised and shows no remote content | Accepted (2026-10-28) |
 | [0028](0028-automatic-light-or-dark-with-one-palette-each.md) | Automatic, light or dark, with one palette each | Accepted (2026-10-29) |
+| [0029](0029-issues-come-from-a-source-jira-is-the-first.md) | Issues come from a source; Jira is the first | Accepted (2026-10-29) |
 
 Open: integrations with Daybook and TimeTracker.

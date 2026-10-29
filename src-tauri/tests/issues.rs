@@ -18,7 +18,7 @@ use taskboard_lib::jira::{Limiter, TokenKind};
 use taskboard_lib::lists::Viewer;
 use taskboard_lib::status_style::{Style, status_style_set};
 use taskboard_lib::store::settings::SettingsStore;
-use taskboard_lib::sync::{Emit, SyncContext, full_sync};
+use taskboard_lib::sync::{Emit, SyncContext, full_sync, source_for};
 use taskboard_lib::test_support::demo::{self, DEMO_NOW, ME_EMAIL, REVIEWER};
 use taskboard_lib::test_support::fake_jira::{DEMO_TOKEN, FakeJira};
 use taskboard_lib::test_support::{FakeSecrets, temp_config_dir};
@@ -138,7 +138,8 @@ impl Site {
     async fn sync_comments(&self, key: &str) -> bool {
         let id = self.id_of(key).await;
         let connection = self.ctx.settings.get().connection;
-        issue_sync_comments(self.db(), &self.ctx.access, &connection, id)
+        let source = source_for(&self.ctx.access, &connection).unwrap();
+        issue_sync_comments(self.db(), source.as_ref(), id)
             .await
             .unwrap()
     }
@@ -935,7 +936,9 @@ async fn an_unknown_issue_is_not_fetched() {
     let site = Site::new().await;
     let connection = site.ctx.settings.get().connection;
 
-    let fetched = issue_sync_comments(site.db(), &site.ctx.access, &connection, "99999999".into())
+    let source = source_for(&site.ctx.access, &connection).unwrap();
+
+    let fetched = issue_sync_comments(site.db(), source.as_ref(), "99999999".into())
         .await
         .unwrap();
 

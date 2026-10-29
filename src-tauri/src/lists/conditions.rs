@@ -276,7 +276,7 @@ fn options(conn: &Connection) -> AppResult<FilterOptions> {
         epics: choices(
             conn,
             &format!(
-                "SELECT i.id, p.key || ' · ' || i.summary FROM cache.issue i JOIN cache.project p ON p.id = i.project_id
+                "SELECT i.id, p.key || ' · ' || i.summary FROM cache.issue i JOIN cache.space p ON p.id = i.project_id
                  WHERE i.is_epic = 1 AND i.gone = 0 AND i.project_id IN ({tracked})
                  ORDER BY p.key, i.summary COLLATE NOCASE"
             ),
@@ -284,7 +284,7 @@ fn options(conn: &Connection) -> AppResult<FilterOptions> {
         releases: choices(
             conn,
             &format!(
-                "SELECT v.id, p.key || ' · ' || v.name FROM cache.version v JOIN cache.project p ON p.id = v.project_id
+                "SELECT v.id, p.key || ' · ' || v.name FROM cache.version v JOIN cache.space p ON p.id = v.project_id
                  WHERE v.project_id IN ({tracked}) ORDER BY p.key, v.released, v.release_date, v.name"
             ),
         )?,
@@ -299,7 +299,7 @@ fn options(conn: &Connection) -> AppResult<FilterOptions> {
         projects: choices(
             conn,
             &format!(
-                "SELECT p.id, p.key || ' · ' || p.name FROM cache.project p WHERE p.id IN ({tracked}) ORDER BY p.key"
+                "SELECT p.id, p.key || ' · ' || p.name FROM cache.space p WHERE p.id IN ({tracked}) ORDER BY p.key"
             ),
         )?,
     })

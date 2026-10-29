@@ -571,7 +571,7 @@ mod projects {
         refresh_projects(&db, &client).await.unwrap();
         db.write(|tx, _| {
             tx.execute(
-                "INSERT INTO cache.project (id, key, name, raw) VALUES ('99999', 'OLD', 'Old site', '{}')",
+                "INSERT INTO cache.space (id, key, name, raw) VALUES ('99999', 'OLD', 'Old site', '{}')",
                 [],
             )?;
             Ok(())

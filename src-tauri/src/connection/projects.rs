@@ -27,7 +27,11 @@ pub struct ProjectRow {
 /// Fetches every project the user can browse into the cache; projects Jira no longer lists are dropped
 /// there (their Space settings stay).
 pub async fn refresh_projects(db: &Db, client: &JiraClient) -> AppResult<Vec<ProjectRow>> {
-    let projects = client.projects().await?;
+    store_spaces(db, client.projects().await?).await
+}
+
+/// Replaces the cached spaces with the source's list and returns them as the Projects page lists them.
+pub async fn store_spaces(db: &Db, projects: Vec<Project>) -> AppResult<Vec<ProjectRow>> {
     db.write(move |tx, _| {
         drop_unlisted(tx, &projects)?;
         for project in &projects {
@@ -40,19 +44,19 @@ pub async fn refresh_projects(db: &Db, client: &JiraClient) -> AppResult<Vec<Pro
 }
 
 fn drop_unlisted(conn: &Connection, listed: &[Project]) -> AppResult<()> {
-    let mut cached = conn.prepare("SELECT id FROM cache.project")?;
+    let mut cached = conn.prepare("SELECT id FROM cache.space")?;
     let ids: Vec<String> = cached
         .query_map([], |row| row.get(0))?
         .collect::<Result<_, _>>()?;
     for id in ids.iter().filter(|id| !listed.iter().any(|p| &p.id == *id)) {
-        conn.execute("DELETE FROM cache.project WHERE id = ?1", [id])?;
+        conn.execute("DELETE FROM cache.space WHERE id = ?1", [id])?;
     }
     Ok(())
 }
 
 fn upsert_project(conn: &Connection, project: &Project) -> AppResult<()> {
     conn.execute(
-        "INSERT INTO cache.project (id, key, name, raw) VALUES (?1, ?2, ?3, ?4)
+        "INSERT INTO cache.space (id, key, name, raw) VALUES (?1, ?2, ?3, ?4)
          ON CONFLICT (id) DO UPDATE SET key = ?2, name = ?3, raw = ?4",
         params![
             project.id,
@@ -69,7 +73,7 @@ pub async fn list_projects(db: &Db) -> AppResult<Vec<ProjectRow>> {
     db.read(|conn| {
         let mut query = conn.prepare(
             "SELECT p.id, p.key, p.name, COALESCE(s.tracked, 0)
-             FROM cache.project p LEFT JOIN space s ON s.project_id = p.id
+             FROM cache.space p LEFT JOIN space s ON s.project_id = p.id
              ORDER BY p.name COLLATE NOCASE",
         )?;
         let rows = query.query_map([], |row| {
@@ -89,7 +93,7 @@ pub async fn list_projects(db: &Db) -> AppResult<Vec<ProjectRow>> {
 pub async fn tracked_projects(db: &Db) -> AppResult<Vec<ProjectRow>> {
     db.read(|conn| {
         let mut query = conn.prepare(
-            "SELECT p.id, p.key, p.name FROM space s JOIN cache.project p ON p.id = s.project_id
+            "SELECT p.id, p.key, p.name FROM space s JOIN cache.space p ON p.id = s.project_id
              WHERE s.tracked = 1 ORDER BY s.position",
         )?;
         let rows = query.query_map([], |row| {
@@ -133,7 +137,7 @@ pub async fn fetch_versions(db: &Db, client: &JiraClient, project_id: String) ->
         let id = project_id.clone();
         db.read(move |conn| {
             Ok(conn
-                .query_row("SELECT key FROM cache.project WHERE id = ?1", [id], |row| {
+                .query_row("SELECT key FROM cache.space WHERE id = ?1", [id], |row| {
                     row.get(0)
                 })
                 .optional()?)
@@ -156,7 +160,7 @@ fn insert_space(conn: &Connection, project_id: &str, tracked: bool) -> AppResult
     )?;
     let name: Option<String> = conn
         .query_row(
-            "SELECT name FROM cache.project WHERE id = ?1",
+            "SELECT name FROM cache.space WHERE id = ?1",
             [project_id],
             |row| row.get(0),
         )
@@ -175,7 +179,7 @@ fn insert_space(conn: &Connection, project_id: &str, tracked: bool) -> AppResult
 pub async fn tracked_keys(db: &Db) -> AppResult<Vec<String>> {
     db.read(|conn| {
         let mut query = conn.prepare(
-            "SELECT p.key FROM space s JOIN cache.project p ON p.id = s.project_id
+            "SELECT p.key FROM space s JOIN cache.space p ON p.id = s.project_id
              WHERE s.tracked = 1 ORDER BY s.position",
         )?;
         let keys = query.query_map([], |row| row.get(0))?;

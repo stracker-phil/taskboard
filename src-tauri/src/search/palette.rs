@@ -253,7 +253,7 @@ fn list_matches(conn: &Connection, text: &str) -> AppResult<Vec<ListHit>> {
          FROM filter_list l
          LEFT JOIN filter_list parent ON parent.id = l.parent_id
          LEFT JOIN space s ON s.project_id = l.project_id
-         LEFT JOIN cache.project p ON p.id = l.project_id
+         LEFT JOIN cache.space p ON p.id = l.project_id
          WHERE COALESCE(l.project_id, parent.project_id) IS NULL
             OR COALESCE(l.project_id, parent.project_id) IN (SELECT project_id FROM space WHERE tracked = 1)
          ORDER BY l.kind = 'space' DESC, l.position, l.id",

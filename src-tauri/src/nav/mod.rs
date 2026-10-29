@@ -172,7 +172,7 @@ fn everything(conn: &Connection) -> AppResult<Option<i64>> {
 fn tracked_space_nodes(conn: &Connection) -> AppResult<Vec<i64>> {
     let mut query = conn.prepare(
         "SELECT f.id FROM space s
-         JOIN cache.project p ON p.id = s.project_id
+         JOIN cache.space p ON p.id = s.project_id
          JOIN filter_list f ON f.kind = 'space' AND f.project_id = s.project_id
          WHERE s.tracked = 1 ORDER BY s.position, p.key",
     )?;

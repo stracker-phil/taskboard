@@ -15,7 +15,7 @@ Settings → Connection (`connection/`):
 2. **Test Connection** asks `/myself` and stores the account id, name and time zone. A scoped token first
    needs the site's cloud id (`/_edge/tenant_info`); when the site doesn't answer it (`not_found`), the page
    asks for it.
-3. **Settings → Projects → Refresh** loads every project into `cache.project`; **Track** creates the project's Space
+3. **Settings → Projects → Refresh** loads every project into `cache.space`; **Track** creates the project's Space
    (`local.space`). Untracking keeps the Space's settings.
 
 Scopes a scoped token needs for v1: `read:jira-work`, `read:jira-user` (writes later add `write:jira-work`).

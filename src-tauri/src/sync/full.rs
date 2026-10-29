@@ -5,15 +5,16 @@ use std::collections::BTreeSet;
 use chrono::Utc;
 
 use super::map::{FieldIds, format_utc};
+use super::source::Source;
 use super::store::{
     fetched_fields, has_project_sync, record_project_sync, record_scope_sync, store_field_usage,
     store_fields, store_page, store_statuses, store_versions,
 };
 use super::{Job, SyncContext, SyncEvent, SyncProgress};
-use crate::connection::{ProjectRow, effective_scope, refresh_projects, tracked_projects};
+use crate::connection::{ProjectRow, effective_scope, store_spaces, tracked_projects};
 use crate::error::AppResult;
 use crate::jira::dto::Myself;
-use crate::jira::{JiraClient, SearchRequest, jql};
+use crate::jira::{SearchRequest, jql};
 use crate::store::settings::Connection;
 
 /// Every issue field the cache maps, besides the site's sprint and epic colour fields.
@@ -40,7 +41,7 @@ const SEARCH_FIELDS: &[&str] = &[
 /// What every project of one run shares.
 struct Run<'a> {
     ctx: &'a SyncContext,
-    client: JiraClient,
+    source: Box<dyn Source>,
     scope: String,
     fields: Vec<String>,
     ids: FieldIds,
@@ -52,19 +53,19 @@ pub async fn full_sync(
     emit: &(dyn Fn(SyncEvent) + Send + Sync),
 ) -> AppResult<()> {
     let settings = ctx.settings.get();
-    let client = ctx.access.client(&settings.connection)?;
-    let (ids, tracked) = sync_metadata(ctx, &client).await?;
+    let source = ctx.source()?;
+    let (ids, tracked) = sync_metadata(ctx, source.as_ref()).await?;
     let keys: Vec<String> = tracked.iter().map(|p| p.key.clone()).collect();
     let scope = effective_scope(&settings.sync, &keys).jql;
     if scope.is_empty() || tracked.is_empty() {
         return Ok(());
     }
     // First, so this run already fetches the fields the projects fill.
-    refresh_field_usage(ctx, &client, &tracked).await?;
+    refresh_field_usage(ctx, source.as_ref(), &tracked).await?;
     let fields = search_fields(ctx, &ids).await?;
     let run = Run {
         ctx,
-        client,
+        source,
         scope,
         fields,
         ids,
@@ -91,8 +92,8 @@ pub(super) async fn search_fields(ctx: &SyncContext, ids: &FieldIds) -> AppResul
 }
 
 /// The site's field list, stored; returns its sprint and epic colour fields.
-pub(super) async fn refresh_fields(ctx: &SyncContext, client: &JiraClient) -> AppResult<FieldIds> {
-    let fields = client.fields().await?;
+pub(super) async fn refresh_fields(ctx: &SyncContext, source: &dyn Source) -> AppResult<FieldIds> {
+    let fields = source.fields().await?;
     ctx.db.write(move |tx, _| store_fields(tx, &fields)).await
 }
 
@@ -109,18 +110,18 @@ pub(super) async fn current_scope(ctx: &SyncContext) -> AppResult<String> {
 /// Fields, projects, statuses, versions of the tracked projects, and who the user is.
 async fn sync_metadata(
     ctx: &SyncContext,
-    client: &JiraClient,
+    source: &dyn Source,
 ) -> AppResult<(FieldIds, Vec<ProjectRow>)> {
-    let fields = client.fields().await?;
-    let statuses = client.statuses().await?;
-    refresh_projects(&ctx.db, client).await?;
+    let fields = source.fields().await?;
+    let statuses = source.statuses().await?;
+    store_spaces(&ctx.db, source.spaces().await?).await?;
     let tracked = tracked_projects(&ctx.db).await?;
     let mut versions = Vec::with_capacity(tracked.len());
     for project in &tracked {
-        versions.push((project.id.clone(), client.versions(&project.key).await?));
+        versions.push((project.id.clone(), source.versions(&project.key).await?));
     }
     let asked = ctx.settings.get().connection;
-    remember_account(ctx, asked, client.myself().await?).await?;
+    remember_account(ctx, asked, source.myself().await?).await?;
     let ids = ctx
         .db
         .write(move |tx, _| {
@@ -143,12 +144,12 @@ async fn sync_metadata(
 /// Which custom fields the tracked projects fill; when a project can't be sampled, the last answer stays.
 async fn refresh_field_usage(
     ctx: &SyncContext,
-    client: &JiraClient,
+    source: &dyn Source,
     tracked: &[ProjectRow],
 ) -> AppResult<()> {
     let mut used = BTreeSet::new();
     for project in tracked {
-        match client.used_custom_fields(&project.key).await {
+        match source.used_custom_fields(&project.key).await {
             Ok(ids) => used.extend(ids),
             Err(e) => {
                 log::warn!("Could not sample the fields of {}: {e}", project.key);
@@ -183,7 +184,7 @@ async fn sync_project(run: &Run<'_>, project: &ProjectRow) -> AppResult<Option<S
     let first = !db
         .read(move |conn| has_project_sync(conn, &project_id))
         .await?;
-    let approx_total = run.client.approximate_count(&project_scope).await?;
+    let approx_total = run.source.count(&project_scope).await?;
     let mut progress = SyncProgress {
         job: Job::Full,
         project_id: project.id.clone(),
@@ -193,7 +194,7 @@ async fn sync_project(run: &Run<'_>, project: &ProjectRow) -> AppResult<Option<S
         approx_total: Some(approx_total),
     };
     (run.emit)(SyncEvent::Progress(progress.clone()));
-    let mut pages = run.client.search_jql(SearchRequest {
+    let mut pages = run.source.issues(SearchRequest {
         jql: jql::order_by_updated(&project_scope),
         fields: run.fields.clone(),
         expand: Some("renderedFields".into()),

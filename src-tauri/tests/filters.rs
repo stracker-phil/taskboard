@@ -91,7 +91,7 @@ fn fixture_sql() -> String {
     }));
     let nw5 = raw(json!({"customfield_10073": "100 done"}));
     let mut sql = vec![
-        "INSERT INTO cache.project (id, key, name, raw) VALUES ('p1', 'NW', 'Northwind', '{}'), \
+        "INSERT INTO cache.space (id, key, name, raw) VALUES ('p1', 'NW', 'Northwind', '{}'), \
          ('p2', 'OLD', 'Legacy', '{}');"
             .to_string(),
         "INSERT OR REPLACE INTO space (project_id, tracked) VALUES ('p1', 1), ('p2', 0);".into(),

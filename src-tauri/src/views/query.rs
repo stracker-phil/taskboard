@@ -359,7 +359,7 @@ fn space_letter(icon: Option<String>, name: &str) -> String {
 fn spaces(conn: &Connection) -> AppResult<HashMap<String, SpaceInfo>> {
     let mut query = conn.prepare(
         "SELECT s.project_id, COALESCE(s.name, p.name), s.icon, s.color, s.client
-         FROM space s JOIN cache.project p ON p.id = s.project_id
+         FROM space s JOIN cache.space p ON p.id = s.project_id
          WHERE s.tracked = 1 ORDER BY s.position, p.key",
     )?;
     let rows = query.query_map([], |row| {

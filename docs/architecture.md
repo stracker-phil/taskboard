@@ -83,7 +83,10 @@ Jira is reached only through `jira/gateway/` ([jira.md](jira.md)): one `JiraClie
 gateway sends only the operations on its allowlist, to the site and `api.atlassian.com` only
 ([ADR 0025](adr/0025-all-jira-traffic-goes-through-one-allowlisted-gateway.md)). The API token stays in the Keychain (`secrets.rs`);
 `connection::JiraAccess` builds clients from the saved connection. The debug build serves the demo site from
-the fake Jira on loopback. The sync engine (`sync/`, [sync.md](sync.md)) is the one task that fetches issues.
+the fake Jira on loopback. The sync engine (`sync/`, [sync.md](sync.md)) is the one task that fetches issues;
+it asks a `sync::source::Source` (`SyncContext::source`), and `sync/jira_source.rs` is the only implementation
+and the only part of `sync/` that names the Jira client
+([ADR 0029](adr/0029-issues-come-from-a-source-jira-is-the-first.md)).
 
 Which issues a sidebar level holds is decided locally: `lists/` keeps the tree of Spaces and filter lists,
 `filter/` compiles their conditions to SQL over the cache, and `views/` keeps the tabs that only decide how

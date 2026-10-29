@@ -42,5 +42,6 @@ pub async fn issue_related(state: State<'_, AppState>, id: String) -> AppResult<
 #[tauri::command]
 pub async fn issue_sync_comments(state: State<'_, AppState>, id: String) -> AppResult<bool> {
     let connection = state.settings.get().connection;
-    super::issue_sync_comments(&state.db, &state.jira, &connection, id).await
+    let source = crate::sync::source_for(&state.jira, &connection)?;
+    super::issue_sync_comments(&state.db, source.as_ref(), id).await
 }

@@ -87,7 +87,7 @@ async fn lab() -> (TempDir, Db) {
     let db = Db::open(dir.path()).unwrap();
     db.write(|tx, _| {
         tx.execute_batch(
-            "INSERT INTO cache.project (id, key, name, raw) VALUES
+            "INSERT INTO cache.space (id, key, name, raw) VALUES
                ('10001', 'NW', 'Website relaunch', '{}'),
                ('10002', 'NWS', 'Northwind support', '{}'),
                ('10003', 'LUM', 'Lumen iOS app', '{}')",

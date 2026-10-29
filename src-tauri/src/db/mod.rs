@@ -177,7 +177,7 @@ mod tests {
     use tempfile::TempDir;
 
     const PROJECT: &str =
-        "INSERT INTO cache.project (id, key, name, raw) VALUES ('10001', 'NW', 'Northwind', '{}')";
+        "INSERT INTO cache.space (id, key, name, raw) VALUES ('10001', 'NW', 'Northwind', '{}')";
     const ISSUE: &str = "INSERT INTO cache.issue (id, key, project_id, summary, issue_type, status_id, \
         status_category, created_at, updated_at, raw, synced_at) \
         VALUES ('20001', 'NW-1', '10001', 'Mount the column', 'Task', '1', 'new', \
@@ -288,10 +288,7 @@ mod tests {
             text(&db, "SELECT name FROM space WHERE project_id = '10001'").await,
             "Shop floor"
         );
-        assert_eq!(
-            text(&db, "SELECT name FROM cache.project").await,
-            "Northwind"
-        );
+        assert_eq!(text(&db, "SELECT name FROM cache.space").await, "Northwind");
     }
 
     #[test]
@@ -350,8 +347,8 @@ mod tests {
         let row: (String, String) = db
             .read(|conn| {
                 Ok(conn.query_row(
-                    "SELECT space.name, project.key FROM space \
-                     JOIN cache.project ON project.id = space.project_id",
+                    "SELECT local.name, tracked.key FROM main.space local \
+                     JOIN cache.space tracked ON tracked.id = local.project_id",
                     [],
                     |row| Ok((row.get(0)?, row.get(1)?)),
                 )?)
@@ -398,7 +395,7 @@ mod tests {
 
         db.reset_cache().await.unwrap();
 
-        assert_eq!(count(&db, "SELECT COUNT(*) FROM cache.project").await, 0);
+        assert_eq!(count(&db, "SELECT COUNT(*) FROM cache.space").await, 0);
         assert_eq!(count(&db, "SELECT COUNT(*) FROM cache.issue").await, 0);
         for ((table, sql), expected) in tables.into_iter().zip(before) {
             assert_eq!(count(&db, sql).await, expected, "{table}");
@@ -409,7 +406,7 @@ mod tests {
             migrate::CACHE.len() as i64
         );
         exec(&db, PROJECT).await;
-        assert_eq!(count(&db, "SELECT COUNT(*) FROM cache.project").await, 1);
+        assert_eq!(count(&db, "SELECT COUNT(*) FROM cache.space").await, 1);
     }
 
     #[tokio::test]
@@ -465,7 +462,7 @@ mod tests {
         db.set_notifier(Box::new(move |_| {
             let conn = rusqlite::Connection::open(&cache_path).unwrap();
             let projects: i64 = conn
-                .query_row("SELECT COUNT(*) FROM project", [], |row| row.get(0))
+                .query_row("SELECT COUNT(*) FROM space", [], |row| row.get(0))
                 .unwrap();
             sink.lock().unwrap().push(projects);
         }));
@@ -496,7 +493,7 @@ mod tests {
             .await;
 
         assert_eq!(result.unwrap_err(), AppError::InvalidInput("Nope".into()));
-        assert_eq!(count(&db, "SELECT COUNT(*) FROM cache.project").await, 0);
+        assert_eq!(count(&db, "SELECT COUNT(*) FROM cache.space").await, 0);
         assert!(sink.lock().unwrap().is_empty());
     }
 
@@ -521,6 +518,6 @@ mod tests {
         })
         .await
         .unwrap();
-        assert_eq!(count(&db, "SELECT COUNT(*) FROM cache.project").await, 1);
+        assert_eq!(count(&db, "SELECT COUNT(*) FROM cache.space").await, 1);
     }
 }

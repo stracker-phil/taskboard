@@ -222,7 +222,7 @@ mod tests {
         ]
         .concat();
         let sql = format!(
-            "INSERT INTO cache.project (id, key, name, raw) VALUES
+            "INSERT INTO cache.space (id, key, name, raw) VALUES
                ('10001', 'NW', 'Website relaunch', '{{}}'), ('10002', 'NWS', 'Northwind support', '{{}}');
              INSERT INTO cache.status (id, name, category) VALUES
                ('s4', 'Done', 'done'), ('s2', 'Testing', 'indeterminate'), ('s1', 'To Do', 'new'),

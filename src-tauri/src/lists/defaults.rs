@@ -19,7 +19,7 @@ pub fn ensure_space(conn: &Connection, project_id: &str) -> AppResult<bool> {
     }
     let name: String = conn
         .query_row(
-            "SELECT name FROM cache.project WHERE id = ?1",
+            "SELECT name FROM cache.space WHERE id = ?1",
             [project_id],
             |row| row.get(0),
         )

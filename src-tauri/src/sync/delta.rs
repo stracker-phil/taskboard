@@ -28,8 +28,8 @@ pub async fn delta_sync(
         return Ok(());
     }
     let connection = ctx.settings.get().connection;
-    let client = ctx.access.client(&connection)?;
-    let ids = refresh_fields(ctx, &client).await?;
+    let source = ctx.source()?;
+    let ids = refresh_fields(ctx, source.as_ref()).await?;
     let since = DateTime::parse_from_rfc3339(&cursor)
         .map_err(|e| AppError::Internal(format!("The delta cursor {cursor} isn't a time: {e}")))?
         .with_timezone(&Utc)
@@ -40,7 +40,7 @@ pub async fn delta_sync(
         &scope,
         &jql::date_literal(since, zone)?,
     ));
-    let mut pages = client.search_jql(SearchRequest {
+    let mut pages = source.issues(SearchRequest {
         jql: query,
         fields: search_fields(ctx, &ids).await?,
         expand: Some("renderedFields".into()),
@@ -86,9 +86,15 @@ async fn prefetch_comments(ctx: &SyncContext) {
     else {
         return;
     };
-    let connection = ctx.settings.get().connection;
+    let source = match ctx.source() {
+        Ok(source) => source,
+        Err(e) => {
+            log::info!("Comment prefetch skipped: {e}");
+            return;
+        }
+    };
     for id in ids {
-        if let Err(e) = issue_sync_comments(&ctx.db, &ctx.access, &connection, id).await {
+        if let Err(e) = issue_sync_comments(&ctx.db, source.as_ref(), id).await {
             log::info!("Comment prefetch stopped: {e}");
             return;
         }

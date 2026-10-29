@@ -49,7 +49,7 @@ fn project_counts(conn: &Connection) -> AppResult<Vec<ProjectCounts>> {
            (SELECT COUNT(*) FROM cache.issue i
               WHERE i.project_id = p.id AND i.gone = 0 AND i.status_category != 'done'),
            (SELECT last_full_at FROM cache.sync_state WHERE scope_id = ?1 || p.id)
-         FROM space s JOIN cache.project p ON p.id = s.project_id
+         FROM space s JOIN cache.space p ON p.id = s.project_id
          WHERE s.tracked = 1 ORDER BY s.position",
     )?;
     let rows = query.query_map([PROJECT_ROW_PREFIX], |row| {

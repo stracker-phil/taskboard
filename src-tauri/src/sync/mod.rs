@@ -5,10 +5,12 @@ mod delta;
 pub mod diff;
 mod engine;
 mod full;
+mod jira_source;
 pub mod map;
 mod overview;
 mod reconcile;
 pub mod schedule;
+pub mod source;
 pub mod store;
 
 use serde::{Deserialize, Serialize};
@@ -20,8 +22,10 @@ pub use overview::{ProjectCounts, SyncOverview, overview};
 
 use crate::connection::JiraAccess;
 use crate::db::Db;
-use crate::error::ErrorKind;
-use crate::store::settings::SettingsStore;
+use crate::error::{AppResult, ErrorKind};
+use crate::store::settings::{Connection, SettingsStore};
+use jira_source::JiraSource;
+use source::Source;
 
 /// What a sync job needs; cheap to clone, so the engine's task owns its own copy.
 #[derive(Clone)]
@@ -29,6 +33,18 @@ pub struct SyncContext {
     pub settings: SettingsStore,
     pub access: JiraAccess,
     pub db: Db,
+}
+
+impl SyncContext {
+    /// The tracker the sync mirrors, for the saved connection.
+    pub fn source(&self) -> AppResult<Box<dyn Source>> {
+        source_for(&self.access, &self.settings.get().connection)
+    }
+}
+
+/// The source of a connection: Jira today; the place to choose another tracker (ADR 0029).
+pub fn source_for(access: &JiraAccess, connection: &Connection) -> AppResult<Box<dyn Source>> {
+    Ok(Box::new(JiraSource::new(access.client(connection)?)))
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Hash, TS)]

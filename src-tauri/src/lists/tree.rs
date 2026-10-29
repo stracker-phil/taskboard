@@ -82,7 +82,7 @@ struct SpaceRow {
 fn tracked_spaces(conn: &Connection) -> AppResult<Vec<SpaceRow>> {
     let mut query = conn.prepare(
         "SELECT s.project_id, p.key, COALESCE(s.name, p.name), p.name, s.icon, s.color, s.client
-         FROM space s JOIN cache.project p ON p.id = s.project_id
+         FROM space s JOIN cache.space p ON p.id = s.project_id
          WHERE s.tracked = 1 ORDER BY s.position, p.key",
     )?;
     let rows = query.query_map([], |row| {

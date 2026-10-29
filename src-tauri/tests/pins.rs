@@ -72,7 +72,7 @@ async fn lab() -> (TempDir, Db) {
     execute(
         &db,
         format!(
-            "INSERT INTO cache.project (id, key, name, raw)
+            "INSERT INTO cache.space (id, key, name, raw)
                VALUES ('{NW}', 'NW', 'Website relaunch', '{{}}');
              INSERT INTO cache.status (id, name, category) VALUES
                ('s1', 'To Do', 'new'), ('s2', 'In Review', 'indeterminate'), ('s3', 'Done', 'done');

@@ -221,7 +221,7 @@ fn list_target(conn: &Connection, id: &str) -> AppResult<Option<Pinned>> {
              FROM filter_list l
              LEFT JOIN filter_list sp ON sp.id = l.parent_id AND sp.kind = 'space'
              LEFT JOIN space s ON s.project_id = sp.project_id
-             LEFT JOIN cache.project p ON p.id = sp.project_id
+             LEFT JOIN cache.space p ON p.id = sp.project_id
              WHERE CAST(l.id AS TEXT) = ?1",
             [id],
             |r| {

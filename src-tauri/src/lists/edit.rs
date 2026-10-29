@@ -289,7 +289,7 @@ pub async fn space_update(db: &Db, project_id: String, update: SpaceUpdate) -> A
         // A name equal to the project's isn't the owner's own, so a renamed project renames the Space too.
         let project_name: Option<String> = tx
             .query_row(
-                "SELECT name FROM cache.project WHERE id = ?1",
+                "SELECT name FROM cache.space WHERE id = ?1",
                 [&project_id],
                 |row| row.get(0),
             )

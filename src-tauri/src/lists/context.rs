@@ -75,7 +75,7 @@ pub fn names(conn: &Connection) -> AppResult<Names> {
         users: map("SELECT account_id, name FROM cache.user")?,
         versions: map("SELECT id, name FROM cache.version")?,
         epics: map("SELECT id, summary FROM cache.issue WHERE is_epic = 1")?,
-        projects: map("SELECT id, key FROM cache.project")?,
+        projects: map("SELECT id, key FROM cache.space")?,
         sprints: map(
             "SELECT sprint_id, MAX(sprint) FROM cache.issue WHERE sprint_id IS NOT NULL GROUP BY sprint_id",
         )?,
