@@ -1,4 +1,5 @@
 import type { Row } from "../../api";
+import { CopyKey } from "../../components/issue/CopyKey";
 import { StatusSquare } from "../../components/issue/StatusSquare";
 import { columnDef } from "../list/columns";
 import { LabelChips } from "../../components/issue/LabelChips";
@@ -35,7 +36,7 @@ export function TableRow(props: Props) {
   return (
     <div className={className} role="row" aria-selected={selected} data-issue-id={row.id} onClick={() => onSelect(row.id)} onDoubleClick={(e) => opensIssue(e) && onOpen(row.id)}>
       <span className="table-row__cell table-row__key" role="gridcell" style={{ width: widthOf("key") }}>
-        {row.key}
+        <CopyKey issueKey={row.key} />
       </span>
       <span className="table-row__cell table-row__summary" role="gridcell">
         {nesting === "parent" && <SubtaskCaret open={subtasksOpen} onToggle={() => onToggleSubtasks?.(row.id)} />}

@@ -317,6 +317,37 @@ describe("TableView", () => {
       expect(useStore.getState().issueView).toEqual({ origin: { listId: 11, viewId: 101 }, stack: ["2"] });
     });
 
+    describe("the key cell", () => {
+      const keyOf = async (key: string) => within(await screen.findByRole("row", { name: new RegExp(key) })).getByText(key);
+
+      it("copies the key and says so in a toast", async () => {
+        await renderTable();
+
+        await userEvent.click(await keyOf("NW-1001"));
+
+        expect(mocked.copyText).toHaveBeenCalledWith("NW-1001");
+        await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Copied NW-1001"));
+      });
+
+      it("neither selects the row nor opens the preview or the Issue view when clicked", async () => {
+        await renderTable(undefined, { ...TABLE, openWith: "full" });
+
+        await userEvent.click(await keyOf("NW-1001"));
+
+        expect(screen.getByRole("row", { name: /NW-1001/ })).toHaveAttribute("aria-selected", "false");
+        expect(useStore.getState().places["11:101"]?.peekOpen ?? false).toBe(false);
+        expect(useStore.getState().issueView).toBeNull();
+      });
+
+      it("opens no Issue view when double-clicked", async () => {
+        await renderTable(undefined, { ...TABLE, openWith: "preview" });
+
+        await userEvent.dblClick(await keyOf("NW-1001"));
+
+        expect(useStore.getState().issueView).toBeNull();
+      });
+    });
+
     it("renders only the visible part of 5,000 rows", async () => {
       const many = Array.from({ length: 5000 }, (_, i) => row({ id: String(i), key: `NW-${i + 1}`, summary: `Task ${i + 1}` }));
       await renderTable(viewData([groupOf(many)], many));

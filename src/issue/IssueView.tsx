@@ -1,4 +1,5 @@
 import { ArrowDown, ArrowLeft, ArrowUp, CheckCheck, CircleDot, ExternalLink, Link2 } from "lucide-react";
+import { CopyKey } from "../components/issue/CopyKey";
 import { useEffect, useRef } from "react";
 import { api, type IssueDetail } from "../api";
 import { onIssueKeys } from "../commands/issueKeys";
@@ -105,7 +106,7 @@ function IssueHeader({
             <span className="issue-header__sep">/</span>
           </>
         )}
-        <span className="issue-header__key">{issue?.key}</span>
+        {issue && <CopyKey className="issue-header__key" issueKey={issue.key} />}
         {issue && actions.openInJira && (
           <button type="button" className="issue-header__copy" aria-label={`Copy the link to ${issue.key}`} title="Copy link (⇧⌘C)" onClick={() => actions.copyUrl(issue.key)}>
             <Link2 size={13} strokeWidth={2} aria-hidden="true" />
@@ -152,7 +153,7 @@ function IssueMain({ issue, origin }: { issue: IssueDetail; origin: IssueOrigin 
     <div ref={scrollRef} className="issue-main">
       <div className="issue-main__type">
         <span className="type-badge">{issue.issueType}</span>
-        <span className="issue-main__key">{issue.key}</span>
+        <CopyKey className="issue-main__key" issueKey={issue.key} />
         <span aria-hidden="true">·</span>
         <span>{comments}</span>
         {files > 0 && (

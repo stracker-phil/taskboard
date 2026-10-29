@@ -648,6 +648,11 @@ global shortcuts.
   subtasks first), Space opens or closes the preview (the Board opens the Issue view), ↩ opens the Issue
   view, E the epic, P adds or removes a bookmark (default duration), M marks read or unread, ⌘C copies the key (only with no text
   field focused and no text selected), ⌘⇧C the URL, ⌘↩ opens it in Jira, esc closes the preview or goes back.
+- **A click on an issue key copies it** ("Copied NW-1042", `components/issue/CopyKey.tsx`): in List and Table rows,
+  on Board cards, in Bookmarks, in the Issue view's header and title line, the preview's header and related, child
+  and subtask rows. The click and a double-click stop at the key, so the row or card neither selects nor opens;
+  the key shows a pointer, a `--hover-bg` tint and `--accent-text` on hover, and "Click to copy" as its tooltip.
+  The ⌥ hover Peek takes no clicks and the palette's rows open on a click, so their keys don't copy.
 - `app:settings:<page>` opens Settings at a page or section (Settings → Projects is `app:settings:projects`).
 
 ## Palette checks

@@ -1,4 +1,5 @@
 import { memo } from "react";
+import { CopyKey } from "../../components/issue/CopyKey";
 import type { Row } from "../../api";
 import { AvatarStack } from "../../components/issue/Avatar";
 import { CommentCount } from "../../components/issue/CommentCount";
@@ -56,7 +57,7 @@ export const BoardCard = memo(function BoardCard({ row, fields, inlineLabels = f
           </span>
         )}
         {row.changed && <span className="board-card__dot" title="Changed since yesterday" />}
-        <span className="board-card__key">{row.key}</span>
+        <CopyKey className="board-card__key" issueKey={row.key} />
       </div>
       <span className="board-card__actions">
         <RowActions issueId={row.id} issueKey={row.key} changed={row.changed} actions={actions} />

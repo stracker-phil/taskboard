@@ -1,4 +1,5 @@
 import { ExternalLink, Maximize2, X } from "lucide-react";
+import { CopyKey } from "../components/issue/CopyKey";
 import { useEffect, useRef } from "react";
 import type { IssueDetail } from "../api";
 import { Avatar } from "../components/issue/Avatar";
@@ -33,7 +34,7 @@ export function Peek({ id, onClose, onExpand }: { id: string; onClose: () => voi
       <header className="peek__header">
         {issue && (
           <>
-            <span className="peek__key">{issue.key}</span>
+            <CopyKey className="peek__key" issueKey={issue.key} />
             <span className="peek__dot" aria-hidden="true">
               ·
             </span>

@@ -1,4 +1,5 @@
 import { Funnel, MessageSquare, X } from "lucide-react";
+import { CopyKey } from "../components/issue/CopyKey";
 import { api, type PinItem } from "../api";
 import { StatusSquare } from "../components/issue/StatusSquare";
 import { usePins } from "../queries/pins";
@@ -113,7 +114,7 @@ function Target({ pin }: { pin: PinItem }) {
       return (
         <>
           <StatusSquare style={target.style} />
-          <span className="pin-table__key">{target.key}</span>
+          <CopyKey className="pin-table__key" issueKey={target.key} />
           <span className="pin-table__text">{target.summary}</span>
           {target.gone && <span className="pin-table__gone">gone</span>}
         </>
@@ -124,7 +125,7 @@ function Target({ pin }: { pin: PinItem }) {
           <MessageSquare className="pin-table__icon" size={14} strokeWidth={1.9} aria-hidden="true" />
           <strong className="pin-table__author">{target.author?.name ?? "Someone"}</strong>
           <span className="pin-table__text">{target.excerpt}</span>
-          <span className="pin-table__key">{target.issueKey}</span>
+          <CopyKey className="pin-table__key" issueKey={target.issueKey} />
         </>
       );
     case "list":

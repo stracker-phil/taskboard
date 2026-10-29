@@ -1,4 +1,5 @@
 import type { Row } from "../../api";
+import { CopyKey } from "../../components/issue/CopyKey";
 import { ChangeChip } from "../../components/issue/ChangeChip";
 import { CommentCount } from "../../components/issue/CommentCount";
 import { StatusSquare } from "../../components/issue/StatusSquare";
@@ -44,7 +45,7 @@ export function IssueRow(props: Props) {
       <span className="list-row__name" role="gridcell">
         {nesting === "parent" && <SubtaskCaret open={subtasksOpen} onToggle={() => onToggleSubtasks?.(row.id)} />}
         <StatusSquare style={row.style} />
-        <span className="list-row__key">{row.key}</span>
+        <CopyKey className="list-row__key" issueKey={row.key} />
         {row.isSubtask && <SubtaskIcon />}
         <span className="list-row__title">
           <span className="list-row__summary">{row.summary}</span>

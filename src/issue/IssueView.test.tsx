@@ -137,6 +137,27 @@ describe("IssueView", () => {
       await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Copied the link to NW-1042"));
     });
 
+    it("copies the key from the breadcrumb and says so in a toast", async () => {
+      renderIssue();
+      const crumbs = within(screen.getByRole("navigation", { name: "Breadcrumb" }));
+
+      await userEvent.click(await crumbs.findByText("NW-1042"));
+
+      expect(mocked.copyText).toHaveBeenCalledWith("NW-1042");
+      await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Copied NW-1042"));
+    });
+
+    it("copies the key from the title line too", async () => {
+      renderIssue();
+      await title("Checkout: address validation for DACH postcodes");
+      const crumbs = screen.getByRole("navigation", { name: "Breadcrumb" });
+      const inTitleLine = screen.getAllByTitle("Click to copy").find((el) => !crumbs.contains(el))!;
+
+      await userEvent.click(inTitleLine);
+
+      expect(mocked.copyText).toHaveBeenCalledWith("NW-1042");
+    });
+
     it("offers no copy link button without a site", async () => {
       renderIssue();
 
@@ -748,6 +769,17 @@ describe("IssueView", () => {
       await userEvent.click(await screen.findByRole("button", { name: /NW-1052/ }));
 
       expect(stack()).toEqual(["10001", "10052"]);
+    });
+
+    it("copies a child issue's key without opening it", async () => {
+      mocked.issueRelated.mockResolvedValue(related({ children }));
+      renderIssue("10001");
+      const row = await screen.findByRole("button", { name: /NW-1052/ });
+
+      await userEvent.click(within(row).getByText("NW-1052"));
+
+      expect(mocked.copyText).toHaveBeenCalledWith("NW-1052");
+      expect(stack()).toEqual(["10001"]);
     });
 
     it("narrows the origin view to the epic and closes the Issue view from Open as list view", async () => {

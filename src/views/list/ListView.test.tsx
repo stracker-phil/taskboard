@@ -511,6 +511,37 @@ describe("ListView", () => {
     });
   });
 
+  describe("the key in a row", () => {
+    const keyOf = async (key: string) => within(await screen.findByRole("row", { name: new RegExp(key) })).getByText(key);
+
+    it("copies the key and says so in a toast", async () => {
+      await renderList(viewData([groupOf([OPEN])], [OPEN]));
+
+      await userEvent.click(await keyOf("NW-1042"));
+
+      expect(mocked.copyText).toHaveBeenCalledWith("NW-1042");
+      await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Copied NW-1042"));
+    });
+
+    it("neither selects the row nor opens the preview or the Issue view when clicked", async () => {
+      await renderList(viewData([groupOf([OPEN])], [OPEN]), "full");
+
+      await userEvent.click(await keyOf("NW-1042"));
+
+      expect(screen.getByRole("row", { name: /NW-1042/ })).toHaveAttribute("aria-selected", "false");
+      expect(place()).toMatchObject({ selectedId: null, peekOpen: false });
+      expect(useStore.getState().issueView).toBeNull();
+    });
+
+    it("opens no Issue view when double-clicked", async () => {
+      await renderList(viewData([groupOf([OPEN])], [OPEN]), "preview");
+
+      await userEvent.dblClick(await keyOf("NW-1042"));
+
+      expect(useStore.getState().issueView).toBeNull();
+    });
+  });
+
   describe("row actions", () => {
     const action = (name: string) => screen.findByRole("button", { name });
 

@@ -86,3 +86,7 @@
 .subtask-caret svg { transition: transform var(--motion-base) var(--ease-out); }
 .subtask-caret[aria-expanded="false"] svg { transform: rotate(-90deg); }
 .subtask-caret:hover { background: var(--hover-bg); color: var(--text); }
+
+/* An issue key copies itself on a click (components/issue/CopyKey). */
+.copy-key { border-radius: 4px; cursor: pointer; transition: color var(--motion-fast) var(--ease-out), background-color var(--motion-fast) var(--ease-out); }
+.copy-key:hover { background: var(--hover-bg); color: var(--accent-text); }

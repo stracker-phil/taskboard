@@ -1,4 +1,5 @@
 import { ChevronRight } from "lucide-react";
+import { CopyKey } from "../components/issue/CopyKey";
 import { useState } from "react";
 import type { IssueLink, Related as RelatedData, RelatedIssue } from "../api";
 import { Avatar } from "../components/issue/Avatar";
@@ -30,7 +31,7 @@ function IssueButton({ issue, onOpen, compact = false }: { issue: RelatedIssue; 
       onClick={() => id && onOpen(id)}
     >
       <StatusSquare style={issue.style} />
-      <span className="related-issue__key">{issue.key}</span>
+      <CopyKey className="related-issue__key" issueKey={issue.key} />
       <span className="related-issue__summary">{issue.summary}</span>
       {!compact && <span className="related-issue__type">{issue.issueType}</span>}
       {!compact && issue.assignee && <Avatar person={issue.assignee} size={24} />}
