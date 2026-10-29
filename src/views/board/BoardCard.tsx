@@ -26,6 +26,7 @@ export const BoardCard = memo(function BoardCard({ row, fields, selected = false
       aria-current={selected || undefined}
       tabIndex={0}
       aria-label={`${row.key} ${row.summary}`}
+      data-issue-id={row.id}
       onClick={() => onOpen(row.id)}
       onKeyDown={(e) => {
         if (e.key === "Enter" && e.target === e.currentTarget) onOpen(row.id);

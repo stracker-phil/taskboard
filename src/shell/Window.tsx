@@ -2,6 +2,7 @@ import { type ReactNode, useEffect } from "react";
 import { IssueView } from "../issue/IssueView";
 import { useNav, useSidebar, useViews } from "../queries/sidebar";
 import { useStore } from "../state/store";
+import { HoverPeek } from "../issue/hoverPeek/HoverPeek";
 import { CurrentPeek } from "./CurrentPeek";
 import { Header } from "./Header";
 import { TokenBanner } from "./TokenBanner";
@@ -39,6 +40,7 @@ export function Window({ sidebarHidden, children }: Props) {
           )}
         </main>
       </div>
+      <HoverPeek />
     </div>
   );
 }

@@ -1,0 +1,13 @@
+/* ⌥ + hover over an issue: a small card beside it (`issue/hoverPeek/`). */
+.hover-peek {
+  position: fixed; z-index: 60; display: flex; flex-direction: column; gap: 10px; box-sizing: border-box; overflow: hidden;
+  padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--panel-bg); box-shadow: var(--shadow-popover);
+  pointer-events: none; animation: fade-in var(--motion-fast) var(--ease-out);
+}
+.hover-peek__meta { display: flex; gap: 6px; color: var(--text-muted); font-size: 12px; }
+.hover-peek__key { font-family: var(--font-mono); }
+.hover-peek__title { margin: 0; font-size: 16px; font-weight: 700; line-height: 1.3; }
+.hover-peek__chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; }
+.hover-peek__chip { display: inline-flex; align-items: center; gap: 5px; color: var(--text-secondary); }
+.hover-peek__description { min-height: 0; overflow: hidden; font-size: 13px; line-height: 1.5; mask-image: linear-gradient(to bottom, var(--panel-bg) 75%, transparent); }
+.hover-peek__empty { margin: 0; color: var(--text-muted); font-size: 13px; }

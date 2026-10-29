@@ -14,7 +14,7 @@ interface Props {
 export function TableRow({ row, columns, widthOf, selected, onSelect }: Props) {
   const className = ["table-row", row.changed && "table-row--changed", selected && "table-row--selected"].filter(Boolean).join(" ");
   return (
-    <div className={className} role="row" aria-selected={selected} onClick={() => onSelect(row.id)}>
+    <div className={className} role="row" aria-selected={selected} data-issue-id={row.id} onClick={() => onSelect(row.id)}>
       <span className="table-row__cell table-row__key" role="gridcell" style={{ width: widthOf("key") }}>
         {row.key}
       </span>

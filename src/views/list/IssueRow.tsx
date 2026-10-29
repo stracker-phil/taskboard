@@ -23,7 +23,7 @@ export function IssueRow({ row, columns, position, wrap = false, selected, onSel
     .filter(Boolean)
     .join(" ");
   return (
-    <div className={className} role="row" aria-selected={selected} onClick={() => onSelect(row.id)}>
+    <div className={className} role="row" aria-selected={selected} data-issue-id={row.id} onClick={() => onSelect(row.id)}>
       <span className="list-row__name" role="gridcell">
         <StatusSquare style={row.style} />
         <span className="list-row__key">{row.key}</span>

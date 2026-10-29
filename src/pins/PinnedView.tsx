@@ -66,6 +66,7 @@ function PinTable({ label, pins, onOpen, onUnpin }: TableProps) {
           className="pin-table__row"
           role="row"
           tabIndex={0}
+          data-issue-id={pin.target.kind === "issue" ? pin.target.id : undefined}
           onClick={() => onOpen(pin)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && e.target === e.currentTarget) onOpen(pin);

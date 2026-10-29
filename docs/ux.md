@@ -149,6 +149,14 @@ one group, Board column or pill per style, whatever the status is called; the Bo
 - Rows are virtualised (`@tanstack/react-virtual`): a card is drawn from its pieces (the header item, then
   rows that know whether they are first, middle, last or the only one).
 
+## Peek
+
+⌥ + hover over any issue (anything marked `data-issue-id`: List and Table rows, Board cards, related and child
+issues, bookmarked issues, epic chips) shows a 380px card beside it after 150 ms (`issue/hoverPeek/`): key ·
+type, the 16/700 title, status pill, epic, priority and assignees, and the description fading out at 360px. It
+sits on the right of the element when there is room, else on the left, never takes the pointer and hides when
+⌥ is released or the pointer leaves the issue. Nothing navigates and nothing counts as read.
+
 ## Issue preview
 
 `src/issue/Peek.tsx` (the code still calls it peek), shown by `shell/CurrentPeek.tsx`: clicking a row in a List

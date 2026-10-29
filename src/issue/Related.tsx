@@ -26,6 +26,7 @@ function IssueButton({ issue, onOpen, compact = false }: { issue: RelatedIssue; 
       type="button"
       className={["related-issue", compact && "related-issue--compact", issue.changed && "related-issue--changed"].filter(Boolean).join(" ")}
       disabled={id === null}
+      data-issue-id={id ?? undefined}
       onClick={() => id && onOpen(id)}
     >
       <StatusSquare style={issue.style} />

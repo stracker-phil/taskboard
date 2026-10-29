@@ -137,7 +137,9 @@ src/
   state/store.ts slices/     UI-only state (zustand)
   shell/                     the main window frame: sidebar and content panel
   shell/toolbar/             the view toolbar: Group menu, Columns and Filter popovers, Me chip, text filter
-  views/list/ views/table/   the List and Table layouts over the view query's rows
+  views/list/ views/table/   the List and Table layouts over the view query's rows (views/board/ the Board)
+  issue/                     the Issue view, the preview (Peek.tsx), activity; hoverPeek/ the ⌥ + hover Peek
+  pins/ palette/             Bookmarks; the command palette
   commands/ registry/        in-window keys; Settings page registry
   components/ (issue/: rings, pills, chips, avatars) windows/<name>/ lib/ styles/ test/
 docs/                        this folder; adr/ holds the decision records; plan/ (gitignored) the steps
