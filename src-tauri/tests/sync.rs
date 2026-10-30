@@ -1269,22 +1269,41 @@ mod the_engine {
     }
 
     #[tokio::test]
-    async fn a_synced_cache_waits_for_a_queued_job_and_then_runs_it() {
+    async fn starting_on_a_synced_cache_fetches_changes_by_itself() {
         let rig = Rig::connected().await;
         rig.full_sync().await;
         let synced_at = scope_full_at(&rig.ctx.db).await;
         let before = rig.requests();
 
-        let engine = SyncEngine::start(rig.ctx.clone(), rig.emit());
-        wait_until("the engine to report its state", || {
-            !rig.states().is_empty()
+        let _engine = SyncEngine::start(rig.ctx.clone(), rig.emit());
+        wait_until("the start delta to finish", || {
+            let states = rig.states();
+            states.contains(&SyncState::Running { job: Job::Delta })
+                && states.last().is_some_and(is_synced)
         })
         .await;
-        tokio::time::sleep(Duration::from_millis(300)).await;
 
-        assert_eq!(rig.states(), vec![SyncState::Idle { last_ok: synced_at }]);
-        assert_eq!(rig.requests(), before);
-        assert!(is_synced(&engine.state()));
+        let states = rig.states();
+        assert_eq!(states[0], SyncState::Idle { last_ok: synced_at });
+        assert_eq!(states[1], SyncState::Running { job: Job::Delta });
+        assert!(is_synced(&states[2]), "{states:?}");
+        assert_eq!(states.len(), 3);
+        assert!(rig.requests() > before);
+    }
+
+    #[tokio::test]
+    async fn a_queued_job_runs_on_a_synced_cache_after_the_start_delta() {
+        let rig = Rig::connected().await;
+        rig.full_sync().await;
+
+        let engine = SyncEngine::start(rig.ctx.clone(), rig.emit());
+        wait_until("the start delta to finish", || {
+            let states = rig.states();
+            states.contains(&SyncState::Running { job: Job::Delta })
+                && states.last().is_some_and(is_synced)
+        })
+        .await;
+        let before = rig.requests();
 
         engine.queue(Job::Full);
         wait_until("the queued sync to finish", || {

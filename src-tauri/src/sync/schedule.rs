@@ -85,7 +85,7 @@ impl Focus {
 }
 
 /// Ticks for as long as the app runs and queues what is due on `engine`. The first deltas wait one interval:
-/// the app start already synced or will (a never-synced cache runs a full sync at start).
+/// the engine already syncs at start (a full sync for a never-synced cache, a delta otherwise).
 pub fn start_schedule(ctx: SyncContext, engine: SyncEngine, focus: Focus) {
     tauri::async_runtime::spawn(async move {
         let now = Utc::now();

@@ -30,7 +30,7 @@ pub struct SyncEngine {
 }
 
 impl SyncEngine {
-    /// Starts the task. A cache that was never synced gets a full sync right away.
+    /// Starts the task and syncs right away: a full sync for a cache that was never synced, a delta otherwise.
     pub fn start(ctx: SyncContext, emit: Emit) -> Self {
         let (commands, receiver) = mpsc::unbounded_channel();
         let state = Arc::new(Mutex::new(SyncState::Idle { last_ok: None }));
@@ -72,9 +72,11 @@ async fn run(
         None
     });
     let mut pending: VecDeque<Job> = VecDeque::new();
-    if last_ok.is_none() {
-        pending.push_back(Job::Full);
-    }
+    pending.push_back(if last_ok.is_none() {
+        Job::Full
+    } else {
+        Job::Delta
+    });
     set(SyncState::Idle {
         last_ok: last_ok.clone(),
     });

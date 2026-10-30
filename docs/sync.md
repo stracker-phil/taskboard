@@ -9,7 +9,7 @@ reads the cache and listens to the events.
 `sync::SyncEngine` (`engine.rs`) is the one task that talks to Jira. `app.rs` starts it with a `SyncContext`
 (clones of the settings store, `connection::JiraAccess` and `Db`) and an `Emit` callback that turns its events
 into Tauri events. Jobs arrive on a channel (`queue`), run one at a time, and a job already waiting isn't
-queued twice. A cache that was never synced gets a full sync at start.
+queued twice. Every start syncs right away: a full sync for a cache that was never synced, a delta otherwise.
 
 | `SyncState` | When | What runs next |
 |---|---|---|
