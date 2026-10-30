@@ -80,7 +80,8 @@ sync chip and `taskboard sync`) queues a delta, ⌘⇧R (`sync:full`, `taskboard
 as UTC with milliseconds, so they sort as text. The sprint is the active one, else the one with the highest id;
 an epic is hierarchy level 1 or type "Epic".
 
-`store.rs` writes them: the issue row, its `issue_body` and its custom fields' values (`raw.rs`,
+`store.rs` writes them, skipping a page older than the cached issue (`updated`) and keeping the value of a
+write on its way (`writes::overlay`, [writes.md](writes.md)): the issue row, its `issue_body` and its custom fields' values (`raw.rs`,
 [ADR 0041](adr/0041-an-issues-big-texts-live-beside-its-row.md)). An issue whose kept JSON and custom values equal
 the cached ones is skipped, so a sync without changes announces nothing; the kept JSON leaves out Jira's
 relative rendered dates and keeps each comment's edit time, so an edited comment still counts. Otherwise `diff.rs` compares the tracked fields with the cached row and writes

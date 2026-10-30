@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import type { BoardData } from "../../api";
 import { onIssueKeys } from "../../commands/issueKeys";
 import type { RowActionHandlers } from "../list/RowActions";
+import { explainWritesOff } from "../../writes/runWrite";
 
 /** The Board's issue keys: J/K (↓/↑) move through a column's cards, ←/→ to the neighboring open column, ↩
  *  opens; Copy, Bookmark, the read toggle and Open in Jira act on the current card, `selected`. */
@@ -54,6 +55,10 @@ export function useBoardKeys(
       },
       togglePin: () => {
         if (state.current.selected) state.current.actions.togglePin(state.current.selected);
+      },
+      toggleMine: () => {
+        const { selected, actions } = state.current;
+        if (selected) (actions.toggleMine ?? explainWritesOff)(selected);
       },
       toggleRead: () => {
         const { selected, actions, data } = state.current;

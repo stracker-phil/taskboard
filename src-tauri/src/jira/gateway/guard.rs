@@ -1,5 +1,6 @@
 //! The last check before the wire, kept apart from `endpoint` so a planning mistake can't widen what is
-//! sent: a fixed table of the methods, paths and query keys Taskboard may use.
+//! sent: a fixed table of the methods, paths and query keys Taskboard may use, and whether each one reads or
+//! writes.
 
 use reqwest::Method;
 
@@ -8,10 +9,10 @@ use super::params::{is_issue_id, is_issue_key, is_project_key};
 use crate::error::{AppError, AppResult};
 use crate::jira::site::Site;
 use Part::{AttachmentId, IssueIdOrKey, Literal, ProjectKey};
-use Verb::{Get, Post};
+use Verb::{Get, Post, Put};
 
-/// Keeps write requests refused; flip only together with the first write rule.
-pub const WRITES_ENABLED: bool = false;
+/// Whether this build may change Jira at all; the setting "Allow changes to Jira" then decides per user.
+pub const WRITES_ENABLED: bool = true;
 
 #[derive(Debug, Clone, Copy)]
 enum Part {
@@ -25,17 +26,33 @@ enum Part {
 enum Verb {
     Get,
     Post,
+    Put,
 }
 
-/// One allowed read under the REST API base (`…/rest/api/3/`).
+/// One allowed request under the REST API base (`…/rest/api/3/`).
 struct Rule {
     verb: Verb,
     path: &'static [Part],
     query: &'static [&'static str],
+    access: Access,
 }
 
 const fn read(verb: Verb, path: &'static [Part], query: &'static [&'static str]) -> Rule {
-    Rule { verb, path, query }
+    Rule {
+        verb,
+        path,
+        query,
+        access: Access::Read,
+    }
+}
+
+const fn write(verb: Verb, path: &'static [Part]) -> Rule {
+    Rule {
+        verb,
+        path,
+        query: &[],
+        access: Access::Write,
+    }
 }
 
 const RULES: &[Rule] = &[
@@ -80,6 +97,7 @@ const RULES: &[Rule] = &[
     ),
     read(Post, &[Literal("issue"), Literal("bulkfetch")], &[]),
     read(Post, &[Literal("jql"), Literal("parse")], &["validation"]),
+    write(Put, &[Literal("issue"), IssueIdOrKey, Literal("assignee")]),
 ];
 
 /// `Ok` only for a request in the table (or the unauthenticated tenant-info read) on this site.
@@ -100,10 +118,11 @@ fn allowed(planned: &Planned, site: &Site) -> AppResult<bool> {
     let verb = match planned.method {
         Method::GET => Get,
         Method::POST => Post,
+        Method::PUT => Put,
         _ => return Ok(false),
     };
     let plain = url.username().is_empty() && url.password().is_none() && url.fragment().is_none();
-    let body_fits = verb == Post || planned.body.is_none();
+    let body_fits = verb != Get || planned.body.is_none();
     let access_open = planned.access == Access::Read || WRITES_ENABLED;
     if !plain || !body_fits || !access_open {
         return Ok(false);
@@ -111,8 +130,7 @@ fn allowed(planned: &Planned, site: &Site) -> AppResult<bool> {
     if *url == site.tenant_info_url() {
         return Ok(verb == Get && !planned.authenticated && planned.access == Access::Read);
     }
-    // Every rule is a read until the first write rule arrives.
-    if !planned.authenticated || planned.access != Access::Read {
+    if !planned.authenticated {
         return Ok(false);
     }
     let base = site.api_base()?;
@@ -125,7 +143,10 @@ fn allowed(planned: &Planned, site: &Site) -> AppResult<bool> {
     let segments: Vec<&str> = rest.split('/').collect();
     let keys: Vec<String> = url.query_pairs().map(|(key, _)| key.into_owned()).collect();
     Ok(RULES.iter().any(|rule| {
-        rule.verb == verb && path_matches(rule.path, &segments) && query_matches(rule.query, &keys)
+        rule.verb == verb
+            && rule.access == planned.access
+            && path_matches(rule.path, &segments)
+            && query_matches(rule.query, &keys)
     }))
 }
 

@@ -3,6 +3,7 @@ import type { Group, ViewData, ViewPlace } from "../../api";
 import { onIssueKeys } from "../../commands/issueKeys";
 import { type Item, itemGroupKey } from "./flatten";
 import type { RowActionHandlers } from "./RowActions";
+import { explainWritesOff } from "../../writes/runWrite";
 
 /** What the List's and Table's issue keys act on: this render's rows, selection and changes. */
 export interface RowKeyState {
@@ -77,6 +78,10 @@ export function useRowKeys(current: RowKeyState): RefObject<RowKeyState> {
       togglePin: () => {
         const { selected, actions } = state.current;
         if (selected) actions.togglePin(selected);
+      },
+      toggleMine: () => {
+        const { selected, actions } = state.current;
+        if (selected) (actions.toggleMine ?? explainWritesOff)(selected);
       },
       toggleRead: () => {
         const { selected, actions, data } = state.current;

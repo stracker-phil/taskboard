@@ -57,6 +57,7 @@ export function issueDetail(patch: Partial<IssueDetail> = {}): IssueDetail {
     custom: [],
     since: null,
     unread: false,
+    assignedToMe: false,
     attachments: [],
     ...patch,
   };

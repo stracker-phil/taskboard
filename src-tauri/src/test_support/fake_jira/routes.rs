@@ -7,6 +7,7 @@ use serde_json::{Value, json};
 
 use super::http::{Recorded, Response};
 use super::jql::{self, Context};
+use super::writes;
 use crate::jira::dto::parse_jira_time;
 use crate::test_support::demo::JiraData;
 
@@ -22,7 +23,7 @@ pub struct Content {
     pub max_results_cap: usize,
 }
 
-pub fn route(site: &Content, request: &Recorded) -> Response {
+pub fn route(site: &mut Content, request: &Recorded) -> Response {
     if request.path == "/_edge/tenant_info" {
         return Response::json(200, json!({ "cloudId": site.data.cloud_id }));
     }
@@ -54,6 +55,7 @@ pub fn route(site: &Content, request: &Recorded) -> Response {
         ("GET", ["issue", key, "changelog"]) => changelog(site, key, request),
         ("GET", ["attachment", "content", id]) => attachment_content(site, id, request),
         ("POST", ["jql", "parse"]) => parse_jql(&request.body),
+        ("PUT", ["issue", key, "assignee"]) => writes::assign(site, key, &request.body),
         _ => not_found(),
     }
 }

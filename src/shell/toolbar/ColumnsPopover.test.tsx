@@ -9,7 +9,7 @@ vi.mock("../../api", async (orig) => ({ ...(await orig<object>()), api: (await i
 import { api, type Column, type IssueOpening, type View } from "../../api";
 import { createQueryClient } from "../../queries/queryClient";
 import { resetStore, useStore } from "../../state/store";
-import { settings } from "../../test/settings";
+import { behaviour, settings } from "../../test/settings";
 import { view } from "../../test/views";
 import { ColumnsPopover } from "./ColumnsPopover";
 
@@ -261,7 +261,7 @@ describe("ColumnsPopover", () => {
     });
 
     it("names the app setting in the Default button", async () => {
-      mocked.getSettings.mockResolvedValue(settings({ behaviour: { seenAfterSeconds: 2, pinDefault: "untilUnpinned", openIssuesIn: "full" } }));
+      mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ openIssuesIn: "full" }) }));
       const popover = await openColumns();
 
       expect(await within(group(popover)).findByRole("button", { name: "Default (Full view)" })).toBeInTheDocument();

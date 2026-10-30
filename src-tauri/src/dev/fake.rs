@@ -63,6 +63,11 @@ async fn connect_to_fake(app: &AppHandle, url: &str) -> AppResult<()> {
         today,
     )
     .await?;
+    // The demo site may be changed freely.
+    state
+        .settings
+        .edit(|s| s.behaviour.allow_jira_changes = true)
+        .await?;
     let client = state.jira.client(&state.settings.get().connection)?;
     let projects = connection::refresh_projects(&state.db, &client).await?;
     for space in demo::demo_spaces().iter().filter(|s| s.tracked) {

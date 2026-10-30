@@ -11,7 +11,7 @@ import { resetStore, useStore } from "../state/store";
 import { connectionView } from "../test/jira";
 import { ALEX, changeItem, commentItem } from "../test/issues";
 import { commentTarget, pinItem, pins } from "../test/pins";
-import { settings } from "../test/settings";
+import { behaviour, settings } from "../test/settings";
 import { pullRequestLink } from "../test/webLinks";
 import { Peek } from "./Peek";
 
@@ -43,6 +43,7 @@ function detail(patch: Partial<IssueDetail> = {}): IssueDetail {
     custom: [],
     since: null,
     unread: false,
+    assignedToMe: false,
     attachments: [],
     ...patch,
   };
@@ -241,7 +242,7 @@ describe("Peek", () => {
     });
 
     async function showUnseen(seenAfterSeconds?: number) {
-      if (seenAfterSeconds !== undefined) mocked.getSettings.mockResolvedValue(settings({ behaviour: { seenAfterSeconds, pinDefault: "untilUnpinned", openIssuesIn: "preview" } }));
+      if (seenAfterSeconds !== undefined) mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ seenAfterSeconds }) }));
       serveByKey();
       const view = renderSwitchable("10042");
       await screen.findByRole("status");

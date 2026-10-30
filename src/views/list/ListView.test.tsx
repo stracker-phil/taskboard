@@ -15,7 +15,7 @@ import { ALEX, COLUMNS, groupOf, row, SAM, viewData } from "../../test/issues";
 import { connectionView } from "../../test/jira";
 import { startMotionTimers, stubMotion } from "../../test/motion";
 import { issueTarget, pinItem, pins } from "../../test/pins";
-import { settings } from "../../test/settings";
+import { behaviour, settings } from "../../test/settings";
 import { sidebarTree, space } from "../../test/spaces";
 import { ListView } from "./ListView";
 
@@ -251,7 +251,7 @@ describe("ListView", () => {
     });
 
     it("follows the app setting when the view has no choice", async () => {
-      mocked.getSettings.mockResolvedValue(settings({ behaviour: { seenAfterSeconds: 2, pinDefault: "untilUnpinned", openIssuesIn: "full" } }));
+      mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ openIssuesIn: "full" }) }));
       await renderList(data());
 
       await click();
@@ -260,7 +260,7 @@ describe("ListView", () => {
     });
 
     it("prefers the view's choice over the app setting", async () => {
-      mocked.getSettings.mockResolvedValue(settings({ behaviour: { seenAfterSeconds: 2, pinDefault: "untilUnpinned", openIssuesIn: "full" } }));
+      mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ openIssuesIn: "full" }) }));
       await renderList(data(), "preview");
 
       await click();
@@ -846,6 +846,23 @@ describe("ListView", () => {
       expect(await action("Remove the bookmark of NW-1042")).toHaveAttribute("aria-pressed", "true");
       expect(screen.queryByRole("button", { name: "Bookmark NW-1042" })).not.toBeInTheDocument();
     });
+
+    it("assigns the issue to me or unassigns it without selecting the row while changes to Jira are on", async () => {
+      mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ allowJiraChanges: true }) }));
+      await renderList(viewData([groupOf([OPEN])], [OPEN]));
+
+      await userEvent.click(await action("Assign NW-1042 to me or unassign it"));
+
+      expect(mocked.issueToggleMine).toHaveBeenCalledWith("1");
+      expect(screen.getByRole("row", { name: /NW-1042/ })).toHaveAttribute("aria-selected", "false");
+    });
+
+    it("offers no Assign to me while changes to Jira are off", async () => {
+      await renderList(viewData([groupOf([OPEN])], [OPEN]));
+      await screen.findByRole("button", { name: "Bookmark NW-1042" });
+
+      expect(screen.queryByRole("button", { name: /to me or unassign it$/ })).not.toBeInTheDocument();
+    });
   });
 
   describe("issue keys", () => {
@@ -928,6 +945,37 @@ describe("ListView", () => {
       await press("issue.open");
 
       expect(useStore.getState().issueView).toEqual({ origin: { listId: 11, viewId: 101 }, stack: ["3"] });
+    });
+
+    it("I assigns the selected issue to me or unassigns it while changes to Jira are on", async () => {
+      mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ allowJiraChanges: true }) }));
+      await renderList(viewData([groupOf(rows)], rows));
+      await userEvent.click(await screen.findByText("Fix the footer links"));
+      await screen.findByRole("button", { name: "Assign NW-1003 to me or unassign it" });
+
+      await press("issue.toggleMine");
+
+      expect(mocked.issueToggleMine).toHaveBeenCalledWith("3");
+    });
+
+    it("I explains that changes to Jira are off instead of changing the issue", async () => {
+      await renderList(viewData([groupOf(rows)], rows));
+      await userEvent.click(await screen.findByText("Fix the footer links"));
+
+      await press("issue.toggleMine");
+
+      expect(useStore.getState().toasts.map((t) => [t.kind, t.message])).toEqual([["info", "Changes to Jira are off. Turn them on in Settings → Connection."]]);
+      expect(mocked.issueToggleMine).not.toHaveBeenCalled();
+    });
+
+    it("I does nothing without a selected issue", async () => {
+      await renderList(viewData([groupOf(rows)], rows));
+      await screen.findByRole("row", { name: /NW-1042/ });
+
+      await press("issue.toggleMine");
+
+      expect(useStore.getState().toasts).toEqual([]);
+      expect(mocked.issueToggleMine).not.toHaveBeenCalled();
     });
 
     it("marks the selected unread issue read", async () => {

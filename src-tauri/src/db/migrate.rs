@@ -36,6 +36,7 @@ pub const CACHE: &[&str] = &[
     include_str!("../../migrations/cache/0011_issue_body.sql"),
     include_str!("../../migrations/cache/0012_left_scope_at.sql"),
     include_str!("../../migrations/cache/0013_drop_issue_seen.sql"),
+    include_str!("../../migrations/cache/0014_pending_write.sql"),
 ];
 
 /// Brings the connection's file up to date in one transaction. A file migrated by a newer Taskboard is

@@ -41,6 +41,8 @@ pub struct Behaviour {
     pub pin_default: PinDuration,
     /// What a click on an issue opens in views that don't choose.
     pub open_issues_in: IssueOpening,
+    /// Whether Taskboard may change Jira; off by default.
+    pub allow_jira_changes: bool,
 }
 
 impl Default for Behaviour {
@@ -49,6 +51,7 @@ impl Default for Behaviour {
             seen_after_seconds: 2,
             pin_default: PinDuration::UntilUnpinned,
             open_issues_in: IssueOpening::Preview,
+            allow_jira_changes: false,
         }
     }
 }

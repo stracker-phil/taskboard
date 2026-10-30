@@ -8,6 +8,7 @@ import type {
   Appearance,
   Behaviour,
   BoardData,
+  Change,
   ConnectionInput,
   ConnectionTest,
   ConnectionView,
@@ -54,6 +55,7 @@ import type {
   ViewData,
   ViewPlace,
   WebLink,
+  WriteOutcome,
 } from "./types";
 
 export * from "./types";
@@ -202,6 +204,10 @@ export const api = {
   issueSyncWebLinks: (id: string) => invoke<boolean>("issue_sync_web_links", { id }),
   /** Fetches the issue's history (Jira's changelog) at most every 5 minutes; true when it changed. */
   issueSyncHistory: (id: string) => invoke<boolean>("issue_sync_history", { id }),
+  /** Changes the issue in Jira; the cache shows it at once and takes the old value back when Jira refuses. */
+  issueWrite: (id: string, change: Change) => invoke<WriteOutcome>("issue_write", { id, change }),
+  /** Assigns the issue to me, or unassigns it when it is mine. */
+  issueToggleMine: (id: string) => invoke<WriteOutcome>("issue_toggle_mine", { id }),
   /** The person's profile picture as a `data:` URL, fetched and cached by Rust; null shows initials. */
   userAvatar: (accountId: string) => invoke<string | null>("user_avatar", { accountId }),
   placeGet: (listId: number, viewId: number) => invoke<ViewPlace | null>("place_get", { listId, viewId }),

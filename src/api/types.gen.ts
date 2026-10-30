@@ -83,7 +83,11 @@ pinDefault: PinDuration,
 /**
  * What a click on an issue opens in views that don't choose.
  */
-openIssuesIn: IssueOpening, };
+openIssuesIn: IssueOpening, 
+/**
+ * Whether Taskboard may change Jira; off by default.
+ */
+allowJiraChanges: boolean, };
 
 export type BoardColumn = { 
 /**
@@ -114,6 +118,11 @@ export type BoardData = { columns: Array<BoardColumn>, rows: { [key in string]: 
 cardFields: Array<string>, };
 
 export type Cell = { "kind": "text", "value": string } | { "kind": "person", "value": Person };
+
+/**
+ * A change to one issue, as the page asks for it.
+ */
+export type Change = { "kind": "assign", accountId: string | null, };
 
 export type ChangeValue = { "kind": "status", "value": { name: string, style: Style, } } | { "kind": "person", "value": Person } | { "kind": "text", "value": string };
 
@@ -268,7 +277,7 @@ since: Since | null,
 /**
  * Unseen changes, or marked unread by the owner.
  */
-unread: boolean, 
+unread: boolean, assignedToMe: boolean, 
 /**
  * Files attached in Jira, in Jira's order.
  */
@@ -547,6 +556,15 @@ id: string | null, key: string, summary: string, style: Style, issueType: string
  * Has changes the owner hasn't seen.
  */
 changed: boolean, };
+
+/**
+ * A second change that sets the field back: a new write in the tracker's history, not an undo.
+ */
+export type Reverse = { 
+/**
+ * "Change back to Jamie Doe", "Change back to Unassigned".
+ */
+label: string, change: Change, };
 
 export type Row = { id: string, key: string, summary: string, style: Style, statusName: string, commentCount: number, 
 /**
@@ -845,3 +863,16 @@ reference: string | null,
 openable: boolean, };
 
 export type WebLinkKind = "pullRequest" | "link";
+
+/**
+ * What a write did, for the page's toast.
+ */
+export type WriteOutcome = { 
+/**
+ * "Assigned NW-1042 to you".
+ */
+done: string, 
+/**
+ * The opposite change, when there is one.
+ */
+reverse: Reverse | null, };

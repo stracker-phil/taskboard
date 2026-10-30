@@ -5,7 +5,7 @@ use serde_json::{Value, json};
 use url::Url;
 
 use super::params::{
-    AttachmentId, Expand, FieldIds, IssueRef, IssueRefs, Jql, PageToken, ProjectKey,
+    AccountId, AttachmentId, Expand, FieldIds, IssueRef, IssueRefs, Jql, PageToken, ProjectKey,
 };
 use crate::error::{AppError, AppResult};
 use crate::jira::site::Site;
@@ -26,7 +26,7 @@ const USAGE_FIELDS: &[&str] = &[
     "-environment",
 ];
 
-/// Reads may be retried; writes never are, and stay refused until writes are enabled (`guard`).
+/// Reads may be retried; writes never are.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Access {
     Read,
@@ -90,6 +90,11 @@ pub enum Endpoint {
     /// The project's most recently updated issues with all their fields, to see which custom fields it fills.
     FieldUsage {
         project: ProjectKey,
+    },
+    /// Write: assigns the issue to the account, or unassigns it (`None`).
+    AssignIssue {
+        issue: IssueRef,
+        account: Option<AccountId>,
     },
 }
 
@@ -179,6 +184,12 @@ impl Endpoint {
             )
             .jql_errors()
             .plan(site),
+            Self::AssignIssue { issue, account } => Rest::write(
+                Method::PUT,
+                &["issue", issue.as_str(), "assignee"],
+                json!({ "accountId": account.as_ref().map(AccountId::as_str) }),
+            )
+            .plan(site),
             Self::JqlParse { jql } => {
                 Rest::read_post(&["jql", "parse"], json!({ "queries": [jql.as_str()] }))
                     .query("validation", "strict")
@@ -215,6 +226,7 @@ struct Rest<'a> {
     segments: &'a [&'a str],
     query: Vec<(&'static str, String)>,
     body: Option<Value>,
+    access: Access,
     bad_request: BadRequest,
 }
 
@@ -225,7 +237,18 @@ impl<'a> Rest<'a> {
             segments,
             query: Vec::new(),
             body: None,
+            access: Access::Read,
             bad_request: BadRequest::Plain,
+        }
+    }
+
+    /// A change to Jira's data: sent once, never retried.
+    fn write(method: Method, segments: &'a [&'a str], body: Value) -> Self {
+        Self {
+            method,
+            body: Some(body),
+            access: Access::Write,
+            ..Self::get(segments)
         }
     }
 
@@ -263,7 +286,7 @@ impl<'a> Rest<'a> {
             url,
             body: self.body,
             authenticated: true,
-            access: Access::Read,
+            access: self.access,
             bad_request: self.bad_request,
         })
     }

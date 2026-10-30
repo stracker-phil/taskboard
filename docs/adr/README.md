@@ -53,5 +53,6 @@ stands in Taskboard. The numbers in this table are Taskboard's.
 | [0041](0041-an-issues-big-texts-live-beside-its-row.md) | An issue's big texts live beside its row | Accepted (2026-10-30) |
 | [0042](0042-inline-images-load-through-an-app-scheme.md) | Inline images load through an app scheme | Accepted (2026-10-30) |
 | [0043](0043-the-palette-runs-the-menus.md) | The palette runs the menus | Accepted (2026-10-30) |
+| [0044](0044-writes-show-at-once-and-settle-after-jira.md) | Writes show at once and settle after Jira | Accepted (2026-10-31) |
 
 Open: integrations with Daybook and TimeTracker.

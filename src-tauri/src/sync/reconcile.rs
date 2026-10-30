@@ -63,8 +63,8 @@ pub async fn reconcile(
         .map(|issue| issue.id)
         .collect();
     if !missing.is_empty() {
-        let ids = refresh_fields(ctx, source.as_ref()).await?;
-        let fields = search_fields(ctx, &ids).await?;
+        let ids = refresh_fields(&ctx.db, source.as_ref()).await?;
+        let fields = search_fields(&ctx.db, &ids).await?;
         for batch in missing.chunks(BULK_FETCH_MAX) {
             let found = source.fetch(batch, &fields).await?;
             let (returned, gone): (Vec<String>, Vec<String>) = batch

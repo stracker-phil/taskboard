@@ -224,6 +224,14 @@ describe("ConnectionPage", () => {
     });
   });
 
+  describe("Changes", () => {
+    it("offers the switch that allows changes to Jira, off by default", async () => {
+      await renderPage();
+
+      expect(await screen.findByRole("switch", { name: "Allow changes to Jira" })).not.toBeChecked();
+    });
+  });
+
   describe("Projects", () => {
     it("does not list projects; they live on the Projects page", async () => {
       mocked.projectsList.mockResolvedValue(PROJECTS);

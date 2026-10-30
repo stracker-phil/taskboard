@@ -8,12 +8,10 @@ vi.mock("../../api", async (orig) => ({ ...(await orig<object>()), api: (await i
 import { api, type Behaviour, type PinDuration } from "../../api";
 import { createQueryClient } from "../../queries/queryClient";
 import { resetStore, useStore } from "../../state/store";
-import { settings } from "../../test/settings";
+import { behaviour, settings } from "../../test/settings";
 import { GeneralPage } from "./GeneralPage";
 
 const mocked = vi.mocked(api, true);
-
-const behaviour = (patch: Partial<Behaviour> = {}): Behaviour => ({ seenAfterSeconds: 2, pinDefault: "untilUnpinned", openIssuesIn: "preview", ...patch });
 
 async function renderPage(current: Behaviour = behaviour()) {
   mocked.getSettings.mockResolvedValue(settings({ behaviour: current }));
@@ -47,7 +45,7 @@ describe("GeneralPage", () => {
       await userEvent.clear(field);
       await userEvent.type(field, "5{Enter}");
 
-      expect(mocked.behaviourSet).toHaveBeenCalledWith({ seenAfterSeconds: 5, pinDefault: "week", openIssuesIn: "preview" });
+      expect(mocked.behaviourSet).toHaveBeenCalledWith(behaviour({ seenAfterSeconds: 5, pinDefault: "week" }));
     });
 
     it("accepts 0 to count an issue as read at once", async () => {
@@ -56,7 +54,7 @@ describe("GeneralPage", () => {
       await userEvent.clear(field);
       await userEvent.type(field, "0{Enter}");
 
-      expect(mocked.behaviourSet).toHaveBeenCalledWith({ seenAfterSeconds: 0, pinDefault: "untilUnpinned", openIssuesIn: "preview" });
+      expect(mocked.behaviourSet).toHaveBeenCalledWith(behaviour({ seenAfterSeconds: 0 }));
     });
 
     it.each(["11", "-1", "1.5"])("does not send %s and shows the saved delay again", async (typed) => {
@@ -86,7 +84,7 @@ describe("GeneralPage", () => {
 
       await userEvent.click(within(screen.getByRole("group", { name: "Bookmark for" })).getByRole("button", { name: label }));
 
-      expect(mocked.behaviourSet).toHaveBeenCalledWith({ seenAfterSeconds: 7, pinDefault, openIssuesIn: "preview" });
+      expect(mocked.behaviourSet).toHaveBeenCalledWith(behaviour({ seenAfterSeconds: 7, pinDefault }));
     });
 
     it("describes the delay as counting in the preview or the Issue view", async () => {
@@ -108,7 +106,7 @@ describe("GeneralPage", () => {
 
       await userEvent.click(within(screen.getByRole("group", { name: "Open issues in" })).getByRole("button", { name: "Full view" }));
 
-      expect(mocked.behaviourSet).toHaveBeenCalledWith({ seenAfterSeconds: 7, pinDefault: "week", openIssuesIn: "full" });
+      expect(mocked.behaviourSet).toHaveBeenCalledWith(behaviour({ seenAfterSeconds: 7, pinDefault: "week", openIssuesIn: "full" }));
     });
 
     it("shows an error toast when the setting cannot be saved", async () => {

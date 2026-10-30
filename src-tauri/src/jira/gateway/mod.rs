@@ -20,7 +20,8 @@ pub use endpoint::{Access, BadRequest, Endpoint, PAGE_SIZE, Planned};
 pub use guard::check;
 pub use http::{MAX_ANSWER_BYTES, MAX_ATTACHMENT_BYTES};
 pub use params::{
-    AttachmentId, BULK_FETCH_MAX, Expand, FieldIds, IssueRef, IssueRefs, Jql, PageToken, ProjectKey,
+    AccountId, AttachmentId, BULK_FETCH_MAX, Expand, FieldIds, IssueRef, IssueRefs, Jql, PageToken,
+    ProjectKey,
 };
 
 use super::limiter::Limiter;
@@ -69,9 +70,15 @@ impl Gateway {
         let path = planned.url.path();
         self.log(&format!("{} {path} → {}", planned.method, answer.status));
         if !(200..300).contains(&answer.status) {
-            return Err(status_error(&answer, planned.bad_request, path));
+            return Err(status_error(&answer, &planned, path));
         }
-        serde_json::from_slice(&answer.body).map_err(|e| {
+        // An empty answer (a write's `204`) reads as `null`, which `()` accepts.
+        let body: &[u8] = if answer.body.is_empty() {
+            b"null"
+        } else {
+            &answer.body
+        };
+        serde_json::from_slice(body).map_err(|e| {
             AppError::Internal(format!("Jira sent an unexpected answer to {path}: {e}"))
         })
     }
@@ -93,7 +100,7 @@ impl Gateway {
         let path = planned.url.path();
         self.log(&format!("GET {path} → {}", answer.status));
         if !(200..300).contains(&answer.status) {
-            return Err(status_error(&answer, planned.bad_request, path));
+            return Err(status_error(&answer, &planned, path));
         }
         Ok(answer.body)
     }
@@ -146,19 +153,31 @@ impl Gateway {
     }
 }
 
-/// A `400` is `InvalidJql` only on the endpoints that take JQL.
-fn status_error(answer: &Answer, bad_request: BadRequest, path: &str) -> AppError {
+/// A `400` is `InvalidJql` only on the endpoints that take JQL. A refused write is `InvalidInput`, which unlike
+/// `Auth` doesn't pause the sync.
+fn status_error(answer: &Answer, planned: &Planned, path: &str) -> AppError {
+    let (access, bad_request) = (planned.access, planned.bad_request);
+    let refused =
+        |reason: &str| AppError::InvalidInput(format!("Jira refused the change: {reason}"));
     match answer.status {
         401 => AppError::Auth("Jira didn't accept the email and API token".into()),
+        403 if access == Access::Write => {
+            refused("you may lack the permission, or a scoped token lacks write:jira-work")
+        }
         403 => AppError::Auth("Jira refused access; check the token and its scopes".into()),
-        400 if bad_request == BadRequest::Jql => AppError::InvalidJql(error_messages(&answer.body)),
+        400 if bad_request == BadRequest::Jql => {
+            AppError::InvalidJql(error_messages(&answer.body, "Jira rejected the query"))
+        }
+        400 if access == Access::Write => {
+            refused(&error_messages(&answer.body, "it gave no reason").join(" "))
+        }
         404 => AppError::NotFound(format!("Jira has no {path}")),
         status => AppError::Internal(format!("Jira answered HTTP {status} to {path}")),
     }
 }
 
 /// Jira's `errorMessages` and the values of `errors`.
-fn error_messages(body: &[u8]) -> Vec<String> {
+fn error_messages(body: &[u8], fallback: &str) -> Vec<String> {
     let parsed: Value = serde_json::from_slice(body).unwrap_or(Value::Null);
     let listed = parsed["errorMessages"].as_array().into_iter().flatten();
     let by_field = parsed["errors"]
@@ -170,7 +189,7 @@ fn error_messages(body: &[u8]) -> Vec<String> {
         .filter_map(|v| v.as_str().map(str::to_string))
         .collect();
     if messages.is_empty() {
-        vec!["Jira rejected the query".into()]
+        vec![fallback.into()]
     } else {
         messages
     }

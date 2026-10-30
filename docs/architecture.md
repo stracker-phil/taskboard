@@ -1,7 +1,7 @@
 # Architecture
 
 Taskboard is the owner's task and project manager for macOS: a local-first Jira Cloud client that mirrors
-issues into a local SQLite cache and reads only from it. It is a Tauri 2 app: a Rust process owns every piece
+issues into a local SQLite cache and reads only from it; the few changes it makes go to Jira first ([writes.md](writes.md)). It is a Tauri 2 app: a Rust process owns every piece
 of logic (Jira traffic, sync, storage, filtering, grouping), a React 19 webview renders state and forwards
 intent. This page holds the rules every feature follows and grows with the code.
 
@@ -122,6 +122,7 @@ src-tauri/
                              the avatar client (avatar.rs)
   src/connection/            the Jira connection: Keychain access, Test Connection, tracked projects, scope
   src/sync/                  the sync engine: one task, the full sync, Jira JSON to rows, change records
+  src/writes/                changes to Jira (assign): shown at once, sent once, settled by fetching the issue again
   src/adf/                   Atlassian Document Format to HTML for descriptions, rich fields and comments (pure;
                              media.rs: attached images as placeholders the page fills)
   src/filter/                filter conditions: the model, SQL compiler, conditions in words

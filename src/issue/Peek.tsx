@@ -18,6 +18,7 @@ import { useSeenAfter } from "./useSeenAfter";
 import { WebLinks } from "./WebLinks";
 import { PinButton } from "../pins/PinButton";
 import { useIssueActions } from "../views/list/useIssueActions";
+import { AssignMeButton } from "../writes/AssignMeButton";
 
 /** The 540px panel beside the list (artboard 4): the selected issue at a glance. */
 export function Peek({ id, onClose, onExpand }: { id: string; onClose: () => void; onExpand: () => void }) {
@@ -43,6 +44,7 @@ export function Peek({ id, onClose, onExpand }: { id: string; onClose: () => voi
           </>
         )}
         <span className="peek__spacer" />
+        {issue && <AssignMeButton issue={issue} className="peek__btn" />}
         {issue && <PinButton kind="issue" target={issue.id} label="Bookmark this issue" meta={issue.key} className="peek__btn" />}
         {issue && actions.openInJira && (
           <button type="button" className="peek__btn" aria-label="Open in Jira" title="Open in Jira (⌘↩)" onClick={() => actions.openInJira?.(issue.key)}>

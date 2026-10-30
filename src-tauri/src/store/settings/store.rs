@@ -304,6 +304,7 @@ mod tests {
                 seen_after_seconds: 2,
                 pin_default: PinDuration::UntilUnpinned,
                 open_issues_in: IssueOpening::Preview,
+                allow_jira_changes: false,
             }
         );
     }
@@ -349,6 +350,7 @@ mod tests {
                 seen_after_seconds: 4,
                 pin_default: PinDuration::Week,
                 open_issues_in: IssueOpening::Preview,
+                allow_jira_changes: false,
             }
         );
     }
@@ -381,6 +383,7 @@ mod tests {
             seen_after_seconds: 5,
             pin_default: PinDuration::TwoDays,
             open_issues_in: IssueOpening::Full,
+            allow_jira_changes: true,
         };
 
         let saved = store.edit(move |s| s.behaviour = behaviour).await.unwrap();
@@ -392,7 +395,7 @@ mod tests {
             serde_json::from_str(&fs::read_to_string(dir.path().join(FILE_NAME)).unwrap()).unwrap();
         assert_eq!(
             file["behaviour"],
-            serde_json::json!({"seenAfterSeconds": 5, "pinDefault": "twoDays", "openIssuesIn": "full"})
+            serde_json::json!({"seenAfterSeconds": 5, "pinDefault": "twoDays", "openIssuesIn": "full", "allowJiraChanges": true})
         );
     }
 
@@ -413,6 +416,7 @@ mod tests {
                 seen_after_seconds: MAX_SEEN_AFTER_SECONDS,
                 pin_default: PinDuration::Week,
                 open_issues_in: IssueOpening::Preview,
+                allow_jira_changes: false,
             }
         );
         assert_eq!(MAX_SEEN_AFTER_SECONDS, 10);
@@ -436,6 +440,7 @@ mod tests {
                     seen_after_seconds: 4,
                     pin_default: PinDuration::UntilUnpinned,
                     open_issues_in: IssueOpening::Preview,
+                    allow_jira_changes: false,
                 },
                 sync: SyncSettings {
                     focused_minutes: 10,

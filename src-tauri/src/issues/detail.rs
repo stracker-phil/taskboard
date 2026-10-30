@@ -59,6 +59,7 @@ pub struct IssueDetail {
     pub since: Option<Since>,
     /// Unseen changes, or marked unread by the owner.
     pub unread: bool,
+    pub assigned_to_me: bool,
     /// Files attached in Jira, in Jira's order.
     pub attachments: Vec<Attachment>,
 }
@@ -142,6 +143,7 @@ fn read(conn: &Connection, viewer: &Viewer, id: &str) -> AppResult<IssueDetail> 
                 .get::<_, Option<String>>(11)?
                 .as_deref()
                 .map(rows::priority),
+            assigned_to_me: viewer.me.is_some() && r.get::<_, Option<String>>(12)? == viewer.me,
             assignees: person(r.get(12)?, r.get(13)?).into_iter().collect(),
             reporter: person(r.get(14)?, r.get(15)?),
             sprint: r.get(16)?,

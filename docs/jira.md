@@ -1,6 +1,7 @@
 # Jira client
 
-`src-tauri/src/jira/` talks to Jira Cloud's REST API v3. It reads only; writes arrive in M4. Every request goes
+`src-tauri/src/jira/` talks to Jira Cloud's REST API v3. It reads, and makes the few changes of `writes/`
+([writes.md](writes.md)). Every request goes
 through `jira/gateway/`, which sends only the operations on its allowlist
 ([ADR 0025](adr/0025-all-jira-traffic-goes-through-one-allowlisted-gateway.md)) to the hosts of the connection
 ([ADR 0020](adr/0020-jira-site-and-atlassian-gateway-are-the-hosts.md)).
@@ -18,7 +19,7 @@ Settings → Connection (`connection/`):
 3. **Settings → Projects → Refresh** loads every project into `cache.space`; **Track** creates the project's Space
    (`local.space`). Untracking keeps the Space's settings.
 
-Scopes a scoped token needs for v1: `read:jira-work`, `read:jira-user` (writes later add `write:jira-work`).
+Scopes a scoped token needs: `read:jira-work`, `read:jira-user`, and `write:jira-work` for changes.
 The expiry date warns 14 days ahead (`connection::token_expiry`).
 
 Settings → Sync sets the scope JQL (validated by Jira's `jql/parse` before it is saved; empty = the default
@@ -57,9 +58,10 @@ header for every request from it and sends `Authorization: Basic base64(email:to
    (explicit ids, never `*all`; only `FieldUsage` asks for `*all`, from a fixed list in `endpoint.rs`), `Expand` (`renderedFields`), `PageToken`. A refused value fails as
    `invalid_input` and nothing is sent.
 3. `guard.rs` `check` compares the planned request with `RULES` (method, path under the REST base, allowed
-   query keys) and the unauthenticated `GET /_edge/tenant_info`. Anything else, a fragment, credentials in the
-   URL, a body on a GET, or a write while `WRITES_ENABLED` is `false`, fails as `internal` ("Taskboard doesn't
-   call …").
+   query keys, read or write) and the unauthenticated `GET /_edge/tenant_info`. Anything else, a fragment,
+   credentials in the URL, a body on a GET, a request planned with the other access than its rule, or a write
+   while `WRITES_ENABLED` is `false`, fails as `internal` ("Taskboard doesn't call …"). A write is sent once
+   (`Retry::Never`); its `204` reads as `null`; a `403` or `400` on it is `invalid_input` with the reason.
 4. `http.rs` `Http` sends it: listed hosts only, no redirects (a 3xx fails), JSON only on success, answers capped
    at `MAX_ANSWER_BYTES` (32 MB). It is the only place `reqwest` may be used (`src-tauri/clippy.toml`).
 
@@ -80,7 +82,7 @@ credentials to the default browser; the app sends nothing itself and the token n
 
 **Adding an endpoint:** a variant in `Endpoint` with its plan, a row in `RULES`, a method in `api.rs`, tests for
 the exact request and its refusals, and a row in the table below. A write also flips `Access::Write` for that
-row and needs the owner's go-ahead (M4).
+row (`write(…)`) and goes through `writes/` ([writes.md](writes.md)).
 
 ## Endpoints
 
@@ -102,6 +104,7 @@ One method on `JiraClient` each (`jira/api.rs`), one `Endpoint` each; the answer
 | `changelog` | `GET issue/{id}/changelog`, every page by `startAt` (`maxResults=100`; only these two query keys are allowed) | `Changelog`, oldest first: id, author, time and the changed fields (`ChangeItem`: field name and id, `from`/`to` ids, `fromString`/`toString` texts). Asked when an issue is opened, at most every 5 minutes ([ADR 0031](adr/0031-issue-history-comes-from-the-changelog-on-demand.md)) |
 | `attachment_content` | `GET attachment/content/{id}?redirect=false` (the id digits only; `redirect` is the only query key) | the file's bytes in any format, through `Gateway::download` and `Http::download`: no redirect followed, at most `MAX_ATTACHMENT_BYTES` (50 MB, by `Content-Length` and while reading), a 5-minute timeout. For Quick Look ([ADR 0035](adr/0035-attachments-preview-in-quick-look.md)) and inline images ([ADR 0039](adr/0039-inline-images-come-from-issue-attachments-through-rust.md)) |
 | `check_jql` | `POST jql/parse?validation=strict` | Jira's messages; empty when valid |
+| `assign` (write) | `PUT issue/{id}/assignee` with `{"accountId": …}` (`AccountId`: letters, digits, `:`, `_`, `-`, up to 128; null unassigns) | nothing (`204`) |
 | `used_custom_fields` | `POST search/jql`: `project = "KEY" ORDER BY updated DESC`, one page of 100, `*all` without the large system fields | the custom field ids with a value |
 
 `Issue.fields` stays untyped JSON (the cache keeps part of it, `sync::raw`); accessors read what the sync needs

@@ -88,4 +88,8 @@ impl Source for JiraSource {
     fn used_custom_fields<'a>(&'a self, space_key: &'a str) -> Answer<'a, BTreeSet<String>> {
         Box::pin(self.client.used_custom_fields(space_key))
     }
+
+    fn assign<'a>(&'a self, issue_id: &'a str, account_id: Option<&'a str>) -> Answer<'a, ()> {
+        Box::pin(self.client.assign(issue_id, account_id))
+    }
 }

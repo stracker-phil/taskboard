@@ -573,6 +573,42 @@ async fn the_demo_account_is_the_assignee_with_color_one() {
 
 #[tokio::test]
 #[ignore = "syncs the demo site into a temp database"]
+async fn an_issue_is_assigned_to_me_only_when_the_assignee_is_the_viewers_account() {
+    let site = Site::new().await;
+    let unassigned = site.id_of("NW-1055").await;
+    site.db()
+        .write(move |tx, _| {
+            tx.execute(
+                "UPDATE cache.issue SET assignee_id = NULL WHERE id = ?1",
+                [unassigned],
+            )?;
+            Ok(())
+        })
+        .await
+        .unwrap();
+
+    for (key, expected) in [("NW-1042", true), ("NW-1044", false), ("NW-1055", false)] {
+        assert_eq!(site.detail(key).await.assigned_to_me, expected, "{key}");
+    }
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn no_issue_is_assigned_to_me_when_the_viewer_has_no_account() {
+    let site = Site::new().await;
+    let id = site.id_of("NW-1042").await;
+    let viewer = Viewer {
+        me: None,
+        ..viewer()
+    };
+
+    let detail = issue_get(site.db(), viewer, id).await.unwrap();
+
+    assert!(!detail.assigned_to_me);
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
 async fn the_reporter_is_a_person_other_than_me() {
     let site = Site::new().await;
 

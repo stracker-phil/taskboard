@@ -122,7 +122,8 @@ impl Http {
         }
         let is_json = header(CONTENT_TYPE.as_str())
             .is_some_and(|value| value.to_ascii_lowercase().starts_with("application/json"));
-        if expect == Expect::Json && (200..300).contains(&status) && !is_json {
+        // A write's `204 No Content` has no body to be JSON.
+        if expect == Expect::Json && (200..300).contains(&status) && status != 204 && !is_json {
             return Err(NetError::Unexpected(
                 "Jira answered with something other than JSON".into(),
             ));

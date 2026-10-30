@@ -29,7 +29,7 @@ pub async fn delta_sync(
     }
     let connection = ctx.settings.get().connection;
     let source = ctx.source()?;
-    let ids = refresh_fields(ctx, source.as_ref()).await?;
+    let ids = refresh_fields(&ctx.db, source.as_ref()).await?;
     let since = DateTime::parse_from_rfc3339(&cursor)
         .map_err(|e| AppError::Internal(format!("The delta cursor {cursor} isn't a time: {e}")))?
         .with_timezone(&Utc)
@@ -42,7 +42,7 @@ pub async fn delta_sync(
     ));
     let mut pages = source.issues(SearchRequest {
         jql: query,
-        fields: search_fields(ctx, &ids).await?,
+        fields: search_fields(&ctx.db, &ids).await?,
         expand: Some("renderedFields".into()),
     });
     let mut progress = SyncProgress {

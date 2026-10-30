@@ -11,6 +11,7 @@ pub mod map;
 mod overview;
 pub mod raw;
 mod reconcile;
+mod refetch;
 mod retention;
 pub mod schedule;
 pub mod source;
@@ -22,6 +23,7 @@ use ts_rs::TS;
 pub use engine::{Emit, SyncEngine, run_job};
 pub use full::full_sync;
 pub use overview::{ProjectCounts, SyncOverview, overview};
+pub use refetch::refetch_issue;
 
 use crate::connection::JiraAccess;
 use crate::db::Db;

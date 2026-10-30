@@ -12,7 +12,7 @@ import { createQueryClient } from "../../queries/queryClient";
 import { NO_NARROWING } from "../../queries/views";
 import { resetStore, useStore } from "../../state/store";
 import { ALEX, COLUMNS, groupOf, row, viewData } from "../../test/issues";
-import { settings } from "../../test/settings";
+import { behaviour, settings } from "../../test/settings";
 import { sidebarTree, space } from "../../test/spaces";
 import { view } from "../../test/views";
 import { TableView } from "./TableView";
@@ -382,7 +382,7 @@ describe("TableView", () => {
     });
 
     it("follows the app setting when the view has no choice", async () => {
-      mocked.getSettings.mockResolvedValue(settings({ behaviour: { seenAfterSeconds: 2, pinDefault: "untilUnpinned", openIssuesIn: "full" } }));
+      mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ openIssuesIn: "full" }) }));
       await renderTable();
       await waitFor(() => expect(mocked.getSettings).toHaveBeenCalled());
       await act(async () => {});

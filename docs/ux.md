@@ -260,7 +260,8 @@ open preview follows the click at once. A Board always opens the Issue view.
   assignee), the sanitized description, web links, the latest three activity items with "All activity".
 - Footer 36: the keys.
 - Hovering a row shows its toolbar at the end of the title: Mark as read (unread rows) or Mark as unread, Copy
-  key, Bookmark, Open in Jira (`RowActions`).
+  key, Bookmark, Assign to me or unassign (only while changes to Jira are on, [writes.md](writes.md)), Open in
+  Jira (`RowActions`).
 
 ## Change tracking
 
@@ -369,7 +370,8 @@ Full view button or E (the selected issue's epic); esc goes back one step (an op
 view with its place intact).
 
 - Header 50: back, breadcrumb (Space tile and name / list or view / key and a copy-link button), **Find in this
-  issue**, "Updated …", previous and next in the view's order (also J/K), Mark as read or unread, Bookmark (with
+  issue**, "Updated …", previous and next in the view's order (also J/K), Mark as read or unread, Assign to me
+  (`AssignMeButton`, pressed while it is mine; only while changes to Jira are on; also I), Bookmark (with
   bookmarks), **Open in Jira** (`OpenInJiraButton`, the content header's too).
   Previous and next step through the rows the view shows (not those in collapsed groups or subtrees), move the
   view's selection along, and keep the current issue on screen until the next one loads (the neighbors load

@@ -16,7 +16,7 @@ import { resetStore, useStore } from "../state/store";
 import { attachment, commentItem, groupOf, issueDetail, related, relatedIssue, row, SAM, viewData } from "../test/issues";
 import { connectionView } from "../test/jira";
 import { pinItem, pins } from "../test/pins";
-import { settings } from "../test/settings";
+import { behaviour, settings } from "../test/settings";
 import { sidebarTree, space } from "../test/spaces";
 import { listNode, view } from "../test/views";
 import { pullRequestLink } from "../test/webLinks";
@@ -748,7 +748,7 @@ describe("IssueView", () => {
     });
 
     it("marks the issue read at once when the delay in the settings is 0", async () => {
-      mocked.getSettings.mockResolvedValue(settings({ behaviour: { seenAfterSeconds: 0, pinDefault: "untilUnpinned", openIssuesIn: "preview" } }));
+      mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ seenAfterSeconds: 0 }) }));
 
       await openUnseen();
       await vi.advanceTimersByTimeAsync(50);
@@ -1008,6 +1008,26 @@ describe("IssueView", () => {
 
       expect(mocked.issueMarkUnread).toHaveBeenCalledWith("10042");
       expect(mocked.issuesMarkSeen).not.toHaveBeenCalled();
+    });
+
+    it("I assigns the open issue to me or unassigns it while changes to Jira are on", async () => {
+      mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ allowJiraChanges: true }) }));
+      renderIssue("10042");
+      await screen.findByRole("button", { name: "Assign NW-1042 to me" });
+
+      await press("issue.toggleMine");
+
+      expect(mocked.issueToggleMine).toHaveBeenCalledWith("10042");
+    });
+
+    it("I explains that changes to Jira are off instead of changing the open issue", async () => {
+      renderIssue("10042");
+      await title("Checkout: address validation for DACH postcodes");
+
+      await press("issue.toggleMine");
+
+      expect(useStore.getState().toasts.map((t) => [t.kind, t.message])).toEqual([["info", "Changes to Jira are off. Turn them on in Settings → Connection."]]);
+      expect(mocked.issueToggleMine).not.toHaveBeenCalled();
     });
 
     it("shows an error toast when M cannot mark the issue read", async () => {

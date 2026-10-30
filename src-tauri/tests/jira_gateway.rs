@@ -341,6 +341,263 @@ mod secrets {
     }
 }
 
+mod writes {
+    use super::*;
+    use taskboard_lib::jira::JiraClient;
+    use taskboard_lib::jira::dto::parse_jira_time;
+    use taskboard_lib::test_support::demo;
+
+    const ISSUE: &str = "NW-1042";
+    const PATH: &str = "/rest/api/3/issue/NW-1042/assignee";
+
+    fn demo_account(index: usize) -> String {
+        demo::demo().users[index]["accountId"]
+            .as_str()
+            .unwrap()
+            .to_string()
+    }
+
+    async fn issue_state(client: &JiraClient) -> (serde_json::Value, String) {
+        let found = client
+            .bulk_fetch(
+                &strings(&[ISSUE]),
+                &strings(&["summary", "assignee", "updated"]),
+            )
+            .await
+            .unwrap();
+        let fields = found.issues[0].fields.clone();
+        let updated = fields["updated"].as_str().unwrap().to_string();
+        (fields["assignee"].clone(), updated)
+    }
+
+    fn message(err: AppError) -> String {
+        match err {
+            AppError::InvalidInput(message) => message,
+            other => panic!("expected InvalidInput, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn assigning_an_issue_sets_its_assignee_and_makes_it_newer() {
+        for kind in [TokenKind::Classic, TokenKind::Scoped] {
+            let fake = FakeJira::start_demo().await;
+            let client = fake.client(kind);
+            let who = demo_account(1);
+            let (_, updated_before) = issue_state(&client).await;
+
+            client.assign(ISSUE, Some(&who)).await.unwrap();
+
+            let (assignee, updated_after) = issue_state(&client).await;
+            assert_eq!(assignee["accountId"], json!(who), "{kind:?}");
+            assert!(
+                parse_jira_time(&updated_after).unwrap()
+                    > parse_jira_time(&updated_before).unwrap(),
+                "{kind:?}: {updated_before} -> {updated_after}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn assigning_sends_one_put_with_the_account_id() {
+        let fake = FakeJira::start_demo().await;
+        let who = demo_account(2);
+
+        fake.client(TokenKind::Classic)
+            .assign(ISSUE, Some(&who))
+            .await
+            .unwrap();
+
+        let requests = fake.requests();
+        assert_eq!(requests.len(), 1);
+        assert_eq!(requests[0].method, "PUT");
+        assert_eq!(requests[0].path, PATH);
+        assert!(requests[0].query.is_empty());
+        assert_eq!(requests[0].body, json!({ "accountId": who }));
+        assert!(requests[0].authorization.is_some());
+    }
+
+    #[tokio::test]
+    async fn unassigning_clears_the_assignee_and_sends_a_null_account_id() {
+        let fake = FakeJira::start_demo().await;
+        let client = fake.client(TokenKind::Classic);
+        client.assign(ISSUE, Some(&demo_account(1))).await.unwrap();
+
+        client.assign(ISSUE, None).await.unwrap();
+
+        let (assignee, _) = issue_state(&client).await;
+        assert!(assignee.is_null(), "{assignee}");
+        let requests = fake.requests();
+        let last_put = requests.iter().rfind(|r| r.method == "PUT").unwrap();
+        assert_eq!(last_put.body, json!({ "accountId": null }));
+    }
+
+    #[tokio::test]
+    async fn the_recorded_write_passes_the_guard_as_a_write_and_not_as_a_read() {
+        for kind in [TokenKind::Classic, TokenKind::Scoped] {
+            let fake = FakeJira::start_demo().await;
+            fake.client(kind)
+                .assign(ISSUE, Some(&demo_account(1)))
+                .await
+                .unwrap();
+            let recorded = fake.requests().remove(0);
+            let site = fake.site(kind);
+            let mut url = fake.url().join(&recorded.path).unwrap();
+            url.query_pairs_mut().extend_pairs(&recorded.query);
+            let mut planned = Planned {
+                method: Method::PUT,
+                url,
+                body: Some(recorded.body.clone()),
+                authenticated: recorded.authorization.is_some(),
+                access: Access::Write,
+                bad_request: BadRequest::Plain,
+            };
+
+            assert!(gateway::check(&planned, &site).is_ok(), "{kind:?}");
+            planned.access = Access::Read;
+            assert!(gateway::check(&planned, &site).is_err(), "{kind:?}");
+        }
+    }
+
+    #[tokio::test]
+    async fn an_account_the_site_does_not_know_is_refused_with_jiras_reason() {
+        let fake = FakeJira::start_demo().await;
+        let client = fake.client(TokenKind::Classic);
+        let (before, _) = issue_state(&client).await;
+
+        let err = client
+            .assign(ISSUE, Some("5b10ac8d82e05b22cc7d4ef5"))
+            .await
+            .unwrap_err();
+
+        assert_eq!(
+            message(err),
+            "Jira refused the change: User '5b10ac8d82e05b22cc7d4ef5' cannot be assigned issues."
+        );
+        let (after, _) = issue_state(&client).await;
+        assert_eq!(after, before);
+    }
+
+    #[tokio::test]
+    async fn an_issue_that_does_not_exist_or_is_hidden_is_not_found() {
+        let fake = FakeJira::start_demo().await;
+        let client = fake.client(TokenKind::Classic);
+        fake.revoke_access("NW-1020");
+
+        for target in ["NW-9999", "NW-1020"] {
+            let err = client
+                .assign(target, Some(&demo_account(1)))
+                .await
+                .unwrap_err();
+
+            assert_eq!(err.kind(), ErrorKind::NotFound, "{target}");
+        }
+    }
+
+    #[tokio::test]
+    async fn a_refused_write_permission_is_invalid_input_naming_the_scope() {
+        let fake = FakeJira::start_demo().await;
+        fake.fail_next(1, 403, None);
+
+        let err = fake
+            .client(TokenKind::Scoped)
+            .assign(ISSUE, None)
+            .await
+            .unwrap_err();
+
+        assert_eq!(
+            message(err),
+            "Jira refused the change: you may lack the permission, or a scoped token lacks write:jira-work"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_read_refused_with_403_is_still_an_auth_error() {
+        let fake = FakeJira::start_demo().await;
+        fake.fail_next(1, 403, None);
+
+        let err = fake.client(TokenKind::Classic).myself().await.unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::Auth);
+    }
+
+    #[tokio::test]
+    async fn a_bad_request_shows_what_jira_said_and_falls_back_when_it_said_nothing() {
+        for (body, expected) in [
+            (
+                json!({ "errors": { "assignee": "User 'x' cannot be assigned issues." } }),
+                "Jira refused the change: User 'x' cannot be assigned issues.",
+            ),
+            (
+                json!({ "errorMessages": ["Issue is archived."], "errors": {} }),
+                "Jira refused the change: Issue is archived.",
+            ),
+            (
+                json!({ "errorMessages": [], "errors": {} }),
+                "Jira refused the change: it gave no reason",
+            ),
+        ] {
+            let fake = FakeJira::start_demo().await;
+            fake.answer_next(400, body.clone());
+
+            let err = fake
+                .client(TokenKind::Classic)
+                .assign(ISSUE, None)
+                .await
+                .unwrap_err();
+
+            assert_eq!(message(err), expected, "{body}");
+        }
+    }
+
+    #[tokio::test]
+    async fn a_write_that_is_rate_limited_or_unavailable_is_sent_once_and_fails() {
+        for (status, retry_after) in [(429, Some("0")), (503, Some("0"))] {
+            let fake = FakeJira::start_demo().await;
+            fake.fail_next(1, status, retry_after);
+            let client = fake.client(TokenKind::Classic);
+
+            let err = client
+                .assign(ISSUE, Some(&demo_account(1)))
+                .await
+                .unwrap_err();
+
+            assert_eq!(err.kind(), ErrorKind::Internal, "HTTP {status}");
+            assert_eq!(fake.requests().len(), 1, "HTTP {status}");
+            let (assignee, _) = issue_state(&client).await;
+            assert_ne!(
+                assignee["accountId"],
+                json!(demo_account(1)),
+                "HTTP {status}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn an_account_id_or_issue_that_could_change_the_url_sends_nothing() {
+        let fake = FakeJira::start_demo().await;
+        let client = fake.client(TokenKind::Classic);
+
+        for (label, result) in [
+            (
+                "an account id with a slash",
+                client.assign(ISSUE, Some("a/b")).await,
+            ),
+            ("an empty account id", client.assign(ISSUE, Some("")).await),
+            (
+                "an issue that climbs out",
+                client.assign("../myself", None).await,
+            ),
+        ] {
+            assert_eq!(
+                result.unwrap_err().kind(),
+                ErrorKind::InvalidInput,
+                "{label}"
+            );
+        }
+        assert!(fake.requests().is_empty());
+    }
+}
+
 mod audit {
     use super::*;
 

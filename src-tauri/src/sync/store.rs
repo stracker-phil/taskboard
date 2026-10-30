@@ -9,6 +9,7 @@ use super::map::{FieldIds, IssueRow, Mapped, map_issue};
 use crate::db::Changes;
 use crate::error::AppResult;
 use crate::jira::dto::{Issue, Status, Version};
+use crate::writes;
 
 /// The `sync_state` row of the whole scope.
 pub const SCOPE_ROW: &str = "scope";
@@ -185,6 +186,7 @@ pub fn store_page(
 
 struct CachedIssue {
     snapshot: Snapshot,
+    updated_at: String,
     custom: Option<String>,
     raw: Option<String>,
     gone: bool,
@@ -193,7 +195,8 @@ struct CachedIssue {
 fn cached_issue(conn: &Connection, id: &str) -> AppResult<Option<CachedIssue>> {
     Ok(conn
         .query_row(
-            "SELECT i.status_id, i.assignee_id, i.due_date, i.priority, i.comment_count, i.custom, b.raw, i.gone
+            "SELECT i.status_id, i.assignee_id, i.due_date, i.priority, i.comment_count, i.custom, b.raw, i.gone,
+               i.updated_at
              FROM cache.issue i LEFT JOIN cache.issue_body b ON b.issue_id = i.id WHERE i.id = ?1",
             [id],
             |r| {
@@ -208,23 +211,27 @@ fn cached_issue(conn: &Connection, id: &str) -> AppResult<Option<CachedIssue>> {
                     custom: r.get(5)?,
                     raw: r.get(6)?,
                     gone: r.get(7)?,
+                    updated_at: r.get(8)?,
                 })
             },
         )
         .optional()?)
 }
 
-/// `false` when the cache already holds this exact version.
+/// `false` when the cache already holds this version or a newer one.
 fn store_issue(conn: &Connection, mapped: &Mapped, first: bool, now: &str) -> AppResult<bool> {
-    let row = &mapped.issue;
-    let cached = cached_issue(conn, &row.id)?;
+    let cached = cached_issue(conn, &mapped.issue.id)?;
     if cached.as_ref().is_some_and(|c| {
-        !c.gone && c.custom == row.custom && c.raw.as_deref() == Some(row.raw.as_str())
+        let same =
+            c.custom == mapped.issue.custom && c.raw.as_deref() == Some(mapped.issue.raw.as_str());
+        !c.gone && (same || c.updated_at > mapped.issue.updated_at)
     }) {
         return Ok(false);
     }
-    upsert_issue(conn, row, now)?;
-    upsert_body(conn, row)?;
+    let mut row = mapped.issue.clone();
+    writes::overlay(conn, &mut row)?;
+    upsert_issue(conn, &row, now)?;
+    upsert_body(conn, &row)?;
     store_users(conn, mapped)?;
     store_comments(conn, mapped, now)?;
     replace_search_doc(conn, mapped)?;
@@ -235,7 +242,7 @@ fn store_issue(conn: &Connection, mapped: &Mapped, first: bool, now: &str) -> Ap
             params![row.id, now],
         )?;
     } else {
-        record_changes(conn, cached.as_ref().map(|c| &c.snapshot), row)?;
+        record_changes(conn, cached.as_ref().map(|c| &c.snapshot), &row)?;
     }
     Ok(true)
 }

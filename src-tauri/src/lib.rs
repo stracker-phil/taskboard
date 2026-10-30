@@ -44,6 +44,7 @@ pub mod sync;
 pub mod test_support;
 pub mod views;
 pub mod window;
+pub mod writes;
 
 use std::path::PathBuf;
 

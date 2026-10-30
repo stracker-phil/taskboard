@@ -12,6 +12,7 @@ use super::store::{
 };
 use super::{Job, SyncContext, SyncEvent, SyncProgress};
 use crate::connection::{ProjectRow, effective_scope, store_spaces, tracked_projects};
+use crate::db::Db;
 use crate::error::AppResult;
 use crate::jira::dto::Myself;
 use crate::jira::{SearchRequest, jql};
@@ -63,7 +64,7 @@ pub async fn full_sync(
     }
     // First, so this run already fetches the fields the projects fill.
     refresh_field_usage(ctx, source.as_ref(), &tracked).await?;
-    let fields = search_fields(ctx, &ids).await?;
+    let fields = search_fields(&ctx.db, &ids).await?;
     let run = Run {
         ctx,
         source,
@@ -85,17 +86,17 @@ pub async fn full_sync(
 
 /// What a search asks for: the mapped fields, the site's sprint and epic color fields, and the custom fields
 /// shown in the field grid or as a column or filled by the tracked projects (the Issue view shows those).
-pub(super) async fn search_fields(ctx: &SyncContext, ids: &FieldIds) -> AppResult<Vec<String>> {
+pub(super) async fn search_fields(db: &Db, ids: &FieldIds) -> AppResult<Vec<String>> {
     let mut fields: Vec<String> = SEARCH_FIELDS.iter().map(|f| f.to_string()).collect();
     fields.extend(ids.sprint.iter().chain(&ids.epic_color).cloned());
-    fields.extend(ctx.db.read(fetched_fields).await?);
+    fields.extend(db.read(fetched_fields).await?);
     Ok(fields)
 }
 
 /// The site's field list, stored; returns its sprint and epic color fields.
-pub(super) async fn refresh_fields(ctx: &SyncContext, source: &dyn Source) -> AppResult<FieldIds> {
+pub(super) async fn refresh_fields(db: &Db, source: &dyn Source) -> AppResult<FieldIds> {
     let fields = source.fields().await?;
-    ctx.db.write(move |tx, _| store_fields(tx, &fields)).await
+    db.write(move |tx, _| store_fields(tx, &fields)).await
 }
 
 /// The scope JQL over the tracked projects; empty when nothing is tracked.

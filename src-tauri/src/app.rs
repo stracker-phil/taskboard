@@ -67,6 +67,7 @@ pub fn start(
             app.set_menu(menu::build(app.handle(), &menu::place::Place::default())?)?;
             let state = app.state::<AppState>();
             clear_cache_if_asked(&state);
+            forget_unsettled_writes(&state);
             follow_the_place_in_the_menus(app.handle(), &state);
             announce_db_changes(app.handle(), &state.db);
             give_spaces_their_lists(&state.db);
@@ -111,6 +112,19 @@ fn clear_cache_if_asked(state: &AppState) {
     match tauri::async_runtime::block_on(state.db.reset_cache()) {
         Ok(()) => log::info!("Cache cleared (clear on quit)"),
         Err(e) => log::warn!("The cache wasn't cleared: {e}"),
+    }
+}
+
+/// A write cut off by the last quit can't settle; its issue keeps what it shows until the sync brings more.
+fn forget_unsettled_writes(state: &AppState) {
+    let forgotten =
+        tauri::async_runtime::block_on(state.db.write(|tx, _| crate::writes::forget_all(tx)));
+    match forgotten {
+        Ok(0) => {}
+        Ok(count) => {
+            log::info!("Forgot {count} changes to Jira that didn't settle before the last quit")
+        }
+        Err(e) => log::warn!("Unsettled changes to Jira weren't forgotten: {e}"),
     }
 }
 

@@ -1,6 +1,6 @@
 # Taskboard
 
-My task and project manager for macOS: a local-first, read-only Jira Cloud client. It mirrors my Jira issues
+My task and project manager for macOS: a local-first Jira Cloud client. It mirrors my Jira issues
 into a local SQLite cache and shows them in a fast, native-looking window with Spaces, filter lists and views,
 so nothing waits on the network.
 
@@ -15,7 +15,7 @@ support. To build it or port it, point a coding agent at [AGENTS.md](AGENTS.md).
 ## What it does
 
 - **A local mirror of Jira:** a full sync of the chosen projects, then quick change syncs; it works offline
-  and shows what is cached. It reads only: nothing is written back to Jira.
+  and shows what is cached. It changes Jira only when asked to, and only with "Allow changes to Jira" on.
 - **Spaces, filter lists and views:** each tracked project is a Space with its own filter lists (current
   sprint, open bugs, a release); every list has views as tabs, shown as a List, a Board or a Table, grouped,
   sorted and with their own columns, filter, Me chip and subtasks (hidden, under their parent or as rows).
@@ -32,6 +32,10 @@ support. To build it or port it, point a coding agent at [AGENTS.md](AGENTS.md).
   people's avatars. ⌘F finds words in the open issue and steps through the matches with ↩. A click opens an
   issue in the Preview beside the list or in the full view, per view, a double-click always in the full view;
   ⌥ + hover peeks at any issue. A click on an issue key copies it.
+- **Quick changes:** with Settings → Connection → Allow changes to Jira on (off by default), assign an issue to
+  yourself or unassign it from its row, its header or with I. The change shows at once; if Jira refuses it, the
+  old value comes back. The confirmation offers the opposite change ("Change back to Jamie Doe"), which is a
+  second change in Jira, not an undo.
 - **Keyboard first:** ⌘K finds issues by key or text and runs any command (`>` commands, `#` issues, `/` Spaces
   and lists), J/K move, every action has a menu item and a rebindable key, right-click menus offer the rest,
   and the `taskboard` command line drives the window from scripts.
@@ -49,7 +53,8 @@ All screenshots show made-up demo data from the debug build.
 
 - The API token lives only in the macOS Keychain; it is never written to the settings, the cache or the logs.
 - Network traffic goes only to your Jira site and `api.atlassian.com`, through one allowlisted gateway that
-  refuses anything but the read requests Taskboard needs. Profile pictures come from Atlassian's avatar host,
+  refuses anything but the reads Taskboard needs and its few changes (assigning an issue), which are sent once
+  and only while you allow changes to Jira. Profile pictures come from Atlassian's avatar host,
   without credentials.
 - The cache stays on your Mac (`~/Library/Application Support/com.philippstracker.taskboard/`). Settings →
   Sync → Cache, File → Reset Cache… or `taskboard reset-cache --yes` empties it; with "Clear the cache when
@@ -69,7 +74,7 @@ It runs on macOS on Apple Silicon only.
 ## CLI
 
 The `taskboard` command drives the running app the way the window does. It reads and moves around but
-never changes Settings, and it never writes to Jira.
+never changes Settings, and it never changes Jira.
 
 | Command | Does |
 |---|---|

@@ -1,9 +1,11 @@
 //! A loopback Jira Cloud for tests and (later) the debug build: serves a `JiraData` set over plain HTTP on
-//! `127.0.0.1`, records every request, and has knobs for failures, paging and changes to the data.
+//! `127.0.0.1`, records every request, takes Taskboard's writes, and has knobs for failures, paging and changes
+//! to the data.
 
 mod http;
 pub mod jql;
 mod routes;
+mod writes;
 
 use std::collections::{HashSet, VecDeque};
 use std::sync::{Arc, Mutex};
@@ -331,7 +333,7 @@ fn next_key(issues: &[Value], project_key: &str) -> String {
     format!("{prefix}{}", highest + 1)
 }
 
-fn jira_time(at: DateTime<Utc>) -> String {
+pub(super) fn jira_time(at: DateTime<Utc>) -> String {
     at.format("%Y-%m-%dT%H:%M:%S%.3f+0000").to_string()
 }
 
@@ -395,6 +397,6 @@ async fn answer(mut socket: tokio::net::TcpStream, shared: Arc<Shared>) {
         tokio::time::sleep(latency).await;
     }
     let canned = shared.canned.lock().unwrap().pop_front();
-    let response = canned.unwrap_or_else(|| route(&shared.content.lock().unwrap(), &request));
+    let response = canned.unwrap_or_else(|| route(&mut shared.content.lock().unwrap(), &request));
     write_response(&mut socket, response).await;
 }

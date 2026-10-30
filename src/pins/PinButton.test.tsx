@@ -9,7 +9,7 @@ import { api } from "../api";
 import { createQueryClient } from "../queries/queryClient";
 import { resetStore } from "../state/store";
 import { pinItem, pins } from "../test/pins";
-import { settings } from "../test/settings";
+import { behaviour, settings } from "../test/settings";
 import { PinButton } from "./PinButton";
 
 const mocked = vi.mocked(api, true);
@@ -53,7 +53,7 @@ describe("PinButton", () => {
     });
 
     it("preselects the duration set in the settings", async () => {
-      mocked.getSettings.mockResolvedValue(settings({ behaviour: { seenAfterSeconds: 2, pinDefault: "week", openIssuesIn: "preview" } }));
+      mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ pinDefault: "week" }) }));
       renderButton();
       await settingsLoaded();
 
@@ -64,7 +64,7 @@ describe("PinButton", () => {
     });
 
     it("pins with the duration set in the settings when the durations are left alone", async () => {
-      mocked.getSettings.mockResolvedValue(settings({ behaviour: { seenAfterSeconds: 2, pinDefault: "today", openIssuesIn: "preview" } }));
+      mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ pinDefault: "today" }) }));
       renderButton();
       await settingsLoaded();
       await open();
@@ -145,7 +145,7 @@ describe("PinButton", () => {
     });
 
     it("pins at once with the duration set in the settings on an alt-click", async () => {
-      mocked.getSettings.mockResolvedValue(settings({ behaviour: { seenAfterSeconds: 2, pinDefault: "twoDays", openIssuesIn: "preview" } }));
+      mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ pinDefault: "twoDays" }) }));
       renderButton();
       await settingsLoaded();
 

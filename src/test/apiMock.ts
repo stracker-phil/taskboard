@@ -31,6 +31,7 @@ import {
   type UiState,
   type View,
   type ViewData,
+  type WriteOutcome,
 } from "../api/types";
 import { filterOptions } from "./filters";
 import { issueDetail } from "./issues";
@@ -148,6 +149,8 @@ export function createApiMock(): Api {
     issueSyncWebLinks: vi.fn().mockResolvedValue(false),
     issueSyncHistory: vi.fn().mockResolvedValue(false),
     issueForget: vi.fn().mockResolvedValue(undefined),
+    issueWrite: vi.fn(async (): Promise<WriteOutcome> => ({ done: "Done", reverse: null })),
+    issueToggleMine: vi.fn(async (): Promise<WriteOutcome> => ({ done: "Done", reverse: null })),
     issueSyncComments: vi.fn().mockResolvedValue(false),
     issuesMarkSeen: vi.fn().mockResolvedValue(undefined),
     issueMarkUnread: vi.fn().mockResolvedValue(undefined),

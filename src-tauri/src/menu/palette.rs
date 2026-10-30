@@ -241,6 +241,7 @@ mod tests {
                 "page:issue.copyUrl",
                 "page:issue.togglePin",
                 "page:issue.markSeen",
+                "page:issue.toggleMine",
             ]
         );
     }

@@ -22,6 +22,7 @@ function handlers(patch: Partial<IssueKeyHandlers> = {}) {
     openEpic: vi.fn(),
     togglePin: vi.fn(),
     toggleRead: vi.fn(),
+    toggleMine: vi.fn(),
     togglePeek: vi.fn(),
     hasSelection: () => true,
     peekOpen: () => true,
@@ -62,6 +63,7 @@ describe("issue keys", () => {
       ["⌘⇧C", "c", { meta: true, shift: true }],
       ["⌘↵", "Enter", { meta: true }],
       ["P", "p", {}],
+      ["I", "i", {}],
     ])("leaves %s to nobody", (_label, key, mods) => {
       expect(press(key, mods)).toBeNull();
     });
@@ -170,6 +172,23 @@ describe("issue keys", () => {
       register(handlers({ hasSelection: () => false }));
 
       expect(press("p")).toBeNull();
+    });
+  });
+
+  describe("assigning to me", () => {
+    it("I assigns the selected issue to me or unassigns it", () => {
+      const h = handlers();
+      register(h);
+
+      void press("i")?.run();
+
+      expect(h.toggleMine).toHaveBeenCalled();
+    });
+
+    it("ignores I without a selected row", () => {
+      register(handlers({ hasSelection: () => false }));
+
+      expect(press("i")).toBeNull();
     });
   });
 

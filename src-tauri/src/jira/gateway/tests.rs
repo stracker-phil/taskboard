@@ -6,8 +6,8 @@ use serde_json::{Value, json};
 use url::Url;
 
 use super::{
-    Access, AttachmentId, BadRequest, Endpoint, Expand, FieldIds, IssueRef, IssueRefs, Jql,
-    PageToken, Planned, ProjectKey, check,
+    Access, AccountId, AttachmentId, BadRequest, Endpoint, Expand, FieldIds, IssueRef, IssueRefs,
+    Jql, PageToken, Planned, ProjectKey, check,
 };
 use crate::error::AppError;
 use crate::jira::site::{Site, TokenKind};
@@ -757,6 +757,170 @@ fn tampering_with_a_planned_request_makes_the_guard_refuse_it() {
                 assert_refused(&with_body, &site, &format!("GET body {context}"));
             }
         }
+    }
+}
+
+const ACCOUNT: &str = "5b10ac8d82e05b22cc7d4ef5";
+
+fn account(text: &str) -> AccountId {
+    AccountId::parse(text).unwrap()
+}
+
+fn assign(issue_text: &str, account: Option<AccountId>) -> Endpoint {
+    Endpoint::AssignIssue {
+        issue: issue(issue_text),
+        account,
+    }
+}
+
+/// A write built by hand, as a stored value or a bug might produce it.
+fn write_request(method: Method, url: &str, access: Access) -> Planned {
+    Planned {
+        method,
+        url: Url::parse(url).unwrap(),
+        body: Some(json!({ "accountId": null })),
+        authenticated: true,
+        access,
+        bad_request: BadRequest::Plain,
+    }
+}
+
+#[test]
+fn assigning_an_issue_plans_a_put_with_the_account_id_in_the_body() {
+    for (prefix, site) in sites() {
+        for (target, who, body) in [
+            (
+                "NW-1042",
+                Some(ACCOUNT),
+                json!({ "accountId": "5b10ac8d82e05b22cc7d4ef5" }),
+            ),
+            (
+                "10001",
+                Some("712020:2b4fc8a1-0c3e-4d7e-9f51-2a6b1c9d0e7f"),
+                json!({ "accountId": "712020:2b4fc8a1-0c3e-4d7e-9f51-2a6b1c9d0e7f" }),
+            ),
+            ("NW-1042", None, json!({ "accountId": null })),
+        ] {
+            let plan = assign(target, who.map(account)).plan(&site).unwrap();
+
+            assert_eq!(
+                plan.url.as_str(),
+                format!("{prefix}issue/{target}/assignee"),
+                "{target} {who:?}"
+            );
+            assert_eq!(plan.method, Method::PUT, "{target} {who:?}");
+            assert_eq!(plan.body, Some(body), "{target} {who:?}");
+            assert!(plan.authenticated, "{target} {who:?}");
+            assert_eq!(plan.access, Access::Write, "{target} {who:?}");
+            assert_eq!(plan.bad_request, BadRequest::Plain, "{target} {who:?}");
+            assert!(check(&plan, &site).is_ok(), "{prefix} {target} {who:?}");
+        }
+    }
+}
+
+#[test]
+fn the_assign_request_is_refused_once_it_is_planned_as_a_read_or_changed_in_shape() {
+    for (label, site) in sites() {
+        let plan = assign("NW-1", Some(account(ACCOUNT))).plan(&site).unwrap();
+
+        let mut as_read = plan.clone();
+        as_read.access = Access::Read;
+        assert_refused(&as_read, &site, &format!("{label} planned as a read"));
+
+        let mut unauthenticated = plan.clone();
+        unauthenticated.authenticated = false;
+        assert_refused(&unauthenticated, &site, &format!("{label} unauthenticated"));
+
+        let mut with_query = plan.clone();
+        with_query
+            .url
+            .query_pairs_mut()
+            .append_pair("notifyUsers", "false");
+        assert_refused(&with_query, &site, &format!("{label} with a query"));
+
+        let mut with_fragment = plan.clone();
+        with_fragment.url.set_fragment(Some("frag"));
+        assert_refused(&with_fragment, &site, &format!("{label} with a fragment"));
+
+        for method in [Method::POST, Method::DELETE, Method::PATCH, Method::GET] {
+            let mut other = plan.clone();
+            other.method = method.clone();
+            assert_refused(&other, &site, &format!("{label} as {method}"));
+        }
+    }
+}
+
+#[test]
+fn only_the_assignee_path_may_be_written() {
+    let writes = [
+        (Method::PUT, "rest/api/3/issue/NW-1/comment"),
+        (Method::PUT, "rest/api/3/issue/NW-1"),
+        (Method::PUT, "rest/api/3/issue/NW-1/assignee/"),
+        (Method::PUT, "rest/api/3/issue/NW-1/assignee/extra"),
+        (Method::PUT, "rest/api/3/issue/NW-1/assignee?accountId=x"),
+        (Method::PUT, "rest/api/3/issue/NW-1/assignee?x=1"),
+        (Method::PUT, "rest/api/3/issue/%2e%2e/assignee"),
+        (Method::PUT, "rest/api/3/issue/..%2Fmyself/assignee"),
+        (Method::PUT, "rest/api/3/issue/NW-1%2Fcomment/assignee"),
+        (Method::PUT, "rest/api/3/issue/NW%2D1/assignee"),
+        (Method::PUT, "rest/api/3/issue/nw-1/assignee"),
+        (Method::PUT, "rest/api/3/issue//assignee"),
+        (Method::PUT, "rest/api/3/issue/-1/assignee"),
+        (Method::PUT, "rest/api/3/user/assignee"),
+        (Method::PUT, "rest/api/3/myself"),
+        (Method::PUT, "rest/api/2/issue/NW-1/assignee"),
+        (Method::POST, "rest/api/3/issue/NW-1/assignee"),
+        (Method::DELETE, "rest/api/3/issue/NW-1/assignee"),
+        (Method::PATCH, "rest/api/3/issue/NW-1/assignee"),
+        (Method::DELETE, "rest/api/3/issue/NW-1"),
+    ];
+    for (label, site) in sites() {
+        for (method, relative) in &writes {
+            let plan = write_request(method.clone(), &url_for(&site, relative), Access::Write);
+            assert_refused(&plan, &site, &format!("{label} {method} {relative}"));
+        }
+    }
+}
+
+#[test]
+fn reading_the_assignee_path_is_refused() {
+    for (label, site) in sites() {
+        for method in [Method::GET, Method::PUT, Method::POST] {
+            let mut plan = write_request(
+                method.clone(),
+                &url_for(&site, "rest/api/3/issue/x/assignee"),
+                Access::Read,
+            );
+            if method == Method::GET {
+                plan.body = None;
+            }
+            assert_refused(
+                &plan,
+                &site,
+                &format!("{label} read {method} issue/x/assignee"),
+            );
+        }
+        let plan = planned(
+            Method::GET,
+            &url_for(&site, "rest/api/3/issue/NW-1/assignee"),
+        );
+        assert_refused(&plan, &site, &format!("{label} GET issue/NW-1/assignee"));
+    }
+}
+
+#[test]
+fn a_put_with_a_body_is_accepted_on_the_assignee_path_while_a_get_with_a_body_is_not() {
+    for (_, site) in sites() {
+        let url = url_for(&site, "rest/api/3/issue/NW-1/assignee");
+        assert!(check(&write_request(Method::PUT, &url, Access::Write), &site).is_ok());
+
+        let mut get_with_body = write_request(Method::GET, &url, Access::Write);
+        get_with_body.body = Some(json!({}));
+        assert_refused(
+            &get_with_body,
+            &site,
+            "GET with a body on the assignee path",
+        );
     }
 }
 

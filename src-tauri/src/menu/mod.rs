@@ -106,6 +106,7 @@ pub const ISSUE: &[Item] = &[
     item("Copy Link", "page:issue.copyUrl", "CmdOrCtrl+Shift+C"),
     plain("Add or Remove Bookmark", "page:issue.togglePin"),
     plain("Mark as Read or Unread", "page:issue.markSeen"),
+    plain("Assign to Me or Unassign", "page:issue.toggleMine"),
 ];
 /// The window's appearance only; what the page shows lives in Go, List and Issue.
 pub const VIEW: &[Item] = &[item(
@@ -389,6 +390,7 @@ mod tests {
                 "issue.copyUrl",
                 "issue.togglePin",
                 "issue.markSeen",
+                "issue.toggleMine",
             ]
         );
     }

@@ -15,7 +15,7 @@ import { paletteMenus } from "../palette/menus";
 import { createQueryClient } from "../queries/queryClient";
 import { resetStore, useStore } from "../state/store";
 import { pinItem, pins, viewTarget } from "../test/pins";
-import { settings } from "../test/settings";
+import { behaviour, settings } from "../test/settings";
 import { view } from "../test/views";
 import { ViewTabs } from "./ViewTabs";
 
@@ -442,7 +442,7 @@ describe("ViewTabs", () => {
       });
 
       it("bookmarks the view for the duration set in the settings", async () => {
-        mocked.getSettings.mockResolvedValue(settings({ behaviour: { seenAfterSeconds: 2, pinDefault: "week", openIssuesIn: "preview" } }));
+        mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ pinDefault: "week" }) }));
         await renderTabs();
         await act(async () => void (await mocked.getSettings.mock.results[0]?.value));
         await rightClick("Sprint board");

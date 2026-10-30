@@ -6,7 +6,9 @@ use super::dto::{
     Myself, ParsedQueries, Project, ProjectPage, RemoteLink, SearchPage, Status, TenantInfo,
     Version,
 };
-use super::gateway::{AttachmentId, Endpoint, FieldIds, IssueRef, IssueRefs, Jql, ProjectKey};
+use super::gateway::{
+    AccountId, AttachmentId, Endpoint, FieldIds, IssueRef, IssueRefs, Jql, ProjectKey,
+};
 use super::paging::{SearchPages, SearchRequest};
 use crate::error::AppResult;
 use serde_json::Value;
@@ -143,6 +145,15 @@ impl JiraClient {
             .send(Endpoint::FieldUsage { project })
             .await?;
         Ok(filled_custom_fields(&page.issues))
+    }
+
+    /// Assigns the issue to the account, or unassigns it. A write: sent once, never retried.
+    pub async fn assign(&self, issue_id: &str, account_id: Option<&str>) -> AppResult<()> {
+        let endpoint = Endpoint::AssignIssue {
+            issue: IssueRef::parse(issue_id)?,
+            account: account_id.map(AccountId::parse).transpose()?,
+        };
+        self.gateway().send(endpoint).await
     }
 
     /// Jira's problems with a query, strictly validated; empty when the query is valid.

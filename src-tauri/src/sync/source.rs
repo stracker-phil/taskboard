@@ -1,7 +1,7 @@
 //! What the sync asks of an issue tracker (ADR 0029). Jira (`jira_source`) is the only source today; another
 //! one (GitHub) is a second implementation, chosen in `SyncContext::source`.
 //!
-//! The answers keep Jira's shapes (`jira::dto`), which `map` turns into cache rows.
+//! The few writes (`writes/`) go through it too. The answers keep Jira's shapes (`jira::dto`), which `map` turns into cache rows.
 
 use std::collections::BTreeSet;
 use std::future::Future;
@@ -65,6 +65,8 @@ pub trait Source: Send + Sync {
     fn attachment_content<'a>(&'a self, attachment_id: &'a str) -> Answer<'a, Vec<u8>>;
     /// The custom fields a space's recent issues fill.
     fn used_custom_fields<'a>(&'a self, space_key: &'a str) -> Answer<'a, BTreeSet<String>>;
+    /// Write: assigns the issue (by id) to the account, or unassigns it.
+    fn assign<'a>(&'a self, issue_id: &'a str, account_id: Option<&'a str>) -> Answer<'a, ()>;
 }
 
 #[cfg(test)]

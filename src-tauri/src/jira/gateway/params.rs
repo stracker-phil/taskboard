@@ -67,6 +67,32 @@ impl IssueRef {
     }
 }
 
+/// An Atlassian account id (`5b10ac8d82e05b22cc7d4ef5`, `712020:2b4f…`): letters, digits, `:`, `_` and `-`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AccountId(String);
+
+/// Longer than any account id Atlassian hands out.
+const ACCOUNT_ID_MAX: usize = 128;
+
+impl AccountId {
+    pub fn parse(text: &str) -> AppResult<Self> {
+        let fits = !text.is_empty()
+            && text.len() <= ACCOUNT_ID_MAX
+            && text
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, ':' | '_' | '-'));
+        if fits {
+            Ok(Self(text.into()))
+        } else {
+            Err(refused("account id", text))
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
 /// An attachment's numeric id.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AttachmentId(String);
@@ -321,6 +347,43 @@ mod tests {
         ];
         for text in escaping_texts().iter().map(String::as_str).chain(extra) {
             assert!(is_invalid(&IssueRef::parse(text)), "{text:?}");
+        }
+    }
+
+    #[test]
+    fn account_ids_are_letters_digits_colons_underscores_and_dashes_up_to_128_characters() {
+        let longest = "a".repeat(128);
+        for id in [
+            "5b10ac8d82e05b22cc7d4ef5",
+            "712020:2b4fc8a1-0c3e-4d7e-9f51-2a6b1c9d0e7f",
+            "a_b-c:D9",
+            "x",
+            longest.as_str(),
+        ] {
+            assert_eq!(AccountId::parse(id).unwrap().as_str(), id);
+        }
+    }
+
+    #[test]
+    fn an_account_id_that_could_leave_its_json_string_or_be_unreasonable_is_refused() {
+        let too_long = "a".repeat(129);
+        for id in [
+            "",
+            too_long.as_str(),
+            "5b10 ac8d",
+            " 5b10ac8d",
+            "5b10ac8d\n",
+            "a/b",
+            "a?b=1",
+            "a#b",
+            "a%2Fb",
+            "a\"b",
+            "a.b",
+            "..",
+            "é",
+            "a\0b",
+        ] {
+            assert!(is_invalid(&AccountId::parse(id)), "{id:?}");
         }
     }
 

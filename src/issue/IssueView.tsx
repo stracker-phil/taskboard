@@ -31,6 +31,8 @@ import { JiraHtml } from "./JiraHtml";
 import { RichFields } from "./RichFields";
 import { Children, Links } from "./Related";
 import { WebLinks } from "./WebLinks";
+import { explainWritesOff } from "../writes/runWrite";
+import { AssignMeButton } from "../writes/AssignMeButton";
 
 /** The issue's neighbors among the rows the origin view shows (open groups, expanded subtrees), for the
  *  previous/next arrows and J/K; an issue the view hides steps through all of its rows. */
@@ -145,6 +147,7 @@ function IssueHeader({
         <ArrowDown size={14} strokeWidth={2} aria-hidden="true" />
       </button>
       {issue && <ReadToggle issue={issue} />}
+      {issue && <AssignMeButton issue={issue} className="issue-header__nav" />}
       {issue && <PinButton kind="issue" target={issue.id} label="Bookmark this issue" meta={issue.key} className="issue-header__nav" />}
       {issue && actions.openInJira && (
         <OpenInJiraButton onClick={() => actions.openInJira?.(issue.key)} />
@@ -256,6 +259,10 @@ function IssueKeys({ issue, neighbors }: { issue: IssueDetail | undefined; neigh
       togglePin: () => {
         const id = state.current.issue?.id;
         if (id) state.current.actions.togglePin(id);
+      },
+      toggleMine: () => {
+        const id = state.current.issue?.id;
+        if (id) (state.current.actions.toggleMine ?? explainWritesOff)(id);
       },
       toggleRead: () => {
         const issue = state.current.issue;
