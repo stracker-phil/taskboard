@@ -92,7 +92,7 @@ pub async fn scope_save(
     jql: Option<String>,
 ) -> AppResult<ScopeView> {
     let client = state.jira.client(&state.settings.get().connection).ok();
-    let sync = super::save_scope(&state.settings, client.as_ref(), jql).await?;
+    let sync = super::save_scope(&state.settings, client.as_deref(), jql).await?;
     announce_settings(&app, &state.settings.get());
     super::scope_view(&state.db, &sync).await
 }

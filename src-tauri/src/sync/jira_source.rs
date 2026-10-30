@@ -3,6 +3,7 @@
 use std::collections::BTreeSet;
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::Arc;
 
 use super::source::{Answer, IssuePages, Source, SourceKind};
 use crate::error::AppResult;
@@ -12,11 +13,11 @@ use crate::jira::dto::{
 use crate::jira::{JiraClient, SearchPages, SearchRequest};
 
 pub struct JiraSource {
-    client: JiraClient,
+    client: Arc<JiraClient>,
 }
 
 impl JiraSource {
-    pub fn new(client: JiraClient) -> Self {
+    pub fn new(client: Arc<JiraClient>) -> Self {
         Self { client }
     }
 }

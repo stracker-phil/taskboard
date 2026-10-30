@@ -41,8 +41,9 @@ dated to today; any email and token connect to it.
 
 The token lives in the Keychain (`secrets.rs`, service `APP_NAME`, account = the email;
 [ADR 0021](adr/0021-the-token-lives-in-the-keychain-through-secrets-rs.md)); the debug build keeps the demo token
-in memory instead ([ADR 0026](adr/0026-the-debug-build-keeps-its-demo-token-in-memory.md)). `JiraClient` reads it for every
-request and sends `Authorization: Basic base64(email:token)` (never to `_edge/tenant_info`). No command returns it; `net::redact` removes
+in memory instead ([ADR 0026](adr/0026-the-debug-build-keeps-its-demo-token-in-memory.md)). `JiraAccess` reads it
+once and keeps it in memory (`secrets::Remembered`) until the connection is saved again; `JiraClient` builds the
+header for every request from it and sends `Authorization: Basic base64(email:token)` (never to `_edge/tenant_info`). No command returns it; `net::redact` removes
 `Authorization` values, `Basic`/`Bearer` tokens and the email from the lines the client logs.
 
 ## Gateway and allowlist

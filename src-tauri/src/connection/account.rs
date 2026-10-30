@@ -71,6 +71,7 @@ pub async fn save(
             message: "Enter the email of your Atlassian account".into(),
         });
     }
+    access.forget();
     let previous = settings.get().connection;
     let token = token
         .map(|t| t.trim().to_string())

@@ -119,7 +119,7 @@ impl Gateway {
         .map_err(|e| self.net_error(e))
     }
 
-    /// Built per request so a token changed in the Keychain is picked up.
+    /// Built per request from the secret store, which keeps the token in memory (`JiraAccess`).
     fn authorization(&self) -> AppResult<String> {
         let token = self
             .secrets

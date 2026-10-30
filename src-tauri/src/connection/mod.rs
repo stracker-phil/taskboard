@@ -7,7 +7,7 @@ mod expiry;
 mod projects;
 mod scope;
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 pub use account::{ConnectionInput, ConnectionTest, ConnectionView, save, test, view};
 pub use expiry::{TokenExpiry, token_expiry};
@@ -21,27 +21,48 @@ pub use scope::{
 
 use crate::error::{AppError, AppResult};
 use crate::jira::{JiraClient, Limiter};
-use crate::secrets::{Secret, SecretStore};
+use crate::lock::MutexExt;
+use crate::secrets::{Remembered, Secret, SecretStore};
 use crate::store::settings::Connection;
 
-/// What every Jira request needs besides the settings: the Keychain and the shared rate limit.
+/// What every Jira request needs besides the settings: the Keychain, read once and kept in memory, the shared
+/// rate limit and the client of the connected site, whose connections are reused.
 #[derive(Clone)]
 pub struct JiraAccess {
-    secrets: Arc<dyn SecretStore>,
+    secrets: Arc<Remembered>,
     limiter: Arc<Limiter>,
+    client: Arc<Mutex<Option<Arc<JiraClient>>>>,
 }
 
 impl JiraAccess {
     pub fn new(secrets: Arc<dyn SecretStore>, limiter: Arc<Limiter>) -> Self {
-        Self { secrets, limiter }
+        Self {
+            secrets: Arc::new(Remembered::new(secrets)),
+            limiter,
+            client: Arc::default(),
+        }
     }
 
-    pub fn client(&self, connection: &Connection) -> AppResult<JiraClient> {
-        Ok(JiraClient::new(
-            connection.site()?,
+    /// The same client while the connection's site stays the same.
+    pub fn client(&self, connection: &Connection) -> AppResult<Arc<JiraClient>> {
+        let site = connection.site()?;
+        let mut cached = self.client.lock_unpoisoned();
+        if let Some(client) = cached.as_ref().filter(|c| *c.site() == site) {
+            return Ok(Arc::clone(client));
+        }
+        let client = Arc::new(JiraClient::new(
+            site,
             self.secrets.clone(),
             self.limiter.clone(),
-        ))
+        ));
+        *cached = Some(Arc::clone(&client));
+        Ok(client)
+    }
+
+    /// Saving the connection reads the Keychain afresh and starts a new client.
+    fn forget(&self) {
+        self.secrets.forget();
+        *self.client.lock_unpoisoned() = None;
     }
 
     /// An unreadable Keychain entry counts as none.
@@ -67,4 +88,79 @@ impl JiraAccess {
 
 fn keychain_error(e: String) -> AppError {
     AppError::Internal(format!("The Keychain failed: {e}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_support::FakeSecrets;
+
+    fn access() -> JiraAccess {
+        JiraAccess::new(
+            Arc::new(FakeSecrets::default()),
+            Arc::new(Limiter::new(1000, 1000)),
+        )
+    }
+
+    fn connection(site_url: &str, email: &str) -> Connection {
+        Connection {
+            site_url: site_url.into(),
+            email: email.into(),
+            ..Connection::default()
+        }
+    }
+
+    #[test]
+    fn an_unchanged_connection_gets_the_same_client() {
+        let access = access();
+        let connection = connection(
+            "https://northwind.atlassian.net/",
+            "alex.morgan@example.com",
+        );
+
+        let first = access.client(&connection).unwrap();
+        let second = access.client(&connection).unwrap();
+
+        assert!(Arc::ptr_eq(&first, &second));
+    }
+
+    #[test]
+    fn a_clone_of_the_access_shares_the_client() {
+        let access = access();
+        let connection = connection(
+            "https://northwind.atlassian.net/",
+            "alex.morgan@example.com",
+        );
+
+        let first = access.client(&connection).unwrap();
+        let second = access.clone().client(&connection).unwrap();
+
+        assert!(Arc::ptr_eq(&first, &second));
+    }
+
+    #[test]
+    fn a_changed_site_or_email_gets_a_new_client() {
+        let access = access();
+        let original = connection(
+            "https://northwind.atlassian.net/",
+            "alex.morgan@example.com",
+        );
+        let first = access.client(&original).unwrap();
+
+        for changed in [
+            connection("https://contoso.atlassian.net/", "alex.morgan@example.com"),
+            connection("https://northwind.atlassian.net/", "sam.lee@example.com"),
+        ] {
+            let next = access.client(&changed).unwrap();
+            assert!(!Arc::ptr_eq(&first, &next), "{changed:?}");
+        }
+    }
+
+    #[test]
+    fn a_connection_that_is_not_set_up_has_no_client() {
+        assert!(matches!(
+            access().client(&Connection::default()),
+            Err(AppError::NotConnected(_))
+        ));
+    }
 }
