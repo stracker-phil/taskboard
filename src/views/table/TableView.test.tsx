@@ -5,10 +5,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../../test/apiMock")).createApiMock() }));
 
-import { api, type View, type ViewData } from "../../api";
+import { api, type Row, type View, type ViewData, type ViewPlace } from "../../api";
+import { installCommands } from "../../commands";
+import { getCommand } from "../../commands/registry";
 import { createQueryClient } from "../../queries/queryClient";
 import { resetStore, useStore } from "../../state/store";
-import { COLUMNS, groupOf, row, viewData } from "../../test/issues";
+import { ALEX, COLUMNS, groupOf, row, viewData } from "../../test/issues";
 import { settings } from "../../test/settings";
 import { sidebarTree, space } from "../../test/spaces";
 import { view } from "../../test/views";
@@ -27,6 +29,9 @@ beforeEach(() => {
   mocked.columnsCatalogue.mockResolvedValue([...COLUMNS, { id: "due", name: "Due", custom: false }]);
   mocked.viewSetSort.mockResolvedValue(view());
   mocked.viewSetWidths.mockResolvedValue(view());
+  mocked.placeGet.mockResolvedValue(null);
+  mocked.placeSet.mockResolvedValue(undefined);
+  mocked.copyText.mockResolvedValue(undefined);
   spies = [
     vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(1000),
     vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(800),
@@ -43,13 +48,17 @@ const DONE = row({ id: "2", key: "NW-1001", summary: "Publish the launch notes",
 
 async function renderTable(data: ViewData = viewData([groupOf([OPEN, DONE])], [OPEN, DONE], { columns: ["assignee", "priority"], groupBy: "none" }), current: View = TABLE) {
   mocked.viewRows.mockResolvedValue(data);
-  render(
+  const rendered = render(
     <QueryClientProvider client={createQueryClient()}>
       <TableView view={current} />
     </QueryClientProvider>,
   );
   await screen.findByRole("grid");
+  return rendered;
 }
+
+const place = () => useStore.getState().places["11:101"];
+const press = (id: string) => act(async () => void (await getCommand(id)?.run()));
 
 /** The header cell with this column name. */
 const header = (name: string) => screen.getByText(name).closest<HTMLElement>('[role="columnheader"]')!;
@@ -184,7 +193,7 @@ describe("TableView", () => {
       fireEvent.pointerDown(screen.getByRole("separator", { name: "Resize Key" }), { button: 0, clientX: 100 });
       fireEvent.pointerMove(window, { clientX: 140 });
 
-      expect(header("Key")).toHaveStyle({ width: "130px" });
+      await waitFor(() => expect(header("Key")).toHaveStyle({ width: "130px" }));
       expect(mocked.viewSetWidths).not.toHaveBeenCalled();
       fireEvent.pointerUp(window);
     });
@@ -248,6 +257,36 @@ describe("TableView", () => {
 
         expect(within(title).queryByText("launch")).not.toBeInTheDocument();
         expect(within(labels).getByText("launch")).toBeInTheDocument();
+      });
+    });
+
+    describe("cells without a value", () => {
+      const withValues = row({
+        id: "6",
+        key: "NW-1006",
+        summary: "Update the footer",
+        assignees: [ALEX],
+        epic: { id: "9", name: "Launch Q4", color: 2 },
+        priority: { name: "High", level: 2 },
+      });
+      const cellsOf = async (issue: Row) => {
+        await renderTable(viewData([groupOf([issue])], [issue], { columns: ["assignee", "epic", "priority"], groupBy: "none" }));
+        return within(await screen.findByRole("row", { name: new RegExp(issue.key) })).getAllByRole("gridcell").slice(3);
+      };
+
+      it("shows a dash in the assignee, epic and priority cells of an issue without them", async () => {
+        const cells = await cellsOf(row({ id: "7", key: "NW-1007", summary: "Archive the old blog" }));
+
+        expect(cells.map((c) => c.textContent)).toEqual(["—", "—", "—"]);
+      });
+
+      it("shows the values and no dash when the issue has them", async () => {
+        const cells = await cellsOf(withValues);
+
+        expect(within(cells[0]).getByRole("img", { name: "Alex Morgan" })).toBeInTheDocument();
+        expect(cells[1]).toHaveTextContent("Launch Q4");
+        expect(cells[2]).toHaveTextContent("High");
+        expect(screen.queryByText("—")).not.toBeInTheDocument();
       });
     });
 
@@ -395,6 +434,148 @@ describe("TableView", () => {
       await userEvent.click(screen.getByRole("button", { name: "Collapse In Progress" }));
 
       expect(screen.queryByText("Redesign the pricing page")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("issue keys", () => {
+    const THIRD = row({ id: "3", key: "NW-1003", summary: "Fix the footer links" });
+    const rows = [OPEN, DONE, THIRD];
+    const flat = () => viewData([groupOf(rows)], rows, { groupBy: "none" });
+    const grouped = () => viewData([groupOf([OPEN], { key: "a", label: "Alpha" }), groupOf([DONE], { key: "b", label: "Beta" })], [OPEN, DONE]);
+    const selectedKeys = () =>
+      screen
+        .getAllByRole("row")
+        .filter((r) => r.getAttribute("aria-selected") === "true")
+        .map((r) => /NW-\d+/.exec(r.textContent ?? "")?.[0]);
+
+    beforeEach(() => {
+      installCommands("main");
+    });
+
+    it.each(["issue.next", "issue.next.arrow"])("%s selects the first row, then the following one", async (id) => {
+      await renderTable(flat());
+      await screen.findByRole("row", { name: /NW-1042/ });
+
+      await press(id);
+      expect(selectedKeys()).toEqual(["NW-1042"]);
+
+      await press(id);
+      expect(selectedKeys()).toEqual(["NW-1001"]);
+    });
+
+    it.each(["issue.previous", "issue.previous.arrow"])("%s selects the row before the selected one", async (id) => {
+      await renderTable(flat());
+      await userEvent.click(await screen.findByText("Fix the footer links"));
+
+      await press(id);
+
+      expect(selectedKeys()).toEqual(["NW-1001"]);
+    });
+
+    it("stays on the last row at the bottom", async () => {
+      await renderTable(flat());
+      await userEvent.click(await screen.findByText("Fix the footer links"));
+
+      await press("issue.next");
+
+      expect(selectedKeys()).toEqual(["NW-1003"]);
+    });
+
+    it("opens the selected issue in the Issue view with the view as origin", async () => {
+      await renderTable(flat());
+      await userEvent.click(await screen.findByText("Publish the launch notes"));
+
+      await press("issue.open");
+
+      expect(useStore.getState().issueView).toEqual({ origin: { listId: 11, viewId: 101 }, stack: ["2"] });
+    });
+
+    it("closes the selected issue's peek and opens it again", async () => {
+      await renderTable(flat());
+      await userEvent.click(await screen.findByText("Publish the launch notes"));
+      expect(place()).toMatchObject({ selectedId: "2", peekOpen: true });
+
+      await press("issue.togglePeek");
+      expect(place()).toMatchObject({ selectedId: "2", peekOpen: false });
+
+      await press("issue.togglePeek");
+      expect(place()).toMatchObject({ selectedId: "2", peekOpen: true });
+    });
+
+    it("closes the peek on escape and keeps the row selected", async () => {
+      await renderTable(flat());
+      await userEvent.click(await screen.findByText("Publish the launch notes"));
+
+      await press("peek.close");
+
+      expect(place()).toMatchObject({ selectedId: "2", peekOpen: false });
+      expect(selectedKeys()).toEqual(["NW-1001"]);
+    });
+
+    it("collapses the selected row's group on left and expands it on right", async () => {
+      await renderTable(grouped());
+      await userEvent.click(await screen.findByText("Redesign the pricing page"));
+
+      await press("group.collapse");
+      expect(screen.queryByText("Redesign the pricing page")).not.toBeInTheDocument();
+      expect(screen.getByText("Publish the launch notes")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Expand Alpha" })).toBeInTheDocument();
+
+      await press("group.expand");
+      expect(await screen.findByText("Redesign the pricing page")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Collapse Alpha" })).toBeInTheDocument();
+    });
+
+    it("copies the selected issue's key", async () => {
+      await renderTable(flat());
+      await userEvent.click(await screen.findByText("Publish the launch notes"));
+
+      await press("issue.copyKey");
+
+      expect(mocked.copyText).toHaveBeenCalledWith("NW-1001");
+    });
+  });
+
+  describe("saved place", () => {
+    const groups = () => [
+      groupOf([OPEN], { key: "status:progress", label: "In Progress" }),
+      groupOf([DONE], { key: "status:done", label: "Done", collapsedByDefault: true }),
+    ];
+    const grouped = () => viewData(groups(), [OPEN, DONE]);
+    const saved: ViewPlace = { scrollTop: 0, toggled: { "status:done": true, "status:progress": false }, collapsedParents: [], selectedId: "2", peekOpen: false };
+
+    it("applies the place saved by Rust on the first render", async () => {
+      mocked.placeGet.mockResolvedValue(saved);
+      await renderTable(grouped());
+
+      expect(await screen.findByRole("row", { name: /NW-1001/ })).toHaveAttribute("aria-selected", "true");
+      expect(screen.queryByText("Redesign the pricing page")).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Collapse Done" })).toHaveAttribute("aria-expanded", "true");
+      expect(mocked.placeGet).toHaveBeenCalledWith(11, 101);
+    });
+
+    it("comes back with the same row selected and the same groups open or closed", async () => {
+      const first = await renderTable(grouped());
+      await userEvent.click(await screen.findByRole("button", { name: "Expand Done" }));
+      await userEvent.click(await screen.findByText("Publish the launch notes"));
+      await userEvent.click(screen.getByRole("button", { name: "Collapse In Progress" }));
+      first.unmount();
+
+      await renderTable(grouped());
+
+      expect(await screen.findByRole("row", { name: /NW-1001/ })).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByRole("button", { name: "Collapse Done" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Expand In Progress" })).toBeInTheDocument();
+      expect(screen.queryByText("Redesign the pricing page")).not.toBeInTheDocument();
+    });
+
+    it("saves the toggled groups and the selected row to Rust", async () => {
+      await renderTable(grouped());
+
+      await userEvent.click(await screen.findByRole("button", { name: "Expand Done" }));
+      await userEvent.click(await screen.findByText("Publish the launch notes"));
+
+      await waitFor(() => expect(mocked.placeSet).toHaveBeenCalledWith(11, 101, expect.objectContaining({ toggled: { "status:done": true }, selectedId: "2" })));
     });
   });
 

@@ -17,10 +17,12 @@ interface Props {
   selected?: boolean;
   onOpen: (id: string) => void;
   actions: RowActionHandlers;
+  /** Has an active bookmark. */
+  pinned?: boolean;
 }
 
 /** A Board card: the summary first, always wrapped, the key in the bottom-right corner; changed cards are tinted. */
-export const BoardCard = memo(function BoardCard({ row, fields, inlineLabels = false, selected = false, onOpen, actions }: Props) {
+export const BoardCard = memo(function BoardCard({ row, fields, inlineLabels = false, selected = false, onOpen, actions, pinned = false }: Props) {
   const shows = (field: string) => fields.includes(field);
   const epic = shows("epic") && row.epic;
   const labels = shows("labels") && row.labels.length > 0;
@@ -60,7 +62,7 @@ export const BoardCard = memo(function BoardCard({ row, fields, inlineLabels = f
         <CopyKey className="board-card__key" issueKey={row.key} />
       </div>
       <span className="board-card__actions">
-        <RowActions issueId={row.id} issueKey={row.key} changed={row.changed} actions={actions} />
+        <RowActions issueId={row.id} issueKey={row.key} changed={row.changed} actions={actions} pinned={pinned} />
       </span>
     </article>
   );

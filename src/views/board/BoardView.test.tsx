@@ -8,6 +8,7 @@ vi.mock("../../api", async (orig) => ({ ...(await orig<object>()), api: (await i
 import { api, type BoardData, type View } from "../../api";
 import { installCommands, useCommandKeys } from "../../commands";
 import { createQueryClient } from "../../queries/queryClient";
+import { narrowingKey } from "../../state/slices/narrowing";
 import { resetStore, useStore } from "../../state/store";
 import { boardColumn, boardData } from "../../test/board";
 import { ALEX, row, SAM } from "../../test/issues";
@@ -35,6 +36,8 @@ beforeEach(() => {
   mocked.viewSetColumnCollapsed.mockResolvedValue(BOARD);
   mocked.pinsList.mockResolvedValue(pins());
   mocked.copyText.mockResolvedValue(undefined);
+  mocked.placeGet.mockResolvedValue(null);
+  mocked.placeSet.mockResolvedValue(undefined);
   spies = [
     vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(1000),
     vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(800),
@@ -51,12 +54,13 @@ afterEach(() => {
 
 async function renderBoard(data: BoardData, current: View = BOARD) {
   mocked.viewBoard.mockResolvedValue(data);
-  render(
+  const rendered = render(
     <QueryClientProvider client={createQueryClient()}>
       <BoardView view={current} />
     </QueryClientProvider>,
   );
   await screen.findByRole("list", { name: "Board" });
+  return rendered;
 }
 
 describe("BoardView", () => {
@@ -633,6 +637,67 @@ describe("BoardView", () => {
         expect(mocked.issueMarkUnread).not.toHaveBeenCalled();
         expect(mocked.copyText).not.toHaveBeenCalled();
       });
+    });
+  });
+
+  describe("the current card", () => {
+    const PLACE_KEY = narrowingKey(BOARD.listId, BOARD.id);
+    const currentCards = () => screen.queryAllByRole("article", { current: true }).map((card) => within(card).getByText(/^NW-\d+$/).textContent);
+
+    function Keys() {
+      useCommandKeys();
+      return null;
+    }
+
+    beforeEach(() => {
+      installCommands("main");
+    });
+
+    it("makes a clicked card current, remembers it in the view's place and opens it", async () => {
+      await renderBoard(boardData([PROGRESS, DONE], [PRICING, NOTES]));
+
+      await userEvent.click(screen.getByRole("article", { name: /NW-1001/ }));
+
+      expect(currentCards()).toEqual(["NW-1001"]);
+      expect(useStore.getState().places[PLACE_KEY]?.selectedId).toBe("2");
+      expect(useStore.getState().issueView?.stack).toEqual(["2"]);
+    });
+
+    it("moves the current card with J and keeps it in the view's place", async () => {
+      const column = boardColumn({ key: "3", name: "In Progress", style: "progress", ids: ["1", "2"] });
+      mocked.viewBoard.mockResolvedValue(boardData([column], [PRICING, NOTES]));
+      render(
+        <QueryClientProvider client={createQueryClient()}>
+          <Keys />
+          <BoardView view={BOARD} />
+        </QueryClientProvider>,
+      );
+      await screen.findByRole("list", { name: "Board" });
+
+      await userEvent.keyboard("jj");
+
+      expect(currentCards()).toEqual(["NW-1001"]);
+      expect(useStore.getState().places[PLACE_KEY]?.selectedId).toBe("2");
+    });
+
+    it("marks the same card current after the Board is shown again", async () => {
+      const data = boardData([PROGRESS, DONE], [PRICING, NOTES]);
+      const first = await renderBoard(data);
+      await userEvent.click(screen.getByRole("article", { name: /NW-1001/ }));
+      first.unmount();
+
+      await renderBoard(data);
+
+      await waitFor(() => expect(currentCards()).toEqual(["NW-1001"]));
+    });
+
+    it("marks the card saved by Rust current on the first render", async () => {
+      mocked.placeGet.mockResolvedValue({ scrollTop: 0, toggled: {}, collapsedParents: [], selectedId: "1", peekOpen: false });
+
+      await renderBoard(boardData([PROGRESS, DONE], [PRICING, NOTES]));
+
+      await waitFor(() => expect(currentCards()).toEqual(["NW-1042"]));
+      expect(mocked.placeGet).toHaveBeenCalledWith(BOARD.listId, BOARD.id);
     });
   });
 

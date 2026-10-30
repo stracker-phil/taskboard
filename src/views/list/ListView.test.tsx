@@ -1046,6 +1046,29 @@ describe("ListView", () => {
       expect(template).toBe("minmax(0, 1fr) 181px");
     });
 
+    describe("cells without a value", () => {
+      const bare = row({ id: "6", key: "NW-1006", summary: "Update the footer" });
+      const cellsOf = async (issue: Row) => {
+        await renderList(viewData([groupOf([issue])], [issue], { columns: ["assignee", "epic", "priority"], groupBy: "none" }));
+        return within(await screen.findByRole("row", { name: new RegExp(issue.key) })).getAllByRole("gridcell").slice(1);
+      };
+
+      it("shows a dash in the assignee, epic and priority cells of an issue without them", async () => {
+        const cells = await cellsOf(bare);
+
+        expect(cells.map((c) => c.textContent)).toEqual(["—", "—", "—"]);
+      });
+
+      it("shows the values and no dash when the issue has them", async () => {
+        const cells = await cellsOf(withEpic);
+
+        expect(within(cells[0]).getByRole("img", { name: "Alex Morgan" })).toBeInTheDocument();
+        expect(cells[1]).toHaveTextContent("Launch Q4");
+        expect(cells[2]).toHaveTextContent("High");
+        expect(screen.queryByText("—")).not.toBeInTheDocument();
+      });
+    });
+
     it("shows a person custom field as an avatar under the field's name", async () => {
       const reviewed: Row = row({ id: "5", key: "NW-1005", summary: "Review the copy", custom: { customfield_10071: { kind: "person", value: SAM } } });
       await renderList(viewData([groupOf([reviewed])], [reviewed], { columns: ["customfield_10071"] }));

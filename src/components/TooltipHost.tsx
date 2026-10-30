@@ -14,14 +14,17 @@ interface Tip {
 
 /** Takes an element's `title` over as `data-tooltip`, so macOS's own small, slow tooltip never shows. An
  *  element named only by its title keeps that name as `aria-label`. */
+function takeTitle(element: Element) {
+  const title = element.getAttribute("title");
+  if (!title) return;
+  element.removeAttribute("title");
+  element.setAttribute("data-tooltip", title);
+  if (!element.hasAttribute("aria-label") && !element.textContent?.trim()) element.setAttribute("aria-label", title);
+}
+
 function adopt(element: Element): string | null {
   if (cutOff(element)) return element.textContent?.trim() || null;
-  const title = element.getAttribute("title");
-  if (title) {
-    element.removeAttribute("title");
-    element.setAttribute("data-tooltip", title);
-    if (!element.hasAttribute("aria-label") && !element.textContent?.trim()) element.setAttribute("aria-label", title);
-  }
+  takeTitle(element);
   return element.getAttribute("data-tooltip");
 }
 
@@ -76,12 +79,22 @@ export function TooltipHost() {
       else timer = setTimeout(reveal, delay);
     };
     const warm = () => Date.now() - hiddenAt < WARM_MS;
+    const titled = (element: Element) => element.closest("[title], [data-tooltip]");
+    // Finding cut-off text reads styles and layout, so it waits until the pointer has rested.
     const onOver = (e: PointerEvent) => {
-      const element = owner(e.target);
-      if (element === current) return;
+      const target = e.target;
+      if (!(target instanceof Element)) return hide();
+      const withTitle = target.closest("[title]");
+      if (withTitle) takeTitle(withTitle);
+      if (current?.contains(target) && titled(target) === titled(current)) return;
       const wasShowing = current !== null;
       hide();
-      if (element) show(element, wasShowing || warm() ? 0 : SHOW_DELAY_MS);
+      const reveal = () => {
+        const element = owner(target);
+        if (element && target.isConnected) show(element, 0);
+      };
+      if (wasShowing || warm()) reveal();
+      else timer = setTimeout(reveal, SHOW_DELAY_MS);
     };
     const onFocus = (e: FocusEvent) => {
       const element = owner(e.target);

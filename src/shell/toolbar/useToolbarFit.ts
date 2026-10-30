@@ -27,12 +27,28 @@ export function useToolbarFit(bar: RefObject<HTMLElement | null>, absent: readon
     setHidden((current) => (current.join() === next.join() ? current : next));
   }, [available, widthsVersion, absentKey, dirty]);
 
-  const measure = (item: Collapsible) => (element: HTMLElement | null) => {
-    if (!element) return;
-    const width = element.getBoundingClientRect().width;
-    if (widths.current[item] === width) return;
-    widths.current[item] = width;
-    setWidthsVersion((v) => v + 1);
+  // One ref per item for good, so a render doesn't detach and re-measure every item; a resize re-measures.
+  const refs = useRef(new Map<Collapsible, (element: HTMLElement | null) => (() => void) | undefined>());
+  const measure = (item: Collapsible) => {
+    let ref = refs.current.get(item);
+    if (!ref) {
+      const record = (element: HTMLElement) => {
+        const width = element.getBoundingClientRect().width;
+        if (widths.current[item] === width) return;
+        widths.current[item] = width;
+        setWidthsVersion((v) => v + 1);
+      };
+      ref = (element) => {
+        if (!element) return;
+        record(element);
+        if (typeof ResizeObserver === "undefined") return;
+        const observer = new ResizeObserver(() => record(element));
+        observer.observe(element);
+        return () => observer.disconnect();
+      };
+      refs.current.set(item, ref);
+    }
+    return ref;
   };
   return { hidden, measure };
 }

@@ -62,10 +62,14 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
       (sort) => edit(api.viewSetSort(view.id, sort), "Could not change the sort order"),
     );
   const groupRef = useRef<HTMLButtonElement | null>(null);
-  const groupButton = (button: HTMLButtonElement | null) => {
-    measure("group")(button);
-    groupRef.current = button;
-  };
+  const measureGroup = measure("group");
+  const groupButton = useCallback(
+    (button: HTMLButtonElement | null) => {
+      groupRef.current = button;
+      return measureGroup(button);
+    },
+    [measureGroup],
+  );
   // Under the "…" button while the Group button is folded into it.
   const openGroupMenu = () => {
     const anchor = groupRef.current ?? moreRef.current;

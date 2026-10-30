@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motionMs } from "../../lib/motion";
 
 /** `--ease-in-out` as a function of progress 0…1. */
@@ -8,7 +8,8 @@ function easeInOut(p: number): number {
 
 /** Animates a group's rows open or closed. A virtualized group isn't one element, so instead of a CSS height
  *  this drives a factor 0…1 per group that scales its rows' heights and opacity; only groups in motion have
- *  one. With no motion time (reduced motion, tests) nothing animates. */
+ *  one; `moving` names them and changes only when one starts or stops. With no motion time (reduced motion,
+ *  tests) nothing animates. */
 export function useGroupMotion() {
   const [factors, setFactors] = useState<Record<string, number>>({});
   const frames = useRef(new Map<string, number>());
@@ -43,5 +44,9 @@ export function useGroupMotion() {
     frames.current.set(key, requestAnimationFrame(step));
   }, []);
 
-  return { factors, animate };
+  // Which groups move changes twice per animation, their factors every frame.
+  const movingKey = JSON.stringify(Object.keys(factors).sort());
+  const moving = useMemo(() => new Set<string>(JSON.parse(movingKey) as string[]), [movingKey]);
+
+  return { factors, moving, animate };
 }

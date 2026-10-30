@@ -24,6 +24,9 @@ function renderActivity(items: ActivityItem[]) {
 
 const created = () => changeItem({ field: "created", from: null, to: null });
 
+/** The whole line of the change whose text contains this one. */
+const lineOf = async (text: string) => (await screen.findByText(text, { exact: false })).closest("div")!;
+
 beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
@@ -47,7 +50,7 @@ describe("Activity", () => {
   it("describes a status change with the two statuses as pills", async () => {
     renderActivity([changeItem()]);
 
-    expect(await screen.findByText(/Changed status/)).toHaveTextContent("Changed status In Review → Done");
+    expect(await lineOf("Changed status")).toHaveTextContent("Changed status In Review → Done");
     expect(screen.getByText("In Review")).toHaveClass("status-pill--activity");
     expect(screen.getByText("Done")).toHaveClass("status-pill--activity");
   });
@@ -55,7 +58,7 @@ describe("Activity", () => {
   it("names the people in an assignee change and shows none for an empty side", async () => {
     renderActivity([changeItem({ field: "assignee", from: null, to: { kind: "person", value: ALEX } })]);
 
-    expect(await screen.findByText(/Changed assignee/)).toHaveTextContent("Changed assignee none → Alex Morgan");
+    expect(await lineOf("Changed assignee")).toHaveTextContent("Changed assignee none → Alex Morgan");
   });
 
   it("describes the creation of the issue", async () => {
@@ -72,13 +75,23 @@ describe("Activity", () => {
 
       const author = await screen.findByText("Sam Lee");
       expect(author.tagName).toBe("STRONG");
-      expect(author.parentElement).toHaveTextContent("Sam Lee changed status In Review → Done");
+      expect(author.closest("div")).toHaveTextContent("Sam Lee changed status In Review → Done");
+    });
+
+    it("reads an in-progress move by a named author as one sentence", async () => {
+      const review = { kind: "status" as const, value: { name: "In Review", style: "review" as const } };
+      const progress = { kind: "status" as const, value: { name: "In Progress", style: "progress" as const } };
+      renderActivity([changeItem({ author: { ...SAM, name: "Marta Klein", initials: "MK" }, from: review, to: progress })]);
+
+      expect(await lineOf("changed status")).toHaveTextContent("Marta Klein changed status In Review → In Progress");
     });
 
     it("starts with a capital Changed when the author is unknown", async () => {
       renderActivity([changeItem({ author: null })]);
 
-      expect(await screen.findByText(/Changed status/)).toHaveTextContent("Changed status In Review → Done");
+      const line = await lineOf("Changed status");
+      expect(line).toHaveTextContent("Changed status In Review → Done");
+      expect(line).not.toHaveTextContent("changed status");
     });
 
     it("names the author who created the issue", async () => {
@@ -111,7 +124,7 @@ describe("Activity", () => {
     ])("shows the field %s as %s", async (field, shown) => {
       renderActivity([changeItem({ field, from: text("a"), to: text("b"), author: null })]);
 
-      expect(await screen.findByText(`Changed ${shown}`, { exact: false })).toHaveTextContent(`Changed ${shown} a → b`);
+      expect(await lineOf(`Changed ${shown}`)).toHaveTextContent(`Changed ${shown} a → b`);
     });
   });
 

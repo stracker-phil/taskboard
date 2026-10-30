@@ -1,4 +1,4 @@
-import { type CSSProperties, Fragment } from "react";
+import { type CSSProperties, Fragment, memo } from "react";
 import type { Row } from "../../api";
 import { CopyKey } from "../../components/issue/CopyKey";
 import { ChangeChip } from "../../components/issue/ChangeChip";
@@ -33,11 +33,13 @@ interface Props {
   onToggleSubtasks?: (id: string) => void;
   /** Its child count after the title. */
   childChip?: boolean;
+  /** Has an active bookmark. */
+  pinned?: boolean;
 }
 
-export function IssueRow(props: Props) {
+export const IssueRow = memo(function IssueRow(props: Props) {
   const { row, columns, position, wrap = false, inlineLabels = false, selected, onSelect, onOpen, actions } = props;
-  const { nesting = null, subtasksOpen = true, onToggleSubtasks, childChip = false } = props;
+  const { nesting = null, subtasksOpen = true, onToggleSubtasks, childChip = false, pinned = false } = props;
   const nested = (nesting?.depth ?? 0) > 0;
   const className = ["list-row", `list-row--${position}`, wrap && "list-row--wrap", nested && "list-row--child", row.changed && "list-row--changed", selected && "list-row--selected"]
     .filter(Boolean)
@@ -66,7 +68,7 @@ export function IssueRow(props: Props) {
             {wrap && flowingChips}
           </span>
           {!wrap && chips}
-          <RowActions issueId={row.id} issueKey={row.key} changed={row.changed} actions={actions} />
+          <RowActions issueId={row.id} issueKey={row.key} changed={row.changed} actions={actions} pinned={pinned} />
         </span>
         {columns.map((id) => (
           <span key={id} className="list-row__cell" role="gridcell">
@@ -76,4 +78,4 @@ export function IssueRow(props: Props) {
       </div>
     </>
   );
-}
+});

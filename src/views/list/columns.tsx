@@ -16,6 +16,9 @@ interface ColumnDef {
   measure: (row: Row, measure: MeasureText) => number;
 }
 
+/** Every cell without a value shows the same muted dash. */
+const NONE = <span className="list-cell--tertiary">{EMPTY}</span>;
+
 const STANDARD: Record<string, ColumnDef> = {
   status: {
     width: 130,
@@ -29,43 +32,45 @@ const STANDARD: Record<string, ColumnDef> = {
   },
   assignee: {
     width: 96,
-    cell: (row) => <AvatarStack people={row.assignees} />,
+    cell: (row) => (row.assignees.length > 0 ? <AvatarStack people={row.assignees} /> : NONE),
     measure: (row) => widthOf.avatars(row.assignees.length),
   },
   epic: {
     width: 176,
-    cell: (row) => row.epic && <EpicChip epic={row.epic} />,
+    cell: (row) => (row.epic ? <EpicChip epic={row.epic} /> : NONE),
     measure: (row, m) => widthOf.chip(m, row.epic?.name ?? null),
   },
   release: {
     width: 96,
-    cell: (row) => <span className="list-cell--mono">{row.release ?? EMPTY}</span>,
-    measure: (row, m) => widthOf.text(m, row.release ?? EMPTY, FONT.mono),
+    cell: (row) => (row.release ? <span className="list-cell--mono">{row.release}</span> : NONE),
+    measure: (row, m) => (row.release ? widthOf.text(m, row.release, FONT.mono) : widthOf.text(m, EMPTY)),
   },
   priority: {
     width: 104,
     cell: (row) =>
-      row.priority && (
+      row.priority ? (
         <span className="list-cell--priority">
           <PriorityFlag level={row.priority.level} />
           {row.priority.name}
         </span>
+      ) : (
+        NONE
       ),
     measure: (row, m) => widthOf.priority(m, row.priority?.name ?? null),
   },
   labels: {
     width: 120,
-    cell: (row) => <LabelChips labels={row.labels} className="list-cell--labels" />,
+    cell: (row) => (row.labels.length > 0 ? <LabelChips labels={row.labels} className="list-cell--labels" /> : NONE),
     measure: (row, m) => widthOf.labels(m, row.labels.map((l) => l.name)),
   },
   sprint: {
     width: 100,
-    cell: (row) => <span className="list-cell--secondary">{row.sprint ?? ""}</span>,
-    measure: (row, m) => widthOf.text(m, row.sprint),
+    cell: (row) => (row.sprint ? <span className="list-cell--secondary">{row.sprint}</span> : NONE),
+    measure: (row, m) => widthOf.text(m, row.sprint ?? EMPTY),
   },
   due: {
     width: 80,
-    cell: (row) => <span className="list-cell--tertiary">{row.due ?? EMPTY}</span>,
+    cell: (row) => (row.due ? <span className="list-cell--tertiary">{row.due}</span> : NONE),
     measure: (row, m) => widthOf.text(m, row.due ?? EMPTY),
   },
 };
@@ -73,7 +78,7 @@ const STANDARD: Record<string, ColumnDef> = {
 const CUSTOM_WIDTH = 90;
 
 function customCell(cell: Cell | undefined): ReactNode {
-  if (!cell) return null;
+  if (!cell) return NONE;
   if (cell.kind === "person") return <Avatar person={cell.value} />;
   return <span className="list-cell--secondary">{cell.value}</span>;
 }

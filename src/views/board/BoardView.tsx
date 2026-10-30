@@ -1,13 +1,15 @@
 import { ChevronLeft } from "lucide-react";
-import { useCallback } from "react";
+import { type RefObject, useCallback, useEffect, useRef } from "react";
 import { api, type BoardColumn, type BoardData, type Narrowing, type View } from "../../api";
 import { StatusPill } from "../../components/issue/StatusPill";
 import { EmptyLevel } from "../../shell/EmptyLevel";
 import { useViewBoard } from "../../queries/views";
 import { attempt } from "../../state/requests";
+import { narrowingKey } from "../../state/slices/narrowing";
 import { useStore } from "../../state/store";
 import { Mark } from "../list/GroupHeader";
 import { useIssueActions } from "../list/useIssueActions";
+import { usePinnedIssues } from "../list/usePinnedIssues";
 import { BoardColumnCards } from "./BoardColumnCards";
 import { useBoardKeys } from "./useBoardKeys";
 
@@ -27,14 +29,34 @@ export function BoardView({ view, narrowing }: Props) {
 function Board({ view, data }: { view: View; data: BoardData }) {
   const openIssue = useStore((s) => s.openIssue);
   const actions = useIssueActions();
+  const pinned = usePinnedIssues();
   const setCollapsed = (column: BoardColumn, collapsed: boolean) =>
     void attempt(api.viewSetColumnCollapsed(view.id, column.key, collapsed), "Could not change the column");
-  const open = useCallback((id: string) => openIssue(id, { listId: view.listId, viewId: view.id }), [openIssue, view.listId, view.id]);
-  const selected = useBoardKeys(data, open, actions);
+  const { listId, id: viewId } = view;
+  const placeKey = narrowingKey(listId, viewId);
+  const selected = useStore((s) => s.places[placeKey]?.selectedId ?? null);
+  const loadPlace = useStore((s) => s.loadPlace);
+  const updatePlace = useStore((s) => s.updatePlace);
+  useEffect(() => {
+    void loadPlace(listId, viewId);
+  }, [loadPlace, listId, viewId]);
+  const select = useCallback((id: string) => updatePlace(listId, viewId, { selectedId: id }), [updatePlace, listId, viewId]);
+  const open = useCallback((id: string) => openIssue(id, { listId, viewId }), [openIssue, listId, viewId]);
+  // A clicked card becomes the current one, so the Board comes back to it.
+  const openCard = useCallback(
+    (id: string) => {
+      select(id);
+      open(id);
+    },
+    [select, open],
+  );
+  useBoardKeys(data, selected, select, open, actions);
+  const boardRef = useRef<HTMLDivElement>(null);
+  useCurrentColumnInView(boardRef, data, selected);
   const inlineLabels = view.inlineLabels && !data.cardFields.includes("labels");
   if (data.columns.length === 0) return <EmptyLevel listId={view.listId} viewId={view.id} />;
   return (
-    <div className="board" role="list" aria-label="Board">
+    <div ref={boardRef} className="board" role="list" aria-label="Board">
       {data.columns.map((column) =>
         column.collapsed ? (
           <div key={column.key} role="listitem" className="board-strip__item" aria-label={column.name}>
@@ -49,7 +71,7 @@ function Board({ view, data }: { view: View; data: BoardData }) {
             </button>
           </div>
         ) : (
-          <section key={column.key} role="listitem" className={`board-column board--${column.style}`} aria-label={column.name}>
+          <section key={column.key} data-column={column.key} role="listitem" className={`board-column board--${column.style}`} aria-label={column.name}>
             <header className="board-column__header">
               <ColumnTitle column={column} />
               <span className="board-column__count">{column.ids.length}</span>
@@ -64,8 +86,9 @@ function Board({ view, data }: { view: View; data: BoardData }) {
               fields={data.cardFields}
               inlineLabels={inlineLabels}
               selected={selected !== null && column.ids.includes(selected) ? selected : null}
-              onOpen={open}
+              onOpen={openCard}
               actions={actions}
+              pinned={pinned}
             />
           </section>
         ),
@@ -84,4 +107,18 @@ function ColumnTitle({ column, vertical = false }: { column: BoardColumn; vertic
       {column.name}
     </span>
   );
+}
+
+/** Once the Board comes back to its current card, scrolls that card's column into view; the column scrolls
+ *  to the card itself. */
+function useCurrentColumnInView(boardRef: RefObject<HTMLDivElement | null>, data: BoardData, selected: string | null) {
+  const done = useRef(false);
+  useEffect(() => {
+    if (done.current || !selected) return;
+    const column = data.columns.find((c) => !c.collapsed && c.ids.includes(selected));
+    if (!column) return;
+    done.current = true;
+    const element = [...(boardRef.current?.querySelectorAll<HTMLElement>("[data-column]") ?? [])].find((e) => e.dataset.column === column.key);
+    element?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+  }, [boardRef, data, selected]);
 }

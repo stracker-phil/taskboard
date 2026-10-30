@@ -1,14 +1,10 @@
-import { useQueryClient } from "@tanstack/react-query";
-import { type CSSProperties, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { Column, Group, IssueOpening, Narrowing, ViewData, ViewPlace } from "../../api";
-import { onIssueKeys } from "../../commands/issueKeys";
+import { type CSSProperties, useCallback, useMemo, useRef } from "react";
+import type { Column, Group, IssueOpening, Narrowing, ViewData } from "../../api";
 import { EmptyLevel } from "../../shell/EmptyLevel";
-import { prefetchIssue, refreshIssueExtras } from "../../queries/issues";
 import { useColumnsCatalogue, useViewRows } from "../../queries/views";
-import { narrowingKey } from "../../state/slices/narrowing";
 import { useStore } from "../../state/store";
 import { columnDef } from "./columns";
-import { flatten, isBelow, type Item, itemGroupKey, itemKey } from "./flatten";
+import { flatten, type Item, itemGroupKey, itemKey } from "./flatten";
 import { GroupHeader } from "./GroupHeader";
 import { IssueRow } from "./IssueRow";
 import { canvasMeasure, columnWidths, fittingColumns, gridTemplate } from "./measure";
@@ -16,8 +12,12 @@ import { useElementWidth } from "./useElementWidth";
 import { useGroupHighlight } from "./useGroupHighlight";
 import { useGroupMotion } from "./useGroupMotion";
 import { useIssueOpening } from "../useIssueOpening";
+import { useRememberedScroll } from "../useRememberedScroll";
 import { useIssueActions } from "./useIssueActions";
+import { usePinnedIssues } from "./usePinnedIssues";
+import { useRowKeys } from "./useRowKeys";
 import { useRowSizing } from "./useRowSizing";
+import { useRowsPlace } from "./useRowsPlace";
 
 interface Props {
   listId: number;
@@ -42,8 +42,6 @@ export function ListView({ listId, viewId, narrowing, wrapTitles = true, openWit
 
 const measure = canvasMeasure();
 const NO_COLUMNS: Column[] = [];
-const NO_TOGGLED: Record<string, boolean> = {};
-const NO_PARENTS: string[] = [];
 /** The list's side padding plus a row's: what the grid can't use. */
 const GRID_INSET = 52 + 24 + 32;
 
@@ -66,26 +64,16 @@ interface RowsProps {
 
 function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const placeKey = narrowingKey(listId, viewId);
-  const loaded = useStore((s) => placeKey in s.places);
-  const toggled = useStore((s) => s.places[placeKey]?.toggled) ?? NO_TOGGLED;
-  const collapsedParents = useStore((s) => s.places[placeKey]?.collapsedParents) ?? NO_PARENTS;
-  const selected = useStore((s) => s.places[placeKey]?.selectedId ?? null);
-  const peekOpen = useStore((s) => s.places[placeKey]?.peekOpen ?? false);
-  const loadPlace = useStore((s) => s.loadPlace);
-  const updatePlace = useStore((s) => s.updatePlace);
+  const place = useRowsPlace(listId, viewId, data);
+  const { toggled, collapsedParents, selected, setPlace, subtasksOpen } = place;
   const openIssue = useStore((s) => s.openIssue);
-  const setPlace = (patch: Partial<ViewPlace>) => updatePlace(listId, viewId, patch);
-  const { factors, animate } = useGroupMotion();
+  const { factors, moving, animate } = useGroupMotion();
   const highlight = useGroupHighlight();
   const actions = useIssueActions();
-  const client = useQueryClient();
+  const pinned = usePinnedIssues();
   const width = useElementWidth(scrollRef);
   const { data: catalog = NO_COLUMNS } = useColumnsCatalogue(listId);
-
-  useEffect(() => {
-    void loadPlace(listId, viewId);
-  }, [loadPlace, listId, viewId]);
+  const onScroll = useRememberedScroll(listId, viewId, scrollRef);
 
   const headers = useMemo(() => data.columns.map((id) => catalog.find((c) => c.id === id)?.name ?? id), [data.columns, catalog]);
   const widths = useMemo(
@@ -94,22 +82,16 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
   );
   // Columns that don't fit beside the title (the peek narrows the list) hide from the right.
   const shown = width === null ? widths.length : fittingColumns(widths, width - GRID_INSET);
-  const columns = data.columns.slice(0, shown);
+  const columns = useMemo(() => data.columns.slice(0, shown), [data.columns, shown]);
+  const shownHeaders = useMemo(() => headers.slice(0, shown), [headers, shown]);
 
   // A collapsing group keeps its rows until they have shrunk away.
   const items = useMemo(
-    () => flatten(data, (group: Group) => isOpen(group, toggled) || group.key in factors, collapsedParents),
-    [data, toggled, factors, collapsedParents],
+    () => flatten(data, (group: Group) => isOpen(group, toggled) || moving.has(group.key), collapsedParents),
+    [data, toggled, moving, collapsedParents],
   );
+  const rowIds = useMemo(() => items.flatMap((item) => (item.kind === "row" ? [item.row.id] : [])), [items]);
   const { virtualizer, groupStartsMoving, itemProps } = useRowSizing(items, factors, wrapTitles, scrollRef);
-
-  // Back to where the owner left this view, once its place has loaded.
-  const [restored, setRestored] = useState(false);
-  useLayoutEffect(() => {
-    if (!loaded || restored || !scrollRef.current) return;
-    scrollRef.current.scrollTop = useStore.getState().places[placeKey]?.scrollTop ?? 0;
-    setRestored(true);
-  }, [loaded, restored, placeKey]);
 
   const toggle = (group: Group) => {
     const opening = !isOpen(group, toggled);
@@ -117,94 +99,21 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
     setPlace({ toggled: { ...toggled, [group.key]: opening } });
     animate(group.key, opening);
   };
-
-  // Collapsing a row moves the selection from its hidden subtree onto it.
-  const setSubtasksOpen = (id: string, open: boolean) => {
-    setPlace({ collapsedParents: open ? collapsedParents.filter((p) => p !== id) : [...collapsedParents, id] });
-    if (!open && selected && isBelow(data.rows, selected, id)) setPlace({ selectedId: id });
-  };
-  const subtasksOpen = (id: string) => !collapsedParents.includes(id);
-
-  const rowIds = items.flatMap((item) => (item.kind === "row" ? [item.row.id] : []));
-  const select = (id: string, openPeek: boolean) => {
-    setPlace({ selectedId: id, peekOpen: openPeek });
-    refreshIssueExtras(id);
-    const at = rowIds.indexOf(id);
-    for (const neighbor of [rowIds[at - 1], rowIds[at + 1]]) if (neighbor) prefetchIssue(client, neighbor);
-  };
-
-  // The keys reach this render's state through a ref the effect below keeps current.
+  const select = (id: string, openPeek: boolean) => place.select(id, openPeek, rowIds);
   const open = (id: string) => openIssue(id, { listId, viewId });
-  const current = { items, rowIds, selected, peekOpen, data, select, toggle, setSubtasksOpen, subtasksOpen, actions, virtualizer, setPlace, open };
-  const keyState = useRef(current);
-  useEffect(() => {
-    keyState.current = current;
-  });
-  useEffect(() => {
-    const withSelected = (run: (key: string) => void) => {
-      const { data, selected } = keyState.current;
-      const row = selected ? data.rows[selected] : undefined;
-      if (row) run(row.key);
-    };
-    return onIssueKeys({
-      move: (step) => {
-        const { rowIds, selected, peekOpen, items, virtualizer, select } = keyState.current;
-        if (rowIds.length === 0) return;
-        const at = selected === null ? -1 : rowIds.indexOf(selected);
-        const next = rowIds[Math.min(Math.max(at + step, 0), rowIds.length - 1)];
-        select(next, peekOpen);
-        virtualizer.scrollToIndex(
-          items.findIndex((item) => item.kind === "row" && item.row.id === next),
-          { align: "auto" },
-        );
-      },
-      setGroupOpen: (open) => {
-        const { items, selected, toggle, select, peekOpen, setSubtasksOpen, subtasksOpen } = keyState.current;
-        const row = items.find((item) => item.kind === "row" && item.row.id === selected);
-        // In Hierarchy ←/→ on a row with children closes or opens its subtree, and ← on a nested row selects its
-        // parent.
-        if (row?.kind === "row" && row.nesting?.parent && subtasksOpen(row.row.id) !== open) {
-          setSubtasksOpen(row.row.id, open);
-          return;
-        }
-        if (row?.kind === "row" && row.nesting && row.nesting.depth > 0 && !open && row.row.parentId) {
-          select(row.row.parentId, peekOpen);
-          return;
-        }
-        const header = row && items.find((item) => item.kind === "group" && item.group.key === itemGroupKey(row));
-        if (header?.kind === "group" && header.open !== open) toggle(header.group);
-      },
-      closePeek: () => keyState.current.setPlace({ peekOpen: false }),
-      copyKey: () => withSelected((key) => keyState.current.actions.copyKey(key)),
-      copyUrl: () => withSelected((key) => keyState.current.actions.copyUrl(key)),
-      openInJira: () => withSelected((key) => keyState.current.actions.openInJira?.(key)),
-      open: () => {
-        const { selected, open } = keyState.current;
-        if (selected) open(selected);
-      },
-      openEpic: () => {
-        const { data, selected, open } = keyState.current;
-        const epic = selected ? data.rows[selected]?.epic : undefined;
-        if (epic) open(epic.id);
-      },
-      togglePin: () => {
-        const { selected, actions } = keyState.current;
-        if (selected) actions.togglePin(selected);
-      },
-      toggleRead: () => {
-        const { selected, actions, data } = keyState.current;
-        if (!selected) return;
-        if (data.rows[selected]?.changed) actions.markSeen(selected);
-        else actions.markUnread(selected);
-      },
-      togglePeek: () => {
-        const { selected, peekOpen, setPlace } = keyState.current;
-        if (selected) setPlace({ peekOpen: !peekOpen });
-      },
-      hasSelection: () => keyState.current.selected !== null,
-      peekOpen: () => keyState.current.peekOpen,
-    });
-  }, []);
+  const scrollToIndex = (index: number) => virtualizer.scrollToIndex(index, { align: "auto" });
+  const keys = useRowKeys({ ...place, items, rowIds, data, select, toggle, actions, scrollToIndex, open });
+
+  // Stable, so rows that didn't change skip re-rendering.
+  const onSelect = useCallback(
+    (id: string) => {
+      keys.current.select(id, opening === "preview");
+      if (opening === "full") keys.current.open(id);
+    },
+    [keys, opening],
+  );
+  const onOpen = useCallback((id: string) => keys.current.open(id), [keys]);
+  const onToggleSubtasks = useCallback((id: string) => keys.current.setSubtasksOpen(id, !keys.current.subtasksOpen(id)), [keys]);
 
   return (
     <div
@@ -213,7 +122,7 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
       role="grid"
       aria-rowcount={items.length}
       style={{ "--list-columns": gridTemplate(widths.slice(0, shown)) } as CSSProperties}
-      onScroll={(e) => setPlace({ scrollTop: e.currentTarget.scrollTop })}
+      onScroll={onScroll}
       {...highlight.handlers}
     >
       <div className="list-scroll__space" style={{ height: virtualizer.getTotalSize() }}>
@@ -221,12 +130,7 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
           const item = items[virtual.index];
           const group = itemGroupKey(item);
           return (
-            <div
-              key={itemKey(item)}
-              {...itemProps(virtual, item)}
-              className={itemClass(item)}
-              data-group={group}
-            >
+            <div key={itemKey(item)} {...itemProps(virtual, item)} className={itemClass(item)} data-group={group}>
               {item.kind === "group" ? (
                 <GroupHeader
                   group={item.group}
@@ -234,7 +138,7 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
                   tab={item.tab}
                   active={highlight.isActive(group)}
                   namesColumns
-                  headers={headers.slice(0, shown)}
+                  headers={shownHeaders}
                   onToggle={() => toggle(item.group)}
                 />
               ) : (
@@ -245,16 +149,14 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
                   wrap={wrapTitles}
                   inlineLabels={inlineLabels}
                   selected={selected === item.row.id}
-                  onSelect={(id) => {
-                    select(id, opening === "preview");
-                    if (opening === "full") open(id);
-                  }}
-                  onOpen={open}
+                  onSelect={onSelect}
+                  onOpen={onOpen}
                   actions={actions}
                   nesting={item.nesting}
                   subtasksOpen={subtasksOpen(item.row.id)}
-                  onToggleSubtasks={(id) => setSubtasksOpen(id, !subtasksOpen(id))}
+                  onToggleSubtasks={onToggleSubtasks}
                   childChip={data.subtasks === "hidden" || (item.nesting?.parent === true && !subtasksOpen(item.row.id))}
+                  pinned={pinned.has(item.row.id)}
                 />
               )}
             </div>

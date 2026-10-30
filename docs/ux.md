@@ -181,6 +181,7 @@ one group, Board column or pill per style, whatever the status is called; the Bo
   wrapped title is one flow: the key and the subtask glyph lead it, the change chip, comment count and child count
   follow its last word, and its lines start under the key; only the square keeps its own column. The Table
   always truncates at a fixed row height; Board cards always wrap. A clicked row is selected (`--selection-bg`).
+  A cell without a value shows a muted "—" (`EMPTY`, `views/list/columns.tsx`), in the List and the Table alike.
 - An issue's labels show as small tags (`row-labels`, 18px `label-chip`s) after its title in the List, the
   Table and on Board cards, unless the view shows the Labels field. The Columns popover lists the field as
   "Labels (column)" ("Labels (card field)" on a Board) and has a "Labels (inline)" switch (`view.inline_labels`,
@@ -189,7 +190,8 @@ one group, Board column or pill per style, whatever the status is called; the Bo
   shows on hover). With wrapped titles, inline labels flow after the title's last word and wrap like text,
   and the Labels column's chips wrap onto more lines in the cell; the row grows to fit. With "Wrap long titles"
   off, both stay on the row's one line and are cut at the cell's edge; the title comes first and truncates
-  only when the cell is narrower than the title itself, and inline labels fill what it leaves.
+  only when the cell is narrower than the title itself, and inline labels fill what it leaves. On one line a
+  change chip gives way before the title: it truncates with an ellipsis down to a few letters first.
 - Rows are virtualized (`@tanstack/react-virtual`): a card is drawn from its pieces (the header item, then
   rows that know whether they are first, middle, last or the only one).
 - **Subtasks** are the children of the view's results at any depth and of any type, and follow the view's
@@ -343,7 +345,7 @@ view with its place intact).
   breadcrumb) closes the Issue view and the preview (`useNavGo`).
 - Activity (400 wide by default, 300–720 by dragging its left edge or ←/→ on the focused edge; saved in
   `ui_state.json` `activityWidth` for every issue, `useActivityWidth`; `--panel-subtle-bg`): All / Comments / Changes, comment cards and change lines (status
-  changes as activity pills), newest first; the comment box waits for writes. Opening an issue fetches its
+  changes as activity pills; a change line stays on one line, its author and field truncate before from → to), newest first; the comment box waits for writes. Opening an issue fetches its
   comments when the cached ones may be behind (`issue_sync_comments`). Change lines come from Jira's changelog
   ([ADR 0031](adr/0031-issue-history-comes-from-the-changelog-on-demand.md)) and the sync's own records: "<Author>
   changed priority Medium → High", "Changed description" for long text without values, other fields by their
@@ -367,7 +369,9 @@ view with its place intact).
   lozenges as small uppercase chips in the status and label colors.
 
 **Remember my place:** each view keeps its opened and closed groups, scroll position, selected row and open
-peek (`state/slices/places.ts`, saved by Rust in `places.json` a moment after the last change, at most 200
+peek (List and Table, `views/list/useRowsPlace.ts`; the Board keeps its current card and scrolls back to it;
+the scroll is written a moment after scrolling stops and on leaving, `views/useRememberedScroll.ts`;
+`state/slices/places.ts`, saved by Rust in `places.json` a moment after the last change, at most 200
 views), also across restarts. The Me chip is saved with the view and the text filter is never saved
 ([below](#toolbar)); while the Issue view, the preview or the Peek is open over a view, its drafts and text stay.
 
@@ -663,8 +667,8 @@ global shortcuts.
 - Bare keys never fire in text fields; there only ⌘ and ⌃ combinations and Escape do.
 - ↵ and Space on a focused button or link activate it. `Tab` moves focus (sidebar, tabs, toolbar, content).
 - A command has one binding; ⌘1–⌘9 open the nth view tab.
-- **Issues** (`commands/issueKeys.ts`, registered by the shown List, Board or Issue view): J or ↓ and K or ↑
-  move (on the Board through a column's cards, ← and → to the neighboring column; in a List ← and → close and
+- **Issues** (`commands/issueKeys.ts`, registered by the shown List, Table, Board or Issue view; the List and the Table share `views/list/useRowKeys.ts`): J or ↓ and K or ↑
+  move (on the Board through a column's cards, ← and → to the neighboring column; in a List or Table ← and → close and
   open the row's group; in Hierarchy ←/→ on a row with children collapse or expand its subtree first, at any
   level, and ← on a nested row selects its parent), Space opens or closes the preview (the Board opens the Issue view), ↩ opens the Issue
   view, E the epic, P adds or removes a bookmark (default duration), M marks read or unread, ⌘C copies the key (only with no text

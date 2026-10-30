@@ -13,13 +13,15 @@ interface Props {
   selected: string | null;
   onOpen: (id: string) => void;
   actions: RowActionHandlers;
+  /** The ids of the bookmarked issues. */
+  pinned: ReadonlySet<string>;
 }
 
 const CARD_ESTIMATE = 110;
 const CARD_GAP = 8;
 
 /** A column's cards, virtualized: a Space with thousands of issues mounts only the cards on screen. */
-export const BoardColumnCards = memo(function BoardColumnCards({ ids, rows, fields, inlineLabels, selected, onOpen, actions }: Props) {
+export const BoardColumnCards = memo(function BoardColumnCards({ ids, rows, fields, inlineLabels, selected, onOpen, actions, pinned }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const virtualizer = useVirtualizer({
     count: ids.length,
@@ -51,7 +53,7 @@ export const BoardColumnCards = memo(function BoardColumnCards({ ids, rows, fiel
               ref={virtualizer.measureElement}
               style={{ transform: `translateY(${virtual.start}px)` }}
             >
-              <BoardCard row={row} fields={fields} inlineLabels={inlineLabels} selected={row.id === selected} onOpen={onOpen} actions={actions} />
+              <BoardCard row={row} fields={fields} inlineLabels={inlineLabels} selected={row.id === selected} onOpen={onOpen} actions={actions} pinned={pinned.has(row.id)} />
             </div>
           ) : null;
         })}

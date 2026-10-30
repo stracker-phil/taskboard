@@ -1,15 +1,20 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import type { BoardData } from "../../api";
 import { onIssueKeys } from "../../commands/issueKeys";
 import type { RowActionHandlers } from "../list/RowActions";
 
 /** The Board's issue keys: J/K (↓/↑) move through a column's cards, ←/→ to the neighboring open column, ↩
- *  opens; Copy, Bookmark, the read toggle and Open in Jira act on the current card. Returns the current card's id. */
-export function useBoardKeys(data: BoardData, open: (id: string) => void, actions: RowActionHandlers & { copyUrl: (key: string) => void }) {
-  const [selected, setSelected] = useState<string | null>(null);
-  const state = useRef({ data, selected, open, actions });
+ *  opens; Copy, Bookmark, the read toggle and Open in Jira act on the current card, `selected`. */
+export function useBoardKeys(
+  data: BoardData,
+  selected: string | null,
+  select: (id: string) => void,
+  open: (id: string) => void,
+  actions: RowActionHandlers & { copyUrl: (key: string) => void },
+) {
+  const state = useRef({ data, selected, select, open, actions });
   useEffect(() => {
-    state.current = { data, selected, open, actions };
+    state.current = { data, selected, select, open, actions };
   });
   useEffect(() => {
     const columns = () => state.current.data.columns.filter((c) => !c.collapsed && c.ids.length > 0);
@@ -26,15 +31,15 @@ export function useBoardKeys(data: BoardData, open: (id: string) => void, action
       move: (step) => {
         const { all, column, index } = where();
         if (all.length === 0) return;
-        if (column < 0) return setSelected(all[0].ids[0]);
+        if (column < 0) return state.current.select(all[0].ids[0]);
         const ids = all[column].ids;
-        setSelected(ids[Math.min(Math.max(index + step, 0), ids.length - 1)]);
+        state.current.select(ids[Math.min(Math.max(index + step, 0), ids.length - 1)]);
       },
       // ← and → go to the same place in the neighboring column.
       setGroupOpen: (right) => {
         const { all, column, index } = where();
         const next = all[column + (right ? 1 : -1)];
-        if (next) setSelected(next.ids[Math.min(index, next.ids.length - 1)]);
+        if (next) state.current.select(next.ids[Math.min(index, next.ids.length - 1)]);
       },
       closePeek: () => {},
       copyKey: () => withKey((key) => state.current.actions.copyKey(key)),
@@ -64,5 +69,4 @@ export function useBoardKeys(data: BoardData, open: (id: string) => void, action
       peekOpen: () => false,
     });
   }, []);
-  return selected;
 }

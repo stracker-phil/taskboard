@@ -58,6 +58,8 @@
 .list-row__title { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .list-row__summary { min-width: 0; overflow: hidden; font-size: 14px; white-space: nowrap; text-overflow: ellipsis; }
 .list-row--changed .list-row__summary { font-weight: 600; }
+/* On one line the change chip gives way first, down to a few letters, before the title shortens. */
+.list-row:not(.list-row--wrap) .change-chip { display: block; flex: 0 1000 auto; min-width: 44px; overflow: hidden; line-height: 18px; text-overflow: ellipsis; }
 .list-row__cell { display: flex; align-items: center; min-width: 0; white-space: nowrap; }
 
 /* A cell's content never widens its column past the cap; long text ends in an ellipsis. */

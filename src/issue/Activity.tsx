@@ -84,14 +84,21 @@ type Change = Extract<ActivityItem, { kind: "change" }>;
 
 /** "Created the issue", "Changed status To do → In progress", or without values (long text such as the
  *  description) "Changed description". After the author's name the verb starts lowercase. */
-function ChangeText({ item, lowercase }: { item: Change; lowercase: boolean }) {
-  const verb = (text: string) => (lowercase ? text.toLowerCase() : text);
-  if (item.field === "created") return <>{verb("Created")} the issue</>;
+function ChangeText({ item }: { item: Change }) {
+  const verb = (text: string) => (item.author ? text.toLowerCase() : text);
+  const author = item.author && <strong>{item.author.name} </strong>;
+  if (item.field === "created") return <span className="change-line__lead">{author}{verb("Created")} the issue</span>;
   const name = fieldName(item.field);
-  if (item.from === null && item.to === null) return <>{`${verb("Changed")} ${name}`}</>;
+  if (item.from === null && item.to === null) return <span className="change-line__lead">{author}{`${verb("Changed")} ${name}`}</span>;
   return (
     <>
-      {verb("Changed")} {name} <Value value={item.from} /> → <Value value={item.to} />
+      <span className="change-line__lead">
+        {author}
+        {verb("Changed")} {name}
+      </span>{" "}
+      <span className="change-line__values">
+        <Value value={item.from} /> → <Value value={item.to} />
+      </span>
     </>
   );
 }
@@ -101,8 +108,7 @@ export function ActivityEntry({ item, issueId }: { item: ActivityItem; issueId: 
   return (
     <div className={item.fresh ? "change-line change-line--new" : "change-line"}>
       <span className="change-line__text">
-        {item.author && <strong>{item.author.name} </strong>}
-        <ChangeText item={item} lowercase={item.author !== null} />
+        <ChangeText item={item} />
       </span>
       <time className="change-line__time" dateTime={item.at}>
         {formatLocalTime(item.at)}

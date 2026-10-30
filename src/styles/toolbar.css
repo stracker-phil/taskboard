@@ -118,7 +118,7 @@
   height: 30px; padding: 0 8px; box-sizing: border-box; border: 1px solid var(--border-strong); border-radius: 7px;
   background: var(--panel-bg); color: var(--text); font: inherit; font-size: 13px;
 }
-.condition-row__field { width: 110px; }
+.condition-row__field { width: 140px; text-overflow: ellipsis; }
 .condition-row__op { width: 70px; }
 .condition-row__value { flex: 1; min-width: 0; }
 .condition-row__remove {

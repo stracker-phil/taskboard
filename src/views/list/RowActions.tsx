@@ -1,6 +1,5 @@
 import { CheckCheck, CircleDot, Copy, ExternalLink, Bookmark } from "lucide-react";
 import type { MouseEvent } from "react";
-import { usePinOf } from "../../queries/pins";
 
 export interface RowActionHandlers {
   copyKey: (key: string) => void;
@@ -18,11 +17,12 @@ interface Props {
   /** Unread: the toggle marks it read, else unread. */
   changed: boolean;
   actions: RowActionHandlers;
+  /** Has an active bookmark. */
+  pinned: boolean;
 }
 
 /** The hover toolbar at the end of a row's title: Mark as read or unread, Copy key, Bookmark, Open in Jira. */
-export function RowActions({ issueId, issueKey, changed, actions }: Props) {
-  const pinned = usePinOf("issue", issueId) !== undefined;
+export function RowActions({ issueId, issueKey, changed, actions, pinned }: Props) {
   // The row's own click selects it; an action must not.
   const run = (action: () => void) => (e: MouseEvent) => {
     e.stopPropagation();
