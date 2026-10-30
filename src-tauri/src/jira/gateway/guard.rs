@@ -55,6 +55,7 @@ const fn write(verb: Verb, path: &'static [Part]) -> Rule {
     }
 }
 
+/// Each rule's token scope is listed in `docs/scopes.md`.
 const RULES: &[Rule] = &[
     read(Get, &[Literal("myself")], &[]),
     read(Get, &[Literal("field")], &[]),

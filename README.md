@@ -51,6 +51,7 @@ All screenshots show made-up demo data from the debug build.
 
 ## Privacy
 
+- A scoped API token needs the scopes in [docs/scopes.md](docs/scopes.md); `write:jira-work` only for changes.
 - The API token lives only in the macOS Keychain; it is never written to the settings, the cache or the logs.
 - Network traffic goes only to your Jira site and `api.atlassian.com`, through one allowlisted gateway that
   refuses anything but the reads Taskboard needs and its few changes (assigning an issue), which are sent once

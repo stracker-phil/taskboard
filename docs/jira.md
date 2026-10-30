@@ -19,7 +19,7 @@ Settings → Connection (`connection/`):
 3. **Settings → Projects → Refresh** loads every project into `cache.space`; **Track** creates the project's Space
    (`local.space`). Untracking keeps the Space's settings.
 
-Scopes a scoped token needs: `read:jira-work`, `read:jira-user`, and `write:jira-work` for changes.
+Scopes a scoped token needs, and why: [scopes.md](scopes.md).
 The expiry date warns 14 days ahead (`connection::token_expiry`).
 
 Settings → Sync sets the scope JQL (validated by Jira's `jql/parse` before it is saved; empty = the default
@@ -81,7 +81,7 @@ that pass the rule (`user.avatar_url`, the 48 px one).
 credentials to the default browser; the app sends nothing itself and the token never leaves the gateway.
 
 **Adding an endpoint:** a variant in `Endpoint` with its plan, a row in `RULES`, a method in `api.rs`, tests for
-the exact request and its refusals, and a row in the table below. A write also flips `Access::Write` for that
+the exact request and its refusals, a row in the table below, and its scope in [scopes.md](scopes.md). A write also flips `Access::Write` for that
 row (`write(…)`) and goes through `writes/` ([writes.md](writes.md)).
 
 ## Endpoints
