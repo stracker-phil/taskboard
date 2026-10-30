@@ -1,9 +1,11 @@
 //! An attachment as a local file for Quick Look (ADR 0035): downloaded from the tracker once into
 //! `<app cache>/attachments/<id>/<name>`, which is cleared when the app starts and quits.
 
+use std::collections::HashMap;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, LazyLock, Mutex, Weak};
 
 use rusqlite::OptionalExtension;
 
@@ -11,6 +13,7 @@ use super::attachments::find_attachment;
 use crate::db::Db;
 use crate::error::{AppError, AppResult};
 use crate::jira::dto;
+use crate::lock::MutexExt;
 use crate::sync::source::Source;
 
 /// Below the file system's 255 bytes per name.
@@ -53,7 +56,7 @@ pub(super) async fn issue_attachment(
         .read(move |conn| {
             Ok(conn
                 .query_row(
-                    "SELECT raw FROM cache.issue WHERE id = ?1",
+                    "SELECT raw FROM cache.issue_body WHERE issue_id = ?1",
                     [&issue_id],
                     |r| r.get(0),
                 )
@@ -65,19 +68,35 @@ pub(super) async fn issue_attachment(
         .ok_or_else(|| AppError::NotFound("The attachment isn't on this issue".into()))
 }
 
-/// The downloaded copy, reused when it has the listed size, else downloaded now.
+/// The downloaded copy, reused when it has the listed size, else downloaded now. Asks for one attachment at
+/// the same time download it once: the later ones wait and reuse the file.
 pub(super) async fn local_copy(
     source: &dyn Source,
     root: &Path,
     attachment: &dto::Attachment,
 ) -> AppResult<PathBuf> {
     let path = cached_path(root, &attachment.id, &attachment.filename)?;
+    let lock = download_lock(&path);
+    let _downloading = lock.lock().await;
     if is_reusable(&path, attachment.size) {
         return Ok(path);
     }
     let bytes = source.attachment_content(&attachment.id).await?;
-    save(&path, &bytes)?;
+    save(&path, &bytes).await?;
     Ok(path)
+}
+
+fn download_lock(path: &Path) -> Arc<tokio::sync::Mutex<()>> {
+    static DOWNLOADS: LazyLock<Mutex<HashMap<PathBuf, Weak<tokio::sync::Mutex<()>>>>> =
+        LazyLock::new(Mutex::default);
+    let mut downloads = DOWNLOADS.lock_unpoisoned();
+    downloads.retain(|_, lock| lock.strong_count() > 0);
+    if let Some(lock) = downloads.get(path).and_then(Weak::upgrade) {
+        return lock;
+    }
+    let lock = Arc::new(tokio::sync::Mutex::new(()));
+    downloads.insert(path.to_owned(), Arc::downgrade(&lock));
+    lock
 }
 
 /// `<root>/<id>/<safe name>`; the id must be a tracker id (digits), so it can't leave the folder.
@@ -132,15 +151,21 @@ pub fn is_reusable(path: &Path, size: Option<u64>) -> bool {
     fs::metadata(path).is_ok_and(|m| m.is_file() && size.is_none_or(|size| m.len() == size))
 }
 
-/// Written next to its place first, so a half-written file is never shown.
-fn save(path: &Path, bytes: &[u8]) -> AppResult<()> {
+/// Written next to its place first under a name of its own, so a half-written file is never shown.
+async fn save(path: &Path, bytes: &[u8]) -> AppResult<()> {
     let folder = path
         .parent()
         .ok_or_else(|| AppError::Internal("An attachment path without a folder".into()))?;
-    fs::create_dir_all(folder).map_err(io_error)?;
-    let partial = folder.join(".download");
-    fs::write(&partial, bytes).map_err(io_error)?;
-    fs::rename(&partial, path).map_err(io_error)
+    tokio::fs::create_dir_all(folder).await.map_err(io_error)?;
+    let partial = folder.join(format!(".download-{}", uuid::Uuid::new_v4()));
+    let written = match tokio::fs::write(&partial, bytes).await {
+        Ok(()) => tokio::fs::rename(&partial, path).await,
+        Err(e) => Err(e),
+    };
+    if written.is_err() {
+        let _ = tokio::fs::remove_file(&partial).await;
+    }
+    written.map_err(io_error)
 }
 
 fn io_error(e: io::Error) -> AppError {

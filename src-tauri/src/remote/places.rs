@@ -129,7 +129,7 @@ pub async fn open_issue(app: &AppHandle, key: String) -> AppResult<()> {
         .read(move |conn| {
             Ok(conn
                 .query_row(
-                    "SELECT id, project_id FROM cache.issue WHERE key = ?1",
+                    "SELECT id, project_id FROM cache.issue WHERE key = ?1 COLLATE NOCASE",
                     [&wanted],
                     |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
                 )

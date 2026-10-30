@@ -78,7 +78,7 @@ export function createApiMock(): Api {
     openLogFolder: vi.fn().mockResolvedValue(undefined),
     openUrl: vi.fn().mockResolvedValue(undefined),
     attachmentPreview: vi.fn().mockResolvedValue(undefined),
-    attachmentImage: vi.fn(async (): Promise<string | null> => null),
+    inlineImageUrl: vi.fn((issueId: string, attachmentId: string) => `inline-image://localhost/${issueId}/${attachmentId}`),
     logError: vi.fn().mockResolvedValue(undefined),
     takeLaunchEvents: vi.fn().mockResolvedValue([]),
     runCommand: vi.fn().mockResolvedValue(undefined),

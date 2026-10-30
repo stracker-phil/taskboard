@@ -56,9 +56,9 @@ async fn lab() -> (TempDir, Db) {
     let issue = |id: &str, key: &str, summary: &str, kind: &str, status: &str, category: &str| {
         format!(
             "INSERT INTO cache.issue (id, key, project_id, summary, issue_type, status_id,
-               status_category, created_at, updated_at, raw, synced_at)
+               status_category, created_at, updated_at, synced_at)
              VALUES ('{id}', '{key}', '{NW}', '{summary}', '{kind}', '{status}', '{category}',
-               '2026-10-20T09:00:00.000Z', '2026-10-20T09:00:00.000Z', '{{}}',
+               '2026-10-20T09:00:00.000Z', '2026-10-20T09:00:00.000Z',
                '2026-10-20T09:00:00.000Z');"
         )
     };
@@ -715,9 +715,9 @@ mod in_the_pinned_view {
             &db,
             format!(
                 "INSERT INTO cache.issue (id, key, project_id, summary, issue_type, type_is_subtask,
-                   parent_id, status_id, status_category, created_at, updated_at, raw, synced_at)
+                   parent_id, status_id, status_category, created_at, updated_at, synced_at)
                  VALUES ('1004', 'NW-4', '{NW}', 'Add a regression test', 'Subtask', 1, '1001',
-                   's1', 'new', '2026-10-20T09:00:00.000Z', '2026-10-20T09:00:00.000Z', '{{}}',
+                   's1', 'new', '2026-10-20T09:00:00.000Z', '2026-10-20T09:00:00.000Z',
                    '2026-10-20T09:00:00.000Z')"
             ),
         )

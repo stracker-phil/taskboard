@@ -72,8 +72,8 @@ export const api = {
   openUrl: (url: string) => invoke<void>("open_url", { url }),
   /** Downloads the attachment from the Jira site (once per app run) and shows it in Quick Look. */
   attachmentPreview: (issueId: string, attachmentId: string) => invoke<void>("attachment_preview", { issueId, attachmentId }),
-  /** An image attached to the issue as a `data:` URL for rich text, or null to keep its chip (ADR 0039). */
-  attachmentImage: (issueId: string, attachmentId: string) => invoke<string | null>("attachment_image", { issueId, attachmentId }),
+  /** Where the webview loads an image attached to the issue for rich text; it fails to load when there is none (ADR 0042). */
+  inlineImageUrl: (issueId: string, attachmentId: string) => `inline-image://localhost/${encodeURIComponent(issueId)}/${encodeURIComponent(attachmentId)}`,
   logError: (message: string) => invoke<void>("log_frontend_error", { message }),
   takeLaunchEvents: () => invoke<LaunchEvent[]>("take_launch_events"),
   /** Runs a command of the Rust command bus by id (`app:settings`, `view:toggleSidebar`, …); rejects when it is unknown, disabled or fails. */

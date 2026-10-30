@@ -48,7 +48,9 @@ stands in Taskboard. The numbers in this table are Taskboard's.
 | [0036](0036-rich-text-renders-from-adf-not-renderedfields.md) | Rich text renders from ADF, not renderedFields | Superseded in part by 0039 (inline images) |
 | [0037](0037-views-choose-how-subtasks-show.md) | Views choose how subtasks show | Accepted (2026-10-29) |
 | [0038](0038-filter-changes-are-drafts-until-the-view-is-saved.md) | Filter changes are drafts until the view is saved | Accepted (2026-10-29) |
-| [0039](0039-inline-images-come-from-issue-attachments-through-rust.md) | Inline images come from issue attachments through Rust | Accepted (2026-10-29) |
+| [0039](0039-inline-images-come-from-issue-attachments-through-rust.md) | Inline images come from issue attachments through Rust | Superseded in part by 0042 (the app scheme) |
 | [0040](0040-subtasks-are-the-children-of-a-views-results.md) | Subtasks are the children of a view's results | Accepted (2026-10-29) |
+| [0041](0041-an-issues-big-texts-live-beside-its-row.md) | An issue's big texts live beside its row | Accepted (2026-10-30) |
+| [0042](0042-inline-images-load-through-an-app-scheme.md) | Inline images load through an app scheme | Accepted (2026-10-30) |
 
 Open: integrations with Daybook and TimeTracker.

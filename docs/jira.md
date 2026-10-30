@@ -104,18 +104,19 @@ One method on `JiraClient` each (`jira/api.rs`), one `Endpoint` each; the answer
 | `check_jql` | `POST jql/parse?validation=strict` | Jira's messages; empty when valid |
 | `used_custom_fields` | `POST search/jql`: `project = "KEY" ORDER BY updated DESC`, one page of 100, `*all` without the large system fields | the custom field ids with a value |
 
-`Issue.fields` stays raw JSON, as the cache stores it; accessors read what the sync needs
+`Issue.fields` stays untyped JSON (the cache keeps part of it, `sync::raw`); accessors read what the sync needs
 (`summary`, `project_id`, `status_id`, `updated`). Searches ask for explicit fields (`sync/full.rs`
 `SEARCH_FIELDS`): the mapped ones, `comment`, `description`, `issuelinks` and `attachment` (id, file name, size,
 MIME type, created, author and the `content` address; `dto::Attachment`), plus the shown custom fields.
 `issues::attachments_of` reads the attachments from the stored issue; `issue_get` keeps an attachment's address
 only when it is `https` on the connected site's host and port (`issues::is_on_site`), and the page opens it with
 `open_url`. Quick Look shows a downloaded copy (`attachment_content`, below;
-[ADR 0035](adr/0035-attachments-preview-in-quick-look.md)). `attachment_image(issue_id, attachment_id)`
-(`issues/inline_image.rs`) hands the page an image attachment of that issue as a `data:` URL for rich text: the
-same downloaded copy, only PNG, JPEG, GIF or WebP whose magic bytes match the declared type (never SVG), at most
-`MAX_INLINE_IMAGE_BYTES` (10 MB); otherwise `None` and the page keeps the chip. `ImageMemory` keeps the last 20
-answers (at most 50 MB) ([ADR 0039](adr/0039-inline-images-come-from-issue-attachments-through-rust.md)).
+[ADR 0035](adr/0035-attachments-preview-in-quick-look.md)). The `inline-image:` scheme (`issues::commands::inline_image`, `issues/inline_image.rs`) serves the page an
+image attachment of that issue for rich text: the same downloaded copy, read asynchronously, only PNG, JPEG, GIF
+or WebP whose magic bytes match the declared type (never SVG), at most `MAX_INLINE_IMAGE_BYTES` (10 MB);
+otherwise a 404 and the page keeps the chip ([ADR 0039](adr/0039-inline-images-come-from-issue-attachments-through-rust.md),
+[ADR 0042](adr/0042-inline-images-load-through-an-app-scheme.md)). Concurrent asks for one attachment download it
+once.
 `parse_jira_time` reads Jira's `2026-10-20T09:14:03.120+0200`.
 
 ## Rich text (ADF)
@@ -123,7 +124,7 @@ answers (at most 50 MB) ([ADR 0039](adr/0039-inline-images-come-from-issue-attac
 Descriptions, rich text custom fields and comments are shown from their Atlassian Document Format, not from
 Jira's `renderedFields` HTML ([ADR 0036](adr/0036-rich-text-renders-from-adf-not-renderedfields.md)): Jira builds
 that HTML through wiki markup, so inline code comes back as `<tt>` and `->text->` as strike-through. The cache
-keeps the ADF (`issue.description_adf`, `comment.body_adf`, the custom field in `issue.raw`) next to Jira's HTML;
+keeps the ADF (`issue_body.description_adf`, `comment.body_adf`, the custom field in `issue.custom`) next to Jira's HTML;
 `issues/detail.rs` and `issues/activity/` render it with `adf::html_or` and fall back to the HTML when there is no
 ADF or it isn't a document. Search text still comes from the HTML (`sync::map::html_to_text`).
 

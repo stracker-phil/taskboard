@@ -224,6 +224,31 @@ mod issues {
 
     #[tokio::test]
     #[ignore = "syncs the demo site into a temp database"]
+    async fn a_number_with_leading_zeros_finds_the_same_issue() {
+        let site = Site::new().await;
+
+        for text in ["01042", "0001042"] {
+            let results = site.palette(text).await;
+
+            let first = &results.issues[0];
+            assert_eq!(first.key, "NW-1042", "{text}");
+            assert_eq!(first.matched_in, MatchedIn::Key, "{text}");
+            assert_eq!(first.project_id, NW, "{text}");
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn a_number_too_large_for_any_issue_finds_nothing_and_does_not_fail() {
+        let site = Site::new().await;
+
+        let results = site.palette("99999999999999999999").await;
+
+        assert_eq!(results.issues, []);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
     async fn a_prefix_finds_summaries_and_marks_the_matched_word_strong() {
         let site = Site::new().await;
 

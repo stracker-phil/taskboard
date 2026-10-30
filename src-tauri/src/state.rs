@@ -6,7 +6,6 @@ use std::sync::Arc;
 use crate::connection::JiraAccess;
 use crate::db::Db;
 use crate::error::AppResult;
-use crate::issues::ImageMemory;
 use crate::jira::Limiter;
 use crate::jira::gateway::AvatarClient;
 use crate::launch::LaunchQueue;
@@ -25,7 +24,6 @@ pub struct AppState {
     pub db: Db,
     pub jira: JiraAccess,
     pub avatars: AvatarClient,
-    pub inline_images: ImageMemory,
     pub nav: NavStore,
     pub places: PlaceStore,
 }
@@ -40,7 +38,6 @@ impl AppState {
             db: Db::open(config_dir)?,
             jira: JiraAccess::new(secret_store(), Arc::new(Limiter::default())),
             avatars: AvatarClient::default(),
-            inline_images: ImageMemory::default(),
             nav: NavStore::open(config_dir),
             places: PlaceStore::open(config_dir),
         })

@@ -731,7 +731,7 @@ mod custom_columns {
         let reviewer = query(
             site.db(),
             format!(
-                "SELECT json_extract(raw, '$.fields.{REVIEWER}.accountId')
+                "SELECT json_extract(custom, '$.\"{REVIEWER}\".accountId')
                  FROM cache.issue WHERE key = 'NW-1042'"
             ),
             |row| row.get::<_, Option<String>>(0),
@@ -2556,9 +2556,9 @@ mod subtasks {
                     tx.execute_batch(
                         "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 100)
                          INSERT INTO cache.issue (id, key, project_id, summary, issue_type, status_id,
-                           status_category, created_at, updated_at, raw, synced_at, parent_id)
+                           status_category, created_at, updated_at, synced_at, parent_id)
                          SELECT 'bulk-' || n.i, 'NW-' || (9000 + n.i), s.project_id, 'Bulk task ' || n.i,
-                           'Task', s.status_id, s.status_category, s.created_at, s.updated_at, s.raw,
+                           'Task', s.status_id, s.status_category, s.created_at, s.updated_at,
                            s.synced_at, (SELECT id FROM cache.issue WHERE key = 'NW-1003')
                          FROM n, cache.issue s WHERE s.key = 'NW-1044'",
                     )?;

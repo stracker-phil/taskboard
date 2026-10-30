@@ -1022,13 +1022,13 @@ mod filter_status_choices {
                ('s1', 'To Do', 'new'), ('s2', 'Done', 'done'),
                ('s3', 'Archived', 'done'), ('s4', 'Unused', 'new');
              INSERT INTO cache.issue (id, key, project_id, summary, issue_type, status_id,
-               status_category, created_at, updated_at, raw, synced_at) VALUES
+               status_category, created_at, updated_at, synced_at) VALUES
                ('1', 'NW-1', '10001', 'One', 'Task', 's1', 'new', '2026-10-20T09:00:00.000Z',
-                '2026-10-20T09:00:00.000Z', '{}', '2026-10-20T09:00:00.000Z'),
+                '2026-10-20T09:00:00.000Z', '2026-10-20T09:00:00.000Z'),
                ('2', 'NW-2', '10001', 'Two', 'Task', 's2', 'done', '2026-10-20T09:00:00.000Z',
-                '2026-10-20T09:00:00.000Z', '{}', '2026-10-20T09:00:00.000Z'),
+                '2026-10-20T09:00:00.000Z', '2026-10-20T09:00:00.000Z'),
                ('3', 'NWS-1', '10002', 'Three', 'Task', 's3', 'done', '2026-10-20T09:00:00.000Z',
-                '2026-10-20T09:00:00.000Z', '{}', '2026-10-20T09:00:00.000Z')",
+                '2026-10-20T09:00:00.000Z', '2026-10-20T09:00:00.000Z')",
         )
         .await;
 

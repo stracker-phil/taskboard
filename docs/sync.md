@@ -49,7 +49,10 @@ Progress counts changed issues (`fetched`).
 are asked for with `issue/bulkfetch` in batches of 100. What comes back is stored as Jira has it (a moved issue
 gets its new key and project and drops out of its old Space); what doesn't is marked `gone` (an `issue_change`
 row `gone`), which takes it out of every list at once. Issues gone for more than 7 days are deleted with their
-comments, changes and seen rows. Runs after every full sync and hourly.
+comments, changes and seen rows. An issue Jira returns that is outside the scope (done for longer than the scope
+keeps, moved to an untracked project) stays cached with `issue.left_scope_at` and is asked for again only after 7
+days (`RECHECK_LEFT_SCOPE`), so one deleted since is still noticed; the mark goes when the scope lists it again.
+Seen changes older than 90 days are pruned ([data.md](data.md#tables)). Runs after every full sync and hourly.
 
 **Detail**: opening an issue fetches its comments when the cached ones are older than the issue
 (`issues::issue_sync_comments`), and its web links unless fetched in the last 5 minutes (`issues::issue_sync_web_links`,
@@ -77,8 +80,10 @@ sync chip and `taskboard sync`) queues a delta, ⌘⇧R (`sync:full`, `taskboard
 as UTC with milliseconds, so they sort as text. The sprint is the active one, else the one with the highest id;
 an epic is hierarchy level 1 or type "Epic".
 
-`store.rs` writes them. An issue whose JSON equals the cached one is skipped, so a sync without changes
-announces nothing. Otherwise `diff.rs` compares the tracked fields with the cached row and writes
+`store.rs` writes them: the issue row, its `issue_body` and its custom fields' values (`raw.rs`,
+[ADR 0041](adr/0041-an-issues-big-texts-live-beside-its-row.md)). An issue whose kept JSON and custom values equal
+the cached ones is skipped, so a sync without changes announces nothing; the kept JSON leaves out Jira's
+relative rendered dates and keeps each comment's edit time, so an edited comment still counts. Otherwise `diff.rs` compares the tracked fields with the cached row and writes
 `issue_change` rows (`status`, `assignee`, `due_date`, `priority`, `comment_added`, `created`), stamped with the
 new `updated`. A project's first sync records no changes and marks every issue seen. When the search returned
 all of an issue's comments, they replace the cached ones.

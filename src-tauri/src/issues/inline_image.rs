@@ -1,38 +1,46 @@
-//! An image attached to an issue as a `data:` URL, for the placeholders rich text writes (ADR 0039). It comes
-//! through the attachment download Quick Look uses (ADR 0035), reusing its file, and only when the bytes are
-//! the raster format the attachment declares; recent answers stay in memory so scrolling doesn't read again.
+//! An image attached to an issue, served to rich text's placeholders through the `inline-image:` scheme
+//! (ADR 0042). It comes through the attachment download Quick Look uses (ADR 0035), reusing its file, and only
+//! when the bytes are the raster format the attachment declares.
 
-use std::collections::VecDeque;
-use std::fs;
 use std::path::Path;
-use std::sync::Mutex;
 
-use base64::Engine;
+use tauri::http::{Response, StatusCode, header};
 
 use super::preview::{issue_attachment, local_copy};
 use crate::db::Db;
 use crate::error::{AppError, AppResult};
 use crate::jira::dto;
 use crate::jira::gateway::ImageKind;
-use crate::lock::MutexExt;
 use crate::sync::source::Source;
 
+/// The webview asks `inline-image://localhost/<issue id>/<attachment id>`.
+pub const INLINE_IMAGE_SCHEME: &str = "inline-image";
 /// Larger images stay a chip: Quick Look still shows them.
 pub const MAX_INLINE_IMAGE_BYTES: u64 = 10 * 1024 * 1024;
-const MEMORY_ENTRIES: usize = 20;
-const MEMORY_BYTES: usize = 50 * 1024 * 1024;
 
-/// The attachment as a `data:` URL; `None` (the page keeps the chip) when it isn't a PNG, JPEG, GIF or WebP
-/// whose bytes match its declared type, or is larger than `MAX_INLINE_IMAGE_BYTES`. `NotFound` when the
-/// attachment isn't the issue's.
+#[derive(Debug, Clone, PartialEq)]
+pub struct InlineImage {
+    pub kind: ImageKind,
+    pub bytes: Vec<u8>,
+}
+
+/// The issue and attachment ids of a scheme request's path; both must be tracker ids (digits).
+pub fn image_path(path: &str) -> Option<(String, String)> {
+    let (issue_id, attachment_id) = path.strip_prefix('/')?.split_once('/')?;
+    let is_id = |id: &str| !id.is_empty() && id.bytes().all(|b| b.is_ascii_digit());
+    (is_id(issue_id) && is_id(attachment_id)).then(|| (issue_id.into(), attachment_id.into()))
+}
+
+/// The attachment's bytes; `None` (the page keeps the chip) when it isn't a PNG, JPEG, GIF or WebP whose bytes
+/// match its declared type, or is larger than `MAX_INLINE_IMAGE_BYTES`. `NotFound` when the attachment isn't
+/// the issue's.
 pub async fn attachment_image(
     db: &Db,
     source: &dyn Source,
     root: &Path,
-    memory: &ImageMemory,
     issue_id: String,
     attachment_id: String,
-) -> AppResult<Option<String>> {
+) -> AppResult<Option<InlineImage>> {
     let attachment = issue_attachment(db, issue_id, attachment_id).await?;
     let Some(kind) = declared_kind(&attachment) else {
         return Ok(None);
@@ -43,16 +51,11 @@ pub async fn attachment_image(
     {
         return Ok(None);
     }
-    if let Some(url) = memory.get(&attachment.id) {
-        return Ok(Some(url));
-    }
     let path = local_copy(source, root, &attachment).await?;
-    let bytes = fs::read(&path).map_err(|e| AppError::Io(e.to_string()))?;
-    let url = data_url(kind, &bytes);
-    if let Some(url) = &url {
-        memory.put(&attachment.id, url.clone());
-    }
-    Ok(url)
+    let bytes = tokio::fs::read(&path)
+        .await
+        .map_err(|e| AppError::Io(e.to_string()))?;
+    Ok(is_inline_image(kind, &bytes).then_some(InlineImage { kind, bytes }))
 }
 
 /// The raster format the attachment claims: its MIME type, else (without an image MIME type) its extension.
@@ -69,41 +72,34 @@ pub fn declared_kind(attachment: &dto::Attachment) -> Option<ImageKind> {
     }
 }
 
-/// `data:<type>;base64,…` when the bytes are `declared` and within `MAX_INLINE_IMAGE_BYTES`.
-pub fn data_url(declared: ImageKind, bytes: &[u8]) -> Option<String> {
-    let fits = bytes.len() as u64 <= MAX_INLINE_IMAGE_BYTES;
-    (fits && ImageKind::sniff(bytes) == Some(declared)).then(|| {
-        let encoded = base64::engine::general_purpose::STANDARD.encode(bytes);
-        format!("data:{};base64,{encoded}", declared.mime())
-    })
+/// The bytes are `declared` and within `MAX_INLINE_IMAGE_BYTES`.
+pub fn is_inline_image(declared: ImageKind, bytes: &[u8]) -> bool {
+    bytes.len() as u64 <= MAX_INLINE_IMAGE_BYTES && ImageKind::sniff(bytes) == Some(declared)
 }
 
-/// The most recently shown images' `data:` URLs by attachment id: at most 20, and 50 MB together.
-#[derive(Default)]
-pub struct ImageMemory {
-    recent: Mutex<VecDeque<(String, String)>>,
-}
-
-impl ImageMemory {
-    pub fn get(&self, attachment_id: &str) -> Option<String> {
-        let mut recent = self.recent.lock_unpoisoned();
-        let at = recent.iter().position(|(id, _)| id == attachment_id)?;
-        let entry = recent.remove(at)?;
-        let url = entry.1.clone();
-        recent.push_back(entry);
-        Some(url)
-    }
-
-    pub fn put(&self, attachment_id: &str, url: String) {
-        let mut recent = self.recent.lock_unpoisoned();
-        recent.retain(|(id, _)| id != attachment_id);
-        recent.push_back((attachment_id.to_owned(), url));
-        while recent.len() > MEMORY_ENTRIES
-            || recent.iter().map(|(_, url)| url.len()).sum::<usize>() > MEMORY_BYTES
-        {
-            recent.pop_front();
+/// The scheme's answer: the image with its type, else 404 (no image, keep the chip) or 500. Never stored
+/// by the webview: the bytes stay in the app's cache folder only.
+pub fn image_response(answer: AppResult<Option<InlineImage>>) -> Response<Vec<u8>> {
+    let (status, image) = match answer {
+        Ok(Some(image)) => (StatusCode::OK, Some(image)),
+        Ok(None) | Err(AppError::NotFound(_) | AppError::InvalidInput(_)) => {
+            (StatusCode::NOT_FOUND, None)
         }
-    }
+        Err(e) => {
+            log::warn!("An inline image couldn't be loaded: {e}");
+            (StatusCode::INTERNAL_SERVER_ERROR, None)
+        }
+    };
+    let builder = Response::builder()
+        .status(status)
+        .header(header::CACHE_CONTROL, "no-store");
+    let response = match image {
+        Some(image) => builder
+            .header(header::CONTENT_TYPE, image.kind.mime())
+            .body(image.bytes),
+        None => builder.body(Vec::new()),
+    };
+    response.unwrap_or_else(|_| Response::new(Vec::new()))
 }
 
 #[cfg(test)]
@@ -126,39 +122,110 @@ mod tests {
     }
 
     #[test]
-    fn a_matching_image_becomes_a_base64_data_url() {
-        assert_eq!(
-            data_url(ImageKind::Png, PNG),
-            Some("data:image/png;base64,iVBORw0KGgo=".to_owned())
-        );
+    fn bytes_of_the_declared_format_are_an_inline_image() {
+        assert!(is_inline_image(ImageKind::Png, PNG));
     }
 
     #[test]
-    fn bytes_of_another_format_than_declared_give_no_data_url() {
-        assert_eq!(data_url(ImageKind::Jpeg, PNG), None);
-        assert_eq!(data_url(ImageKind::Png, b"GIF89a\x01\0\x01\0"), None);
+    fn bytes_of_another_format_than_declared_are_no_inline_image() {
+        assert!(!is_inline_image(ImageKind::Jpeg, PNG));
+        assert!(!is_inline_image(ImageKind::Png, b"GIF89a\x01\0\x01\0"));
     }
 
     #[test]
-    fn svg_bytes_never_become_a_data_url() {
+    fn svg_bytes_are_never_an_inline_image() {
         for kind in [
             ImageKind::Png,
             ImageKind::Jpeg,
             ImageKind::Gif,
             ImageKind::Webp,
         ] {
-            assert_eq!(data_url(kind, SVG), None, "{kind:?}");
+            assert!(!is_inline_image(kind, SVG), "{kind:?}");
         }
     }
 
     #[test]
-    fn an_image_over_the_cap_gives_no_data_url_and_one_at_the_cap_does() {
+    fn an_image_over_the_cap_is_no_inline_image_and_one_at_the_cap_is() {
         let mut bytes = PNG.to_vec();
         bytes.resize(MAX_INLINE_IMAGE_BYTES as usize, 0);
-        assert!(data_url(ImageKind::Png, &bytes).is_some());
+        assert!(is_inline_image(ImageKind::Png, &bytes));
 
         bytes.push(0);
-        assert_eq!(data_url(ImageKind::Png, &bytes), None);
+        assert!(!is_inline_image(ImageKind::Png, &bytes));
+    }
+
+    #[test]
+    fn a_scheme_path_is_two_numeric_ids() {
+        for (path, expected) in [
+            ("/101042/80001", Some(("101042", "80001"))),
+            ("/1/2", Some(("1", "2"))),
+            ("", None),
+            ("/", None),
+            ("/101042", None),
+            ("/101042/", None),
+            ("//80001", None),
+            ("/101042/80001/", None),
+            ("/101042/80001/3", None),
+            ("101042/80001", None),
+            ("/abc/80001", None),
+            ("/101042/8000x", None),
+            ("/../80001", None),
+            ("/101042/-1", None),
+        ] {
+            assert_eq!(
+                image_path(path),
+                expected.map(|(a, b): (&str, &str)| (a.to_string(), b.to_string())),
+                "{path:?}"
+            );
+        }
+    }
+
+    fn png_image() -> InlineImage {
+        InlineImage {
+            kind: ImageKind::Png,
+            bytes: PNG.to_vec(),
+        }
+    }
+
+    #[test]
+    fn an_image_is_answered_with_its_bytes_type_and_no_caching() {
+        let response = image_response(Ok(Some(png_image())));
+
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.headers()[header::CONTENT_TYPE], "image/png");
+        assert_eq!(response.headers()[header::CACHE_CONTROL], "no-store");
+        assert_eq!(response.body(), PNG);
+    }
+
+    #[test]
+    fn no_image_or_a_bad_request_is_a_404_with_an_empty_body() {
+        for (answer, label) in [
+            (Ok(None), "none"),
+            (Err(AppError::NotFound("attachment".into())), "not found"),
+            (
+                Err(AppError::InvalidInput("id".into())),
+                "invalid input",
+            ),
+        ] {
+            let response = image_response(answer);
+
+            assert_eq!(response.status(), StatusCode::NOT_FOUND, "{label}");
+            assert_eq!(response.headers()[header::CACHE_CONTROL], "no-store", "{label}");
+            assert!(response.body().is_empty(), "{label}");
+        }
+    }
+
+    #[test]
+    fn any_other_failure_is_a_500_with_an_empty_body() {
+        for error in [
+            AppError::Io("disk full".into()),
+            AppError::Db("locked".into()),
+        ] {
+            let response = image_response(Err(error));
+
+            assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+            assert!(response.body().is_empty());
+        }
     }
 
     #[test]
@@ -204,55 +271,4 @@ mod tests {
         }
     }
 
-    #[test]
-    fn memory_returns_what_was_put_and_nothing_for_an_unknown_id() {
-        let memory = ImageMemory::default();
-        memory.put("1", "data:one".into());
-        assert_eq!(memory.get("1"), Some("data:one".to_owned()));
-        assert_eq!(memory.get("2"), None);
-    }
-
-    #[test]
-    fn putting_an_id_again_replaces_its_url() {
-        let memory = ImageMemory::default();
-        memory.put("1", "data:old".into());
-        memory.put("1", "data:new".into());
-        assert_eq!(memory.get("1"), Some("data:new".to_owned()));
-    }
-
-    #[test]
-    fn memory_forgets_the_oldest_entry_after_twenty() {
-        let memory = ImageMemory::default();
-        for id in 1..=21 {
-            memory.put(&id.to_string(), format!("data:{id}"));
-        }
-        assert_eq!(memory.get("1"), None);
-        assert_eq!(memory.get("2"), Some("data:2".to_owned()));
-        assert_eq!(memory.get("21"), Some("data:21".to_owned()));
-    }
-
-    #[test]
-    fn a_recently_read_entry_survives_eviction() {
-        let memory = ImageMemory::default();
-        for id in 1..=20 {
-            memory.put(&id.to_string(), format!("data:{id}"));
-        }
-        assert!(memory.get("1").is_some());
-        memory.put("21", "data:21".into());
-        assert_eq!(memory.get("1"), Some("data:1".to_owned()));
-        assert_eq!(memory.get("2"), None);
-    }
-
-    #[test]
-    fn memory_forgets_the_oldest_entries_beyond_fifty_megabytes() {
-        let memory = ImageMemory::default();
-        let big = "x".repeat(20 * 1024 * 1024);
-        memory.put("1", big.clone());
-        memory.put("2", big.clone());
-        assert!(memory.get("1").is_some());
-        memory.put("3", big);
-        assert_eq!(memory.get("2"), None);
-        assert!(memory.get("1").is_some());
-        assert!(memory.get("3").is_some());
-    }
 }

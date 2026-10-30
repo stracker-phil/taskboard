@@ -3,6 +3,7 @@
 use chrono::{DateTime, Utc};
 use serde_json::Value;
 
+use super::raw::{custom_values, kept_raw};
 use crate::jira::dto::{Issue, parse_jira_time};
 use crate::net::AvatarUrl;
 
@@ -45,6 +46,9 @@ pub struct IssueRow {
     pub comment_count: i64,
     /// Whether the search returned every comment, so the comment table is complete.
     pub comments_complete: bool,
+    /// The custom fields' values (`raw::custom_values`).
+    pub custom: Option<String>,
+    /// What `issue_body.raw` keeps (`raw::kept_raw`).
     pub raw: String,
 }
 
@@ -134,7 +138,8 @@ pub fn map_issue(issue: &Issue, ids: &FieldIds) -> Option<Mapped> {
         comments_complete: f["comment"]["total"]
             .as_i64()
             .is_none_or(|total| total as usize <= comments.len()),
-        raw: serde_json::to_string(issue).unwrap_or_default(),
+        custom: custom_values(f),
+        raw: kept_raw(issue),
         description_html,
     };
     let fts = FtsDoc {
@@ -389,6 +394,7 @@ mod tests {
         assert_eq!(
             IssueRow {
                 raw: String::new(),
+                custom: None,
                 description_adf: None,
                 ..row
             },
@@ -420,18 +426,32 @@ mod tests {
                 description_adf: None,
                 comment_count: 4,
                 comments_complete: true,
+                custom: None,
                 raw: String::new(),
             }
         );
     }
 
     #[test]
-    fn the_raw_column_is_the_issue_json_and_the_adf_column_is_its_description_document() {
+    fn the_raw_column_is_the_kept_issue_json_and_the_custom_column_holds_the_custom_values() {
         let issue = demo_issue("NW-1042");
 
         let row = map_issue(&issue, &ids()).unwrap().issue;
 
-        assert_eq!(row.raw, serde_json::to_string(&issue).unwrap());
+        assert_eq!(row.raw, kept_raw(&issue));
+        assert_eq!(row.custom, custom_values(&issue.fields));
+        let raw: Value = serde_json::from_str(&row.raw).unwrap();
+        assert_eq!(raw["key"], "NW-1042");
+        assert_eq!(raw["fields"].get("description"), None);
+        assert_eq!(raw["fields"]["summary"], issue.fields["summary"]);
+    }
+
+    #[test]
+    fn the_adf_column_is_the_description_document() {
+        let issue = demo_issue("NW-1042");
+
+        let row = map_issue(&issue, &ids()).unwrap().issue;
+
         let adf: Value = serde_json::from_str(row.description_adf.as_deref().unwrap()).unwrap();
         assert_eq!(adf, issue.fields["description"]);
         assert_eq!(adf["type"], "doc");

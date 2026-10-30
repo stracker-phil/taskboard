@@ -19,6 +19,7 @@ own name, identifier, data, socket and URL scheme
 | Binary and CLI | `taskboard` | the same name inside the debug bundle, run by path | Cargo package `name` (also the self dev-dependency); `cli/`; the scripts |
 | Installed links | `~/Applications/Taskboard.app`, `~/.local/bin/taskboard` | none | `scripts/install.sh` |
 | URL scheme | `taskboard://` | `taskboard-debug://` | both Tauri configs; `lib.rs` `LINK_SCHEME` (tested) |
+| Image scheme | `inline-image://` (inside the webview only) | the same | `issues::INLINE_IMAGE_SCHEME`, `app.rs`, `api.inlineImageUrl`, the CSP in `tauri.conf.json` |
 | Socket, lock | `taskboard.sock`, `taskboard.lock` in the config dir | the same in the debug config dir | `lib.rs`, `instance.rs`; `scripts/dev/js.sh` |
 | Config dir | `~/Library/Application Support/com.philippstracker.taskboard/` | `….taskboard.debug/` | `lib.rs` `config_dir()` |
 | Logs | `~/Library/Logs/com.philippstracker.taskboard/` | `….taskboard.debug/` | Tauri's `app_log_dir` |

@@ -118,8 +118,8 @@ impl Sql {
 
     fn json(id: &str, member: &str) -> Self {
         Self {
-            text: "json_extract(i.raw, ?)".into(),
-            params: vec![SqlValue::Text(format!("$.fields.\"{id}\"{member}"))],
+            text: "json_extract(i.custom, ?)".into(),
+            params: vec![SqlValue::Text(format!("$.\"{id}\"{member}"))],
         }
     }
 

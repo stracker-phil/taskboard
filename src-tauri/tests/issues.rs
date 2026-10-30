@@ -15,9 +15,9 @@ use taskboard_lib::connection::{
 use taskboard_lib::db::{Changes, Db};
 use taskboard_lib::error::{AppResult, ErrorKind};
 use taskboard_lib::issues::{
-    ActivityItem, ChangeValue, CustomField, ImageMemory, IssueDetail, IssueLink,
+    ActivityItem, ChangeValue, CustomField, InlineImage, IssueDetail, IssueLink,
     MAX_INLINE_IMAGE_BYTES, RelatedIssue, WebLink, WebLinkKind, attachment_file, attachment_image,
-    issue_activity, issue_forget, issue_get, issue_related, issue_sync_comments,
+    image_response, issue_activity, issue_forget, issue_get, issue_related, issue_sync_comments,
     issue_sync_history, issue_sync_web_links, issue_web_links,
 };
 use taskboard_lib::jira::{Limiter, TokenKind};
@@ -232,17 +232,15 @@ impl Site {
     async fn inline_image(
         &self,
         root: &Path,
-        memory: &ImageMemory,
         issue_id: &str,
         attachment_id: &str,
-    ) -> AppResult<Option<String>> {
+    ) -> AppResult<Option<InlineImage>> {
         let connection = self.ctx.settings.get().connection;
         let source = source_for(&self.ctx.access, &connection).unwrap();
         attachment_image(
             self.db(),
             source.as_ref(),
             root,
-            memory,
             issue_id.into(),
             attachment_id.into(),
         )
@@ -259,7 +257,8 @@ impl Site {
         self.db()
             .write(move |tx, _| {
                 tx.execute(
-                    "UPDATE cache.issue SET raw = ?1 WHERE key = ?2",
+                    "UPDATE cache.issue_body SET raw = ?1
+                     WHERE issue_id = (SELECT id FROM cache.issue WHERE key = ?2)",
                     [&raw, &key],
                 )?;
                 Ok(())
@@ -349,11 +348,12 @@ impl Site {
         let raw = self
             .db()
             .read(move |conn| {
-                Ok(
-                    conn.query_row("SELECT raw FROM cache.issue WHERE key = ?1", [&key], |r| {
-                        r.get::<_, String>(0)
-                    })?,
-                )
+                Ok(conn.query_row(
+                    "SELECT b.raw FROM cache.issue_body b JOIN cache.issue i ON i.id = b.issue_id
+                     WHERE i.key = ?1",
+                    [&key],
+                    |r| r.get::<_, String>(0),
+                )?)
             })
             .await
             .unwrap();
@@ -630,10 +630,10 @@ async fn the_description_arrives_as_rendered_html() {
 async fn the_description_is_rendered_from_its_adf_over_jiras_lossy_html() {
     let site = Site::new().await;
     site.execute(
-        r#"UPDATE cache.issue SET
+        r#"UPDATE cache.issue_body SET
              description_html = '<p>Stored <tt>a</tt><del>b</del>c</p>',
              description_adf = '{"type":"doc","version":1,"content":[{"type":"paragraph","content":[{"type":"text","text":"a->b->c","marks":[{"type":"code"}]}]}]}'
-           WHERE key = 'NW-1042'"#,
+           WHERE issue_id = (SELECT id FROM cache.issue WHERE key = 'NW-1042')"#,
     )
     .await;
 
@@ -649,18 +649,21 @@ async fn a_description_without_usable_adf_shows_the_stored_html() {
 
     for (sql, label) in [
         (
-            "UPDATE cache.issue SET description_adf = NULL,
-               description_html = '<p>Stored <tt>a</tt><del>b</del>c</p>' WHERE key = 'NW-1042'",
+            "UPDATE cache.issue_body SET description_adf = NULL,
+               description_html = '<p>Stored <tt>a</tt><del>b</del>c</p>'
+             WHERE issue_id = (SELECT id FROM cache.issue WHERE key = 'NW-1042')",
             "no ADF",
         ),
         (
-            "UPDATE cache.issue SET description_adf = '{not json',
-               description_html = '<p>Stored <tt>a</tt><del>b</del>c</p>' WHERE key = 'NW-1042'",
+            "UPDATE cache.issue_body SET description_adf = '{not json',
+               description_html = '<p>Stored <tt>a</tt><del>b</del>c</p>'
+             WHERE issue_id = (SELECT id FROM cache.issue WHERE key = 'NW-1042')",
             "malformed JSON",
         ),
         (
-            "UPDATE cache.issue SET description_adf = '[1, 2]',
-               description_html = '<p>Stored <tt>a</tt><del>b</del>c</p>' WHERE key = 'NW-1042'",
+            "UPDATE cache.issue_body SET description_adf = '[1, 2]',
+               description_html = '<p>Stored <tt>a</tt><del>b</del>c</p>'
+             WHERE issue_id = (SELECT id FROM cache.issue WHERE key = 'NW-1042')",
             "not a document",
         ),
     ] {
@@ -768,13 +771,19 @@ async fn the_sync_stores_each_comments_body_adf() {
     let stored = site.comment_adfs("NW-1042").await;
 
     assert_eq!(stored.len(), 4);
-    let raw = site.raw_of("NW-1042").await;
-    let from_jira: Vec<Option<serde_json::Value>> = raw["fields"]["comment"]["comments"]
+    let issue = demo::demo()
+        .issues
+        .into_iter()
+        .find(|issue| issue["key"] == "NW-1042")
+        .unwrap();
+    let mut comments: Vec<&serde_json::Value> = issue["fields"]["comment"]["comments"]
         .as_array()
         .unwrap()
         .iter()
-        .map(|c| Some(c["body"].clone()))
         .collect();
+    comments.sort_by_key(|c| c["created"].as_str().unwrap().to_string());
+    let from_jira: Vec<Option<serde_json::Value>> =
+        comments.iter().map(|c| Some(c["body"].clone())).collect();
     assert_eq!(stored, from_jira);
     assert!(
         stored
@@ -1274,6 +1283,45 @@ async fn a_linked_issue_the_cache_does_not_hold_shows_the_links_own_fields() {
                 changed: false,
             },
         }]
+    );
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn two_links_to_the_same_cached_issue_both_resolve_to_it_whatever_the_keys_case() {
+    let site = Site::new().await;
+    let mut raw = site.raw_of("NW-1042").await;
+    let mut second = raw["fields"]["issuelinks"][0].clone();
+    second["id"] = serde_json::json!("99001");
+    second["type"] = serde_json::json!({ "outward": "relates to", "inward": "relates to" });
+    second["outwardIssue"]["key"] = serde_json::json!("nw-1051");
+    raw["fields"]["issuelinks"].as_array_mut().unwrap().push(second);
+    let raw = raw.to_string();
+    site.db()
+        .write(move |tx, _| {
+            tx.execute(
+                "UPDATE cache.issue_body SET raw = ?1
+                 WHERE issue_id = (SELECT id FROM cache.issue WHERE key = 'NW-1042')",
+                [&raw],
+            )?;
+            Ok(())
+        })
+        .await
+        .unwrap();
+
+    let links = site.related("NW-1042").await.links;
+
+    let blocked = site.id_of("NW-1051").await;
+    let resolved: Vec<(&str, Option<&str>, &str)> = links
+        .iter()
+        .map(|l| (l.relation.as_str(), l.issue.id.as_deref(), l.issue.key.as_str()))
+        .collect();
+    assert_eq!(
+        resolved,
+        [
+            ("blocks", Some(blocked.as_str()), "NW-1051"),
+            ("relates to", Some(blocked.as_str()), "NW-1051"),
+        ]
     );
 }
 
@@ -1820,12 +1868,12 @@ async fn an_issue_that_fills_no_custom_field_lists_none_until_one_is_shown() {
 #[ignore = "syncs the demo site into a temp database"]
 async fn a_bug_lists_its_template_rich_text_fields_with_html_rendered_from_their_adf() {
     let site = Site::new().await;
-    let raw: serde_json::Value = serde_json::from_str(
+    let custom: serde_json::Value = serde_json::from_str(
         &site
             .db()
             .read(|conn| {
                 Ok(conn.query_row(
-                    "SELECT raw FROM cache.issue WHERE key = 'NW-1038'",
+                    "SELECT custom FROM cache.issue WHERE key = 'NW-1038'",
                     [],
                     |r| r.get::<_, String>(0),
                 )?)
@@ -1835,7 +1883,7 @@ async fn a_bug_lists_its_template_rich_text_fields_with_html_rendered_from_their
     )
     .unwrap();
     let html = |id: &str| {
-        taskboard_lib::adf::to_html(&raw["fields"][id], &taskboard_lib::adf::Media::NONE).unwrap()
+        taskboard_lib::adf::to_html(&custom[id], &taskboard_lib::adf::Media::NONE).unwrap()
     };
 
     let detail = site.detail("NW-1038").await;
@@ -2499,6 +2547,35 @@ async fn an_attachment_the_issue_does_not_list_is_not_found_and_not_downloaded()
 
 #[tokio::test]
 #[ignore = "syncs the demo site into a temp database"]
+async fn concurrent_asks_for_one_attachment_download_it_once_and_leave_no_partial_file() {
+    let site = Site::new().await;
+    let root = tempfile::tempdir().unwrap();
+    let issue = site.id_of("NW-1020").await;
+    let id = site.attachment_id("NW-1020", "release-notes.pdf").await;
+    let size = demo::demo().attachment_files[&id].1.len() as u64;
+    site.list_attachment_size("NW-1020", &id, size).await;
+
+    let (first, second) = tokio::join!(
+        site.open_attachment(root.path(), &issue, &id),
+        site.open_attachment(root.path(), &issue, &id),
+    );
+
+    let (first, second) = (first.unwrap(), second.unwrap());
+    assert_eq!(first, second);
+    assert_eq!(
+        fs::read(&first).unwrap(),
+        demo::demo().attachment_files[&id].1
+    );
+    assert_eq!(site.attachment_downloads(), 1);
+    let names: Vec<String> = fs::read_dir(first.parent().unwrap())
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    assert_eq!(names, ["release-notes.pdf"]);
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
 async fn an_attachment_of_an_unknown_issue_is_not_found() {
     let site = Site::new().await;
     let root = tempfile::tempdir().unwrap();
@@ -2513,33 +2590,26 @@ async fn an_attachment_of_an_unknown_issue_is_not_found() {
     assert_eq!(site.attachment_downloads(), 0);
 }
 
-fn decoded_png(url: &str) -> Vec<u8> {
-    use base64::Engine;
-    let encoded = url
-        .strip_prefix("data:image/png;base64,")
-        .unwrap_or_else(|| panic!("a PNG data URL: {url}"));
-    base64::engine::general_purpose::STANDARD
-        .decode(encoded)
-        .unwrap()
-}
-
 #[tokio::test]
 #[ignore = "syncs the demo site into a temp database"]
-async fn an_attached_png_is_returned_as_a_data_url_of_its_bytes() {
+async fn an_attached_png_is_returned_as_its_file_bytes() {
     let site = Site::new().await;
     let root = tempfile::tempdir().unwrap();
-    let memory = ImageMemory::default();
     let issue = site.id_of("NW-1020").await;
     let id = site.attachment_id("NW-1020", "checkout-flow.png").await;
 
-    let url = site
-        .inline_image(root.path(), &memory, &issue, &id)
+    let image = site
+        .inline_image(root.path(), &issue, &id)
         .await
         .unwrap()
         .expect("an image");
 
-    assert_eq!(decoded_png(&url), demo::demo().attachment_files[&id].1);
+    assert_eq!(image.bytes, demo::demo().attachment_files[&id].1);
     assert_eq!(site.attachment_downloads(), 1);
+    let response = image_response(Ok(Some(image)));
+    assert_eq!(response.status(), 200);
+    assert_eq!(response.headers()["content-type"], "image/png");
+    assert_eq!(response.body(), &demo::demo().attachment_files[&id].1);
 }
 
 #[tokio::test]
@@ -2547,12 +2617,11 @@ async fn an_attached_png_is_returned_as_a_data_url_of_its_bytes() {
 async fn an_image_of_another_issue_is_not_found_and_not_downloaded() {
     let site = Site::new().await;
     let root = tempfile::tempdir().unwrap();
-    let memory = ImageMemory::default();
     let issue = site.id_of("NW-1020").await;
     let other = site.attachment_id("NW-1042", "screenshot-login.png").await;
 
     let err = site
-        .inline_image(root.path(), &memory, &issue, &other)
+        .inline_image(root.path(), &issue, &other)
         .await
         .unwrap_err();
 
@@ -2565,16 +2634,12 @@ async fn an_image_of_another_issue_is_not_found_and_not_downloaded() {
 async fn an_attachment_that_is_not_an_image_gives_none_without_a_download() {
     let site = Site::new().await;
     let root = tempfile::tempdir().unwrap();
-    let memory = ImageMemory::default();
     let issue = site.id_of("NW-1020").await;
     let id = site.attachment_id("NW-1020", "release-notes.pdf").await;
 
-    let url = site
-        .inline_image(root.path(), &memory, &issue, &id)
-        .await
-        .unwrap();
+    let image = site.inline_image(root.path(), &issue, &id).await.unwrap();
 
-    assert_eq!(url, None);
+    assert_eq!(image, None);
     assert_eq!(site.attachment_downloads(), 0);
 }
 
@@ -2583,7 +2648,6 @@ async fn an_attachment_that_is_not_an_image_gives_none_without_a_download() {
 async fn a_file_quick_look_already_downloaded_is_reused_for_the_image() {
     let site = Site::new().await;
     let root = tempfile::tempdir().unwrap();
-    let memory = ImageMemory::default();
     let issue = site.id_of("NW-1020").await;
     let id = site.attachment_id("NW-1020", "checkout-flow.png").await;
     let bytes = demo::demo().attachment_files[&id].1.clone();
@@ -2593,33 +2657,28 @@ async fn a_file_quick_look_already_downloaded_is_reused_for_the_image() {
     fs::create_dir_all(path.parent().unwrap()).unwrap();
     fs::write(&path, &bytes).unwrap();
 
-    let url = site
-        .inline_image(root.path(), &memory, &issue, &id)
+    let image = site
+        .inline_image(root.path(), &issue, &id)
         .await
         .unwrap()
         .expect("an image");
 
-    assert_eq!(decoded_png(&url), bytes);
+    assert_eq!(image.bytes, bytes);
     assert_eq!(site.attachment_downloads(), 0);
 }
 
 #[tokio::test]
 #[ignore = "syncs the demo site into a temp database"]
-async fn a_second_ask_for_the_same_image_is_answered_from_memory() {
+async fn a_second_ask_for_the_same_image_reuses_the_downloaded_file() {
     let site = Site::new().await;
     let root = tempfile::tempdir().unwrap();
-    let memory = ImageMemory::default();
     let issue = site.id_of("NW-1020").await;
     let id = site.attachment_id("NW-1020", "checkout-flow.png").await;
+    let size = demo::demo().attachment_files[&id].1.len() as u64;
+    site.list_attachment_size("NW-1020", &id, size).await;
 
-    let first = site
-        .inline_image(root.path(), &memory, &issue, &id)
-        .await
-        .unwrap();
-    let second = site
-        .inline_image(root.path(), &memory, &issue, &id)
-        .await
-        .unwrap();
+    let first = site.inline_image(root.path(), &issue, &id).await.unwrap();
+    let second = site.inline_image(root.path(), &issue, &id).await.unwrap();
 
     assert!(first.is_some());
     assert_eq!(second, first);
@@ -2631,18 +2690,14 @@ async fn a_second_ask_for_the_same_image_is_answered_from_memory() {
 async fn an_image_listed_over_ten_megabytes_gives_none_without_a_download() {
     let site = Site::new().await;
     let root = tempfile::tempdir().unwrap();
-    let memory = ImageMemory::default();
     let issue = site.id_of("NW-1020").await;
     let id = site.attachment_id("NW-1020", "checkout-flow.png").await;
     site.list_attachment_size("NW-1020", &id, MAX_INLINE_IMAGE_BYTES + 1)
         .await;
 
-    let url = site
-        .inline_image(root.path(), &memory, &issue, &id)
-        .await
-        .unwrap();
+    let image = site.inline_image(root.path(), &issue, &id).await.unwrap();
 
-    assert_eq!(url, None);
+    assert_eq!(image, None);
     assert_eq!(site.attachment_downloads(), 0);
 }
 

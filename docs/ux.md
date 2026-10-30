@@ -359,7 +359,7 @@ view with its place intact).
   An image attached to the issue shows inline ([ADR 0039](adr/0039-inline-images-come-from-issue-attachments-through-rust.md),
   `InlineImage`): at most the content width, keeping its aspect ratio, radius 8 and a `--hairline` border; while
   it loads a `--fill-subtle` box of its size holds its place, and without an image it stays the chip
-  "Attachment · name". It is asked from Rust only once on screen (Issue view, preview, ⌥ Peek). A click shows it
+  "Attachment · name". It is loaded from Rust's `inline-image:` scheme ([ADR 0042](adr/0042-inline-images-load-through-an-app-scheme.md)) only once on screen (Issue view, preview, ⌥ Peek). A click shows it
   in Quick Look (cursor zoom-in); its context menu is the attachment tile's. The preview
   shows the same description and the latest three activity items.
 - Rich text styles (`.jira-html` in `issue-view.css`): inline `code` and old `tt` as a mono chip on

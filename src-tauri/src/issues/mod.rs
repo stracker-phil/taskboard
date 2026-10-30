@@ -20,7 +20,8 @@ pub use comments::issue_sync_comments;
 pub use detail::{CustomField, IssueDetail, issue_forget, issue_get};
 pub use history::issue_sync_history;
 pub use inline_image::{
-    ImageMemory, MAX_INLINE_IMAGE_BYTES, attachment_image, data_url, declared_kind,
+    INLINE_IMAGE_SCHEME, InlineImage, MAX_INLINE_IMAGE_BYTES, attachment_image, declared_kind,
+    image_path, image_response, is_inline_image,
 };
 pub use preview::{
     attachment_file, cache_root, cached_path, clear as clear_attachment_cache, is_reusable,

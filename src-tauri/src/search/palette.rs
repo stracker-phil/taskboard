@@ -1,5 +1,6 @@
 //! What the command palette finds for the typed text: issues by key and full text, and filter lists by name.
 
+use rusqlite::types::Value;
 use rusqlite::{Connection, params};
 use serde::Serialize;
 use ts_rs::TS;
@@ -103,12 +104,17 @@ pub fn query(conn: &Connection, text: &str) -> AppResult<PaletteResults> {
 }
 
 const TRACKED: &str = "i.project_id IN (SELECT project_id FROM space WHERE tracked = 1)";
+/// The number after the key's dash, as the index `issue_key_number` (migration `cache/0011`) has it.
+const KEY_NUMBER_IS: &str = "CAST(substr(i.key, instr(i.key, '-') + 1) AS INTEGER) = ?1";
 
 /// A whole key first; a bare number matches that number in every tracked project.
 fn key_matches(conn: &Connection, text: &str) -> AppResult<Vec<String>> {
     let (sql, value) = match key_hint(text) {
-        Some(KeyHint::Key(key)) => ("upper(i.key) = ?1", key),
-        Some(KeyHint::Number(number)) => ("i.key LIKE '%-' || ?1", number),
+        Some(KeyHint::Key(key)) => ("i.key = ?1 COLLATE NOCASE", Value::Text(key)),
+        Some(KeyHint::Number(number)) => match number.parse::<i64>() {
+            Ok(number) => (KEY_NUMBER_IS, Value::Integer(number)),
+            Err(_) => return Ok(Vec::new()),
+        },
         None => return Ok(Vec::new()),
     };
     let mut query = conn.prepare(&format!(

@@ -23,7 +23,7 @@ struct Fixture {
     custom: HashMap<String, CustomField>,
 }
 
-const ISSUE_DEFAULTS: [(&str, &str); 10] = [
+const ISSUE_DEFAULTS: [(&str, &str); 9] = [
     ("project_id", "'p1'"),
     ("summary", "'Demo issue'"),
     ("issue_type", "'Task'"),
@@ -31,16 +31,12 @@ const ISSUE_DEFAULTS: [(&str, &str); 10] = [
     ("status_category", "'new'"),
     ("created_at", "'2026-01-01T00:00:00.000Z'"),
     ("updated_at", "'2026-01-01T00:00:00.000Z'"),
-    ("raw", "'{\"fields\":{}}'"),
     ("synced_at", "'2026-10-28T08:00:00.000Z'"),
     ("gone", "0"),
 ];
 
-fn raw(fields: Json) -> String {
-    format!(
-        "'{}'",
-        json!({ "fields": fields }).to_string().replace('\'', "''")
-    )
+fn custom_values(values: Json) -> String {
+    format!("'{}'", values.to_string().replace('\'', "''"))
 }
 
 fn issue(key: &str, set: &[(&str, &str)]) -> String {
@@ -64,7 +60,7 @@ fn issue(key: &str, set: &[(&str, &str)]) -> String {
 }
 
 fn fixture_sql() -> String {
-    let nw1 = raw(json!({
+    let nw1 = custom_values(json!({
         "customfield_10071": {"accountId": "acc-sam"},
         "customfield_10072": {"value": "Gold"},
         "customfield_10073": "Needs 100% review_ok",
@@ -74,7 +70,7 @@ fn fixture_sql() -> String {
         "customfield_10077": "2026-10-28T09:30:00.000+0100",
         "customfield_10078": [{"value": "Web"}, {"value": "API"}],
     }));
-    let nw2 = raw(json!({
+    let nw2 = custom_values(json!({
         "customfield_10071": {"accountId": "acc-alex"},
         "customfield_10072": {"value": "Silver"},
         "customfield_10073": "plain",
@@ -84,12 +80,12 @@ fn fixture_sql() -> String {
         "customfield_10077": "2026-10-29T08:00:00.000+0100",
         "customfield_10078": [{"name": "Web"}],
     }));
-    let nw4 = raw(json!({
+    let nw4 = custom_values(json!({
         "customfield_10074": 5,
         "customfield_10075": [],
         "customfield_10078": [{"id": "77"}],
     }));
-    let nw5 = raw(json!({"customfield_10073": "100 done"}));
+    let nw5 = custom_values(json!({"customfield_10073": "100 done"}));
     let mut sql = vec![
         "INSERT INTO cache.space (id, key, name, raw) VALUES ('p1', 'NW', 'Northwind', '{}'), \
          ('p2', 'OLD', 'Legacy', '{}');"
@@ -118,7 +114,7 @@ fn fixture_sql() -> String {
             ("due_date", "'2026-10-28'"),
             ("created_at", "'2026-10-20T10:00:00.000Z'"),
             ("updated_at", "'2026-10-27T22:59:59.999Z'"),
-            ("raw", nw1.as_str()),
+            ("custom", nw1.as_str()),
         ],
     ));
     sql.push(issue(
@@ -138,7 +134,7 @@ fn fixture_sql() -> String {
             ("due_date", "'2026-10-30'"),
             ("created_at", "'2026-10-27T22:59:59.999Z'"),
             ("updated_at", "'2026-10-27T23:00:00.000Z'"),
-            ("raw", nw2.as_str()),
+            ("custom", nw2.as_str()),
         ],
     ));
     sql.push(issue(
@@ -161,7 +157,7 @@ fn fixture_sql() -> String {
             ("labels", "'[]'"),
             ("due_date", "'2026-11-04'"),
             ("updated_at", "'2026-11-01T12:00:00.000Z'"),
-            ("raw", nw4.as_str()),
+            ("custom", nw4.as_str()),
         ],
     ));
     sql.push(issue(
@@ -178,7 +174,7 @@ fn fixture_sql() -> String {
             ("sprint_state", "'active'"),
             ("due_date", "'2026-10-21'"),
             ("updated_at", "'2026-10-21T08:00:00.000Z'"),
-            ("raw", nw5.as_str()),
+            ("custom", nw5.as_str()),
         ],
     ));
     for (key, extra) in [("OLD-1", ("project_id", "'p2'")), ("NW-9", ("gone", "1"))] {

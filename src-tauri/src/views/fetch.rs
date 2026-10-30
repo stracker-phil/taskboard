@@ -39,13 +39,13 @@ pub(super) fn fetch(
     let custom_sql: String = source
         .custom
         .iter()
-        .map(|_| ", json_extract(i.raw, ?)")
+        .map(|_| ", json_extract(i.custom, ?)")
         .collect();
     // The custom fields' paths come first in the statement, so their parameters go first too.
     let paths = source
         .custom
         .iter()
-        .map(|c| SqlValue::Text(format!("$.fields.{}", c.id)));
+        .map(|c| SqlValue::Text(format!("$.\"{}\"", c.id)));
     let mut query = conn.prepare(&format!(
         "SELECT {SELECT} {custom_sql}
          FROM cache.issue i

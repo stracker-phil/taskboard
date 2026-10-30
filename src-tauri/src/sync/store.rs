@@ -1,83 +1,20 @@
 //! The cache side of the sync: what it writes inside `Db::write` transactions, and the few reads it needs.
 
-use std::collections::BTreeSet;
-
 use rusqlite::{Connection, OptionalExtension, params};
+
+pub use super::fields::{fetched_fields, shown_fields, store_field_usage, store_fields};
 
 use super::diff::{Snapshot, diff};
 use super::map::{FieldIds, IssueRow, Mapped, map_issue};
 use crate::db::Changes;
 use crate::error::AppResult;
-use crate::jira::dto::{Field, Issue, Status, Version};
+use crate::jira::dto::{Issue, Status, Version};
 
-const SPRINT_TYPE: &str = "com.pyxis.greenhopper.jira:gh-sprint";
-const EPIC_COLOR_TYPE: &str = "com.pyxis.greenhopper.jira:gh-epic-color";
 
 /// The `sync_state` row of the whole scope.
 pub const SCOPE_ROW: &str = "scope";
 /// `sync_state` rows of single projects are this prefix plus the project id.
 pub const PROJECT_ROW_PREFIX: &str = "full:";
-
-/// Stores the field list and finds the site's Sprint and Epic Color fields. `shown` stays as the owner set it.
-pub fn store_fields(conn: &Connection, fields: &[Field]) -> AppResult<FieldIds> {
-    let mut ids = FieldIds::default();
-    for field in fields {
-        match field.schema.as_ref().and_then(|s| s.custom.as_deref()) {
-            Some(SPRINT_TYPE) => ids.sprint = Some(field.id.clone()),
-            Some(EPIC_COLOR_TYPE) => ids.epic_color = Some(field.id.clone()),
-            _ => {}
-        }
-        conn.execute(
-            "INSERT INTO cache.field (id, name, type) VALUES (?1, ?2, ?3)
-             ON CONFLICT (id) DO UPDATE SET name = excluded.name, type = excluded.type",
-            params![field.id, field.name, field.schema.as_ref().map(|s| &s.kind)],
-        )?;
-    }
-    Ok(ids)
-}
-
-/// Marks which custom fields the tracked projects' issues fill; the rest drop out of pickers (`filter::RELEVANT_FIELD`).
-pub fn store_field_usage(conn: &Connection, used: &BTreeSet<String>) -> AppResult<()> {
-    let used = serde_json::to_string(used)?;
-    conn.execute(
-        "UPDATE cache.field SET used = (id IN (SELECT value FROM json_each(?1)))
-         WHERE id LIKE 'customfield\\_%' ESCAPE '\\'",
-        [used],
-    )?;
-    Ok(())
-}
-
-/// Custom fields fetched with every issue: the `shown_fields`, and the ones the tracked projects fill (once a
-/// sample has marked some unused; before that `used` is 1 for every field of the site).
-pub fn fetched_fields(conn: &Connection) -> AppResult<Vec<String>> {
-    let mut query = conn.prepare(
-        "SELECT id FROM cache.field
-         WHERE used = 1 AND id LIKE 'customfield\\_%' ESCAPE '\\'
-           AND EXISTS (SELECT 1 FROM cache.field WHERE used = 0)",
-    )?;
-    let used = query.query_map([], |row| row.get::<_, String>(0))?;
-    let mut ids = shown_fields(conn)?;
-    for id in used {
-        let id = id?;
-        if !ids.contains(&id) {
-            ids.push(id);
-        }
-    }
-    Ok(ids)
-}
-
-/// Custom fields shown with every issue: those the owner marked `shown` and those a view shows as a column.
-pub fn shown_fields(conn: &Connection) -> AppResult<Vec<String>> {
-    let mut query = conn.prepare(
-        "SELECT id FROM cache.field WHERE shown = 1
-         UNION
-         SELECT DISTINCT c.value FROM view v, json_each(v.columns) c
-         WHERE c.value LIKE 'customfield\\_%' ESCAPE '\\'
-         ORDER BY 1",
-    )?;
-    let ids = query.query_map([], |row| row.get(0))?;
-    Ok(ids.collect::<Result<_, _>>()?)
-}
 
 pub fn store_statuses(conn: &Connection, statuses: &[Status]) -> AppResult<()> {
     for status in statuses {
@@ -156,47 +93,6 @@ pub fn record_reconcile(conn: &Connection, now: &str) -> AppResult<()> {
     Ok(())
 }
 
-/// Marks issues Jira no longer returns as gone and records when; they leave every list at once.
-pub fn mark_gone(
-    conn: &Connection,
-    changes: &mut Changes,
-    ids: &[String],
-    now: &str,
-) -> AppResult<()> {
-    for id in ids {
-        let marked = conn.execute(
-            "UPDATE cache.issue SET gone = 1 WHERE id = ?1 AND gone = 0",
-            [id],
-        )?;
-        if marked > 0 {
-            conn.execute(
-                "INSERT INTO cache.issue_change (issue_id, field, old_value, new_value, changed_at)
-                 VALUES (?1, 'gone', NULL, NULL, ?2)",
-                params![id, now],
-            )?;
-            changes.issue_changed(id.clone());
-        }
-    }
-    Ok(())
-}
-
-/// Deletes issues gone for longer than `before` (with their comments, changes and seen rows).
-pub fn purge_gone(conn: &Connection, before: &str) -> AppResult<usize> {
-    let ids: Vec<String> = {
-        let mut query = conn.prepare(
-            "SELECT i.id FROM cache.issue i WHERE i.gone = 1 AND NOT EXISTS (
-               SELECT 1 FROM cache.issue_change c WHERE c.issue_id = i.id AND c.field = 'gone' AND c.changed_at >= ?1)",
-        )?;
-        query
-            .query_map([before], |r| r.get(0))?
-            .collect::<Result<_, _>>()?
-    };
-    for id in &ids {
-        forget_issue(conn, id)?;
-    }
-    Ok(ids.len())
-}
-
 /// Removes the issue with its search row; comments, changes and seen rows go with it.
 pub fn forget_issue(conn: &Connection, id: &str) -> AppResult<bool> {
     conn.execute(
@@ -204,13 +100,6 @@ pub fn forget_issue(conn: &Connection, id: &str) -> AppResult<bool> {
         [id],
     )?;
     Ok(conn.execute("DELETE FROM cache.issue WHERE id = ?1", [id])? > 0)
-}
-
-/// The cached issues that aren't gone, by id.
-pub fn live_issue_ids(conn: &Connection) -> AppResult<Vec<String>> {
-    let mut query = conn.prepare("SELECT id FROM cache.issue WHERE gone = 0")?;
-    let ids = query.query_map([], |r| r.get(0))?;
-    Ok(ids.collect::<Result<_, _>>()?)
 }
 
 /// The most recently updated live issues, for the comment prefetch after a delta.
@@ -296,15 +185,16 @@ pub fn store_page(
 
 struct CachedIssue {
     snapshot: Snapshot,
-    raw: String,
+    custom: Option<String>,
+    raw: Option<String>,
     gone: bool,
 }
 
 fn cached_issue(conn: &Connection, id: &str) -> AppResult<Option<CachedIssue>> {
     Ok(conn
         .query_row(
-            "SELECT status_id, assignee_id, due_date, priority, comment_count, raw, gone
-             FROM cache.issue WHERE id = ?1",
+            "SELECT i.status_id, i.assignee_id, i.due_date, i.priority, i.comment_count, i.custom, b.raw, i.gone
+             FROM cache.issue i LEFT JOIN cache.issue_body b ON b.issue_id = i.id WHERE i.id = ?1",
             [id],
             |r| {
                 Ok(CachedIssue {
@@ -315,8 +205,9 @@ fn cached_issue(conn: &Connection, id: &str) -> AppResult<Option<CachedIssue>> {
                         priority: r.get(3)?,
                         comment_count: r.get(4)?,
                     },
-                    raw: r.get(5)?,
-                    gone: r.get(6)?,
+                    custom: r.get(5)?,
+                    raw: r.get(6)?,
+                    gone: r.get(7)?,
                 })
             },
         )
@@ -327,10 +218,13 @@ fn cached_issue(conn: &Connection, id: &str) -> AppResult<Option<CachedIssue>> {
 fn store_issue(conn: &Connection, mapped: &Mapped, first: bool, now: &str) -> AppResult<bool> {
     let row = &mapped.issue;
     let cached = cached_issue(conn, &row.id)?;
-    if cached.as_ref().is_some_and(|c| c.raw == row.raw && !c.gone) {
+    if cached.as_ref().is_some_and(|c| {
+        !c.gone && c.custom == row.custom && c.raw.as_deref() == Some(row.raw.as_str())
+    }) {
         return Ok(false);
     }
     upsert_issue(conn, row, now)?;
+    upsert_body(conn, row)?;
     store_users(conn, mapped)?;
     store_comments(conn, mapped, now)?;
     replace_search_doc(conn, mapped)?;
@@ -351,9 +245,9 @@ fn upsert_issue(conn: &Connection, row: &IssueRow, now: &str) -> AppResult<()> {
         "INSERT INTO cache.issue (id, key, project_id, parent_id, fix_versions, epic_color, summary,
            issue_type, type_is_subtask, is_epic, status_id, status_category, priority, assignee_id,
            reporter_id, sprint, sprint_id, sprint_state, labels, due_date, created_at, updated_at,
-           resolved_at, description_html, description_adf, comment_count, raw, synced_at, gone)
+           resolved_at, comment_count, custom, synced_at, gone)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19,
-           ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28, 0)
+           ?20, ?21, ?22, ?23, ?24, ?25, ?26, 0)
          ON CONFLICT (id) DO UPDATE SET key = excluded.key, project_id = excluded.project_id,
            parent_id = excluded.parent_id, fix_versions = excluded.fix_versions,
            epic_color = excluded.epic_color, summary = excluded.summary, issue_type = excluded.issue_type,
@@ -363,9 +257,8 @@ fn upsert_issue(conn: &Connection, row: &IssueRow, now: &str) -> AppResult<()> {
            reporter_id = excluded.reporter_id, sprint = excluded.sprint, sprint_id = excluded.sprint_id,
            sprint_state = excluded.sprint_state, labels = excluded.labels, due_date = excluded.due_date,
            created_at = excluded.created_at, updated_at = excluded.updated_at,
-           resolved_at = excluded.resolved_at, description_html = excluded.description_html,
-           description_adf = excluded.description_adf, comment_count = excluded.comment_count,
-           raw = excluded.raw, synced_at = excluded.synced_at, gone = 0",
+           resolved_at = excluded.resolved_at, comment_count = excluded.comment_count,
+           custom = excluded.custom, synced_at = excluded.synced_at, gone = 0",
         params![
             row.id,
             row.key,
@@ -390,12 +283,21 @@ fn upsert_issue(conn: &Connection, row: &IssueRow, now: &str) -> AppResult<()> {
             row.created_at,
             row.updated_at,
             row.resolved_at,
-            row.description_html,
-            row.description_adf,
             row.comment_count,
-            row.raw,
+            row.custom,
             now
         ],
+    )?;
+    Ok(())
+}
+
+fn upsert_body(conn: &Connection, row: &IssueRow) -> AppResult<()> {
+    conn.execute(
+        "INSERT INTO cache.issue_body (issue_id, description_html, description_adf, raw)
+         VALUES (?1, ?2, ?3, ?4)
+         ON CONFLICT (issue_id) DO UPDATE SET description_html = excluded.description_html,
+           description_adf = excluded.description_adf, raw = excluded.raw",
+        params![row.id, row.description_html, row.description_adf, row.raw],
     )?;
     Ok(())
 }

@@ -117,6 +117,7 @@ mod tests {
             description_adf: None,
             comment_count: 4,
             comments_complete: true,
+            custom: None,
             raw: "{}".into(),
         }
     }

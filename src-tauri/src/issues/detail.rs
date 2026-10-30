@@ -80,9 +80,10 @@ pub async fn issue_get(db: &Db, viewer: Viewer, id: String) -> AppResult<IssueDe
 
 const SELECT: &str = "SELECT i.id, i.key, i.issue_type, i.summary, i.status_id, COALESCE(st.name, ''),
     i.status_category, e.id, e.summary, e.epic_color, i.fix_versions, i.priority, i.assignee_id, a.name,
-    i.reporter_id, r.name, i.sprint, i.labels, i.due_date, i.created_at, i.updated_at, i.description_html,
-    i.comment_count, i.is_epic, i.gone, i.raw, i.synced_at, i.project_id, i.description_adf
+    i.reporter_id, r.name, i.sprint, i.labels, i.due_date, i.created_at, i.updated_at, b.description_html,
+    i.comment_count, i.is_epic, i.gone, b.raw, i.synced_at, i.project_id, b.description_adf, i.custom
     FROM cache.issue i
+    LEFT JOIN cache.issue_body b ON b.issue_id = i.id
     LEFT JOIN cache.status st ON st.id = i.status_id
     LEFT JOIN cache.user a ON a.account_id = i.assignee_id
     LEFT JOIN cache.user r ON r.account_id = i.reporter_id
@@ -112,7 +113,8 @@ fn read(conn: &Connection, viewer: &Viewer, id: &str) -> AppResult<IssueDetail> 
             }),
             _ => None,
         };
-        let raw: String = r.get(25)?;
+        let raw: String = r.get::<_, Option<String>>(25)?.unwrap_or_default();
+        let custom: Option<String> = r.get(29)?;
         let attachments = attachments_of(&raw);
         let files = media_files(&attachments);
         let media = adf::Media {
@@ -168,15 +170,16 @@ fn read(conn: &Connection, viewer: &Viewer, id: &str) -> AppResult<IssueDetail> 
             attachments,
         };
         let project_id: String = r.get(27)?;
-        Ok((detail, raw, project_id))
+        Ok((detail, raw, custom, project_id))
     })
     .optional()?
-    .map(|(mut detail, raw, project_id)| -> AppResult<IssueDetail> {
+    .map(|(mut detail, raw, custom, project_id)| -> AppResult<IssueDetail> {
         let files = media_files(&detail.attachments);
         let media = adf::Media {
             files: &files,
             written_at: None,
         };
+        let raw = with_custom_values(&raw, custom.as_deref());
         detail.custom = custom_fields(conn, &project_id, &raw, me, &media)?;
         detail.since = since_banner(conn, viewer, id)?;
         detail.unread = unseen_since(conn, id)?.is_some();
@@ -197,6 +200,18 @@ fn since_banner(conn: &Connection, viewer: &Viewer, id: &str) -> AppResult<Optio
         people: &user_names(conn)?,
     };
     since(conn, viewer, id, &names)
+}
+
+/// The kept issue JSON with the custom fields' values back among its fields (`sync::raw`).
+fn with_custom_values(raw: &str, custom: Option<&str>) -> String {
+    let mut raw: serde_json::Value = serde_json::from_str(raw).unwrap_or_default();
+    let custom: serde_json::Value = custom
+        .and_then(|c| serde_json::from_str(c).ok())
+        .unwrap_or_default();
+    if let (Some(fields), Some(custom)) = (raw["fields"].as_object_mut(), custom.as_object()) {
+        fields.extend(custom.clone());
+    }
+    raw.to_string()
 }
 
 /// The custom fields the owner shows (always, empty or not), then every other one the issue fills, by name;

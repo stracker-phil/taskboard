@@ -257,9 +257,9 @@ mod tests {
     fn issue(id: u32, project: &str, status: &str, category: &str, gone: bool) -> String {
         format!(
             "INSERT INTO cache.issue (id, key, project_id, summary, issue_type, status_id,
-               status_category, created_at, updated_at, raw, synced_at, gone)
+               status_category, created_at, updated_at, synced_at, gone)
              VALUES ('{id}', 'K-{id}', '{project}', 'Summary {id}', 'Task', '{status}', '{category}',
-               '2026-10-20T09:00:00.000Z', '2026-10-20T09:00:00.000Z', '{{}}',
+               '2026-10-20T09:00:00.000Z', '2026-10-20T09:00:00.000Z',
                '2026-10-20T09:00:00.000Z', {});",
             gone as i32
         )

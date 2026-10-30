@@ -819,25 +819,42 @@ mod the_full_sync {
         rig.full_sync().await;
 
         let db = &rig.ctx.db;
-        let bug: Value = serde_json::from_str(
-            &text_of(db, "SELECT raw FROM cache.issue WHERE key = 'NW-1038'").await,
+        let bug_custom: Value = serde_json::from_str(
+            &text_of(db, "SELECT custom FROM cache.issue WHERE key = 'NW-1038'").await,
         )
         .unwrap();
-        let story: Value = serde_json::from_str(
-            &text_of(db, "SELECT raw FROM cache.issue WHERE key = 'NW-1042'").await,
+        let bug_raw: Value = serde_json::from_str(
+            &text_of(
+                db,
+                "SELECT b.raw FROM cache.issue_body b JOIN cache.issue i ON i.id = b.issue_id
+                 WHERE i.key = 'NW-1038'",
+            )
+            .await,
         )
         .unwrap();
+        let story_custom: Option<Value> = rows(
+            db,
+            "SELECT custom FROM cache.issue WHERE key = 'NW-1042'",
+            |r| r.get::<_, Option<String>>(0),
+        )
+        .await
+        .remove(0)
+        .map(|text| serde_json::from_str(&text).unwrap());
         for id in ["customfield_10080", "customfield_10081"] {
-            assert_eq!(bug["fields"][id]["type"], "doc", "{id}");
+            assert_eq!(bug_custom[id]["type"], "doc", "{id}");
             assert!(
-                bug["renderedFields"][id]
+                bug_raw["renderedFields"][id]
                     .as_str()
                     .is_some_and(|html| !html.trim().is_empty()),
                 "{id}"
             );
+            assert!(
+                story_custom
+                    .as_ref()
+                    .is_none_or(|custom| custom[id].is_null()),
+                "{id}"
+            );
         }
-        assert!(story["fields"]["customfield_10080"].is_null());
-        assert!(story["fields"]["customfield_10081"].is_null());
     }
 
     #[tokio::test]
@@ -1410,6 +1427,46 @@ mod the_delta_sync {
     }
 
     #[tokio::test]
+    async fn an_issue_whose_only_change_is_an_edited_comment_is_stored_again() {
+        const KEPT_RAW: &str = "SELECT b.raw FROM cache.issue_body b JOIN cache.issue i
+            ON i.id = b.issue_id WHERE i.key = 'NW-1042'";
+        let rig = Rig::connected().await;
+        rig.full_sync().await;
+        let before = text_of(&rig.ctx.db, KEPT_RAW).await;
+        rig.fake.set_now(later());
+        rig.fake.edit_issue("NW-1042", |fields| {
+            fields["comment"]["comments"][0]["updated"] = json!("2026-10-29T08:00:00.000+0000");
+        });
+
+        let state = rig.job(Job::Delta, None).await;
+
+        assert!(idle_after_a_sync(&state), "{state:?}");
+        let after: Value = serde_json::from_str(&text_of(&rig.ctx.db, KEPT_RAW).await).unwrap();
+        assert_ne!(after, serde_json::from_str::<Value>(&before).unwrap());
+        assert_eq!(
+            after["fields"]["comment"]["comments"][0]["updated"],
+            "2026-10-29T08:00:00.000+0000"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_second_sync_leaves_every_stored_body_as_it_was() {
+        const BODIES: &str = "SELECT COALESCE(group_concat(b.raw, char(10)), '') FROM
+            (SELECT raw FROM cache.issue_body ORDER BY issue_id) b";
+        let rig = Rig::connected().await;
+        rig.full_sync().await;
+        let before = text_of(&rig.ctx.db, BODIES).await;
+
+        rig.full_sync().await;
+
+        assert_eq!(text_of(&rig.ctx.db, BODIES).await, before);
+        assert_eq!(
+            count(&rig.ctx.db, "SELECT COUNT(*) FROM cache.issue_body").await,
+            TOTAL
+        );
+    }
+
+    #[tokio::test]
     async fn a_new_issue_on_the_site_arrives_as_created() {
         let rig = Rig::connected().await;
         rig.full_sync().await;
@@ -1646,6 +1703,166 @@ mod reconciliation {
             0
         );
         assert_eq!(gone_changes(db).await, vec![]);
+    }
+
+    const BULK_FETCH_PATH: &str = "/rest/api/3/issue/bulkfetch";
+
+    /// The ids each bulk fetch asked for, oldest first.
+    fn bulk_fetches(rig: &Rig) -> Vec<Vec<String>> {
+        rig.fake
+            .requests()
+            .into_iter()
+            .filter(|request| request.path == BULK_FETCH_PATH)
+            .map(|request| {
+                request.body["issueIdsOrKeys"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|id| id.as_str().unwrap().to_string())
+                    .collect()
+            })
+            .collect()
+    }
+
+    async fn left_scope_at(db: &Db, id: &str) -> Option<String> {
+        let id = id.to_string();
+        db.read(move |conn| {
+            Ok(conn.query_row(
+                "SELECT left_scope_at FROM cache.issue WHERE id = ?1",
+                [id],
+                |row| row.get::<_, Option<String>>(0),
+            )?)
+        })
+        .await
+        .unwrap()
+    }
+
+    async fn set_left_scope_at(db: &Db, id: &'static str, at: &'static str) {
+        db.write(move |tx, _| {
+            tx.execute(
+                "UPDATE cache.issue SET left_scope_at = ?2 WHERE id = ?1",
+                [id, at],
+            )?;
+            Ok(())
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn an_issue_found_outside_the_scope_is_kept_and_not_asked_for_again_for_a_week() {
+        let rig = Rig::connected().await;
+        rig.full_sync().await;
+        rig.fake.set_now(later());
+        rig.fake.move_issue("NW-1049", "ARC");
+        let db = &rig.ctx.db;
+
+        rig.job(Job::Reconcile, None).await;
+
+        let asked = bulk_fetches(&rig);
+        assert_eq!(asked.last(), Some(&vec![NW_1049.to_string()]));
+        assert!(left_scope_at(db, NW_1049).await.is_some());
+        assert_eq!(count(db, "SELECT gone FROM cache.issue WHERE id = '101049'").await, 0);
+
+        rig.job(Job::Reconcile, None).await;
+
+        assert_eq!(bulk_fetches(&rig), asked);
+        assert_eq!(count(db, "SELECT gone FROM cache.issue WHERE id = '101049'").await, 0);
+        assert_eq!(count(db, "SELECT COUNT(*) FROM cache.issue").await, TOTAL);
+    }
+
+    #[tokio::test]
+    async fn an_issue_found_outside_the_scope_over_a_week_ago_is_asked_for_again_and_stays_live() {
+        let rig = Rig::connected().await;
+        rig.full_sync().await;
+        rig.fake.set_now(later());
+        rig.fake.move_issue("NW-1049", "ARC");
+        rig.job(Job::Reconcile, None).await;
+        let db = &rig.ctx.db;
+        let asked = bulk_fetches(&rig).len();
+        set_left_scope_at(db, NW_1049, FAR_PAST).await;
+
+        rig.job(Job::Reconcile, None).await;
+
+        let fetches = bulk_fetches(&rig);
+        assert_eq!(fetches.len(), asked + 1);
+        assert_eq!(fetches.last(), Some(&vec![NW_1049.to_string()]));
+        assert_eq!(count(db, "SELECT gone FROM cache.issue WHERE id = '101049'").await, 0);
+        let marked = left_scope_at(db, NW_1049).await.unwrap();
+        assert!(marked.as_str() > FAR_PAST, "{marked}");
+    }
+
+    #[tokio::test]
+    async fn an_issue_deleted_after_it_left_the_scope_becomes_gone_once_it_is_asked_for_again() {
+        let rig = Rig::connected().await;
+        rig.full_sync().await;
+        rig.fake.set_now(later());
+        rig.fake.move_issue("NW-1049", "ARC");
+        rig.job(Job::Reconcile, None).await;
+        rig.fake.delete_issue(NW_1049);
+        let db = &rig.ctx.db;
+
+        rig.job(Job::Reconcile, None).await;
+        let gone = "SELECT gone FROM cache.issue WHERE id = '101049'";
+        assert_eq!(count(db, gone).await, 0);
+
+        set_left_scope_at(db, NW_1049, FAR_PAST).await;
+        rig.job(Job::Reconcile, None).await;
+
+        assert_eq!(count(db, gone).await, 1);
+    }
+
+    #[tokio::test]
+    async fn an_issue_listed_by_the_scope_again_loses_its_mark() {
+        let rig = Rig::connected().await;
+        rig.full_sync().await;
+        let db = &rig.ctx.db;
+        set_left_scope_at(db, NW_1044, "2026-10-20T00:00:00.000Z").await;
+
+        rig.job(Job::Reconcile, None).await;
+
+        assert_eq!(left_scope_at(db, NW_1044).await, None);
+    }
+
+    #[tokio::test]
+    async fn old_changes_the_owner_has_seen_are_pruned_and_the_rest_stays() {
+        let rig = Rig::connected().await;
+        rig.full_sync().await;
+        let db = &rig.ctx.db;
+        db.write(|tx, _| {
+            tx.execute_batch(
+                "UPDATE cache.issue_seen SET seen_at = '2999-01-02T00:00:00.000Z' WHERE issue_id = '101042';
+                 UPDATE cache.issue_seen SET seen_at = '2000-06-01T00:00:00.000Z' WHERE issue_id = '101044';
+                 INSERT INTO cache.issue_change (issue_id, field, old_value, new_value, changed_at) VALUES
+                   ('101042', 'priority', 'High', 'Low', '2000-01-01T00:00:00.000Z'),
+                   ('101042', 'created', NULL, 'NW-1042', '2000-01-01T00:00:00.000Z'),
+                   ('101042', 'gone', NULL, NULL, '2000-01-01T00:00:00.000Z'),
+                   ('101042', 'status', '1', '2', '2999-01-01T00:00:00.000Z'),
+                   ('101044', 'status', '1', '2', '2000-09-01T00:00:00.000Z'),
+                   ('101044', 'priority', 'High', 'Low', '2000-03-01T00:00:00.000Z');",
+            )?;
+            Ok(())
+        })
+        .await
+        .unwrap();
+
+        rig.job(Job::Reconcile, None).await;
+
+        let kept = rows(
+            db,
+            "SELECT issue_id, field FROM cache.issue_change ORDER BY issue_id, field",
+            |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+        )
+        .await;
+        let expected: Vec<(String, String)> = [
+            ("101042", "created"),
+            ("101042", "gone"),
+            ("101042", "status"),
+            ("101044", "status"),
+        ]
+        .map(|(id, field)| (id.to_string(), field.to_string()))
+        .to_vec();
+        assert_eq!(kept, expected);
     }
 
     #[tokio::test]

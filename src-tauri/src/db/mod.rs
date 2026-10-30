@@ -181,9 +181,9 @@ mod tests {
     const PROJECT: &str =
         "INSERT INTO cache.space (id, key, name, raw) VALUES ('10001', 'NW', 'Northwind', '{}')";
     const ISSUE: &str = "INSERT INTO cache.issue (id, key, project_id, summary, issue_type, status_id, \
-        status_category, created_at, updated_at, raw, synced_at) \
+        status_category, created_at, updated_at, synced_at) \
         VALUES ('20001', 'NW-1', '10001', 'Mount the column', 'Task', '1', 'new', \
-        '2026-01-05T09:00:00Z', '2026-01-05T09:00:00Z', '{}', '2026-01-05T09:00:00Z')";
+        '2026-01-05T09:00:00Z', '2026-01-05T09:00:00Z', '2026-01-05T09:00:00Z')";
 
     fn open_db() -> (TempDir, Db) {
         let dir = temp_config_dir();

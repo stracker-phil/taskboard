@@ -108,7 +108,7 @@ fn at(item: &ActivityItem) -> &str {
 
 fn comments(conn: &Connection, id: &str, values: &Values) -> AppResult<Vec<ActivityItem>> {
     let raw: Option<String> = conn
-        .query_row("SELECT raw FROM cache.issue WHERE id = ?1", [id], |r| {
+        .query_row("SELECT raw FROM cache.issue_body WHERE issue_id = ?1", [id], |r| {
             r.get(0)
         })
         .optional()?;

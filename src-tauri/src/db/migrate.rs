@@ -32,6 +32,8 @@ pub const CACHE: &[&str] = &[
     include_str!("../../migrations/cache/0008_avatar.sql"),
     include_str!("../../migrations/cache/0009_refetch_for_attachments.sql"),
     include_str!("../../migrations/cache/0010_comment_body_adf.sql"),
+    include_str!("../../migrations/cache/0011_issue_body.sql"),
+    include_str!("../../migrations/cache/0012_left_scope_at.sql"),
 ];
 
 /// Brings the connection's file up to date in one transaction. A file migrated by a newer Taskboard is
@@ -85,7 +87,11 @@ mod tests {
     const SPACE: &str =
         "INSERT INTO space (id, key, name, raw) VALUES ('10001', 'NW', 'Northwind', '{}')";
     const ISSUE: &str = "INSERT INTO issue (id, key, project_id, summary, issue_type, status_id, \
-        status_category, created_at, updated_at, raw, synced_at) \
+        status_category, created_at, updated_at, synced_at) \
+        VALUES ('20001', 'NW-1', '10001', 'Mount the column', 'Task', '1', 'new', \
+        '2026-01-05T09:00:00Z', '2026-01-05T09:00:00Z', '2026-01-05T09:00:00Z')";
+    const ISSUE_BEFORE_BODIES: &str = "INSERT INTO issue (id, key, project_id, summary, issue_type, \
+        status_id, status_category, created_at, updated_at, raw, synced_at) \
         VALUES ('20001', 'NW-1', '10001', 'Mount the column', 'Task', '1', 'new', \
         '2026-01-05T09:00:00Z', '2026-01-05T09:00:00Z', '{}', '2026-01-05T09:00:00Z')";
     const COMMENT: &str = "INSERT INTO comment (id, issue_id, created_at, updated_at) \
@@ -211,6 +217,164 @@ mod tests {
         );
     }
 
+    fn issue_before_bodies(id: &str, key: &str, raw: &serde_json::Value, html: &str) -> String {
+        format!(
+            "INSERT INTO issue (id, key, project_id, summary, issue_type, status_id, status_category,
+               created_at, updated_at, raw, description_html, description_adf, synced_at)
+             VALUES ('{id}', '{key}', '10001', 'Mount the column', 'Task', '1', 'new',
+               '2026-01-05T09:00:00Z', '2026-01-05T09:00:00Z', '{raw}', '{html}', '{{\"type\":\"doc\"}}',
+               '2026-01-05T09:00:00Z')"
+        )
+    }
+
+    fn cache_with_issue_bodies_migrated() -> Connection {
+        let mut conn = Connection::open_in_memory().unwrap();
+        migrate(&mut conn, "cache", &CACHE[..10]).unwrap();
+        let filled = serde_json::json!({
+            "id": "20001",
+            "key": "NW-1",
+            "fields": {
+                "summary": "Mount the column",
+                "description": { "type": "doc", "version": 1, "content": [] },
+                "attachment": [{ "id": "80001", "filename": "plan.png" }],
+                "comment": {
+                    "total": 1,
+                    "comments": [{ "id": "30001", "updated": "2026-01-06T09:00:00Z", "body": "Long text" }]
+                },
+                "customfield_10001": "North",
+                "customfield_10002": null,
+                "customfield_10003": { "accountId": "u-1" }
+            },
+            "renderedFields": {
+                "description": "<p>Hello</p>",
+                "updated": "2 hours ago",
+                "customfield_10001": "<p>North</p>",
+                "customfield_10003": null
+            }
+        });
+        let bare = serde_json::json!({
+            "id": "20002",
+            "key": "NW-2",
+            "fields": { "summary": "Paint the wall", "customfield_10002": null }
+        });
+        for sql in [
+            SPACE.to_string(),
+            issue_before_bodies("20001", "NW-1", &filled, "<p>Hello</p>"),
+            issue_before_bodies("20002", "NW-2", &bare, "<p>Plain</p>"),
+            COMMENT.to_string(),
+        ] {
+            conn.execute(&sql, []).unwrap();
+        }
+        migrate(&mut conn, "cache", CACHE).unwrap();
+        conn
+    }
+
+    #[test]
+    fn the_issue_body_migration_moves_descriptions_and_a_trimmed_raw_into_issue_body() {
+        let conn = cache_with_issue_bodies_migrated();
+
+        let body = |id: &str| -> (Option<String>, Option<String>, serde_json::Value) {
+            conn.query_row(
+                "SELECT description_html, description_adf, raw FROM issue_body WHERE issue_id = ?1",
+                [id],
+                |r| {
+                    let raw: String = r.get(2)?;
+                    Ok((r.get(0)?, r.get(1)?, serde_json::from_str(&raw).unwrap()))
+                },
+            )
+            .unwrap()
+        };
+        assert_eq!(
+            body("20001"),
+            (
+                Some("<p>Hello</p>".to_string()),
+                Some("{\"type\":\"doc\"}".to_string()),
+                serde_json::json!({
+                    "id": "20001",
+                    "key": "NW-1",
+                    "fields": {
+                        "summary": "Mount the column",
+                        "attachment": [{ "id": "80001", "filename": "plan.png" }]
+                    },
+                    "renderedFields": { "customfield_10001": "<p>North</p>" }
+                })
+            )
+        );
+        assert_eq!(
+            body("20002").2,
+            serde_json::json!({
+                "id": "20002",
+                "key": "NW-2",
+                "fields": { "summary": "Paint the wall" },
+                "renderedFields": {}
+            })
+        );
+    }
+
+    #[test]
+    fn the_issue_body_migration_keeps_only_filled_custom_values_on_the_issue() {
+        let conn = cache_with_issue_bodies_migrated();
+
+        let custom = |id: &str| -> Option<serde_json::Value> {
+            let text: Option<String> = conn
+                .query_row("SELECT custom FROM issue WHERE id = ?1", [id], |r| r.get(0))
+                .unwrap();
+            text.map(|t| serde_json::from_str(&t).unwrap())
+        };
+        assert_eq!(
+            custom("20001"),
+            Some(serde_json::json!({
+                "customfield_10001": "North",
+                "customfield_10003": { "accountId": "u-1" }
+            }))
+        );
+        assert_eq!(custom("20002"), None);
+    }
+
+    #[test]
+    fn the_issue_body_migration_drops_the_big_columns_and_keeps_comments_and_cascades_bodies() {
+        let conn = cache_with_issue_bodies_migrated();
+        conn.execute_batch("PRAGMA foreign_keys = ON").unwrap();
+
+        let columns: Vec<String> = conn
+            .prepare("SELECT name FROM pragma_table_info('issue')")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect();
+        for dropped in ["raw", "description_html", "description_adf"] {
+            assert!(!columns.contains(&dropped.to_string()), "{dropped}");
+        }
+        let count = |sql: &str| -> i64 { conn.query_row(sql, [], |r| r.get(0)).unwrap() };
+        assert_eq!(count("SELECT COUNT(*) FROM comment"), 1);
+
+        conn.execute("DELETE FROM issue WHERE id = '20001'", [])
+            .unwrap();
+
+        assert_eq!(count("SELECT COUNT(*) FROM issue_body"), 1);
+        assert_eq!(
+            count("SELECT COUNT(*) FROM issue_body WHERE issue_id = '20001'"),
+            0
+        );
+    }
+
+    #[test]
+    fn existing_issues_start_without_a_left_scope_mark_after_the_migration() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        migrate(&mut conn, "cache", &CACHE[..11]).unwrap();
+        for sql in [SPACE, ISSUE] {
+            conn.execute(sql, []).unwrap();
+        }
+
+        migrate(&mut conn, "cache", CACHE).unwrap();
+
+        let mark: Option<String> = conn
+            .query_row("SELECT left_scope_at FROM issue", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(mark, None);
+    }
+
     #[test]
     fn a_fresh_cache_has_spaces_instead_of_projects_and_rows_default_to_jira() {
         let mut conn = Connection::open_in_memory().unwrap();
@@ -260,7 +424,7 @@ mod tests {
             [],
         )
         .unwrap();
-        conn.execute(ISSUE, []).unwrap();
+        conn.execute(ISSUE_BEFORE_BODIES, []).unwrap();
         conn.execute(COMMENT, []).unwrap();
 
         migrate(&mut conn, "cache", CACHE).unwrap();

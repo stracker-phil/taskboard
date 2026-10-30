@@ -1,5 +1,7 @@
 //! The issues around one issue: its children (an epic's issues or a task's subtasks) and its links.
 
+use std::collections::HashMap;
+
 use rusqlite::{Connection, OptionalExtension};
 use serde::Serialize;
 use serde_json::Value;
@@ -129,64 +131,83 @@ fn key_number(key: &str) -> u64 {
 /// From the issue's raw `issuelinks`; a linked issue the cache holds shows its cached status.
 fn links(conn: &Connection, id: &str, me: Option<&str>) -> AppResult<Vec<IssueLink>> {
     let raw: Option<String> = conn
-        .query_row("SELECT raw FROM cache.issue WHERE id = ?1", [id], |r| {
+        .query_row("SELECT raw FROM cache.issue_body WHERE issue_id = ?1", [id], |r| {
             r.get(0)
         })
         .optional()?;
     let raw: Value = raw
         .and_then(|r| serde_json::from_str(&r).ok())
         .unwrap_or(Value::Null);
-    let styles = Styles::load(conn)?;
-    let mut links = Vec::new();
-    for link in raw["fields"]["issuelinks"].as_array().into_iter().flatten() {
-        let (side, words) = if link["outwardIssue"].is_object() {
-            (&link["outwardIssue"], &link["type"]["outward"])
-        } else {
-            (&link["inwardIssue"], &link["type"]["inward"])
-        };
-        let (Some(key), Some(relation)) = (side["key"].as_str(), words.as_str()) else {
-            continue;
-        };
-        let cached = related_by_key(conn, key, &styles, me)?;
-        let fallback = || RelatedIssue {
-            id: None,
-            key: key.to_string(),
-            summary: side["fields"]["summary"]
-                .as_str()
-                .unwrap_or_default()
-                .to_string(),
-            style: detect(
-                side["fields"]["status"]["statusCategory"]["key"]
-                    .as_str()
-                    .unwrap_or_default(),
-                side["fields"]["status"]["name"]
-                    .as_str()
-                    .unwrap_or_default(),
-            ),
-            issue_type: side["fields"]["issuetype"]["name"]
-                .as_str()
-                .unwrap_or_default()
-                .to_string(),
-            assignee: None,
-            changed: false,
-        };
-        links.push(IssueLink {
+    let sides: Vec<(&Value, &str, &str)> = raw["fields"]["issuelinks"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|link| {
+            let (side, words) = if link["outwardIssue"].is_object() {
+                (&link["outwardIssue"], &link["type"]["outward"])
+            } else {
+                (&link["inwardIssue"], &link["type"]["inward"])
+            };
+            Some((side, side["key"].as_str()?, words.as_str()?))
+        })
+        .collect();
+    let keys: Vec<&str> = sides.iter().map(|(_, key, _)| *key).collect();
+    let cached = related_by_keys(conn, &keys, me)?;
+    let links = sides
+        .into_iter()
+        .map(|(side, key, relation)| IssueLink {
             relation: relation.to_string(),
-            issue: cached.unwrap_or_else(fallback),
-        });
-    }
+            issue: cached
+                .get(&key.to_ascii_uppercase())
+                .cloned()
+                .unwrap_or_else(|| uncached(side, key)),
+        })
+        .collect();
     Ok(links)
 }
 
-fn related_by_key(
+/// A linked issue the cache doesn't hold, as the link describes it.
+fn uncached(side: &Value, key: &str) -> RelatedIssue {
+    let fields = &side["fields"];
+    RelatedIssue {
+        id: None,
+        key: key.to_string(),
+        summary: fields["summary"].as_str().unwrap_or_default().to_string(),
+        style: detect(
+            fields["status"]["statusCategory"]["key"]
+                .as_str()
+                .unwrap_or_default(),
+            fields["status"]["name"].as_str().unwrap_or_default(),
+        ),
+        issue_type: fields["issuetype"]["name"]
+            .as_str()
+            .unwrap_or_default()
+            .to_string(),
+        assignee: None,
+        changed: false,
+    }
+}
+
+/// The cached live issues with these keys, by key in capitals; one query for all of them.
+fn related_by_keys(
     conn: &Connection,
-    key: &str,
-    styles: &Styles,
+    keys: &[&str],
     me: Option<&str>,
-) -> AppResult<Option<RelatedIssue>> {
-    Ok(conn
-        .query_row(&related_sql("i.key = ?1 AND i.gone = 0"), [key], |r| {
-            related_from(r, styles, me)
-        })
-        .optional()?)
+) -> AppResult<HashMap<String, RelatedIssue>> {
+    if keys.is_empty() {
+        return Ok(HashMap::new());
+    }
+    let styles = Styles::load(conn)?;
+    let mut query = conn.prepare(&related_sql(
+        "i.key COLLATE NOCASE IN (SELECT value FROM json_each(?1)) AND i.gone = 0",
+    ))?;
+    let found = query.query_map([serde_json::to_string(keys)?], |r| {
+        related_from(r, &styles, me)
+    })?;
+    let mut by_key = HashMap::new();
+    for issue in found {
+        let issue = issue?;
+        by_key.insert(issue.key.to_ascii_uppercase(), issue);
+    }
+    Ok(by_key)
 }
