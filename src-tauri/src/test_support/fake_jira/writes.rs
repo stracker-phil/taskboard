@@ -16,10 +16,7 @@ pub fn assign(site: &mut Content, id_or_key: &str, body: &Value) -> Response {
     };
     let now = site.now;
     let Some(issue) = visible_issue_mut(site, id_or_key) else {
-        return Response::json(
-            404,
-            json!({ "errorMessages": ["Issue does not exist or you do not have permission to see it."] }),
-        );
+        return not_found();
     };
     issue["fields"]["assignee"] = assignee;
     stamp_after(issue, now);
@@ -43,6 +40,76 @@ fn assignee_for(site: &Content, body: &Value) -> Result<Value, Response> {
                 json!({ "errorMessages": [], "errors": { "assignee": reason } }),
             )
         })
+}
+
+/// `GET /issue/{id}/transitions`: one move to every other status, named like it; the move's id is the status's.
+pub fn transitions(site: &Content, id_or_key: &str) -> Response {
+    let Some(issue) = visible_issue(site, id_or_key) else {
+        return not_found();
+    };
+    let current = &issue["fields"]["status"]["id"];
+    let moves: Vec<Value> = site
+        .data
+        .statuses
+        .iter()
+        .filter(|status| status["id"] != *current)
+        .map(|status| {
+            json!({
+                "id": status["id"],
+                "name": status["name"],
+                "to": status,
+                "hasScreen": site.screens.contains(status["id"].as_str().unwrap_or_default()),
+                "isAvailable": true,
+            })
+        })
+        .collect();
+    Response::json(200, json!({ "transitions": moves }))
+}
+
+/// `POST /issue/{id}/transitions` with `{ "transition": { "id": "…" } }`.
+pub fn transition(site: &mut Content, id_or_key: &str, body: &Value) -> Response {
+    let asked = body["transition"]["id"].as_str().unwrap_or_default();
+    let Some(target) = site
+        .data
+        .statuses
+        .iter()
+        .find(|s| s["id"] == asked)
+        .cloned()
+    else {
+        return Response::json(
+            400,
+            json!({ "errorMessages": [format!("Transition id '{asked}' is not valid for this issue.")] }),
+        );
+    };
+    let now = site.now;
+    let Some(issue) = visible_issue_mut(site, id_or_key) else {
+        return not_found();
+    };
+    if issue["fields"]["status"]["id"] == target["id"] {
+        return Response::json(
+            400,
+            json!({ "errorMessages": [format!("Transition id '{asked}' is not valid for this issue.")] }),
+        );
+    }
+    issue["fields"]["status"] = target;
+    stamp_after(issue, now);
+    Response::raw(204, "text/plain", "")
+}
+
+fn not_found() -> Response {
+    Response::json(
+        404,
+        json!({ "errorMessages": ["Issue does not exist or you do not have permission to see it."] }),
+    )
+}
+
+fn visible_issue<'a>(site: &'a Content, id_or_key: &str) -> Option<&'a Value> {
+    site.data.issues.iter().find(|issue| {
+        is_issue(issue, id_or_key)
+            && !site
+                .hidden
+                .contains(issue["id"].as_str().unwrap_or_default())
+    })
 }
 
 fn visible_issue_mut<'a>(site: &'a mut Content, id_or_key: &str) -> Option<&'a mut Value> {

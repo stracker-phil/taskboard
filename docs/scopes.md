@@ -10,7 +10,7 @@ the gateway's allowlist (`jira/gateway/guard.rs` `RULES`): every new endpoint na
 |---|---|---|
 | `read:jira-work` | Syncing issues, projects, fields, statuses, releases, comments, history, web links, attachments; checking JQL | Nothing syncs; Test Connection may pass, the sync fails |
 | `read:jira-user` | Who you are (Test Connection, the Me chip, "Assigned to you") | Test Connection fails; the app doesn't know which issues are yours |
-| `write:jira-work` | Assigning issues (and, as they arrive, changing status and adding comments) | Changes fail with "a scoped token lacks write:jira-work"; reading keeps working |
+| `write:jira-work` | Assigning issues and changing their status (and, as it arrives, adding comments) | Changes fail with "a scoped token lacks write:jira-work"; reading keeps working |
 
 `write:jira-work` is only needed with Settings → Connection → **Allow changes to Jira** on
 ([writes.md](writes.md)). Leave it out for a token that can only read.
@@ -30,6 +30,7 @@ Reads the issues and everything around them. Every request of the sync and of an
   `GET project/search` (Settings → Projects), `GET project/{key}/versions` (releases).
 - **An opened issue:** `GET issue/{id}/comment`, `GET issue/{id}/remotelink` (web links),
   `GET issue/{id}/changelog` (history), `GET attachment/content/{id}` (Quick Look, inline images).
+- **The status menu:** `GET issue/{id}/transitions`, the moves the workflow offers.
 - **Settings → Sync:** `POST jql/parse` validates the sync scope's JQL.
 
 ## read:jira-user
@@ -44,3 +45,4 @@ arrive inside the issues under `read:jira-work`.
 Changes, sent once and only while changes to Jira are allowed ([writes.md](writes.md)):
 
 - `PUT issue/{id}/assignee`: Assign to me, Unassign, and "Change back to …".
+- `POST issue/{id}/transitions`: a move from the status menu, and its "Change back to …".

@@ -371,7 +371,8 @@ view with its place intact).
 
 - Header 50: back, breadcrumb (Space tile and name / list or view / key and a copy-link button), **Find in this
   issue**, "Updated …", previous and next in the view's order (also J/K), Mark as read or unread, Assign to me
-  (`AssignMeButton`, pressed while it is mine; only while changes to Jira are on; also I), Bookmark (with
+  (`AssignMeButton`, pressed while it is mine; only while changes to Jira are on; also I; the field grid's status
+  pill opens the status menu, also S), Bookmark (with
   bookmarks), **Open in Jira** (`OpenInJiraButton`, the content header's too).
   Previous and next step through the rows the view shows (not those in collapsed groups or subtrees), move the
   view's selection along, and keep the current issue on screen until the next one loads (the neighbors load

@@ -21,6 +21,8 @@ export interface IssueKeyHandlers {
   toggleRead: () => void;
   /** I: the selected issue is assigned to me, or unassigned when it is mine. */
   toggleMine: () => void;
+  /** S: the selected issue's status menu. */
+  changeStatus: () => void;
   /** Space: opens or closes the selected issue's preview; absent where there is none, so Space scrolls. */
   togglePeek?: () => void;
   hasSelection: () => boolean;
@@ -55,6 +57,7 @@ export const ISSUE_KEY_COMMANDS: Command[] = [
   { id: "issue.openEpic", title: "Open the issue's epic", scope: "main", defaultBinding: "E", when: selected, run: () => handlers?.openEpic() },
   { id: "issue.togglePin", title: "Bookmark the issue or remove its bookmark", scope: "main", defaultBinding: "P", when: selected, run: () => handlers?.togglePin() },
   { id: "issue.toggleMine", title: "Assign the issue to me or unassign it", scope: "main", defaultBinding: "I", when: selected, run: () => handlers?.toggleMine() },
+  { id: "issue.changeStatus", title: "Change the issue's status", scope: "main", defaultBinding: "S", when: selected, run: () => handlers?.changeStatus() },
   { id: "issue.markSeen", title: "Mark the issue as read or unread", scope: "main", defaultBinding: "M", when: selected, run: () => handlers?.toggleRead() },
   { id: "issue.togglePeek", title: "Open or close the preview", scope: "main", defaultBinding: "Space", when: () => selected() && handlers?.togglePeek !== undefined, run: () => handlers?.togglePeek?.() },
   {

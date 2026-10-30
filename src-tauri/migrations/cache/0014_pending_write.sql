@@ -4,7 +4,7 @@
 CREATE TABLE pending_write (
   issue_id   TEXT NOT NULL REFERENCES issue(id) ON DELETE CASCADE,
   field      TEXT NOT NULL,          -- writes::Field
-  value      TEXT,                   -- what was sent: an account id; null = none
+  value      TEXT,                   -- what was sent: an account or status id; null = none
   base       TEXT,                   -- what the tracker last had
   created_at TEXT NOT NULL,
   PRIMARY KEY (issue_id, field)

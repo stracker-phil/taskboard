@@ -37,6 +37,8 @@ struct Shared {
     content: Mutex<Content>,
     /// Answered instead of the route, oldest first.
     canned: Mutex<VecDeque<Response>>,
+    /// Answered instead of the next writes (any method but GET), oldest first.
+    canned_writes: Mutex<VecDeque<Response>>,
     latency: Mutex<Duration>,
     requests: Mutex<Vec<Recorded>>,
     online: watch::Sender<bool>,
@@ -58,10 +60,12 @@ impl FakeJira {
                 data,
                 now,
                 hidden: HashSet::new(),
+                screens: HashSet::new(),
                 page_size: None,
                 max_results_cap: 100,
             }),
             canned: Mutex::new(VecDeque::new()),
+            canned_writes: Mutex::new(VecDeque::new()),
             latency: Mutex::new(Duration::ZERO),
             requests: Mutex::new(Vec::new()),
             online: watch::channel(true).0,
@@ -111,6 +115,11 @@ impl FakeJira {
         self.content().page_size = Some(size);
     }
 
+    /// Moving an issue into this status asks for a screen (`hasScreen`).
+    pub fn require_screen(&self, status_id: &str) {
+        self.content().screens.insert(status_id.to_string());
+    }
+
     /// The most issues a search page holds when `maxResults` asks for more.
     pub fn cap_max_results(&self, cap: usize) {
         self.content().max_results_cap = cap;
@@ -131,6 +140,15 @@ impl FakeJira {
             }
             self.shared.canned.lock().unwrap().push_back(response);
         }
+    }
+
+    /// The next write (any method but GET) gets this answer; reads before it are answered as usual.
+    pub fn answer_next_write(&self, status: u16, body: Value) {
+        self.shared
+            .canned_writes
+            .lock()
+            .unwrap()
+            .push_back(Response::json(status, body));
     }
 
     /// The next request gets exactly this answer.
@@ -396,7 +414,11 @@ async fn answer(mut socket: tokio::net::TcpStream, shared: Arc<Shared>) {
     if !latency.is_zero() {
         tokio::time::sleep(latency).await;
     }
-    let canned = shared.canned.lock().unwrap().pop_front();
+    let canned = shared.canned.lock().unwrap().pop_front().or_else(|| {
+        (request.method != "GET")
+            .then(|| shared.canned_writes.lock().unwrap().pop_front())
+            .flatten()
+    });
     let response = canned.unwrap_or_else(|| route(&mut shared.content.lock().unwrap(), &request));
     write_response(&mut socket, response).await;
 }

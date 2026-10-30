@@ -968,6 +968,27 @@ describe("ListView", () => {
       expect(mocked.issueToggleMine).not.toHaveBeenCalled();
     });
 
+    it("S asks Jira for the selected issue's moves while changes to Jira are on", async () => {
+      mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ allowJiraChanges: true }) }));
+      await renderList(viewData([groupOf(rows)], rows));
+      await userEvent.click(await screen.findByText("Fix the footer links"));
+      await screen.findByRole("button", { name: "Assign NW-1003 to me or unassign it" });
+
+      await press("issue.changeStatus");
+
+      expect(mocked.issueTransitions).toHaveBeenCalledWith("3");
+    });
+
+    it("S explains that changes to Jira are off instead of opening the status menu", async () => {
+      await renderList(viewData([groupOf(rows)], rows));
+      await userEvent.click(await screen.findByText("Fix the footer links"));
+
+      await press("issue.changeStatus");
+
+      expect(useStore.getState().toasts.map((t) => [t.kind, t.message])).toEqual([["info", "Changes to Jira are off. Turn them on in Settings → Connection."]]);
+      expect(mocked.issueTransitions).not.toHaveBeenCalled();
+    });
+
     it("I does nothing without a selected issue", async () => {
       await renderList(viewData([groupOf(rows)], rows));
       await screen.findByRole("row", { name: /NW-1042/ });

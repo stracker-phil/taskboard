@@ -13,12 +13,15 @@ use taskboard_lib::connection::{
 use taskboard_lib::db::Db;
 use taskboard_lib::error::ErrorKind;
 use taskboard_lib::jira::{Limiter, TokenKind};
+use taskboard_lib::status_style::{Style, status_style_set};
 use taskboard_lib::store::settings::{Settings, SettingsStore};
 use taskboard_lib::sync::{Emit, SyncContext, SyncEvent, full_sync};
 use taskboard_lib::test_support::demo::{self, DEMO_NOW, ME_EMAIL};
 use taskboard_lib::test_support::fake_jira::{DEMO_TOKEN, FakeJira};
 use taskboard_lib::test_support::{FakeSecrets, temp_config_dir};
-use taskboard_lib::writes::{Change, Reverse, WriteOutcome, apply, forget_all, toggle_mine};
+use taskboard_lib::writes::{
+    Change, Reverse, TransitionOption, WriteOutcome, apply, forget_all, toggle_mine, transitions,
+};
 
 const PROJECT_IDS: [&str; 5] = ["10001", "10002", "10003", "10004", "10005"];
 const ALEX: &str = "712020:5a1e0c3f-8d2b-4f61-9c7e-1b2a3c4d5e01";
@@ -235,6 +238,128 @@ impl Rig {
     }
 }
 
+/// Statuses of the demo site: NW-1042 and NW-1049 start In Progress. A move's id is its target status's id.
+const IN_PROGRESS: &str = "3";
+const TO_DO: &str = "10000";
+const DONE: &str = "10001";
+const IN_REVIEW: &str = "10002";
+const BLOCKED: &str = "10003";
+const NW_PROJECT: &str = "10001";
+
+fn demo_status(id: &str) -> Value {
+    demo::demo()
+        .statuses
+        .into_iter()
+        .find(|status| status["id"] == id)
+        .unwrap()
+}
+
+impl Rig {
+    /// `(status id, status category)` the cache shows.
+    async fn cached_status(&self, issue_id: &str) -> (String, String) {
+        let id = issue_id.to_string();
+        self.ctx
+            .db
+            .read(move |conn| {
+                Ok(conn.query_row(
+                    "SELECT status_id, status_category FROM cache.issue WHERE id = ?1",
+                    [id],
+                    |row| Ok((row.get(0)?, row.get(1)?)),
+                )?)
+            })
+            .await
+            .unwrap()
+    }
+
+    /// The status id Jira (the fake) holds.
+    async fn jira_status(&self, issue_id: &str) -> String {
+        let source = self.ctx.source().unwrap();
+        let found = source
+            .fetch(&[issue_id.to_string()], &["status".to_string()])
+            .await
+            .unwrap();
+        found.issues[0].fields["status"]["id"]
+            .as_str()
+            .unwrap()
+            .to_string()
+    }
+
+    async fn move_to(&self, issue_id: &str, transition_id: &str) -> WriteOutcome {
+        self.try_move_to(issue_id, transition_id).await.unwrap()
+    }
+
+    async fn try_move_to(
+        &self,
+        issue_id: &str,
+        transition_id: &str,
+    ) -> taskboard_lib::error::AppResult<WriteOutcome> {
+        let source = self.ctx.source().unwrap();
+        apply(
+            &self.ctx.db,
+            &*source,
+            &self.settings(),
+            issue_id.into(),
+            Change::Transition {
+                transition_id: transition_id.into(),
+            },
+        )
+        .await
+    }
+
+    async fn moves(&self, issue_id: &str) -> Vec<TransitionOption> {
+        let source = self.ctx.source().unwrap();
+        transitions(&self.ctx.db, &*source, issue_id.into())
+            .await
+            .unwrap()
+    }
+
+    fn transitions_posted(&self) -> usize {
+        self.fake
+            .requests()
+            .iter()
+            .filter(|r| r.method == "POST" && r.path.ends_with("/transitions"))
+            .count()
+    }
+
+    /// A move on its way: the row already shows the status, as `writes::apply` leaves it.
+    async fn start_pending_status(&self, issue_id: &'static str, status: &'static str) {
+        let category = demo_status(status)["statusCategory"]["key"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        self.ctx
+            .db
+            .write(move |tx, _| {
+                let base: String = tx.query_row(
+                    "SELECT status_id FROM cache.issue WHERE id = ?1",
+                    [issue_id],
+                    |row| row.get(0),
+                )?;
+                tx.execute(
+                    "INSERT INTO cache.pending_write (issue_id, field, value, base, created_at)
+                     VALUES (?1, 'status', ?2, ?3, '2026-10-28T11:00:00.000Z')",
+                    rusqlite::params![issue_id, status, base],
+                )?;
+                tx.execute(
+                    "UPDATE cache.issue SET status_id = ?2, status_category = ?3 WHERE id = ?1",
+                    rusqlite::params![issue_id, status, category],
+                )?;
+                Ok(())
+            })
+            .await
+            .unwrap();
+    }
+}
+
+fn option(id: &str, status_name: &str, style: Style, opens_jira: bool) -> TransitionOption {
+    TransitionOption {
+        id: id.into(),
+        status_name: status_name.into(),
+        style,
+        opens_jira,
+    }
+}
+
 fn outcome(done: &str, label: &str, back_to: Option<&str>) -> WriteOutcome {
     WriteOutcome {
         done: done.into(),
@@ -320,7 +445,9 @@ mod assigning {
         assert_eq!(rig.jira_assignee(NW_1042).await.as_deref(), Some(MARTA));
 
         let reverse = done.reverse.unwrap().change;
-        let Change::Assign { account_id } = reverse;
+        let Change::Assign { account_id } = reverse else {
+            panic!("expected an assignment, got {reverse:?}");
+        };
         rig.apply(NW_1042, account_id.as_deref()).await;
 
         assert_eq!(rig.cached_assignee(NW_1042).await.as_deref(), Some(ALEX));
@@ -589,6 +716,330 @@ mod the_sync_with_a_write_on_its_way {
 
         assert_eq!(rig.cached_assignee(NW_1049).await.as_deref(), Some(ALEX));
         assert_eq!(rig.recorded_changes().await, 0);
+    }
+}
+
+mod the_moves_of_an_issue {
+    use super::*;
+
+    #[tokio::test]
+    async fn are_listed_in_jiras_order_named_by_their_target_status_and_styled() {
+        let rig = Rig::synced().await;
+        rig.fake.require_screen(BLOCKED);
+
+        let moves = rig.moves(NW_1042).await;
+
+        assert_eq!(
+            moves,
+            [
+                option(TO_DO, "To Do", Style::Todo, false),
+                option(IN_REVIEW, "In Review", Style::Review, false),
+                option(BLOCKED, "Blocked", Style::Blocked, true),
+                option(DONE, "Done", Style::Done, false),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn take_the_style_the_owner_chose_for_the_status_in_the_issues_space() {
+        let rig = Rig::synced().await;
+        status_style_set(
+            &rig.ctx.db,
+            NW_PROJECT.into(),
+            IN_REVIEW.into(),
+            Some(Style::Progress),
+        )
+        .await
+        .unwrap();
+
+        let moves = rig.moves(NW_1042).await;
+
+        let review = moves.iter().find(|m| m.id == IN_REVIEW).unwrap();
+        assert_eq!(review.style, Style::Progress);
+    }
+
+    #[tokio::test]
+    async fn leave_out_the_status_the_issue_is_in() {
+        let rig = Rig::synced().await;
+
+        let ids: Vec<String> = rig.moves(NW_1044).await.into_iter().map(|m| m.id).collect();
+
+        assert_eq!(ids, [TO_DO, IN_PROGRESS, BLOCKED, DONE]);
+    }
+
+    #[tokio::test]
+    async fn serialize_for_the_page_in_camel_case() {
+        let rig = Rig::synced().await;
+        rig.fake.require_screen(DONE);
+
+        let moves = rig.moves(NW_1042).await;
+
+        assert_eq!(
+            serde_json::to_value(&moves[3]).unwrap(),
+            json!({
+                "id": DONE,
+                "statusName": "Done",
+                "style": "done",
+                "opensJira": true,
+            })
+        );
+    }
+}
+
+mod moving {
+    use super::*;
+
+    fn invalid_input(result: taskboard_lib::error::AppResult<WriteOutcome>) -> String {
+        match result {
+            Err(taskboard_lib::error::AppError::InvalidInput(message)) => message,
+            other => panic!("expected InvalidInput, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn shows_the_new_status_in_the_cache_and_in_jira_without_a_new_change() {
+        let rig = Rig::synced().await;
+
+        let done = rig.move_to(NW_1042, DONE).await;
+
+        assert_eq!(
+            done,
+            WriteOutcome {
+                done: "Moved NW-1042 to Done".into(),
+                reverse: Some(Reverse {
+                    label: "Change back to In Progress".into(),
+                    change: Change::Transition {
+                        transition_id: IN_PROGRESS.into()
+                    },
+                }),
+            }
+        );
+        assert_eq!(
+            rig.cached_status(NW_1042).await,
+            (DONE.to_string(), "done".to_string())
+        );
+        assert_eq!(rig.jira_status(NW_1042).await, DONE);
+        assert_eq!(rig.pending_writes().await, 0);
+        assert_eq!(rig.recorded_changes().await, 0);
+        assert_eq!(rig.transitions_posted(), 1);
+    }
+
+    #[tokio::test]
+    async fn the_reverse_moves_the_issue_back_and_offers_the_move_forward_again() {
+        let rig = Rig::synced().await;
+        let done = rig.move_to(NW_1042, DONE).await;
+        let Some(Reverse {
+            change: Change::Transition { transition_id },
+            ..
+        }) = done.reverse
+        else {
+            panic!("expected a move back, got {done:?}");
+        };
+
+        let back = rig.move_to(NW_1042, &transition_id).await;
+
+        assert_eq!(back.done, "Moved NW-1042 to In Progress");
+        assert_eq!(
+            back.reverse.map(|r| r.label),
+            Some("Change back to Done".to_string())
+        );
+        assert_eq!(
+            rig.cached_status(NW_1042).await,
+            (IN_PROGRESS.to_string(), "indeterminate".to_string())
+        );
+        assert_eq!(rig.jira_status(NW_1042).await, IN_PROGRESS);
+        assert_eq!(rig.pending_writes().await, 0);
+    }
+
+    #[tokio::test]
+    async fn offers_no_reverse_when_the_way_back_needs_a_screen() {
+        let rig = Rig::synced().await;
+        rig.fake.require_screen(IN_PROGRESS);
+
+        let done = rig.move_to(NW_1042, DONE).await;
+
+        assert_eq!(
+            done,
+            WriteOutcome {
+                done: "Moved NW-1042 to Done".into(),
+                reverse: None
+            }
+        );
+        assert_eq!(rig.jira_status(NW_1042).await, DONE);
+    }
+
+    #[tokio::test]
+    async fn a_move_that_needs_jiras_screen_is_refused_and_nothing_is_sent() {
+        let rig = Rig::synced().await;
+        rig.fake.require_screen(BLOCKED);
+
+        let message = invalid_input(rig.try_move_to(NW_1042, BLOCKED).await);
+
+        assert_eq!(
+            message,
+            "Moving to Blocked needs Jira's own screen; open the issue in Jira"
+        );
+        assert_eq!(rig.transitions_posted(), 0);
+        assert_eq!(
+            rig.cached_status(NW_1042).await,
+            (IN_PROGRESS.to_string(), "indeterminate".to_string())
+        );
+        assert_eq!(rig.pending_writes().await, 0);
+    }
+
+    #[tokio::test]
+    async fn a_move_jira_does_not_list_is_refused_and_nothing_is_sent() {
+        let rig = Rig::synced().await;
+        for (label, id) in [
+            ("an unknown move", "99999"),
+            ("the current status", IN_PROGRESS),
+        ] {
+            let message = invalid_input(rig.try_move_to(NW_1042, id).await);
+
+            assert_eq!(
+                message, "Jira no longer offers this move; the issue may have changed",
+                "{label}"
+            );
+        }
+        assert_eq!(rig.transitions_posted(), 0);
+        assert_eq!(rig.pending_writes().await, 0);
+    }
+
+    #[tokio::test]
+    async fn an_issue_already_in_that_status_sends_nothing_and_offers_no_reverse() {
+        let rig = Rig::synced().await;
+        rig.ctx
+            .db
+            .write(|tx, _| {
+                tx.execute(
+                    "UPDATE cache.issue SET status_id = ?2, status_category = 'done' WHERE id = ?1",
+                    rusqlite::params![NW_1042, DONE],
+                )?;
+                Ok(())
+            })
+            .await
+            .unwrap();
+
+        let done = rig.move_to(NW_1042, DONE).await;
+
+        assert_eq!(
+            done,
+            WriteOutcome {
+                done: "NW-1042 is already Done".into(),
+                reverse: None
+            }
+        );
+        assert_eq!(rig.transitions_posted(), 0);
+        assert_eq!(rig.pending_writes().await, 0);
+    }
+
+    #[tokio::test]
+    async fn an_issue_missing_from_the_cache_is_not_found() {
+        let rig = Rig::synced().await;
+        rig.ctx
+            .db
+            .write(|tx, _| {
+                tx.execute("UPDATE cache.issue SET gone = 1 WHERE id = ?1", [NW_1042])?;
+                Ok(())
+            })
+            .await
+            .unwrap();
+
+        let err = rig.try_move_to(NW_1042, DONE).await.unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::NotFound);
+        assert_eq!(rig.transitions_posted(), 0);
+    }
+
+    #[tokio::test]
+    async fn changes_to_jira_that_are_off_send_nothing() {
+        let rig = Rig::synced().await;
+        rig.ctx
+            .settings
+            .edit(|s| s.behaviour.allow_jira_changes = false)
+            .await
+            .unwrap();
+
+        let requests_before = rig.fake.requests().len();
+
+        let err = rig.try_move_to(NW_1042, DONE).await.unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::InvalidInput);
+        assert_eq!(rig.fake.requests().len(), requests_before);
+        assert_eq!(rig.jira_status(NW_1042).await, IN_PROGRESS);
+    }
+
+    #[tokio::test]
+    async fn a_write_jira_refuses_puts_the_old_status_back_and_returns_the_error() {
+        let rig = Rig::synced().await;
+        rig.fake
+            .answer_next_write(400, json!({ "errorMessages": ["Not allowed"] }));
+
+        let err = rig.try_move_to(NW_1042, DONE).await.unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::InvalidInput);
+        assert_eq!(
+            rig.cached_status(NW_1042).await,
+            (IN_PROGRESS.to_string(), "indeterminate".to_string())
+        );
+        assert_eq!(rig.pending_writes().await, 0);
+        assert_eq!(rig.recorded_changes().await, 0);
+        assert_eq!(rig.transitions_posted(), 1);
+    }
+
+    #[tokio::test]
+    async fn a_second_change_to_the_status_while_one_is_on_its_way_is_refused() {
+        let rig = Rig::synced().await;
+        rig.start_pending_status(NW_1049, IN_REVIEW).await;
+
+        let err = rig.try_move_to(NW_1049, DONE).await.unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::InvalidInput);
+        assert_eq!(rig.transitions_posted(), 0);
+        assert_eq!(
+            rig.cached_status(NW_1049).await,
+            (IN_REVIEW.to_string(), "indeterminate".to_string())
+        );
+        assert_eq!(rig.pending_writes().await, 1);
+    }
+}
+
+mod the_sync_with_a_move_on_its_way {
+    use super::*;
+
+    #[tokio::test]
+    async fn keeps_the_pending_status_and_its_category_over_what_jira_sent() {
+        let rig = Rig::synced().await;
+        rig.start_pending_status(NW_1049, DONE).await;
+        rig.fake.set_now(demo_now() + chrono::Duration::hours(2));
+        rig.fake.edit_issue("NW-1049", |fields| {
+            fields["status"] = demo_status(IN_REVIEW)
+        });
+
+        rig.sync().await;
+
+        assert_eq!(
+            rig.cached_status(NW_1049).await,
+            (DONE.to_string(), "done".to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn takes_what_jira_sent_once_the_move_is_forgotten() {
+        let rig = Rig::synced().await;
+        rig.start_pending_status(NW_1049, DONE).await;
+        rig.ctx.db.write(|tx, _| forget_all(tx)).await.unwrap();
+        rig.fake.set_now(demo_now() + chrono::Duration::hours(2));
+        rig.fake.edit_issue("NW-1049", |fields| {
+            fields["status"] = demo_status(IN_REVIEW)
+        });
+
+        rig.sync().await;
+
+        assert_eq!(
+            rig.cached_status(NW_1049).await,
+            (IN_REVIEW.to_string(), "indeterminate".to_string())
+        );
     }
 }
 

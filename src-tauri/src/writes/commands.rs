@@ -2,7 +2,7 @@
 
 use tauri::State;
 
-use super::{Change, WriteOutcome};
+use super::{Change, TransitionOption, WriteOutcome};
 use crate::error::AppResult;
 use crate::state::AppState;
 
@@ -23,4 +23,15 @@ pub async fn issue_toggle_mine(state: State<'_, AppState>, id: String) -> AppRes
     let settings = state.settings.get();
     let source = crate::sync::source_for(&state.jira, &settings.connection)?;
     super::toggle_mine(&state.db, source.as_ref(), &settings, id).await
+}
+
+/// The moves Jira offers from the issue's status.
+#[tauri::command]
+pub async fn issue_transitions(
+    state: State<'_, AppState>,
+    id: String,
+) -> AppResult<Vec<TransitionOption>> {
+    let settings = state.settings.get();
+    let source = crate::sync::source_for(&state.jira, &settings.connection)?;
+    super::transitions(&state.db, source.as_ref(), id).await
 }

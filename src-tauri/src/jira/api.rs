@@ -4,10 +4,10 @@ use super::client::JiraClient;
 use super::dto::{
     ApproximateCount, BulkFetch, Changelog, ChangelogPage, Comment, CommentPage, Field, Issue,
     Myself, ParsedQueries, Project, ProjectPage, RemoteLink, SearchPage, Status, TenantInfo,
-    Version,
+    Transition, Transitions, Version,
 };
 use super::gateway::{
-    AccountId, AttachmentId, Endpoint, FieldIds, IssueRef, IssueRefs, Jql, ProjectKey,
+    AccountId, AttachmentId, Endpoint, FieldIds, IssueRef, IssueRefs, Jql, ProjectKey, TransitionId,
 };
 use super::paging::{SearchPages, SearchRequest};
 use crate::error::AppResult;
@@ -152,6 +152,25 @@ impl JiraClient {
         let endpoint = Endpoint::AssignIssue {
             issue: IssueRef::parse(issue_id)?,
             account: account_id.map(AccountId::parse).transpose()?,
+        };
+        self.gateway().send(endpoint).await
+    }
+
+    /// The moves the workflow allows from the issue's status.
+    pub async fn transitions(&self, issue_id: &str) -> AppResult<Vec<Transition>> {
+        let issue = IssueRef::parse(issue_id)?;
+        let answer: Transitions = self
+            .gateway()
+            .send(Endpoint::IssueTransitions { issue })
+            .await?;
+        Ok(answer.transitions)
+    }
+
+    /// Moves the issue along a transition. A write: sent once, never retried.
+    pub async fn transition(&self, issue_id: &str, transition_id: &str) -> AppResult<()> {
+        let endpoint = Endpoint::TransitionIssue {
+            issue: IssueRef::parse(issue_id)?,
+            transition: TransitionId::parse(transition_id)?,
         };
         self.gateway().send(endpoint).await
     }

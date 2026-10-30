@@ -122,7 +122,7 @@ export type Cell = { "kind": "text", "value": string } | { "kind": "person", "va
 /**
  * A change to one issue, as the page asks for it.
  */
-export type Change = { "kind": "assign", accountId: string | null, };
+export type Change = { "kind": "assign", accountId: string | null, } | { "kind": "transition", transitionId: string, };
 
 export type ChangeValue = { "kind": "status", "value": { name: string, style: Style, } } | { "kind": "person", "value": Person } | { "kind": "text", "value": string };
 
@@ -562,7 +562,7 @@ changed: boolean, };
  */
 export type Reverse = { 
 /**
- * "Change back to Jamie Doe", "Change back to Unassigned".
+ * "Change back to Jamie Doe", "Change back to In Progress".
  */
 label: string, change: Change, };
 
@@ -766,6 +766,15 @@ export type TokenExpiry = { "state": "fine" } | { "state": "soon", days: number,
  * Classic (unscoped) tokens call the site; scoped tokens call the gateway with the site's cloud id.
  */
 export type TokenKind = "classic" | "scoped";
+
+/**
+ * One move the status menu offers, named by the status it leads to.
+ */
+export type TransitionOption = { id: string, statusName: string, style: Style, 
+/**
+ * Needs Jira's screen: the page opens the issue in Jira.
+ */
+opensJira: boolean, };
 
 export type UiState = { sidebarHidden: boolean, 
 /**

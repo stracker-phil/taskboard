@@ -6,6 +6,7 @@ use url::Url;
 
 use super::params::{
     AccountId, AttachmentId, Expand, FieldIds, IssueRef, IssueRefs, Jql, PageToken, ProjectKey,
+    TransitionId,
 };
 use crate::error::{AppError, AppResult};
 use crate::jira::site::Site;
@@ -90,6 +91,15 @@ pub enum Endpoint {
     /// The project's most recently updated issues with all their fields, to see which custom fields it fills.
     FieldUsage {
         project: ProjectKey,
+    },
+    /// The workflow's moves from the issue's status, with their target statuses.
+    IssueTransitions {
+        issue: IssueRef,
+    },
+    /// Write: moves the issue along a workflow transition.
+    TransitionIssue {
+        issue: IssueRef,
+        transition: TransitionId,
     },
     /// Write: assigns the issue to the account, or unassigns it (`None`).
     AssignIssue {
@@ -183,6 +193,15 @@ impl Endpoint {
                 }),
             )
             .jql_errors()
+            .plan(site),
+            Self::IssueTransitions { issue } => {
+                Rest::get(&["issue", issue.as_str(), "transitions"]).plan(site)
+            }
+            Self::TransitionIssue { issue, transition } => Rest::write(
+                Method::POST,
+                &["issue", issue.as_str(), "transitions"],
+                json!({ "transition": { "id": transition.as_str() } }),
+            )
             .plan(site),
             Self::AssignIssue { issue, account } => Rest::write(
                 Method::PUT,

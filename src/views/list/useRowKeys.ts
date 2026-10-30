@@ -4,6 +4,7 @@ import { onIssueKeys } from "../../commands/issueKeys";
 import { type Item, itemGroupKey } from "./flatten";
 import type { RowActionHandlers } from "./RowActions";
 import { explainWritesOff } from "../../writes/runWrite";
+import { statusMenuAnchor } from "../../writes/statusMenu";
 
 /** What the List's and Table's issue keys act on: this render's rows, selection and changes. */
 export interface RowKeyState {
@@ -82,6 +83,13 @@ export function useRowKeys(current: RowKeyState): RefObject<RowKeyState> {
       toggleMine: () => {
         const { selected, actions } = state.current;
         if (selected) (actions.toggleMine ?? explainWritesOff)(selected);
+      },
+      changeStatus: () => {
+        const { selected, actions, data } = state.current;
+        const row = selected ? data.rows[selected] : undefined;
+        if (!row) return;
+        if (actions.changeStatus) actions.changeStatus(row, statusMenuAnchor(row.id));
+        else explainWritesOff();
       },
       toggleRead: () => {
         const { selected, actions, data } = state.current;

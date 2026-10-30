@@ -3,6 +3,7 @@ import type { BoardData } from "../../api";
 import { onIssueKeys } from "../../commands/issueKeys";
 import type { RowActionHandlers } from "../list/RowActions";
 import { explainWritesOff } from "../../writes/runWrite";
+import { statusMenuAnchor } from "../../writes/statusMenu";
 
 /** The Board's issue keys: J/K (↓/↑) move through a column's cards, ←/→ to the neighboring open column, ↩
  *  opens; Copy, Bookmark, the read toggle and Open in Jira act on the current card, `selected`. */
@@ -59,6 +60,13 @@ export function useBoardKeys(
       toggleMine: () => {
         const { selected, actions } = state.current;
         if (selected) (actions.toggleMine ?? explainWritesOff)(selected);
+      },
+      changeStatus: () => {
+        const { selected, actions, data } = state.current;
+        const row = selected ? data.rows[selected] : undefined;
+        if (!row) return;
+        if (actions.changeStatus) actions.changeStatus(row, statusMenuAnchor(row.id));
+        else explainWritesOff();
       },
       toggleRead: () => {
         const { selected, actions, data } = state.current;

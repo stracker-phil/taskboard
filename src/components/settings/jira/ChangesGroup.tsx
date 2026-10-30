@@ -13,7 +13,7 @@ export function ChangesGroup() {
     <Group title="Changes" anchor="changes">
       <Switch
         label="Allow changes to Jira"
-        description="Assign issues to yourself from Taskboard. Each change is sent once; a scoped token needs write:jira-work."
+        description="Assign issues and change their status from Taskboard. Each change is sent once; a scoped token needs write:jira-work."
         checked={behaviour.allowJiraChanges}
         onChange={setAllowJiraChanges}
       />

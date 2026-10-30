@@ -1020,6 +1020,33 @@ describe("IssueView", () => {
       expect(mocked.issueToggleMine).toHaveBeenCalledWith("10042");
     });
 
+    it("S asks Jira for the open issue's moves while changes to Jira are on", async () => {
+      mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ allowJiraChanges: true }) }));
+      renderIssue("10042");
+      await screen.findByRole("button", { name: "Assign NW-1042 to me" });
+
+      await press("issue.changeStatus");
+
+      expect(mocked.issueTransitions).toHaveBeenCalledWith("10042");
+    });
+
+    it("S explains that changes to Jira are off instead of opening the status menu", async () => {
+      renderIssue("10042");
+      await title("Checkout: address validation for DACH postcodes");
+
+      await press("issue.changeStatus");
+
+      expect(useStore.getState().toasts.map((t) => [t.kind, t.message])).toEqual([["info", "Changes to Jira are off. Turn them on in Settings → Connection."]]);
+      expect(mocked.issueTransitions).not.toHaveBeenCalled();
+    });
+
+    it("shows the status as a Change the status button while changes to Jira are on", async () => {
+      mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ allowJiraChanges: true }) }));
+      renderIssue("10042");
+
+      expect(await screen.findByRole("button", { name: "Change the status of NW-1042" })).toBeInTheDocument();
+    });
+
     it("I explains that changes to Jira are off instead of changing the open issue", async () => {
       renderIssue("10042");
       await title("Checkout: address validation for DACH postcodes");

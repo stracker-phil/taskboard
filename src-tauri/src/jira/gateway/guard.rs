@@ -98,7 +98,16 @@ const RULES: &[Rule] = &[
     ),
     read(Post, &[Literal("issue"), Literal("bulkfetch")], &[]),
     read(Post, &[Literal("jql"), Literal("parse")], &["validation"]),
+    read(
+        Get,
+        &[Literal("issue"), IssueIdOrKey, Literal("transitions")],
+        &[],
+    ),
     write(Put, &[Literal("issue"), IssueIdOrKey, Literal("assignee")]),
+    write(
+        Post,
+        &[Literal("issue"), IssueIdOrKey, Literal("transitions")],
+    ),
 ];
 
 /// `Ok` only for a request in the table (or the unauthenticated tenant-info read) on this site.

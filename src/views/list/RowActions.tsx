@@ -1,5 +1,6 @@
 import { CheckCheck, CircleDot, Copy, ExternalLink, Bookmark, UserRound } from "lucide-react";
 import type { MouseEvent } from "react";
+import type { MenuAt } from "../../components/menu";
 
 export interface RowActionHandlers {
   copyKey: (key: string) => void;
@@ -11,6 +12,8 @@ export interface RowActionHandlers {
   togglePin: (id: string) => void;
   /** Assigns the issue to me, or unassigns it when it is mine; null while changes to Jira are off. */
   toggleMine: ((id: string) => void) | null;
+  /** Opens the status menu under `at`; null while changes to Jira are off. */
+  changeStatus: ((issue: { id: string; key: string }, at: MenuAt) => void) | null;
 }
 
 interface Props {

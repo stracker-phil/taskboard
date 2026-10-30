@@ -5,7 +5,6 @@ import type { IssueDetail } from "../api";
 import { Avatar } from "../components/issue/Avatar";
 import { EpicChip } from "../components/issue/EpicChip";
 import { PriorityFlag } from "../components/issue/PriorityFlag";
-import { StatusPill } from "../components/issue/StatusPill";
 import { useIssue, useIssueActivity } from "../queries/issues";
 import { ActivityEntry } from "./Activity";
 import { hasContent } from "../lib/jiraHtml";
@@ -19,6 +18,7 @@ import { WebLinks } from "./WebLinks";
 import { PinButton } from "../pins/PinButton";
 import { useIssueActions } from "../views/list/useIssueActions";
 import { AssignMeButton } from "../writes/AssignMeButton";
+import { StatusMenuButton } from "../writes/StatusMenuButton";
 
 /** The 540px panel beside the list (artboard 4): the selected issue at a glance. */
 export function Peek({ id, onClose, onExpand }: { id: string; onClose: () => void; onExpand: () => void }) {
@@ -82,7 +82,7 @@ function Body({ issue, onExpand, onClose }: { issue: IssueDetail; onExpand: () =
       <h2 className={issue.gone ? "peek__title issue-title--gone" : "peek__title"}>{issue.summary}</h2>
       {issue.gone && <GoneNotice issue={issue} onRemoved={onClose} />}
       <div className="peek__chips">
-        <StatusPill style={issue.style} name={issue.statusName} variant="peek" />
+        <StatusMenuButton issue={issue} variant="peek" />
         {issue.epic && <EpicChip epic={issue.epic} />}
         {issue.releases.map((release) => (
           <span key={release} className="release-chip">

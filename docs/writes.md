@@ -1,6 +1,7 @@
 # Writes
 
-`src-tauri/src/writes/` changes Jira: today it assigns issues ([ADR 0044](adr/0044-writes-show-at-once-and-settle-after-jira.md)).
+`src-tauri/src/writes/` changes Jira: it assigns issues (`assign.rs`) and moves them along their workflow
+(`transition.rs`) ([ADR 0044](adr/0044-writes-show-at-once-and-settle-after-jira.md)).
 Every write is an allowlisted gateway endpoint with `Access::Write` ([jira.md](jira.md#gateway-and-allowlist)),
 sent once and never retried.
 
@@ -19,7 +20,7 @@ sent once and never retried.
 1. In one `Db::write`: the issue row shows the new value and `cache.pending_write` records it with the value
    the row had (`pending::begin`); `issues_changed` refreshes the page at once. A second write to the same
    field while one is on its way is refused.
-2. The write goes to Jira through `Source` (`assign`).
+2. The write goes to Jira through `Source` (`assign`, `transition`).
 3. Refused: the row gets `base` back (`pending::roll_back`) and the error reaches the page, which toasts it.
 4. Accepted: `sync::refetch_issue` fetches the issue with the sync's fields and stores it like a sync page;
    the pending row goes in the same transaction (`pending::settle`). If that fetch fails the row goes anyway.
@@ -30,10 +31,21 @@ record no `issue_change`, so they never show in Unread. At launch `writes::forge
 
 ## Outcome
 
-`WriteOutcome { done, reverse }`: `done` is the toast ("Assigned NW-1042 to you", "Unassigned NW-1042");
+`WriteOutcome { done, reverse }`: `done` is the toast ("Assigned NW-1042 to you", "Moved NW-1042 to Done");
 `reverse` is the opposite change and its label ("Change back to Jamie Doe", "Change back to Unassigned"),
 which the toast offers as its action (`src/writes/runWrite.ts`). It is a second change in Jira, never an undo.
-Assigning to the current assignee sends nothing and offers no reverse.
+Assigning to the current assignee, or moving to the current status, sends nothing and offers no reverse.
+
+## Status changes
+
+Jira's workflow decides which statuses an issue can move to, so `issue_transitions(id)` asks Jira each time the
+status menu opens (`GET issue/{id}/transitions`) and lists the moves by target status
+(`TransitionOption { id, statusName, style, opensJira }`, in Jira's order). A move with `hasScreen` needs fields
+Taskboard doesn't show: the menu marks it "Opens Jira" and opens the issue in the browser, and `apply` refuses it.
+`apply` asks for the moves again before it writes, so a move Jira no longer offers fails with a reason. The row
+shows the target status (and its category) at once; the pending row holds the status id. The reverse is the move
+back to the old status when Jira offers one without a screen ("Change back to In Progress"); otherwise none.
+Board drag and drop between status columns isn't built yet.
 
 ## Commands
 
@@ -41,6 +53,11 @@ Assigning to the current assignee sends nothing and offers no reverse.
 |---|---|
 | `issue_write(id, change)` | `Change::Assign { accountId }` (null unassigns) |
 | `issue_toggle_mine(id)` | assigns to me, or unassigns when it is mine |
+| `issue_write(id, Transition { transitionId })` | moves the issue along a transition from `issue_transitions` |
+| `issue_transitions(id)` | the moves Jira offers from the issue's status |
 
 In the page: the row hover toolbar's person button, the Issue view's and the Preview's header button (pressed
 while it is mine), the key **I** (`issue.toggleMine`) and Issue → Assign to Me or Unassign (also in the palette).
+The status pill in the Preview and the Issue view's field grid is the status menu's button (`StatusMenuButton`);
+**S** (`issue.changeStatus`) and Issue → Change Status… open the same menu under the pill, or under the selected
+row or card.

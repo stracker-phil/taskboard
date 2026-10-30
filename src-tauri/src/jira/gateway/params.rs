@@ -93,6 +93,24 @@ impl AccountId {
     }
 }
 
+/// A workflow transition's numeric id.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TransitionId(String);
+
+impl TransitionId {
+    pub fn parse(text: &str) -> AppResult<Self> {
+        if is_issue_id(text) {
+            Ok(Self(text.into()))
+        } else {
+            Err(refused("transition id", text))
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
 /// An attachment's numeric id.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AttachmentId(String);

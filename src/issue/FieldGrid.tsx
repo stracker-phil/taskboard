@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import type { Cell, IssueDetail } from "../api";
 import { Avatar } from "../components/issue/Avatar";
 import { PriorityFlag } from "../components/issue/PriorityFlag";
-import { StatusPill } from "../components/issue/StatusPill";
+import { StatusMenuButton } from "../writes/StatusMenuButton";
 
 function Field({ icon: Icon, label, children }: { icon?: LucideIcon; label: string; children: ReactNode }) {
   return (
@@ -37,7 +37,7 @@ export function FieldGrid({ issue, onOpenEpic }: { issue: IssueDetail; onOpenEpi
   return (
     <dl className="field-grid">
       <Field icon={CircleDot} label="Status">
-        <StatusPill style={issue.style} name={issue.statusName} />
+        <StatusMenuButton issue={issue} />
       </Field>
       <Field icon={User} label="Assignee">
         {issue.assignees.length > 0

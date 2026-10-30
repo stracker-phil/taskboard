@@ -6,6 +6,7 @@ mod comment;
 mod issue;
 mod meta;
 mod remote_link;
+mod transition;
 
 pub use attachment::{Attachment, AttachmentAuthor};
 pub(crate) use changelog::ChangelogPage;
@@ -17,6 +18,8 @@ pub use meta::{
     Field, FieldSchema, Myself, Project, Status, StatusCategory, TenantInfo, User, Version,
 };
 pub use remote_link::{RemoteApplication, RemoteIcon, RemoteLink, RemoteObject};
+pub use transition::Transition;
+pub(crate) use transition::Transitions;
 
 use serde::Deserialize;
 

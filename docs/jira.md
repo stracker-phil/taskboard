@@ -104,6 +104,8 @@ One method on `JiraClient` each (`jira/api.rs`), one `Endpoint` each; the answer
 | `changelog` | `GET issue/{id}/changelog`, every page by `startAt` (`maxResults=100`; only these two query keys are allowed) | `Changelog`, oldest first: id, author, time and the changed fields (`ChangeItem`: field name and id, `from`/`to` ids, `fromString`/`toString` texts). Asked when an issue is opened, at most every 5 minutes ([ADR 0031](adr/0031-issue-history-comes-from-the-changelog-on-demand.md)) |
 | `attachment_content` | `GET attachment/content/{id}?redirect=false` (the id digits only; `redirect` is the only query key) | the file's bytes in any format, through `Gateway::download` and `Http::download`: no redirect followed, at most `MAX_ATTACHMENT_BYTES` (50 MB, by `Content-Length` and while reading), a 5-minute timeout. For Quick Look ([ADR 0035](adr/0035-attachments-preview-in-quick-look.md)) and inline images ([ADR 0039](adr/0039-inline-images-come-from-issue-attachments-through-rust.md)) |
 | `check_jql` | `POST jql/parse?validation=strict` | Jira's messages; empty when valid |
+| `transitions` | `GET issue/{id}/transitions` | `Transition`: id, name, `to` status, `hasScreen` |
+| `transition` (write) | `POST issue/{id}/transitions` with `{"transition": {"id": …}}` (`TransitionId`: digits) | nothing (`204`) |
 | `assign` (write) | `PUT issue/{id}/assignee` with `{"accountId": …}` (`AccountId`: letters, digits, `:`, `_`, `-`, up to 128; null unassigns) | nothing (`204`) |
 | `used_custom_fields` | `POST search/jql`: `project = "KEY" ORDER BY updated DESC`, one page of 100, `*all` without the large system fields | the custom field ids with a value |
 

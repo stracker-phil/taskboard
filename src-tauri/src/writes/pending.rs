@@ -73,8 +73,15 @@ pub fn overlay(conn: &Connection, row: &mut IssueRow) -> AppResult<()> {
         let Some(field) = Field::parse(&field) else {
             continue;
         };
-        let fetched = match field {
-            Field::Assignee => std::mem::replace(&mut row.assignee_id, value),
+        let fetched = match (field, value) {
+            (Field::Assignee, value) => std::mem::replace(&mut row.assignee_id, value),
+            (Field::Status, Some(status_id)) => {
+                if let Some(category) = status_category(conn, &status_id)? {
+                    row.status_category = category;
+                }
+                Some(std::mem::replace(&mut row.status_id, status_id))
+            }
+            (Field::Status, None) => continue,
         };
         conn.execute(
             "UPDATE cache.pending_write SET base = ?3 WHERE issue_id = ?1 AND field = ?2",
@@ -87,6 +94,7 @@ pub fn overlay(conn: &Connection, row: &mut IssueRow) -> AppResult<()> {
 fn shown_value(conn: &Connection, issue_id: &str, field: Field) -> AppResult<Option<String>> {
     let column = match field {
         Field::Assignee => "assignee_id",
+        Field::Status => "status_id",
     };
     conn.query_row(
         &format!("SELECT {column} FROM cache.issue WHERE id = ?1 AND gone = 0"),
@@ -108,6 +116,23 @@ fn set_value(
             "UPDATE cache.issue SET assignee_id = ?2 WHERE id = ?1",
             params![issue_id, value],
         )?,
+        Field::Status => conn.execute(
+            "UPDATE cache.issue SET status_id = ?2,
+               status_category = COALESCE((SELECT category FROM cache.status WHERE id = ?2), status_category)
+             WHERE id = ?1",
+            params![issue_id, value],
+        )?,
     };
     Ok(())
+}
+
+/// `new`, `indeterminate` or `done`, from the cached statuses.
+fn status_category(conn: &Connection, status_id: &str) -> AppResult<Option<String>> {
+    Ok(conn
+        .query_row(
+            "SELECT category FROM cache.status WHERE id = ?1",
+            [status_id],
+            |row| row.get(0),
+        )
+        .optional()?)
 }

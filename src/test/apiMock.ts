@@ -149,6 +149,7 @@ export function createApiMock(): Api {
     issueSyncWebLinks: vi.fn().mockResolvedValue(false),
     issueSyncHistory: vi.fn().mockResolvedValue(false),
     issueForget: vi.fn().mockResolvedValue(undefined),
+    issueTransitions: vi.fn().mockResolvedValue([]),
     issueWrite: vi.fn(async (): Promise<WriteOutcome> => ({ done: "Done", reverse: null })),
     issueToggleMine: vi.fn(async (): Promise<WriteOutcome> => ({ done: "Done", reverse: null })),
     issueSyncComments: vi.fn().mockResolvedValue(false),

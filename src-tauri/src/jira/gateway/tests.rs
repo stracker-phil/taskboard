@@ -7,7 +7,7 @@ use url::Url;
 
 use super::{
     Access, AccountId, AttachmentId, BadRequest, Endpoint, Expand, FieldIds, IssueRef, IssueRefs,
-    Jql, PageToken, Planned, ProjectKey, check,
+    Jql, PageToken, Planned, ProjectKey, TransitionId, check,
 };
 use crate::error::AppError;
 use crate::jira::site::{Site, TokenKind};
@@ -164,6 +164,22 @@ fn allowlist() -> Vec<(Endpoint, Method, &'static str, Option<Value>)> {
             },
             Method::GET,
             "issue/10001/remotelink",
+            None,
+        ),
+        (
+            Endpoint::IssueTransitions {
+                issue: issue("NW-1042"),
+            },
+            Method::GET,
+            "issue/NW-1042/transitions",
+            None,
+        ),
+        (
+            Endpoint::IssueTransitions {
+                issue: issue("10001"),
+            },
+            Method::GET,
+            "issue/10001/transitions",
             None,
         ),
         (
@@ -423,8 +439,12 @@ fn the_guard_accepts_the_allowed_requests_when_built_by_hand() {
 fn paths_methods_and_queries_outside_the_table_are_refused() {
     let cases = [
         (Method::GET, "rest/api/3/issue/1"),
-        (Method::GET, "rest/api/3/issue/1/transitions"),
-        (Method::POST, "rest/api/3/issue/1/transitions"),
+        (Method::PUT, "rest/api/3/issue/1/transitions"),
+        (Method::DELETE, "rest/api/3/issue/1/transitions"),
+        (
+            Method::GET,
+            "rest/api/3/issue/1/transitions?expand=transitions.fields",
+        ),
         (Method::POST, "rest/api/3/issue/1/comment"),
         (Method::POST, "rest/api/3/issue"),
         (Method::PUT, "rest/api/3/issue/NW-1"),
@@ -921,6 +941,100 @@ fn a_put_with_a_body_is_accepted_on_the_assignee_path_while_a_get_with_a_body_is
             &site,
             "GET with a body on the assignee path",
         );
+    }
+}
+
+fn transition(issue_text: &str, id: &str) -> Endpoint {
+    Endpoint::TransitionIssue {
+        issue: issue(issue_text),
+        transition: TransitionId::parse(id).unwrap(),
+    }
+}
+
+#[test]
+fn a_transition_id_is_digits_only() {
+    for (text, valid) in [
+        ("31", true),
+        ("5", true),
+        ("", false),
+        ("-1", false),
+        ("3a", false),
+        ("3/1", false),
+        ("../31", false),
+        (" 31", false),
+        ("NW-1", false),
+    ] {
+        assert_eq!(TransitionId::parse(text).is_ok(), valid, "{text:?}");
+    }
+}
+
+#[test]
+fn moving_an_issue_plans_a_post_with_the_transition_id_in_the_body() {
+    for (prefix, site) in sites() {
+        for target in ["NW-1042", "10001"] {
+            let plan = transition(target, "31").plan(&site).unwrap();
+
+            assert_eq!(
+                plan.url.as_str(),
+                format!("{prefix}issue/{target}/transitions"),
+                "{target}"
+            );
+            assert_eq!(plan.method, Method::POST, "{target}");
+            assert_eq!(
+                plan.body,
+                Some(json!({ "transition": { "id": "31" } })),
+                "{target}"
+            );
+            assert!(plan.authenticated, "{target}");
+            assert_eq!(plan.access, Access::Write, "{target}");
+            assert_eq!(plan.bad_request, BadRequest::Plain, "{target}");
+            assert!(check(&plan, &site).is_ok(), "{prefix} {target}");
+        }
+    }
+}
+
+#[test]
+fn the_transition_request_is_refused_once_it_is_planned_as_a_read_or_changed_in_shape() {
+    for (label, site) in sites() {
+        let plan = transition("NW-1", "31").plan(&site).unwrap();
+
+        let mut as_read = plan.clone();
+        as_read.access = Access::Read;
+        assert_refused(&as_read, &site, &format!("{label} planned as a read"));
+
+        let mut unauthenticated = plan.clone();
+        unauthenticated.authenticated = false;
+        assert_refused(&unauthenticated, &site, &format!("{label} unauthenticated"));
+
+        let mut with_query = plan.clone();
+        with_query.url.query_pairs_mut().append_pair("expand", "x");
+        assert_refused(&with_query, &site, &format!("{label} with a query"));
+
+        for method in [Method::PUT, Method::DELETE, Method::PATCH] {
+            let mut other = plan.clone();
+            other.method = method.clone();
+            assert_refused(&other, &site, &format!("{label} as {method}"));
+        }
+    }
+}
+
+#[test]
+fn reading_transitions_is_a_read_and_writing_them_is_a_write() {
+    for (label, site) in sites() {
+        let url = url_for(&site, "rest/api/3/issue/NW-1/transitions");
+
+        let get = planned(Method::GET, &url);
+        assert!(check(&get, &site).is_ok(), "{label} GET");
+
+        let mut get_as_write = get.clone();
+        get_as_write.access = Access::Write;
+        assert_refused(&get_as_write, &site, &format!("{label} GET as a write"));
+
+        let post = write_request(Method::POST, &url, Access::Write);
+        assert!(check(&post, &site).is_ok(), "{label} POST");
+
+        let post_as_read = write_request(Method::POST, &url, Access::Read);
+        assert_refused(&post_as_read, &site, &format!("{label} POST as a read"));
     }
 }
 

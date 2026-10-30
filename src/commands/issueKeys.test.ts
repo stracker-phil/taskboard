@@ -23,6 +23,7 @@ function handlers(patch: Partial<IssueKeyHandlers> = {}) {
     togglePin: vi.fn(),
     toggleRead: vi.fn(),
     toggleMine: vi.fn(),
+    changeStatus: vi.fn(),
     togglePeek: vi.fn(),
     hasSelection: () => true,
     peekOpen: () => true,
@@ -64,6 +65,7 @@ describe("issue keys", () => {
       ["⌘↵", "Enter", { meta: true }],
       ["P", "p", {}],
       ["I", "i", {}],
+      ["S", "s", {}],
     ])("leaves %s to nobody", (_label, key, mods) => {
       expect(press(key, mods)).toBeNull();
     });
@@ -189,6 +191,23 @@ describe("issue keys", () => {
       register(handlers({ hasSelection: () => false }));
 
       expect(press("i")).toBeNull();
+    });
+  });
+
+  describe("changing the status", () => {
+    it("S changes the selected issue's status", () => {
+      const h = handlers();
+      register(h);
+
+      void press("s")?.run();
+
+      expect(h.changeStatus).toHaveBeenCalled();
+    });
+
+    it("ignores S without a selected row", () => {
+      register(handlers({ hasSelection: () => false }));
+
+      expect(press("s")).toBeNull();
     });
   });
 

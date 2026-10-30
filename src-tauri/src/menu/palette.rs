@@ -242,6 +242,7 @@ mod tests {
                 "page:issue.togglePin",
                 "page:issue.markSeen",
                 "page:issue.toggleMine",
+                "page:issue.changeStatus",
             ]
         );
     }

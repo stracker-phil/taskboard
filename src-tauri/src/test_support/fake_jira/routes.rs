@@ -20,6 +20,8 @@ pub struct Content {
     /// Revoked: the user can no longer see these issue ids.
     pub hidden: HashSet<String>,
     pub page_size: Option<usize>,
+    /// Status ids whose transitions ask for a screen.
+    pub screens: HashSet<String>,
     pub max_results_cap: usize,
 }
 
@@ -56,6 +58,8 @@ pub fn route(site: &mut Content, request: &Recorded) -> Response {
         ("GET", ["attachment", "content", id]) => attachment_content(site, id, request),
         ("POST", ["jql", "parse"]) => parse_jql(&request.body),
         ("PUT", ["issue", key, "assignee"]) => writes::assign(site, key, &request.body),
+        ("GET", ["issue", key, "transitions"]) => writes::transitions(site, key),
+        ("POST", ["issue", key, "transitions"]) => writes::transition(site, key, &request.body),
         _ => not_found(),
     }
 }

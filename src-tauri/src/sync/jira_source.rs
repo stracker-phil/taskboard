@@ -8,7 +8,8 @@ use std::sync::Arc;
 use super::source::{Answer, IssuePages, Source, SourceKind};
 use crate::error::AppResult;
 use crate::jira::dto::{
-    BulkFetch, Changelog, Comment, Field, Myself, Project, RemoteLink, SearchPage, Status, Version,
+    BulkFetch, Changelog, Comment, Field, Myself, Project, RemoteLink, SearchPage, Status,
+    Transition, Version,
 };
 use crate::jira::{JiraClient, SearchPages, SearchRequest};
 
@@ -87,6 +88,14 @@ impl Source for JiraSource {
 
     fn used_custom_fields<'a>(&'a self, space_key: &'a str) -> Answer<'a, BTreeSet<String>> {
         Box::pin(self.client.used_custom_fields(space_key))
+    }
+
+    fn transitions<'a>(&'a self, issue_id: &'a str) -> Answer<'a, Vec<Transition>> {
+        Box::pin(self.client.transitions(issue_id))
+    }
+
+    fn transition<'a>(&'a self, issue_id: &'a str, transition_id: &'a str) -> Answer<'a, ()> {
+        Box::pin(self.client.transition(issue_id, transition_id))
     }
 
     fn assign<'a>(&'a self, issue_id: &'a str, account_id: Option<&'a str>) -> Answer<'a, ()> {

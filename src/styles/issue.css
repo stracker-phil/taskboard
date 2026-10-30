@@ -89,3 +89,7 @@
 /* An issue key copies itself on a click (components/issue/CopyKey). */
 .copy-key { border-radius: 4px; cursor: pointer; transition: color var(--motion-fast) var(--ease-out), background-color var(--motion-fast) var(--ease-out); }
 .copy-key:hover { background: var(--hover-bg); color: var(--accent-text); }
+
+/* The status pill as the status menu's button (writes on); the pill keeps its look. */
+.status-menu-button { display: inline-flex; padding: 0; border: 0; background: none; border-radius: 7px; cursor: pointer; }
+.status-menu-button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }

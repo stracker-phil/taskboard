@@ -54,6 +54,7 @@ import type {
   View,
   ViewData,
   ViewPlace,
+  TransitionOption,
   WebLink,
   WriteOutcome,
 } from "./types";
@@ -208,6 +209,8 @@ export const api = {
   issueWrite: (id: string, change: Change) => invoke<WriteOutcome>("issue_write", { id, change }),
   /** Assigns the issue to me, or unassigns it when it is mine. */
   issueToggleMine: (id: string) => invoke<WriteOutcome>("issue_toggle_mine", { id }),
+  /** The moves Jira offers from the issue's status. */
+  issueTransitions: (id: string) => invoke<TransitionOption[]>("issue_transitions", { id }),
   /** The person's profile picture as a `data:` URL, fetched and cached by Rust; null shows initials. */
   userAvatar: (accountId: string) => invoke<string | null>("user_avatar", { accountId }),
   placeGet: (listId: number, viewId: number) => invoke<ViewPlace | null>("place_get", { listId, viewId }),

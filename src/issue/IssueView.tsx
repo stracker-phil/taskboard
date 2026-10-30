@@ -33,6 +33,7 @@ import { Children, Links } from "./Related";
 import { WebLinks } from "./WebLinks";
 import { explainWritesOff } from "../writes/runWrite";
 import { AssignMeButton } from "../writes/AssignMeButton";
+import { statusMenuAnchor } from "../writes/statusMenu";
 
 /** The issue's neighbors among the rows the origin view shows (open groups, expanded subtrees), for the
  *  previous/next arrows and J/K; an issue the view hides steps through all of its rows. */
@@ -263,6 +264,12 @@ function IssueKeys({ issue, neighbors }: { issue: IssueDetail | undefined; neigh
       toggleMine: () => {
         const id = state.current.issue?.id;
         if (id) (state.current.actions.toggleMine ?? explainWritesOff)(id);
+      },
+      changeStatus: () => {
+        const { issue, actions } = state.current;
+        if (!issue) return;
+        if (actions.changeStatus) actions.changeStatus(issue, statusMenuAnchor(issue.id));
+        else explainWritesOff();
       },
       toggleRead: () => {
         const issue = state.current.issue;

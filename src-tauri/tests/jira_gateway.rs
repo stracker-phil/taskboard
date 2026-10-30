@@ -596,6 +596,149 @@ mod writes {
         }
         assert!(fake.requests().is_empty());
     }
+
+    async fn status_id_of(client: &JiraClient) -> String {
+        let found = client
+            .bulk_fetch(&strings(&[ISSUE]), &strings(&["status"]))
+            .await
+            .unwrap();
+        found.issues[0].fields["status"]["id"]
+            .as_str()
+            .unwrap()
+            .to_string()
+    }
+
+    #[tokio::test]
+    async fn the_transitions_of_an_issue_are_one_move_to_every_other_status_in_the_sites_order() {
+        let fake = FakeJira::start_demo().await;
+        fake.require_screen("10001");
+
+        let moves = fake
+            .client(TokenKind::Classic)
+            .transitions(ISSUE)
+            .await
+            .unwrap();
+
+        let listed: Vec<(&str, &str, &str, bool)> = moves
+            .iter()
+            .map(|t| {
+                (
+                    t.id.as_str(),
+                    t.name.as_str(),
+                    t.to.id.as_str(),
+                    t.has_screen,
+                )
+            })
+            .collect();
+        assert_eq!(
+            listed,
+            [
+                ("10000", "To Do", "10000", false),
+                ("10002", "In Review", "10002", false),
+                ("10003", "Blocked", "10003", false),
+                ("10001", "Done", "10001", true),
+            ]
+        );
+        let requests = fake.requests();
+        assert_eq!(requests.len(), 1);
+        assert_eq!(requests[0].method, "GET");
+        assert_eq!(requests[0].path, "/rest/api/3/issue/NW-1042/transitions");
+    }
+
+    #[tokio::test]
+    async fn moving_an_issue_sends_one_post_sets_its_status_and_makes_it_newer() {
+        for kind in [TokenKind::Classic, TokenKind::Scoped] {
+            let fake = FakeJira::start_demo().await;
+            let client = fake.client(kind);
+            let (_, updated_before) = issue_state(&client).await;
+
+            client.transition(ISSUE, "10001").await.unwrap();
+
+            assert_eq!(status_id_of(&client).await, "10001", "{kind:?}");
+            let (_, updated_after) = issue_state(&client).await;
+            assert!(
+                parse_jira_time(&updated_after).unwrap()
+                    > parse_jira_time(&updated_before).unwrap(),
+                "{kind:?}: {updated_before} -> {updated_after}"
+            );
+            let posts: Vec<_> = fake
+                .requests()
+                .into_iter()
+                .filter(|r| r.method == "POST" && r.path.ends_with("/transitions"))
+                .collect();
+            assert_eq!(posts.len(), 1, "{kind:?}");
+            let base = fake.site(kind).api_base().unwrap();
+            assert_eq!(
+                posts[0].path,
+                format!("{}issue/NW-1042/transitions", base.path()),
+                "{kind:?}"
+            );
+            assert_eq!(
+                posts[0].body,
+                json!({ "transition": { "id": "10001" } }),
+                "{kind:?}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn a_move_the_issue_cannot_make_is_refused_and_leaves_the_status_alone() {
+        let fake = FakeJira::start_demo().await;
+        let client = fake.client(TokenKind::Classic);
+        let before = status_id_of(&client).await;
+
+        for (label, id) in [("an unknown id", "99999"), ("the current status", "3")] {
+            let err = client.transition(ISSUE, id).await.unwrap_err();
+
+            assert_eq!(err.kind(), ErrorKind::InvalidInput, "{label}");
+            assert_eq!(status_id_of(&client).await, before, "{label}");
+        }
+    }
+
+    #[tokio::test]
+    async fn moving_an_issue_that_is_hidden_is_not_found() {
+        let fake = FakeJira::start_demo().await;
+        fake.revoke_access("NW-1020");
+
+        let err = fake
+            .client(TokenKind::Classic)
+            .transition("NW-1020", "10001")
+            .await
+            .unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::NotFound);
+    }
+
+    #[tokio::test]
+    async fn a_transition_id_that_could_change_the_url_or_body_sends_nothing() {
+        let fake = FakeJira::start_demo().await;
+        let client = fake.client(TokenKind::Classic);
+
+        for (label, id) in [
+            ("a slash", "1/2"),
+            ("letters", "done"),
+            ("empty", ""),
+            ("a climb", "../x"),
+        ] {
+            let err = client.transition(ISSUE, id).await.unwrap_err();
+
+            assert_eq!(err.kind(), ErrorKind::InvalidInput, "{label}");
+        }
+        assert!(fake.requests().is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_move_is_sent_once_when_jira_is_rate_limited() {
+        let fake = FakeJira::start_demo().await;
+        fake.fail_next(1, 429, Some("0"));
+        let client = fake.client(TokenKind::Classic);
+
+        let err = client.transition(ISSUE, "10001").await.unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::Internal);
+        assert_eq!(fake.requests().len(), 1);
+        assert_eq!(status_id_of(&client).await, "3");
+    }
 }
 
 mod audit {
