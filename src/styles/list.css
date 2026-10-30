@@ -91,18 +91,23 @@
 .row-actions__btn:hover:not(:disabled) { background: var(--hover-bg); color: var(--text); }
 .row-actions__btn:disabled { opacity: 0.45; }
 
-/* Wrapped titles (the List's default): a row grows with its title; cells stay centered, the square sits on the
-   first line. The key and subtask icon lead the title's flow and the chips follow it, so a wrapped line starts
-   under the key and the chips never narrow the title. */
-.list-row--wrap { height: auto; min-height: 44px; padding-top: 8px; padding-bottom: 8px; }
+/* Wrapped titles (the List's default): a row grows with its title. Everything hangs from the first line, 11px
+   below the row's top edge as on a one-line row, so the square and the key never move with what wraps below; every
+   inline item keeps to the 22px line box, so the first line never grows. The key and subtask icon lead the title's
+   flow and the chips follow it, so a wrapped line starts under the key and the chips never narrow the title. */
+.list-row--wrap { align-items: start; height: auto; min-height: 44px; padding-top: 10px; padding-bottom: 11px; }
+.list-row--wrap .list-row__cell { height: 22px; }
+.list-row--wrap .list-row__cell:has(.list-cell--labels) { height: auto; min-height: 22px; }
 .list-row--wrap .list-row__name { align-items: flex-start; }
 .list-row--wrap .list-row__title { display: block; line-height: 22px; white-space: normal; overflow-wrap: anywhere; word-spacing: 4px; }
 .list-row--wrap .list-row__summary { white-space: normal; text-overflow: clip; word-spacing: normal; }
 .list-row--wrap .list-cell--labels { flex-wrap: wrap; }
 .list-row--wrap .list-row__title > .list-row__key, .list-row--wrap .list-row__title > .subtask-icon { margin-right: 8px; }
-.list-row--wrap .list-row__title > .subtask-icon { vertical-align: -2px; }
+.list-row--wrap .list-row__title > :is(.list-row__key, .subtask-icon) { line-height: 22px; vertical-align: top; }
+.list-row--wrap .list-row__title > .subtask-icon { margin-top: 4px; }
 .list-row--wrap .status-square { margin-top: 6px; }
-.list-row--wrap .list-row__title > :is(.change-chip, .comment-count, .subtask-count) { margin-top: 2px; vertical-align: top; word-spacing: normal; }
+.list-row--wrap .list-row__title > :is(.change-chip, .comment-count, .subtask-count) { vertical-align: top; word-spacing: normal; }
+.list-row--wrap .list-row__title > .change-chip { margin-top: 2px; line-height: 18px; }
 
 /* Hierarchy (ADR 0040): each level indents one step. A row's caret sits beside the row, since the card clips
    what its rows draw outside it: a top-level row's in the gutter under its group's chevron, a nested row's just
