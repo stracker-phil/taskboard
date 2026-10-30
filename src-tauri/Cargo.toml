@@ -44,7 +44,7 @@ unicode-normalization = "0.1.26"
 # Quick Look for attachments (ADR 0035).
 objc2 = "0.6"
 objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSString", "NSURL"] }
-objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSPanel", "NSWindow", "NSResponder"] }
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSEvent", "NSPanel", "NSWindow", "NSResponder"] }
 objc2-quick-look-ui = { version = "0.3", default-features = false, features = ["std", "QLPreviewItem", "QLPreviewPanel", "objc2-app-kit"] }
 
 [features]

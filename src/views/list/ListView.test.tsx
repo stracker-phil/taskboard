@@ -66,6 +66,10 @@ async function renderList(data: ViewData, openWith: IssueOpening | null = null) 
 const OPEN = row({ id: "1", key: "NW-1042", summary: "Redesign the pricing page", commentCount: 3 });
 const DONE = row({ id: "2", key: "NW-1001", summary: "Publish the launch notes", style: "done", statusName: "Done" });
 
+/** A preview opens once the double-click interval (500ms in the API mock) has passed. */
+const PREVIEW_WAIT = { timeout: 2000 };
+const pastDoubleClickInterval = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 700)));
+
 describe("ListView", () => {
   it("renders nothing until the rows have loaded", () => {
     mocked.viewRows.mockReturnValue(new Promise(() => {}));
@@ -167,7 +171,8 @@ describe("ListView", () => {
 
       await userEvent.click(await screen.findByText("Publish the launch notes"));
 
-      expect(place()).toMatchObject({ selectedId: "2", peekOpen: true });
+      expect(place().selectedId).toBe("2");
+      await waitFor(() => expect(place().peekOpen).toBe(true), PREVIEW_WAIT);
     });
 
     it("asks Rust to sync the history and web links of the clicked row", async () => {
@@ -201,8 +206,38 @@ describe("ListView", () => {
 
       await click();
 
-      expect(place()).toMatchObject({ selectedId: "2", peekOpen: true });
+      await waitFor(() => expect(place()).toMatchObject({ selectedId: "2", peekOpen: true }), PREVIEW_WAIT);
       expect(useStore.getState().issueView).toBeNull();
+    });
+
+    it("selects the row at once and opens the preview only after the double-click interval", async () => {
+      await renderList(data(), "preview");
+
+      await click();
+
+      expect(place()).toMatchObject({ selectedId: "2", peekOpen: false });
+      await waitFor(() => expect(place().peekOpen).toBe(true), PREVIEW_WAIT);
+    });
+
+    it("moves an open preview to the clicked row at once", async () => {
+      await renderList(data(), "preview");
+      await userEvent.click(await screen.findByText("Redesign the pricing page"));
+      await waitFor(() => expect(place()).toMatchObject({ selectedId: "1", peekOpen: true }), PREVIEW_WAIT);
+
+      await click();
+
+      expect(place()).toMatchObject({ selectedId: "2", peekOpen: true });
+    });
+
+    it("does not open the preview for a row the selection has left in the meantime", async () => {
+      installCommands("main");
+      await renderList(data(), "preview");
+      await userEvent.click(await screen.findByText("Redesign the pricing page"));
+
+      await act(async () => void (await getCommand("issue.next")?.run()));
+      await pastDoubleClickInterval();
+
+      expect(place()).toMatchObject({ selectedId: "2", peekOpen: false });
     });
 
     it("selects the row without the preview and opens the Issue view over the view when the view opens in full", async () => {
@@ -230,13 +265,23 @@ describe("ListView", () => {
 
       await click();
 
-      expect(place()).toMatchObject({ selectedId: "2", peekOpen: true });
+      await waitFor(() => expect(place()).toMatchObject({ selectedId: "2", peekOpen: true }), PREVIEW_WAIT);
       expect(useStore.getState().issueView).toBeNull();
     });
   });
 
   describe("opening an issue by double-click", () => {
     const data = () => viewData([groupOf([OPEN, DONE])], [OPEN, DONE]);
+
+    it("opens the Issue view alone, never the preview, even after the interval has passed", async () => {
+      await renderList(data(), "preview");
+
+      await userEvent.dblClick(await screen.findByText("Publish the launch notes"));
+      await pastDoubleClickInterval();
+
+      expect(useStore.getState().issueView).toEqual({ origin: { listId: 11, viewId: 101 }, stack: ["2"] });
+      expect(place()).toMatchObject({ selectedId: "2", peekOpen: false });
+    });
 
     it("opens the Issue view even when the view opens with the preview", async () => {
       await renderList(data(), "preview");
@@ -867,6 +912,7 @@ describe("ListView", () => {
     it("keeps the peek open or closed as it was while moving", async () => {
       await renderList(viewData([groupOf(rows)], rows));
       await userEvent.click(await screen.findByText("Redesign the pricing page"));
+      await waitFor(() => expect(place().peekOpen).toBe(true), PREVIEW_WAIT);
       await press("peek.close");
       expect(place().peekOpen).toBe(false);
 
@@ -919,7 +965,7 @@ describe("ListView", () => {
     it("closes the selected issue's peek and opens it again", async () => {
       await renderList(viewData([groupOf(rows)], rows));
       await userEvent.click(await screen.findByText("Fix the footer links"));
-      expect(place()).toMatchObject({ selectedId: "3", peekOpen: true });
+      await waitFor(() => expect(place()).toMatchObject({ selectedId: "3", peekOpen: true }), PREVIEW_WAIT);
 
       await press("issue.togglePeek");
       expect(place()).toMatchObject({ selectedId: "3", peekOpen: false });

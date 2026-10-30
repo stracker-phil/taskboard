@@ -72,6 +72,7 @@ export const api = {
   diagnosticsGet: () => invoke<Diagnostics>("diagnostics_get"),
   /** https links only; Rust refuses anything else. */
   openUrl: (url: string) => invoke<void>("open_url", { url }),
+  doubleClickMs: () => invoke<number>("double_click_ms"),
   /** Downloads the attachment from the Jira site (once per app run) and shows it in Quick Look. */
   attachmentPreview: (issueId: string, attachmentId: string) => invoke<void>("attachment_preview", { issueId, attachmentId }),
   /** Where the webview loads an image attached to the issue for rich text; it fails to load when there is none (ADR 0042). */

@@ -251,7 +251,9 @@ results, the preview closes; the row stays selected for when it comes back.
 What a click opens is the view's choice (Columns → Open issues in: Default, Preview, Full view; `view.open_with`,
 null for Default) or else Settings → General → Open issues in (`behaviour.openIssuesIn`, Preview unless changed;
 `useIssueOpening`). Full view opens the Issue view at once, the row still selected. A double-click on a List or Table row
-always opens the Issue view; a Board always opens it.
+always opens the Issue view, and only it: a click selects the row at once, but a closed preview waits out the
+system's double-click interval (`useRowClicks`, the `double_click_ms` command) and a double-click cancels it. An
+open preview follows the click at once. A Board always opens the Issue view.
 
 - Header 50: mono key · type text, then Bookmark (with bookmarks), Open in Jira, Full view, Close.
 - Body: title 22/750, one line of chips (status pill `peek`, epic chip, release outline chip, priority,

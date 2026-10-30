@@ -155,6 +155,12 @@ pub fn sanitize_log_text(text: &str) -> String {
         .replace('\r', "\\r")
 }
 
+/// The system's double-click interval in milliseconds: how long a click on a row waits for a second one.
+#[tauri::command]
+pub fn double_click_ms() -> u32 {
+    (objc2_app_kit::NSEvent::doubleClickInterval() * 1000.0).round() as u32
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

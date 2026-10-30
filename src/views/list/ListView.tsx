@@ -15,6 +15,7 @@ import { useIssueOpening } from "../useIssueOpening";
 import { useRememberedScroll } from "../useRememberedScroll";
 import { useIssueActions } from "./useIssueActions";
 import { usePinnedIssues } from "./usePinnedIssues";
+import { useRowClicks } from "./useRowClicks";
 import { useRowKeys } from "./useRowKeys";
 import { useRowSizing } from "./useRowSizing";
 import { useRowsPlace } from "./useRowsPlace";
@@ -105,14 +106,7 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
   const keys = useRowKeys({ ...place, items, rowIds, data, select, toggle, actions, scrollToIndex, open });
 
   // Stable, so rows that didn't change skip re-rendering.
-  const onSelect = useCallback(
-    (id: string) => {
-      keys.current.select(id, opening === "preview");
-      if (opening === "full") keys.current.open(id);
-    },
-    [keys, opening],
-  );
-  const onOpen = useCallback((id: string) => keys.current.open(id), [keys]);
+  const { onSelect, onOpen } = useRowClicks(keys, opening);
   const onToggleSubtasks = useCallback((id: string) => keys.current.setSubtasksOpen(id, !keys.current.subtasksOpen(id)), [keys]);
 
   return (

@@ -61,6 +61,10 @@ async function renderTable(data: ViewData = viewData([groupOf([OPEN, DONE])], [O
 }
 
 const place = () => useStore.getState().places["11:101"];
+
+/** A preview opens once the double-click interval (500ms in the API mock) has passed. */
+const PREVIEW_WAIT = { timeout: 2000 };
+const pastDoubleClickInterval = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 700)));
 const press = (id: string) => act(async () => void (await getCommand(id)?.run()));
 
 /** The header cell with this column name. */
@@ -327,8 +331,37 @@ describe("TableView", () => {
 
       await userEvent.click(await screen.findByText("Publish the launch notes"));
 
-      expect(useStore.getState().places["11:101"]).toMatchObject({ selectedId: "2", peekOpen: true });
+      await waitFor(() => expect(place()).toMatchObject({ selectedId: "2", peekOpen: true }), PREVIEW_WAIT);
       expect(useStore.getState().issueView).toBeNull();
+    });
+
+    it("selects the row at once and opens the preview only after the double-click interval", async () => {
+      await renderTable(undefined, { ...TABLE, openWith: "preview" });
+
+      await userEvent.click(await screen.findByText("Publish the launch notes"));
+
+      expect(place()).toMatchObject({ selectedId: "2", peekOpen: false });
+      await waitFor(() => expect(place().peekOpen).toBe(true), PREVIEW_WAIT);
+    });
+
+    it("moves an open preview to the clicked row at once", async () => {
+      await renderTable(undefined, { ...TABLE, openWith: "preview" });
+      await userEvent.click(await screen.findByText("Redesign the pricing page"));
+      await waitFor(() => expect(place()).toMatchObject({ selectedId: "1", peekOpen: true }), PREVIEW_WAIT);
+
+      await userEvent.click(screen.getByText("Publish the launch notes"));
+
+      expect(place()).toMatchObject({ selectedId: "2", peekOpen: true });
+    });
+
+    it("opens the Issue view alone, never the preview, for a double-clicked row even after the interval has passed", async () => {
+      await renderTable(undefined, { ...TABLE, openWith: "preview" });
+
+      await userEvent.dblClick(await screen.findByText("Publish the launch notes"));
+      await pastDoubleClickInterval();
+
+      expect(useStore.getState().issueView).toEqual({ origin: { listId: 11, viewId: 101 }, stack: ["2"] });
+      expect(place()).toMatchObject({ selectedId: "2", peekOpen: false });
     });
 
     it("opens the Issue view over the view when the view opens in full", async () => {
@@ -512,7 +545,7 @@ describe("TableView", () => {
     it("closes the selected issue's peek and opens it again", async () => {
       await renderTable(flat());
       await userEvent.click(await screen.findByText("Publish the launch notes"));
-      expect(place()).toMatchObject({ selectedId: "2", peekOpen: true });
+      await waitFor(() => expect(place()).toMatchObject({ selectedId: "2", peekOpen: true }), PREVIEW_WAIT);
 
       await press("issue.togglePeek");
       expect(place()).toMatchObject({ selectedId: "2", peekOpen: false });
@@ -524,6 +557,7 @@ describe("TableView", () => {
     it("closes the peek on escape and keeps the row selected", async () => {
       await renderTable(flat());
       await userEvent.click(await screen.findByText("Publish the launch notes"));
+      await waitFor(() => expect(place().peekOpen).toBe(true), PREVIEW_WAIT);
 
       await press("peek.close");
 
