@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { type CSSProperties, Fragment } from "react";
 import type { Row } from "../../api";
 import { CopyKey } from "../../components/issue/CopyKey";
 import { ChangeChip } from "../../components/issue/ChangeChip";
@@ -38,30 +38,42 @@ interface Props {
 export function IssueRow(props: Props) {
   const { row, columns, position, wrap = false, inlineLabels = false, selected, onSelect, onOpen, actions } = props;
   const { nesting = null, subtasksOpen = true, onToggleSubtasks, childChip = false } = props;
-  const className = ["list-row", `list-row--${position}`, wrap && "list-row--wrap", nesting && nesting.depth > 0 && "list-row--child", row.changed && "list-row--changed", selected && "list-row--selected"]
+  const nested = (nesting?.depth ?? 0) > 0;
+  const className = ["list-row", `list-row--${position}`, wrap && "list-row--wrap", nested && "list-row--child", row.changed && "list-row--changed", selected && "list-row--selected"]
     .filter(Boolean)
     .join(" ");
+  // A wrapping title takes the chips into its flow, each after a space that vanishes at a line start; on one
+  // line they follow the title and the summary is cut first.
+  const chips = [
+    childChip && <ChildCount key="children" count={row.childCount} />,
+    row.changeNote && <ChangeChip key="change" note={row.changeNote} />,
+    <CommentCount key="comments" count={row.commentCount} />,
+  ];
+  const flowingChips = chips.map((chip) => chip && <Fragment key={chip.key}> {chip}</Fragment>);
+  const indentStyle = { "--depth": nesting?.depth ?? 0 } as CSSProperties;
+  const caretClass = ["list-row-caret", nested && "list-row-caret--nested", wrap && "list-row-caret--wrap"].filter(Boolean).join(" ");
   return (
-    <div className={className} style={{ "--depth": nesting?.depth ?? 0 } as CSSProperties} role="row" aria-selected={selected} data-issue-id={row.id} onClick={() => onSelect(row.id)} onDoubleClick={(e) => opensIssue(e) && onOpen(row.id)}>
-      <span className="list-row__name" role="gridcell">
-        {nesting?.parent && <SubtaskCaret open={subtasksOpen} onToggle={() => onToggleSubtasks?.(row.id)} />}
-        <StatusSquare style={row.style} />
-        <CopyKey className="list-row__key" issueKey={row.key} />
-        {row.isSubtask && <SubtaskIcon />}
-        <span className="list-row__title">
-          <span className="list-row__summary">{row.summary}</span>
-          {inlineLabels && <LabelChips labels={row.labels} className={wrap ? "row-labels row-labels--flow" : "row-labels"} />}
+    <>
+      {nesting?.parent && <SubtaskCaret className={caretClass} style={indentStyle} open={subtasksOpen} onToggle={() => onToggleSubtasks?.(row.id)} />}
+      <div className={className} style={indentStyle} role="row" aria-selected={selected} data-issue-id={row.id} onClick={() => onSelect(row.id)} onDoubleClick={(e) => opensIssue(e) && onOpen(row.id)}>
+        <span className="list-row__name" role="gridcell">
+          <StatusSquare style={row.style} />
+          <span className="list-row__title">
+            <CopyKey className="list-row__key" issueKey={row.key} />
+            {row.isSubtask && <SubtaskIcon />}
+            <span className="list-row__summary">{row.summary}</span>
+            {inlineLabels && <LabelChips labels={row.labels} className={wrap ? "row-labels row-labels--flow" : "row-labels"} />}
+            {wrap && flowingChips}
+          </span>
+          {!wrap && chips}
+          <RowActions issueId={row.id} issueKey={row.key} changed={row.changed} actions={actions} />
         </span>
-        {childChip && <ChildCount count={row.childCount} />}
-        {row.changeNote && <ChangeChip note={row.changeNote} />}
-        <CommentCount count={row.commentCount} />
-        <RowActions issueId={row.id} issueKey={row.key} changed={row.changed} actions={actions} />
-      </span>
-      {columns.map((id) => (
-        <span key={id} className="list-row__cell" role="gridcell">
-          {columnDef(id).cell(row)}
-        </span>
-      ))}
-    </div>
+        {columns.map((id) => (
+          <span key={id} className="list-row__cell" role="gridcell">
+            {columnDef(id).cell(row)}
+          </span>
+        ))}
+      </div>
+    </>
   );
 }

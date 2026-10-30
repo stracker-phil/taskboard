@@ -177,8 +177,10 @@ one group, Board column or pill per style, whatever the status is called; the Bo
   value, such as a long epic name, truncates and shows in full on hover. Gap 20, rows padded 16.
 - Rows 44: square, mono key, summary (600 when changed, on `--changed-bg`), change chip, comment count, then
   the cells. Long titles wrap onto more lines by default and the row grows (each row is measured); "Wrap long
-  titles" in the Columns popover turns that off per view, and titles truncate instead (`view.wrap_titles`). The
-  Table always truncates at a fixed row height; Board cards always wrap. A clicked row is selected (`--selection-bg`).
+  titles" in the Columns popover turns that off per view, and titles truncate instead (`view.wrap_titles`). A
+  wrapped title is one flow: the key and the subtask glyph lead it, the change chip, comment count and child count
+  follow its last word, and its lines start under the key; only the square keeps its own column. The Table
+  always truncates at a fixed row height; Board cards always wrap. A clicked row is selected (`--selection-bg`).
 - An issue's labels show as small tags (`row-labels`, 18px `label-chip`s) after its title in the List, the
   Table and on Board cards, unless the view shows the Labels field. The Columns popover lists the field as
   "Labels (column)" ("Labels (card field)" on a Board) and has a "Labels (inline)" switch (`view.inline_labels`,
@@ -196,8 +198,8 @@ one group, Board column or pill per style, whatever the status is called; the Bo
   left, a line down bending right into a circle bottom right, lucide style), muted 12px like the comment count,
   "3 child issues" as its tooltip. List: a subtask is a row like any other, with the glyph before its title.
   Hierarchy: each result's subtree follows it, every level indented 24 more (`list-row--child`, the row's
-  `--depth`); a 16px caret just left of a row's indent (`SubtaskCaret`) collapses or expands its subtree at any
-  level, and a collapsed row shows the count chip. Collapsed rows are kept per view (`places.json`); expanded is
+  `--depth`); a 16px caret (`SubtaskCaret`) collapses or expands its subtree at any level: a top-level row's sits
+  in the gutter left of the card, under its group's chevron; a nested row's 6 before its square, and a collapsed row shows the count chip. Collapsed rows are kept per view (`places.json`); expanded is
   the default.
 
 ## Peek

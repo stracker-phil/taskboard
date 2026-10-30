@@ -270,6 +270,20 @@ describe("ListView", () => {
       expect(await screen.findByRole("row", { name: /NW-1042/ })).toHaveClass("list-row--wrap");
     });
 
+    it("still shows a wrapping row's change note and comment count", async () => {
+      const changed = row({ id: "3", key: "NW-1003", summary: "Fix the footer links", changed: true, changeNote: "2 new comments", commentCount: 4 });
+      mocked.viewRows.mockResolvedValue(viewData([groupOf([changed])], [changed]));
+      render(
+        <QueryClientProvider client={createQueryClient()}>
+          <ListView listId={11} viewId={101} wrapTitles />
+        </QueryClientProvider>,
+      );
+
+      const issue = await screen.findByRole("row", { name: /NW-1003/ });
+      expect(within(issue).getByText("2 new comments")).toBeInTheDocument();
+      expect(within(issue).getByLabelText("4 comments")).toBeInTheDocument();
+    });
+
     it("keeps titles on one line when wrapping is off", async () => {
       renderWith(false);
 
@@ -353,6 +367,15 @@ describe("ListView", () => {
     const modeData = (subtasks: ViewData["subtasks"], rows = [PARENT, STEP, LAST_STEP, OTHER]) => viewData([groupOf(rows)], rows, { subtasks });
     const rowOf = (key: RegExp) => screen.getByRole("row", { name: key });
     const caret = (name: "Collapse subtasks" | "Expand subtasks") => screen.findByRole("button", { name });
+    const caretOf = (key: RegExp) => {
+      const before = rowOf(key).previousElementSibling;
+      return before instanceof HTMLButtonElement && /subtasks$/.test(before.getAttribute("aria-label") ?? "") ? before : null;
+    };
+    const toggleCaretOf = async (key: RegExp) => {
+      const button = caretOf(key);
+      if (!button) throw new Error(`No subtask caret before ${key}`);
+      await userEvent.click(button);
+    };
 
     it("shows a parent's child count as a chip after its title in Hidden", async () => {
       const single = row({ id: "3", key: "NW-1003", summary: "Fix the footer links", childCount: 1 });
@@ -373,9 +396,52 @@ describe("ListView", () => {
       expect(rowOf(/NW-1044/)).toHaveClass("list-row--child");
       expect(rowOf(/NW-1042/)).not.toHaveClass("list-row--child");
       expect(rowOf(/NW-1001/)).not.toHaveClass("list-row--child");
-      expect(within(rowOf(/NW-1042/)).getByRole("button", { name: "Collapse subtasks" })).toHaveAttribute("aria-expanded", "true");
+      expect(caretOf(/NW-1042/)).toHaveAccessibleName("Collapse subtasks");
+      expect(caretOf(/NW-1042/)).toHaveAttribute("aria-expanded", "true");
       expect(within(rowOf(/NW-1042/)).queryByLabelText("2 child issues")).not.toBeInTheDocument();
-      expect(within(rowOf(/NW-1001/)).queryByRole("button", { name: /subtasks$/ })).not.toBeInTheDocument();
+      expect(caretOf(/NW-1001/)).toBeNull();
+    });
+
+    it("leaves the selection where it was when a caret is clicked", async () => {
+      await renderList(modeData("hierarchy"));
+      await userEvent.click(await screen.findByText("Publish the launch notes"));
+
+      await toggleCaretOf(/NW-1042/);
+
+      expect(rowOf(/NW-1001/)).toHaveAttribute("aria-selected", "true");
+      expect(rowOf(/NW-1042/)).toHaveAttribute("aria-selected", "false");
+      expect(place().selectedId).toBe("2");
+    });
+
+    it("selects nothing when a caret is clicked with no selection", async () => {
+      await renderList(modeData("hierarchy"));
+      await screen.findByRole("row", { name: /NW-1042/ });
+
+      await toggleCaretOf(/NW-1042/);
+
+      expect(place().selectedId).toBeNull();
+    });
+
+    it("shows the key and subtask icon inside the title, before the summary", async () => {
+      await renderList(modeData("hierarchy"));
+
+      const step = await screen.findByRole("row", { name: /NW-1043/ });
+      const key = within(step).getByText("NW-1043");
+      const summary = within(step).getByText("Draft the price table");
+      expect(key.compareDocumentPosition(summary) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(summary.parentElement).toContainElement(key);
+      expect(summary.parentElement).toContainElement(step.querySelector<HTMLElement>(".subtask-icon"));
+    });
+
+    it("copies a parent's key in Hierarchy without selecting the row or toggling its subtasks", async () => {
+      await renderList(modeData("hierarchy"));
+
+      await userEvent.click(within(await screen.findByRole("row", { name: /NW-1042/ })).getByText("NW-1042"));
+
+      expect(mocked.copyText).toHaveBeenCalledWith("NW-1042");
+      expect(rowOf(/NW-1042/)).toHaveAttribute("aria-selected", "false");
+      expect(caretOf(/NW-1042/)).toHaveAccessibleName("Collapse subtasks");
+      expect(screen.getByText("Draft the price table")).toBeInTheDocument();
     });
 
     describe("with several levels in Hierarchy", () => {
@@ -410,17 +476,18 @@ describe("ListView", () => {
 
         await screen.findByRole("row", { name: /NW-2001/ });
         for (const key of [/NW-2001/, /NW-2002/, /NW-2003/]) {
-          expect(within(rowOf(key)).getByRole("button", { name: "Collapse subtasks" })).toBeInTheDocument();
+          expect(caretOf(key)).toHaveAccessibleName("Collapse subtasks");
         }
         for (const key of [/NW-2004/, /NW-2005/, /NW-2006/]) {
-          expect(within(rowOf(key)).queryByRole("button", { name: /subtasks$/ })).not.toBeInTheDocument();
+          expect(caretOf(key)).toBeNull();
         }
       });
 
       it("collapses only the subtree of a mid-level row and leaves its siblings and the rest", async () => {
         await renderList(modeData("hierarchy", tree));
 
-        await userEvent.click(within(await screen.findByRole("row", { name: /NW-2002/ })).getByRole("button", { name: "Collapse subtasks" }));
+        await screen.findByRole("row", { name: /NW-2002/ });
+        await toggleCaretOf(/NW-2002/);
 
         expect(screen.queryByText("Proofread the welcome article")).not.toBeInTheDocument();
         expect(screen.queryByText("Check the screenshots")).not.toBeInTheDocument();
@@ -434,7 +501,7 @@ describe("ListView", () => {
         await renderList(modeData("hierarchy", tree));
         await userEvent.click(await screen.findByText("Check the screenshots"));
 
-        await userEvent.click(within(rowOf(/NW-2002/)).getByRole("button", { name: "Collapse subtasks" }));
+        await toggleCaretOf(/NW-2002/);
 
         expect(selectedKeys()).toEqual(["NW-2002"]);
       });
@@ -472,7 +539,8 @@ describe("ListView", () => {
 
       it("walks the visible rows with next and previous, skipping a collapsed subtree", async () => {
         await renderList(modeData("hierarchy", tree));
-        await userEvent.click(within(await screen.findByRole("row", { name: /NW-2002/ })).getByRole("button", { name: "Collapse subtasks" }));
+        await screen.findByRole("row", { name: /NW-2002/ });
+        await toggleCaretOf(/NW-2002/);
         await userEvent.click(screen.getByText("Write the onboarding articles"));
 
         await press("issue.next");

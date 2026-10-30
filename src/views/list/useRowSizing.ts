@@ -46,7 +46,8 @@ export function useRowSizing(items: Item[], factors: Record<string, number>, wra
     if (item.kind === "row" && item.groupKey in factors) {
       const factor = motionFactor(item, factors);
       const start = wrapTitles ? startHeights.current.get(item.row.id) : undefined;
-      Object.assign(style, { opacity: factor, overflow: "hidden" }, start === undefined ? {} : { height: start * factor });
+      // Clip only vertically: a top-level row's caret sits in the gutter left of the card.
+      Object.assign(style, { opacity: factor, overflowY: "clip" }, start === undefined ? {} : { height: start * factor });
     }
     return { ref: wrapTitles ? virtualizer.measureElement : undefined, "data-index": virtual.index, style };
   };

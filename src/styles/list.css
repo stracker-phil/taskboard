@@ -89,22 +89,24 @@
 .row-actions__btn:hover:not(:disabled) { background: var(--hover-bg); color: var(--text); }
 .row-actions__btn:disabled { opacity: 0.45; }
 
-/* Wrapped titles (the List's default): a row grows with its title; cells stay centered, the square and key sit
-   on the first line. */
+/* Wrapped titles (the List's default): a row grows with its title; cells stay centered, the square sits on the
+   first line. The key and subtask icon lead the title's flow and the chips follow it, so a wrapped line starts
+   under the key and the chips never narrow the title. */
 .list-row--wrap { height: auto; min-height: 44px; padding-top: 8px; padding-bottom: 8px; }
 .list-row--wrap .list-row__name { align-items: flex-start; }
-.list-row--wrap .list-row__title { display: block; line-height: 22px; white-space: normal; overflow-wrap: anywhere; }
-.list-row--wrap .list-row__summary { white-space: normal; text-overflow: clip; }
+.list-row--wrap .list-row__title { display: block; line-height: 22px; white-space: normal; overflow-wrap: anywhere; word-spacing: 4px; }
+.list-row--wrap .list-row__summary { white-space: normal; text-overflow: clip; word-spacing: normal; }
 .list-row--wrap .list-cell--labels { flex-wrap: wrap; }
-.list-row--wrap .list-row__key { line-height: 22px; }
+.list-row--wrap .list-row__title > .list-row__key, .list-row--wrap .list-row__title > .subtask-icon { margin-right: 8px; }
+.list-row--wrap .list-row__title > .subtask-icon { vertical-align: -2px; }
 .list-row--wrap .status-square { margin-top: 6px; }
-.list-row--wrap .change-chip, .list-row--wrap .comment-count { margin-top: 2px; }
+.list-row--wrap .list-row__title > :is(.change-chip, .comment-count, .subtask-count) { margin-top: 2px; vertical-align: top; word-spacing: normal; }
 
-/* Hierarchy (ADR 0040): each level indents one step; a row's caret sits just left of its indent, the root's in
-   the row's left padding. */
-.list-row { --indent-step: 24px; }
-.list-row__name > .subtask-caret { position: absolute; left: calc(var(--depth, 0) * var(--indent-step) - 17px); top: 50%; transform: translateY(-50%); }
+/* Hierarchy (ADR 0040): each level indents one step. A row's caret sits beside the row, since the card clips
+   what its rows draw outside it: a top-level row's in the gutter under its group's chevron, a nested row's just
+   before its status square. */
+.list-item { --indent-step: 24px; }
+.list-row-caret { position: absolute; left: -26px; top: 22px; transform: translateY(-50%); z-index: 1; }
+.list-row-caret--nested { left: calc(var(--depth) * var(--indent-step) - 6px); }
+.list-row-caret--wrap { top: 11px; transform: none; }
 .list-row--child .list-row__name { padding-left: calc(var(--depth) * var(--indent-step)); }
-.list-row--wrap .list-row__name > .subtask-caret { top: 3px; transform: none; }
-.list-row--wrap .subtask-icon { margin-top: 4px; }
-.list-row--wrap .subtask-count { margin-top: 2px; }
