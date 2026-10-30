@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { narrowingKey } from "./narrowing";
 import { resetStore, useStore } from "../store";
 
 const ORIGIN = { listId: 3, viewId: 7 };
@@ -51,6 +52,14 @@ describe("issue view slice", () => {
       useStore.getState().showIssue("10060");
 
       expect(stack()).toEqual(["10042", "10060"]);
+    });
+
+    it("selects the issue in the origin view's place", () => {
+      useStore.getState().openIssue("10042", ORIGIN);
+
+      useStore.getState().showIssue("10060");
+
+      expect(useStore.getState().places[narrowingKey(ORIGIN.listId, ORIGIN.viewId)].selectedId).toBe("10060");
     });
 
     it("does nothing while the Issue view is closed", () => {

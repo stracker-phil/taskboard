@@ -1,4 +1,4 @@
-import { useQuery, type QueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, type QueryClient } from "@tanstack/react-query";
 import { api } from "../api";
 
 /** Every issue's detail; `issueKey` is one issue's. */
@@ -10,8 +10,14 @@ export const useIssueRelated = (id: string) => useQuery({ queryKey: [...issueKey
 export const webLinksKey = (id: string) => [...issueKey(id), "webLinks"] as const;
 export const useIssueWebLinks = (id: string) => useQuery({ queryKey: webLinksKey(id), queryFn: () => api.issueWebLinks(id) });
 
-export const useIssue = (id: string | null) =>
-  useQuery({ queryKey: issueKey(id ?? ""), queryFn: () => api.issueGet(id ?? ""), enabled: id !== null });
+/** With `keepPrevious`, the last issue stays (as placeholder data) while the next one loads. */
+export const useIssue = (id: string | null, { keepPrevious = false } = {}) =>
+  useQuery({
+    queryKey: issueKey(id ?? ""),
+    queryFn: () => api.issueGet(id ?? ""),
+    enabled: id !== null,
+    placeholderData: keepPrevious ? keepPreviousData : undefined,
+  });
 
 /** Loads an issue ahead, so moving to it shows it without a loading frame. */
 export const prefetchIssue = (client: QueryClient, id: string) =>

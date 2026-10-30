@@ -422,10 +422,18 @@ describe("Peek", () => {
   });
 
   it("says the issue is no longer in the cache when Rust cannot find it", async () => {
-    mocked.issueGet.mockRejectedValue({ kind: "notFound", message: "No such issue", code: null });
+    mocked.issueGet.mockRejectedValue({ kind: "not_found", message: "No such issue", code: null });
     renderPeek();
 
     expect(await screen.findByText("This issue is no longer in the cache.")).toBeInTheDocument();
     expect(screen.queryByRole("heading")).not.toBeInTheDocument();
+  });
+
+  it("gives Rust's reason instead when loading the issue fails for another cause", async () => {
+    mocked.issueGet.mockRejectedValue({ kind: "db", message: "Disk full", code: null });
+    renderPeek();
+
+    expect(await screen.findByText("Could not load this issue: Disk full")).toBeInTheDocument();
+    expect(screen.queryByText("This issue is no longer in the cache.")).not.toBeInTheDocument();
   });
 });

@@ -12,6 +12,7 @@ import { hasContent } from "../lib/jiraHtml";
 import { JiraHtml } from "./JiraHtml";
 import { RichFields } from "./RichFields";
 import { GoneNotice } from "./GoneNotice";
+import { IssueMissing } from "./IssueMissing";
 import { SinceBanner } from "./SinceBanner";
 import { useSeenAfter } from "./useSeenAfter";
 import { WebLinks } from "./WebLinks";
@@ -20,7 +21,7 @@ import { useIssueActions } from "../views/list/useIssueActions";
 
 /** The 540px panel beside the list (artboard 4): the selected issue at a glance. */
 export function Peek({ id, onClose, onExpand }: { id: string; onClose: () => void; onExpand: () => void }) {
-  const { data: issue, isError } = useIssue(id);
+  const { data: issue, error } = useIssue(id);
   const actions = useIssueActions();
   const bodyRef = useRef<HTMLDivElement>(null);
   useSeenAfter(id, issue?.unread ?? false);
@@ -56,7 +57,7 @@ export function Peek({ id, onClose, onExpand }: { id: string; onClose: () => voi
         </button>
       </header>
       <div ref={bodyRef} className="peek__body">
-        {issue ? <Body issue={issue} onExpand={onExpand} onClose={onClose} /> : isError ? <p className="peek__missing">This issue is no longer in the cache.</p> : null}
+        {issue ? <Body issue={issue} onExpand={onExpand} onClose={onClose} /> : error ? <IssueMissing error={error} className="peek__missing" /> : null}
       </div>
       <footer className="peek__footer">
         <span>J / K next</span>

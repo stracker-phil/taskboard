@@ -1,12 +1,13 @@
 import { ArrowDown, ArrowLeft, ArrowUp, CheckCheck, CircleDot, ExternalLink, Link2 } from "lucide-react";
 import { CopyKey } from "../components/issue/CopyKey";
-import { useEffect, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef } from "react";
 import { api, type IssueDetail } from "../api";
 import { onIssueKeys } from "../commands/issueKeys";
 import { SpaceTile } from "../components/SpaceTile";
 import { hasContent } from "../lib/jiraHtml";
 import { formatLocalTime } from "../lib/time";
-import { refreshIssueExtras, useIssue, useIssueRelated } from "../queries/issues";
+import { prefetchIssue, refreshIssueExtras, useIssue, useIssueRelated } from "../queries/issues";
 import { useNavGo, useSidebar, useViews } from "../queries/sidebar";
 import { useRequestNarrowing, useViewRows } from "../queries/views";
 import { findLevel, spaceOf } from "../shell/levels";
@@ -18,7 +19,9 @@ import { PinButton } from "../pins/PinButton";
 import { useIssueActions } from "../views/list/useIssueActions";
 import { Activity } from "./Activity";
 import { Attachments } from "./Attachments";
+import { flatten } from "../views/list/flatten";
 import { GoneNotice } from "./GoneNotice";
+import { IssueMissing } from "./IssueMissing";
 import { SinceBanner } from "./SinceBanner";
 import { holdUnread, useSeenAfter } from "./useSeenAfter";
 import { FieldGrid } from "./FieldGrid";
@@ -27,11 +30,20 @@ import { RichFields } from "./RichFields";
 import { Children, Links } from "./Related";
 import { WebLinks } from "./WebLinks";
 
-/** The issue's neighbors in the view it was opened from, for the previous/next arrows and J/K. */
+/** The issue's neighbors among the rows the origin view shows (open groups, expanded subtrees), for the
+ *  previous/next arrows and J/K; an issue the view hides steps through all of its rows. */
 function useNeighbors(origin: IssueOrigin, id: string): { previous: string | null; next: string | null } {
   const narrowing = useRequestNarrowing(origin.listId, origin.viewId);
   const { data } = useViewRows(origin.listId, origin.viewId, narrowing);
-  const order = data?.groups.flatMap((group) => group.rowIds) ?? [];
+  const place = useStore((s) => s.places[narrowingKey(origin.listId, origin.viewId)]);
+  const order = useMemo(() => {
+    if (!data) return [];
+    const toggled = place?.toggled ?? {};
+    const shown = flatten(data, (group) => toggled[group.key] ?? !group.collapsedByDefault, place?.collapsedParents).flatMap((item) =>
+      item.kind === "row" ? [item.row.id] : [],
+    );
+    return shown.includes(id) ? shown : data.groups.flatMap((group) => group.rowIds);
+  }, [data, place, id]);
   const at = order.indexOf(id);
   if (at < 0) return { previous: null, next: null };
   return { previous: order[at - 1] ?? null, next: order[at + 1] ?? null };
@@ -39,27 +51,32 @@ function useNeighbors(origin: IssueOrigin, id: string): { previous: string | nul
 
 /** The full Issue view (artboards 5 and 6): it fills the content panel; one layout for every issue type. */
 export function IssueView({ id, origin }: { id: string; origin: IssueOrigin }) {
-  const { data: issue, isError } = useIssue(id);
+  // The previous issue stays on screen until the next one loads; its neighbors load ahead.
+  const { data: issue, error, isPlaceholderData } = useIssue(id, { keepPrevious: true });
   const back = useStore((s) => s.issueBack);
   const neighbors = useNeighbors(origin, id);
-  useSeenAfter(id, issue?.unread ?? false);
+  const client = useQueryClient();
+  useSeenAfter(id, !isPlaceholderData && (issue?.unread ?? false));
 
   useEffect(() => {
     // Comments may be newer in Jira than in the cache; a failure (offline) leaves the cached ones.
     void api.issueSyncComments(id).catch(() => {});
     refreshIssueExtras(id);
   }, [id]);
+  useEffect(() => {
+    for (const neighbor of [neighbors.previous, neighbors.next]) if (neighbor) prefetchIssue(client, neighbor);
+  }, [client, neighbors.previous, neighbors.next]);
 
   return (
     <div className="issue-view">
       <IssueHeader issue={issue} origin={origin} neighbors={neighbors} onBack={back} />
       <div className="issue-view__columns">
         <div className="issue-view__main">
-          {issue ? <IssueMain issue={issue} origin={origin} /> : isError ? <p className="issue-view__missing">This issue is no longer in the cache.</p> : null}
+          {issue ? <IssueMain issue={issue} origin={origin} /> : error ? <IssueMissing error={error} className="issue-view__missing" /> : null}
         </div>
         <Activity id={id} />
       </div>
-      <IssueKeys issue={issue} neighbors={neighbors} />
+      <IssueKeys issue={isPlaceholderData ? undefined : issue} neighbors={neighbors} />
     </div>
   );
 }

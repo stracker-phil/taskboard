@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
 
-import { api, type IssueDetail, type Row } from "../api";
+import { api, type IssueDetail, type Row, type ViewPlace } from "../api";
 import { installCommands } from "../commands";
 import { getCommand, resolveKeydown } from "../commands/registry";
 import { issueKey } from "../queries/issues";
@@ -30,9 +30,30 @@ const EPIC = issueDetail({ id: "10001", key: "NW-1001", issueType: "Epic", summa
 function serve(...issues: IssueDetail[]) {
   mocked.issueGet.mockImplementation(async (id) => {
     const found = issues.find((issue) => issue.id === id);
-    if (!found) throw Object.assign(new Error("No such issue"), { kind: "notFound", code: null });
+    if (!found) throw Object.assign(new Error("No such issue"), { kind: "not_found", code: null });
     return found;
   });
+}
+
+const STEP_ISSUES = ["10041", "10042", "10043", "10044"].map((id) => issueDetail({ id, key: `NW-${id.slice(1)}`, summary: `Step ${id}` }));
+const stepRows = (...ids: string[]) => ids.map((id) => row({ id, key: `NW-${id.slice(1)}` }));
+
+function Stepping() {
+  const view = useStore((s) => s.issueView);
+  return view ? <IssueView id={view.stack.at(-1)!} origin={view.origin} /> : null;
+}
+
+/** Renders the Issue view the way the app does: it shows whichever issue is on top of the store's stack. */
+function renderStepping(id: string, place: Partial<ViewPlace> = {}) {
+  resetStore({ issueView: { origin: ORIGIN, stack: [id] } });
+  useStore.getState().updatePlace(ORIGIN.listId, ORIGIN.viewId, place);
+  const client = createQueryClient();
+  const view = render(
+    <QueryClientProvider client={client}>
+      <Stepping />
+    </QueryClientProvider>,
+  );
+  return { ...view, client };
 }
 
 function renderIssue(id = "10042", origin = ORIGIN) {
@@ -266,6 +287,148 @@ describe("IssueView", () => {
     });
   });
 
+  describe("stepping with J and K", () => {
+    const press = (id: string) => act(async () => void (await getCommand(id)?.run()));
+    const stepTitle = (id: string) => title(`Step ${id}`);
+
+    beforeEach(() => {
+      installCommands("main");
+      serve(...STEP_ISSUES);
+    });
+
+    async function ready() {
+      await waitFor(() => expect(screen.getByRole("button", { name: "Next issue" })).toBeEnabled());
+    }
+
+    it("keeps the previous issue on screen until the next one has loaded", async () => {
+      let release: (issue: IssueDetail) => void = () => {};
+      const pending = new Promise<IssueDetail>((resolve) => (release = resolve));
+      mocked.issueGet.mockImplementation(async (id) => (id === "10043" ? pending : STEP_ISSUES.find((issue) => issue.id === id)!));
+      mocked.viewRows.mockResolvedValue(viewData([groupOf(stepRows("10041", "10042", "10043"))], stepRows("10041", "10042", "10043")));
+      renderStepping("10042");
+      await stepTitle("10042");
+      await ready();
+
+      await press("issue.next");
+
+      expect(screen.getByRole("heading", { level: 1, name: "Step 10042" })).toBeInTheDocument();
+      await act(async () => release(STEP_ISSUES[2]));
+      expect(await stepTitle("10043")).toBeInTheDocument();
+      expect(screen.queryByRole("heading", { level: 1, name: "Step 10042" })).not.toBeInTheDocument();
+    });
+
+    it("shows a neighbor at once because it was loaded ahead", async () => {
+      const rows = stepRows("10041", "10042", "10043");
+      mocked.viewRows.mockResolvedValue(viewData([groupOf(rows)], rows));
+      const { client } = renderStepping("10042");
+      await stepTitle("10042");
+      await ready();
+      await waitFor(() => expect(client.getQueryData(issueKey("10043"))).toBeDefined());
+
+      await press("issue.next");
+
+      expect(screen.getByRole("heading", { level: 1, name: "Step 10043" })).toBeInTheDocument();
+    });
+
+    it("steps back with K", async () => {
+      const rows = stepRows("10041", "10042", "10043");
+      mocked.viewRows.mockResolvedValue(viewData([groupOf(rows)], rows));
+      renderStepping("10042");
+      await stepTitle("10042");
+      await ready();
+
+      await press("issue.previous");
+
+      expect(await stepTitle("10041")).toBeInTheDocument();
+    });
+
+    it("skips the issues of a group the List has collapsed", async () => {
+      const [a, b, c] = [stepRows("10041", "10042"), stepRows("10043"), stepRows("10044")];
+      mocked.viewRows.mockResolvedValue(
+        viewData([groupOf(a, { key: "status:a" }), groupOf(b, { key: "status:b" }), groupOf(c, { key: "status:c" })], [...a, ...b, ...c]),
+      );
+      renderStepping("10042", { toggled: { "status:b": false } });
+      await stepTitle("10042");
+      await ready();
+
+      await press("issue.next");
+
+      expect(await stepTitle("10044")).toBeInTheDocument();
+    });
+
+    it("skips a group that is collapsed by default and steps into one the List opened", async () => {
+      const [a, b, c] = [stepRows("10041"), stepRows("10042"), stepRows("10043")];
+      mocked.viewRows.mockResolvedValue(
+        viewData(
+          [groupOf(a, { key: "status:a" }), groupOf(b, { key: "status:b", collapsedByDefault: true }), groupOf(c, { key: "status:c", collapsedByDefault: true })],
+          [...a, ...b, ...c],
+        ),
+      );
+      renderStepping("10041", { toggled: { "status:c": true } });
+      await stepTitle("10041");
+      await ready();
+
+      await press("issue.next");
+
+      expect(await stepTitle("10043")).toBeInTheDocument();
+    });
+
+    it("skips the subtasks of a collapsed parent in Hierarchy", async () => {
+      const rows = [row({ id: "10041", key: "NW-1041" }), row({ id: "10042", key: "NW-1042", depth: 1, isSubtask: true, parentId: "10041" }), row({ id: "10043", key: "NW-1043" })];
+      mocked.viewRows.mockResolvedValue(viewData([groupOf(rows)], rows, { subtasks: "hierarchy" }));
+      renderStepping("10041", { collapsedParents: ["10041"] });
+      await stepTitle("10041");
+      await ready();
+
+      await press("issue.next");
+
+      expect(await stepTitle("10043")).toBeInTheDocument();
+    });
+
+    it("steps into the subtasks of an expanded parent in Hierarchy", async () => {
+      const rows = [row({ id: "10041", key: "NW-1041" }), row({ id: "10042", key: "NW-1042", depth: 1, isSubtask: true, parentId: "10041" }), row({ id: "10043", key: "NW-1043" })];
+      mocked.viewRows.mockResolvedValue(viewData([groupOf(rows)], rows, { subtasks: "hierarchy" }));
+      renderStepping("10041");
+      await stepTitle("10041");
+      await ready();
+
+      await press("issue.next");
+
+      expect(await stepTitle("10042")).toBeInTheDocument();
+    });
+
+    it("steps through every row of the view when the shown issue is hidden in the List", async () => {
+      const [a, b, c] = [stepRows("10041"), stepRows("10042"), stepRows("10043")];
+      mocked.viewRows.mockResolvedValue(
+        viewData([groupOf(a, { key: "status:a" }), groupOf(b, { key: "status:b" }), groupOf(c, { key: "status:c" })], [...a, ...b, ...c]),
+      );
+      renderStepping("10042", { toggled: { "status:b": false } });
+      await stepTitle("10042");
+      await ready();
+
+      await press("issue.previous");
+
+      expect(await stepTitle("10041")).toBeInTheDocument();
+    });
+
+    it("leaves the last shown issue selected in the origin view when going back", async () => {
+      const rows = stepRows("10041", "10042", "10043", "10044");
+      mocked.viewRows.mockResolvedValue(viewData([groupOf(rows)], rows));
+      renderStepping("10041");
+      await stepTitle("10041");
+      await ready();
+
+      await press("issue.next");
+      await stepTitle("10042");
+      await press("issue.next");
+      await stepTitle("10043");
+      await press("issue.back");
+
+      expect(useStore.getState().issueView).toBeNull();
+      expect(useStore.getState().places[narrowingKey(ORIGIN.listId, ORIGIN.viewId)].selectedId).toBe("10043");
+    });
+  });
+
   describe("main column", () => {
     it("shows the type badge, key, comment count and title", async () => {
       renderIssue();
@@ -333,11 +496,19 @@ describe("IssueView", () => {
     });
 
     it("says the issue is no longer in the cache when Rust cannot find it", async () => {
-      mocked.issueGet.mockRejectedValue({ kind: "notFound", message: "No such issue", code: null });
+      mocked.issueGet.mockRejectedValue({ kind: "not_found", message: "No such issue", code: null });
       renderIssue();
 
       expect(await screen.findByText("This issue is no longer in the cache.")).toBeInTheDocument();
       expect(screen.queryByRole("heading", { level: 1 })).not.toBeInTheDocument();
+    });
+
+    it("names the reason when the issue fails to load for another cause", async () => {
+      mocked.issueGet.mockRejectedValue({ kind: "db", message: "Disk full", code: null });
+      renderIssue();
+
+      expect(await screen.findByText("Could not load this issue: Disk full")).toBeInTheDocument();
+      expect(screen.queryByText("This issue is no longer in the cache.")).not.toBeInTheDocument();
     });
 
     it("lists the issue's web links", async () => {

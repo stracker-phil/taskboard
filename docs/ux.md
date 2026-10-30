@@ -319,6 +319,9 @@ view with its place intact).
 
 - Header 50: back, breadcrumb (Space tile and name / list or view / key and a copy-link button), "Updated …", previous and next in the
   view's order (also J/K), Mark as read or unread, Bookmark (with bookmarks), **Open in Jira** (primary).
+  Previous and next step through the rows the view shows (not those in collapsed groups or subtrees), move the
+  view's selection along, and keep the current issue on screen until the next one loads (the neighbors load
+  ahead). An issue missing from the cache says so; any other failure shows Rust's reason.
 - Main column: type badge · key · comment count (· attachment count, when there are any), the 30/750 title, the field grid (Status, Assignee, Epic chip
   that opens the epic here, Release, Priority, Sprint, then the custom fields shown as columns or marked shown,
   then every other custom field the issue fills, by name), links ("blocks", "is blocked by"), the description,
