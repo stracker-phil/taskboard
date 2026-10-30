@@ -47,7 +47,7 @@
 
 /* Hover and press: a short tint or border change on every interactive element. */
 .sb-row, .sb-new-list, .sb-sync, .sb-settings, .sb-spaces__add, .view-tab, .view-tabs__add,
-.content-header__jira, .content-header__crumb, .icon-btn, .btn-primary-dark {
+.open-in-jira, .content-header__crumb, .icon-btn, .btn-primary-dark {
   transition: background-color var(--motion-fast) var(--ease-out), color var(--motion-fast) var(--ease-out),
     border-color var(--motion-fast) var(--ease-out), box-shadow var(--motion-fast) var(--ease-out);
 }
@@ -55,10 +55,11 @@
 /* A view switch shows the next view at once: its toolbar takes its controls' state without transitions. */
 .motion-off, .motion-off * { transition: none !important; }
 
-/* The app's tooltip (components/TooltipHost.tsx): small, dark on light and light on dark, rising in. */
+/* The app's tooltip (components/TooltipHost.tsx): small and dark in both schemes, rising in. */
 .tooltip {
   position: fixed; z-index: 100; max-width: 280px; padding: 4px 8px; border-radius: 6px; transform: translateX(-50%);
-  background: var(--tooltip-bg); color: var(--tooltip-text); box-shadow: var(--shadow-raised);
+  border: 1px solid var(--tooltip-border); background: var(--tooltip-bg); color: var(--tooltip-text);
+  box-shadow: var(--shadow-raised);
   font-size: 12px; font-weight: 500; line-height: 1.35; pointer-events: none; white-space: pre-line;
   animation: tooltip-in var(--motion-fast) var(--ease-out);
 }

@@ -1,4 +1,5 @@
 import { usePageAction } from "../commands/pageActions";
+import { OpenInJiraButton } from "../components/OpenInJiraButton";
 import { browseUrl } from "../lib/jiraLinks";
 import { api, type SpaceNode } from "../api";
 import { useConnection } from "../queries/settings";
@@ -51,9 +52,5 @@ function OpenInJira({ space }: { space: SpaceNode | null }) {
   const { data: connection } = useConnection();
   const url = space ? browseUrl(connection?.connection.siteUrl, space.key) : null;
   if (!url) return null;
-  return (
-    <button type="button" className="content-header__jira" onClick={() => void attempt(api.openUrl(url), "Could not open Jira")}>
-      Open in Jira <span aria-hidden="true">↗</span>
-    </button>
-  );
+  return <OpenInJiraButton onClick={() => void attempt(api.openUrl(url), "Could not open Jira")} />;
 }

@@ -1,9 +1,10 @@
-import { ArrowDown, ArrowLeft, ArrowUp, CheckCheck, CircleDot, ExternalLink, Link2 } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, CheckCheck, CircleDot, Link2 } from "lucide-react";
 import { CopyKey } from "../components/issue/CopyKey";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef } from "react";
 import { api, type IssueDetail } from "../api";
 import { onIssueKeys } from "../commands/issueKeys";
+import { OpenInJiraButton } from "../components/OpenInJiraButton";
 import { SpaceTile } from "../components/SpaceTile";
 import { hasContent } from "../lib/jiraHtml";
 import { formatLocalTime } from "../lib/time";
@@ -141,10 +142,7 @@ function IssueHeader({
       {issue && <ReadToggle issue={issue} />}
       {issue && <PinButton kind="issue" target={issue.id} label="Bookmark this issue" meta={issue.key} className="issue-header__nav" />}
       {issue && actions.openInJira && (
-        <button type="button" className="btn-primary-dark issue-header__jira" onClick={() => actions.openInJira?.(issue.key)}>
-          Open in Jira
-          <ExternalLink size={13} strokeWidth={2} aria-hidden="true" />
-        </button>
+        <OpenInJiraButton onClick={() => actions.openInJira?.(issue.key)} />
       )}
     </header>
   );

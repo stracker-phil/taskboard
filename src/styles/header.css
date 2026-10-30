@@ -32,7 +32,8 @@
   font-size: 13px;
 }
 .content-header__crumb:hover { color: var(--text); }
-.content-header__jira {
+/* components/OpenInJiraButton.tsx */
+.open-in-jira {
   display: flex;
   flex: none;
   align-items: center;
@@ -45,7 +46,7 @@
   color: var(--text-secondary);
   font-size: 13px;
 }
-.content-header__jira:hover { background: var(--fill-subtle); }
+.open-in-jira:hover { background: var(--fill-subtle); }
 .content-header__action {
   height: 28px; padding: 0 10px; border: 1px solid var(--border); border-radius: 7px; background: var(--panel-bg);
   color: var(--text-secondary); font: inherit; font-size: 12px; font-weight: 600; cursor: default;
