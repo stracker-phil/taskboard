@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { api, type Layout, type View } from "../api";
 import { usePageAction } from "../commands/pageActions";
+import { usePaletteMenu } from "../palette/menus";
 import { onSelectView } from "../commands/viewKeys";
 import { LookPopover } from "../components/look/LookPopover";
 import { openContextMenu, openMenu, type MenuEntry } from "../components/menu";
@@ -57,13 +58,17 @@ export function ViewTabs({ listId, viewId }: { listId: number; viewId: number })
   const setLayoutOf = (view: View, layout: Layout) => {
     if (view.layout !== layout) void attempt(api.viewSetLayout(view.id, layout), "Could not change the layout");
   };
+  const editing = (view: View): MenuEntry[] => [
+    { text: "Rename", run: () => setRenamingId(view.id) },
+    { text: "Icon and Color…", run: () => editLook(view, document.querySelector(`[data-view-look="${view.id}"]`)) },
+    { text: "Duplicate", run: () => void attempt(api.viewDuplicate(view.id), "Could not duplicate the view") },
+  ];
+  const deleting = (view: View): MenuEntry => ({ text: "Delete", danger: true, enabled: views.length > 1, run: () => void remove(view) });
   const tabMenu = (e: MouseEvent, view: View): void =>
     openContextMenu(
       e,
       [
-        { text: "Rename", run: () => setRenamingId(view.id) },
-        { text: "Icon and Color…", run: () => editLook(view, document.querySelector(`[data-view-look="${view.id}"]`)) },
-        { text: "Duplicate", run: () => void attempt(api.viewDuplicate(view.id), "Could not duplicate the view") },
+        ...editing(view),
         { caption: "Layout" },
         ...offered.map(
           (layout): MenuEntry => ({
@@ -74,7 +79,7 @@ export function ViewTabs({ listId, viewId }: { listId: number; viewId: number })
           }),
         ),
         "separator",
-        { text: "Delete", danger: true, enabled: views.length > 1, run: () => void remove(view) },
+        deleting(view),
       ],
       view.name,
     );
@@ -106,6 +111,13 @@ export function ViewTabs({ listId, viewId }: { listId: number; viewId: number })
   usePageAction("view.layout.list", current >= 0 && offers("list") ? () => setLayout("list") : null);
   usePageAction("view.layout.board", current >= 0 && offers("board") ? () => setLayout("board") : null);
   usePageAction("view.layout.table", current >= 0 && offers("table") ? () => setLayout("table") : null);
+  const shown = views[current];
+  usePaletteMenu("views.open", {
+    section: "Views",
+    title: "Open view",
+    entries: () => views.map((view): MenuEntry => ({ text: view.name, checked: view.id === viewId, run: () => void open(listId, view.id) })),
+  });
+  usePaletteMenu("views.edit", shown ? { section: "Views", title: "View", entries: () => [...editing(shown), deleting(shown)] } : null);
 
   return (
     <div className="view-tabs" role="tablist" aria-label="Views" ref={containerRef}>

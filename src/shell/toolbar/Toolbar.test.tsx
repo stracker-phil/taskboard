@@ -9,6 +9,7 @@ import { api } from "../../api";
 import { MenuHost } from "../../components/menu";
 import { installCommands, useCommandKeys } from "../../commands";
 import { runPageAction } from "../../commands/pageActions";
+import { paletteMenus } from "../../palette/menus";
 import { createQueryClient } from "../../queries/queryClient";
 import { resetStore, useStore } from "../../state/store";
 import type { View } from "../../api";
@@ -547,5 +548,37 @@ describe("Toolbar view drafts", () => {
 
       expect([run("view.save"), run("view.revert")]).toEqual([false, false]);
     });
+  });
+});
+
+describe("Toolbar palette entries", () => {
+  const offered = (title: string) => paletteMenus().find((menu) => menu.title === title);
+  const texts = (title: string) => (offered(title)?.entries() ?? []).flatMap((entry) => (typeof entry === "string" || "caption" in entry ? [] : [entry.text]));
+
+  it("offers the Group menu under “This view”, with the current grouping checked", () => {
+    renderToolbar();
+
+    expect(offered("Group")?.section).toBe("This view");
+    expect(texts("Group")).toEqual(expect.arrayContaining(["Status", "Epic", "Sort by"]));
+    const status = offered("Group")!.entries().find((entry) => typeof entry !== "string" && "text" in entry && entry.text === "Status");
+    expect(status).toMatchObject({ checked: true });
+  });
+
+  it("offers wrapping titles only on a list", () => {
+    renderToolbar(LIST_LEVEL, 0, { layout: "list" });
+    expect(texts("Show")).toEqual(["Labels inline", "Wrap long titles"]);
+
+    cleanup();
+    renderToolbar(LIST_LEVEL, 0, { layout: "board" });
+    expect(texts("Show")).toEqual(["Labels inline"]);
+  });
+
+  it("withdraws its entries when the toolbar unmounts", () => {
+    renderToolbar();
+
+    cleanup();
+
+    expect(offered("Group")).toBeUndefined();
+    expect(offered("Show")).toBeUndefined();
   });
 });

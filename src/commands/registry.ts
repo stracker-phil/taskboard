@@ -9,6 +9,8 @@ export interface Command {
   defaultBinding?: string;
   /** Enabled-state check; disabled commands neither fire nor show in the palette. */
   when?: () => boolean;
+  /** The Rust bus command it runs, which a menu item runs too; the palette lists the two once, with this key. */
+  bus?: string;
   run: () => void | Promise<void>;
 }
 
@@ -151,6 +153,17 @@ export function bindingFromEvent(e: KeyLike, mac = true): string | null {
   if (e.altKey) mods.push("Alt");
   if (e.shiftKey) mods.push("Shift");
   return [...mods, key].join("+");
+}
+
+/** Tauri's names for keys that `normalizeBinding` spells differently. */
+const ACCELERATOR_KEYS: Record<string, string> = { Up: "ArrowUp", Down: "ArrowDown", Left: "ArrowLeft", Right: "ArrowRight", Backslash: "\\" };
+
+/** A menu item's accelerator (`CmdOrCtrl+Shift+R`) as a key label (`⌘⇧R`). */
+export function acceleratorLabel(accelerator: string | null): string {
+  if (!accelerator) return "";
+  const parts = splitBinding(accelerator);
+  const key = parts.pop() ?? "";
+  return bindingLabel(normalizeBinding([...parts, ACCELERATOR_KEYS[key] ?? key].join("+")));
 }
 
 /** `Mod+Shift+K` → `⌘⇧K`. */

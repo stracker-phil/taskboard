@@ -21,6 +21,7 @@ import type {
   Keybindings,
   LaunchEvent,
   Layout,
+  MenuCommand,
   FilterOptions,
   IssueDetail,
   IssueOpening,
@@ -29,6 +30,7 @@ import type {
   Narrowing,
   Nav,
   PaletteResults,
+  PaletteScope,
   SpaceConfig,
   SpaceLayouts,
   PinDuration,
@@ -171,8 +173,10 @@ export const api = {
   issueForget: (id: string) => invoke<void>("issue_forget", { id }),
   issueActivity: (id: string) => invoke<ActivityItem[]>("issue_activity", { id }),
   issueRelated: (id: string) => invoke<Related>("issue_related", { id }),
-  /** The command palette's issues (by key and full text) and filter lists for the typed text. */
-  paletteQuery: (text: string) => invoke<PaletteResults>("palette_query", { text }),
+  /** The command palette's issues (by key and full text) and filter lists for the typed text; a scope searches one kind with room for more. */
+  paletteQuery: (text: string, scope: PaletteScope = "all") => invoke<PaletteResults>("palette_query", { text, scope }),
+  /** Every enabled item of the app menu, in menu order, for the command palette. */
+  menuCommands: () => invoke<MenuCommand[]>("menu_commands"),
   /** Their highlight and change chip clear. */
   issuesMarkSeen: (ids: string[]) => invoke<void>("issues_mark_seen", { ids }),
   /** Unread again: from the activity item at `from` (its time) on, or the whole issue. */

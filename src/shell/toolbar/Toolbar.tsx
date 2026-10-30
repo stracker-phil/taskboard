@@ -1,6 +1,7 @@
 import { Columns3, Ellipsis, Layers, ListFilter } from "lucide-react";
 import { type ReactNode, type RefObject, useCallback, useEffect, useRef, useState } from "react";
 import { usePageAction } from "../../commands/pageActions";
+import { usePaletteMenu } from "../../palette/menus";
 import { type Presence, usePresence } from "../../lib/motion";
 import { api, type View } from "../../api";
 import { openMenu, type MenuEntry } from "../../components/menu";
@@ -21,6 +22,9 @@ import { useViewDraft } from "./useViewDraft";
 import { useViewEdit } from "./useViewEdit";
 
 type Open = "columns" | "filter" | null;
+
+/** The palette's section for the current view's options. */
+const THIS_VIEW = "This view";
 
 /** One popover at a time; when the bar is too narrow, the text filter shrinks and then items move into a "…" menu.
  *  The Me chip and the Filter popover change the view as a draft until Save View (ADR 0038). */
@@ -96,6 +100,14 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
   usePageAction("toolbar.filter", () => setOpen("filter"));
   usePageAction("toolbar.columns", () => setOpen("columns"));
   usePageAction("toolbar.group", openGroupMenu);
+
+  const displayEntries = (): MenuEntry[] => [
+    { text: "Labels inline", checked: view.inlineLabels, toggle: true, run: () => edit(api.viewSetInlineLabels(view.id, !view.inlineLabels), "Could not change how labels show") },
+    ...(view.layout === "list" ? [{ text: "Wrap long titles", checked: view.wrapTitles, toggle: true, run: () => edit(api.viewSetWrap(view.id, !view.wrapTitles), "Could not change how titles show") }] : []),
+  ];
+  usePaletteMenu("toolbar.group", { section: THIS_VIEW, title: "Group", entries: groupEntries });
+  usePaletteMenu("toolbar.subtasks", hasSubtasks ? { section: THIS_VIEW, title: "Subtasks", entries: subtaskEntries } : null);
+  usePaletteMenu("toolbar.display", { section: THIS_VIEW, title: "Show", entries: displayEntries });
 
   const moreEntries = (): MenuEntry[] => [
     ...hidden.map((item): MenuEntry => {

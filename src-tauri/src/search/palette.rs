@@ -2,7 +2,7 @@
 
 use rusqlite::types::Value;
 use rusqlite::{Connection, params};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 use super::fts::{KeyHint, key_hint, match_expression};
@@ -11,11 +11,37 @@ use crate::error::AppResult;
 use crate::status_style::{Style, Styles};
 use crate::views::fold;
 
-const ISSUE_LIMIT: usize = 8;
-const LIST_LIMIT: usize = 6;
 /// Marks a match in `highlight()` and `snippet()` output; control characters never occur in Jira text.
 const OPEN: char = '\u{1}';
 const CLOSE: char = '\u{2}';
+
+/// What the palette searches: both kinds side by side, or one kind alone (its prefix typed) with room for more.
+#[derive(Deserialize, Clone, Copy, Debug, PartialEq, Eq, TS)]
+#[ts(export, export_to = "src/api/types.gen.ts")]
+#[serde(rename_all = "camelCase")]
+pub enum PaletteScope {
+    All,
+    Issues,
+    Lists,
+}
+
+impl PaletteScope {
+    fn issue_limit(self) -> usize {
+        match self {
+            Self::All => 8,
+            Self::Issues => 40,
+            Self::Lists => 0,
+        }
+    }
+
+    fn list_limit(self) -> usize {
+        match self {
+            Self::All => 6,
+            Self::Issues => 0,
+            Self::Lists => 200,
+        }
+    }
+}
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
 #[ts(export, export_to = "src/api/types.gen.ts")]
@@ -75,20 +101,38 @@ pub struct ListHit {
 }
 
 pub async fn palette_query(db: &Db, text: String) -> AppResult<PaletteResults> {
-    db.read(move |conn| query(conn, &text)).await
+    palette_search(db, text, PaletteScope::All).await
 }
 
-pub fn query(conn: &Connection, text: &str) -> AppResult<PaletteResults> {
+pub async fn palette_search(
+    db: &Db,
+    text: String,
+    scope: PaletteScope,
+) -> AppResult<PaletteResults> {
+    db.read(move |conn| query(conn, &text, scope)).await
+}
+
+pub fn query(conn: &Connection, text: &str, scope: PaletteScope) -> AppResult<PaletteResults> {
+    Ok(PaletteResults {
+        issues: issue_matches(conn, text, scope.issue_limit())?,
+        lists: list_matches(conn, text, scope)?,
+    })
+}
+
+fn issue_matches(conn: &Connection, text: &str, limit: usize) -> AppResult<Vec<IssueHit>> {
+    if limit == 0 {
+        return Ok(Vec::new());
+    }
     let styles = Styles::load(conn)?;
     let mut issues: Vec<IssueHit> = Vec::new();
-    for id in key_matches(conn, text)? {
+    for id in key_matches(conn, text, limit)? {
         if let Some(hit) = plain_hit(conn, &styles, &id)? {
             issues.push(hit);
         }
     }
     if let Some(expression) = match_expression(text) {
-        for hit in text_matches(conn, &styles, &expression)? {
-            if issues.len() >= ISSUE_LIMIT {
+        for hit in text_matches(conn, &styles, &expression, limit)? {
+            if issues.len() >= limit {
                 break;
             }
             if !issues.iter().any(|known| known.id == hit.id) {
@@ -96,11 +140,8 @@ pub fn query(conn: &Connection, text: &str) -> AppResult<PaletteResults> {
             }
         }
     }
-    issues.truncate(ISSUE_LIMIT);
-    Ok(PaletteResults {
-        issues,
-        lists: list_matches(conn, text)?,
-    })
+    issues.truncate(limit);
+    Ok(issues)
 }
 
 const TRACKED: &str = "i.project_id IN (SELECT project_id FROM space WHERE tracked = 1)";
@@ -108,7 +149,7 @@ const TRACKED: &str = "i.project_id IN (SELECT project_id FROM space WHERE track
 const KEY_NUMBER_IS: &str = "CAST(substr(i.key, instr(i.key, '-') + 1) AS INTEGER) = ?1";
 
 /// A whole key first; a bare number matches that number in every tracked project.
-fn key_matches(conn: &Connection, text: &str) -> AppResult<Vec<String>> {
+fn key_matches(conn: &Connection, text: &str, limit: usize) -> AppResult<Vec<String>> {
     let (sql, value) = match key_hint(text) {
         Some(KeyHint::Key(key)) => ("i.key = ?1 COLLATE NOCASE", Value::Text(key)),
         Some(KeyHint::Number(number)) => match number.parse::<i64>() {
@@ -118,7 +159,7 @@ fn key_matches(conn: &Connection, text: &str) -> AppResult<Vec<String>> {
         None => return Ok(Vec::new()),
     };
     let mut query = conn.prepare(&format!(
-        "SELECT i.id FROM cache.issue i WHERE {sql} AND {TRACKED} ORDER BY i.gone, i.key LIMIT {ISSUE_LIMIT}"
+        "SELECT i.id FROM cache.issue i WHERE {sql} AND {TRACKED} ORDER BY i.gone, i.key LIMIT {limit}"
     ))?;
     let ids = query.query_map([value], |r| r.get(0))?;
     Ok(ids.collect::<Result<_, _>>()?)
@@ -153,7 +194,12 @@ fn plain_hit(conn: &Connection, styles: &Styles, id: &str) -> AppResult<Option<I
 }
 
 /// Key and summary weigh most; the best ones first.
-fn text_matches(conn: &Connection, styles: &Styles, expression: &str) -> AppResult<Vec<IssueHit>> {
+fn text_matches(
+    conn: &Connection,
+    styles: &Styles,
+    expression: &str,
+    limit: usize,
+) -> AppResult<Vec<IssueHit>> {
     let mut query = conn.prepare(&format!(
         "SELECT i.id, i.key,
            highlight(issue_fts, 0, ?2, ?3), highlight(issue_fts, 1, ?2, ?3), highlight(issue_fts, 2, ?2, ?3),
@@ -164,7 +210,7 @@ fn text_matches(conn: &Connection, styles: &Styles, expression: &str) -> AppResu
          LEFT JOIN cache.status st ON st.id = i.status_id
          WHERE issue_fts MATCH ?1 AND {TRACKED}
          ORDER BY bm25(issue_fts, 10.0, 5.0, 1.0, 1.0)
-         LIMIT {ISSUE_LIMIT}"
+         LIMIT {limit}"
     ))?;
     let rows = query.query_map(
         params![expression, OPEN.to_string(), CLOSE.to_string()],
@@ -237,9 +283,12 @@ fn parts(marked: &str) -> Vec<TextPart> {
 }
 
 /// Filter lists and Spaces whose name holds the text, ignoring case and accents.
-fn list_matches(conn: &Connection, text: &str) -> AppResult<Vec<ListHit>> {
+/// Lists whose name holds the text, Spaces first, the others under their parent; with the Lists scope, nothing
+/// typed lists them all.
+fn list_matches(conn: &Connection, text: &str, scope: PaletteScope) -> AppResult<Vec<ListHit>> {
     let needle = fold(text.trim());
-    if needle.is_empty() {
+    let limit = scope.list_limit();
+    if limit == 0 || (needle.is_empty() && scope != PaletteScope::Lists) {
         return Ok(Vec::new());
     }
     let mut query = conn.prepare(
@@ -250,7 +299,7 @@ fn list_matches(conn: &Connection, text: &str) -> AppResult<Vec<ListHit>> {
          LEFT JOIN cache.space p ON p.id = l.project_id
          WHERE COALESCE(l.project_id, parent.project_id) IS NULL
             OR COALESCE(l.project_id, parent.project_id) IN (SELECT project_id FROM space WHERE tracked = 1)
-         ORDER BY l.kind = 'space' DESC, l.position, l.id",
+         ORDER BY l.kind = 'space' DESC, parent.position IS NOT NULL, parent.position, l.parent_id, l.position, l.id",
     )?;
     let rows = query.query_map([], |r| {
         Ok(ListHit {
@@ -266,7 +315,7 @@ fn list_matches(conn: &Connection, text: &str) -> AppResult<Vec<ListHit>> {
         if fold(&hit.name).contains(&needle) {
             hits.push(hit);
         }
-        if hits.len() == LIST_LIMIT {
+        if hits.len() == limit {
             break;
         }
     }

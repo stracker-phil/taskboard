@@ -258,19 +258,31 @@ unread (`src-tauri/src/changes/`). The UI says read and unread; the code says se
 
 ## Command palette
 
-`src/palette/` (⌘K, or Search in the sidebar); Rust's `search::palette_query` finds the issues and lists.
+`src/palette/` (⌘K, or Search in the sidebar). It finds issues and lists through Rust's `search::palette_query`
+and runs everything the menus offer ([ADR 0043](adr/0043-the-palette-runs-the-menus.md)).
 
 - A `--scrim` over the window; the 640px panel (16px radius, `--shadow-palette`) 110px from the top, rising in.
-- Input row 56: search icon, the 17px field, "N issues · M actions" on the right. It searches once typing
-  pauses for 80 ms; the last results stay until the next arrive.
-- Issues (max 8): a whole key or a bare number first, then full-text hits (every word as a prefix; key and
-  summary weigh most). Each 46px row: status square, mono key (70), the summary with the match bold, the
+- Input row 56: search icon, the 17px field, "N issues · M lists · K commands" on the right. It searches once
+  typing pauses for 80 ms; the last results stay until the next arrive. "No results" once nothing matches.
+- **Prefixes**, as in Daybook, narrow it to one kind when typed first: `>` Commands, `#` Issues, `/` Lists. The
+  footer shows them as buttons (the active one is lit; clicking it again clears the field), and with nothing
+  typed the palette lists them under "Narrow to" (↩ types the prefix). The field's placeholder names what the
+  prefix searches.
+- Issues (8, with `#` 40): a whole key or a bare number first, then full-text hits (every word as a prefix; key
+  and summary weigh most). Each 46px row: status square, mono key (70), the summary with the match bold, the
   status pill, ↩ on the active row; a comment-only match adds "Matched in comment: “…”" under it.
-- Filter lists (max 6): Spaces and lists whose name holds the text; Space tile and "Space › List".
-- Actions (max 6): Open KEY in Jira (⌘↩), Save “text” as a filter list (⌘S; a `text contains` list under the
-  current Space or Everything, opened), Refresh now (⌘R), Full sync, Group by …, then every titled command.
-- Keys: ↑↓ move (wrapping), ↩ opens (an issue in the full Issue view over its Space's view, its row selected; a list; an action), ⌘C copies
-  the key, esc or a click outside closes. The active row is `--palette-active-bg`. Footer 38 lists the keys.
+- Filter lists (6; with `/` every list, also with nothing typed): Spaces and lists whose name holds the text;
+  Space tile and "Space › List".
+- Commands (6 without a prefix, all with `>`): Open KEY in Jira (⌘↩) and Save “text” as a filter list (⌘S; a
+  `text contains` list under the current Space or Everything, opened), then every enabled menu item
+  (`menu_commands`), the current view's options (Group, Sort by, Subtasks, labels inline, wrapped titles: "This
+  view") and its tabs (Open view, Rename, Icon and Color…, Duplicate, Delete: "Views"), and each Settings page
+  (its groups are searched too). Ranked as in Daybook: the label starting with the text, a word of it, every
+  word in label or menu, then letters in order. Each row has its menu or detail and its key (the rebound one)
+  at the right; a checked option shows a check. `>` with nothing typed groups them under their menus.
+- Keys: ↑↓ move (wrapping), ↩ opens (an issue in the full Issue view over its Space's view, its row selected; a
+  list; a command), ⌘C copies the key, ⌘R refreshes, esc or a click outside closes. The active row is
+  `--palette-active-bg`. Footer 38: the prefix buttons, then the keys.
 
 ## Bookmarks
 
@@ -650,7 +662,8 @@ The app is fully keyboard controllable, and every action is also a menu item (ow
 actions are Rust commands ([ADR 0012](adr/0012-commands-live-in-rust.md)); what the page does is in the page's
 registry (`src/commands/`), and the menus reach it through the bus family `page:<id>`, which shows the main
 window and emits `page_command` (`state/useAppEvents.ts` runs the command when it can). Components offer
-their actions while on screen with `usePageAction(id, run)` (`commands/pageActions.ts`). Settings → Shortcuts
+their actions while on screen with `usePageAction(id, run)` (`commands/pageActions.ts`), and their own menus
+to the palette with `usePaletteMenu(id, menu)` (`palette/menus.ts`). Settings → Shortcuts
 lists and rebinds the page's keys (conflicts are flagged); the menu shows the default keys. There are no
 global shortcuts.
 

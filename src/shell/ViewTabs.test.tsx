@@ -11,6 +11,7 @@ import { MenuHost } from "../components/menu";
 import { installCommands, useCommandKeys } from "../commands";
 import { runPageAction } from "../commands/pageActions";
 import { getCommand } from "../commands/registry";
+import { paletteMenus } from "../palette/menus";
 import { createQueryClient } from "../queries/queryClient";
 import { resetStore, useStore } from "../state/store";
 import { view } from "../test/views";
@@ -658,6 +659,39 @@ describe("ViewTabs", () => {
       cleanup();
 
       expect(["view.new", "view.next", "view.previous", "view.layout.list"].map(run)).toEqual([false, false, false, false]);
+    });
+  });
+
+  describe("palette entries", () => {
+    const entriesOf = (title: string) =>
+      (paletteMenus().find((menu) => menu.title === title)?.entries() ?? []).flatMap((entry) => (typeof entry === "string" || "caption" in entry ? [] : [entry]));
+
+    it("offers every view to open under “Views”, the current one checked", async () => {
+      await renderTabs([LIST, BOARD]);
+
+      expect(paletteMenus().find((menu) => menu.title === "Open view")?.section).toBe("Views");
+      expect(entriesOf("Open view").map((e) => [e.text, e.checked])).toEqual([
+        ["List", true],
+        ["Sprint board", false],
+      ]);
+    });
+
+    it("offers renaming, styling, duplicating and deleting the current view", async () => {
+      await renderTabs([LIST, BOARD]);
+
+      expect(entriesOf("View").map((e) => e.text)).toEqual(["Rename", "Icon and Color…", "Duplicate", "Delete"]);
+    });
+
+    it("greys out Delete while the view is the only one", async () => {
+      await renderTabs([LIST]);
+
+      expect(entriesOf("View").find((e) => e.text === "Delete")).toMatchObject({ enabled: false });
+    });
+
+    it("offers nothing for a current view that is not among the tabs", async () => {
+      await renderTabs([LIST, BOARD], 999);
+
+      expect(entriesOf("View")).toEqual([]);
     });
   });
 });

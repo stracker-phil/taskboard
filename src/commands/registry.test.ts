@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { clearCommands, conflicts, registerCommands, setOverrides, type Command } from "./registry";
+import { acceleratorLabel, clearCommands, conflicts, registerCommands, setOverrides, type Command } from "./registry";
 import { registerCoreScopes } from "./index";
 import { registerScope } from "./scopes";
 
@@ -58,5 +58,22 @@ describe("conflicts", () => {
     setOverrides({ b: "Mod+K" });
 
     expect(conflicts()).toHaveLength(1);
+  });
+});
+
+describe("acceleratorLabel", () => {
+  it.each([
+    ["CmdOrCtrl+Shift+R", "⌘⇧R"],
+    ["CmdOrCtrl+K", "⌘K"],
+    ["CmdOrCtrl+Alt+Up", "⌘⌥↑"],
+    ["CmdOrCtrl+Down", "⌘↓"],
+    ["CmdOrCtrl+Backslash", "⌘\\"],
+    ["CmdOrCtrl+Enter", "⌘↵"],
+  ])("writes %s as %s", (accelerator, label) => {
+    expect(acceleratorLabel(accelerator)).toBe(label);
+  });
+
+  it.each([null, ""])("is empty for %j", (accelerator) => {
+    expect(acceleratorLabel(accelerator)).toBe("");
   });
 });

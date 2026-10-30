@@ -43,3 +43,14 @@
   background: var(--panel-subtle-bg); font-size: 12px; color: var(--text-muted); white-space: nowrap;
 }
 .palette__spacer { flex: 1; }
+.palette__shortcut, .palette__prefix-key {
+  flex: none; min-width: 12px; padding: 1px 5px; border-radius: 5px; background: var(--fill-subtle);
+  font-size: 11px; line-height: 16px; text-align: center; color: var(--text-tertiary); white-space: nowrap;
+}
+.palette__empty { margin: 0; padding: 18px 10px; font-size: 13px; color: var(--text-muted); }
+.palette__prefix {
+  display: inline-flex; align-items: center; gap: 6px; padding: 0; border: 0; background: none;
+  color: inherit; font: inherit; cursor: default; transition: color var(--motion-fast) var(--ease-out);
+}
+.palette__prefix:hover, .palette__prefix--on { color: var(--text); }
+.palette__prefix--on .palette__prefix-key { background: var(--palette-active-bg); color: var(--text); }

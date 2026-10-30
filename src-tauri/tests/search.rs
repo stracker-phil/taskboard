@@ -14,7 +14,9 @@ use taskboard_lib::error::ErrorKind;
 use taskboard_lib::filter::{Condition, Field, Filter, Op, Value};
 use taskboard_lib::jira::{Limiter, TokenKind};
 use taskboard_lib::lists::{Viewer, list_create, list_match_count, list_set_filter};
-use taskboard_lib::search::{MatchedIn, PaletteResults, TextPart, palette_query};
+use taskboard_lib::search::{
+    MatchedIn, PaletteResults, PaletteScope, TextPart, palette_query, palette_search,
+};
 use taskboard_lib::store::settings::SettingsStore;
 use taskboard_lib::sync::{Emit, SyncContext, full_sync};
 use taskboard_lib::test_support::demo::{DEMO_NOW, ME_EMAIL};
@@ -126,6 +128,12 @@ impl Site {
         palette_query(self.db(), text.to_string())
             .await
             .unwrap_or_else(|e| panic!("{text:?}: {e}"))
+    }
+
+    async fn palette_in(&self, text: &str, scope: PaletteScope) -> PaletteResults {
+        palette_search(self.db(), text.to_string(), scope)
+            .await
+            .unwrap_or_else(|e| panic!("{text:?} in {scope:?}: {e}"))
     }
 
     async fn execute(&self, sql: &'static str) {
@@ -573,6 +581,152 @@ mod lists {
                 .iter()
                 .all(|l| l.project_id.as_deref() != Some(NWS))
         );
+    }
+}
+
+mod scopes {
+    use super::*;
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn the_issues_scope_lists_more_than_eight_issues_and_no_lists() {
+        let site = Site::new().await;
+
+        let results = site.palette_in("e", PaletteScope::Issues).await;
+
+        assert!(results.issues.len() > 8, "{}", results.issues.len());
+        assert!(results.issues.len() <= 40, "{}", results.issues.len());
+        assert_eq!(results.lists, vec![]);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn the_issues_scope_ranks_an_exact_key_first_like_the_default() {
+        let site = Site::new().await;
+
+        let results = site.palette_in("NW-1042", PaletteScope::Issues).await;
+
+        assert_eq!(results.issues[0].key, "NW-1042");
+        assert_eq!(results.issues[0].matched_in, MatchedIn::Key);
+        assert_eq!(results.lists, vec![]);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn the_lists_scope_finds_no_issues_even_for_a_matching_key() {
+        let site = Site::new().await;
+
+        for text in ["NW-1042", "checkout", "e"] {
+            let results = site.palette_in(text, PaletteScope::Lists).await;
+
+            assert_eq!(results.issues, vec![], "{text}");
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn the_lists_scope_with_empty_text_lists_every_list_spaces_first() {
+        let site = Site::new().await;
+
+        for text in ["", "  \t "] {
+            let results = site.palette_in(text, PaletteScope::Lists).await;
+
+            assert_eq!(results.issues, vec![], "{text:?}");
+            assert!(results.lists.len() > 6, "{text:?}: {}", results.lists.len());
+            let spaces = results.lists.iter().filter(|l| l.is_space).count();
+            assert_eq!(spaces, PROJECT_IDS.len(), "{text:?}");
+            assert!(
+                results.lists[..spaces].iter().all(|l| l.is_space),
+                "{text:?}"
+            );
+            assert!(
+                results.lists[spaces..].iter().all(|l| !l.is_space),
+                "{text:?}"
+            );
+            assert!(
+                results.lists.iter().any(|l| l.name == "Open bugs"),
+                "{text:?}"
+            );
+            let mut ids: Vec<i64> = results.lists.iter().map(|l| l.id).collect();
+            ids.sort();
+            ids.dedup();
+            assert_eq!(ids.len(), results.lists.len(), "{text:?}");
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn the_lists_scope_still_narrows_by_name_and_goes_beyond_six() {
+        let site = Site::new().await;
+
+        let narrowed = site.palette_in("website", PaletteScope::Lists).await;
+        assert_eq!(
+            narrowed
+                .lists
+                .iter()
+                .map(|l| (l.name.as_str(), l.is_space))
+                .collect::<Vec<_>>(),
+            [("Website relaunch", true)]
+        );
+
+        let all = site.palette_in("", PaletteScope::Lists).await;
+        let default = site.palette("e").await;
+        assert_eq!(default.lists.len(), 6);
+        assert!(all.lists.len() > default.lists.len());
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn the_lists_scope_leaves_out_untracked_spaces() {
+        let site = Site::new().await;
+        track_project(site.db(), NWS.into(), false).await.unwrap();
+
+        let results = site.palette_in("", PaletteScope::Lists).await;
+
+        assert!(
+            results
+                .lists
+                .iter()
+                .all(|l| l.project_id.as_deref() != Some(NWS))
+        );
+        assert_eq!(
+            results.lists.iter().filter(|l| l.is_space).count(),
+            PROJECT_IDS.len() - 1
+        );
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn the_all_scope_matches_the_default_query() {
+        let site = Site::new().await;
+
+        for text in ["", "e", "NW-1042", "open bugs"] {
+            let all = site.palette_in(text, PaletteScope::All).await;
+
+            assert_eq!(all, site.palette(text).await, "{text:?}");
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn the_all_scope_with_empty_text_lists_no_issues_and_no_lists() {
+        let site = Site::new().await;
+
+        let results = site.palette_in("", PaletteScope::All).await;
+
+        assert_eq!(results.issues, vec![]);
+        assert_eq!(results.lists, vec![]);
+    }
+
+    #[test]
+    fn scopes_are_named_in_camel_case_on_the_wire() {
+        for (json, scope) in [
+            ("\"all\"", PaletteScope::All),
+            ("\"issues\"", PaletteScope::Issues),
+            ("\"lists\"", PaletteScope::Lists),
+        ] {
+            assert_eq!(serde_json::from_str::<PaletteScope>(json).unwrap(), scope);
+        }
     }
 }
 

@@ -140,7 +140,8 @@ src-tauri/
   src/avatars/               people's profile pictures: freshness, the `cache.avatar` rows, `user_avatar` (data URLs)
   src/nav/                   where the main window is (level and view, nav.json); previous/next Space
   src/<feature>/             one folder per feature: types, pure logic, commands.rs, tests
-  src/window/ menu/          the main and Settings windows, the native app menu
+  src/window/ menu/          the main and Settings windows, the native app menu (menu/palette.rs: its items for the
+                             palette)
   src/dev/                   debug builds only: window frame, background launch, eval; fake.rs the fake Jira's server
   src/diagnostics/           Settings → Status: what the connection, the sync and this Mac report
   src/test_support/          fixtures, fakes (cfg test, test-util); the demo Jira site and the fake Jira (also debug)
@@ -156,7 +157,7 @@ src/
   views/list/ views/table/   the List and Table layouts over the view query's rows (views/board/ the Board)
   issue/                     the Issue view, the preview (Peek.tsx), activity, rich text (JiraHtml.tsx, InlineImage.tsx);
                              hoverPeek/ the ⌥ + hover Peek
-  pins/ palette/             Bookmarks; the command palette
+  pins/ palette/             Bookmarks; the command palette (prefixes, ranking, the menus' and the page's commands)
   commands/ registry/        in-window keys; Settings page registry
   components/ (issue/: rings, pills, chips, avatars; menu/: the one in-app menu; look/: tiles and the look editor)
   windows/<name>/ lib/ styles/ test/

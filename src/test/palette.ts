@@ -1,8 +1,13 @@
-import type { IssueHit, ListHit, TextPart } from "../api/types";
+import type { IssueHit, ListHit, MenuCommand, TextPart } from "../api/types";
 
 /** Plain text, or the parts of a match: `parts("Fix the ", ["login"], " form")` marks "login" strong. */
 export function parts(...pieces: (string | [string])[]): TextPart[] {
   return pieces.map((p) => (typeof p === "string" ? { text: p, strong: false } : { text: p[0], strong: true }));
+}
+
+/** A menu item from Rust (File › Refresh now); override per test. */
+export function menuCommand(patch: Partial<MenuCommand> = {}): MenuCommand {
+  return { menu: "File", label: "Refresh now", command: "sync:refresh", accelerator: null, ...patch };
 }
 
 /** An issue hit in the "Website relaunch" project; override per test. */

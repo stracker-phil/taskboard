@@ -414,6 +414,16 @@ export type MatchCount = { open: number, total: number, };
 
 export type MatchedIn = "key" | "summary" | "description" | "comment";
 
+export type MenuCommand = { 
+/**
+ * The menu's title, the palette's section.
+ */
+menu: string, label: string, command: string, 
+/**
+ * In Tauri's notation (`CmdOrCtrl+Shift+R`).
+ */
+accelerator: string | null, };
+
 /**
  * The toolbar's narrowing on top of the level's filter, and the Filter popover's unsaved conditions (ADR 0038).
  */
@@ -455,6 +465,11 @@ expanded: Array<number>, };
 export type Op = "is" | "isNot" | "in" | "notIn" | "isEmpty" | "isNotEmpty" | "contains" | "before" | "after" | "withinLastDays" | "withinNextDays";
 
 export type PaletteResults = { issues: Array<IssueHit>, lists: Array<ListHit>, };
+
+/**
+ * What the palette searches: both kinds side by side, or one kind alone (its prefix typed) with room for more.
+ */
+export type PaletteScope = "all" | "issues" | "lists";
 
 export type Person = { accountId: string, name: string, initials: string, 
 /**

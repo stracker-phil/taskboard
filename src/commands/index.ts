@@ -27,10 +27,10 @@ const escapeIsFree = () => !isTextInput(document.activeElement) && !document.que
 /** The windows' own keys. Settings (⌘,), Quit and Close Window are Rust commands with app menu keys only. The
  *  sidebar key is the menu item's too; the page claims it so it can be rebound, and runs the same bus command. */
 const APP_COMMANDS: Command[] = [
-  { id: "sidebar.toggle", title: "Toggle sidebar", scope: "main", defaultBinding: "Mod+\\", run: () => runBusCommand("view:toggleSidebar", "Could not toggle the sidebar") },
-  { id: "space.previous", title: "Previous Space", scope: "main", defaultBinding: "Mod+Alt+ArrowUp", run: () => runBusCommand("nav:previousSpace", "Could not open the Space") },
+  { id: "sidebar.toggle", title: "Toggle sidebar", scope: "main", defaultBinding: "Mod+\\", bus: "view:toggleSidebar", run: () => runBusCommand("view:toggleSidebar", "Could not toggle the sidebar") },
+  { id: "space.previous", title: "Previous Space", scope: "main", defaultBinding: "Mod+Alt+ArrowUp", bus: "nav:previousSpace", run: () => runBusCommand("nav:previousSpace", "Could not open the Space") },
   { id: "palette.open", title: "Command palette", scope: "main", defaultBinding: "Mod+K", run: () => useStore.getState().setPaletteOpen(true) },
-  { id: "space.next", title: "Next Space", scope: "main", defaultBinding: "Mod+Alt+ArrowDown", run: () => runBusCommand("nav:nextSpace", "Could not open the Space") },
+  { id: "space.next", title: "Next Space", scope: "main", defaultBinding: "Mod+Alt+ArrowDown", bus: "nav:nextSpace", run: () => runBusCommand("nav:nextSpace", "Could not open the Space") },
   ...VIEW_KEY_COMMANDS,
   ...PAGE_ACTION_COMMANDS,
   ...ISSUE_KEY_COMMANDS,

@@ -52,5 +52,6 @@ stands in Taskboard. The numbers in this table are Taskboard's.
 | [0040](0040-subtasks-are-the-children-of-a-views-results.md) | Subtasks are the children of a view's results | Accepted (2026-10-29) |
 | [0041](0041-an-issues-big-texts-live-beside-its-row.md) | An issue's big texts live beside its row | Accepted (2026-10-30) |
 | [0042](0042-inline-images-load-through-an-app-scheme.md) | Inline images load through an app scheme | Accepted (2026-10-30) |
+| [0043](0043-the-palette-runs-the-menus.md) | The palette runs the menus | Accepted (2026-10-30) |
 
 Open: integrations with Daybook and TimeTracker.

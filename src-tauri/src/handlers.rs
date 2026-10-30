@@ -32,6 +32,7 @@ pub fn handlers() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
         changes::issue_mark_unread,
         pins::pins_list,
         search::palette_query,
+        crate::menu::palette::menu_commands,
         pins::pin_create,
         pins::pin_remove,
         pins::pin_toggle_issue,

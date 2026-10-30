@@ -3,6 +3,8 @@
 //! items (About, Services, Hide, the Edit items, Minimize) are macOS's own. Plain-letter keys (J, K, P, M) stay
 //! off the menu items, so they never take a typed letter from a text field.
 
+pub mod palette;
+
 use tauri::menu::{AboutMetadata, Menu, MenuItem, MenuItemBuilder, Submenu, SubmenuBuilder};
 use tauri::{AppHandle, Manager, Wry};
 
@@ -44,8 +46,9 @@ pub const FILE_SYNC: &[Item] = &[
 /// Opens Settings at the Cache group, which asks before it empties the cache.
 pub const RESET_CACHE: Item = plain("Reset Cache…", "app:settings:cache");
 pub const CLOSE: Item = item("Close Window", "window:close", "CmdOrCtrl+W");
+pub const PALETTE: Item = item("Command Palette…", "page:palette.open", "CmdOrCtrl+K");
 pub const GO_LEVELS: &[Item] = &[
-    item("Command Palette…", "page:palette.open", "CmdOrCtrl+K"),
+    PALETTE,
     item("Everything", "page:go.everything", "CmdOrCtrl+Shift+E"),
     item("Unread", "page:go.recent", "CmdOrCtrl+Shift+U"),
     item("Bookmarks", "page:go.pinned", "CmdOrCtrl+Shift+P"),
@@ -105,6 +108,22 @@ pub const HELP: &[Item] = &[
     plain("Show Data Folder", "app:data"),
 ];
 
+/// A menu's title and its own items, in the groups it splits with separators; macOS's standard items come
+/// on top.
+pub type MenuDef = (&'static str, &'static [&'static [Item]]);
+
+pub const APP_MENU: MenuDef = (crate::APP_NAME, &[&[SETTINGS], &[QUIT]]);
+pub const FILE_MENU: MenuDef = ("File", &[FILE, FILE_SYNC, &[RESET_CACHE], &[CLOSE]]);
+pub const GO_MENU: MenuDef = ("Go", &[GO_LEVELS, GO_MOVES]);
+pub const LIST_MENU: MenuDef = ("List", &[LIST_LAYOUTS, LIST_TOOLBAR, LIST_SEEN]);
+pub const ISSUE_MENU: MenuDef = ("Issue", &[ISSUE]);
+pub const VIEW_MENU: MenuDef = ("View", &[VIEW, &[RELOAD]]);
+pub const HELP_MENU: MenuDef = ("Help", &[HELP]);
+/// Every menu with items of its own, in menu bar order.
+pub const MENUS: &[MenuDef] = &[
+    APP_MENU, FILE_MENU, GO_MENU, LIST_MENU, ISSUE_MENU, VIEW_MENU, HELP_MENU,
+];
+
 fn build_item(
     app: &AppHandle,
     commands: &dyn CommandStatus,
@@ -135,8 +154,35 @@ fn with_items<'a>(
     Ok(builder)
 }
 
+/// A menu's groups with a separator between each two; a group without a known command is left out.
+fn with_groups<'a>(
+    app: &'a AppHandle,
+    commands: &dyn CommandStatus,
+    mut builder: SubmenuBuilder<'a, Wry, AppHandle>,
+    groups: &[&[Item]],
+) -> tauri::Result<SubmenuBuilder<'a, Wry, AppHandle>> {
+    let shown = groups
+        .iter()
+        .filter(|items| items.iter().any(|item| commands.knows(item.command)));
+    for (i, items) in shown.enumerate() {
+        if i > 0 {
+            builder = builder.separator();
+        }
+        builder = with_items(app, commands, builder, items)?;
+    }
+    Ok(builder)
+}
+
+fn submenu(
+    app: &AppHandle,
+    commands: &dyn CommandStatus,
+    (title, groups): MenuDef,
+) -> tauri::Result<Submenu<Wry>> {
+    with_groups(app, commands, SubmenuBuilder::new(app, title), groups)?.build()
+}
+
 fn app_submenu(app: &AppHandle, commands: &dyn CommandStatus) -> tauri::Result<Submenu<Wry>> {
-    let builder = SubmenuBuilder::new(app, crate::APP_NAME)
+    let builder = SubmenuBuilder::new(app, APP_MENU.0)
         .about(Some(AboutMetadata::default()))
         .separator();
     let builder = with_items(app, commands, builder, &[SETTINGS])?
@@ -163,23 +209,12 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         .paste()
         .select_all()
         .build()?;
-    let file = with_items(app, &commands, SubmenuBuilder::new(app, "File"), FILE)?.separator();
-    let file = with_items(app, &commands, file, FILE_SYNC)?.separator();
-    let file = with_items(app, &commands, file, &[RESET_CACHE])?.separator();
-    let file = with_items(app, &commands, file, &[CLOSE])?.build()?;
-    let go = with_items(app, &commands, SubmenuBuilder::new(app, "Go"), GO_LEVELS)?.separator();
-    let go = with_items(app, &commands, go, GO_MOVES)?.build()?;
-    let list = with_items(
-        app,
-        &commands,
-        SubmenuBuilder::new(app, "List"),
-        LIST_LAYOUTS,
-    )?
-    .separator();
-    let list = with_items(app, &commands, list, LIST_TOOLBAR)?.separator();
-    let list = with_items(app, &commands, list, LIST_SEEN)?.build()?;
-    let issue = with_items(app, &commands, SubmenuBuilder::new(app, "Issue"), ISSUE)?.build()?;
-    let view = with_items(app, &commands, SubmenuBuilder::new(app, "View"), VIEW)?;
+    let file = submenu(app, &commands, FILE_MENU)?;
+    let go = submenu(app, &commands, GO_MENU)?;
+    let list = submenu(app, &commands, LIST_MENU)?;
+    let issue = submenu(app, &commands, ISSUE_MENU)?;
+    // The View menu keeps its items together, above Enter Full Screen.
+    let view = with_items(app, &commands, SubmenuBuilder::new(app, VIEW_MENU.0), VIEW)?;
     let view = with_items(app, &commands, view, &[RELOAD])?
         .separator()
         .fullscreen()
@@ -190,7 +225,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         .separator()
         .bring_all_to_front()
         .build()?;
-    let help = with_items(app, &commands, SubmenuBuilder::new(app, "Help"), HELP)?.build()?;
+    let help = submenu(app, &commands, HELP_MENU)?;
     Menu::with_items(
         app,
         &[
@@ -218,7 +253,18 @@ mod tests {
     }
 
     fn all_items() -> Vec<&'static Item> {
-        let mut items: Vec<&Item> = vec![&SETTINGS, &QUIT, &RESET_CACHE, &CLOSE, &RELOAD];
+        MENUS
+            .iter()
+            .flat_map(|(_, groups)| groups.iter().flat_map(|items| items.iter()))
+            .collect()
+    }
+
+    #[test]
+    fn every_item_const_appears_in_the_menus_exactly_once() {
+        let mut expected: Vec<&str> = [&SETTINGS, &QUIT, &RESET_CACHE, &CLOSE, &RELOAD]
+            .iter()
+            .map(|item| item.command)
+            .collect();
         for list in [
             FILE,
             FILE_SYNC,
@@ -231,9 +277,12 @@ mod tests {
             VIEW,
             HELP,
         ] {
-            items.extend(list);
+            expected.extend(list.iter().map(|item| item.command));
         }
-        items
+        let mut found: Vec<&str> = all_items().iter().map(|item| item.command).collect();
+        expected.sort();
+        found.sort();
+        assert_eq!(found, expected);
     }
 
     #[test]

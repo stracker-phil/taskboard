@@ -1,21 +1,24 @@
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CornerDownLeft, Search, Zap } from "lucide-react";
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import { api, type IssueHit, type ListHit, type Nav, type TextPart } from "../api";
-import { SpaceTile } from "../components/SpaceTile";
-import { StatusPill } from "../components/issue/StatusPill";
-import { StatusSquare } from "../components/issue/StatusSquare";
+import { Search } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { api, type IssueHit, type ListHit, type Nav } from "../api";
 import { NAV_KEY, useNav, useNavGo, useSidebar } from "../queries/sidebar";
+import { runBusCommand } from "../state/requests";
 import { useStore } from "../state/store";
 import { useIssueActions } from "../views/list/useIssueActions";
-import { type PaletteAction, paletteActions, saveSearch } from "./actions";
+import { collectCommands, snapshotPage, type PaletteCommand } from "./commands";
+import { CommandRow, IssueRow, ListRow, PrefixButtons, PrefixRow } from "./PaletteRows";
+import { parsePrefix, PREFIXES, SCOPES, type Prefix } from "./prefixes";
+import { ranked } from "./rank";
+import { saveSearch } from "./saveSearch";
 
-/** At most this many actions show, so issues and lists stay in sight. */
-const ACTION_LIMIT = 6;
+/** Without a prefix at most this many commands show, so issues and lists stay in sight. */
+const COMMAND_LIMIT = 6;
 /** Searches once typing pauses, like the toolbar's text filter. */
 const DEBOUNCE_MS = 80;
 /** Every searched prefix is its own entry: unused ones go soon. */
 const RESULTS_GC_MS = 15_000;
+const MENU_COMMANDS_KEY = ["menuCommands"];
 
 /** `value` once it has stopped changing for `DEBOUNCE_MS`. */
 function useSettled(value: string): string {
@@ -27,20 +30,28 @@ function useSettled(value: string): string {
   return settled;
 }
 
-type Item = { kind: "issue"; hit: IssueHit } | { kind: "list"; hit: ListHit } | { kind: "action"; action: PaletteAction };
+type Item = { kind: "issue"; hit: IssueHit } | { kind: "list"; hit: ListHit } | { kind: "command"; command: PaletteCommand } | { kind: "prefix"; prefix: Prefix };
 
-/** ⌘K over a dimmed window (artboard 7): issues by key and full text, filter lists, actions. */
+interface Section {
+  heading: string;
+  items: Item[];
+}
+
+const plural = (count: number, word: string) => count > 0 && `${count} ${word}${count === 1 ? "" : "s"}`;
+
+/** Commands grouped under their menus while nothing is typed, else one list, best match first. */
+function commandSections(commands: PaletteCommand[], query: string): Section[] {
+  const items = (list: PaletteCommand[]) => list.map((command): Item => ({ kind: "command", command }));
+  if (query) return [{ heading: "Commands", items: items(ranked(commands, query, (c) => [c.label, `${c.section} ${c.detail ?? ""}`])) }];
+  const sections = new Map<string, PaletteCommand[]>();
+  for (const command of commands) sections.set(command.section, [...(sections.get(command.section) ?? []), command]);
+  return [...sections].map(([heading, list]) => ({ heading, items: items(list) }));
+}
+
+/** ⌘K over a dimmed window (artboard 7): issues, filter lists and commands; `>`, `#` and `/` narrow it to one kind. */
 export function CommandPalette() {
   const open = useStore((s) => s.paletteOpen);
   return open ? <Palette /> : null;
-}
-
-function Marked({ parts }: { parts: TextPart[] }) {
-  return (
-    <>
-      {parts.map((part, i) => (part.strong ? <strong key={i}>{part.text}</strong> : <span key={i}>{part.text}</span>))}
-    </>
-  );
 }
 
 function Palette() {
@@ -50,39 +61,57 @@ function Palette() {
   const showIssue = useStore((s) => s.openIssue);
   const [text, setText] = useState("");
   const [active, setActive] = useState(0);
+  // Before the palette is on screen, while the page still has the focus it had.
+  const [page] = useState(snapshotPage);
   const { data: tree } = useSidebar();
   const { data: nav } = useNav();
   const client = useQueryClient();
   const go = useNavGo();
   const actions = useIssueActions();
   const listRef = useRef<HTMLDivElement>(null);
-  const query = useSettled(text);
-  const { data: results } = useQuery({
-    queryKey: ["palette", query],
-    queryFn: () => api.paletteQuery(query),
-    enabled: query.trim() !== "",
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const { prefix, query } = parsePrefix(text);
+  const mode = prefix?.mode ?? null;
+  const settledText = useSettled(text);
+  const settled = parsePrefix(settledText);
+  const scope = settled.prefix && settled.prefix.mode !== "commands" ? SCOPES[settled.prefix.mode] : "all";
+  const { data: results, isFetching } = useQuery({
+    queryKey: ["palette", scope, settled.query],
+    queryFn: () => api.paletteQuery(settled.query, scope),
+    enabled: settled.prefix?.mode !== "commands" && (settled.query !== "" || scope === "lists"),
     placeholderData: keepPreviousData,
     gcTime: RESULTS_GC_MS,
   });
-  const issues = text.trim() ? (results?.issues ?? []) : [];
-  const lists = text.trim() ? (results?.lists ?? []) : [];
+  const { data: menu } = useQuery({ queryKey: MENU_COMMANDS_KEY, queryFn: api.menuCommands });
+  const commands = useMemo(() => collectCommands(menu ?? [], page), [menu, page]);
+
+  const issues = (mode === null || mode === "issues") && query ? (results?.issues ?? []) : [];
+  const lists = (mode === null || mode === "lists") && (query || mode === "lists") ? (results?.lists ?? []) : [];
   // Issues come first, so a low index is an issue; elsewhere the first issue is meant.
   const activeIssue = issues[active] ?? issues[0];
-  const shownActions = paletteActions({
-    text,
-    issue: activeIssue,
-    openInJira: actions.openInJira,
-    tree,
-    nav,
-    go: (listId) => go(listId),
-    viewId: nav?.location?.viewId ?? null,
-  }).slice(0, ACTION_LIMIT);
 
-  const all: Item[] = [
-    ...issues.map((hit): Item => ({ kind: "issue", hit })),
-    ...lists.map((hit): Item => ({ kind: "list", hit })),
-    ...shownActions.map((action): Item => ({ kind: "action", action })),
-  ];
+  const own: PaletteCommand[] = [];
+  const openInJira = actions.openInJira;
+  if (activeIssue && openInJira) own.push({ id: "jira", label: `Open ${activeIssue.key} in Jira`, section: "Issue", shortcut: "⌘↩", run: () => openInJira(activeIssue.key) });
+  if (query && (mode === null || mode === "issues")) {
+    own.push({ id: "save", label: `Save “${query}” as a filter list`, section: "List", shortcut: "⌘S", run: () => void saveSearch(query, tree, nav, (id) => go(id)) });
+  }
+
+  const sections: Section[] = [];
+  const add = (heading: string, items: Item[]) => {
+    if (items.length > 0) sections.push({ heading, items });
+  };
+  if (mode === "commands") sections.push(...commandSections(commands, query));
+  else if (mode === null && !query) add("Narrow to", PREFIXES.map((p): Item => ({ kind: "prefix", prefix: p })));
+  else {
+    add("Issues", issues.map((hit): Item => ({ kind: "issue", hit })));
+    add(mode === "lists" ? "Lists" : "Filter lists", lists.map((hit): Item => ({ kind: "list", hit })));
+    const found = mode === null ? ranked(commands, query, (c) => [c.label, `${c.section} ${c.detail ?? ""}`]).slice(0, COMMAND_LIMIT) : [];
+    add("Commands", [...own, ...found].map((command): Item => ({ kind: "command", command })));
+  }
+  const all = sections.flatMap((section) => section.items);
+  const commandCount = all.filter((item) => item.kind === "command").length;
 
   useEffect(() => setActive(0), [text]);
   useEffect(() => {
@@ -90,6 +119,10 @@ function Palette() {
   }, [active]);
 
   const dismiss = () => close(false);
+  const narrow = (next: string) => {
+    setText(next);
+    inputRef.current?.focus();
+  };
 
   /** In the full Issue view, over its Space's last view (where the row stays selected). */
   const openIssue = async (hit: IssueHit) => {
@@ -105,10 +138,11 @@ function Palette() {
   };
   const run = async (item: Item | undefined) => {
     if (!item) return;
+    if (item.kind === "prefix") return narrow(item.prefix.char);
     if (item.kind === "issue") return openIssue(item.hit);
     dismiss();
     if (item.kind === "list") return go(item.hit.id);
-    return item.action.run();
+    return item.command.run();
   };
 
   const onKeyDown = (e: KeyboardEvent) => {
@@ -125,9 +159,9 @@ function Palette() {
       if (all.length > 0) setActive((at) => (at + (e.key === "ArrowDown" ? 1 : -1) + all.length) % all.length);
     } else if (e.key === "Enter" && mod) {
       handled();
-      if (activeIssue && actions.openInJira) {
+      if (activeIssue && openInJira) {
         dismiss();
-        actions.openInJira(activeIssue.key);
+        openInJira(activeIssue.key);
       }
     } else if (e.key === "Enter") {
       handled();
@@ -135,14 +169,14 @@ function Palette() {
     } else if (mod && e.key.toLowerCase() === "c" && activeIssue && (window.getSelection()?.isCollapsed ?? true) && isCaretOnly(e.target)) {
       handled();
       actions.copyKey(activeIssue.key);
-    } else if (mod && e.key.toLowerCase() === "s" && text.trim()) {
+    } else if (mod && e.key.toLowerCase() === "s" && own.some((c) => c.id === "save")) {
       handled();
       dismiss();
-      void saveSearch(text.trim(), tree, nav, (id) => go(id));
+      void saveSearch(query, tree, nav, (id) => go(id));
     } else if (mod && e.key.toLowerCase() === "r") {
       handled();
       dismiss();
-      void shownActions.find((a) => a.id === "refresh")?.run();
+      runBusCommand("sync:refresh", "Could not refresh");
     }
   };
 
@@ -163,10 +197,20 @@ function Palette() {
       </div>
     );
   };
-  const spaceOf = (projectId: string | null) => tree?.spaces.find((s) => s.projectId === projectId);
-  const counts = [issues.length && `${issues.length} ${issues.length === 1 ? "issue" : "issues"}`, `${shownActions.length} ${shownActions.length === 1 ? "action" : "actions"}`]
-    .filter(Boolean)
-    .join(" · ");
+  const row = (item: Item) => {
+    switch (item.kind) {
+      case "issue":
+        return option(`issue:${item.hit.id}`, "palette__option palette__issue", <IssueRow hit={item.hit} />, item);
+      case "list":
+        return option(`list:${item.hit.id}`, "palette__option palette__list", <ListRow hit={item.hit} tree={tree} />, item);
+      case "command":
+        return option(`command:${item.command.id}`, "palette__option palette__action", <CommandRow command={item.command} showSection={mode !== "commands" || query !== ""} />, item);
+      case "prefix":
+        return option(`prefix:${item.prefix.char}`, "palette__option palette__action", <PrefixRow prefix={item.prefix} />, item);
+    }
+  };
+  const counts = [plural(issues.length, "issue"), plural(lists.length, "list"), plural(commandCount, "command")].filter(Boolean).join(" · ");
+  const placeholder = prefix?.placeholder ?? "Search issues, lists and commands";
 
   return (
     <div className="palette-scrim" onMouseDown={(e) => e.target === e.currentTarget && dismiss()}>
@@ -174,91 +218,39 @@ function Palette() {
         <label className="palette__input">
           <Search size={18} strokeWidth={2} aria-hidden="true" />
           <input
+            ref={inputRef}
             autoFocus
             role="combobox"
             aria-expanded="true"
             aria-controls="palette-results"
-            aria-label="Search issues, filter lists and actions"
-            placeholder="Search issues, filter lists and actions"
+            aria-label={placeholder}
+            placeholder={placeholder}
             value={text}
             onChange={(e) => setText(e.target.value)}
           />
           <span className="palette__count">{counts}</span>
         </label>
         <div ref={listRef} id="palette-results" className="palette__results" role="listbox" aria-label="Results">
-          {issues.length > 0 && (
-            <section aria-label="Issues">
-              <h2 className="palette__caps">Issues</h2>
-              {issues.map((hit) =>
-                option(
-                  `issue:${hit.id}`,
-                  "palette__option palette__issue",
-                  <>
-                    <span className="palette__issue-line">
-                      <StatusSquare style={hit.style} />
-                      <span className="palette__key">{hit.key}</span>
-                      <span className="palette__summary">
-                        <Marked parts={hit.summary} />
-                      </span>
-                      {hit.gone && <span className="palette__gone">gone</span>}
-                      <StatusPill style={hit.style} name={hit.statusName} variant="activity" />
-                      <CornerDownLeft className="palette__enter" size={12} strokeWidth={2} aria-hidden="true" />
-                    </span>
-                    {hit.comment && (
-                      <span className="palette__comment">
-                        Matched in comment: “<Marked parts={hit.comment} />”
-                      </span>
-                    )}
-                  </>,
-                  { kind: "issue", hit },
-                ),
-              )}
+          {sections.map((section, i) => (
+            <section key={section.heading} aria-label={section.heading}>
+              {i > 0 && <hr className="palette__separator" />}
+              <h2 className="palette__caps">{section.heading}</h2>
+              {section.items.map(row)}
             </section>
-          )}
-          {lists.length > 0 && (
-            <section aria-label="Filter lists">
-              {issues.length > 0 && <hr className="palette__separator" />}
-              <h2 className="palette__caps">Filter lists</h2>
-              {lists.map((hit) => {
-                const space = spaceOf(hit.projectId);
-                return option(
-                  `list:${hit.id}`,
-                  "palette__option palette__list",
-                  <>
-                    {space ? <SpaceTile space={space} size={20} /> : <span className="palette__tile-gap" />}
-                    <span className="palette__summary">{space && !hit.isSpace ? `${space.name} › ${hit.name}` : hit.name}</span>
-                    <span className="palette__meta">{hit.isSpace ? "Space" : "filter list"}</span>
-                  </>,
-                  { kind: "list", hit },
-                );
-              })}
-            </section>
-          )}
-          {shownActions.length > 0 && (
-            <section aria-label="Actions">
-              {(issues.length > 0 || lists.length > 0) && <hr className="palette__separator" />}
-              <h2 className="palette__caps">Actions</h2>
-              {shownActions.map((action) =>
-                option(
-                  `action:${action.id}`,
-                  "palette__option palette__action",
-                  <>
-                    <Zap size={16} strokeWidth={1.8} aria-hidden="true" />
-                    <span className="palette__summary">{action.label}</span>
-                    {action.hint && <span className="palette__meta">{action.hint}</span>}
-                  </>,
-                  { kind: "action", action },
-                ),
-              )}
-            </section>
-          )}
+          ))}
+          {all.length === 0 && query !== "" && !isFetching && settledText === text && <p className="palette__empty">No results</p>}
         </div>
         <footer className="palette__footer">
-          <span>↑↓ move</span>
-          <span>↩ open</span>
-          <span>⌘↩ open in Jira</span>
-          <span>⌘C copy key</span>
+          <PrefixButtons active={prefix} onPick={narrow} />
           <span className="palette__spacer" />
+          {activeIssue ? (
+            <>
+              <span>⌘↩ open in Jira</span>
+              <span>⌘C copy key</span>
+            </>
+          ) : (
+            <span>↩ open</span>
+          )}
           <span>esc close</span>
         </footer>
       </div>
