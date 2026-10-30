@@ -25,6 +25,13 @@ export function useRowsPlace(listId: number, viewId: number, data: ViewData) {
     void loadPlace(listId, viewId);
   }, [loadPlace, listId, viewId]);
 
+  // A narrowing (the text filter, Me, a filter draft) that drops the previewed issue closes the preview; the
+  // selection stays, so the row is selected again when it comes back.
+  const previewGone = peekOpen && selected !== null && !(selected in data.rows);
+  useEffect(() => {
+    if (previewGone) updatePlace(listId, viewId, { peekOpen: false });
+  }, [previewGone, updatePlace, listId, viewId]);
+
   const collapsed = useMemo(() => new Set(collapsedParents), [collapsedParents]);
   const setPlace = (patch: Partial<ViewPlace>) => updatePlace(listId, viewId, patch);
   const subtasksOpen = (id: string) => !collapsed.has(id);

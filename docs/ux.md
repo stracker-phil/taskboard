@@ -241,10 +241,11 @@ sits on the right of the element when there is room, else on the left, never tak
 ## Issue preview
 
 `src/issue/Peek.tsx` (the code still calls it peek), shown by `shell/CurrentPeek.tsx`: clicking a row in a List
-or Table view selects it and opens a 540px panel over the right of the view body, under the toolbar. The view keeps
-its width beneath it, so nothing reflows or moves ([Stable controls](#stable-controls)): the rows' title, key and
-status stay visible on the left, the header, tabs and toolbar stay usable. It slides in with a shadow on its left
-edge and no scrim.
+or Table view selects it and opens a 540px panel over the right of the content panel, its full height. The header,
+tabs, toolbar and view keep their width beneath it, so nothing reflows or moves ([Stable controls](#stable-controls));
+the rows' title, key and status stay visible on the left. It slides in with a shadow on its left edge and no scrim,
+and slides out when closed. When the narrowing (text filter, Me, a filter draft) drops the previewed issue from the
+results, the preview closes; the row stays selected for when it comes back.
 
 What a click opens is the view's choice (Columns → Open issues in: Default, Preview, Full view; `view.open_with`,
 null for Default) or else Settings → General → Open issues in (`behaviour.openIssuesIn`, Preview unless changed;

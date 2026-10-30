@@ -5,10 +5,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../../test/apiMock")).createApiMock() }));
 
-import { api, type IssueOpening, type Row, type ViewData, type ViewPlace } from "../../api";
+import { api, type IssueOpening, type Narrowing, type Row, type ViewData, type ViewPlace } from "../../api";
 import { installCommands } from "../../commands";
 import { getCommand } from "../../commands/registry";
 import { createQueryClient } from "../../queries/queryClient";
+import { NO_NARROWING } from "../../queries/views";
 import { resetStore, useStore } from "../../state/store";
 import { ALEX, COLUMNS, groupOf, row, SAM, viewData } from "../../test/issues";
 import { connectionView } from "../../test/jira";
@@ -48,15 +49,18 @@ afterEach(() => {
 
 async function renderList(data: ViewData, openWith: IssueOpening | null = null) {
   mocked.viewRows.mockResolvedValue(data);
-  render(
-    <QueryClientProvider client={createQueryClient()}>
-      <ListView listId={11} viewId={101} openWith={openWith} />
-    </QueryClientProvider>,
+  const client = createQueryClient();
+  const tree = (narrowing: Narrowing) => (
+    <QueryClientProvider client={client}>
+      <ListView listId={11} viewId={101} openWith={openWith} narrowing={narrowing} />
+    </QueryClientProvider>
   );
+  const { rerender } = render(tree(NO_NARROWING));
   await screen.findByRole("grid");
   await waitFor(() => expect(place()).toBeDefined());
   await waitFor(() => expect(mocked.getSettings).toHaveBeenCalled());
   await act(async () => {});
+  return { narrowTo: (narrowing: Narrowing) => rerender(tree(narrowing)) };
 }
 
 const OPEN = row({ id: "1", key: "NW-1042", summary: "Redesign the pricing page", commentCount: 3 });
@@ -347,6 +351,36 @@ describe("ListView", () => {
       await renderList(viewData(groups(), [OPEN, DONE]));
 
       expect(mocked.placeGet).toHaveBeenCalledWith(11, 101);
+    });
+
+    describe("with the preview open", () => {
+      const previewing: ViewPlace = { ...saved, peekOpen: true };
+      const pricing: Narrowing = { ...NO_NARROWING, text: "pricing" };
+      const refetchWith = (rows: Row[]) => mocked.viewRows.mockResolvedValue(viewData([groupOf(rows)], rows));
+
+      it("closes the preview and keeps the selection when a narrowing drops the selected issue", async () => {
+        mocked.placeGet.mockResolvedValue(previewing);
+        const { narrowTo } = await renderList(viewData(groups(), [OPEN, DONE]));
+        await waitFor(() => expect(place()).toMatchObject({ selectedId: "2", peekOpen: true }));
+
+        refetchWith([OPEN]);
+        narrowTo(pricing);
+
+        await waitFor(() => expect(place()).toMatchObject({ selectedId: "2", peekOpen: false }));
+      });
+
+      it("keeps the preview open when the selected issue is still among the rows", async () => {
+        mocked.placeGet.mockResolvedValue(previewing);
+        const { narrowTo } = await renderList(viewData(groups(), [OPEN, DONE]));
+        await waitFor(() => expect(place()).toMatchObject({ selectedId: "2", peekOpen: true }));
+
+        refetchWith([OPEN, DONE]);
+        narrowTo(pricing);
+        await waitFor(() => expect(mocked.viewRows).toHaveBeenCalledWith(11, 101, expect.objectContaining({ text: "pricing" })));
+        await act(async () => {});
+
+        expect(place()).toMatchObject({ selectedId: "2", peekOpen: true });
+      });
     });
 
     it("keeps a toggled group in the place and saves it", async () => {

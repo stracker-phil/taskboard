@@ -9,6 +9,7 @@ import { api, type Row, type View, type ViewData, type ViewPlace } from "../../a
 import { installCommands } from "../../commands";
 import { getCommand } from "../../commands/registry";
 import { createQueryClient } from "../../queries/queryClient";
+import { NO_NARROWING } from "../../queries/views";
 import { resetStore, useStore } from "../../state/store";
 import { ALEX, COLUMNS, groupOf, row, viewData } from "../../test/issues";
 import { settings } from "../../test/settings";
@@ -42,14 +43,16 @@ afterEach(() => {
   spies.forEach((s) => s.mockRestore());
 });
 
+let client = createQueryClient();
 const TABLE = view({ layout: "table", sort: { by: "key", descending: false } });
 const OPEN = row({ id: "1", key: "NW-1042", summary: "Redesign the pricing page" });
 const DONE = row({ id: "2", key: "NW-1001", summary: "Publish the launch notes", style: "done", statusName: "Done" });
 
 async function renderTable(data: ViewData = viewData([groupOf([OPEN, DONE])], [OPEN, DONE], { columns: ["assignee", "priority"], groupBy: "none" }), current: View = TABLE) {
   mocked.viewRows.mockResolvedValue(data);
+  client = createQueryClient();
   const rendered = render(
-    <QueryClientProvider client={createQueryClient()}>
+    <QueryClientProvider client={client}>
       <TableView view={current} />
     </QueryClientProvider>,
   );
@@ -354,6 +357,22 @@ describe("TableView", () => {
       await userEvent.click(await screen.findByText("Publish the launch notes"));
 
       expect(useStore.getState().issueView).toEqual({ origin: { listId: 11, viewId: 101 }, stack: ["2"] });
+    });
+
+    it("closes the preview and keeps the selection when a narrowing drops the selected issue", async () => {
+      const previewing: ViewPlace = { scrollTop: 0, toggled: {}, collapsedParents: [], selectedId: "2", peekOpen: true };
+      mocked.placeGet.mockResolvedValue(previewing);
+      const { rerender } = await renderTable();
+      await waitFor(() => expect(place()).toMatchObject({ selectedId: "2", peekOpen: true }));
+
+      mocked.viewRows.mockResolvedValue(viewData([groupOf([OPEN])], [OPEN], { columns: ["assignee", "priority"], groupBy: "none" }));
+      rerender(
+        <QueryClientProvider client={client}>
+          <TableView view={TABLE} narrowing={{ ...NO_NARROWING, text: "pricing" }} />
+        </QueryClientProvider>,
+      );
+
+      await waitFor(() => expect(place()).toMatchObject({ selectedId: "2", peekOpen: false }));
     });
 
     describe("the key cell", () => {

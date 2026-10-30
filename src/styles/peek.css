@@ -1,5 +1,5 @@
-/* The issue preview (docs/ux.md → Issue preview): 540 wide over the right of the view body, under the toolbar;
-   the view keeps its width beneath it. */
+/* The issue preview (docs/ux.md → Issue preview): 540 wide over the right of the content panel, its full height;
+   the header, tabs, toolbar and view keep their width beneath it. */
 .content-panel__main { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; }
 
 .peek {
