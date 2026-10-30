@@ -1,6 +1,7 @@
 import { useVirtualizer, type VirtualItem } from "@tanstack/react-virtual";
 import { type CSSProperties, type RefObject, useLayoutEffect, useRef } from "react";
 import { type Item, itemHeight, itemKey } from "./flatten";
+import { revealedHeights } from "./groupReveal";
 
 /** How far a row's group is open while it animates (1 when still). */
 function motionFactor(item: Item, factors: Record<string, number>): number {
@@ -9,10 +10,17 @@ function motionFactor(item: Item, factors: Record<string, number>): number {
 
 /**
  * The virtualizer and each item's size. Fixed-height rows take their height from the item; wrapped rows are
- * measured and, while their group collapses, shrink from the height they had when it started.
+ * measured. While a group opens or closes its rows keep their height, fade, and are cut at the group's moving
+ * bottom edge (`revealedHeights`); a wrapped row keeps the height it had when the motion started.
  */
 export function useRowSizing(items: Item[], factors: Record<string, number>, wrapTitles: boolean, scrollRef: RefObject<HTMLDivElement | null>) {
-  const heightOf = (index: number) => itemHeight(items[index]) * motionFactor(items[index], factors);
+  const startHeights = useRef(new Map<string, number>());
+  const fullHeight = (index: number) => {
+    const item = items[index];
+    return (item.kind === "row" && wrapTitles ? startHeights.current.get(item.row.id) : undefined) ?? itemHeight(item);
+  };
+  const revealed = Object.keys(factors).length > 0 ? revealedHeights(items, factors, fullHeight) : null;
+  const heightOf = (index: number) => revealed?.[index] ?? itemHeight(items[index]);
   const virtualizer = useVirtualizer({
     count: items.length,
     getScrollElement: () => scrollRef.current,
@@ -31,7 +39,6 @@ export function useRowSizing(items: Item[], factors: Record<string, number>, wra
     if (!wrapTitles) virtualizer.measure();
   }, [factors, virtualizer, wrapTitles]);
 
-  const startHeights = useRef(new Map<string, number>());
   const groupStartsMoving = (groupKey: string) => {
     if (!wrapTitles) return;
     items.forEach((item, index) => {
@@ -44,10 +51,8 @@ export function useRowSizing(items: Item[], factors: Record<string, number>, wra
     const style: CSSProperties = { transform: `translateY(${virtual.start}px)` };
     if (!wrapTitles) style.height = virtual.size;
     if (item.kind === "row" && item.groupKey in factors) {
-      const factor = motionFactor(item, factors);
-      const start = wrapTitles ? startHeights.current.get(item.row.id) : undefined;
       // Clip only vertically: a top-level row's caret sits in the gutter left of the card.
-      Object.assign(style, { opacity: factor, overflowY: "clip" }, start === undefined ? {} : { height: start * factor });
+      Object.assign(style, { opacity: motionFactor(item, factors), overflowY: "clip", height: heightOf(virtual.index) });
     }
     return { ref: wrapTitles ? virtualizer.measureElement : undefined, "data-index": virtual.index, style };
   };

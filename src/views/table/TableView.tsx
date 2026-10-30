@@ -18,6 +18,7 @@ import { useIssueOpening } from "../useIssueOpening";
 import { useRememberedScroll } from "../useRememberedScroll";
 import { useViewSettings } from "./useViewSettings";
 import { columnWidth, SUMMARY_MIN_WIDTH, widthVar } from "./widths";
+import { revealedHeights } from "../list/groupReveal";
 
 /** Every row, a group's heading row too: the Table never changes its rhythm. */
 const TABLE_ROW_HEIGHT = 30;
@@ -71,7 +72,8 @@ function Table({ view, data }: { view: View; data: ViewData }) {
     [data, toggled, moving, collapsedParents],
   );
   const rowIds = useMemo(() => items.flatMap((item) => (item.kind === "row" ? [item.row.id] : [])), [items]);
-  const heightOf = (index: number) => TABLE_ROW_HEIGHT * openness(items[index], factors);
+  const revealed = Object.keys(factors).length > 0 ? revealedHeights(items, factors, () => TABLE_ROW_HEIGHT) : null;
+  const heightOf = (index: number) => revealed?.[index] ?? TABLE_ROW_HEIGHT;
   const virtualizer = useVirtualizer({
     count: items.length,
     getScrollElement: () => scrollRef.current,

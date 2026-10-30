@@ -34,7 +34,8 @@ The owner's rule (2026-10-30), for every control, list and popover:
   push others aside (Revert and Save View in the toolbar's middle).
 - **Nothing jumps; things move.** A control that appears fades in, and controls that change position glide to
   the new one (`useGlide` in `lib/motion.ts`: the toolbar, the view tabs, the Board's columns). Rows that grow or
-  shrink animate their height (group collapse). A window resize may move things at once.
+  shrink animate their height (a group reveals or hides its rows from the bottom). A window resize may move
+  things at once.
 - **Folding follows the width only.** The toolbar folds items into "…" when the window narrows, never because
   of a click: the room Revert and Save View need is always kept (`toolbar/fit.ts`).
 
@@ -472,8 +473,9 @@ movement is instant and fades are short.
   exit, inert), chevrons fade in with their group, a view's content fades in when it changes.
 - Hover gives a short response: a `--hover-bg` tint, a `--border-strong` border on outlined controls,
   `--row-hover-bg` on rows.
-- Expand and collapse animate: a List group's rows shrink and fade while the groups below glide up
-  (`useGroupMotion`, which scales the virtual rows' heights), sidebar Spaces grow open (`components/Disclosure`).
+- Expand and collapse animate like the sidebar's Spaces (`components/Disclosure`): a List or Table group's rows
+  keep their height and fade while the group's height opens or closes, so rows appear and vanish at its bottom
+  edge and the groups below glide (`useGroupMotion` drives the openness, `groupReveal.ts` cuts the rows).
 
 ## Toolbar
 
