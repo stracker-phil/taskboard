@@ -34,6 +34,9 @@
 .issue-header__nav:disabled { opacity: 0.45; }
 
 .issue-view__columns { display: flex; flex: 1; min-height: 0; }
+.issue-view__columns[data-finding] { -webkit-user-select: text; user-select: text; }
+::highlight(find-match) { background-color: var(--find-match-bg); color: var(--find-match-text); }
+::highlight(find-current) { background-color: var(--find-current-bg); color: var(--find-current-text); }
 .issue-view__main { display: flex; flex: 1; min-width: 0; min-height: 0; }
 .issue-view__missing { margin: 40px; color: var(--text-muted); }
 

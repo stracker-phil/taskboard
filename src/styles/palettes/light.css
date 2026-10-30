@@ -167,6 +167,11 @@
   --pin-icon: #b45309;
   --pin-bg: #fef3c7;
   --pin-text: #92400e;
+  /* find in the Issue view: every match, and the one Enter stepped to */
+  --find-match-bg: #fde68a;
+  --find-match-text: #1c1917;
+  --find-current-bg: #f59e0b;
+  --find-current-text: #1c1917;
   --pr-open-bg: #f3e8ff;
   --pr-open-fg: #6b21a8;
 

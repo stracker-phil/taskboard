@@ -1,7 +1,7 @@
 import { ArrowDown, ArrowLeft, ArrowUp, CheckCheck, CircleDot, Link2 } from "lucide-react";
 import { CopyKey } from "../components/issue/CopyKey";
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef } from "react";
+import { type RefObject, useEffect, useMemo, useRef } from "react";
 import { api, type IssueDetail } from "../api";
 import { onIssueKeys } from "../commands/issueKeys";
 import { OpenInJiraButton } from "../components/OpenInJiraButton";
@@ -26,6 +26,7 @@ import { IssueMissing } from "./IssueMissing";
 import { SinceBanner } from "./SinceBanner";
 import { holdUnread, useSeenAfter } from "./useSeenAfter";
 import { FieldGrid } from "./FieldGrid";
+import { IssueFind } from "./find/IssueFind";
 import { JiraHtml } from "./JiraHtml";
 import { RichFields } from "./RichFields";
 import { Children, Links } from "./Related";
@@ -57,6 +58,7 @@ export function IssueView({ id, origin }: { id: string; origin: IssueOrigin }) {
   const back = useStore((s) => s.issueBack);
   const neighbors = useNeighbors(origin, id);
   const client = useQueryClient();
+  const columnsRef = useRef<HTMLDivElement>(null);
   useSeenAfter(id, !isPlaceholderData && (issue?.unread ?? false));
 
   useEffect(() => {
@@ -70,8 +72,8 @@ export function IssueView({ id, origin }: { id: string; origin: IssueOrigin }) {
 
   return (
     <div className="issue-view">
-      <IssueHeader issue={issue} origin={origin} neighbors={neighbors} onBack={back} />
-      <div className="issue-view__columns">
+      <IssueHeader issue={issue} origin={origin} neighbors={neighbors} onBack={back} findIn={columnsRef} />
+      <div ref={columnsRef} className="issue-view__columns">
         <div className="issue-view__main">
           {issue ? <IssueMain issue={issue} origin={origin} /> : error ? <IssueMissing error={error} className="issue-view__missing" /> : null}
         </div>
@@ -87,11 +89,13 @@ function IssueHeader({
   origin,
   neighbors,
   onBack,
+  findIn,
 }: {
   issue: IssueDetail | undefined;
   origin: IssueOrigin;
   neighbors: { previous: string | null; next: string | null };
   onBack: () => void;
+  findIn: RefObject<HTMLElement | null>;
 }) {
   const { data: tree } = useSidebar();
   const { data: views } = useViews(origin.listId);
@@ -132,6 +136,7 @@ function IssueHeader({
         )}
       </nav>
       <span className="issue-header__spacer" />
+      <IssueFind rootRef={findIn} />
       {issue && <span className="issue-header__updated">Updated {formatLocalTime(issue.updatedAt)}</span>}
       <button type="button" className="issue-header__nav" aria-label="Previous issue" title="Previous (K)" disabled={!neighbors.previous} onClick={() => neighbors.previous && showIssue(neighbors.previous)}>
         <ArrowUp size={14} strokeWidth={2} aria-hidden="true" />

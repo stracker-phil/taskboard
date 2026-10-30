@@ -59,7 +59,8 @@ export const ISSUE_KEY_COMMANDS: Command[] = [
     title: "Back from the Issue view",
     scope: "main",
     defaultBinding: "Escape",
-    when: () => useStore.getState().issueView !== null && !document.querySelector("[role=dialog]"),
+    // Escape in a text field (the find) clears or leaves it first.
+    when: () => useStore.getState().issueView !== null && !document.querySelector("[role=dialog]") && !isTextInput(document.activeElement),
     run: () => useStore.getState().issueBack(),
   },
   { id: "issue.openInJira", title: "Open issue in Jira", scope: "main", defaultBinding: "Mod+Enter", when: selected, run: () => handlers?.openInJira() },

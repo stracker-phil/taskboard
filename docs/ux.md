@@ -368,11 +368,19 @@ Replace and × (dismissed for the rest of the day). Nothing blocks: the app keep
 Full view button or E (the selected issue's epic); esc goes back one step (an opened epic or child, then the
 view with its place intact).
 
-- Header 50: back, breadcrumb (Space tile and name / list or view / key and a copy-link button), "Updated …", previous and next in the
-  view's order (also J/K), Mark as read or unread, Bookmark (with bookmarks), **Open in Jira** (primary).
+- Header 50: back, breadcrumb (Space tile and name / list or view / key and a copy-link button), **Find in this
+  issue**, "Updated …", previous and next in the view's order (also J/K), Mark as read or unread, Bookmark (with
+  bookmarks), **Open in Jira** (`OpenInJiraButton`, the content header's too).
   Previous and next step through the rows the view shows (not those in collapsed groups or subtrees), move the
   view's selection along, and keep the current issue on screen until the next one loads (the neighbors load
   ahead). An issue missing from the cache says so; any other failure shows Rust's reason.
+- Find in this issue (`src/issue/find/`, ⌘F, the toolbar's `TextFilter` with a match count): every word of the
+  text is a term, matched case-insensitively anywhere in the main column and Activity; matches in one line apart
+  only by spaces are one match ("the checkout" for "checkout the"). They're painted with the CSS Custom
+  Highlight API (`--find-match-*`, the current one `--find-current-*`) without touching the DOM. ↩ brings the
+  current match into view, then steps to the next (⇧↩ back), wrapping; the count reads "2/7". It follows content
+  that loads later and the next issue (J/K). WebKit paints highlights only on selectable text, so the columns turn
+  selectable while a find is active. esc clears the field, then leaves it, then goes back.
 - Main column: type badge · key · comment count (· attachment count, when there are any), the 30/750 title, the field grid (Status, Assignee, Epic chip
   that opens the epic here, Release, Priority, Sprint, then the custom fields shown as columns or marked shown,
   then every other custom field the issue fills, by name), links ("blocks", "is blocked by"), the description,
@@ -518,7 +526,7 @@ button, Escape and a press outside close it, focus goes back to the button).
   list with a search box and a checkbox per value (`ValuePicker`); every tick applies at once, and several values
   are stored as `in` / `not in` (shown as "is" / "is not").
 - **Me** chip (on: `--accent-soft-*` pill with the `--avatar-1` avatar and "Me ×") and **Filter this view**
-  (190 wide, filters by key or summary as you type). Both narrow only the current view. A view opens with the Me
+  (190 wide, filters by key or summary as you type; esc clears it). Both narrow only the current view. A view opens with the Me
   chip it saved (`view.only_mine`); a click changes it as a draft. The text is never saved.
 - **Save View** (left of the Filter button, `SaveViewButton.tsx`, on `--accent` with `--text-on-accent`; pops in
   with a short fade and scale, instant under reduced motion) shows while the Me chip or any condition of either

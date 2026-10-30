@@ -156,7 +156,7 @@ src/
                              text filter, Save View (useViewDraft.ts)
   views/list/ views/table/   the List and Table layouts over the view query's rows (views/board/ the Board)
   issue/                     the Issue view, the preview (Peek.tsx), activity, rich text (JiraHtml.tsx, InlineImage.tsx);
-                             hoverPeek/ the ⌥ + hover Peek
+                             hoverPeek/ the ⌥ + hover Peek; find/ Find in this issue (CSS Custom Highlights)
   pins/ palette/             Bookmarks; the command palette (prefixes, ranking, the menus' and the page's commands)
   commands/ registry/        in-window keys; Settings page registry
   components/ (issue/: rings, pills, chips, avatars; menu/: the one in-app menu; look/: tiles and the look editor)

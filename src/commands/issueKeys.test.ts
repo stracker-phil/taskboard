@@ -255,6 +255,27 @@ describe("issue keys", () => {
       expect(press("Escape")).toBeNull();
     });
 
+    it("leaves Escape to a focused text field, such as the find", () => {
+      register(handlers({ peekOpen: () => false }));
+      useStore.getState().openIssue("10042", { listId: 1, viewId: 1 });
+      const input = document.createElement("input");
+      document.body.append(input);
+      input.focus();
+
+      expect(press("Escape")).toBeNull();
+    });
+
+    it("goes back again once the text field has lost focus", () => {
+      register(handlers({ peekOpen: () => false }));
+      useStore.getState().openIssue("10042", { listId: 1, viewId: 1 });
+      const input = document.createElement("input");
+      document.body.append(input);
+      input.focus();
+      input.blur();
+
+      expect(press("Escape")?.id).toBe("issue.back");
+    });
+
     it("closes the peek, not the Issue view, while only the peek is open", () => {
       register(handlers());
 

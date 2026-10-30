@@ -1,10 +1,22 @@
 import { Search } from "lucide-react";
-import { type Ref, useEffect, useId, useState } from "react";
+import { type KeyboardEvent, type Ref, useEffect, useId, useState } from "react";
 
 const DEBOUNCE_MS = 80;
 
-/** "Filter this view": narrows by key or summary as you type. */
-export function TextFilter({ value, onChange, inputRef }: { value: string; onChange: (text: string) => void; inputRef?: Ref<HTMLInputElement> }) {
+interface Props {
+  value: string;
+  onChange: (text: string) => void;
+  inputRef?: Ref<HTMLInputElement>;
+  /** The placeholder and the field's name. */
+  label?: string;
+  /** Enter (backwards with ⇧), with the text as typed. */
+  onEnter?: (text: string, backwards: boolean) => void;
+  /** Shown at the field's end, in a slot that keeps its width. */
+  status?: string;
+}
+
+/** The text field of the toolbar ("Filter this view") and the Issue view's find. Escape clears it, then leaves it. */
+export function TextFilter({ value, onChange, inputRef, label = "Filter this view", onEnter, status }: Props) {
   const id = useId();
   const [draft, setDraft] = useState(value);
   useEffect(() => {
@@ -12,11 +24,29 @@ export function TextFilter({ value, onChange, inputRef }: { value: string; onCha
     const timer = setTimeout(() => onChange(draft), DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [draft, value, onChange]);
+
+  const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && onEnter) {
+      e.preventDefault();
+      if (draft !== value) onChange(draft);
+      onEnter(draft, e.shiftKey);
+    } else if (e.key === "Escape") {
+      if (draft) {
+        setDraft("");
+        onChange("");
+      } else e.currentTarget.blur();
+    }
+  };
+
   return (
     <label className="text-filter" htmlFor={id}>
       <Search size={14} strokeWidth={2} aria-hidden="true" />
-      <span className="visually-hidden">Filter this view</span>
-      <input ref={inputRef} id={id} type="text" placeholder="Filter this view" value={draft} onChange={(e) => setDraft(e.target.value)} />
+      <input ref={inputRef} id={id} type="text" aria-label={label} placeholder={label} value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={onKeyDown} />
+      {status !== undefined && (
+        <span className="text-filter__status" aria-live="polite">
+          {status}
+        </span>
+      )}
     </label>
   );
 }
