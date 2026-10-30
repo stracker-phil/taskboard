@@ -199,7 +199,9 @@ one group, Board column or pill per style, whatever the status is called; the Bo
   "3 child issues" as its tooltip. List: a subtask is a row like any other, with the glyph before its title.
   Hierarchy: each result's subtree follows it, every level indented 24 more (`list-row--child`, the row's
   `--depth`); a 16px caret (`SubtaskCaret`) collapses or expands its subtree at any level: a top-level row's sits
-  in the gutter left of the card, under its group's chevron; a nested row's 6 before its square, and a collapsed row shows the count chip. Collapsed rows are kept per view (`places.json`); expanded is
+  in the gutter left of the card, under its group's chevron; a nested row's 6 before its square. Like the group's
+  chevron it shows only while its row has the pointer (or it has focus). A collapsed row shows the count chip.
+  Collapsed rows are kept per view (`places.json`); expanded is
   the default.
 
 ## Peek

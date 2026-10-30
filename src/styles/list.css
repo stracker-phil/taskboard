@@ -106,7 +106,12 @@
    what its rows draw outside it: a top-level row's in the gutter under its group's chevron, a nested row's just
    before its status square. */
 .list-item { --indent-step: 24px; }
-.list-row-caret { position: absolute; left: -26px; top: 22px; transform: translateY(-50%); z-index: 1; }
+.list-row-caret {
+  position: absolute; left: -26px; top: 22px; transform: translateY(-50%); z-index: 1;
+  opacity: 0; transition: opacity var(--motion-base) var(--ease-out), background-color var(--motion-fast) var(--ease-out);
+}
+/* Like the group's chevron: only while the row has the pointer, or the caret has focus. */
+.list-item:hover > .list-row-caret, .list-row-caret:focus-visible { opacity: 1; }
 .list-row-caret--nested { left: calc(var(--depth) * var(--indent-step) - 6px); }
 .list-row-caret--wrap { top: 11px; transform: none; }
 .list-row--child .list-row__name { padding-left: calc(var(--depth) * var(--indent-step)); }
