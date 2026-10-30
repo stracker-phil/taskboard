@@ -1,4 +1,4 @@
-import { ChevronDown } from "lucide-react";
+import { DisclosureChevron } from "../../components/DisclosureChevron";
 import type { Group, GroupMark } from "../../api";
 import { Avatar } from "../../components/issue/Avatar";
 import { PriorityFlag } from "../../components/issue/PriorityFlag";
@@ -29,7 +29,7 @@ export function GroupHeader({ group, open, tab, active, namesColumns, headers, o
           aria-expanded={open}
           onClick={onToggle}
         >
-          <ChevronDown size={12} strokeWidth={2.6} aria-hidden="true" />
+          <DisclosureChevron open={open} />
         </button>
       )}
       <span className="list-group__title" role={namesColumns ? "columnheader" : undefined}>

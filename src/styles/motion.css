@@ -41,8 +41,9 @@
   from { grid-template-rows: 0fr; opacity: 0; }
 }
 
-.sb-space__glyph { display: inline-block; transition: transform var(--motion-base) var(--ease-out); }
-.sb-space__chevron[aria-expanded="false"] .sb-space__glyph { transform: rotate(-90deg); }
+/* Every disclosure's chevron (components/DisclosureChevron.tsx) turns between open and closed. */
+.disclosure-chevron { flex: none; transition: transform var(--motion-base) var(--ease-out); }
+.disclosure-chevron--closed { transform: rotate(-90deg); }
 
 /* Hover and press: a short tint or border change on every interactive element. */
 .sb-row, .sb-new-list, .sb-sync, .sb-settings, .sb-spaces__add, .view-tab, .view-tabs__add,

@@ -30,8 +30,6 @@
   width: 24px; height: 24px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--text-muted);
   opacity: 0; transition: opacity var(--motion-base) var(--ease-out), background-color var(--motion-fast) var(--ease-out);
 }
-.list-group__chevron svg { transition: transform var(--motion-base) var(--ease-out); }
-.list-group__chevron[aria-expanded="false"] svg { transform: rotate(-90deg); }
 .list-group--active .list-group__chevron, .list-group__chevron:focus-visible { opacity: 1; }
 .list-group__chevron:hover { background: var(--hover-bg); }
 

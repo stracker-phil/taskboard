@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { ChevronDown } from "lucide-react";
+import { DisclosureChevron } from "../../components/DisclosureChevron";
 
 /** A row's disclosure in Hierarchy: collapses or expands its subtree without selecting the row. */
 interface Props {
@@ -23,7 +23,7 @@ export function SubtaskCaret({ open, onToggle, className, style }: Props) {
       }}
       onDoubleClick={(e) => e.stopPropagation()}
     >
-      <ChevronDown size={12} strokeWidth={2.2} aria-hidden="true" />
+      <DisclosureChevron open={open} />
     </button>
   );
 }

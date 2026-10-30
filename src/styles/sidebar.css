@@ -71,18 +71,24 @@
 
 /* A Space row: the chevron and the main button share the row's 36px; the chevron takes the left padding. */
 .sb-space { gap: 10px; height: 36px; color: var(--text-strong-body); }
+/* Dimmed until its Space has the pointer or holds the shown level. */
 .sb-space__chevron {
+  display: flex;
   flex: none;
-  width: 20px;
+  align-items: center;
+  width: 22px;
   height: 100%;
   margin-right: -4px;
-  padding: 0 0 0 10px;
+  padding: 0 0 0 8px;
   border: none;
   background: none;
-  color: var(--text-faint);
-  font-size: 10px;
-  text-align: left;
+  color: var(--text-muted);
+  opacity: 0.4;
+  transition: opacity var(--motion-fast) var(--ease-out);
 }
+.sb-space:hover .sb-space__chevron,
+.sb-space[data-state] .sb-space__chevron,
+.sb-space__chevron:focus-visible { opacity: 1; }
 .sb-space__main {
   display: flex;
   flex: 1;

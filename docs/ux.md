@@ -76,7 +76,8 @@ The owner's rule (2026-10-30), for every control, list and popover:
   changed has no count: while it has unseen issues its label is 600 and a badge (20px, `--accent`, white
   11/700) shows how many.
 - **Spaces** (`SpacesSection`, scrolls): the "Spaces" header (12/600 `--text-muted`); Spaces are added in
-  Settings → Projects, not here. Each Space (`SpaceRow`): 36px, a 10px ▾/▸ chevron in `--text-faint`, the 22px
+  Settings → Projects, not here. Each Space (`SpaceRow`): 36px, the shared 12px chevron (`DisclosureChevron`, the one of every disclosure) in `--text-muted` at 0.4
+  opacity, full while the Space has the pointer or holds the shown level, the 22px
   tile (6px radius, 11/800 letter on `--space-tile-N`) and the name; no count (only filter lists count). Once it
   has filter lists, hovering shows a 24px + on the right that adds one.
   The current Space has `--selection-bg` with `--selection-text` and a 600 name; the Space of the current
@@ -240,9 +241,10 @@ sits on the right of the element when there is room, else on the left, never tak
 ## Issue preview
 
 `src/issue/Peek.tsx` (the code still calls it peek), shown by `shell/CurrentPeek.tsx`: clicking a row in a List
-or Table view selects it and opens a 540px panel at
-the content panel's full height; header, tabs, toolbar and view narrow beside it and the List hides the
-columns that no longer fit beside a 240px title, rightmost first, until it closes. It slides in.
+or Table view selects it and opens a 540px panel over the right of the view body, under the toolbar. The view keeps
+its width beneath it, so nothing reflows or moves ([Stable controls](#stable-controls)): the rows' title, key and
+status stay visible on the left, the header, tabs and toolbar stay usable. It slides in with a shadow on its left
+edge and no scrim.
 
 What a click opens is the view's choice (Columns → Open issues in: Default, Preview, Full view; `view.open_with`,
 null for Default) or else Settings → General → Open issues in (`behaviour.openIssuesIn`, Preview unless changed;

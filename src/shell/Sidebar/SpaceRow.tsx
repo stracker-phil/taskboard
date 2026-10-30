@@ -1,3 +1,4 @@
+import { DisclosureChevron } from "../../components/DisclosureChevron";
 import { Plus } from "lucide-react";
 import { useState, type HTMLAttributes, type MouseEvent } from "react";
 import { api, type SpaceNode } from "../../api";
@@ -54,7 +55,7 @@ export function SpaceRow({ space, active, holdsActive, expanded, renaming, onOpe
         aria-expanded={expanded}
         onClick={(e) => onToggle(e.altKey)}
       >
-        <span className="sb-space__glyph" aria-hidden="true">▾</span>
+        <DisclosureChevron open={expanded} />
       </button>
       <SpaceLookButton
         space={space}
