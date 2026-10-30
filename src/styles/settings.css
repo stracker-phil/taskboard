@@ -145,6 +145,7 @@
 }
 .settings-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--settings-text); font-size: 13px; }
 .shortcut-control { display: flex; align-items: center; gap: 4px; }
+.shortcut-control__slot { visibility: hidden; }
 .shortcut-field {
   display: inline-flex; align-items: center; justify-content: center; width: 7rem; height: 24px; border: 0; border-radius: 6px;
   background: var(--settings-field); box-shadow: inset 0 0 0 1px var(--settings-field-line); color: var(--settings-text); font-size: 12px;
@@ -153,7 +154,7 @@
 .shortcut-field--recording { box-shadow: inset 0 0 0 1px var(--settings-field-line), 0 0 0 3px var(--settings-focus-ring); color: var(--settings-text-tertiary); }
 .shortcut-field--unbound { color: var(--settings-text-tertiary); font-style: italic; }
 .shortcut-fixed { font-size: 12px; color: var(--settings-text-secondary); }
-.shortcut-conflicts { margin-bottom: 12px; padding: 8px 10px; border-radius: 7px; background: var(--banner-warn-bg); color: var(--banner-warn-text); font-size: 12px; }
+.shortcut-conflicts { margin: 12px 0; padding: 8px 10px; border-radius: 7px; background: var(--banner-warn-bg); color: var(--banner-warn-text); font-size: 12px; }
 
 /* Settings → Statuses: compact rows per Jira category, the pill at its own width. */
 .status-search { padding: 8px 0; }

@@ -40,12 +40,20 @@ export function ColumnsPopover({ view, spaceProjectId, anchor, onClose }: Props)
   const names = board ? BOARD_LABELS : LABELS;
   const save = (columns: string[]) => edit(api.viewSetColumns(view.id, columns), "Could not change the columns");
 
-  const standard = inViewOrder(catalog.filter((c) => !c.custom), view.columns);
-  const custom = inViewOrder(catalog.filter((c) => c.custom), view.columns);
+  // The order the list opened with stays while it is open: a toggle changes only its switch, never which field
+  // is under the cursor (docs/ux.md → Stable controls). A drag sets a new order.
+  const [order, setOrder] = useState<string[] | null>(null);
+  if (order === null && catalog.length > 0) setOrder(inViewOrder(catalog, view.columns).map((c) => c.id));
+  const listed = (columns: Column[]) => (order ? inOrder(columns, order) : inViewOrder(columns, view.columns));
+  const standard = listed(catalog.filter((c) => !c.custom));
+  const custom = listed(catalog.filter((c) => c.custom));
   const listedIds = [...standard, ...custom].map((c) => c.id);
   /** Each section keeps its own order; the view shows the Jira fields first. */
-  const saveOrder = (nextStandard: Column[], nextCustom: Column[]) =>
-    save([...nextStandard, ...nextCustom].map((c) => c.id).filter((id) => view.columns.includes(id)));
+  const saveOrder = (nextStandard: Column[], nextCustom: Column[]) => {
+    const ids = [...nextStandard, ...nextCustom].map((c) => c.id);
+    setOrder(ids);
+    save(ids.filter((id) => view.columns.includes(id)));
+  };
   const toggle = (id: string) =>
     save(view.columns.includes(id) ? view.columns.filter((c) => c !== id) : listedIds.filter((c) => c === id || view.columns.includes(c)));
 
@@ -126,6 +134,15 @@ export function ColumnsPopover({ view, spaceProjectId, anchor, onClose }: Props)
 function matches(column: Column, needle: string, names: Record<string, string>): boolean {
   const hint = column.custom ? column.id.replace("customfield_", "cf_") : (HINTS[column.id] ?? "");
   return [names[column.id] ?? column.name, column.id, hint].some((text) => text.toLowerCase().includes(needle));
+}
+
+/** `columns` in `order`; any it doesn't know follow, in the catalog's order. */
+function inOrder(columns: Column[], order: string[]): Column[] {
+  const rank = (column: Column) => {
+    const at = order.indexOf(column.id);
+    return at === -1 ? order.length : at;
+  };
+  return [...columns].sort((a, b) => rank(a) - rank(b));
 }
 
 /** The view's columns in its order, then the others in the catalog's. */

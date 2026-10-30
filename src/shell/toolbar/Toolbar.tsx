@@ -2,7 +2,7 @@ import { Columns3, Ellipsis, Layers, ListFilter } from "lucide-react";
 import { type ReactNode, type RefObject, useCallback, useEffect, useRef, useState } from "react";
 import { usePageAction } from "../../commands/pageActions";
 import { usePaletteMenu } from "../../palette/menus";
-import { type Presence, usePresence } from "../../lib/motion";
+import { type Presence, useGlide, usePresence } from "../../lib/motion";
 import { api, type View } from "../../api";
 import { openMenu, type MenuEntry } from "../../components/menu";
 import { narrowingKey, NO_VIEW_NARROWING } from "../../state/slices/narrowing";
@@ -16,7 +16,7 @@ import { GROUP_NAMES, groupMenu } from "./groupMenu";
 import { MODE_NAMES, SubtasksButton, subtasksMenu } from "./SubtasksButton";
 import { MeChip } from "./MeChip";
 import { TextFilter } from "./TextFilter";
-import { SaveViewButton } from "./SaveViewButton";
+import { DraftActions } from "./DraftActions";
 import { useToolbarFit } from "./useToolbarFit";
 import { useViewDraft } from "./useViewDraft";
 import { useViewEdit } from "./useViewEdit";
@@ -38,7 +38,8 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
   // The Board always hides subtasks, so its bar has no Subtasks button.
   const hasSubtasks = view.layout !== "board";
   const draft = useViewDraft(level, view);
-  const { hidden, measure } = useToolbarFit(barRef, hasSubtasks ? [] : ["subtasks"], draft.dirty);
+  const { hidden, measure } = useToolbarFit(barRef, hasSubtasks ? [] : ["subtasks"]);
+  useGlide(barRef);
   const edit = useViewEdit();
   const key = narrowingKey(view.listId, view.id);
   const narrowing = useStore((s) => s.narrowings[key]) ?? NO_VIEW_NARROWING;
@@ -109,8 +110,8 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
   usePaletteMenu("toolbar.subtasks", hasSubtasks ? { section: THIS_VIEW, title: "Subtasks", entries: subtaskEntries } : null);
   usePaletteMenu("toolbar.display", { section: THIS_VIEW, title: "Show", entries: displayEntries });
 
-  const moreEntries = (): MenuEntry[] => [
-    ...hidden.map((item): MenuEntry => {
+  const moreEntries = (): MenuEntry[] =>
+    hidden.map((item): MenuEntry => {
       switch (item) {
         case "columns":
           return { text: `${columnsLabel}…`, run: () => setOpen("columns") };
@@ -123,9 +124,7 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
         case "me":
           return { text: "Only my issues", checked: draft.me, toggle: true, run: toggleMe };
       }
-    }),
-    ...(draft.dirty ? revertEntries(hidden.length > 0, draft.revert) : []),
-  ];
+    });
 
   const columnsPopover = (anchor: RefObject<HTMLButtonElement | null>) =>
     columnsShown.mounted && (
@@ -165,7 +164,7 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
       )}
       {shows("subtasks") && <SubtasksButton ref={measure("subtasks")} mode={view.subtasks} entries={subtaskEntries} />}
       <span className="toolbar__spacer" />
-      {draft.dirty && <SaveViewButton onSave={save} />}
+      <DraftActions dirty={draft.dirty} onSave={save} onRevert={draft.revert} />
       {shows("filter") && (
         <span ref={measure("filter")} className="toolbar__anchor toolbar__anchor--end">
           <button
@@ -193,7 +192,7 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
       )}
       {narrowing.epic && <EpicNarrowingChip epicId={narrowing.epic} onClear={() => setNarrowing(key, { epic: null })} />}
       <TextFilter key={key} value={narrowing.text} onChange={setText} inputRef={searchRef} />
-      {(hidden.length > 0 || draft.dirty) && (
+      {hidden.length > 0 && (
         <span className="toolbar__anchor toolbar__anchor--end">
           <button ref={moreRef} type="button" className="toolbar-btn toolbar-btn--icon" aria-label="More toolbar items" aria-haspopup="menu" onClick={(e) => openMenu(moreEntries(), e.currentTarget, "More toolbar items")}>
             <Ellipsis size={14} strokeWidth={2} aria-hidden="true" />
@@ -204,12 +203,6 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
       )}
     </div>
   );
-}
-
-/** Revert View, after a separator when other items come first. */
-function revertEntries(afterItems: boolean, revert: () => void): MenuEntry[] {
-  const entry: MenuEntry = { text: "Revert View", run: revert };
-  return afterItems ? ["separator", entry] : [entry];
 }
 
 /** Plays a popover's exit while it is still mounted; a leaving popover takes no input. */

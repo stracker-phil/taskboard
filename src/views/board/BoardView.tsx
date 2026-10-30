@@ -1,3 +1,4 @@
+import { useGlide } from "../../lib/motion";
 import { ChevronLeft } from "lucide-react";
 import { type RefObject, useCallback, useEffect, useRef } from "react";
 import { api, type BoardColumn, type BoardData, type Narrowing, type View } from "../../api";
@@ -53,6 +54,8 @@ function Board({ view, data }: { view: View; data: BoardData }) {
   useBoardKeys(data, selected, select, open, actions);
   const boardRef = useRef<HTMLDivElement>(null);
   useCurrentColumnInView(boardRef, data, selected);
+  // A column that collapses or opens moves the ones after it smoothly.
+  useGlide(boardRef);
   const inlineLabels = view.inlineLabels && !data.cardFields.includes("labels");
   if (data.columns.length === 0) return <EmptyLevel listId={view.listId} viewId={view.id} />;
   return (

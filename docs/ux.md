@@ -16,6 +16,27 @@ an item.
 - **One word for each thing** in every label, menu item, palette title, toast and in the docs. Accessible names
   follow the visible labels.
 - **Demo data in every picture** ([demo-data.md](../.claude/rules/demo-data.md)).
+- **Stable controls**: a click never changes what is under the cursor, and nothing jumps ([below](#stable-controls)).
+
+## Stable controls
+
+The owner's rule (2026-10-30), for every control, list and popover:
+
+- **A click never changes what is under the cursor.** Clicking the same spot again must do the same thing
+  again: a toggle toggles back, a checkbox unticks. Only closing an overlay or menu and navigating away may
+  replace what was clicked.
+- **Lists don't re-sort while they are used.** A popover or picker keeps the order it opened with; ticking or
+  switching an item changes only its box or switch (`ValuePicker`, `ColumnsPopover`). A row removed from a list
+  on screen keeps its place, grayed, until the page is left (Bookmarks); Unread keeps the issues read there.
+- **Controls keep their size.** A toggle shows its state in color and outline, never by adding an icon or text
+  that changes its width (the Me chip). Buttons that only sometimes apply keep their slot, invisible, so their
+  neighbors don't move (Settings → Shortcuts). New controls appear where the row has free room, not where they
+  push others aside (Revert and Save View in the toolbar's middle).
+- **Nothing jumps; things move.** A control that appears fades in, and controls that change position glide to
+  the new one (`useGlide` in `lib/motion.ts`: the toolbar, the view tabs, the Board's columns). Rows that grow or
+  shrink animate their height (group collapse). A window resize may move things at once.
+- **Folding follows the width only.** The toolbar folds items into "…" when the window narrows, never because
+  of a click: the room Revert and Save View need is always kept (`toolbar/fit.ts`).
 
 ## Window
 
@@ -290,8 +311,8 @@ and runs everything the menus offer ([ADR 0043](adr/0043-the-palette-runs-the-me
 
 ## Bookmarks
 
-Local only (`src-tauri/src/pins/`, `src/pins/`; the code calls them pins). Issues, comments and filter lists can be
-bookmarked; a filter list's bookmark puts it under Home.
+Local only (`src-tauri/src/pins/`, `src/pins/`; the code calls them pins). Issues, comments, Spaces, filter lists
+and views can be bookmarked; a filter list's bookmark puts it under Home.
 
 - `PinButton` (the `Bookmark` icon) in the preview and Issue view headers ("Bookmark this issue") and on each
   comment (on hover) opens `PinPopover` (340px): "Keep bookmarked for" chips (Today, 2 days, 1 week, Until
@@ -299,7 +320,12 @@ bookmarked; a filter list's bookmark puts it under Home.
   `--button-primary-bg`), an optional one-line reason, Cancel and Bookmark; ↩ bookmarks. ⌥-click bookmarks at
   once with the default; a bookmarked target's button is amber and removes the bookmark on click.
 - The row toolbar's Bookmark and P toggle the issue's bookmark (with the default duration) without the popover;
-  the filter-list context menu has Add to Home / Remove from Home.
+  the filter-list context menu has Add to Home / Remove from Home. A Space's or filter list's header has a
+  `PinButton` right after the name (always shown, muted until bookmarked); a view tab's context menu has
+  Bookmark View / Remove Bookmark (the default duration). The Bookmarks page lists a view as its layout tile and
+  "Space / List › View", opened at that view.
+- Removing a bookmark on the Bookmarks page keeps its row in place, grayed with "Removed" and no X, until the page
+  is left ([Stable controls](#stable-controls)).
 - Today ends at local midnight, 2 days at the end of tomorrow, 1 week seven midnights on. The page refreshes
   when the next bookmark runs out (`usePinExpiry`).
 - A bookmarked comment shows the amber strip (`--pin-bg`, `--pin-text`): bookmark icon, the reason, the time left.

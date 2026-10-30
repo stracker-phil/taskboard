@@ -174,7 +174,7 @@ describe("Window", () => {
       await userEvent.click(await screen.findByRole("button", { name: /^Back to / }));
 
       expect(await screen.findByRole("button", { name: "Save View" })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Only my issues, click to show all", pressed: true })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Me", pressed: true })).toBeInTheDocument();
     });
 
     it("do not carry over to a view that saved the Me chip: it opens with Me on", async () => {
@@ -183,7 +183,7 @@ describe("Window", () => {
 
       await goTo(nav(21, 201));
 
-      expect(await screen.findByRole("button", { name: "Only my issues, click to show all", pressed: true })).toBeInTheDocument();
+      expect(await screen.findByRole("button", { name: "Me", pressed: true })).toBeInTheDocument();
       expect(saveView()).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Me", pressed: false })).not.toBeInTheDocument();
     });

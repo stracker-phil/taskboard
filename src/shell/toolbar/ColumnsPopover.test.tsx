@@ -399,6 +399,107 @@ describe("ColumnsPopover", () => {
     });
   });
 
+  describe("a stable order while open", () => {
+    const FIELD = /^(Status|Assignee|Priority|Epic|Release|Labels \(column\)|Due date|Reviewer)/;
+    const fieldRows = (popover: HTMLElement) => within(popover).getAllByRole("button", { name: FIELD });
+
+    /** Saving a column set hands the new set back to the popover, like the app does. */
+    async function openLive(initial: string[]) {
+      function Live() {
+        const [current, setCurrent] = useState(view({ columns: initial }));
+        mocked.viewSetColumns.mockImplementation(async (_id, columns) => {
+          setCurrent(view({ columns }));
+          return view({ columns });
+        });
+        return <Harness current={current} projectId="10001" />;
+      }
+      render(
+        <QueryClientProvider client={createQueryClient()}>
+          <Live />
+        </QueryClientProvider>,
+      );
+      await userEvent.click(screen.getByRole("button", { name: "Columns" }));
+      await screen.findByRole("button", { name: /^Reviewer ?cf_10071$/ });
+      return screen.getByRole("dialog", { name: "Columns for this view" });
+    }
+
+    it("lists the view's columns first, then the other fields in the catalog's order", async () => {
+      const popover = await openLive(["priority", "release"]);
+
+      expect(fieldRows(popover).map((row) => row.textContent?.replace(/⋮⋮/, ""))).toEqual([
+        "Priority",
+        "Releasefix version",
+        "Status",
+        "Assignee",
+        "Epicparent",
+        "Labels (column)",
+        "Due date",
+        "Reviewercf_10071",
+      ]);
+    });
+
+    it("keeps a field in its row when it is toggled on", async () => {
+      const popover = await openLive(["priority"]);
+      const rows = fieldRows(popover);
+      const epic = within(popover).getByRole("button", { name: /^Epic/ });
+
+      await userEvent.click(epic);
+
+      await waitFor(() => expect(epic).toHaveAttribute("aria-pressed", "true"));
+      expect(fieldRows(popover)).toEqual(rows);
+    });
+
+    it("keeps a field in its row when it is toggled off, so the same spot toggles it back on", async () => {
+      const popover = await openLive(["priority", "assignee"]);
+      const rows = fieldRows(popover);
+      const priority = within(popover).getByRole("button", { name: "Priority" });
+
+      await userEvent.click(priority);
+      await waitFor(() => expect(priority).toHaveAttribute("aria-pressed", "false"));
+      expect(fieldRows(popover)).toEqual(rows);
+
+      await userEvent.click(within(popover).getAllByRole("button", { name: FIELD })[0]);
+      await waitFor(() => expect(priority).toHaveAttribute("aria-pressed", "true"));
+    });
+
+    it("puts a field turned back on at its place in the list's order", async () => {
+      const popover = await openLive(["priority", "release"]);
+      await userEvent.click(within(popover).getByRole("button", { name: "Priority" }));
+      await waitFor(() => expect(mocked.viewSetColumns).toHaveBeenLastCalledWith(101, ["release"]));
+
+      await userEvent.click(within(popover).getByRole("button", { name: "Priority" }));
+
+      await waitFor(() => expect(mocked.viewSetColumns).toHaveBeenLastCalledWith(101, ["priority", "release"]));
+    });
+
+    describe("when a row is dragged", () => {
+      let rects: { mockRestore: () => void };
+
+      beforeEach(() => {
+        rects = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+          const index = this.getAttribute("data-drag-index");
+          const top = index === null ? 0 : Number(index) * 40;
+          const height = index === null ? 0 : 40;
+          return { top, bottom: top + height, height, left: 0, right: 0, width: 0, x: 0, y: top, toJSON: () => ({}) };
+        });
+      });
+
+      afterEach(() => rects.mockRestore());
+
+      it("lists the rows in the dropped order", async () => {
+        const popover = await openLive(["assignee", "priority"]);
+        const assignee = within(popover).getByRole("button", { name: "Assignee" });
+        const priority = within(popover).getByRole("button", { name: "Priority" });
+
+        fireEvent.pointerDown(assignee, { button: 0, clientY: 10 });
+        fireEvent.pointerMove(assignee, { buttons: 1, clientY: 70 });
+        fireEvent.pointerUp(assignee);
+
+        await waitFor(() => expect(fieldRows(popover).slice(0, 2)).toEqual([priority, assignee]));
+      });
+    });
+  });
+
   describe("Use as Space default", () => {
     it("saves the view's columns as the Space's default", async () => {
       mocked.spaceDefaultColumns.mockResolvedValue(undefined);

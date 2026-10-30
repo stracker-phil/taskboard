@@ -15,6 +15,8 @@ interface Props {
 export function ValuePicker({ id, choices, selected, onChange }: Props) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  // The values picked when the list opened lead it; ticking one only changes its box, never the order.
+  const [leading, setLeading] = useState<string[]>([]);
   const rootRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -31,8 +33,7 @@ export function ValuePicker({ id, choices, selected, onChange }: Props) {
   const names = selected.map((value) => choices.find((c) => c.id === value)?.name ?? value);
   const needle = search.trim().toLowerCase();
   const shown = needle ? choices.filter((c) => c.name.toLowerCase().includes(needle)) : choices;
-  // Picked values first, in the order the list has them, so they stay visible in a long list.
-  const ordered = [...shown.filter((c) => selected.includes(c.id)), ...shown.filter((c) => !selected.includes(c.id))];
+  const ordered = [...shown.filter((c) => leading.includes(c.id)), ...shown.filter((c) => !leading.includes(c.id))];
   const toggle = (value: string) =>
     onChange(selected.includes(value) ? selected.filter((v) => v !== value) : choices.map((c) => c.id).filter((c) => c === value || selected.includes(c)));
 
@@ -45,7 +46,10 @@ export function ValuePicker({ id, choices, selected, onChange }: Props) {
         aria-haspopup="listbox"
         aria-expanded={open}
         title={names.join(", ")}
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          if (!open) setLeading(selected);
+          setOpen(!open);
+        }}
       >
         <span className="value-picker__names">{names.length > 0 ? names.join(", ") : "Choose…"}</span>
         {names.length > 1 && <span className="value-picker__count">{names.length}</span>}

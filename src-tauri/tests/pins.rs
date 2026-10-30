@@ -13,10 +13,13 @@ use taskboard_lib::pins::{
     PinDuration, PinItem, PinKind, Pinned, Pins, pin_create, pin_remove, pin_toggle_issue,
     pins_list,
 };
+use taskboard_lib::space_config::{SpaceLayouts, space_set_layouts};
 use taskboard_lib::status_style::Style;
 use taskboard_lib::test_support::temp_config_dir;
 use taskboard_lib::views::rows::person;
-use taskboard_lib::views::{Narrowing, view_rows, views_of};
+use taskboard_lib::views::{
+    GroupBy, Layout, Narrowing, view_create, view_delete, view_rows, views_of,
+};
 
 const NOW: &str = "2026-10-28T10:00:00Z";
 const ME: &str = "712020:5a1e0c3f-8d2b-4f61-9c7e-1b2a3c4d5e01";
@@ -419,6 +422,8 @@ mod creating_pins {
             (PinKind::Issue, "9999"),
             (PinKind::Comment, "c99"),
             (PinKind::FilterList, "9999"),
+            (PinKind::View, "9999"),
+            (PinKind::View, "not a view id"),
         ] {
             let err = pin_create(
                 &db,
@@ -594,6 +599,233 @@ mod ending_pins {
         let tree = tree_at(&db, NOW).await;
         assert_eq!(pinned_list_names(&tree), ["Open bugs"]);
         assert_eq!(home_pinned_count(&tree), Some(1));
+    }
+}
+
+mod bookmarked_views {
+    use super::*;
+
+    async fn view_id(db: &Db, list: i64, name: &str) -> i64 {
+        number(
+            db,
+            format!("SELECT id FROM view WHERE list_id = {list} AND name = '{name}'"),
+        )
+        .await
+    }
+
+    async fn pin_view(db: &Db, now: &str, view: i64) {
+        pin(
+            db,
+            now,
+            PinKind::View,
+            &view.to_string(),
+            PinDuration::UntilUnpinned,
+            None,
+        )
+        .await;
+    }
+
+    fn view_target(
+        id: i64,
+        list_id: i64,
+        name: &str,
+        layout: Layout,
+        list: &str,
+        space: Option<&str>,
+    ) -> Pinned {
+        Pinned::View {
+            id,
+            list_id,
+            name: name.into(),
+            layout,
+            list: list.into(),
+            space: space.map(String::from),
+        }
+    }
+
+    #[tokio::test]
+    async fn views_of_a_space_a_filter_list_and_a_global_list_show_their_level_newest_first() {
+        let (_dir, db) = lab().await;
+        let space = node_id(&db, "space").await;
+        let open_bugs = list_id(&db, "Open bugs").await;
+        let everything = node_id(&db, "everything").await;
+        let my_bugs = list_create(&db, viewer(NOW), everything, "My bugs".into(), None)
+            .await
+            .unwrap();
+        let global_board = view_create(&db, my_bugs, "Board".into(), Layout::Board)
+            .await
+            .unwrap()
+            .id;
+        let space_board = view_id(&db, space, "Board").await;
+        let bugs_list = view_id(&db, open_bugs, "List").await;
+        pin_view(&db, "2026-10-28T09:00:00Z", space_board).await;
+        pin_view(&db, "2026-10-28T09:30:00Z", bugs_list).await;
+        pin_view(&db, "2026-10-28T09:45:00Z", global_board).await;
+
+        let pins = pins_at(&db, NOW).await;
+
+        assert_eq!(
+            targets(&pins.active),
+            [
+                view_target(
+                    global_board,
+                    my_bugs,
+                    "Board",
+                    Layout::Board,
+                    "My bugs",
+                    None
+                ),
+                view_target(
+                    bugs_list,
+                    open_bugs,
+                    "List",
+                    Layout::List,
+                    "Open bugs",
+                    Some("Website relaunch")
+                ),
+                view_target(
+                    space_board,
+                    space,
+                    "Board",
+                    Layout::Board,
+                    "Website relaunch",
+                    None
+                ),
+            ]
+        );
+        assert!(pins.recently_unpinned.is_empty());
+        assert_eq!(
+            number(&db, "SELECT COUNT(*) FROM pin WHERE target_kind = 'view'").await,
+            3
+        );
+    }
+
+    #[tokio::test]
+    async fn a_layout_the_space_switched_off_shows_as_the_spaces_default() {
+        let (_dir, db) = lab().await;
+        let space = node_id(&db, "space").await;
+        let space_board = view_id(&db, space, "Board").await;
+        let space_table = view_id(&db, space, "Table").await;
+        pin_view(&db, "2026-10-28T09:00:00Z", space_board).await;
+        pin_view(&db, "2026-10-28T09:30:00Z", space_table).await;
+        space_set_layouts(
+            &db,
+            NW.into(),
+            SpaceLayouts {
+                layouts: vec![Layout::List, Layout::Table],
+                default_layout: Layout::List,
+                default_group: GroupBy::Status,
+            },
+        )
+        .await
+        .unwrap();
+
+        let pins = pins_at(&db, NOW).await;
+
+        assert_eq!(
+            targets(&pins.active),
+            [
+                view_target(
+                    space_table,
+                    space,
+                    "Table",
+                    Layout::Table,
+                    "Website relaunch",
+                    None
+                ),
+                view_target(
+                    space_board,
+                    space,
+                    "Board",
+                    Layout::List,
+                    "Website relaunch",
+                    None
+                ),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn removing_a_view_pin_moves_it_to_recently_unpinned() {
+        let (_dir, db) = lab().await;
+        let space = node_id(&db, "space").await;
+        let space_board = view_id(&db, space, "Board").await;
+        pin_view(&db, NOW, space_board).await;
+        let id = pins_at(&db, NOW).await.active[0].id;
+
+        pin_remove(&db, viewer("2026-10-28T11:00:00Z"), id)
+            .await
+            .unwrap();
+
+        let pins = pins_at(&db, "2026-10-28T11:30:00Z").await;
+        assert!(pins.active.is_empty());
+        assert_eq!(
+            targets(&pins.recently_unpinned),
+            [view_target(
+                space_board,
+                space,
+                "Board",
+                Layout::Board,
+                "Website relaunch",
+                None
+            )]
+        );
+        assert_eq!(pins.recently_unpinned[0].id, id);
+    }
+
+    #[tokio::test]
+    async fn a_deleted_view_is_left_out_of_active_and_recently_unpinned() {
+        let (_dir, db) = lab().await;
+        let space = node_id(&db, "space").await;
+        let board = view_id(&db, space, "Board").await;
+        let table = view_id(&db, space, "Table").await;
+        let all_issues = view_id(&db, space, "All issues").await;
+        pin_view(&db, "2026-10-28T09:00:00Z", board).await;
+        pin_view(&db, "2026-10-28T09:10:00Z", table).await;
+        pin_view(&db, "2026-10-28T09:20:00Z", all_issues).await;
+        let table_pin = pins_at(&db, NOW).await.active[1].id;
+        pin_remove(&db, viewer(NOW), table_pin).await.unwrap();
+
+        view_delete(&db, board).await.unwrap();
+        view_delete(&db, table).await.unwrap();
+
+        let pins = pins_at(&db, NOW).await;
+        assert_eq!(
+            targets(&pins.active),
+            [view_target(
+                all_issues,
+                space,
+                "All issues",
+                Layout::List,
+                "Website relaunch",
+                None
+            )]
+        );
+        assert!(pins.recently_unpinned.is_empty());
+    }
+
+    #[tokio::test]
+    async fn the_view_pin_kind_and_target_keep_their_names_towards_the_page() {
+        let (_dir, db) = lab().await;
+        let open_bugs = list_id(&db, "Open bugs").await;
+        let bugs_list = view_id(&db, open_bugs, "List").await;
+        pin_view(&db, NOW, bugs_list).await;
+
+        let pins = pins_at(&db, NOW).await;
+
+        assert_eq!(serde_json::to_value(PinKind::View).unwrap(), "view");
+        assert_eq!(
+            serde_json::to_value(&pins.active[0].target).unwrap(),
+            serde_json::json!({
+                "kind": "view",
+                "id": bugs_list,
+                "listId": open_bugs,
+                "name": "List",
+                "layout": "list",
+                "list": "Open bugs",
+                "space": "Website relaunch",
+            })
+        );
     }
 }
 

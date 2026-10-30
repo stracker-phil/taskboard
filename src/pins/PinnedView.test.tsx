@@ -8,7 +8,7 @@ vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await impo
 import { api } from "../api";
 import { createQueryClient } from "../queries/queryClient";
 import { resetStore, useStore } from "../state/store";
-import { commentTarget, issueTarget, listTarget, pinItem, pins } from "../test/pins";
+import { commentTarget, issueTarget, listTarget, pinItem, pins, viewTarget } from "../test/pins";
 import { PinnedView } from "./PinnedView";
 
 const mocked = vi.mocked(api, true);
@@ -108,6 +108,22 @@ describe("PinnedView", () => {
       const row = await rowOf(/My open issues/);
       expect(row).not.toHaveTextContent("/");
     });
+
+    it("shows a view with its Space and list, then its name", async () => {
+      mocked.pinsList.mockResolvedValue(pins([pinItem({ target: viewTarget() })]));
+      renderPinned();
+
+      const row = within(await rowOf(/Sprint board/));
+      expect(row.getByText("Website relaunch / My open issues ›")).toBeInTheDocument();
+      expect(row.getByText("Sprint board")).toBeInTheDocument();
+    });
+
+    it("shows a view of a Space level or global list without a Space prefix", async () => {
+      mocked.pinsList.mockResolvedValue(pins([pinItem({ target: viewTarget({ space: null }) })]));
+      renderPinned();
+
+      expect(within(await rowOf(/Sprint board/)).getByText("My open issues ›")).toBeInTheDocument();
+    });
   });
 
   describe("opening a row", () => {
@@ -140,6 +156,15 @@ describe("PinnedView", () => {
       expect(mocked.navGo).toHaveBeenCalledWith(21, null);
       expect(useStore.getState().issueView).toBeNull();
     });
+
+    it("navigates to the view of its list for a bookmarked view", async () => {
+      mocked.pinsList.mockResolvedValue(pins([pinItem({ target: viewTarget() })]));
+      renderPinned();
+
+      await userEvent.click(await rowOf(/Sprint board/));
+
+      expect(mocked.navGo).toHaveBeenCalledWith(21, 7);
+    });
   });
 
   describe("time left", () => {
@@ -171,6 +196,60 @@ describe("PinnedView", () => {
 
       expect(mocked.pinRemove).toHaveBeenCalledWith(2);
       expect(useStore.getState().issueView).toBeNull();
+    });
+
+    describe("while the page stays open", () => {
+      /** Removes the comment's bookmark, then lets the page refetch pins that no longer hold it. */
+      const removeSecond = async () => {
+        mocked.pinsList.mockResolvedValue(pins([ISSUE, COMMENT, LIST]));
+        const client = createQueryClient();
+        render(
+          <QueryClientProvider client={client}>
+            <PinnedView listId={3} viewId={0} />
+          </QueryClientProvider>,
+        );
+        await userEvent.click(within(await rowOf(/Sam Lee/)).getByRole("button", { name: "Remove bookmark" }));
+        mocked.pinsList.mockResolvedValue(pins([ISSUE, LIST], [{ ...COMMENT, timeLeft: "" }]));
+        await client.invalidateQueries({ queryKey: ["pins"] });
+      };
+      const bookmarkRows = () => within(screen.getByRole("table", { name: "Bookmarked" })).getAllByRole("row").slice(1);
+
+      it("keeps the removed bookmark in its row, reading Removed instead of the time left", async () => {
+        await removeSecond();
+
+        const row = within(await rowOf(/Sam Lee/));
+        expect(row.getByText("Removed")).toBeInTheDocument();
+        expect(row.queryByText("today")).not.toBeInTheDocument();
+        expect(bookmarkRows().map((r) => /Redesign|Sam Lee|My open issues/.exec(r.textContent ?? "")?.[0])).toEqual(["Redesign", "Sam Lee", "My open issues"]);
+      });
+
+      it("replaces the X by a placeholder that does not open the row", async () => {
+        await removeSecond();
+        const row = within(await rowOf(/Sam Lee/));
+
+        expect(row.queryByRole("button", { name: "Remove bookmark" })).not.toBeInTheDocument();
+        const buttons = row.getAllByRole("button", { hidden: true });
+        const placeholder = buttons[buttons.length - 1];
+        expect(placeholder).toBeDisabled();
+        await userEvent.click(placeholder);
+
+        expect(useStore.getState().issueView).toBeNull();
+        expect(mocked.pinRemove).toHaveBeenCalledTimes(1);
+      });
+
+      it("does not list it under Recently removed", async () => {
+        await removeSecond();
+
+        await rowOf(/Sam Lee/);
+        expect(screen.queryByRole("region", { name: "Recently removed" })).not.toBeInTheDocument();
+      });
+
+      it("keeps the other bookmarks' Remove bookmark buttons", async () => {
+        await removeSecond();
+
+        const table = within(await pinnedTable());
+        expect(table.getAllByRole("button", { name: "Remove bookmark" })).toHaveLength(2);
+      });
     });
   });
 

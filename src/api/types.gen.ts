@@ -497,7 +497,7 @@ timeLeft: string,
  */
 expiresAt: string | null, };
 
-export type PinKind = "issue" | "comment" | "filterList";
+export type PinKind = "issue" | "comment" | "filterList" | "view";
 
 export type Pinned = { "kind": "issue", id: string, key: string, summary: string, style: Style, 
 /**
@@ -506,6 +506,14 @@ export type Pinned = { "kind": "issue", id: string, key: string, summary: string
 gone: boolean, } | { "kind": "comment", id: string, issueId: string, issueKey: string, author: Person | null, excerpt: string, } | { "kind": "list", id: number, name: string, 
 /**
  * The Space it belongs to; none for a global list.
+ */
+space: string | null, } | { "kind": "view", id: number, listId: number, name: string, layout: Layout, 
+/**
+ * The level's name.
+ */
+list: string, 
+/**
+ * The Space the level belongs to, unless the level is that Space or a global list.
  */
 space: string | null, };
 

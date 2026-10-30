@@ -8,6 +8,12 @@
 }
 .content-header__title { margin: 0; font-size: 19px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .content-header__spacer { flex: 1; }
+.content-header__pin {
+  display: grid; flex: none; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 7px;
+  background: none; color: var(--text-faint); cursor: default; transition: background-color var(--motion-fast) var(--ease-out), color var(--motion-fast) var(--ease-out);
+}
+.content-header__pin:hover { background: var(--hover-bg); color: var(--text-secondary); }
+.content-header__pin[aria-pressed="true"] { color: var(--pin-icon); }
 /* The tile edits the look; the name is renamed with a click. */
 .content-header__tile { display: flex; flex: none; padding: 0; border: none; border-radius: 8px; background: none; color: var(--text-tertiary); }
 .content-header__name { max-width: 100%; padding: 0; border: none; background: none; color: inherit; font: inherit; overflow: hidden; text-overflow: ellipsis; }

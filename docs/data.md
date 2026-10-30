@@ -80,7 +80,7 @@ unique across sources (Jira's numeric ids; another source prefixes its own):
 | `space` | a tracked project as the sidebar shows it: name, icon, color (`1`–`12`), client, position, `default_columns` for new views; its Space settings (`local/0007`): `layouts` (JSON array of the layouts its views offer; null = all), `default_layout` and `default_group` for new views |
 | `filter_list` | WHICH issues: the sidebar tree (`kind` everything, space, list, recent, pinned); a JSON filter ANDed with its ancestors |
 | `view` | HOW to show a list: one tab; layout, columns, grouping, sort; `filter` (`local/0012`): its own conditions, ANDed with its list's ([ADR 0033](adr/0033-views-can-hold-their-own-filter.md)); `subtasks` (`local/0013`): how subtasks show ([ADR 0037](adr/0037-views-choose-how-subtasks-show.md)); `only_mine` (`local/0014`): the saved Me chip ([ADR 0038](adr/0038-filter-changes-are-drafts-until-the-view-is-saved.md)) |
-| `pin` | bookmarked issues, comments and lists (Bookmarks in the UI), with an optional reason and expiry; active while not removed and not expired (`pins::active`); ended bookmarks stay in Recently removed for 7 days |
+| `pin` | bookmarked issues, comments, filter lists and views (Bookmarks in the UI; `target_kind` `issue`, `comment`, `filter_list`, `view`), with an optional reason and expiry; active while not removed and not expired (`pins::active`); ended bookmarks stay in Recently removed for 7 days |
 | `space_status_style` | overrides the detected style of a status in one Space (`local/0007`; the old app-wide `status_style` rows were copied to every Space) |
 | `space_field` | how a custom field shows in one Space: `hiddenInList`, `hiddenInDetail` or `hidden`; no row = visible (`space_config`) |
 

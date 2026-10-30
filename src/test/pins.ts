@@ -32,6 +32,18 @@ export const listTarget = (patch: Partial<Extract<Pinned, { kind: "list" }>> = {
   ...patch,
 });
 
+/** A bookmarked view of the "My open issues" list in the "Website relaunch" Space. */
+export const viewTarget = (patch: Partial<Extract<Pinned, { kind: "view" }>> = {}): Pinned => ({
+  kind: "view",
+  id: 7,
+  listId: 21,
+  name: "Sprint board",
+  layout: "board",
+  list: "My open issues",
+  space: "Website relaunch",
+  ...patch,
+});
+
 /** An active pin on an issue unless overridden; pass `target: commentTarget()` or `listTarget()` for the others. */
 export function pinItem(patch: Partial<PinItem> = {}): PinItem {
   return { id: 1, target: issueTarget(), reason: null, timeLeft: "2d left", expiresAt: null, ...patch };

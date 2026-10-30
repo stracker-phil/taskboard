@@ -86,3 +86,4 @@
 .pin-table__row:hover .pin-table__unpin, .pin-table__unpin:focus-visible { opacity: 1; }
 .pin-table__unpin:hover { background: var(--hover-bg); }
 .pin-table--ended .pin-table__text, .pin-table--ended .pin-table__reason { color: var(--text-muted); }
+.pin-table__row--removed .pin-table__text, .pin-table__row--removed .pin-table__reason, .pin-table__row--removed .pin-table__left { color: var(--text-muted); }

@@ -14,27 +14,28 @@
 .toolbar-btn--open { background: var(--accent-soft-bg); }
 .toolbar-btn--filter { padding: 0 9px 0 11px; }
 .toolbar-btn--active { background: var(--accent-soft-bg); border-color: var(--accent-soft-border); }
-/* Save View: the view's unsaved Me chip or filter (ADR 0038); it pops in beside the Filter button. */
-.save-view-btn {
-  border-color: var(--accent); background: var(--accent); color: var(--text-on-accent); font-weight: 600;
-  animation: pop-in var(--motion-slow) var(--ease-out);
-}
+/* Revert View and Save View: they fade in where the bar is free (useGlide) and fade out when saved or reverted. */
+.draft-actions { display: flex; flex: none; gap: 8px; }
+.draft-actions--leaving { opacity: 0; transition: opacity var(--motion-base) var(--ease-out); }
+.save-view-btn { border-color: var(--accent); background: var(--accent); color: var(--text-on-accent); font-weight: 600; }
 .save-view-btn:hover { border-color: var(--accent-text); background: var(--accent-text); }
-@keyframes pop-in {
-  from { opacity: 0; transform: scale(0.92); }
-}
 
 .toolbar-badge {
   display: flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box;
   border-radius: 9px; background: var(--accent); color: var(--text-on-accent); font-size: 11px; font-weight: 700;
 }
 
+/* The Me chip keeps one size: off it looks like a toolbar button with a muted avatar, on it takes the accent. */
 .me-chip {
-  display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px 0 4px; box-sizing: border-box;
-  border: 1px solid var(--accent-soft-border); border-radius: 15px; background: var(--accent-soft-bg); color: var(--accent-text);
+  display: flex; flex: none; align-items: center; gap: 6px; height: 30px; padding: 0 11px 0 4px; box-sizing: border-box;
+  border: 1px solid var(--border); border-radius: 15px; background: var(--panel-bg); color: var(--text-secondary);
   font: inherit; font-size: 13px; white-space: nowrap; cursor: default;
+  transition: background-color var(--motion-fast) var(--ease-out), border-color var(--motion-fast) var(--ease-out), color var(--motion-fast) var(--ease-out);
 }
-.me-chip__avatar { width: 22px; height: 22px; }
+.me-chip:hover { background: var(--hover-bg); border-color: var(--border-strong); }
+.me-chip[aria-pressed="true"] { border-color: var(--accent-soft-border); background: var(--accent-soft-bg); color: var(--accent-text); }
+.me-chip__avatar { width: 22px; height: 22px; transition: opacity var(--motion-fast) var(--ease-out), filter var(--motion-fast) var(--ease-out); }
+.me-chip[aria-pressed="false"] .me-chip__avatar { opacity: 0.55; filter: grayscale(1); }
 
 .text-filter {
   display: flex; flex: 0 1 190px; align-items: center; gap: 6px; min-width: 96px; height: 30px; padding: 0 10px; box-sizing: border-box;

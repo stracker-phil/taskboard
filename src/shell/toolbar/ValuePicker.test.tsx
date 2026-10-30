@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { Choice } from "../../api";
 import { ValuePicker } from "./ValuePicker";
@@ -129,6 +130,49 @@ describe("ValuePicker", () => {
       await userEvent.click(screen.getByRole("option", { name: "In Progress" }));
 
       expect(onChange).toHaveBeenLastCalledWith([]);
+    });
+  });
+
+  describe("a stable order while open", () => {
+    function Stateful({ initial }: { initial: string[] }) {
+      const [selected, setSelected] = useState(initial);
+      return <ValuePicker id="values" choices={CHOICES} selected={selected} onChange={setSelected} />;
+    }
+    const openStateful = async (initial: string[]) => {
+      render(<Stateful initial={initial} />);
+      await userEvent.click(screen.getByRole("button", { expanded: false }));
+    };
+
+    it("keeps the option under the cursor when a value is ticked", async () => {
+      await openStateful(["4"]);
+      const toDo = screen.getByRole("option", { name: "To Do" });
+
+      await userEvent.click(toDo);
+
+      expect(toDo).toHaveAttribute("aria-selected", "true");
+      expect(optionNames()).toEqual(["Done", "To Do", "In Progress"]);
+    });
+
+    it("keeps the option under the cursor when a picked value is unticked, so the same spot ticks it again", async () => {
+      await openStateful(["4"]);
+
+      await userEvent.click(screen.getByRole("option", { name: "Done" }));
+      expect(optionNames()).toEqual(["Done", "To Do", "In Progress"]);
+      await userEvent.click(screen.getAllByRole("option")[0]);
+
+      expect(screen.getByRole("option", { name: "Done" })).toHaveAttribute("aria-selected", "true");
+    });
+
+    it("lists the values picked meanwhile first once the list is reopened", async () => {
+      await openStateful(["4"]);
+      await userEvent.click(screen.getByRole("option", { name: "In Progress" }));
+      await userEvent.click(screen.getByRole("option", { name: "Done" }));
+      const field = screen.getByRole("button", { expanded: true });
+
+      await userEvent.click(field);
+      await userEvent.click(field);
+
+      expect(optionNames()).toEqual(["In Progress", "To Do", "Done"]);
     });
   });
 

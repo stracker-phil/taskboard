@@ -8,16 +8,24 @@ export const PINS_KEY = ["pins"] as const;
 
 export const usePins = () => useQuery({ queryKey: PINS_KEY, queryFn: api.pinsList });
 
-const targetOf = (pinned: Pinned): { kind: PinKind; id: string } =>
-  pinned.kind === "list" ? { kind: "filterList", id: String(pinned.id) } : { kind: pinned.kind, id: pinned.id };
+function targetOf(pinned: Pinned): { kind: PinKind; id: string } {
+  if (pinned.kind === "list") return { kind: "filterList", id: String(pinned.id) };
+  if (pinned.kind === "view") return { kind: "view", id: String(pinned.id) };
+  return { kind: pinned.kind, id: pinned.id };
+}
+
+/** The target's active pin among `pins`, if it has one. */
+export function pinOf(pins: PinItem[] | undefined, kind: PinKind, id: string): PinItem | undefined {
+  return pins?.find((pin) => {
+    const target = targetOf(pin.target);
+    return target.kind === kind && target.id === id;
+  });
+}
 
 /** The target's active pin, if it has one. */
 export function usePinOf(kind: PinKind, id: string): PinItem | undefined {
   const { data } = usePins();
-  return data?.active.find((pin) => {
-    const target = targetOf(pin.target);
-    return target.kind === kind && target.id === id;
-  });
+  return pinOf(data?.active, kind, id);
 }
 
 /** Refreshes pins, the sidebar and the Pinned view when the next pin runs out. */

@@ -1,5 +1,5 @@
 import { RotateCcw, Search, X } from "lucide-react";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { api, type Keybindings } from "../../api";
 import { allCommands, bindingFor, bindingFromEvent, bindingLabel, conflicts, type Command } from "../../commands/registry";
 import { scopeLabel } from "../../commands/scopes";
@@ -26,23 +26,30 @@ function withoutBinding(bindings: Keybindings, id: string): Keybindings {
   return rest;
 }
 
+/** A small button that keeps its place while hidden: invisible, out of the tab order and the accessibility tree. */
+function SlotButton({ shown, label, title, onClick, children }: { shown: boolean; label: string; title: string; onClick: () => void; children: ReactNode }) {
+  if (!shown) return <span className="icon-btn tiny shortcut-control__slot" aria-hidden="true" />;
+  return (
+    <button type="button" className="icon-btn tiny" aria-label={label} title={title} onClick={onClick}>
+      {children}
+    </button>
+  );
+}
+
 function ShortcutRow({ command, bindings, save }: { command: Command; bindings: Keybindings; save: (next: Keybindings) => void }) {
   const overridden = Object.hasOwn(bindings, command.id);
   const binding = bindingFor(command.id, bindings);
   const set = (next: string | null) => save({ ...bindings, [command.id]: next });
   return (
     <Row label={command.title} description={scopeLabel(command.scope)}>
+      {/* Both buttons keep their slot, shown or not, so a click never lands on the other one. */}
       <div className="shortcut-control">
-        {overridden && (
-          <button type="button" className="icon-btn tiny" aria-label={`Reset ${command.title}`} title="Reset to default" onClick={() => save(withoutBinding(bindings, command.id))}>
-            <RotateCcw size={11} />
-          </button>
-        )}
-        {binding && (
-          <button type="button" className="icon-btn tiny" aria-label={`Remove shortcut for ${command.title}`} title="Remove shortcut" onClick={() => set(null)}>
-            <X size={11} />
-          </button>
-        )}
+        <SlotButton shown={overridden} label={`Reset ${command.title}`} title="Reset to default" onClick={() => save(withoutBinding(bindings, command.id))}>
+          <RotateCcw size={11} />
+        </SlotButton>
+        <SlotButton shown={binding !== null} label={`Remove shortcut for ${command.title}`} title="Remove shortcut" onClick={() => set(null)}>
+          <X size={11} />
+        </SlotButton>
         <ShortcutRecorder value={binding} parse={bindingFromEvent} label={bindingLabel} onChange={set} name={command.title} />
       </div>
     </Row>
@@ -63,6 +70,12 @@ export function ShortcutsPage() {
         <Search size={14} aria-hidden="true" />
         <input aria-label="Search shortcuts" placeholder="Search commands" value={search} onChange={(e) => setSearch(e.target.value)} />
       </label>
+      <Group title="In the Taskboard window">
+        {list.length === 0 && <div className="settings-row muted">No matching commands.</div>}
+        {list.map((command) => (
+          <ShortcutRow key={command.id} command={command} bindings={bindings} save={save} />
+        ))}
+      </Group>
       {clashes.length > 0 && (
         <div className="shortcut-conflicts" role="alert">
           {clashes.map((clash) => (
@@ -72,12 +85,6 @@ export function ShortcutsPage() {
           ))}
         </div>
       )}
-      <Group title="In the Taskboard window">
-        {list.length === 0 && <div className="settings-row muted">No matching commands.</div>}
-        {list.map((command) => (
-          <ShortcutRow key={command.id} command={command} bindings={bindings} save={save} />
-        ))}
-      </Group>
       <Group title="In the menu" description="These keys belong to the app menu and can't be changed.">
         {MENU_KEYS.map((key) => (
           <Row key={key.title} label={key.title}>

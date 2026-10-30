@@ -121,4 +121,6 @@
 .list-item:hover > .list-row-caret, .list-row-caret:focus-visible { opacity: 1; }
 .list-row-caret--nested { left: calc(var(--depth) * var(--indent-step) - 6px); }
 .list-row-caret--wrap { top: 11px; transform: none; }
+/* The hover actions sit on the first line too, so they stay put when marking read shortens the title. */
+.list-row--wrap .row-actions { top: -4px; transform: none; }
 .list-row--child .list-row__name { padding-left: calc(var(--depth) * var(--indent-step)); }

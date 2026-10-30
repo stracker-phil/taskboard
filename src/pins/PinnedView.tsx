@@ -1,6 +1,7 @@
+import { LayoutTile } from "../shell/viewLayouts";
 import { useQueryClient } from "@tanstack/react-query";
 import { Folder, MessageSquare, X } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { CopyKey } from "../components/issue/CopyKey";
 import { api, type PinItem } from "../api";
 import { StatusSquare } from "../components/issue/StatusSquare";
@@ -27,26 +28,36 @@ export function PinnedView({ listId, viewId }: Props) {
   }, [client]);
   const openIssue = useStore((s) => s.openIssue);
   const go = useNavGo();
+  // Removed here, they keep their row (grayed, without the X) until the page is left, so the next X never slides
+  // under the cursor (docs/ux.md → Stable controls).
+  const [removed, setRemoved] = useState<Removed[]>([]);
   if (!data) return null;
+  const removedIds = new Set(removed.map((r) => r.pin.id));
+  const active = withRemoved(data.active.filter((pin) => !removedIds.has(pin.id)), removed);
+  const unpin = (pin: PinItem) => {
+    setRemoved((list) => [...list, { pin, at: active.findIndex((p) => p.id === pin.id) }]);
+    void attempt(api.pinRemove(pin.id), "Could not remove the bookmark");
+  };
   const open = (pin: PinItem) => {
     const target = pin.target;
     if (target.kind === "issue") openIssue(target.id, { listId, viewId });
     else if (target.kind === "comment") openIssue(target.issueId, { listId, viewId });
+    else if (target.kind === "view") void go(target.listId, target.id);
     else void go(target.id);
   };
   return (
     <div className="pinned">
-      {data.active.length === 0 ? (
+      {active.length === 0 ? (
         <p className="pinned__empty">Nothing pinned. Press P on an issue, or pin a comment or a filter list.</p>
       ) : (
-        <PinTable label="Bookmarked" pins={data.active} onOpen={open} onUnpin={(pin) => void attempt(api.pinRemove(pin.id), "Could not remove the bookmark")} />
+        <PinTable label="Bookmarked" pins={active} onOpen={open} onUnpin={unpin} removed={removedIds} />
       )}
-      {data.recentlyUnpinned.length > 0 && (
+      {data.recentlyUnpinned.some((pin) => !removedIds.has(pin.id)) && (
         <section className="pinned__recent" aria-labelledby="pinned-recent">
           <h2 id="pinned-recent" className="pinned__caps">
             {RECENT}
           </h2>
-          <PinTable label={RECENT} pins={data.recentlyUnpinned} onOpen={open} />
+          <PinTable label={RECENT} pins={data.recentlyUnpinned.filter((pin) => !removedIds.has(pin.id))} onOpen={open} />
         </section>
       )}
     </div>
@@ -55,15 +66,30 @@ export function PinnedView({ listId, viewId }: Props) {
 
 const RECENT = "Recently removed";
 
+/** A pin removed on this page and the row it had. */
+interface Removed {
+  pin: PinItem;
+  at: number;
+}
+
+/** `pins` with the ones removed here back at their rows. */
+function withRemoved(pins: PinItem[], removed: Removed[]): PinItem[] {
+  const rows = [...pins];
+  for (const { pin, at } of [...removed].sort((a, b) => a.at - b.at)) rows.splice(Math.min(at, rows.length), 0, pin);
+  return rows;
+}
+
 interface TableProps {
   label: string;
   pins: PinItem[];
   onOpen: (pin: PinItem) => void;
   /** Active pins can be unpinned; ended ones are grayed and show no time left. */
   onUnpin?: (pin: PinItem) => void;
+  /** Pins just removed, still in their rows: grayed, no time left, no X. */
+  removed?: Set<number>;
 }
 
-function PinTable({ label, pins, onOpen, onUnpin }: TableProps) {
+function PinTable({ label, pins, onOpen, onUnpin, removed }: TableProps) {
   return (
     <div className={onUnpin ? "pin-table" : "pin-table pin-table--ended"} role="table" aria-label={label}>
       <div className="pin-table__head" role="row">
@@ -74,7 +100,7 @@ function PinTable({ label, pins, onOpen, onUnpin }: TableProps) {
       {pins.map((pin) => (
         <div
           key={pin.id}
-          className="pin-table__row"
+          className={removed?.has(pin.id) ? "pin-table__row pin-table__row--removed" : "pin-table__row"}
           role="row"
           tabIndex={0}
           data-issue-id={pin.target.kind === "issue" ? pin.target.id : undefined}
@@ -90,8 +116,8 @@ function PinTable({ label, pins, onOpen, onUnpin }: TableProps) {
             {pin.reason ?? ""}
           </span>
           <span className="pin-table__left" role="cell">
-            {pin.timeLeft}
-            {onUnpin && <UnpinButton onUnpin={() => onUnpin(pin)} />}
+            {removed?.has(pin.id) ? "Removed" : pin.timeLeft}
+            {onUnpin && (removed?.has(pin.id) ? <RemovedSlot /> : <UnpinButton onUnpin={() => onUnpin(pin)} />)}
           </span>
         </div>
       ))}
@@ -115,6 +141,11 @@ function UnpinButton({ onUnpin }: { onUnpin: () => void }) {
       <X size={13} strokeWidth={2} aria-hidden="true" />
     </button>
   );
+}
+
+/** Where the X was: a second click there does nothing rather than opening the row. */
+function RemovedSlot() {
+  return <button type="button" className="pin-table__unpin" disabled tabIndex={-1} aria-hidden="true" onClick={(e) => e.stopPropagation()} />;
 }
 
 function Target({ pin }: { pin: PinItem }) {
@@ -143,6 +174,14 @@ function Target({ pin }: { pin: PinItem }) {
         <>
           <Folder className="pin-table__icon" size={14} strokeWidth={2} aria-hidden="true" />
           {target.space && <span className="pin-table__space">{target.space} /</span>}
+          <span className="pin-table__text">{target.name}</span>
+        </>
+      );
+    case "view":
+      return (
+        <>
+          <LayoutTile layout={target.layout} />
+          <span className="pin-table__space">{target.space ? `${target.space} / ${target.list} ›` : `${target.list} ›`}</span>
           <span className="pin-table__text">{target.name}</span>
         </>
       );

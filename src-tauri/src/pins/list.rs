@@ -13,6 +13,7 @@ use crate::lists::Viewer;
 use crate::status_style::{Style, Styles};
 use crate::sync::map::format_utc;
 use crate::views::rows::{self, Person};
+use crate::views::{Layout, list_views};
 
 /// How long an ended pin stays in Recently unpinned.
 const RECENT_DAYS: i64 = 7;
@@ -69,6 +70,17 @@ pub enum Pinned {
         /// The Space it belongs to; none for a global list.
         space: Option<String>,
     },
+    /// A view tab, opened at its level.
+    View {
+        id: i64,
+        list_id: i64,
+        name: String,
+        layout: Layout,
+        /// The level's name.
+        list: String,
+        /// The Space the level belongs to, unless the level is that Space or a global list.
+        space: Option<String>,
+    },
 }
 
 struct Row {
@@ -121,6 +133,7 @@ fn resolve(
             "issue" => issue_target(conn, style_map, &row.target)?,
             "comment" => comment_target(conn, viewer, &row.target)?,
             "filter_list" => list_target(conn, &row.target)?,
+            "view" => view_target(conn, &row.target)?,
             _ => None,
         };
         if let Some(target) = found {
@@ -224,6 +237,46 @@ fn list_target(conn: &Connection, id: &str) -> AppResult<Option<Pinned>> {
             },
         )
         .optional()?)
+}
+
+fn view_target(conn: &Connection, id: &str) -> AppResult<Option<Pinned>> {
+    let found = conn
+        .query_row(
+            "SELECT v.id, v.list_id, v.name, l.name, COALESCE(s.name, p.name)
+             FROM view v
+             JOIN filter_list l ON l.id = v.list_id
+             LEFT JOIN filter_list sp ON sp.id = l.parent_id AND sp.kind = 'space'
+             LEFT JOIN space s ON s.project_id = sp.project_id
+             LEFT JOIN cache.space p ON p.id = sp.project_id
+             WHERE CAST(v.id AS TEXT) = ?1",
+            [id],
+            |r| {
+                Ok((
+                    r.get::<_, i64>(0)?,
+                    r.get::<_, i64>(1)?,
+                    r.get(2)?,
+                    r.get(3)?,
+                    r.get(4)?,
+                ))
+            },
+        )
+        .optional()?;
+    let Some((id, list_id, name, list, space)) = found else {
+        return Ok(None);
+    };
+    // The layout as the level shows it: a layout its Space switched off shows as the Space's default.
+    let layout = list_views(conn, list_id)?
+        .into_iter()
+        .find(|v| v.id == id)
+        .map(|v| v.layout);
+    Ok(layout.map(|layout| Pinned::View {
+        id,
+        list_id,
+        name,
+        layout,
+        list,
+        space,
+    }))
 }
 
 fn excerpt(body: &str) -> String {

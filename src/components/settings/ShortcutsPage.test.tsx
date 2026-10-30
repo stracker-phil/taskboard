@@ -153,7 +153,58 @@ describe("ShortcutsPage", () => {
     });
   });
 
+  describe("fixed slots for Reset and Remove", () => {
+    const slots = (title: string) => Array.from(field(title).closest(".shortcut-control")!.children).slice(0, 2);
+    const isPlaceholder = (slot: Element) => slot.getAttribute("aria-hidden") === "true" && slot.tagName !== "BUTTON";
+
+    it("puts a placeholder before Remove while nothing is overridden", async () => {
+      await renderPage();
+
+      const [first, second] = slots("Open Search");
+      expect(isPlaceholder(first)).toBe(true);
+      expect(second).toHaveAccessibleName("Remove shortcut for Open Search");
+    });
+
+    it("keeps Remove in the second slot when Reset shows in the first", async () => {
+      mocked.getKeybindings.mockResolvedValue({ "search.open": "Mod+Shift+P" });
+      await renderPage();
+      await screen.findByRole("button", { name: "Reset Open Search" });
+
+      const [first, second] = slots("Open Search");
+      expect(first).toHaveAccessibleName("Reset Open Search");
+      expect(second).toHaveAccessibleName("Remove shortcut for Open Search");
+    });
+
+    it("shows Reset in the first slot and a placeholder in the second once the shortcut is removed", async () => {
+      mocked.getKeybindings.mockResolvedValue({ "search.open": null });
+      await renderPage();
+      await screen.findByRole("button", { name: "Reset Open Search" });
+
+      const [first, second] = slots("Open Search");
+      expect(first).toHaveAccessibleName("Reset Open Search");
+      expect(isPlaceholder(second)).toBe(true);
+    });
+
+    it("holds two placeholders for an unbound command", async () => {
+      await renderPage();
+
+      expect(slots("Copy Link").map(isPlaceholder)).toEqual([true, true]);
+    });
+  });
+
   describe("conflicts", () => {
+    it("shows the alert after the window's shortcuts and before the menu's", async () => {
+      mocked.getKeybindings.mockResolvedValue({ "issue.copy": "Mod+K" });
+      await renderPage();
+
+      const alert = await screen.findByRole("alert");
+
+      const windowGroup = screen.getByRole("region", { name: "In the Taskboard window" });
+      const menuGroup = screen.getByRole("region", { name: "In the menu" });
+      expect(windowGroup.compareDocumentPosition(alert) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(alert.compareDocumentPosition(menuGroup) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
     it("shows no alert while every key is unique", async () => {
       await renderPage();
 

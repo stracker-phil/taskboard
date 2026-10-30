@@ -14,6 +14,8 @@ import { getCommand } from "../commands/registry";
 import { paletteMenus } from "../palette/menus";
 import { createQueryClient } from "../queries/queryClient";
 import { resetStore, useStore } from "../state/store";
+import { pinItem, pins, viewTarget } from "../test/pins";
+import { settings } from "../test/settings";
 import { view } from "../test/views";
 import { ViewTabs } from "./ViewTabs";
 
@@ -61,6 +63,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
   installCommands("main");
+  mocked.pinsList.mockResolvedValue(pins());
+  mocked.getSettings.mockResolvedValue(settings());
   mocked.viewSetLayout.mockResolvedValue(LIST);
   mocked.viewMove.mockResolvedValue([]);
 });
@@ -416,8 +420,61 @@ describe("ViewTabs", () => {
       await rightClick("Sprint board");
 
       const menu = within(screen.getByRole("menu", { name: "Sprint board" }));
-      expect(menu.getAllByRole("menuitem").map((r) => r.textContent)).toEqual(["Rename", "Icon and Color…", "Duplicate", "Delete"]);
+      expect(menu.getAllByRole("menuitem").map((r) => r.textContent)).toEqual(["Rename", "Icon and Color…", "Duplicate", "Bookmark View", "Delete"]);
       expect(menu.getByRole("group", { name: "Layout" })).toBeInTheDocument();
+    });
+
+    describe("bookmarking", () => {
+      it("bookmarks the view until removed by default", async () => {
+        await renderTabs();
+        await rightClick("Sprint board");
+
+        await choose("Bookmark View");
+
+        expect(mocked.pinCreate).toHaveBeenCalledWith("view", "102", "untilUnpinned", null);
+      });
+
+      it("bookmarks the view for the duration set in the settings", async () => {
+        mocked.getSettings.mockResolvedValue(settings({ behaviour: { seenAfterSeconds: 2, pinDefault: "week", openIssuesIn: "preview" } }));
+        await renderTabs();
+        await act(async () => void (await mocked.getSettings.mock.results[0]?.value));
+        await rightClick("Sprint board");
+
+        await choose("Bookmark View");
+
+        expect(mocked.pinCreate).toHaveBeenCalledWith("view", "102", "week", null);
+      });
+
+      it("offers Remove Bookmark instead for a bookmarked view and removes its pin", async () => {
+        mocked.pinsList.mockResolvedValue(pins([pinItem({ id: 8, target: viewTarget({ id: 102 }) })]));
+        await renderTabs([LIST, BOARD], 102);
+        await waitFor(() => expect(paletteMenus().find((menu) => menu.title === "View")?.entries()).toContainEqual(expect.objectContaining({ text: "Remove Bookmark" })));
+        await rightClick("Sprint board");
+
+        expect(screen.queryByRole("menuitem", { name: "Bookmark View" })).not.toBeInTheDocument();
+        await choose("Remove Bookmark");
+
+        expect(mocked.pinRemove).toHaveBeenCalledWith(8);
+      });
+
+      it("offers Bookmark View on another tab than the bookmarked one", async () => {
+        mocked.pinsList.mockResolvedValue(pins([pinItem({ id: 8, target: viewTarget({ id: 102 }) })]));
+        await renderTabs([LIST, BOARD], 102);
+        await waitFor(() => expect(paletteMenus().find((menu) => menu.title === "View")?.entries()).toContainEqual(expect.objectContaining({ text: "Remove Bookmark" })));
+        await rightClick("List");
+
+        expect(row("Bookmark View")).toBeInTheDocument();
+      });
+
+      it("shows an error toast when the bookmark cannot be made", async () => {
+        mocked.pinCreate.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
+        await renderTabs();
+        await rightClick("Sprint board");
+
+        await choose("Bookmark View");
+
+        await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not bookmark the view: Disk full"));
+      });
     });
 
     it("checks the view's current layout in the Layout group", async () => {
@@ -676,10 +733,17 @@ describe("ViewTabs", () => {
       ]);
     });
 
-    it("offers renaming, styling, duplicating and deleting the current view", async () => {
+    it("offers renaming, styling, duplicating, bookmarking and deleting the current view", async () => {
       await renderTabs([LIST, BOARD]);
 
-      expect(entriesOf("View").map((e) => e.text)).toEqual(["Rename", "Icon and Color…", "Duplicate", "Delete"]);
+      expect(entriesOf("View").map((e) => e.text)).toEqual(["Rename", "Icon and Color…", "Duplicate", "Bookmark View", "Delete"]);
+    });
+
+    it("offers Remove Bookmark for the current view once it is bookmarked", async () => {
+      mocked.pinsList.mockResolvedValue(pins([pinItem({ id: 8, target: viewTarget({ id: 101 }) })]));
+      await renderTabs([LIST, BOARD]);
+
+      await waitFor(() => expect(entriesOf("View").map((e) => e.text)).toEqual(["Rename", "Icon and Color…", "Duplicate", "Remove Bookmark", "Delete"]));
     });
 
     it("greys out Delete while the view is the only one", async () => {

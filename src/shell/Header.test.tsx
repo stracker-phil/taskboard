@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -10,6 +10,7 @@ import { runPageAction } from "../commands/pageActions";
 import { createQueryClient } from "../queries/queryClient";
 import { resetStore, useStore } from "../state/store";
 import { connectionView } from "../test/jira";
+import { listTarget, pinItem, pins } from "../test/pins";
 import { space } from "../test/spaces";
 import { listNode, view } from "../test/views";
 import { Header } from "./Header";
@@ -40,6 +41,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
   mocked.connectionGet.mockResolvedValue(connectionView());
+  mocked.pinsList.mockResolvedValue(pins());
   mocked.listMarkAllSeen.mockResolvedValue(undefined);
   mocked.openUrl.mockResolvedValue(undefined);
 });
@@ -138,6 +140,59 @@ describe("Header", () => {
 
       expect(screen.getByRole("dialog", { name: "Icon and color" })).toBeInTheDocument();
       expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("bookmark button", () => {
+    const BOOKMARK = { name: /^(Bookmark this|Remove bookmark)/ };
+
+    it.each([
+      ["a Space", SPACE_LEVEL, "Bookmark this Space", "11"],
+      ["a filter list", LIST_LEVEL, "Bookmark this list", "21"],
+      ["a Home list", { kind: "home", node: listNode({ id: 31 }) } satisfies Level, "Bookmark this list", "31"],
+    ])("bookmarks %s as a filter list at once on an alt-click", async (_name, level, label, target) => {
+      await renderHeader(level);
+
+      fireEvent.click(await screen.findByRole("button", { name: label }), { altKey: true });
+
+      expect(mocked.pinCreate).toHaveBeenCalledWith("filterList", target, "untilUnpinned", null);
+    });
+
+    it.each([
+      ["Everything", EVERYTHING],
+      ["Unread", recent(3)],
+      ["Bookmarks", PINNED],
+    ])("is absent on the Home level %s", async (_name, level) => {
+      await renderHeader(level);
+
+      expect(screen.queryByRole("button", BOOKMARK)).not.toBeInTheDocument();
+    });
+
+    it("sits after the title and before Open in Jira", async () => {
+      await renderHeader(SPACE_LEVEL);
+
+      const button = await screen.findByRole("button", { name: "Bookmark this Space" });
+
+      expect(screen.getByRole("heading", { level: 1 }).compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(button.compareDocumentPosition(screen.getByRole("button", { name: /Open in Jira/ })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it("is pressed and removes the bookmark when the level is bookmarked", async () => {
+      mocked.pinsList.mockResolvedValue(pins([pinItem({ id: 9, target: listTarget({ id: 21 }) })]));
+      await renderHeader(LIST_LEVEL);
+
+      const button = await screen.findByRole("button", { name: "Remove bookmark" });
+      expect(button).toHaveAttribute("aria-pressed", "true");
+      await userEvent.click(button);
+
+      expect(mocked.pinRemove).toHaveBeenCalledWith(9);
+    });
+
+    it("is not pressed while another list is the one bookmarked", async () => {
+      mocked.pinsList.mockResolvedValue(pins([pinItem({ id: 9, target: listTarget({ id: 99 }) })]));
+      await renderHeader(LIST_LEVEL);
+
+      expect(await screen.findByRole("button", { name: "Bookmark this list" })).toHaveAttribute("aria-pressed", "false");
     });
   });
 

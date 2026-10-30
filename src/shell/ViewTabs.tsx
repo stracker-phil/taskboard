@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { api, type Layout, type View } from "../api";
 import { usePageAction } from "../commands/pageActions";
+import { useGlide } from "../lib/motion";
 import { usePaletteMenu } from "../palette/menus";
+import { usePinDefault } from "../pins/PinPopover";
+import { pinOf, usePins } from "../queries/pins";
 import { onSelectView } from "../commands/viewKeys";
 import { LookPopover } from "../components/look/LookPopover";
 import { openContextMenu, openMenu, type MenuEntry } from "../components/menu";
@@ -25,6 +28,8 @@ export function ViewTabs({ listId, viewId }: { listId: number; viewId: number })
     setLookingId(view.id);
   };
   const addRef = useRef<HTMLButtonElement>(null);
+  const { data: pins } = usePins();
+  const pinDefault = usePinDefault();
 
   useEffect(
     () =>
@@ -58,10 +63,17 @@ export function ViewTabs({ listId, viewId }: { listId: number; viewId: number })
   const setLayoutOf = (view: View, layout: Layout) => {
     if (view.layout !== layout) void attempt(api.viewSetLayout(view.id, layout), "Could not change the layout");
   };
+  const bookmarking = (view: View): MenuEntry => {
+    const pin = pinOf(pins?.active, "view", String(view.id));
+    return pin
+      ? { text: "Remove Bookmark", run: () => void attempt(api.pinRemove(pin.id), "Could not remove the bookmark") }
+      : { text: "Bookmark View", run: () => void attempt(api.pinCreate("view", String(view.id), pinDefault, null), "Could not bookmark the view") };
+  };
   const editing = (view: View): MenuEntry[] => [
     { text: "Rename", run: () => setRenamingId(view.id) },
     { text: "Icon and Color…", run: () => editLook(view, document.querySelector(`[data-view-look="${view.id}"]`)) },
     { text: "Duplicate", run: () => void attempt(api.viewDuplicate(view.id), "Could not duplicate the view") },
+    bookmarking(view),
   ];
   const deleting = (view: View): MenuEntry => ({ text: "Delete", danger: true, enabled: views.length > 1, run: () => void remove(view) });
   const tabMenu = (e: MouseEvent, view: View): void =>
@@ -95,6 +107,8 @@ export function ViewTabs({ listId, viewId }: { listId: number; viewId: number })
     const moved = views[from];
     if (moved) void attempt(api.viewMove(moved.id, to), "Could not move the view");
   }, "x");
+  // A tab that is renamed, added or removed moves the ones after it smoothly.
+  useGlide(containerRef);
 
   const current = views.findIndex((view) => view.id === viewId);
   const step = (by: 1 | -1) => {

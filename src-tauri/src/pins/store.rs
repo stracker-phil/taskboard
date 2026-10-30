@@ -26,6 +26,7 @@ pub enum PinKind {
     Issue,
     Comment,
     FilterList,
+    View,
 }
 
 impl PinKind {
@@ -34,6 +35,7 @@ impl PinKind {
             Self::Issue => "issue",
             Self::Comment => "comment",
             Self::FilterList => "filter_list",
+            Self::View => "view",
         }
     }
 }
@@ -68,6 +70,7 @@ fn target_exists(conn: &Connection, kind: PinKind, target: &str) -> AppResult<bo
         PinKind::FilterList => {
             "SELECT EXISTS (SELECT 1 FROM filter_list WHERE CAST(id AS TEXT) = ?1)"
         }
+        PinKind::View => "SELECT EXISTS (SELECT 1 FROM view WHERE CAST(id AS TEXT) = ?1)",
     };
     Ok(conn.query_row(sql, [target], |r| r.get(0))?)
 }

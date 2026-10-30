@@ -1,7 +1,7 @@
 import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../../test/apiMock")).createApiMock() }));
 
@@ -68,19 +68,21 @@ async function addCondition(sectionName: "All views of this list" | "This view")
   await userEvent.click(within(dialog).getByRole("button", { name: "Done" }));
 }
 
-const meChip = () => screen.getByRole("button", { name: /^(Me|Only my issues, click to show all)$/ });
+const meChip = () => screen.getByRole("button", { name: "Me" });
+const revertViewButton = () => screen.queryByRole("button", { name: "Revert View" });
+const moreButton = () => screen.queryByRole("button", { name: "More toolbar items" });
 
 describe("Toolbar page actions", () => {
   describe("toolbar.me", () => {
     it("turns the Me narrowing on and off", () => {
       renderToolbar();
-      expect(screen.getByRole("button", { name: "Me", pressed: false })).toBeInTheDocument();
+      expect(meChip()).toHaveAttribute("aria-pressed", "false");
 
       run("toolbar.me");
-      expect(screen.getByRole("button", { name: "Only my issues, click to show all", pressed: true })).toBeInTheDocument();
+      expect(meChip()).toHaveAttribute("aria-pressed", "true");
 
       run("toolbar.me");
-      expect(screen.getByRole("button", { name: "Me", pressed: false })).toBeInTheDocument();
+      expect(meChip()).toHaveAttribute("aria-pressed", "false");
     });
 
     it("toggles on ⌘⇧M", async () => {
@@ -88,7 +90,18 @@ describe("Toolbar page actions", () => {
 
       await userEvent.keyboard("{Meta>}{Shift>}m{/Shift}{/Meta}");
 
-      expect(screen.getByRole("button", { name: "Only my issues, click to show all" })).toBeInTheDocument();
+      expect(meChip()).toHaveAttribute("aria-pressed", "true");
+    });
+
+    it("keeps one button named Me while on, and toggles back when clicked at the same spot", async () => {
+      renderToolbar();
+
+      await userEvent.click(meChip());
+      expect(meChip()).toHaveAttribute("title", "Only my issues; click to show all");
+
+      await userEvent.click(meChip());
+      expect(meChip()).toHaveAttribute("aria-pressed", "false");
+      expect(meChip()).toHaveAttribute("title", "Show only my issues");
     });
   });
 
@@ -321,11 +334,12 @@ describe("Toolbar view drafts", () => {
   });
 
   describe("Me chip", () => {
-    it("offers no Save View, no More menu and no view actions while nothing changed", () => {
+    it("offers no Save View, no Revert View, no More menu and no view actions while nothing changed", () => {
       renderToolbar(SPACE_LEVEL);
 
       expect(saveViewButton()).not.toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "More toolbar items" })).not.toBeInTheDocument();
+      expect(revertViewButton()).not.toBeInTheDocument();
+      expect(moreButton()).not.toBeInTheDocument();
       expect(run("view.save")).toBe(false);
       expect(run("view.revert")).toBe(false);
     });
@@ -338,6 +352,16 @@ describe("Toolbar view drafts", () => {
       expect(await screen.findByRole("button", { name: "Save View" })).toBeInTheDocument();
       expect(mocked.viewSetOnlyMine).not.toHaveBeenCalled();
       expect(mocked.viewSetFilter).not.toHaveBeenCalled();
+    });
+
+    it("shows Revert View beside Save View, and no More menu, while the view is dirty", async () => {
+      renderToolbar(SPACE_LEVEL);
+
+      await userEvent.click(meChip());
+
+      expect(await screen.findByRole("button", { name: "Revert View" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Save View" })).toBeInTheDocument();
+      expect(moreButton()).not.toBeInTheDocument();
     });
 
     it("hides Save View again when Me is toggled back to what the view saved", async () => {
@@ -365,7 +389,7 @@ describe("Toolbar view drafts", () => {
     it("shows a view that saved Me with the chip on and nothing to save", () => {
       renderToolbar(SPACE_LEVEL, 0, { onlyMine: true });
 
-      expect(screen.getByRole("button", { name: "Only my issues, click to show all", pressed: true })).toBeInTheDocument();
+      expect(meChip()).toHaveAttribute("aria-pressed", "true");
       expect(saveViewButton()).not.toBeInTheDocument();
     });
 
@@ -387,7 +411,7 @@ describe("Toolbar view drafts", () => {
 
       await waitFor(() => expect(useStore.getState().toasts.map((t) => t.kind)).toContain("error"));
       expect(screen.getByRole("button", { name: "Save View" })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Only my issues, click to show all", pressed: true })).toBeInTheDocument();
+      expect(meChip()).toHaveAttribute("aria-pressed", "true");
     });
   });
 
@@ -472,16 +496,15 @@ describe("Toolbar view drafts", () => {
   });
 
   describe("Revert View", () => {
-    it("drops the Me draft from the More menu", async () => {
+    it("drops the Me draft and both draft buttons", async () => {
       renderToolbar(SPACE_LEVEL);
       await userEvent.click(meChip());
 
-      await userEvent.click(await screen.findByRole("button", { name: "More toolbar items" }));
-      await userEvent.click(await screen.findByRole("menuitem", { name: "Revert View" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Revert View" }));
 
       expect(saveViewButton()).not.toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Me", pressed: false })).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "More toolbar items" })).not.toBeInTheDocument();
+      expect(revertViewButton()).not.toBeInTheDocument();
+      expect(meChip()).toHaveAttribute("aria-pressed", "false");
       expect(mocked.viewSetOnlyMine).not.toHaveBeenCalled();
     });
 
@@ -490,8 +513,7 @@ describe("Toolbar view drafts", () => {
       await addCondition("This view");
       await screen.findByLabelText("1 condition");
 
-      await userEvent.click(screen.getByRole("button", { name: "More toolbar items" }));
-      await userEvent.click(await screen.findByRole("menuitem", { name: "Revert View" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Revert View" }));
 
       expect(screen.queryByLabelText(/condition/)).not.toBeInTheDocument();
       expect(mocked.viewSetFilter).not.toHaveBeenCalled();
@@ -502,8 +524,7 @@ describe("Toolbar view drafts", () => {
       await userEvent.type(filterField(), "pricing");
       await userEvent.click(meChip());
 
-      await userEvent.click(await screen.findByRole("button", { name: "More toolbar items" }));
-      await userEvent.click(await screen.findByRole("menuitem", { name: "Revert View" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Revert View" }));
 
       expect(filterField()).toHaveValue("pricing");
     });
@@ -548,6 +569,69 @@ describe("Toolbar view drafts", () => {
 
       expect([run("view.save"), run("view.revert")]).toEqual([false, false]);
     });
+  });
+});
+
+describe("Toolbar folding", () => {
+  const rects: { mockRestore: () => void }[] = [];
+
+  /** A bar of `width` px whose items are each 100px wide; the observer reports the size at once. */
+  function narrowBar(width: number) {
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        callback: ResizeObserverCallback;
+        constructor(callback: ResizeObserverCallback) {
+          this.callback = callback;
+        }
+        observe() {
+          this.callback([], this);
+        }
+        unobserve() {}
+        disconnect() {}
+      },
+    );
+    rects.push(vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(width));
+    rects.push(vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ width: 100, height: 20, top: 0, left: 0, right: 100, bottom: 20, x: 0, y: 0, toJSON: () => ({}) }));
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    rects.splice(0).forEach((spy) => spy.mockRestore());
+  });
+
+  it("shows the More button only once items fold, and lists them", async () => {
+    narrowBar(500);
+    renderToolbar(SPACE_LEVEL);
+
+    await userEvent.click(await screen.findByRole("button", { name: "More toolbar items" }));
+
+    const menu = within(await screen.findByRole("menu", { name: "More toolbar items" }));
+    expect(menu.getByRole("menuitem", { name: /^Columns/ })).toBeInTheDocument();
+    expect(menu.getByRole("menuitem", { name: /^Filter/ })).toBeInTheDocument();
+  });
+
+  it("does not add a More button for a draft, nor Revert View to its menu", async () => {
+    narrowBar(500);
+    renderToolbar(SPACE_LEVEL);
+    await userEvent.click(meChip());
+    await screen.findByRole("button", { name: "Revert View" });
+
+    await userEvent.click(screen.getByRole("button", { name: "More toolbar items" }));
+
+    expect(within(await screen.findByRole("menu", { name: "More toolbar items" })).queryByRole("menuitem", { name: "Revert View" })).not.toBeInTheDocument();
+  });
+
+  it("folds the same items whether or not the view is dirty", async () => {
+    narrowBar(500);
+    renderToolbar(SPACE_LEVEL);
+    const before = screen.queryAllByRole("button").map((b) => b.getAttribute("aria-label") ?? b.textContent);
+
+    await userEvent.click(meChip());
+    await screen.findByRole("button", { name: "Save View" });
+
+    const after = screen.queryAllByRole("button").map((b) => b.getAttribute("aria-label") ?? b.textContent);
+    expect(after.filter((name) => name !== "Revert View" && name !== "Save View")).toEqual(before);
   });
 });
 

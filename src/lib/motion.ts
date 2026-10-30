@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 export type MotionToken = "--motion-fast" | "--motion-base" | "--motion-slow";
 
@@ -27,4 +27,35 @@ export function usePresence(shown: boolean, token: MotionToken = "--motion-base"
     return () => clearTimeout(timer);
   }, [leaving, token]);
   return { mounted: shown || leaving, state: shown ? "open" : "leaving" };
+}
+
+/** Where a row of controls had each control, and how wide it was then. */
+interface Places {
+  width: number;
+  lefts: WeakMap<Element, number>;
+}
+
+/** The children of `row` glide to a new place instead of jumping, and a new child fades in (docs/ux.md → Stable
+ *  controls). Only while the row keeps its width: when the window resizes, they follow at once. */
+export function useGlide(row: RefObject<HTMLElement | null>) {
+  const before = useRef<Places | null>(null);
+  useLayoutEffect(() => {
+    const element = row.current;
+    if (!element) return;
+    const now: Places = { width: element.clientWidth, lefts: new WeakMap() };
+    const previous = before.current;
+    const ms = motionMs("--motion-slow");
+    const animates = previous !== null && previous.width === now.width && ms > 0;
+    const easing = getComputedStyle(document.documentElement).getPropertyValue("--ease-out").trim() || "ease-out";
+    for (const child of element.children) {
+      if (!(child instanceof HTMLElement)) continue;
+      const left = child.offsetLeft;
+      now.lefts.set(child, left);
+      if (!animates || typeof child.animate !== "function") continue;
+      const was = previous.lefts.get(child);
+      if (was === undefined) child.animate([{ opacity: 0, transform: "scale(0.92)" }, { opacity: 1, transform: "none" }], { duration: ms, easing });
+      else if (was !== left) child.animate([{ transform: `translateX(${was - left}px)` }, { transform: "none" }], { duration: ms, easing });
+    }
+    before.current = now;
+  });
 }

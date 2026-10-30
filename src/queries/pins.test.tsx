@@ -5,9 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
 
 import { api } from "../api";
-import { pinItem, pins } from "../test/pins";
+import { commentTarget, issueTarget, listTarget, pinItem, pins, viewTarget } from "../test/pins";
 import { createQueryClient } from "./queryClient";
-import { usePinExpiry } from "./pins";
+import { pinOf, usePinExpiry } from "./pins";
 
 const mocked = vi.mocked(api, true);
 
@@ -35,6 +35,33 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+});
+
+describe("pinOf", () => {
+  const ISSUE = pinItem({ id: 1, target: issueTarget({ id: "10042" }) });
+  const COMMENT = pinItem({ id: 2, target: commentTarget({ id: "20001" }) });
+  const LIST = pinItem({ id: 3, target: listTarget({ id: 21 }) });
+  const VIEW = pinItem({ id: 4, target: viewTarget({ id: 21 }) });
+  const ALL = [ISSUE, COMMENT, LIST, VIEW];
+
+  it.each([
+    ["an issue", "issue", "10042", 1],
+    ["a comment", "comment", "20001", 2],
+    ["a filter list", "filterList", "21", 3],
+    ["a view", "view", "21", 4],
+  ] as const)("finds the pin of %s by kind and id", (_name, kind, id, pinId) => {
+    expect(pinOf(ALL, kind, id)?.id).toBe(pinId);
+  });
+
+  it("keeps a list and a view with the same id apart", () => {
+    expect(pinOf([VIEW], "filterList", "21")).toBeUndefined();
+    expect(pinOf([LIST], "view", "21")).toBeUndefined();
+  });
+
+  it("finds nothing for an id nobody bookmarked or before the pins have loaded", () => {
+    expect(pinOf(ALL, "view", "99")).toBeUndefined();
+    expect(pinOf(undefined, "view", "21")).toBeUndefined();
+  });
 });
 
 describe("usePinExpiry", () => {
