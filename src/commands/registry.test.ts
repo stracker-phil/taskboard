@@ -69,6 +69,8 @@ describe("acceleratorLabel", () => {
     ["CmdOrCtrl+Down", "⌘↓"],
     ["CmdOrCtrl+Backslash", "⌘\\"],
     ["CmdOrCtrl+Enter", "⌘↵"],
+    ["CmdOrCtrl+Alt+BracketLeft", "⌘⌥["],
+    ["CmdOrCtrl+Alt+BracketRight", "⌘⌥]"],
   ])("writes %s as %s", (accelerator, label) => {
     expect(acceleratorLabel(accelerator)).toBe(label);
   });

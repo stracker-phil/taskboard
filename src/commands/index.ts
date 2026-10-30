@@ -31,6 +31,8 @@ const APP_COMMANDS: Command[] = [
   { id: "space.previous", title: "Previous Space", scope: "main", defaultBinding: "Mod+Alt+ArrowUp", bus: "nav:previousSpace", run: () => runBusCommand("nav:previousSpace", "Could not open the Space") },
   { id: "palette.open", title: "Command palette", scope: "main", defaultBinding: "Mod+K", run: () => useStore.getState().setPaletteOpen(true) },
   { id: "space.next", title: "Next Space", scope: "main", defaultBinding: "Mod+Alt+ArrowDown", bus: "nav:nextSpace", run: () => runBusCommand("nav:nextSpace", "Could not open the Space") },
+  { id: "list.previous", title: "Previous List", scope: "main", defaultBinding: "Mod+Alt+[", bus: "nav:previousList", run: () => runBusCommand("nav:previousList", "Could not open the list") },
+  { id: "list.next", title: "Next List", scope: "main", defaultBinding: "Mod+Alt+]", bus: "nav:nextList", run: () => runBusCommand("nav:nextList", "Could not open the list") },
   ...VIEW_KEY_COMMANDS,
   ...PAGE_ACTION_COMMANDS,
   ...ISSUE_KEY_COMMANDS,

@@ -44,7 +44,7 @@ export function snapshotPage(): PageSnapshot {
 /** A menu item runs the page's command of the same id, or a Rust command (through the page's twin when one has a key
  *  of its own); a page command that couldn't run is left out. */
 function fromMenu(item: MenuCommand, page: PageSnapshot, twins: Map<string, Command>): PaletteCommand | null {
-  const base = { id: item.command, label: item.label, section: item.menu };
+  const base = { id: item.command, label: item.label, section: item.menu, checked: item.checked || undefined };
   if (item.command.startsWith(PAGE)) {
     const command = getCommand(item.command.slice(PAGE.length));
     if (!command || !page.runnable.has(command.id)) return null;

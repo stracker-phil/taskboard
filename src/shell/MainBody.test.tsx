@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -6,6 +6,7 @@ vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await impo
 
 import { api } from "../api";
 import { createQueryClient } from "../queries/queryClient";
+import { NAV_KEY } from "../queries/sidebar";
 import { narrowingKey } from "../state/slices/narrowing";
 import { resetStore, useStore } from "../state/store";
 import { boardColumn, boardData } from "../test/board";
@@ -39,11 +40,19 @@ afterEach(() => {
 });
 
 function renderBody() {
+  const client = createQueryClient();
   render(
-    <QueryClientProvider client={createQueryClient()}>
+    <QueryClientProvider client={client}>
       <MainBody />
     </QueryClientProvider>,
   );
+  return client;
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((r) => (resolve = r));
+  return { promise, resolve };
 }
 
 describe("MainBody", () => {
@@ -320,6 +329,91 @@ describe("MainBody", () => {
       renderBody();
 
       expect(await screen.findByText("Redesign the pricing page")).toBeInTheDocument();
+    });
+  });
+
+  describe("switching what is shown", () => {
+    const OLD = row({ id: "1", key: "NW-1", summary: "Old rows" });
+    const NEW = row({ id: "2", key: "NW-2", summary: "New rows" });
+    const dataOf = (...rows: ReturnType<typeof row>[]) => viewData([groupOf(rows)], rows);
+
+    beforeEach(() => {
+      mocked.navCurrent.mockResolvedValue({ location: { listId: 11, viewId: 101 }, expanded: [] });
+      mocked.syncOverview.mockResolvedValue(syncOverview({ projects: [projectCounts()] }));
+    });
+
+    const goTo = (client: ReturnType<typeof renderBody>, viewId: number) =>
+      act(() => client.setQueryData(NAV_KEY, { location: { listId: 11, viewId }, expanded: [] }));
+
+    it("keeps the old view on screen until the new view's rows arrive", async () => {
+      const next = deferred<ReturnType<typeof dataOf>>();
+      mocked.viewsOf.mockResolvedValue([view({ id: 101 }), view({ id: 102, name: "Other" })]);
+      mocked.viewRows.mockImplementation((_list, viewId) => (viewId === 101 ? Promise.resolve(dataOf(OLD)) : next.promise));
+      const client = renderBody();
+      await screen.findByText("Old rows");
+
+      await goTo(client, 102);
+      await waitFor(() => expect(mocked.viewRows).toHaveBeenCalledWith(11, 102, expect.anything()));
+
+      expect(screen.getByText("Old rows")).toBeInTheDocument();
+      expect(screen.queryByText("New rows")).not.toBeInTheDocument();
+
+      await act(async () => next.resolve(dataOf(NEW)));
+
+      expect(await screen.findByText("New rows")).toBeInTheDocument();
+      expect(screen.queryByText("Old rows")).not.toBeInTheDocument();
+    });
+
+    it("keeps the list on screen when switching to a board until the board's data arrives", async () => {
+      const board = deferred<ReturnType<typeof boardData>>();
+      mocked.viewsOf.mockResolvedValue([view({ id: 101, layout: "list" }), view({ id: 102, layout: "board" })]);
+      mocked.viewRows.mockResolvedValue(dataOf(OLD));
+      mocked.viewBoard.mockReturnValue(board.promise);
+      const client = renderBody();
+      await screen.findByText("Old rows");
+
+      await goTo(client, 102);
+      await waitFor(() => expect(mocked.viewBoard).toHaveBeenCalledWith(11, 102, expect.anything()));
+
+      expect(screen.getByText("Old rows")).toBeInTheDocument();
+      expect(screen.queryByRole("list", { name: "Board" })).not.toBeInTheDocument();
+
+      await act(async () => board.resolve(boardData([boardColumn({ ids: [NEW.id] })], [NEW])));
+
+      expect(await screen.findByRole("list", { name: "Board" })).toBeInTheDocument();
+      expect(screen.queryByText("Old rows")).not.toBeInTheDocument();
+    });
+
+    it("keeps the old rows when the narrowing changes until the narrowed rows arrive", async () => {
+      const narrowed = deferred<ReturnType<typeof dataOf>>();
+      mocked.viewsOf.mockResolvedValue([view()]);
+      mocked.viewRows.mockImplementation((_list, _view, narrowing) => (narrowing.text === "new" ? narrowed.promise : Promise.resolve(dataOf(OLD))));
+      renderBody();
+      await screen.findByText("Old rows");
+
+      act(() => useStore.getState().setNarrowing(narrowingKey(11, 101), { text: "new" }));
+      await waitFor(() => expect(mocked.viewRows).toHaveBeenCalledWith(11, 101, expect.objectContaining({ text: "new" })));
+
+      expect(screen.getByText("Old rows")).toBeInTheDocument();
+
+      await act(async () => narrowed.resolve(dataOf(NEW)));
+
+      expect(await screen.findByText("New rows")).toBeInTheDocument();
+      expect(screen.queryByText("Old rows")).not.toBeInTheDocument();
+    });
+
+    it("draws nothing while the first view's rows are still loading", async () => {
+      mocked.viewsOf.mockResolvedValue([view()]);
+      mocked.viewRows.mockReturnValue(new Promise(() => {}));
+
+      const { container } = render(
+        <QueryClientProvider client={createQueryClient()}>
+          <MainBody />
+        </QueryClientProvider>,
+      );
+
+      await waitFor(() => expect(mocked.viewRows).toHaveBeenCalled());
+      expect(container).toBeEmptyDOMElement();
     });
   });
 

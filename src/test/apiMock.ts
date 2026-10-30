@@ -158,7 +158,7 @@ export function createApiMock(): Api {
     placeGet:vi.fn().mockResolvedValue(null),
     placeSet: vi.fn().mockResolvedValue(undefined),
     copyText: vi.fn().mockResolvedValue(undefined),
-    paletteQuery: vi.fn(async (): Promise<PaletteResults> => ({ issues: [], lists: [] })),
+    paletteQuery: vi.fn(async (): Promise<PaletteResults> => ({ issues: [], lists: [], views: [] })),
     menuCommands: vi.fn(async (): Promise<MenuCommand[]> => []),
     columnsCatalogue: vi.fn().mockResolvedValue([]),
     statusStylesList: vi.fn().mockResolvedValue([]),

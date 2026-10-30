@@ -8,7 +8,7 @@ use tauri_plugin_deep_link::DeepLinkExt;
 use tauri_plugin_log::{RotationStrategy, Target, TargetKind, TimezoneStrategy};
 
 use crate::cli::LogLevel;
-use crate::db::{ANNOUNCE_EVERY, Db, coalesce};
+use crate::db::{ANNOUNCE_EVERY, Db, LocalPart, coalesce};
 use crate::events::{
     ISSUE_DETAILS_CHANGED_EVENT, ISSUES_CHANGED_EVENT, LOCAL_CHANGED_EVENT, SYNC_PROGRESS_EVENT,
     SYNC_STATE_EVENT,
@@ -64,8 +64,9 @@ pub fn start(
         .setup(move |app| {
             log::info!("Taskboard {} started", env!("CARGO_PKG_VERSION"));
             clear_attachments(app.handle());
-            app.set_menu(menu::build(app.handle())?)?;
+            app.set_menu(menu::build(app.handle(), &menu::place::Place::default())?)?;
             let state = app.state::<AppState>();
+            follow_the_place_in_the_menus(app.handle(), &state);
             announce_db_changes(app.handle(), &state.db);
             give_spaces_their_lists(&state.db);
             carry_over_me_chips(app.handle(), &state);
@@ -123,12 +124,29 @@ fn take_initial(app: &AppHandle, state: &AppState, initial: IpcMessage) {
     });
 }
 
+/// The menus check the shown layout and list the level's views, so they follow every move.
+fn follow_the_place_in_the_menus(app: &AppHandle, state: &AppState) {
+    let handle = app.clone();
+    state
+        .nav
+        .on_move(Box::new(move || menu::place::refresh(&handle)));
+    menu::place::refresh(app);
+}
+
 /// A sync stores a page every few milliseconds; the page hears about them at most every `ANNOUNCE_EVERY`.
 fn announce_db_changes(app: &AppHandle, db: &Db) {
     let app = app.clone();
     db.set_notifier(coalesce(
         ANNOUNCE_EVERY,
         Box::new(move |changes| {
+            if changes.local.iter().any(|part| {
+                matches!(
+                    part,
+                    LocalPart::Views | LocalPart::Lists | LocalPart::Spaces
+                )
+            }) {
+                menu::place::refresh(&app);
+            }
             let issues = changes.issues_event();
             let details = changes.details_event();
             let sent = issues

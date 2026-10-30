@@ -4,11 +4,16 @@
 //! off the menu items, so they never take a typed letter from a text field.
 
 pub mod palette;
+pub mod place;
 
-use tauri::menu::{AboutMetadata, Menu, MenuItem, MenuItemBuilder, Submenu, SubmenuBuilder};
+use tauri::menu::{
+    AboutMetadata, CheckMenuItemBuilder, IsMenuItem, Menu, MenuItemBuilder, Submenu, SubmenuBuilder,
+};
 use tauri::{AppHandle, Manager, Wry};
 
 use crate::bus::{self, CommandStatus};
+
+use self::place::{Place, VIEW_KEYS};
 
 /// A menu item that runs a command, with its key equivalent in Tauri's accelerator notation.
 pub struct Item {
@@ -56,6 +61,12 @@ pub const GO_LEVELS: &[Item] = &[
 pub const GO_MOVES: &[Item] = &[
     item("Previous Space", "nav:previousSpace", "CmdOrCtrl+Alt+Up"),
     item("Next Space", "nav:nextSpace", "CmdOrCtrl+Alt+Down"),
+    item(
+        "Previous List",
+        "nav:previousList",
+        "CmdOrCtrl+Alt+BracketLeft",
+    ),
+    item("Next List", "nav:nextList", "CmdOrCtrl+Alt+BracketRight"),
     item("Previous View", "page:view.previous", "Ctrl+Shift+Tab"),
     item("Next View", "page:view.next", "Ctrl+Tab"),
 ];
@@ -115,7 +126,8 @@ pub type MenuDef = (&'static str, &'static [&'static [Item]]);
 pub const APP_MENU: MenuDef = (crate::APP_NAME, &[&[SETTINGS], &[QUIT]]);
 pub const FILE_MENU: MenuDef = ("File", &[FILE, FILE_SYNC, &[RESET_CACHE], &[CLOSE]]);
 pub const GO_MENU: MenuDef = ("Go", &[GO_LEVELS, GO_MOVES]);
-pub const LIST_MENU: MenuDef = ("List", &[LIST_LAYOUTS, LIST_TOOLBAR, LIST_SEEN]);
+/// The layouts come last: changing a view's layout is rare.
+pub const LIST_MENU: MenuDef = ("List", &[LIST_TOOLBAR, LIST_SEEN, LIST_LAYOUTS]);
 pub const ISSUE_MENU: MenuDef = ("Issue", &[ISSUE]);
 pub const VIEW_MENU: MenuDef = ("View", &[VIEW, &[RELOAD]]);
 pub const HELP_MENU: MenuDef = ("Help", &[HELP]);
@@ -124,31 +136,49 @@ pub const MENUS: &[MenuDef] = &[
     APP_MENU, FILE_MENU, GO_MENU, LIST_MENU, ISSUE_MENU, VIEW_MENU, HELP_MENU,
 ];
 
-fn build_item(
-    app: &AppHandle,
-    commands: &dyn CommandStatus,
-    item: &Item,
-) -> tauri::Result<Option<MenuItem<Wry>>> {
-    if !commands.knows(item.command) {
+/// What every item is built with: the app, which commands exist and run, and the current place.
+struct Ctx<'a> {
+    app: &'a AppHandle,
+    commands: &'a dyn CommandStatus,
+    place: &'a Place,
+}
+
+type Builder<'a> = SubmenuBuilder<'a, Wry, AppHandle>;
+
+fn build_item(ctx: &Ctx, item: &Item) -> tauri::Result<Option<Box<dyn IsMenuItem<Wry>>>> {
+    if !ctx.commands.knows(item.command) {
         return Ok(None);
     }
-    let mut builder = MenuItemBuilder::with_id(item.command, item.label)
-        .enabled(commands.is_enabled(item.command));
-    if let Some(accelerator) = item.accelerator {
-        builder = builder.accelerator(accelerator);
-    }
-    builder.build(app).map(Some)
+    let enabled = ctx.commands.is_enabled(item.command);
+    let built: Box<dyn IsMenuItem<Wry>> = match ctx.place.checked(item.command) {
+        Some(checked) => {
+            let mut builder = CheckMenuItemBuilder::with_id(item.command, item.label)
+                .checked(checked)
+                .enabled(enabled);
+            if let Some(accelerator) = item.accelerator {
+                builder = builder.accelerator(accelerator);
+            }
+            Box::new(builder.build(ctx.app)?)
+        }
+        None => {
+            let mut builder = MenuItemBuilder::with_id(item.command, item.label).enabled(enabled);
+            if let Some(accelerator) = item.accelerator {
+                builder = builder.accelerator(accelerator);
+            }
+            Box::new(builder.build(ctx.app)?)
+        }
+    };
+    Ok(Some(built))
 }
 
 fn with_items<'a>(
-    app: &'a AppHandle,
-    commands: &dyn CommandStatus,
-    mut builder: SubmenuBuilder<'a, Wry, AppHandle>,
+    ctx: &Ctx<'a>,
+    mut builder: Builder<'a>,
     items: &[Item],
-) -> tauri::Result<SubmenuBuilder<'a, Wry, AppHandle>> {
+) -> tauri::Result<Builder<'a>> {
     for item in items {
-        if let Some(built) = build_item(app, commands, item)? {
-            builder = builder.item(&built);
+        if let Some(built) = build_item(ctx, item)? {
+            builder = builder.item(&*built);
         }
     }
     Ok(builder)
@@ -156,36 +186,47 @@ fn with_items<'a>(
 
 /// A menu's groups with a separator between each two; a group without a known command is left out.
 fn with_groups<'a>(
-    app: &'a AppHandle,
-    commands: &dyn CommandStatus,
-    mut builder: SubmenuBuilder<'a, Wry, AppHandle>,
+    ctx: &Ctx<'a>,
+    mut builder: Builder<'a>,
     groups: &[&[Item]],
-) -> tauri::Result<SubmenuBuilder<'a, Wry, AppHandle>> {
+) -> tauri::Result<Builder<'a>> {
     let shown = groups
         .iter()
-        .filter(|items| items.iter().any(|item| commands.knows(item.command)));
+        .filter(|items| items.iter().any(|item| ctx.commands.knows(item.command)));
     for (i, items) in shown.enumerate() {
         if i > 0 {
             builder = builder.separator();
         }
-        builder = with_items(app, commands, builder, items)?;
+        builder = with_items(ctx, builder, items)?;
     }
     Ok(builder)
 }
 
-fn submenu(
-    app: &AppHandle,
-    commands: &dyn CommandStatus,
-    (title, groups): MenuDef,
-) -> tauri::Result<Submenu<Wry>> {
-    with_groups(app, commands, SubmenuBuilder::new(app, title), groups)?.build()
+fn submenu<'a>(ctx: &Ctx<'a>, (title, groups): MenuDef) -> tauri::Result<Builder<'a>> {
+    with_groups(ctx, SubmenuBuilder::new(ctx.app, title), groups)
 }
 
-fn app_submenu(app: &AppHandle, commands: &dyn CommandStatus) -> tauri::Result<Submenu<Wry>> {
-    let builder = SubmenuBuilder::new(app, APP_MENU.0)
+/// The level's first nine views by name, the shown one checked, each with its ⌘ digit.
+fn with_views<'a>(ctx: &Ctx<'a>, mut builder: Builder<'a>) -> tauri::Result<Builder<'a>> {
+    if ctx.place.views.is_empty() {
+        return Ok(builder);
+    }
+    builder = builder.separator();
+    for (i, (id, name)) in ctx.place.views.iter().take(VIEW_KEYS).enumerate() {
+        let item = CheckMenuItemBuilder::with_id(format!("page:view.select.{}", i + 1), name)
+            .checked(ctx.place.view_id == Some(*id))
+            .accelerator(format!("CmdOrCtrl+{}", i + 1))
+            .build(ctx.app)?;
+        builder = builder.item(&item);
+    }
+    Ok(builder)
+}
+
+fn app_submenu<'a>(ctx: &Ctx<'a>) -> tauri::Result<Submenu<Wry>> {
+    let builder = SubmenuBuilder::new(ctx.app, APP_MENU.0)
         .about(Some(AboutMetadata::default()))
         .separator();
-    let builder = with_items(app, commands, builder, &[SETTINGS])?
+    let builder = with_items(ctx, builder, &[SETTINGS])?
         .separator()
         .services()
         .separator()
@@ -193,13 +234,19 @@ fn app_submenu(app: &AppHandle, commands: &dyn CommandStatus) -> tauri::Result<S
         .hide_others()
         .show_all()
         .separator();
-    with_items(app, commands, builder, &[QUIT])?.build()
+    with_items(ctx, builder, &[QUIT])?.build()
 }
 
-pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
+/// The menu bar for `place`; `place::refresh` builds it again when the place or its views change.
+pub fn build(app: &AppHandle, place: &Place) -> tauri::Result<Menu<Wry>> {
     let registry = app.state::<bus::Commands>();
     let commands = registry.available(app);
-    let taskboard = app_submenu(app, &commands)?;
+    let ctx = Ctx {
+        app,
+        commands: &commands,
+        place,
+    };
+    let taskboard = app_submenu(&ctx)?;
     let edit = SubmenuBuilder::new(app, "Edit")
         .undo()
         .redo()
@@ -209,13 +256,13 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         .paste()
         .select_all()
         .build()?;
-    let file = submenu(app, &commands, FILE_MENU)?;
-    let go = submenu(app, &commands, GO_MENU)?;
-    let list = submenu(app, &commands, LIST_MENU)?;
-    let issue = submenu(app, &commands, ISSUE_MENU)?;
+    let file = submenu(&ctx, FILE_MENU)?.build()?;
+    let go = with_views(&ctx, submenu(&ctx, GO_MENU)?)?.build()?;
+    let list = submenu(&ctx, LIST_MENU)?.build()?;
+    let issue = submenu(&ctx, ISSUE_MENU)?.build()?;
     // The View menu keeps its items together, above Enter Full Screen.
-    let view = with_items(app, &commands, SubmenuBuilder::new(app, VIEW_MENU.0), VIEW)?;
-    let view = with_items(app, &commands, view, &[RELOAD])?
+    let view = with_items(&ctx, SubmenuBuilder::new(app, VIEW_MENU.0), VIEW)?;
+    let view = with_items(&ctx, view, &[RELOAD])?
         .separator()
         .fullscreen()
         .build()?;
@@ -225,7 +272,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         .separator()
         .bring_all_to_front()
         .build()?;
-    let help = submenu(app, &commands, HELP_MENU)?;
+    let help = submenu(&ctx, HELP_MENU)?.build()?;
     Menu::with_items(
         app,
         &[
@@ -303,9 +350,9 @@ mod tests {
             FILE,
             GO_LEVELS,
             GO_MOVES,
-            LIST_LAYOUTS,
             LIST_TOOLBAR,
             LIST_SEEN,
+            LIST_LAYOUTS,
             ISSUE,
         ]
         .into_iter()
@@ -323,9 +370,6 @@ mod tests {
                 "go.pinned",
                 "view.previous",
                 "view.next",
-                "view.layout.list",
-                "view.layout.board",
-                "view.layout.table",
                 "toolbar.group",
                 "toolbar.columns",
                 "toolbar.filter",
@@ -334,6 +378,9 @@ mod tests {
                 "view.save",
                 "view.revert",
                 "recent.markAllSeen",
+                "view.layout.list",
+                "view.layout.board",
+                "view.layout.table",
                 "issue.open",
                 "issue.togglePeek",
                 "issue.openEpic",
@@ -347,13 +394,54 @@ mod tests {
     }
 
     #[test]
-    fn the_space_moves_run_the_nav_commands() {
-        let commands: Vec<&str> = GO_MOVES
+    fn the_space_and_list_moves_run_the_nav_commands() {
+        let commands: Vec<(&str, &str, Option<&str>)> = GO_MOVES
             .iter()
             .filter(|item| !item.command.starts_with("page:"))
-            .map(|item| item.command)
+            .map(|item| (item.label, item.command, item.accelerator))
             .collect();
-        assert_eq!(commands, ["nav:previousSpace", "nav:nextSpace"]);
+        assert_eq!(
+            commands,
+            [
+                (
+                    "Previous Space",
+                    "nav:previousSpace",
+                    Some("CmdOrCtrl+Alt+Up")
+                ),
+                ("Next Space", "nav:nextSpace", Some("CmdOrCtrl+Alt+Down")),
+                (
+                    "Previous List",
+                    "nav:previousList",
+                    Some("CmdOrCtrl+Alt+BracketLeft")
+                ),
+                (
+                    "Next List",
+                    "nav:nextList",
+                    Some("CmdOrCtrl+Alt+BracketRight")
+                ),
+            ]
+        );
+    }
+
+    #[test]
+    fn the_layouts_come_last_in_the_list_menu() {
+        let first_commands: Vec<&str> = LIST_MENU.1.iter().map(|g| g[0].command).collect();
+        assert_eq!(
+            first_commands,
+            [
+                LIST_TOOLBAR[0].command,
+                LIST_SEEN[0].command,
+                LIST_LAYOUTS[0].command
+            ]
+        );
+    }
+
+    #[test]
+    fn the_digit_keys_of_the_views_do_not_clash_with_any_item() {
+        let digits: Vec<String> = (1..=VIEW_KEYS).map(|n| format!("CmdOrCtrl+{n}")).collect();
+        for accelerator in all_items().iter().filter_map(|item| item.accelerator) {
+            assert!(!digits.iter().any(|d| d == accelerator), "{accelerator}");
+        }
     }
 
     #[test]

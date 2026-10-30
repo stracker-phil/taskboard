@@ -53,6 +53,33 @@ describe("page commands", () => {
     });
   });
 
+  describe("list keys", () => {
+    it("binds list.previous to ⌥⌘[ and list.next to ⌥⌘]", () => {
+      const lists = allCommands().filter((c) => c.id === "list.previous" || c.id === "list.next");
+
+      expect(lists.map((c) => [c.id, c.defaultBinding, c.bus])).toEqual([
+        ["list.previous", "Mod+Alt+[", "nav:previousList"],
+        ["list.next", "Mod+Alt+]", "nav:nextList"],
+      ]);
+    });
+
+    it("runs nav:previousList on ⌥⌘[", async () => {
+      await renderKeys();
+
+      await userEvent.keyboard("{Meta>}{Alt>}[BracketLeft]{/Alt}{/Meta}");
+
+      expect(mocked.runCommand).toHaveBeenCalledWith("nav:previousList");
+    });
+
+    it("runs nav:nextList on ⌥⌘]", async () => {
+      await renderKeys();
+
+      await userEvent.keyboard("{Meta>}{Alt>}[BracketRight]{/Alt}{/Meta}");
+
+      expect(mocked.runCommand).toHaveBeenCalledWith("nav:nextList");
+    });
+  });
+
   describe("view keys", () => {
     it.each([1, 2, 9])("passes the zero-based index of ⌘%i to the shown tabs", async (n) => {
       const handler = vi.fn();

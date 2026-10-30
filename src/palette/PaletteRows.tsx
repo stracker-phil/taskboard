@@ -1,5 +1,6 @@
 import { Check, CornerDownLeft, Zap } from "lucide-react";
-import type { IssueHit, ListHit, SidebarTree, TextPart } from "../api";
+import type { IssueHit, ListHit, SidebarTree, TextPart, ViewHit } from "../api";
+import { LayoutTile } from "../shell/viewLayouts";
 import { SpaceTile } from "../components/SpaceTile";
 import { StatusPill } from "../components/issue/StatusPill";
 import { StatusSquare } from "../components/issue/StatusSquare";
@@ -43,6 +44,21 @@ export function ListRow({ hit, tree }: { hit: ListHit; tree: SidebarTree | undef
       {space ? <SpaceTile space={space} size={20} /> : <span className="palette__tile-gap" />}
       <span className="palette__summary">{space && !hit.isSpace ? `${space.name} › ${hit.name}` : hit.name}</span>
       <span className="palette__meta">{hit.isSpace ? "Space" : "filter list"}</span>
+    </>
+  );
+}
+
+/** "Space › list › view" with the view's layout tile. */
+export function ViewRow({ hit, tree }: { hit: ViewHit; tree: SidebarTree | undefined }) {
+  const space = tree?.spaces.find((s) => s.projectId === hit.list.projectId);
+  const level = space && !hit.list.isSpace ? `${space.name} › ${hit.list.name}` : hit.list.name;
+  return (
+    <>
+      <LayoutTile layout={hit.layout} />
+      <span className="palette__summary">
+        {level} › {hit.name}
+      </span>
+      <span className="palette__meta">view</span>
     </>
   );
 }

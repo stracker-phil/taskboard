@@ -33,7 +33,9 @@ an item.
   below their content. "Hide sidebar" or "Show sidebar" with the current shortcut; `aria-pressed` while the
   sidebar shows. It runs `view:toggleSidebar` and stays the same element, so focus stays on it.
 - **Content panel** (`main`, a flex column): the [header](#content-header), the [view tabs](#view-tabs), then
-  the view body (`.content-panel__body`). Until the issue list the body is `SyncStatusView` (`src/shell/SyncStatusView.tsx`) says
+  the view body (`.content-panel__body`). The body stays and only its content changes: `MainBody` shows a view once
+  its rows or Board are loaded and keeps the one before until then, so switching views, layouts or the narrowing
+  never blanks it. Until the issue list the body is `SyncStatusView` (`src/shell/SyncStatusView.tsx`) says
   "Connect Jira in Settings" with an Open Settings button while no project is tracked; during a full sync
   "Loading your Jira issues" with a line and a 4px bar (`--accent` on `--fill-subtle`) per tracked project
   (fetched of Jira's estimate); afterwards "N issues in M Spaces" and the last sync; otherwise the sync state.
@@ -48,7 +50,7 @@ an item.
 - **Search**: 34px, 9px radius, a `--border` frame on `--panel-bg`, `--text-muted`; Search icon 15/2, the
   label, a "⌘K" key hint (11px, `--fill-subtle`, 5px radius). Disabled until the palette exists.
 - **Home** (`HomeRows`): Everything (`Layers2`), then the Home lists in Rust's order: Unread
-  (`History`), Bookmarks (`Bookmark`) and global filter lists (`Funnel`). 34px rows, 10px padding and gap, 8px radius,
+  (`History`), Bookmarks (`Bookmark`) and global filter lists (`Folder`). 34px rows, 10px padding and gap, 8px radius,
   `--text-strong-body`; icons 17/1.8; the count 12px `--text-muted`, hidden while Rust has none. Recently
   changed has no count: while it has unseen issues its label is 600 and a badge (20px, `--accent`, white
   11/700) shows how many.
@@ -61,7 +63,7 @@ an item.
 - **Expanding**: the chevron toggles a Space (saved with `nav_set_expanded`); ⌥-click keeps only that Space
   expanded. The Space holding the current level always shows expanded.
 - **Filter lists** (`FilterListTree`): indented 34px behind a 1px `--border` guide with 12px padding; 32px
-  rows, 9px gap, `--text-secondary`, the list's icon 15/2 (the funnel unless one was picked), name and count (`ListCount`; a list whose filter can't be
+  rows, 9px gap, `--text-secondary`, the list's icon 15/2 (the folder unless one was picked), name and count (`ListCount`; a list whose filter can't be
   used shows a muted `CircleAlert` with the reason as its tooltip instead). The current list is selected like
   a Space, 600. A Space without filter lists shows "+ New filter list" (30px, 13px, `--text-muted`); it and
   the Space row's + create "New filter list", open it and start renaming it.
@@ -91,10 +93,10 @@ with a 10px gap.
 
 - A Space: the 28px tile (8px radius, 14/800) and the name (19/700).
 - A filter list: a breadcrumb button with the 20px tile (6px radius, 10/800) and the Space name (13px
-  `--text-tertiary`, opens the Space), "/" in `--text-faint`, the funnel 15/2 in `--text-tertiary`, then the
+  `--text-tertiary`, opens the Space), "/" in `--text-faint`, the folder 15/2 in `--text-tertiary`, then the
   list name (19/700).
 - The level shown is the selected one: a click on a Space's or list's name renames it in place, one on its
-  tile or funnel opens `LookPopover` under it.
+  tile or folder opens `LookPopover` under it.
 - Everything and the Home lists: their sidebar icon (20/1.8, `--text-tertiary`) and name.
 - **Mark all as read** on the right for Unread: 28px, 7px radius, a `--border` frame, 12/600; disabled
   while nothing is unseen. It marks what the current view shows, in its subtask mode and with its drafts.
@@ -108,8 +110,8 @@ The icon is one letter, digit or emoji (the first grapheme typed; ⌃⌘Space op
 name of a line icon from `components/look/icons.ts`; the color is one of the twelve `--space-tile-N`. `Tile`
 draws the icon in `--text-on-accent` (white) on the color with a 5–8px radius; without a color (lists and views
 only) the icon stands alone in the text color. A Space without an icon shows its name's first letter, a list
-the funnel, a view its layout's tile. `LookEditor`: a 32px preview, Icon / Letter or emoji, Reset, the 8-column
-icon grid or the text field, then the swatches ("No color" first where allowed). `LookPopover` puts it under the
+the folder, a view its layout's tile. `LookEditor`: a 32px preview, Icon / Letter or emoji, Reset, the 8-column
+icon grid (general marks, then workflow, quality, shop, WordPress and tech icons) or the text field, then the swatches ("No color" first where allowed). `LookPopover` puts it under the
 tile it changes: a click on the tile of the selected Space, list or view tab (sidebar, header, tabs; `LookButton`
 and `SpaceLookButton`), on the tile in the Space settings header, or "Icon and Color…" in a context menu. The
 Space settings' General group also shows it inline.
@@ -271,8 +273,10 @@ and runs everything the menus offer ([ADR 0043](adr/0043-the-palette-runs-the-me
 - Issues (8, with `#` 40): a whole key or a bare number first, then full-text hits (every word as a prefix; key
   and summary weigh most). Each 46px row: status square, mono key (70), the summary with the match bold, the
   status pill, ↩ on the active row; a comment-only match adds "Matched in comment: “…”" under it.
-- Filter lists (6; with `/` every list, also with nothing typed): Spaces and lists whose name holds the text;
-  Space tile and "Space › List".
+- Filter lists (6; with `/` every list, also with nothing typed): Spaces and lists whose path holds every typed
+  word ("web sprint" finds Website relaunch › Current sprint); Space tile and "Space › List". Then their views
+  (`search/places.rs`), when a word is in the view's name: the layout tile and "Space › List › View", opened at
+  that view.
 - Commands (6 without a prefix, all with `>`): Open KEY in Jira (⌘↩) and Save “text” as a filter list (⌘S; a
   `text contains` list under the current Space or Everything, opened), then every enabled menu item
   (`menu_commands`), the current view's options (Group, Sort by, Subtasks, labels inline, wrapped titles: "This
@@ -670,9 +674,12 @@ global shortcuts.
 - **Menus** (`src-tauri/src/menu/`), in the Mac order: Taskboard, File, Edit, Go, List, Issue, View, Window, Help.
   File holds the core actions (New Filter List ⌘N, New View ⌘T; Refresh ⌘R, Full Sync ⇧⌘R; Reset Cache…,
   which opens Settings → Sync → Cache to confirm; Close Window ⌘W). Go moves around (Command Palette ⌘K,
-  Everything ⇧⌘E, Unread ⇧⌘U, Bookmarks ⇧⌘P, Previous/Next Space ⌥⌘↑/↓, Previous/Next View ⌃⇧⇥/⌃⇥).
-  List acts on the shown issues (Show as List / Board / Table ⌃⌘1–3; Group and Sort… ⌥⌘G, Columns… ⌥⌘C, Edit
-  Filter… ⌥⌘F, Only My Issues ⇧⌘M, Filter This View ⌘F, Save View ⌘S, Revert View; Mark All as Read ⇧⌘A). Issue acts on the selected one
+  Everything ⇧⌘E, Unread ⇧⌘U, Bookmarks ⇧⌘P, Previous/Next Space ⌥⌘↑/↓, Previous/Next List ⌥⌘[/] (within the
+  Space, or among the levels outside the Spaces, wrapping), Previous/Next View ⌃⇧⇥/⌃⇥, then the level's views by
+  name with ⌘1–⌘9, the shown one checked). List acts on the shown issues (Group and Sort… ⌥⌘G, Columns… ⌥⌘C, Edit
+  Filter… ⌥⌘F, Only My Issues ⇧⌘M, Filter This View ⌘F, Save View ⌘S, Revert View; Mark All as Read ⇧⌘A; last, as
+  it is rare: Show as List / Board / Table ⌃⌘1–3, the shown layout checked). The menus follow the place:
+  `menu/place.rs` builds them again whenever the place moves (`NavStore::on_move`) or views, lists or Spaces change. Issue acts on the selected one
   (Open, Open or Close Preview, Open Epic, Open in Jira ⌘↩, Copy Key, Copy Link ⇧⌘C, Add or Remove Bookmark, Mark as Read or Unread).
   View is the window's appearance only (Toggle Sidebar ⌘\, Enter Full Screen; the debug build's Reload ⌥⌘R),
   never what the page shows. Help has Open Log Folder and Show Data Folder. Plain-letter keys stay off menu

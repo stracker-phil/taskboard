@@ -4,6 +4,7 @@ use serde::Serialize;
 use tauri::{AppHandle, Manager};
 use ts_rs::TS;
 
+use super::place::{self, Place};
 use super::{MENUS, PALETTE};
 use crate::bus::{self, CommandStatus};
 
@@ -17,10 +18,12 @@ pub struct MenuCommand {
     pub command: String,
     /// In Tauri's notation (`CmdOrCtrl+Shift+R`).
     pub accelerator: Option<String>,
+    /// A choice that is on, such as the shown view's layout.
+    pub checked: bool,
 }
 
 /// Every enabled item of the menus, in menu order; Command Palette… itself is left out.
-pub fn listed(commands: &dyn CommandStatus) -> Vec<MenuCommand> {
+pub fn listed(commands: &dyn CommandStatus, place: &Place) -> Vec<MenuCommand> {
     MENUS
         .iter()
         .flat_map(|(menu, groups)| {
@@ -35,20 +38,23 @@ pub fn listed(commands: &dyn CommandStatus) -> Vec<MenuCommand> {
             label: item.label.to_string(),
             command: item.command.to_string(),
             accelerator: item.accelerator.map(str::to_string),
+            checked: place.checked(item.command).unwrap_or(false),
         })
         .collect()
 }
 
 #[tauri::command]
-pub fn menu_commands(app: AppHandle) -> Vec<MenuCommand> {
+pub async fn menu_commands(app: AppHandle) -> Vec<MenuCommand> {
+    let place = place::read(&app).await;
     let registry = app.state::<bus::Commands>();
-    listed(&registry.available(&app))
+    listed(&registry.available(&app), &place)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::bus::CommandBus;
+    use crate::views::Layout;
 
     /// Every command is known and enabled, except the ones listed.
     struct Except(&'static [&'static str]);
@@ -61,6 +67,10 @@ mod tests {
         fn is_enabled(&self, id: &str) -> bool {
             self.knows(id)
         }
+    }
+
+    fn listed_anywhere(commands: &dyn CommandStatus) -> Vec<MenuCommand> {
+        listed(commands, &Place::default())
     }
 
     fn commands_of(listed: &[MenuCommand]) -> Vec<&str> {
@@ -77,7 +87,7 @@ mod tests {
 
     #[test]
     fn the_first_item_is_settings_in_the_app_menu() {
-        let items = listed(&Except(&[]));
+        let items = listed_anywhere(&Except(&[]));
 
         assert_eq!(
             items[0],
@@ -86,13 +96,14 @@ mod tests {
                 label: "Settings…".into(),
                 command: "app:settings".into(),
                 accelerator: Some("CmdOrCtrl+,".into()),
+                checked: false,
             }
         );
     }
 
     #[test]
     fn items_come_in_menu_order_under_their_menu_titles() {
-        let items = listed(&Except(&[]));
+        let items = listed_anywhere(&Except(&[]));
 
         let mut titles: Vec<&str> = items.iter().map(|c| c.menu.as_str()).collect();
         titles.dedup();
@@ -112,7 +123,7 @@ mod tests {
 
     #[test]
     fn the_file_menu_lists_its_groups_in_order_with_labels_and_keys() {
-        let items = listed(&Except(&[]));
+        let items = listed_anywhere(&Except(&[]));
 
         let file: Vec<(&str, &str, Option<&str>)> = items
             .iter()
@@ -140,7 +151,7 @@ mod tests {
 
     #[test]
     fn the_palette_item_itself_is_left_out() {
-        let items = listed(&Except(&[]));
+        let items = listed_anywhere(&Except(&[]));
 
         assert!(!commands_of(&items).contains(&"page:palette.open"));
         assert_eq!(
@@ -151,6 +162,8 @@ mod tests {
                 "page:go.pinned",
                 "nav:previousSpace",
                 "nav:nextSpace",
+                "nav:previousList",
+                "nav:nextList",
                 "page:view.previous",
                 "page:view.next",
             ]
@@ -158,8 +171,53 @@ mod tests {
     }
 
     #[test]
+    fn the_list_menu_ends_with_the_layouts() {
+        let items = listed_anywhere(&Except(&[]));
+
+        let list = in_menu(&items, "List");
+        assert_eq!(
+            list[list.len() - 3..],
+            [
+                "page:view.layout.list",
+                "page:view.layout.board",
+                "page:view.layout.table"
+            ]
+        );
+    }
+
+    #[test]
+    fn only_the_shown_layouts_item_is_checked() {
+        for (layout, shown) in [
+            (Layout::List, "page:view.layout.list"),
+            (Layout::Board, "page:view.layout.board"),
+            (Layout::Table, "page:view.layout.table"),
+        ] {
+            let place = Place {
+                layout: Some(layout),
+                ..Place::default()
+            };
+
+            let items = listed(&Except(&[]), &place);
+
+            let checked: Vec<&str> = items
+                .iter()
+                .filter(|c| c.checked)
+                .map(|c| c.command.as_str())
+                .collect();
+            assert_eq!(checked, [shown], "{layout:?}");
+        }
+    }
+
+    #[test]
+    fn nothing_is_checked_without_a_shown_layout() {
+        let items = listed_anywhere(&Except(&[]));
+
+        assert!(items.iter().all(|c| !c.checked));
+    }
+
+    #[test]
     fn items_whose_command_is_not_enabled_are_left_out() {
-        let items = listed(&Except(&["app:reload", "sync:full"]));
+        let items = listed_anywhere(&Except(&["app:reload", "sync:full"]));
 
         let commands = commands_of(&items);
         assert!(!commands.contains(&"app:reload"));
@@ -170,7 +228,7 @@ mod tests {
 
     #[test]
     fn page_items_keep_their_page_ids() {
-        let items = listed(&Except(&[]));
+        let items = listed_anywhere(&Except(&[]));
 
         assert_eq!(
             in_menu(&items, "Issue"),
@@ -203,7 +261,7 @@ mod tests {
             }
         }
 
-        let items = listed(&Known(&bus));
+        let items = listed_anywhere(&Known(&bus));
 
         assert_eq!(
             commands_of(&items).contains(&"app:reload"),
@@ -219,6 +277,7 @@ mod tests {
             label: "New View".into(),
             command: "page:view.new".into(),
             accelerator: None,
+            checked: true,
         };
 
         assert_eq!(
@@ -228,6 +287,7 @@ mod tests {
                 "label": "New View",
                 "command": "page:view.new",
                 "accelerator": null,
+                "checked": true,
             })
         );
     }

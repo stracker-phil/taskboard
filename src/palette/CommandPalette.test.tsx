@@ -15,7 +15,7 @@ import { NAV_KEY, SIDEBAR_KEY } from "../queries/sidebar";
 import { registerSettingsPage } from "../registry/settingsPages";
 import { resetStore, useStore } from "../state/store";
 import { connectionView } from "../test/jira";
-import { issueHit, listHit, menuCommand, parts } from "../test/palette";
+import { issueHit, listHit, menuCommand, parts, viewHit } from "../test/palette";
 import { sidebarTree, space } from "../test/spaces";
 import { CommandPalette } from "./CommandPalette";
 import { usePaletteMenu, type PaletteMenu } from "./menus";
@@ -28,7 +28,7 @@ const NW_ID = 11;
 const NEW_LIST_ID = 31;
 
 interface Setup {
-  results?: PaletteResults;
+  results?: Partial<PaletteResults>;
   tree?: SidebarTree;
   location?: Nav["location"];
   siteUrl?: string;
@@ -48,8 +48,8 @@ function PageMenu({ menu }: { menu: PaletteMenu }) {
   return null;
 }
 
-async function renderPalette({ results = { issues: [], lists: [] }, tree = TREE, location = null, siteUrl = "", menu = [], pageMenu }: Setup = {}) {
-  mocked.paletteQuery.mockResolvedValue(results);
+async function renderPalette({ results = {}, tree = TREE, location = null, siteUrl = "", menu = [], pageMenu }: Setup = {}) {
+  mocked.paletteQuery.mockResolvedValue({ issues: [], lists: [], views: [], ...results });
   mocked.sidebarTree.mockResolvedValue(tree);
   mocked.navCurrent.mockResolvedValue({ location, expanded: [] });
   mocked.connectionGet.mockResolvedValue(connectionView({ siteUrl }));
@@ -324,6 +324,37 @@ describe("CommandPalette", () => {
       expect(within(await screen.findByRole("option", { name: /Unread/ })).getByText("Unread")).toBeInTheDocument();
     });
 
+    it("lists a view after the lists, as Space › list › view", async () => {
+      await renderPalette({ results: { lists: [listHit()], views: [viewHit()] } });
+
+      await search("board");
+
+      await screen.findByRole("option", { name: /Sprint board/ });
+      const rows = options("Filter lists");
+      expect(rows.map((o) => o.textContent)).toEqual([expect.stringContaining("Current sprint"), expect.stringContaining("Sprint board")]);
+      expect(within(rows[1]).getByText("Website relaunch › Current sprint › Sprint board")).toBeInTheDocument();
+      expect(within(rows[1]).getByText("view")).toBeInTheDocument();
+    });
+
+    it("lists a view of a Space as Space › view", async () => {
+      const hit = viewHit({ list: listHit({ id: NW_ID, name: "Website relaunch", isSpace: true }), name: "All issues", layout: "list" });
+      await renderPalette({ results: { views: [hit] } });
+
+      await search("all");
+
+      const row = await screen.findByRole("option", { name: /All issues/ });
+      expect(within(row).getByText("Website relaunch › All issues")).toBeInTheDocument();
+    });
+
+    it("counts a view as a list", async () => {
+      await renderPalette({ results: { lists: [listHit()], views: [viewHit()] } });
+
+      await search("sprint");
+
+      await screen.findByRole("option", { name: /Sprint board/ });
+      expect(screen.getByText(/2 lists/)).toBeInTheDocument();
+    });
+
     it("counts the issues, lists and commands", async () => {
       await renderPalette({ results: { issues: [issueHit(), issueHit({ id: "10044", key: "NW-44" })], lists: [listHit()] } });
 
@@ -460,6 +491,15 @@ describe("CommandPalette", () => {
 
       expect(mocked.runCommand).toHaveBeenCalledWith("go:inbox");
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+
+    it("marks a menu item that is checked", async () => {
+      await renderPalette({ menu: [menuCommand({ menu: "View", label: "Show sidebar", command: "view:sidebar", checked: true }), menuCommand({ menu: "View", label: "Show toolbar", command: "view:toolbar" })] });
+
+      await search(">show");
+
+      expect(within(screen.getByRole("option", { name: /Show sidebar/ })).getByLabelText("On")).toBeInTheDocument();
+      expect(within(screen.getByRole("option", { name: /Show toolbar/ })).queryByLabelText("On")).not.toBeInTheDocument();
     });
 
     it("runs a Settings page through the command bus", async () => {
@@ -634,6 +674,34 @@ describe("CommandPalette", () => {
       expect(headings()).toEqual(["Lists"]);
     });
 
+    it("shows the views after the lists under “Lists” once text follows the slash", async () => {
+      await renderPalette({ results: { lists: [listHit()], views: [viewHit()] } });
+
+      await search("/sprint");
+
+      await screen.findByRole("option", { name: /Sprint board/ });
+      expect(headings()).toEqual(["Lists"]);
+      expect(options("Lists")).toHaveLength(2);
+    });
+
+    it("shows no views for a bare slash", async () => {
+      await renderPalette({ results: { lists: [listHit()], views: [viewHit()] } });
+
+      await search("/");
+
+      await screen.findByRole("option", { name: /Current sprint/ });
+      expect(screen.queryByRole("option", { name: /Sprint board/ })).not.toBeInTheDocument();
+    });
+
+    it("shows no views when only issues are searched", async () => {
+      await renderPalette({ results: { issues: [issueHit()], views: [viewHit()] } });
+
+      await search("#contact");
+
+      await screen.findByRole("option", { name: /NW-43/ });
+      expect(screen.queryByRole("option", { name: /Sprint board/ })).not.toBeInTheDocument();
+    });
+
     it("shows no “No results” for a bare / that finds no list", async () => {
       await renderPalette();
 
@@ -722,6 +790,15 @@ describe("CommandPalette", () => {
       await userEvent.click(await screen.findByRole("option", { name: /Current sprint/ }));
 
       expect(mocked.navGo).toHaveBeenCalledWith(21, null);
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+
+    it("opens a view of a list, passing the list and the view", async () => {
+      await renderPalette({ results: { views: [viewHit()] } });
+      await search("board");
+      await userEvent.click(await screen.findByRole("option", { name: /Sprint board/ }));
+
+      expect(mocked.navGo).toHaveBeenCalledWith(21, 201);
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     });
 

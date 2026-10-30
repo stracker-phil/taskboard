@@ -1,13 +1,13 @@
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import { api, type IssueHit, type ListHit, type Nav } from "../api";
+import { api, type IssueHit, type ListHit, type Nav, type ViewHit } from "../api";
 import { NAV_KEY, useNav, useNavGo, useSidebar } from "../queries/sidebar";
 import { runBusCommand } from "../state/requests";
 import { useStore } from "../state/store";
 import { useIssueActions } from "../views/list/useIssueActions";
 import { collectCommands, snapshotPage, type PaletteCommand } from "./commands";
-import { CommandRow, IssueRow, ListRow, PrefixButtons, PrefixRow } from "./PaletteRows";
+import { CommandRow, IssueRow, ListRow, PrefixButtons, PrefixRow, ViewRow } from "./PaletteRows";
 import { parsePrefix, PREFIXES, SCOPES, type Prefix } from "./prefixes";
 import { ranked } from "./rank";
 import { saveSearch } from "./saveSearch";
@@ -30,7 +30,7 @@ function useSettled(value: string): string {
   return settled;
 }
 
-type Item = { kind: "issue"; hit: IssueHit } | { kind: "list"; hit: ListHit } | { kind: "command"; command: PaletteCommand } | { kind: "prefix"; prefix: Prefix };
+type Item = { kind: "issue"; hit: IssueHit } | { kind: "list"; hit: ListHit } | { kind: "view"; hit: ViewHit } | { kind: "command"; command: PaletteCommand } | { kind: "prefix"; prefix: Prefix };
 
 interface Section {
   heading: string;
@@ -88,6 +88,7 @@ function Palette() {
 
   const issues = (mode === null || mode === "issues") && query ? (results?.issues ?? []) : [];
   const lists = (mode === null || mode === "lists") && (query || mode === "lists") ? (results?.lists ?? []) : [];
+  const views = (mode === null || mode === "lists") && query ? (results?.views ?? []) : [];
   // Issues come first, so a low index is an issue; elsewhere the first issue is meant.
   const activeIssue = issues[active] ?? issues[0];
 
@@ -106,7 +107,7 @@ function Palette() {
   else if (mode === null && !query) add("Narrow to", PREFIXES.map((p): Item => ({ kind: "prefix", prefix: p })));
   else {
     add("Issues", issues.map((hit): Item => ({ kind: "issue", hit })));
-    add(mode === "lists" ? "Lists" : "Filter lists", lists.map((hit): Item => ({ kind: "list", hit })));
+    add(mode === "lists" ? "Lists" : "Filter lists", [...lists.map((hit): Item => ({ kind: "list", hit })), ...views.map((hit): Item => ({ kind: "view", hit }))]);
     const found = mode === null ? ranked(commands, query, (c) => [c.label, `${c.section} ${c.detail ?? ""}`]).slice(0, COMMAND_LIMIT) : [];
     add("Commands", [...own, ...found].map((command): Item => ({ kind: "command", command })));
   }
@@ -142,6 +143,7 @@ function Palette() {
     if (item.kind === "issue") return openIssue(item.hit);
     dismiss();
     if (item.kind === "list") return go(item.hit.id);
+    if (item.kind === "view") return go(item.hit.list.id, item.hit.viewId);
     return item.command.run();
   };
 
@@ -203,13 +205,15 @@ function Palette() {
         return option(`issue:${item.hit.id}`, "palette__option palette__issue", <IssueRow hit={item.hit} />, item);
       case "list":
         return option(`list:${item.hit.id}`, "palette__option palette__list", <ListRow hit={item.hit} tree={tree} />, item);
+      case "view":
+        return option(`view:${item.hit.viewId}`, "palette__option palette__list", <ViewRow hit={item.hit} tree={tree} />, item);
       case "command":
         return option(`command:${item.command.id}`, "palette__option palette__action", <CommandRow command={item.command} showSection={mode !== "commands" || query !== ""} />, item);
       case "prefix":
         return option(`prefix:${item.prefix.char}`, "palette__option palette__action", <PrefixRow prefix={item.prefix} />, item);
     }
   };
-  const counts = [plural(issues.length, "issue"), plural(lists.length, "list"), plural(commandCount, "command")].filter(Boolean).join(" · ");
+  const counts = [plural(issues.length, "issue"), plural(lists.length + views.length, "list"), plural(commandCount, "command")].filter(Boolean).join(" · ");
   const placeholder = prefix?.placeholder ?? "Search issues, lists and commands";
 
   return (

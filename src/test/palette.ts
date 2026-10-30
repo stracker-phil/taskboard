@@ -1,4 +1,4 @@
-import type { IssueHit, ListHit, MenuCommand, TextPart } from "../api/types";
+import type { IssueHit, ListHit, MenuCommand, TextPart, ViewHit } from "../api/types";
 
 /** Plain text, or the parts of a match: `parts("Fix the ", ["login"], " form")` marks "login" strong. */
 export function parts(...pieces: (string | [string])[]): TextPart[] {
@@ -7,7 +7,7 @@ export function parts(...pieces: (string | [string])[]): TextPart[] {
 
 /** A menu item from Rust (File › Refresh now); override per test. */
 export function menuCommand(patch: Partial<MenuCommand> = {}): MenuCommand {
-  return { menu: "File", label: "Refresh now", command: "sync:refresh", accelerator: null, ...patch };
+  return { menu: "File", label: "Refresh now", command: "sync:refresh", accelerator: null, checked: false, ...patch };
 }
 
 /** An issue hit in the "Website relaunch" project; override per test. */
@@ -29,4 +29,9 @@ export function issueHit(patch: Partial<IssueHit> = {}): IssueHit {
 /** A filter list of the "Website relaunch" Space; override per test. */
 export function listHit(patch: Partial<ListHit> = {}): ListHit {
   return { id: 21, name: "Current sprint", projectId: "10001", isSpace: false, ...patch };
+}
+
+/** A view of the "Current sprint" filter list; override per test. */
+export function viewHit(patch: Partial<ViewHit> = {}): ViewHit {
+  return { list: listHit(), viewId: 201, name: "Sprint board", layout: "board", ...patch };
 }

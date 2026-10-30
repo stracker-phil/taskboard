@@ -6,10 +6,10 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 use super::fts::{KeyHint, key_hint, match_expression};
+use super::places::{ListHit, ViewHit, list_matches, view_matches};
 use crate::db::Db;
 use crate::error::AppResult;
 use crate::status_style::{Style, Styles};
-use crate::views::fold;
 
 /// Marks a match in `highlight()` and `snippet()` output; control characters never occur in Jira text.
 const OPEN: char = '\u{1}';
@@ -49,6 +49,8 @@ impl PaletteScope {
 pub struct PaletteResults {
     pub issues: Vec<IssueHit>,
     pub lists: Vec<ListHit>,
+    /// Views by their path (Space › list › view); only once something is typed.
+    pub views: Vec<ViewHit>,
 }
 
 /// Text with its matches marked; the page bolds the `strong` parts.
@@ -88,18 +90,6 @@ pub struct IssueHit {
     pub gone: bool,
 }
 
-#[derive(Serialize, Clone, Debug, PartialEq, TS)]
-#[ts(export, export_to = "src/api/types.gen.ts")]
-#[serde(rename_all = "camelCase")]
-pub struct ListHit {
-    pub id: i64,
-    pub name: String,
-    /// The Space's project for a Space or one of its lists; none for Everything and Home lists.
-    pub project_id: Option<String>,
-    /// The Space itself rather than one of its lists.
-    pub is_space: bool,
-}
-
 pub async fn palette_query(db: &Db, text: String) -> AppResult<PaletteResults> {
     palette_search(db, text, PaletteScope::All).await
 }
@@ -115,7 +105,8 @@ pub async fn palette_search(
 pub fn query(conn: &Connection, text: &str, scope: PaletteScope) -> AppResult<PaletteResults> {
     Ok(PaletteResults {
         issues: issue_matches(conn, text, scope.issue_limit())?,
-        lists: list_matches(conn, text, scope)?,
+        lists: list_matches(conn, text, scope.list_limit(), scope == PaletteScope::Lists)?,
+        views: view_matches(conn, text, scope.list_limit())?,
     })
 }
 
@@ -280,44 +271,4 @@ fn parts(marked: &str) -> Vec<TextPart> {
         });
     }
     out
-}
-
-/// Filter lists and Spaces whose name holds the text, ignoring case and accents.
-/// Lists whose name holds the text, Spaces first, the others under their parent; with the Lists scope, nothing
-/// typed lists them all.
-fn list_matches(conn: &Connection, text: &str, scope: PaletteScope) -> AppResult<Vec<ListHit>> {
-    let needle = fold(text.trim());
-    let limit = scope.list_limit();
-    if limit == 0 || (needle.is_empty() && scope != PaletteScope::Lists) {
-        return Ok(Vec::new());
-    }
-    let mut query = conn.prepare(
-        "SELECT l.id, COALESCE(s.name, p.name, l.name), COALESCE(l.project_id, parent.project_id), l.kind = 'space'
-         FROM filter_list l
-         LEFT JOIN filter_list parent ON parent.id = l.parent_id
-         LEFT JOIN space s ON s.project_id = l.project_id
-         LEFT JOIN cache.space p ON p.id = l.project_id
-         WHERE COALESCE(l.project_id, parent.project_id) IS NULL
-            OR COALESCE(l.project_id, parent.project_id) IN (SELECT project_id FROM space WHERE tracked = 1)
-         ORDER BY l.kind = 'space' DESC, parent.position IS NOT NULL, parent.position, l.parent_id, l.position, l.id",
-    )?;
-    let rows = query.query_map([], |r| {
-        Ok(ListHit {
-            id: r.get(0)?,
-            name: r.get(1)?,
-            project_id: r.get(2)?,
-            is_space: r.get(3)?,
-        })
-    })?;
-    let mut hits = Vec::new();
-    for hit in rows {
-        let hit = hit?;
-        if fold(&hit.name).contains(&needle) {
-            hits.push(hit);
-        }
-        if hits.len() == limit {
-            break;
-        }
-    }
-    Ok(hits)
 }

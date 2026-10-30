@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { api, type Narrowing } from "../api";
+import { api, type Narrowing, type View } from "../api";
 import { isComplete } from "../shell/toolbar/conditionEditing";
 import { narrowingKey, NO_VIEW_NARROWING, type ViewNarrowing } from "../state/slices/narrowing";
 import { useStore } from "../state/store";
@@ -34,30 +34,36 @@ export const viewRowsKey = (listId: number, viewId: number, narrowing: Narrowing
 export const COLUMNS_KEY = ["columns"] as const;
 export const STATUS_STYLES_KEY = ["statusStyles"] as const;
 
-
 /** Every typed prefix of the text filter is its own entry: unused ones go soon. */
 const VIEW_GC_MS = 15_000;
 const VIEW_FAILURE = "Could not load this view";
 
+const viewRowsQuery = (listId: number, viewId: number, narrowing: Narrowing) => ({
+  queryKey: viewRowsKey(listId, viewId, narrowing),
+  queryFn: () => api.viewRows(listId, viewId, narrowing),
+  gcTime: VIEW_GC_MS,
+  meta: { failure: VIEW_FAILURE },
+});
+
+/** Under `VIEW_ROWS_KEY`, so it refreshes with the rows. */
+const viewBoardQuery = (listId: number, viewId: number, narrowing: Narrowing) => ({
+  queryKey: [...VIEW_ROWS_KEY, "board", listId, viewId, narrowing],
+  queryFn: () => api.viewBoard(listId, viewId, narrowing),
+  gcTime: VIEW_GC_MS,
+  meta: { failure: VIEW_FAILURE },
+});
+
+/** What a view's layout loads: the Board its columns and cards, the List and the Table their rows. */
+export const viewDataQuery = (view: View, narrowing: Narrowing): { queryKey: readonly unknown[]; queryFn: () => Promise<unknown>; gcTime: number; meta: { failure: string } } =>
+  view.layout === "board" ? viewBoardQuery(view.listId, view.id, narrowing) : viewRowsQuery(view.listId, view.id, narrowing);
+
 /** A view's grouped rows; the previous result stays on screen while the next one loads. */
 export const useViewRows = (listId: number, viewId: number, narrowing: Narrowing = NO_NARROWING) =>
-  useQuery({
-    queryKey: viewRowsKey(listId, viewId, narrowing),
-    queryFn: () => api.viewRows(listId, viewId, narrowing),
-    placeholderData: keepPreviousData,
-    gcTime: VIEW_GC_MS,
-    meta: { failure: VIEW_FAILURE },
-  });
+  useQuery({ ...viewRowsQuery(listId, viewId, narrowing), placeholderData: keepPreviousData });
 
-/** A Board view's columns and cards; under `VIEW_ROWS_KEY`, so it refreshes with the rows. */
+/** A Board view's columns and cards. */
 export const useViewBoard = (listId: number, viewId: number, narrowing: Narrowing = NO_NARROWING) =>
-  useQuery({
-    queryKey: [...VIEW_ROWS_KEY, "board", listId, viewId, narrowing],
-    queryFn: () => api.viewBoard(listId, viewId, narrowing),
-    placeholderData: keepPreviousData,
-    gcTime: VIEW_GC_MS,
-    meta: { failure: VIEW_FAILURE },
-  });
+  useQuery({ ...viewBoardQuery(listId, viewId, narrowing), placeholderData: keepPreviousData });
 
 /** Every column a view can show, for the column names. */
 export const useColumnsCatalogue = (listId: number) =>

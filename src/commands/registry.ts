@@ -156,7 +156,7 @@ export function bindingFromEvent(e: KeyLike, mac = true): string | null {
 }
 
 /** Tauri's names for keys that `normalizeBinding` spells differently. */
-const ACCELERATOR_KEYS: Record<string, string> = { Up: "ArrowUp", Down: "ArrowDown", Left: "ArrowLeft", Right: "ArrowRight", Backslash: "\\" };
+const ACCELERATOR_KEYS: Record<string, string> = { Up: "ArrowUp", Down: "ArrowDown", Left: "ArrowLeft", Right: "ArrowRight", Backslash: "\\", BracketLeft: "[", BracketRight: "]" };
 
 /** A menu item's accelerator (`CmdOrCtrl+Shift+R`) as a key label (`⌘⇧R`). */
 export function acceleratorLabel(accelerator: string | null): string {

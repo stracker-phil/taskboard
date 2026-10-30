@@ -39,13 +39,34 @@ pub fn register(bus: &mut CommandBus<AppHandle>) {
             .help("Open the Space below")
             .run(|app| step(app, 1)),
     );
+    bus.add(
+        Command::new("nav:previousList", "Previous List")
+            .help("Open the list above, in the same Space")
+            .run(|app| step_list(app, -1)),
+    );
+    bus.add(
+        Command::new("nav:nextList", "Next List")
+            .help("Open the list below, in the same Space")
+            .run(|app| step_list(app, 1)),
+    );
 }
 
 async fn step(app: AppHandle, step: i64) -> AppResult<()> {
     let state = app.state::<AppState>();
     let nav = state.nav.step_space(&state.db, step).await?;
-    if let Err(e) = app.emit(NAV_CHANGED_EVENT, &nav) {
+    announce(&app, &nav);
+    Ok(())
+}
+
+async fn step_list(app: AppHandle, step: i64) -> AppResult<()> {
+    let state = app.state::<AppState>();
+    let nav = state.nav.step_list(&state.db, step).await?;
+    announce(&app, &nav);
+    Ok(())
+}
+
+fn announce(app: &AppHandle, nav: &Nav) {
+    if let Err(e) = app.emit(NAV_CHANGED_EVENT, nav) {
         log::warn!("Couldn't announce the new place: {e}");
     }
-    Ok(())
 }

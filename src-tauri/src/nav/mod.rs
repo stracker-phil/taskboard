@@ -13,7 +13,7 @@ use ts_rs::TS;
 
 use crate::db::Db;
 use crate::error::AppResult;
-use crate::lists::{Kind, node};
+use crate::lists::{Kind, Node, all_nodes, node};
 use crate::store::json_store::JsonStore;
 use crate::views::{View, list_views};
 
@@ -46,11 +46,15 @@ struct Saved {
     expanded: Vec<i64>,
 }
 
+/// Told when the place changes, whoever moved it (the page, a menu, the CLI).
+pub type OnMove = Box<dyn Fn() + Send + Sync>;
+
 #[derive(Clone)]
 pub struct NavStore {
     store: JsonStore<Saved>,
     /// Issues read while the owner stays at this place: Unread keeps showing them until the place changes.
     read_here: Arc<Mutex<BTreeSet<String>>>,
+    on_move: Arc<Mutex<Option<OnMove>>>,
 }
 
 const NAV_FILE: &str = "nav.json";
@@ -60,6 +64,17 @@ impl NavStore {
         Self {
             store: JsonStore::open(dir.join(NAV_FILE)),
             read_here: Arc::default(),
+            on_move: Arc::default(),
+        }
+    }
+
+    pub fn on_move(&self, notify: OnMove) {
+        *self.on_move.lock().unwrap_or_else(|e| e.into_inner()) = Some(notify);
+    }
+
+    fn moved(&self) {
+        if let Some(notify) = &*self.on_move.lock().unwrap_or_else(|e| e.into_inner()) {
+            notify();
         }
     }
 
@@ -103,6 +118,9 @@ impl NavStore {
                     s.last_views.insert(at.list_id.to_string(), at.view_id);
                 })
                 .await?;
+            if before != Some(at) {
+                self.moved();
+            }
         }
         self.current(db).await
     }
@@ -133,6 +151,28 @@ impl NavStore {
         match target {
             Some(id) => self.go(db, id, None).await,
             None => self.current(db).await,
+        }
+    }
+
+    /// The next (`step` 1) or previous (-1) level of the current one's section, wrapping around: a Space and its
+    /// lists, or the levels outside the Spaces.
+    pub async fn step_list(&self, db: &Db, step: i64) -> AppResult<Nav> {
+        let Some(at) = self.current(db).await?.location else {
+            return self.current(db).await;
+        };
+        let target = db
+            .read(move |conn| {
+                let levels = section_levels(&all_nodes(conn)?, space_of(conn, at.list_id)?);
+                let Some(index) = levels.iter().position(|id| *id == at.list_id) else {
+                    return Ok(None);
+                };
+                let next = (index as i64 + step).rem_euclid(levels.len() as i64);
+                Ok(Some(levels[next as usize]))
+            })
+            .await?;
+        match target {
+            Some(id) if id != at.list_id => self.go(db, id, None).await,
+            _ => self.current(db).await,
         }
     }
 
@@ -198,6 +238,23 @@ fn tracked_space_nodes(conn: &Connection) -> AppResult<Vec<i64>> {
     )?;
     let ids = query.query_map([], |row| row.get(0))?;
     Ok(ids.collect::<Result<_, _>>()?)
+}
+
+/// A section's levels in sidebar order (each before its children): the Space `space` and its lists, or without one
+/// every level outside the Spaces.
+fn section_levels(nodes: &[Node], space: Option<i64>) -> Vec<i64> {
+    fn walk(nodes: &[Node], parent: Option<i64>, out: &mut Vec<i64>) {
+        for child in nodes.iter().filter(|n| n.parent_id == parent) {
+            if parent.is_none() && child.kind == Kind::Space {
+                continue;
+            }
+            out.push(child.id);
+            walk(nodes, Some(child.id), out);
+        }
+    }
+    let mut levels = Vec::from_iter(space);
+    walk(nodes, space, &mut levels);
+    levels
 }
 
 /// The Space a level belongs to: itself, or the Space above a filter list.

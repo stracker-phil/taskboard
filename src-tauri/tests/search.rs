@@ -15,14 +15,15 @@ use taskboard_lib::filter::{Condition, Field, Filter, Op, Value};
 use taskboard_lib::jira::{Limiter, TokenKind};
 use taskboard_lib::lists::{Viewer, list_create, list_match_count, list_set_filter};
 use taskboard_lib::search::{
-    MatchedIn, PaletteResults, PaletteScope, TextPart, palette_query, palette_search,
+    ListHit, MatchedIn, PaletteResults, PaletteScope, TextPart, ViewHit, palette_query,
+    palette_search,
 };
 use taskboard_lib::store::settings::SettingsStore;
 use taskboard_lib::sync::{Emit, SyncContext, full_sync};
 use taskboard_lib::test_support::demo::{DEMO_NOW, ME_EMAIL};
 use taskboard_lib::test_support::fake_jira::{DEMO_TOKEN, FakeJira};
 use taskboard_lib::test_support::{FakeSecrets, temp_config_dir};
-use taskboard_lib::views::{Narrowing, view_rows, views_of};
+use taskboard_lib::views::{Layout, Narrowing, view_rows, views_of};
 
 const ME_ACCOUNT_ID: &str = "712020:5a1e0c3f-8d2b-4f61-9c7e-1b2a3c4d5e01";
 const PROJECT_IDS: [&str; 5] = ["10001", "10002", "10003", "10004", "10005"];
@@ -69,6 +70,28 @@ fn keys(results: &PaletteResults) -> Vec<&str> {
 fn sorted(mut keys: Vec<String>) -> Vec<String> {
     keys.sort();
     keys
+}
+
+/// The Website relaunch Space first, then its filter lists, and nothing else.
+fn assert_website_group(lists: &[ListHit], text: &str) {
+    let (space, lists) = lists.split_first().expect("the Space");
+    assert_eq!(
+        (
+            space.name.as_str(),
+            space.is_space,
+            space.project_id.as_deref()
+        ),
+        ("Website relaunch", true, Some(NW)),
+        "{text:?}"
+    );
+    assert!(!lists.is_empty(), "{text:?}");
+    for list in lists {
+        assert!(!list.is_space, "{text:?}: {list:?}");
+        assert_eq!(list.project_id.as_deref(), Some(NW), "{text:?}: {list:?}");
+    }
+    let names: Vec<&str> = lists.iter().map(|l| l.name.as_str()).collect();
+    assert_eq!(names[0], "Current sprint", "{text:?}");
+    assert_eq!(names[names.len() - 1], "Open bugs", "{text:?}");
 }
 
 struct Site {
@@ -491,12 +514,66 @@ mod lists {
         for text in ["website", "WEBSITE", "wébsite", "  launch ", "Site Re"] {
             let results = site.palette(text).await;
 
-            let names: Vec<(&str, bool, Option<&str>)> = results
-                .lists
-                .iter()
-                .map(|l| (l.name.as_str(), l.is_space, l.project_id.as_deref()))
-                .collect();
-            assert_eq!(names, [("Website relaunch", true, Some(NW))], "{text:?}");
+            assert_website_group(&results.lists, text);
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn every_typed_word_has_to_be_in_the_path_of_the_list() {
+        let site = Site::new().await;
+
+        let results = site.palette("web sprint").await;
+
+        let found: Vec<(&str, bool, Option<&str>)> = results
+            .lists
+            .iter()
+            .map(|l| (l.name.as_str(), l.is_space, l.project_id.as_deref()))
+            .collect();
+        assert_eq!(found, [("Current sprint", false, Some(NW))]);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn the_words_may_come_in_any_order() {
+        let site = Site::new().await;
+
+        let results = site.palette("sprint web").await;
+
+        let names: Vec<&str> = results.lists.iter().map(|l| l.name.as_str()).collect();
+        assert_eq!(names, ["Current sprint"]);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn a_word_missing_from_the_path_finds_no_list() {
+        let site = Site::new().await;
+
+        let results = site.palette("web zzzzqx").await;
+
+        assert_eq!(results.lists, vec![]);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn a_space_and_its_lists_are_grouped_with_the_space_first() {
+        let site = Site::new().await;
+
+        let results = site.palette_in("", PaletteScope::Lists).await;
+
+        let spaces = results.lists.iter().filter(|l| l.is_space).count();
+        assert_eq!(spaces, PROJECT_IDS.len());
+        let mut last_project: Option<&str> = None;
+        let mut finished: Vec<&str> = Vec::new();
+        for list in &results.lists[spaces..] {
+            let project = list.project_id.as_deref().unwrap_or("");
+            if last_project != Some(project) {
+                assert!(!finished.contains(&project), "{project} is split up");
+                if let Some(previous) = last_project {
+                    finished.push(previous);
+                }
+                last_project = Some(project);
+            }
         }
     }
 
@@ -584,6 +661,201 @@ mod lists {
     }
 }
 
+mod views {
+    use super::*;
+
+    fn view_names(views: &[ViewHit]) -> Vec<(&str, &str)> {
+        views
+            .iter()
+            .map(|v| (v.list.name.as_str(), v.name.as_str()))
+            .collect()
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn a_view_is_found_by_a_word_of_its_space_and_its_name() {
+        let site = Site::new().await;
+        let space = site.space_id(NW).await;
+        let board = views_of(site.db(), space)
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|v| v.name == "Board")
+            .unwrap();
+
+        for text in ["website board", "Board WEBSITE", "  relaunch   boa "] {
+            let results = site.palette(text).await;
+
+            assert_eq!(
+                results.views,
+                [ViewHit {
+                    list: ListHit {
+                        id: space,
+                        name: "Website relaunch".into(),
+                        project_id: Some(NW.into()),
+                        is_space: true,
+                    },
+                    view_id: board.id,
+                    name: "Board".into(),
+                    layout: Layout::Board,
+                }],
+                "{text:?}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn a_view_of_a_filter_list_is_found_by_its_space_list_and_view_words() {
+        let site = Site::new().await;
+
+        let results = site.palette("web sprint list").await;
+
+        assert_eq!(view_names(&results.views), [("Current sprint", "List")]);
+        assert_eq!(results.views[0].layout, Layout::List);
+        assert!(!results.views[0].list.is_space);
+        assert_eq!(results.views[0].list.project_id.as_deref(), Some(NW));
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn a_view_name_alone_finds_that_view_of_every_space() {
+        let site = Site::new().await;
+
+        let results = site.palette("board").await;
+
+        let mut projects: Vec<&str> = results
+            .views
+            .iter()
+            .map(|v| v.list.project_id.as_deref().unwrap())
+            .collect();
+        projects.sort();
+        assert_eq!(projects, PROJECT_IDS);
+        assert!(results.views.iter().all(|v| v.name == "Board"));
+        assert!(results.views.iter().all(|v| v.list.is_space));
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn a_list_name_alone_does_not_return_its_views() {
+        let site = Site::new().await;
+
+        for text in ["website", "web sprint", "sprint", "open bugs"] {
+            let results = site.palette(text).await;
+
+            assert!(!results.lists.is_empty(), "{text:?}");
+            assert_eq!(results.views, vec![], "{text:?}");
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn a_word_missing_from_the_path_and_the_view_finds_no_view() {
+        let site = Site::new().await;
+
+        let results = site.palette("website board zzzzqx").await;
+
+        assert_eq!(results.views, vec![]);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn empty_text_finds_no_views_in_any_scope() {
+        let site = Site::new().await;
+
+        for scope in [PaletteScope::All, PaletteScope::Issues, PaletteScope::Lists] {
+            for text in ["", "  \t "] {
+                let results = site.palette_in(text, scope).await;
+
+                assert_eq!(results.views, vec![], "{text:?} in {scope:?}");
+            }
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn the_issues_scope_finds_no_views() {
+        let site = Site::new().await;
+
+        let results = site.palette_in("website board", PaletteScope::Issues).await;
+
+        assert_eq!(results.views, vec![]);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn at_most_six_views_are_listed_but_the_lists_scope_goes_beyond() {
+        let site = Site::new().await;
+
+        let default = site.palette("list").await;
+        let lists = site.palette_in("list", PaletteScope::Lists).await;
+
+        assert_eq!(default.views.len(), 6);
+        assert!(lists.views.len() > 6, "{}", lists.views.len());
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn bookmarks_has_no_views_to_choose() {
+        let site = Site::new().await;
+
+        let by_view = site.palette_in("all issues", PaletteScope::Lists).await;
+        let by_name = site.palette_in("bookmarks", PaletteScope::Lists).await;
+
+        assert!(by_view.views.iter().all(|v| v.list.name != "Bookmarks"));
+        assert!(!by_view.views.is_empty());
+        assert!(by_name.lists.iter().any(|l| l.name == "Bookmarks"));
+        assert_eq!(by_name.views, vec![]);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn views_of_untracked_spaces_are_left_out() {
+        let site = Site::new().await;
+        track_project(site.db(), NWS.into(), false).await.unwrap();
+
+        let results = site.palette("board").await;
+
+        assert_eq!(results.views.len(), PROJECT_IDS.len() - 1);
+        assert!(
+            results
+                .views
+                .iter()
+                .all(|v| v.list.project_id.as_deref() != Some(NWS))
+        );
+    }
+
+    #[test]
+    fn a_view_hit_serializes_with_camel_case_fields() {
+        let hit = ViewHit {
+            list: ListHit {
+                id: 3,
+                name: "Website relaunch".into(),
+                project_id: Some(NW.into()),
+                is_space: true,
+            },
+            view_id: 8,
+            name: "Board".into(),
+            layout: Layout::Board,
+        };
+
+        assert_eq!(
+            serde_json::to_value(&hit).unwrap(),
+            serde_json::json!({
+                "list": {
+                    "id": 3,
+                    "name": "Website relaunch",
+                    "projectId": NW,
+                    "isSpace": true,
+                },
+                "viewId": 8,
+                "name": "Board",
+                "layout": "board",
+            })
+        );
+    }
+}
+
 mod scopes {
     use super::*;
 
@@ -660,14 +932,7 @@ mod scopes {
         let site = Site::new().await;
 
         let narrowed = site.palette_in("website", PaletteScope::Lists).await;
-        assert_eq!(
-            narrowed
-                .lists
-                .iter()
-                .map(|l| (l.name.as_str(), l.is_space))
-                .collect::<Vec<_>>(),
-            [("Website relaunch", true)]
-        );
+        assert_website_group(&narrowed.lists, "website");
 
         let all = site.palette_in("", PaletteScope::Lists).await;
         let default = site.palette("e").await;
