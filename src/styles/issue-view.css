@@ -156,10 +156,9 @@
 .comment-card__time { font-size: 12px; color: var(--text-muted); }
 .comment-card__body { font-size: 14px; line-height: 1.5; }
 .change-line { display: flex; align-items: flex-start; gap: 10px; padding: 0 6px; font-size: 13px; line-height: 1.45; color: var(--text-tertiary); }
-.change-line__text { display: flex; flex: 1; gap: 4px; min-width: 0; padding-top: 3px; white-space: nowrap; }
-/* A change stays on one line: who and what truncate first, the values last. */
-.change-line__lead { flex: 0 1000 auto; min-width: 2em; overflow: hidden; text-overflow: ellipsis; }
-.change-line__values { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.change-line__text { display: flex; flex: 1; flex-direction: column; gap: 2px; min-width: 0; padding-top: 3px; white-space: nowrap; }
+/* Who changed what on the first line, from → to on the second; each truncates instead of wrapping. */
+.change-line__lead, .change-line__values { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .change-line__text strong { color: var(--text); }
 .change-line__text .status-pill { vertical-align: middle; }
 .change-line__time { padding-top: 3px; font-size: 12px; color: var(--text-muted); white-space: nowrap; }

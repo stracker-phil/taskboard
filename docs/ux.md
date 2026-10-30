@@ -345,7 +345,7 @@ view with its place intact).
   breadcrumb) closes the Issue view and the preview (`useNavGo`).
 - Activity (400 wide by default, 300–720 by dragging its left edge or ←/→ on the focused edge; saved in
   `ui_state.json` `activityWidth` for every issue, `useActivityWidth`; `--panel-subtle-bg`): All / Comments / Changes, comment cards and change lines (status
-  changes as activity pills; a change line stays on one line, its author and field truncate before from → to), newest first; the comment box waits for writes. Opening an issue fetches its
+  changes as activity pills; a change line shows who changed what on its first line and from → to on a second, each line truncating instead of wrapping), newest first; the comment box waits for writes. Opening an issue fetches its
   comments when the cached ones may be behind (`issue_sync_comments`). Change lines come from Jira's changelog
   ([ADR 0031](adr/0031-issue-history-comes-from-the-changelog-on-demand.md)) and the sync's own records: "<Author>
   changed priority Medium → High", "Changed description" for long text without values, other fields by their
