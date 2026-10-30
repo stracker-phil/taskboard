@@ -84,10 +84,12 @@ shot list-light
 "$HERE/js.sh" '(() => { const tab = [...document.querySelectorAll("[role=tab]")].find((e) => e.textContent.trim() === "Board"); const r = tab.getBoundingClientRect(); tab.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: r.left + r.width / 2, clientY: r.bottom - 4 })); })()'
 shot menu-light
 "$HERE/js.sh" 'window.taskboard.getState().closeMenu()'
-# The Issue view, scrolled to the inline image, subtasks and attachments.
+# The Issue view, scrolled to the inline image, subtasks and attachments, finding a word.
 "$BIN" open NW-1042 >/dev/null
 sleep 2
 "$HERE/js.sh" '(() => { const h = [...document.querySelectorAll("h2, h3")].find((e) => e.textContent.trim() === "Web links"); h?.scrollIntoView({ block: "start" }); })()'
+# Find in this issue, highlighting its matches.
+"$HERE/js.sh" '(() => { const input = document.querySelector(".issue-header input"); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set; set.call(input, "checkout"); input.dispatchEvent(new Event("input", { bubbles: true })); })()'
 shot issue-light
 "$BIN" go NW Table >/dev/null
 shot table-light

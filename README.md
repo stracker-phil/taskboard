@@ -24,19 +24,21 @@ support. To build it or port it, point a coding agent at [AGENTS.md](AGENTS.md).
 - **Space settings:** per Space, the layouts its views offer and how new views start, its own status colors
   (six status types from Backlog to Done, which views can also group by) and where each custom field shows.
 - **What changed:** Unread collects new comments, status and assignee changes since you last looked, and
-  anything you mark unread; bookmarks keep issues at hand for a while.
+  anything you mark unread; read marks survive a cache reset. Bookmarks keep issues, comments, lists and views
+  at hand, for good or for a while.
 - **The Issue view:** description and the filled custom fields (acceptance criteria, steps to reproduce)
   as rich text with inline images, attachments that open in Quick Look, web links (pull requests show as
   such), related issues and subtasks, and the activity: comments and Jira's history, newest first, with
-  people's avatars. A click opens an issue in the Preview beside the list or in the full view, per view;
+  people's avatars. ⌘F finds words in the open issue and steps through the matches with ↩. A click opens an
+  issue in the Preview beside the list or in the full view, per view, a double-click always in the full view;
   ⌥ + hover peeks at any issue. A click on an issue key copies it.
-- **Keyboard first:** ⌘K finds issues by key or text, J/K move, every action has a menu item and a
-  rebindable key, right-click menus offer the rest, and the `taskboard` command line drives the window from
-  scripts.
+- **Keyboard first:** ⌘K finds issues by key or text and runs any command (`>` commands, `#` issues, `/` Spaces
+  and lists), J/K move, every action has a menu item and a rebindable key, right-click menus offer the rest,
+  and the `taskboard` command line drives the window from scripts.
 
 | | |
 |---|---|
-| ![The Board layout of a Space, with labels on the cards](docs/screens/board-dark.png) | ![The Issue view: an inline image, web links, subtasks, an attachment and the activity with Jira's history](docs/screens/issue-light.png) |
+| ![The Board layout of a Space, with labels on the cards](docs/screens/board-dark.png) | ![The Issue view finding a word: an inline image, web links, subtasks, an attachment and the activity with Jira's history](docs/screens/issue-light.png) |
 | ![A filter list's Filter popover: its own conditions, a draft for this view and Save View](docs/screens/filter-dark.png) | ![A view tab's menu: rename, icon and color, duplicate, layout](docs/screens/menu-light.png) |
 | ![Unread, with what changed on each issue](docs/screens/unread-dark.png) | ![The Table layout](docs/screens/table-light.png) |
 | ![The command palette finding issues and actions](docs/screens/palette-dark.png) | ![A Space's settings: name, icon and color, client, layouts](docs/screens/space-settings-dark.png) |
@@ -50,7 +52,8 @@ All screenshots show made-up demo data from the debug build.
   refuses anything but the read requests Taskboard needs. Profile pictures come from Atlassian's avatar host,
   without credentials.
 - The cache stays on your Mac (`~/Library/Application Support/com.philippstracker.taskboard/`). Settings →
-  Sync → Cache, File → Reset Cache… or `taskboard reset-cache --yes` empties it.
+  Sync → Cache, File → Reset Cache… or `taskboard reset-cache --yes` empties it; with "Clear the cache when
+  Taskboard quits" on, no copy of your issues stays on the Mac after quitting.
 
 ## Install
 
