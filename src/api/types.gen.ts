@@ -381,7 +381,7 @@ description: string,
  */
 error: string | null, 
 /**
- * The icon the owner picked for a filter list (`look`); none shows the funnel.
+ * The icon the owner picked for a filter list (`look`); none shows the folder.
  */
 icon: string | null, 
 /**
@@ -422,7 +422,11 @@ menu: string, label: string, command: string,
 /**
  * In Tauri's notation (`CmdOrCtrl+Shift+R`).
  */
-accelerator: string | null, };
+accelerator: string | null, 
+/**
+ * A choice that is on, such as the shown view's layout.
+ */
+checked: boolean, };
 
 /**
  * The toolbar's narrowing on top of the level's filter, and the Filter popover's unsaved conditions (ADR 0038).
@@ -464,7 +468,11 @@ expanded: Array<number>, };
 
 export type Op = "is" | "isNot" | "in" | "notIn" | "isEmpty" | "isNotEmpty" | "contains" | "before" | "after" | "withinLastDays" | "withinNextDays";
 
-export type PaletteResults = { issues: Array<IssueHit>, lists: Array<ListHit>, };
+export type PaletteResults = { issues: Array<IssueHit>, lists: Array<ListHit>, 
+/**
+ * Views by their path (Space › list › view); only once something is typed.
+ */
+views: Array<ViewHit>, };
 
 /**
  * What the palette searches: both kinds side by side, or one kind alone (its prefix typed) with room for more.
@@ -794,6 +802,11 @@ isDefault: boolean,
 ownConditions: number, };
 
 export type ViewData = { groupBy: GroupBy, subtasks: SubtaskMode, groups: Array<Group>, rows: { [key in string]: Row }, columns: Array<string>, };
+
+/**
+ * One view of a level, opened at that view.
+ */
+export type ViewHit = { list: ListHit, viewId: number, name: string, layout: Layout, };
 
 export type ViewPlace = { scrollTop: number, 
 /**

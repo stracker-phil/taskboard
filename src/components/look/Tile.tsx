@@ -9,7 +9,7 @@ export interface Look {
 }
 
 interface Props extends Look {
-  /** Shown without an icon: a letter (a Space's initial) or a line icon (the funnel, a layout). */
+  /** Shown without an icon: a letter (a Space's initial) or a line icon (the folder, a layout). */
   fallback: string | LucideIcon;
   size: number;
 }

@@ -104,7 +104,7 @@ pub async fn list_rename(db: &Db, id: i64, name: String) -> AppResult<()> {
     .await
 }
 
-/// A filter list's look; no icon is the funnel, no color shows the icon plain.
+/// A filter list's look; no icon is the folder, no color shows the icon plain.
 pub async fn list_set_look(
     db: &Db,
     id: i64,

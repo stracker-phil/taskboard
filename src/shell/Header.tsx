@@ -8,7 +8,7 @@ import { attempt } from "../state/requests";
 import { HeaderTitle } from "./HeaderTitle";
 import { spaceOf, type Level } from "./levels";
 
-/** The content header: the level's tile or icon and name (a filter list as Space / funnel / name), then Mark all
+/** The content header: the level's tile or icon and name (a filter list as Space / folder / name), then Mark all
  *  as read for Unread and Open in Jira for a Space and its lists. */
 export function Header({ level }: { level: Level }) {
   return (

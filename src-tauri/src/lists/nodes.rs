@@ -28,7 +28,7 @@ pub struct Node {
     pub name: String,
     pub filter: Option<String>,
     pub position: i64,
-    /// A filter list's icon; none shows the funnel.
+    /// A filter list's icon; none shows the folder.
     pub icon: Option<String>,
     /// Its tile color (`look`); none shows the icon plain.
     pub color: Option<String>,

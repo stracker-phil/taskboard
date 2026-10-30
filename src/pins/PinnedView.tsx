@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { Funnel, MessageSquare, X } from "lucide-react";
+import { Folder, MessageSquare, X } from "lucide-react";
 import { useEffect } from "react";
 import { CopyKey } from "../components/issue/CopyKey";
 import { api, type PinItem } from "../api";
@@ -141,7 +141,7 @@ function Target({ pin }: { pin: PinItem }) {
     case "list":
       return (
         <>
-          <Funnel className="pin-table__icon" size={14} strokeWidth={2} aria-hidden="true" />
+          <Folder className="pin-table__icon" size={14} strokeWidth={2} aria-hidden="true" />
           {target.space && <span className="pin-table__space">{target.space} /</span>}
           <span className="pin-table__text">{target.name}</span>
         </>

@@ -42,7 +42,7 @@ pub struct ListNode {
     pub description: String,
     /// Why its filter can't be used.
     pub error: Option<String>,
-    /// The icon the owner picked for a filter list (`look`); none shows the funnel.
+    /// The icon the owner picked for a filter list (`look`); none shows the folder.
     pub icon: Option<String>,
     /// Its tile color; none shows the icon plain.
     pub color: Option<String>,

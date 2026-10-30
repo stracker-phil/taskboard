@@ -1,4 +1,4 @@
-import { Funnel } from "lucide-react";
+import { DEFAULT_LIST_ICON } from "../components/look/icons";
 import { useState } from "react";
 import { api } from "../api";
 import { InlineRename } from "../components/InlineRename";
@@ -41,13 +41,13 @@ export function HeaderTitle({ level }: { level: Level }) {
             label={`Icon and color of ${node.name}`}
             className="content-header__tile"
             look={{ icon: node.icon, color: node.color }}
-            fallback={Funnel}
+            fallback={DEFAULT_LIST_ICON}
             colorOptional
             open={editingLook}
             onOpenChange={setEditingLook}
             onChange={(look) => void attempt(api.listSetLook(node.id, look.icon, look.color), "Could not change the icon")}
           >
-            <Tile icon={node.icon} color={node.color} fallback={Funnel} size={node.color ? 20 : 15} />
+            <Tile icon={node.icon} color={node.color} fallback={DEFAULT_LIST_ICON} size={node.color ? 20 : 15} />
           </LookButton>
           <EditableTitle
             key={node.id}

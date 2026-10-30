@@ -1,8 +1,8 @@
+import { DEFAULT_LIST_ICON } from "../../components/look/icons";
 import { type HTMLAttributes, type MouseEvent, useState } from "react";
 import { api, type ListNode, type SpaceNode } from "../../api";
 import { InlineRename } from "../../components/InlineRename";
 import { openContextMenu } from "../../components/menu";
-import { Funnel } from "lucide-react";
 import { LookButton } from "../../components/look/LookButton";
 import { Tile } from "../../components/look/Tile";
 import { usePinOf } from "../../queries/pins";
@@ -94,7 +94,7 @@ function FilterListRow({ list, active, renaming, onOpen, onRename, onRenameDone,
       ],
       list.name,
     );
-  const icon = <Tile icon={list.icon} color={list.color} fallback={Funnel} size={list.color ? 16 : 15} />;
+  const icon = <Tile icon={list.icon} color={list.color} fallback={DEFAULT_LIST_ICON} size={list.color ? 16 : 15} />;
   if (renaming) {
     return (
       <div className="sb-row sb-list" {...dragProps}>
@@ -128,7 +128,7 @@ function FilterListRow({ list, active, renaming, onOpen, onRename, onRenameDone,
         label={`Icon and color of ${list.name}`}
         className="sb-list__icon"
         look={{ icon: list.icon, color: list.color }}
-        fallback={Funnel}
+        fallback={DEFAULT_LIST_ICON}
         colorOptional
         open={editingLook}
         onOpenChange={setEditingLook}
