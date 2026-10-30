@@ -300,7 +300,7 @@ relation: string, issue: RelatedIssue, };
 export type IssueOpening = "full" | "preview";
 
 /**
- * Payload of `issues_changed`.
+ * Payload of `issues_changed` and `issue_details_changed`.
  */
 export type IssuesChanged = { ids: Array<string>, 
 /**

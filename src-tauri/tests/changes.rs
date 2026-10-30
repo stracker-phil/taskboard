@@ -1,7 +1,8 @@
 //! Unseen changes on the demo site synced from the in-process fake Jira into a temp database: the highlight and
 //! chip on rows, Unread and its badge, Mark seen and Mark all seen, and the Since banner of an issue.
 
-use std::sync::Arc;
+use std::collections::BTreeSet;
+use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, NaiveDate, Utc};
 use tempfile::TempDir;
@@ -10,7 +11,7 @@ use taskboard_lib::changes::{Since, mark_all_seen, mark_seen, mark_unread};
 use taskboard_lib::connection::{
     ConnectionInput, JiraAccess, fetch_versions, refresh_projects, save, track_project,
 };
-use taskboard_lib::db::Db;
+use taskboard_lib::db::{Changes, Db};
 use taskboard_lib::error::ErrorKind;
 use taskboard_lib::filter::{Condition, Field, Filter};
 use taskboard_lib::issues::{ActivityItem, issue_activity, issue_get, issue_related};
@@ -46,6 +47,16 @@ fn viewer() -> Viewer {
         time_zone: Some("Europe/Berlin".into()),
         now: DEMO_NOW.parse::<DateTime<Utc>>().unwrap(),
     }
+}
+
+/// Collects what the database announces from now on.
+fn watch(db: &Db) -> Arc<Mutex<Vec<Changes>>> {
+    let announced = Arc::new(Mutex::new(Vec::new()));
+    let sink = Arc::clone(&announced);
+    db.set_notifier(Box::new(move |changes: &Changes| {
+        sink.lock().unwrap().push(changes.clone());
+    }));
+    announced
 }
 
 struct Site {
@@ -410,6 +421,58 @@ mod marking_seen {
             (true, Some("1 new comment"))
         );
         assert_eq!(site.seen_at("NW-1042").await, LATER);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn marking_an_unseen_issue_seen_announces_it() {
+        let site = Site::new().await;
+        site.comment_after_seen("NW-1042").await;
+        let announced = watch(site.db());
+
+        site.mark(&["NW-1042"], LATER).await;
+
+        assert_eq!(
+            *announced.lock().unwrap(),
+            [Changes {
+                issues: BTreeSet::from([site.id_of("NW-1042").await]),
+                ..Changes::default()
+            }]
+        );
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn marking_an_already_read_issue_seen_announces_nothing() {
+        let site = Site::new().await;
+        site.set_seen("NW-1042", LATER).await;
+        let announced = watch(site.db());
+
+        site.mark(&["NW-1042"], TEN).await;
+
+        assert!(announced.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn mark_all_seen_announces_only_the_issues_that_were_unseen() {
+        let site = Site::new().await;
+        site.comment_after_seen("NW-1042").await;
+        site.set_seen("NW-1044", LATER).await;
+        let ids = vec![site.id_of("NW-1042").await, site.id_of("NW-1044").await];
+        let announced = watch(site.db());
+
+        mark_all_seen(site.db(), move |_| Ok(ids), LATER.into())
+            .await
+            .unwrap();
+
+        assert_eq!(
+            *announced.lock().unwrap(),
+            [Changes {
+                issues: BTreeSet::from([site.id_of("NW-1042").await]),
+                ..Changes::default()
+            }]
+        );
     }
 
     #[tokio::test]

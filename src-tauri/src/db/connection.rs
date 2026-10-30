@@ -27,6 +27,7 @@ fn open_file(path: &Path) -> AppResult<Connection> {
     conn.execute_batch(
         "PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA foreign_keys = ON;",
     )?;
+    tune(&conn, "main")?;
     make_private(path)?;
     Ok(conn)
 }
@@ -71,6 +72,15 @@ pub fn attach_cache(conn: &Connection, dir: &Path) -> AppResult<()> {
         .ok_or_else(|| AppError::Db(format!("{} is not a UTF-8 path", path.display())))?;
     conn.execute("ATTACH DATABASE ?1 AS cache", [path])?;
     conn.execute_batch("PRAGMA cache.journal_mode = WAL; PRAGMA cache.synchronous = NORMAL;")?;
+    tune(conn, "cache")
+}
+
+/// A 16 MB page cache and up to 256 MB read through memory mapping per connection: a view reads most of the
+/// mirror on every refresh.
+fn tune(conn: &Connection, schema: &str) -> AppResult<()> {
+    conn.execute_batch(&format!(
+        "PRAGMA {schema}.cache_size = -16000; PRAGMA {schema}.mmap_size = 268435456;"
+    ))?;
     Ok(())
 }
 

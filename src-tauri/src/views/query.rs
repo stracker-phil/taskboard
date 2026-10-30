@@ -132,8 +132,7 @@ pub(super) fn fetch_view(
         SubtaskMode::Hidden => Vec::new(),
         _ => descendants(conn, &source, &results)?,
     };
-    mark_changed(conn, ctx.me.as_deref(), &mut results)?;
-    mark_changed(conn, ctx.me.as_deref(), &mut descendants)?;
+    mark_changed(conn, ctx.me.as_deref(), &mut results, &mut descendants)?;
     let (by, descending) = (view.sort.by, view.sort.descending);
     let (items, below) = match mode {
         SubtaskMode::Hidden => {
@@ -230,8 +229,21 @@ fn build(
 }
 
 /// Rows with unseen changes are highlighted and say what changed.
-fn mark_changed(conn: &Connection, me: Option<&str>, items: &mut [(Row, Facts)]) -> AppResult<()> {
-    let unseen = unseen_changes(conn)?;
+fn mark_changed(
+    conn: &Connection,
+    me: Option<&str>,
+    results: &mut [(Row, Facts)],
+    descendants: &mut [(Row, Facts)],
+) -> AppResult<()> {
+    let ids: Vec<&str> = results
+        .iter()
+        .chain(descendants.iter())
+        .map(|(row, _)| row.id.as_str())
+        .collect();
+    if ids.is_empty() {
+        return Ok(());
+    }
+    let unseen = unseen_changes(conn, &ids)?;
     if unseen.is_empty() {
         return Ok(());
     }
@@ -244,7 +256,7 @@ fn mark_changed(conn: &Connection, me: Option<&str>, items: &mut [(Row, Facts)])
         statuses: &statuses,
         people: &HashMap::new(),
     };
-    for (row, _) in items {
+    for (row, _) in results.iter_mut().chain(descendants.iter_mut()) {
         if let Some(changes) = unseen.get(&row.id) {
             row.changed = true;
             row.change_note = chip(&facts(changes), &names);

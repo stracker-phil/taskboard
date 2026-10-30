@@ -1,9 +1,10 @@
 //! An issue as the peek shows it, on the demo site synced from the in-process fake Jira into a temp database.
 
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};
+use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, NaiveDate, Utc};
 use tempfile::TempDir;
@@ -11,7 +12,7 @@ use tempfile::TempDir;
 use taskboard_lib::connection::{
     ConnectionInput, JiraAccess, fetch_versions, refresh_projects, save, track_project,
 };
-use taskboard_lib::db::Db;
+use taskboard_lib::db::{Changes, Db};
 use taskboard_lib::error::{AppResult, ErrorKind};
 use taskboard_lib::issues::{
     ActivityItem, ChangeValue, CustomField, ImageMemory, IssueDetail, IssueLink,
@@ -1374,6 +1375,102 @@ async fn an_unknown_issue_is_not_fetched() {
         .unwrap();
 
     assert!(!fetched);
+}
+
+/// Collects what the database announces from now on.
+fn watch(db: &Db) -> Arc<Mutex<Vec<Changes>>> {
+    let announced = Arc::new(Mutex::new(Vec::new()));
+    let sink = Arc::clone(&announced);
+    db.set_notifier(Box::new(move |changes: &Changes| {
+        sink.lock().unwrap().push(changes.clone());
+    }));
+    announced
+}
+
+fn only_ids(ids: &[&str]) -> BTreeSet<String> {
+    ids.iter().map(|id| id.to_string()).collect()
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn fetching_comments_identical_to_the_cached_ones_announces_nothing() {
+    let site = Site::new().await;
+    let stale = "UPDATE cache.issue SET comments_synced_at = NULL WHERE key = 'NW-1042'";
+    site.execute(stale).await;
+    assert!(site.sync_comments("NW-1042").await);
+    site.execute(stale).await;
+    let announced = watch(site.db());
+
+    assert!(site.sync_comments("NW-1042").await);
+
+    assert!(announced.lock().unwrap().is_empty());
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn fetching_changed_comments_announces_the_issue() {
+    let site = Site::new().await;
+    site.fake.add_comment(
+        "NW-1042",
+        demo::demo().users[0].clone(),
+        "Liechtenstein rule is covered by a new test.",
+    );
+    site.execute("UPDATE cache.issue SET comments_synced_at = NULL WHERE key = 'NW-1042'")
+        .await;
+    let announced = watch(site.db());
+
+    assert!(site.sync_comments("NW-1042").await);
+
+    assert_eq!(
+        *announced.lock().unwrap(),
+        [Changes {
+            issues: only_ids(&["101042"]),
+            ..Changes::default()
+        }]
+    );
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn changed_history_announces_only_the_issues_detail() {
+    let site = Site::new().await;
+    site.fake.set_changelog(
+        "NW-1049",
+        vec![entry(
+            "2026-10-27T09:00:00.000+0100",
+            "labels",
+            "",
+            "backend",
+        )],
+    );
+    let announced = watch(site.db());
+
+    assert!(site.sync_history("NW-1049").await);
+
+    assert_eq!(
+        *announced.lock().unwrap(),
+        [Changes {
+            details: only_ids(&["101049"]),
+            ..Changes::default()
+        }]
+    );
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn changed_web_links_announce_only_the_issues_detail() {
+    let site = Site::new().await;
+    let announced = watch(site.db());
+
+    assert!(site.sync_web_links("NW-1042").await);
+
+    assert_eq!(
+        *announced.lock().unwrap(),
+        [Changes {
+            details: only_ids(&["101042"]),
+            ..Changes::default()
+        }]
+    );
 }
 
 fn remote_link(id: u64, url: &str, title: Option<&str>) -> serde_json::Value {

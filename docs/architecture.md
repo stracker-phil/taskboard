@@ -76,15 +76,16 @@ loads as defaults, unknown keys are ignored and a file that cannot be parsed is 
 
 Taskboard's data is two SQLite files ([data.md](data.md), [ADR 0019](adr/0019-two-sqlite-files-through-rusqlite.md)):
 `local.sqlite` holds the owner's setup (Spaces, filter lists, views, bookmarks), `cache.sqlite` the Jira mirror,
-attached as `cache`. Every change goes through `Db::write`, which emits `issues_changed` or `local_changed`
-after the commit. Reset cache deletes only the cache file.
+attached as `cache`. Every change goes through `Db::write`, which emits `issues_changed`,
+`issue_details_changed` or `local_changed` after the commit, at most every 500 ms during a burst. Reset cache deletes only the cache file.
 
 Jira is reached only through `jira/gateway/` ([jira.md](jira.md)): one `JiraClient` per connection, whose
 gateway sends only the operations on its allowlist, to the site and `api.atlassian.com` only
 ([ADR 0025](adr/0025-all-jira-traffic-goes-through-one-allowlisted-gateway.md)); its `AvatarClient` fetches
 profile pictures from Atlassian's avatar host only, without credentials, for `avatars/`
 ([ADR 0032](adr/0032-avatars-come-from-atlassians-avatar-host-through-rust.md)). The API token stays in the Keychain (`secrets.rs`);
-`connection::JiraAccess` builds clients from the saved connection. The debug build serves the demo site from
+`connection::JiraAccess` builds the client from the saved connection and reuses it (and its HTTP connections)
+while the site stays the same; saving the connection starts a new one. The debug build serves the demo site from
 the fake Jira on loopback. The sync engine (`sync/`, [sync.md](sync.md)) is the one task that fetches issues;
 it asks a `sync::source::Source` (`SyncContext::source`), and `sync/jira_source.rs` is the only implementation
 and the only part of `sync/` that names the Jira client

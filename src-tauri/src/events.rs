@@ -19,6 +19,8 @@ pub const KEYBINDINGS_CHANGED_EVENT: &str = "keybindings_changed";
 pub const OPEN_SETTINGS_EVENT: &str = "open_settings";
 /// Payload: an `IssuesChanged`; issues in the cache changed (`db::Db::write`).
 pub const ISSUES_CHANGED_EVENT: &str = "issues_changed";
+/// Payload: an `IssuesChanged` (never `all`); only these issues' detail changed (history, web links).
+pub const ISSUE_DETAILS_CHANGED_EVENT: &str = "issue_details_changed";
 /// Payload: a `LocalChanged`; parts of the owner's own setup changed.
 pub const LOCAL_CHANGED_EVENT: &str = "local_changed";
 /// Payload: the `SyncState` after it changed.

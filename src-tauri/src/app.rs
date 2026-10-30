@@ -8,9 +8,10 @@ use tauri_plugin_deep_link::DeepLinkExt;
 use tauri_plugin_log::{RotationStrategy, Target, TargetKind, TimezoneStrategy};
 
 use crate::cli::LogLevel;
-use crate::db::Db;
+use crate::db::{ANNOUNCE_EVERY, Db, coalesce};
 use crate::events::{
-    ISSUES_CHANGED_EVENT, LOCAL_CHANGED_EVENT, SYNC_PROGRESS_EVENT, SYNC_STATE_EVENT,
+    ISSUE_DETAILS_CHANGED_EVENT, ISSUES_CHANGED_EVENT, LOCAL_CHANGED_EVENT, SYNC_PROGRESS_EVENT,
+    SYNC_STATE_EVENT,
 };
 use crate::handlers::handlers;
 use crate::ipc::IpcMessage;
@@ -111,24 +112,30 @@ fn take_initial(app: &AppHandle, state: &AppState, initial: IpcMessage) {
     });
 }
 
+/// A sync stores a page every few milliseconds; the page hears about them at most every `ANNOUNCE_EVERY`.
 fn announce_db_changes(app: &AppHandle, db: &Db) {
     let app = app.clone();
-    db.set_notifier(Box::new(move |changes| {
-        let sent = changes
-            .issues_event()
-            .map(|event| app.emit(ISSUES_CHANGED_EVENT, event))
-            .into_iter()
-            .chain(
-                changes
-                    .local_event()
-                    .map(|event| app.emit(LOCAL_CHANGED_EVENT, event)),
-            );
-        for result in sent {
-            if let Err(e) = result {
-                log::warn!("Couldn't announce a data change: {e}");
+    db.set_notifier(coalesce(
+        ANNOUNCE_EVERY,
+        Box::new(move |changes| {
+            let issues = changes.issues_event();
+            let details = changes.details_event();
+            let sent = issues
+                .map(|event| app.emit(ISSUES_CHANGED_EVENT, event))
+                .into_iter()
+                .chain(details.map(|event| app.emit(ISSUE_DETAILS_CHANGED_EVENT, event)))
+                .chain(
+                    changes
+                        .local_event()
+                        .map(|event| app.emit(LOCAL_CHANGED_EVENT, event)),
+                );
+            for result in sent {
+                if let Err(e) = result {
+                    log::warn!("Couldn't announce a data change: {e}");
+                }
             }
-        }
-    }));
+        }),
+    ));
 }
 
 /// Spaces tracked before this Taskboard knew filter lists get their defaults.

@@ -14,9 +14,10 @@ import { row, statusStyle, viewData } from "../test/issues";
 import { settings } from "../test/settings";
 import { lumenSpace, sidebarTree, space } from "../test/spaces";
 import { createQueryClient } from "./queryClient";
+import { useIssue } from "./issues";
 import { useNav, useSpaces } from "./sidebar";
 import { useEvents } from "./useEvents";
-import { useStatusStyles, useViewRows } from "./views";
+import { useFilterOptions, useStatusStyles, useViewRows } from "./views";
 
 const mocked = vi.mocked(api, true);
 
@@ -149,6 +150,65 @@ describe("useEvents", () => {
       act(() => emitEvent(api, event, payload as never));
 
       expect(await screen.findByText("Styles: In Progress=blocked")).toBeInTheDocument();
+    });
+  });
+
+  describe("which queries an issue event refetches", () => {
+    function QueriesHarness() {
+      useEvents();
+      const { data: view } = useViewRows(11, 101);
+      const { data: options } = useFilterOptions();
+      const { data: first } = useIssue("1");
+      const { data: second } = useIssue("2");
+      return (
+        <p>
+          {view && options && first && second ? "Loaded" : "Loading"}: {Object.values(view?.rows ?? {}).map((r) => r.key).join(", ")}
+        </p>
+      );
+    }
+
+    async function renderQueries() {
+      mocked.viewRows.mockResolvedValue(viewData([], [row({ key: "NW-1" })]));
+      render(
+        <QueryClientProvider client={createQueryClient()}>
+          <QueriesHarness />
+        </QueryClientProvider>,
+      );
+      await screen.findByText("Loaded: NW-1");
+      await waitFor(() => expect(mocked.listen).toHaveBeenCalledWith("issues_changed", expect.any(Function)));
+      vi.clearAllMocks();
+      mocked.viewRows.mockResolvedValue(viewData([], [row({ key: "NW-1" }), row({ id: "10043", key: "NW-2" })]));
+    }
+
+    it("refetches the rows and the named issue, but not the filter options or other issues, when one issue changed", async () => {
+      await renderQueries();
+
+      act(() => emitEvent(api, "issues_changed", { ids: ["1"], all: false }));
+
+      expect(await screen.findByText("Loaded: NW-1, NW-2")).toBeInTheDocument();
+      await waitFor(() => expect(mocked.issueGet).toHaveBeenCalledWith("1"));
+      expect(mocked.filterOptions).not.toHaveBeenCalled();
+      expect(mocked.issueGet).not.toHaveBeenCalledWith("2");
+    });
+
+    it("refetches only the named issue's detail when issue_details_changed arrives", async () => {
+      await renderQueries();
+
+      act(() => emitEvent(api, "issue_details_changed", { ids: ["2"], all: false }));
+
+      await waitFor(() => expect(mocked.issueGet).toHaveBeenCalledWith("2"));
+      expect(mocked.issueGet).not.toHaveBeenCalledWith("1");
+      expect(mocked.viewRows).not.toHaveBeenCalled();
+      expect(mocked.filterOptions).not.toHaveBeenCalled();
+    });
+
+    it("refetches the filter options when issues_changed covers all issues", async () => {
+      await renderQueries();
+
+      act(() => emitEvent(api, "issues_changed", { ids: [], all: true }));
+
+      await waitFor(() => expect(mocked.filterOptions).toHaveBeenCalled());
+      expect(await screen.findByText("Loaded: NW-1, NW-2")).toBeInTheDocument();
     });
   });
 

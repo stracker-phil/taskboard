@@ -3,12 +3,14 @@
 use chrono::{DateTime, Duration};
 use rusqlite::{Connection, params};
 
+use super::UNSEEN;
 use crate::db::{Changes, Db};
 use crate::error::{AppError, AppResult};
 use crate::sync::map::format_utc;
 
 /// Seen at `now`, or at the issue's newest change or comment when Jira's clock runs ahead of this Mac's, so
-/// nothing already shown stays unseen.
+/// nothing already shown stays unseen. Only an issue that was unseen counts as changed: reading a read issue
+/// again shows nothing new.
 fn mark(conn: &Connection, changes: &mut Changes, ids: &[String], now: &str) -> AppResult<()> {
     let mut insert = conn.prepare(
         "INSERT INTO cache.issue_seen (issue_id, seen_at)
@@ -18,8 +20,13 @@ fn mark(conn: &Connection, changes: &mut Changes, ids: &[String], now: &str) -> 
          FROM cache.issue i WHERE i.id = ?1
          ON CONFLICT (issue_id) DO UPDATE SET seen_at = MAX(seen_at, excluded.seen_at), unread = 0",
     )?;
+    let mut unseen = conn.prepare(&format!(
+        "SELECT EXISTS (SELECT 1 FROM cache.issue i WHERE i.id = ?1 AND {UNSEEN})"
+    ))?;
     for id in ids {
-        if insert.execute(params![id, now])? > 0 {
+        let was_unseen: bool = unseen.query_row([id], |r| r.get(0))?;
+        insert.execute(params![id, now])?;
+        if was_unseen {
             changes.issue_changed(id);
         }
     }

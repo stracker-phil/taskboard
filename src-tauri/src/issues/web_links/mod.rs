@@ -38,8 +38,8 @@ pub async fn issue_web_links(db: &Db, id: String) -> AppResult<Vec<WebLink>> {
 }
 
 /// Fetches the issue's web links and replaces the cached ones, unless they were fetched within `FRESH_FOR` of
-/// `now`. Returns whether they changed; the cache emits `issues_changed` for the issue when they did. On a
-/// failure the cached links stay.
+/// `now`. Returns whether they changed; the cache emits `issue_details_changed` for the issue when they did.
+/// On a failure the cached links stay.
 pub async fn issue_sync_web_links(
     db: &Db,
     source: &dyn Source,
@@ -61,7 +61,7 @@ pub async fn issue_sync_web_links(
         let changed = store(tx, &id, &links, source_name)?;
         fetched::mark_fetched(tx, &id, Detail::WebLinks, now)?;
         if changed {
-            changes.issue_changed(&id);
+            changes.detail_changed(&id);
         }
         Ok(changed)
     })

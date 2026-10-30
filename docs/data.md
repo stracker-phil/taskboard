@@ -38,9 +38,15 @@ commands, which validate them. Tracking a project writes `local.space`, not the 
 - `Db::open` creates or migrates both files, then opens one writer and two readers. Each connection opens
   `local.sqlite` and attaches `cache.sqlite` as `cache`, so cache tables are written `cache.issue`.
 - `Db::read(|conn| …)` runs a query on a reader; `Db::write(|tx, changes| …)` is the only way to change data.
-  The closure records what it changed (`changes.issue_changed(id)`, `changes.local_changed(LocalPart::Views)`);
-  after the commit the app emits `issues_changed { ids, all }` and `local_changed { parts }`. A failed write
-  rolls back and emits nothing.
+  The closure records what it changed (`changes.issue_changed(id)`, `changes.detail_changed(id)` when only the
+  issue's detail changed, `changes.local_changed(LocalPart::Views)`); after the commit the app emits
+  `issues_changed { ids, all }`, `issue_details_changed { ids }` and `local_changed { parts }`. A failed write
+  rolls back and emits nothing. Writes in a burst (a sync's pages) are merged (`db::coalesce`): the first is
+  announced at once, the rest at most every `ANNOUNCE_EVERY` (500 ms), the last one always.
+- The page refetches by event (`src/queries/useEvents.ts`): `issues_changed` for named issues refreshes the
+  rows, the sidebar, the bookmarks, the counts and those issues' detail; with `all` everything an issue shows
+  up in; `issue_details_changed` only those issues' detail.
+- Every connection keeps a 16 MB page cache and memory-maps up to 256 MB per file (`connection::tune`).
 - `Db::reset_cache` detaches the cache everywhere, deletes it, creates an empty one and emits
   `issues_changed { all: true }`.
 

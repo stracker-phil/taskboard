@@ -13,8 +13,8 @@ use crate::sync::map::utc;
 use crate::sync::source::Source;
 
 /// Fetches the issue's changelog and replaces the cached history, unless it was fetched within `FRESH_FOR` of
-/// `now`. Returns whether it changed; the cache emits `issues_changed` for the issue when it did. On a failure
-/// the cached history stays.
+/// `now`. Returns whether it changed; the cache emits `issue_details_changed` for the issue when it did. On a
+/// failure the cached history stays.
 pub async fn issue_sync_history(
     db: &Db,
     source: &dyn Source,
@@ -33,7 +33,7 @@ pub async fn issue_sync_history(
         let changed = store(tx, &id, &entries, source_name)?;
         fetched::mark_fetched(tx, &id, Detail::History, now)?;
         if changed {
-            changes.issue_changed(&id);
+            changes.detail_changed(&id);
         }
         Ok(changed)
     })

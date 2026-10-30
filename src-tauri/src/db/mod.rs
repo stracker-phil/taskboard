@@ -3,6 +3,7 @@
 //! workers. All writes go through `Db::write`, which announces what changed after the commit.
 
 mod changes;
+mod coalesce;
 mod connection;
 mod migrate;
 
@@ -13,6 +14,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 use rusqlite::{Connection, Transaction};
 
 pub use changes::{Changes, IssuesChanged, LocalChanged, LocalPart};
+pub use coalesce::{ANNOUNCE_EVERY, coalesce};
 pub use connection::{CACHE_FILE, LOCAL_FILE};
 
 use crate::error::{AppError, AppResult};
@@ -213,11 +215,7 @@ mod tests {
     fn collect_into(sink: &Arc<Mutex<Vec<Changes>>>) -> Notifier {
         let sink = Arc::clone(sink);
         Box::new(move |changes| {
-            sink.lock().unwrap().push(Changes {
-                issues: changes.issues.clone(),
-                local: changes.local.clone(),
-                cache_reset: changes.cache_reset,
-            });
+            sink.lock().unwrap().push(changes.clone());
         })
     }
 
@@ -448,7 +446,7 @@ mod tests {
             vec![Changes {
                 issues: BTreeSet::from(["20001".to_string(), "20002".to_string()]),
                 local: BTreeSet::from([LocalPart::Spaces, LocalPart::Pins]),
-                cache_reset: false,
+                ..Changes::default()
             }]
         );
     }

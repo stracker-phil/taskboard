@@ -33,6 +33,8 @@ export interface EventPayloads {
   page_command: string;
   /** Issues in the cache changed. */
   issues_changed: IssuesChanged;
+  /** Only these issues' detail changed (history, web links); never `all`. */
+  issue_details_changed: IssuesChanged;
   /** Parts of the owner's own setup changed. */
   local_changed: LocalChanged;
   /** The sync engine's state changed. */

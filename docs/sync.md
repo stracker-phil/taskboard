@@ -56,8 +56,9 @@ comments, changes and seen rows. Runs after every full sync and hourly.
 `Source::remote_links`): they replace the cached ones; a failure is logged and the cached links stay.
 Its history (`issues::issue_sync_history`, `Source::changelog`, [ADR 0031](adr/0031-issue-history-comes-from-the-changelog-on-demand.md))
 is fetched the same way: Jira's whole changelog, at most every 5 minutes per issue (`issues::fetched::FRESH_FOR`,
-`issue.history_synced_at`), replacing the cached `issue_history` rows; `issues_changed` is emitted only when
-they changed. History never makes an issue unread: unseen changes stay those the sync recorded in `issue_change`.
+`issue.history_synced_at`), replacing the cached `issue_history` rows; `issue_details_changed` is emitted only when
+they changed (web links alike), so only the issue's detail refetches. Comments emit `issues_changed` only when
+they or their authors changed. History never makes an issue unread: unseen changes stay those the sync recorded in `issue_change`.
 The activity shows the history with its authors and drops the recorded changes (except `created`) at or before
 its newest entry, which the history already has.
 
@@ -88,7 +89,8 @@ all of an issue's comments, they replace the cached ones.
 |---|---|---|
 | `sync_state` | `SyncState` | the state changed |
 | `sync_progress` | `SyncProgress { job, projectId, projectKey, pagesDone, fetched, approxTotal }` | before the first page and after every page |
-| `issues_changed` | `IssuesChanged { ids, all }` | after a page stored changes (`Db::write`) |
+| `issues_changed` | `IssuesChanged { ids, all }` | after a page stored changes (`Db::write`), merged to at most one per 500 ms |
+| `issue_details_changed` | `IssuesChanged { ids }` | an opened issue's history or web links changed |
 
 ## Where to see it
 
