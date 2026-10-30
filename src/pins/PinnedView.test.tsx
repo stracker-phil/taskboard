@@ -1,7 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
 
@@ -140,6 +140,26 @@ describe("PinnedView", () => {
       expect(mocked.navGo).toHaveBeenCalledWith(21, null);
       expect(useStore.getState().issueView).toBeNull();
     });
+  });
+
+  describe("time left", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("is refreshed from Rust every minute while the view is open", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      mocked.pinsList.mockResolvedValueOnce(pins([pinItem({ timeLeft: "3h left" })])).mockResolvedValue(pins([pinItem({ timeLeft: "2h left" })]));
+      renderPinned();
+      expect(await screen.findByText("3h left")).toBeInTheDocument();
+
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(screen.getByText("3h left")).toBeInTheDocument();
+      await vi.advanceTimersByTimeAsync(31_000);
+
+      expect(await screen.findByText("2h left")).toBeInTheDocument();
+    });
+
   });
 
   describe("removing a bookmark", () => {

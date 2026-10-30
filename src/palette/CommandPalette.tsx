@@ -12,6 +12,20 @@ import { type PaletteAction, paletteActions, saveSearch } from "./actions";
 
 /** At most this many actions show, so issues and lists stay in sight. */
 const ACTION_LIMIT = 6;
+/** Searches once typing pauses, like the toolbar's text filter. */
+const DEBOUNCE_MS = 80;
+/** Every searched prefix is its own entry: unused ones go soon. */
+const RESULTS_GC_MS = 15_000;
+
+/** `value` once it has stopped changing for `DEBOUNCE_MS`. */
+function useSettled(value: string): string {
+  const [settled, setSettled] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setSettled(value), DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [value]);
+  return settled;
+}
 
 type Item = { kind: "issue"; hit: IssueHit } | { kind: "list"; hit: ListHit } | { kind: "action"; action: PaletteAction };
 
@@ -42,11 +56,13 @@ function Palette() {
   const go = useNavGo();
   const actions = useIssueActions();
   const listRef = useRef<HTMLDivElement>(null);
+  const query = useSettled(text);
   const { data: results } = useQuery({
-    queryKey: ["palette", text],
-    queryFn: () => api.paletteQuery(text),
-    enabled: text.trim() !== "",
+    queryKey: ["palette", query],
+    queryFn: () => api.paletteQuery(query),
+    enabled: query.trim() !== "",
     placeholderData: keepPreviousData,
+    gcTime: RESULTS_GC_MS,
   });
   const issues = text.trim() ? (results?.issues ?? []) : [];
   const lists = text.trim() ? (results?.lists ?? []) : [];

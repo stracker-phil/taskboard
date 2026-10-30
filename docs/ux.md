@@ -259,7 +259,8 @@ unread (`src-tauri/src/changes/`). The UI says read and unread; the code says se
 `src/palette/` (⌘K, or Search in the sidebar); Rust's `search::palette_query` finds the issues and lists.
 
 - A `--scrim` over the window; the 640px panel (16px radius, `--shadow-palette`) 110px from the top, rising in.
-- Input row 56: search icon, the 17px field, "N issues · M actions" on the right.
+- Input row 56: search icon, the 17px field, "N issues · M actions" on the right. It searches once typing
+  pauses for 80 ms; the last results stay until the next arrive.
 - Issues (max 8): a whole key or a bare number first, then full-text hits (every word as a prefix; key and
   summary weigh most). Each 46px row: status square, mono key (70), the summary with the match bold, the
   status pill, ↩ on the active row; a comment-only match adds "Matched in comment: “…”" under it.
@@ -287,7 +288,7 @@ bookmarked; a filter list's bookmark puts it under Home.
 - The Bookmarks page (`PinnedView`, no tabs or toolbar): one card with the bookmarked issue (status square, key,
   summary), comment (author, excerpt, issue key) or list (Space / name), Reason and Time left; hover shows ×
   to remove the bookmark. "Recently removed" lists what ended in the last 7 days. The Home row counts the active
-  bookmarks.
+  bookmarks. Time left refreshes every minute while the page is open.
 
 ## States
 
@@ -578,7 +579,8 @@ titlebar row, so its bar never reaches the window buttons.
 
 Toasts and dialogs are `--pop` with `--shadow` (no border). Toasts (`--radius`, bottom right) dismiss
 themselves (success 2.5 s, info 4 s, errors 8 s, with an action 10 s), repeats count up (`×3`); an error reads
-"Something went wrong" with Details. Sheets (`Modal`, `--radius-lg`, 20px padding, over `--scrim`) take Esc
+"Something went wrong" with Details. A view whose rows fail to load says so in one ("Could not load this view";
+`meta.failure` on a query in `queries/queryClient.ts`). Sheets (`Modal`, `--radius-lg`, 20px padding, over `--scrim`) take Esc
 first, a click on the scrim closes them, Tab cycles inside them, and closing returns the focus to where it was.
 Everything that loses the owner's setup asks first in a `ConfirmSheet` (`components/ConfirmSheet.tsx`; the page
 calls `useStore.getState().confirm({ title, text, action })` and `ConfirmHost` shows it): deleting a filter list

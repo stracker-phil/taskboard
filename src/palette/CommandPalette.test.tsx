@@ -157,6 +157,27 @@ describe("CommandPalette", () => {
       await waitFor(() => expect(mocked.paletteQuery).toHaveBeenLastCalledWith("contact"));
     });
 
+    it("asks once for text typed in a burst, not for each prefix", async () => {
+      await renderPalette();
+
+      await userEvent.type(input(), "abc", { delay: null });
+
+      await waitFor(() => expect(mocked.paletteQuery).toHaveBeenCalledWith("abc"));
+      expect(mocked.paletteQuery.mock.calls.map(([text]) => text)).toEqual(["abc"]);
+    });
+
+    it("keeps the previous results listed while the next ones load", async () => {
+      await renderPalette({ results: { issues: [issueHit()], lists: [] } });
+      await search("contact");
+      await screen.findByRole("option", { name: /NW-43/ });
+      mocked.paletteQuery.mockReturnValue(new Promise(() => {}));
+
+      await userEvent.type(input(), "s");
+      await waitFor(() => expect(mocked.paletteQuery).toHaveBeenLastCalledWith("contacts"));
+
+      expect(screen.getByRole("option", { name: /NW-43/ })).toBeInTheDocument();
+    });
+
     it("lists an issue with its key, summary, status and the matched words in bold", async () => {
       await renderPalette({ results: { issues: [issueHit({ summary: parts("Fix the ", ["contact"], " form") })], lists: [] } });
 

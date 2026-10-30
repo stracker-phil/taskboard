@@ -35,12 +35,18 @@ export const COLUMNS_KEY = ["columns"] as const;
 export const STATUS_STYLES_KEY = ["statusStyles"] as const;
 
 
+/** Every typed prefix of the text filter is its own entry: unused ones go soon. */
+const VIEW_GC_MS = 15_000;
+const VIEW_FAILURE = "Could not load this view";
+
 /** A view's grouped rows; the previous result stays on screen while the next one loads. */
 export const useViewRows = (listId: number, viewId: number, narrowing: Narrowing = NO_NARROWING) =>
   useQuery({
     queryKey: viewRowsKey(listId, viewId, narrowing),
     queryFn: () => api.viewRows(listId, viewId, narrowing),
     placeholderData: keepPreviousData,
+    gcTime: VIEW_GC_MS,
+    meta: { failure: VIEW_FAILURE },
   });
 
 /** A Board view's columns and cards; under `VIEW_ROWS_KEY`, so it refreshes with the rows. */
@@ -49,6 +55,8 @@ export const useViewBoard = (listId: number, viewId: number, narrowing: Narrowin
     queryKey: [...VIEW_ROWS_KEY, "board", listId, viewId, narrowing],
     queryFn: () => api.viewBoard(listId, viewId, narrowing),
     placeholderData: keepPreviousData,
+    gcTime: VIEW_GC_MS,
+    meta: { failure: VIEW_FAILURE },
   });
 
 /** Every column a view can show, for the column names. */

@@ -1,8 +1,10 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { Funnel, MessageSquare, X } from "lucide-react";
+import { useEffect } from "react";
 import { CopyKey } from "../components/issue/CopyKey";
 import { api, type PinItem } from "../api";
 import { StatusSquare } from "../components/issue/StatusSquare";
-import { usePins } from "../queries/pins";
+import { PINS_KEY, usePins } from "../queries/pins";
 import { useNavGo } from "../queries/sidebar";
 import { attempt } from "../state/requests";
 import { useStore } from "../state/store";
@@ -12,9 +14,17 @@ interface Props {
   viewId: number;
 }
 
+/** Rust words the time left ("3h left"); asking again every minute keeps it counting down. */
+const TIME_LEFT_REFRESH_MS = 60_000;
+
 /** Active pins, then the pins recently unpinned. */
 export function PinnedView({ listId, viewId }: Props) {
   const { data } = usePins();
+  const client = useQueryClient();
+  useEffect(() => {
+    const timer = setInterval(() => void client.invalidateQueries({ queryKey: PINS_KEY }), TIME_LEFT_REFRESH_MS);
+    return () => clearInterval(timer);
+  }, [client]);
   const openIssue = useStore((s) => s.openIssue);
   const go = useNavGo();
   if (!data) return null;
