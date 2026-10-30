@@ -52,8 +52,8 @@
     border-color var(--motion-fast) var(--ease-out), box-shadow var(--motion-fast) var(--ease-out);
 }
 
-/* A view's content fades in when the view, level or layout changes. */
-.list-scroll, .table-scroll { animation: fade-in var(--motion-base) var(--ease-out); }
+/* A view switch shows the next view at once: its toolbar takes its controls' state without transitions. */
+.motion-off, .motion-off * { transition: none !important; }
 
 /* The app's tooltip (components/TooltipHost.tsx): small, dark on light and light on dark, rising in. */
 .tooltip {

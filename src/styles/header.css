@@ -80,6 +80,9 @@
   color: var(--text);
   font-weight: 600;
 }
+/* The bold label's width is kept in every tab, so selecting one never moves the tabs after it. */
+.view-tab__name { display: inline-flex; flex-direction: column; }
+.view-tab__name::after { content: attr(data-text) / ""; height: 0; overflow: hidden; visibility: hidden; font-weight: 600; }
 .view-tab__look { display: flex; flex: none; align-items: center; }
 .view-tab .inline-rename { flex: none; width: 140px; font-weight: 400; }
 .view-tab__tile {

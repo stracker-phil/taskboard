@@ -237,7 +237,7 @@ fn app_submenu<'a>(ctx: &Ctx<'a>) -> tauri::Result<Submenu<Wry>> {
     with_items(ctx, builder, &[QUIT])?.build()
 }
 
-/// The menu bar for `place`; `place::refresh` builds it again when the place or its views change.
+/// The menu bar for `place`; `place::refresh` builds it again when the level's views change.
 pub fn build(app: &AppHandle, place: &Place) -> tauri::Result<Menu<Wry>> {
     let registry = app.state::<bus::Commands>();
     let commands = registry.available(app);

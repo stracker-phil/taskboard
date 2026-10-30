@@ -55,7 +55,7 @@ function Board({ view, data }: { view: View; data: BoardData }) {
   const boardRef = useRef<HTMLDivElement>(null);
   useCurrentColumnInView(boardRef, data, selected);
   // A column that collapses or opens moves the ones after it smoothly.
-  useGlide(boardRef);
+  useGlide(boardRef, view.id);
   const inlineLabels = view.inlineLabels && !data.cardFields.includes("labels");
   if (data.columns.length === 0) return <EmptyLevel listId={view.listId} viewId={view.id} />;
   return (

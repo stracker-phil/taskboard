@@ -39,7 +39,7 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
   const hasSubtasks = view.layout !== "board";
   const draft = useViewDraft(level, view);
   const { hidden, measure } = useToolbarFit(barRef, hasSubtasks ? [] : ["subtasks"]);
-  useGlide(barRef);
+  useGlide(barRef, view.id);
   const edit = useViewEdit();
   const key = narrowingKey(view.listId, view.id);
   const narrowing = useStore((s) => s.narrowings[key]) ?? NO_VIEW_NARROWING;

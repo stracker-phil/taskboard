@@ -470,7 +470,10 @@ popover entry), `--ease-out`, `--ease-in-out`; no literal durations elsewhere. U
 movement is instant and fades are short.
 
 - Show and hide fade: popovers rise in and fade out (`lib/motion.ts` `usePresence` keeps them mounted for the
-  exit, inert), chevrons fade in with their group, a view's content fades in when it changes.
+  exit, inert), chevrons fade in with their group.
+- A view switch is instant: the next view's content replaces the last one in the same frame, and the toolbar
+  takes the new view's state without glides or transitions (`useGlide`'s `scope`). The menu bar is updated in
+  place (`menu::place`), rebuilt only when the level's views change.
 - Hover gives a short response: a `--hover-bg` tint, a `--border-strong` border on outlined controls,
   `--row-hover-bg` on rows.
 - Expand and collapse animate like the sidebar's Spaces (`components/Disclosure`): a List or Table group's rows

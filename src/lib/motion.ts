@@ -36,16 +36,21 @@ interface Places {
 }
 
 /** The children of `row` glide to a new place instead of jumping, and a new child fades in (docs/ux.md → Stable
- *  controls). Only while the row keeps its width: when the window resizes, they follow at once. */
-export function useGlide(row: RefObject<HTMLElement | null>) {
+ *  controls). Only while the row keeps its width: when the window resizes, they follow at once. When `scope`
+ *  changes (another view) the row shows its new state at once, also without its controls' CSS transitions. */
+export function useGlide(row: RefObject<HTMLElement | null>, scope?: unknown) {
   const before = useRef<Places | null>(null);
+  const shownScope = useRef(scope);
   useLayoutEffect(() => {
     const element = row.current;
     if (!element) return;
+    const switched = shownScope.current !== scope;
+    shownScope.current = scope;
+    if (switched) instantly(element);
     const now: Places = { width: element.clientWidth, lefts: new WeakMap() };
     const previous = before.current;
     const ms = motionMs("--motion-slow");
-    const animates = previous !== null && previous.width === now.width && ms > 0;
+    const animates = !switched && previous !== null && previous.width === now.width && ms > 0;
     const easing = getComputedStyle(document.documentElement).getPropertyValue("--ease-out").trim() || "ease-out";
     for (const child of element.children) {
       if (!(child instanceof HTMLElement)) continue;
@@ -58,4 +63,10 @@ export function useGlide(row: RefObject<HTMLElement | null>) {
     }
     before.current = now;
   });
+}
+
+/** Turns off `element`'s transitions until the frame with its new state is drawn. */
+function instantly(element: HTMLElement) {
+  element.classList.add("motion-off");
+  requestAnimationFrame(() => requestAnimationFrame(() => element.classList.remove("motion-off")));
 }

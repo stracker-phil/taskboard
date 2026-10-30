@@ -66,7 +66,9 @@ export function ViewTab({ view, active, renaming, onOpen, onRename, onRenameDone
       {...dragProps}
     >
       {tile}
-      {view.name}
+      <span className="view-tab__name" data-text={view.name}>
+        {view.name}
+      </span>
     </button>
   );
 }

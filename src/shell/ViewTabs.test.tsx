@@ -78,6 +78,13 @@ describe("ViewTabs", () => {
       expect(screen.getByRole("tab", { name: "Sprint board" })).toHaveAttribute("aria-selected", "false");
     });
 
+    it("names each tab after its view alone", async () => {
+      await renderTabs();
+
+      expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["List", "Sprint board"]);
+      expect(screen.getByRole("tab", { name: "Sprint board" })).toBeInTheDocument();
+    });
+
     it("opens a view when its tab is clicked", async () => {
       await renderTabs();
 
