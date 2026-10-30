@@ -71,7 +71,7 @@
 
 /* The Table reuses the group header without the List's grid and gutter. */
 .table-item .list-group { display: flex; gap: 4px; padding: 0; }
-.table-item .list-group__chevron { position: static; opacity: 1; }
+.table-item .list-group__chevron { opacity: 1; }
 .table-item .list-group__title { margin-left: 0; }
 
 /* The row's hover toolbar overlays the end of the title cell and fades in. */

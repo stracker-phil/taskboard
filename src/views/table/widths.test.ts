@@ -7,7 +7,7 @@ describe("columnWidth", () => {
   });
 
   it.each([
-    ["key", 90],
+    ["key", 102],
     ["status", 130],
     ["priority", 104],
     ["customfield_10071", 90],

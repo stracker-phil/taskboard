@@ -563,6 +563,9 @@ one line that scrolls sideways inside the cell (an overlay scrollbar, [below](#s
 the List: the caret, the indent, the glyph and the count chip sit in the Summary cell. In Hierarchy every row
 leaves the caret's room before its title (`table-row--tree`), so titles line up whether a row has children or
 not, and the Summary header lines up with them; each level indents one caret's room (23) further.
+- **Edges**: rows and the header run from the panel's left edge to its right, so hover and selection reach both
+  sides; a 24px inset inside each row (spacers) and every cell's 12px keep the text off the edges (the key at
+  36). A group heading's tab starts where the keys do; its chevron sits in the left inset, as in the List.
 
 ## Tokens
 

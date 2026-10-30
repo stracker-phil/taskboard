@@ -1,6 +1,9 @@
 /* The Table layout: sticky header 34, rows 36, resizable columns, horizontal scroll when they overflow. */
 .table-scroll { height: 100%; overflow: auto; }
-.table-content { box-sizing: border-box; width: 100%; padding: 0 24px; }
+/* Rows and the header run edge to edge, so hover and selection reach the panel's sides; their 24px side insets
+   are spacers inside them (TableView's SIDE_PADDING). Group headings keep the inset as padding. */
+.table-content { box-sizing: border-box; width: 100%; }
+.table-header::before, .table-header::after, .table-row::before, .table-row::after { content: ""; flex: none; width: 24px; }
 
 .table-header {
   position: sticky; top: 0; z-index: 1; display: flex; align-items: center; height: 34px;
@@ -20,11 +23,14 @@
 .table-space { position: relative; width: 100%; }
 .table-item { position: absolute; top: 0; left: 0; width: 100%; box-sizing: border-box; }
 /* A group's heading row: as tall as any row, its tab 22 high on the row's bottom edge. */
+/* A group heading's tab starts where the keys do (the 24px inset and the key's 12px); its chevron sits in the
+   inset, as in the List. */
+.table-item--group { padding: 0 24px 0 36px; }
 .table-item--group .list-group { height: 30px; align-items: end; }
 .table-item--group .status-pill--tab { height: 22px; padding: 0 10px; border-radius: 6px 6px 0 0; font-size: 11px; }
 .table-item--group .status-pill--tab.status-pill--closed { border-radius: 6px; }
 .table-item--group .list-group__count { padding-bottom: 4px; }
-.table-item--group .list-group__chevron { top: 3px; }
+.table-item--group .list-group__chevron { top: 7px; left: -32px; }
 
 .table-row {
   display: flex; align-items: center; height: 30px; box-sizing: border-box;
@@ -35,6 +41,8 @@
 .table-row--changed, .table-row--changed:hover { background: var(--changed-bg); }
 .table-row--selected, .table-row--selected:hover { background: var(--selection-bg); }
 .table-row__cell { display: flex; flex: none; align-items: center; gap: 7px; min-width: 0; box-sizing: border-box; padding-right: 12px; overflow: hidden; }
+/* The key keeps 12px from the inset, like every cell from the next. */
+.table-row__key, .table-header__cell:first-child { padding-left: 12px; }
 .table-row__key { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); white-space: nowrap; }
 .table-row__summary { flex: 1; min-width: 240px; font-size: 13px; white-space: nowrap; }
 .table-row__title { min-width: 0; overflow: hidden; text-overflow: ellipsis; }

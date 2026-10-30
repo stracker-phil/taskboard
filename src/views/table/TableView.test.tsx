@@ -174,7 +174,7 @@ describe("TableView", () => {
     it("uses the default width for a column without a stored one", async () => {
       await renderTable();
 
-      expect(header("Key")).toHaveStyle({ width: "90px" });
+      expect(header("Key")).toHaveStyle({ width: "102px" });
     });
 
     it("saves the widths with the dragged column's new width once the pointer is released", async () => {
@@ -186,7 +186,7 @@ describe("TableView", () => {
       fireEvent.pointerMove(window, { clientX: 140 });
       fireEvent.pointerUp(window);
 
-      await waitFor(() => expect(mocked.viewSetWidths).toHaveBeenCalledWith(101, { status: 160, key: 130 }));
+      await waitFor(() => expect(mocked.viewSetWidths).toHaveBeenCalledWith(101, { status: 160, key: 142 }));
       expect(mocked.viewSetWidths).toHaveBeenCalledTimes(1);
     });
 
@@ -196,7 +196,7 @@ describe("TableView", () => {
       fireEvent.pointerDown(screen.getByRole("separator", { name: "Resize Key" }), { button: 0, clientX: 100 });
       fireEvent.pointerMove(window, { clientX: 140 });
 
-      await waitFor(() => expect(header("Key")).toHaveStyle({ width: "130px" }));
+      await waitFor(() => expect(header("Key")).toHaveStyle({ width: "142px" }));
       expect(mocked.viewSetWidths).not.toHaveBeenCalled();
       fireEvent.pointerUp(window);
     });
