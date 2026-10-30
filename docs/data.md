@@ -10,8 +10,8 @@ All in the config dir (`~/Library/Application Support/com.philippstracker.taskbo
 
 | File | Holds | Reset cache |
 |---|---|---|
-| `local.sqlite` | The owner's setup: Spaces, filter lists, views, bookmarks (`pin`), status style overrides | kept |
-| `cache.sqlite` | The tracker mirror (Jira today): spaces, issues, comments, people, versions, fields, change log, seen marks, sync state, search index | deleted and recreated empty |
+| `local.sqlite` | The owner's setup: Spaces, filter lists, views, bookmarks (`pin`), status style overrides, read and unread marks (`issue_seen`) | kept |
+| `cache.sqlite` | The tracker mirror (Jira today): spaces, issues, comments, people, versions, fields, change log, sync state, search index | deleted and recreated empty; with `sync.clearCacheOnQuit` also at every quit and launch |
 | `settings.json`, `keybindings.json`, `ui_state.json`, `places.json` | Settings, key overrides, window layout (the hidden sidebar, the activity column's width), each view's remembered place (`store/`; no longer the Me chip or the text filter, [ADR 0038](adr/0038-filter-changes-are-drafts-until-the-view-is-saved.md): an old `onlyMine` seeds `view.only_mine` once at startup, `text` is ignored) | kept |
 | `nav.json` | The main window's place: the open level and view, each level's last view, the expanded Spaces (`nav/`). A place that no longer exists falls back to the level's default view, then to Everything | kept |
 
@@ -28,7 +28,7 @@ The Jira token is in the Keychain only, never in a file or a log.
 | Section | Holds | Changed by |
 |---|---|---|
 | `connection` | site URL (normalized), email, token kind, token expiry date, cloud id, and what Test Connection found: account id, display name, time zone. Never the token (Keychain, service `APP_NAME`, account = email) | `connection_save`, `connection_test` |
-| `sync` | scope override (JQL or none), delta interval in front (1–60 min) and in the background (5–120 min), days to keep done issues (7–365) | `scope_save`, `sync_save` |
+| `sync` | scope override (JQL or none), delta interval in front (1–60 min) and in the background (5–120 min), days to keep done issues (7–365), `clearCacheOnQuit` (empty the cache at quit and at launch, `app::clear_cache_if_asked`) | `scope_save`, `sync_save` |
 
 `update_settings` replaces only what the page owns; `connection` and `sync` change through their own
 commands, which validate them. Tracking a project writes `local.space`, not the settings.
@@ -63,7 +63,6 @@ unique across sources (Jira's numeric ids; another source prefixes its own):
 | `issue` | keyed by the numeric Jira id (as text), never the key. Normalized columns for everything the UI filters, groups or sorts on; `custom` (migration `cache/0011`, [ADR 0041](adr/0041-an-issues-big-texts-live-beside-its-row.md)): the non-null custom fields' values as one JSON object, which custom columns and custom-field filters read. Ours, derived during sync: `status_category`, `type_is_subtask`, `is_epic`, `sprint_id`, `sprint_state`, `comment_count`, `comments_synced_at`, `links_synced_at`, `history_synced_at`, `synced_at`, `gone`, `left_scope_at` (migration `cache/0012`: when reconciliation last found it outside the sync scope, [sync.md](sync.md#jobs)). Indexed by key ignoring case (`issue_key`) and by the number after its dash (`issue_key_number`) |
 | `issue_body` | an issue's big texts, kept out of the rows every view reads (migration `cache/0011`, cascades): `description_html`, `description_adf`, and `raw`: the rest of Jira's issue JSON that no column or table holds (`sync::raw::kept_raw`: no description, custom fields or comment bodies, only the custom rendered fields). Attachments and links are read from `raw` (migration `cache/0009` clears the delta cursor so the next sync is a full one that fills the attachments) |
 | `issue_change` | what the sync saw change (status, assignee, due date, priority, comments, created, gone). Reconciliation deletes the changes older than 90 days that the owner has seen (`changed_at` at or before `issue_seen.seen_at`), except `created` (the activity always shows it) and `gone` (the purge of gone issues counts from it); the rest go with their issue |
-| `issue_seen` | when the owner last looked at an issue: changes after it are unseen (`changes::UNSEEN`); `unread` (migration `cache/0006`): marked unread by the owner, unread until read again |
 | `comment` | `body_html` from Jira, `body_text` (ours) for search, `body_adf` (migration `cache/0010`, [ADR 0036](adr/0036-rich-text-renders-from-adf-not-renderedfields.md)): the body as ADF, which the page is shown from (`adf::html_or`); null on rows from before the migration until the next sync, which then show `body_html` |
 | `remote_link` | an issue's web links (migration `cache/0004`): `issue_id` (cascades), `id`, `position`, `url` (untrusted), `title`, `application`, `relationship`, `source`; replaced as a whole when the issue is opened, at most every 5 minutes: `issue.links_synced_at` (migration `cache/0005`) holds the last fetch (`issues::issue_sync_web_links`, `issues::fetched::FRESH_FOR`) |
 | `issue_history` | an issue's history, Jira's changelog (migration `cache/0007`, [ADR 0031](adr/0031-issue-history-comes-from-the-changelog-on-demand.md)): `issue_id` (cascades), `position` (oldest first), `field` (Jira's name: `status`, `Fix Version`, `Sprint`), `field_id`, `from_value`/`to_value` (ids: status, account, version), `from_text`/`to_text`, `author_id`, `changed_at` (UTC, sorts with `issue_change`), `source`; replaced as a whole when the issue is opened, at most every 5 minutes: `issue.history_synced_at` holds the last fetch (`issues::issue_sync_history`). Never read by `changes::UNSEEN` |
@@ -83,6 +82,7 @@ unique across sources (Jira's numeric ids; another source prefixes its own):
 | `pin` | bookmarked issues, comments, filter lists and views (Bookmarks in the UI; `target_kind` `issue`, `comment`, `filter_list`, `view`), with an optional reason and expiry; active while not removed and not expired (`pins::active`); ended bookmarks stay in Recently removed for 7 days |
 | `space_status_style` | overrides the detected style of a status in one Space (`local/0007`; the old app-wide `status_style` rows were copied to every Space) |
 | `space_field` | how a custom field shows in one Space: `hiddenInList`, `hiddenInDetail` or `hidden`; no row = visible (`space_config`) |
+| `issue_seen` | when the owner last looked at an issue: changes after it are unseen (`changes::UNSEEN`); `unread`: marked unread by the owner, unread until read again. In the local file since `local/0015`, so a cache reset keeps it (`db::connection::carry_over_seen` copied the cache's rows once); no foreign key to `cache.issue`, `sync::store::forget_issue` deletes the row with its issue |
 
 Project ids in `local` point into `cache`; SQLite can't enforce that across files, so code cleans up.
 

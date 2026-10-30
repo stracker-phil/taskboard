@@ -13,7 +13,7 @@ use crate::sync::map::format_utc;
 /// again shows nothing new.
 fn mark(conn: &Connection, changes: &mut Changes, ids: &[String], now: &str) -> AppResult<()> {
     let mut insert = conn.prepare(
-        "INSERT INTO cache.issue_seen (issue_id, seen_at)
+        "INSERT INTO issue_seen (issue_id, seen_at)
          SELECT i.id, MAX(?2,
            COALESCE((SELECT MAX(changed_at) FROM cache.issue_change WHERE issue_id = i.id), ''),
            COALESCE((SELECT MAX(created_at) FROM cache.comment WHERE issue_id = i.id), ''))
@@ -60,7 +60,7 @@ pub async fn mark_unread(db: &Db, id: String, from: Option<String>) -> AppResult
     };
     db.write(move |tx, changes| {
         let marked = tx.execute(
-            "INSERT INTO cache.issue_seen (issue_id, seen_at, unread)
+            "INSERT INTO issue_seen (issue_id, seen_at, unread)
              SELECT id, COALESCE(?2, ''), 1 FROM cache.issue WHERE id = ?1
              ON CONFLICT (issue_id) DO UPDATE SET unread = 1,
                seen_at = CASE WHEN ?2 IS NULL THEN seen_at ELSE MIN(seen_at, ?2) END",

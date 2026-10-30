@@ -535,7 +535,7 @@ mod the_full_sync {
         rig.full_sync().await;
 
         assert_eq!(
-            count(&rig.ctx.db, "SELECT COUNT(*) FROM cache.issue_seen").await,
+            count(&rig.ctx.db, "SELECT COUNT(*) FROM issue_seen").await,
             TOTAL
         );
         assert_eq!(changes(&rig.ctx.db).await, vec![]);
@@ -713,13 +713,10 @@ mod the_full_sync {
             .await,
             "done"
         );
-        assert_eq!(
-            count(db, "SELECT COUNT(*) FROM cache.issue_seen").await,
-            TOTAL
-        );
+        assert_eq!(count(db, "SELECT COUNT(*) FROM issue_seen").await, TOTAL);
         let unseen = rows(
             db,
-            "SELECT i.id FROM cache.issue i LEFT JOIN cache.issue_seen s ON s.issue_id = i.id
+            "SELECT i.id FROM cache.issue i LEFT JOIN issue_seen s ON s.issue_id = i.id
              WHERE s.issue_id IS NULL",
             |row| row.get::<_, String>(0),
         )
@@ -1840,8 +1837,8 @@ mod reconciliation {
         let db = &rig.ctx.db;
         db.write(|tx, _| {
             tx.execute_batch(
-                "UPDATE cache.issue_seen SET seen_at = '2999-01-02T00:00:00.000Z' WHERE issue_id = '101042';
-                 UPDATE cache.issue_seen SET seen_at = '2000-06-01T00:00:00.000Z' WHERE issue_id = '101044';
+                "UPDATE issue_seen SET seen_at = '2999-01-02T00:00:00.000Z' WHERE issue_id = '101042';
+                 UPDATE issue_seen SET seen_at = '2000-06-01T00:00:00.000Z' WHERE issue_id = '101044';
                  INSERT INTO cache.issue_change (issue_id, field, old_value, new_value, changed_at) VALUES
                    ('101042', 'priority', 'High', 'Low', '2000-01-01T00:00:00.000Z'),
                    ('101042', 'created', NULL, 'NW-1042', '2000-01-01T00:00:00.000Z'),
@@ -1883,6 +1880,8 @@ mod reconciliation {
         rig.job(Job::Reconcile, None).await;
         let db = &rig.ctx.db;
         assert_eq!(gone_flag(db, "NW-1042").await, 1);
+        let seen_1042 = "SELECT COUNT(*) FROM issue_seen WHERE issue_id = '101042'";
+        assert_eq!(count(db, seen_1042).await, 1);
         db.write(|tx, _| {
             tx.execute(
                 "UPDATE cache.issue_change SET changed_at = ?1
@@ -1901,9 +1900,18 @@ mod reconciliation {
             "SELECT COUNT(*) FROM cache.comment WHERE issue_id = '101042'",
             "SELECT COUNT(*) FROM cache.issue_change WHERE issue_id = '101042'",
             "SELECT COUNT(*) FROM cache.issue_fts WHERE rowid = 101042",
+            seen_1042,
         ] {
             assert_eq!(count(db, sql).await, 0, "{sql}");
         }
+        assert_eq!(
+            count(
+                db,
+                "SELECT COUNT(*) FROM issue_seen WHERE issue_id = '101049'"
+            )
+            .await,
+            1
+        );
         assert_eq!(gone_flag(db, "NW-1049").await, 1);
         assert_eq!(
             count(db, "SELECT COUNT(*) FROM cache.issue").await,

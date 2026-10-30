@@ -11,7 +11,7 @@ const emptyConnection = (): Connection => ({
   timeZone: null,
 });
 
-export const defaultSync = (): SyncSettings => ({ scopeOverride: null, focusedMinutes: 5, backgroundMinutes: 15, keepDoneDays: 90 });
+export const defaultSync = (): SyncSettings => ({ scopeOverride: null, focusedMinutes: 5, backgroundMinutes: 15, keepDoneDays: 90, clearCacheOnQuit: false });
 
 /** The settings of a fresh install (Automatic appearance), with overrides. */
 export const settings = (patch: Partial<Settings> = {}): Settings => ({

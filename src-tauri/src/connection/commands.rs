@@ -108,7 +108,7 @@ pub async fn sync_save(
     Ok(saved)
 }
 
-/// Deletes the Jira mirror; the next sync is a full one. Spaces, filter lists, views and pins stay.
+/// Deletes the Jira mirror; the next sync is a full one. Spaces, filter lists, views, pins and read marks stay.
 #[tauri::command]
 pub async fn cache_reset(state: State<'_, AppState>) -> AppResult<()> {
     state.db.reset_cache().await?;

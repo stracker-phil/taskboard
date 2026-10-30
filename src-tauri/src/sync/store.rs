@@ -92,12 +92,13 @@ pub fn record_reconcile(conn: &Connection, now: &str) -> AppResult<()> {
     Ok(())
 }
 
-/// Removes the issue with its search row; comments, changes and seen rows go with it.
+/// Removes the issue with its search row and seen mark; comments and changes go with it.
 pub fn forget_issue(conn: &Connection, id: &str) -> AppResult<bool> {
     conn.execute(
         "DELETE FROM cache.issue_fts WHERE rowid = CAST(?1 AS INTEGER)",
         [id],
     )?;
+    conn.execute("DELETE FROM issue_seen WHERE issue_id = ?1", [id])?;
     Ok(conn.execute("DELETE FROM cache.issue WHERE id = ?1", [id])? > 0)
 }
 
@@ -229,7 +230,7 @@ fn store_issue(conn: &Connection, mapped: &Mapped, first: bool, now: &str) -> Ap
     replace_search_doc(conn, mapped)?;
     if first {
         conn.execute(
-            "INSERT INTO cache.issue_seen (issue_id, seen_at) VALUES (?1, ?2)
+            "INSERT INTO issue_seen (issue_id, seen_at) VALUES (?1, ?2)
              ON CONFLICT (issue_id) DO NOTHING",
             params![row.id, now],
         )?;

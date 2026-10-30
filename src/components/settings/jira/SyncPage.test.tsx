@@ -139,7 +139,7 @@ describe("SyncPage", () => {
       await userEvent.tab();
 
       await waitFor(() =>
-        expect(mocked.syncSave).toHaveBeenCalledWith({ scopeOverride: null, focusedMinutes: 10, backgroundMinutes: 15, keepDoneDays: 90 }),
+        expect(mocked.syncSave).toHaveBeenCalledWith({ scopeOverride: null, focusedMinutes: 10, backgroundMinutes: 15, keepDoneDays: 90, clearCacheOnQuit: false }),
       );
     });
 
@@ -181,7 +181,7 @@ describe("SyncPage", () => {
       await userEvent.click(screen.getByRole("button", { name: "Reset Cache" }));
 
       const dialog = screen.getByRole("alertdialog", { name: "Reset the cache?" });
-      expect(dialog).toHaveTextContent("Spaces, filter lists, views and bookmarks stay");
+      expect(dialog).toHaveTextContent("Spaces, filter lists, views, bookmarks and what you've read stay");
       expect(mocked.cacheReset).not.toHaveBeenCalled();
     });
 

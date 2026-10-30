@@ -20,6 +20,7 @@ pub const LOCAL: &[&str] = &[
     include_str!("../../migrations/local/0012_view_filter.sql"),
     include_str!("../../migrations/local/0013_view_subtasks.sql"),
     include_str!("../../migrations/local/0014_view_only_mine.sql"),
+    include_str!("../../migrations/local/0015_issue_seen.sql"),
 ];
 pub const CACHE: &[&str] = &[
     include_str!("../../migrations/cache/0001_init.sql"),
@@ -34,6 +35,7 @@ pub const CACHE: &[&str] = &[
     include_str!("../../migrations/cache/0010_comment_body_adf.sql"),
     include_str!("../../migrations/cache/0011_issue_body.sql"),
     include_str!("../../migrations/cache/0012_left_scope_at.sql"),
+    include_str!("../../migrations/cache/0013_drop_issue_seen.sql"),
 ];
 
 /// Brings the connection's file up to date in one transaction. A file migrated by a newer Taskboard is

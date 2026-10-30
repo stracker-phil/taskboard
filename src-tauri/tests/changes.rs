@@ -187,7 +187,7 @@ impl Site {
 
     async fn set_seen(&self, key: &str, at: &str) {
         self.run(format!(
-            "INSERT INTO cache.issue_seen (issue_id, seen_at)
+            "INSERT INTO issue_seen (issue_id, seen_at)
              SELECT id, '{at}' FROM cache.issue WHERE key = '{key}'
              ON CONFLICT (issue_id) DO UPDATE SET seen_at = excluded.seen_at"
         ))
@@ -196,14 +196,14 @@ impl Site {
 
     async fn forget_seen(&self, key: &str) {
         self.run(format!(
-            "DELETE FROM cache.issue_seen WHERE issue_id = (SELECT id FROM cache.issue WHERE key = '{key}')"
+            "DELETE FROM issue_seen WHERE issue_id = (SELECT id FROM cache.issue WHERE key = '{key}')"
         ))
         .await;
     }
 
     async fn seen_at(&self, key: &str) -> String {
         self.text(format!(
-            "SELECT seen_at FROM cache.issue_seen WHERE issue_id = (SELECT id FROM cache.issue WHERE key = '{key}')"
+            "SELECT seen_at FROM issue_seen WHERE issue_id = (SELECT id FROM cache.issue WHERE key = '{key}')"
         ))
         .await
     }
@@ -1331,7 +1331,7 @@ mod after_a_delta_sync {
     #[ignore = "syncs the demo site into a temp database"]
     async fn what_the_site_did_shows_as_chips_on_the_edited_issues() {
         let site = Site::new().await;
-        site.run(format!("UPDATE cache.issue_seen SET seen_at = '{TEN}'"))
+        site.run(format!("UPDATE issue_seen SET seen_at = '{TEN}'"))
             .await;
         site.fake
             .set_now(DELTA_AT.parse::<DateTime<Utc>>().unwrap());

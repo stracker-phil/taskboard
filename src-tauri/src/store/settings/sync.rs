@@ -20,6 +20,8 @@ pub struct SyncSettings {
     pub background_minutes: u32,
     /// How long finished issues stay in the default scope.
     pub keep_done_days: u32,
+    /// Empties the cache when Taskboard quits, and at launch in case it didn't quit cleanly.
+    pub clear_cache_on_quit: bool,
 }
 
 impl Default for SyncSettings {
@@ -29,6 +31,7 @@ impl Default for SyncSettings {
             focused_minutes: 5,
             background_minutes: 15,
             keep_done_days: 90,
+            clear_cache_on_quit: false,
         }
     }
 }
@@ -153,7 +156,41 @@ mod tests {
                 "focusedMinutes": 5,
                 "backgroundMinutes": 15,
                 "keepDoneDays": 90,
+                "clearCacheOnQuit": false,
             })
         );
+    }
+
+    #[test]
+    fn the_cache_is_kept_on_quit_by_default() {
+        assert!(!SyncSettings::default().clear_cache_on_quit);
+    }
+
+    #[test]
+    fn a_file_without_the_clear_on_quit_key_reads_false_and_keeps_the_rest() {
+        let read: SyncSettings = serde_json::from_value(json!({ "focusedMinutes": 10 })).unwrap();
+        assert_eq!(read, sync(10, 15, 90));
+    }
+
+    #[test]
+    fn the_clear_on_quit_key_reads_from_camel_case() {
+        let read: SyncSettings =
+            serde_json::from_value(json!({ "clearCacheOnQuit": true })).unwrap();
+        assert_eq!(
+            read,
+            SyncSettings {
+                clear_cache_on_quit: true,
+                ..SyncSettings::default()
+            }
+        );
+    }
+
+    #[test]
+    fn clamping_keeps_the_clear_on_quit_choice() {
+        let settings = SyncSettings {
+            clear_cache_on_quit: true,
+            ..sync(0, 1000, 90)
+        };
+        assert!(settings.clamped().clear_cache_on_quit);
     }
 }

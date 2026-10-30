@@ -729,7 +729,11 @@ focusedMinutes: number, backgroundMinutes: number,
 /**
  * How long finished issues stay in the default scope.
  */
-keepDoneDays: number, };
+keepDoneDays: number, 
+/**
+ * Empties the cache when Taskboard quits, and at launch in case it didn't quit cleanly.
+ */
+clearCacheOnQuit: boolean, };
 
 export type SyncState = { "state": "idle", lastOk: string | null, } | { "state": "running", job: Job, } | { "state": "error", kind: ErrorKind, message: string, } | { "state": "offline", since: string, } | { "state": "paused", message: string, };
 

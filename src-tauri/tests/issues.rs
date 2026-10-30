@@ -384,7 +384,7 @@ impl Site {
             ))
             .await,
             self.count_rows(format!(
-                "SELECT COUNT(*) FROM cache.issue_seen WHERE issue_id = '{id}'"
+                "SELECT COUNT(*) FROM issue_seen WHERE issue_id = '{id}'"
             ))
             .await,
             self.count_rows(format!(
@@ -1079,7 +1079,7 @@ async fn an_issue_created_after_the_first_sync_shows_a_created_change() {
 #[ignore = "syncs the demo site into a temp database"]
 async fn a_status_edited_on_the_site_shows_as_a_change_with_names_and_styles() {
     let site = Site::new().await;
-    site.execute("UPDATE cache.issue_seen SET seen_at = '2026-10-28T10:00:00.000Z'")
+    site.execute("UPDATE issue_seen SET seen_at = '2026-10-28T10:00:00.000Z'")
         .await;
     site.fake.set_now(later());
     site.fake
@@ -1142,7 +1142,7 @@ async fn a_chosen_status_style_colors_the_status_change() {
 #[ignore = "syncs the demo site into a temp database"]
 async fn an_assignee_edited_on_the_site_shows_as_a_change_between_people() {
     let site = Site::new().await;
-    site.execute("UPDATE cache.issue_seen SET seen_at = '2026-10-28T10:00:00.000Z'")
+    site.execute("UPDATE issue_seen SET seen_at = '2026-10-28T10:00:00.000Z'")
         .await;
     site.fake.set_now(later());
     let marta_user = demo::demo()
@@ -2240,7 +2240,7 @@ async fn the_created_change_stays_when_the_history_is_newer() {
 #[ignore = "syncs the demo site into a temp database"]
 async fn fetching_history_does_not_make_a_seen_issue_unread() {
     let site = Site::new().await;
-    site.execute("UPDATE cache.issue_seen SET seen_at = '2026-10-28T10:00:00.000Z'")
+    site.execute("UPDATE issue_seen SET seen_at = '2026-10-28T10:00:00.000Z'")
         .await;
     let space = site
         .db()
@@ -2279,7 +2279,7 @@ async fn fetching_history_does_not_make_a_seen_issue_unread() {
 async fn history_items_after_the_seen_time_are_fresh_while_the_issue_is_unseen() {
     let site = Site::new().await;
     site.execute(
-        "UPDATE cache.issue_seen SET seen_at = '2026-10-26T12:00:00.000Z'
+        "UPDATE issue_seen SET seen_at = '2026-10-26T12:00:00.000Z'
          WHERE issue_id = (SELECT id FROM cache.issue WHERE key = 'NW-1042')",
     )
     .await;

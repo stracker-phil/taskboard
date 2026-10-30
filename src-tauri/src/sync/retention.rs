@@ -80,7 +80,7 @@ pub fn prune_seen_changes(conn: &Connection, before: &str) -> AppResult<usize> {
     Ok(conn.execute(
         "DELETE FROM cache.issue_change
          WHERE changed_at < ?1 AND field NOT IN ('created', 'gone')
-           AND changed_at <= (SELECT s.seen_at FROM cache.issue_seen s WHERE s.issue_id = issue_change.issue_id)",
+           AND changed_at <= (SELECT s.seen_at FROM issue_seen s WHERE s.issue_id = issue_change.issue_id)",
         [before],
     )?)
 }

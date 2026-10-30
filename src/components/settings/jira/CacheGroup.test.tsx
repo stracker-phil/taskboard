@@ -10,6 +10,7 @@ import { formatLocalTime } from "../../../lib/time";
 import { createQueryClient } from "../../../queries/queryClient";
 import { resetStore } from "../../../state/store";
 import { projectCounts, syncOverview } from "../../../test/jira";
+import { defaultSync, settings } from "../../../test/settings";
 import { CacheGroup } from "./CacheGroup";
 
 const mocked = vi.mocked(api, true);
@@ -26,6 +27,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
   mocked.syncOverview.mockResolvedValue(syncOverview());
+  mocked.getSettings.mockResolvedValue(settings());
 });
 
 describe("CacheGroup", () => {
@@ -70,6 +72,63 @@ describe("CacheGroup", () => {
 
       expect(await screen.findByText("Syncing…")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Sync Now" })).toBeDisabled();
+    });
+  });
+
+  describe("clearing the cache on quit", () => {
+    const switchName = "Clear the cache when Taskboard quits";
+
+    it("shows the switch off when the setting is off", async () => {
+      renderGroup();
+
+      expect(await screen.findByRole("switch", { name: switchName })).not.toBeChecked();
+    });
+
+    it("shows the switch on when the setting is saved on", async () => {
+      mocked.getSettings.mockResolvedValue(settings({ sync: { ...defaultSync(), clearCacheOnQuit: true } }));
+
+      renderGroup();
+
+      expect(await screen.findByRole("switch", { name: switchName })).toBeChecked();
+    });
+
+    it("saves the whole sync settings with the flag turned on and shows the saved result", async () => {
+      renderGroup();
+
+      await userEvent.click(await screen.findByRole("switch", { name: switchName }));
+
+      await waitFor(() => expect(mocked.syncSave).toHaveBeenCalledWith({ ...defaultSync(), clearCacheOnQuit: true }));
+      await waitFor(() => expect(screen.getByRole("switch", { name: switchName })).toBeChecked());
+    });
+
+    it("saves the flag turned off when it was on", async () => {
+      mocked.getSettings.mockResolvedValue(settings({ sync: { ...defaultSync(), keepDoneDays: 30, clearCacheOnQuit: true } }));
+      renderGroup();
+
+      await userEvent.click(await screen.findByRole("switch", { name: switchName }));
+
+      await waitFor(() => expect(mocked.syncSave).toHaveBeenCalledWith({ ...defaultSync(), keepDoneDays: 30, clearCacheOnQuit: false }));
+      await waitFor(() => expect(screen.getByRole("switch", { name: switchName })).not.toBeChecked());
+    });
+
+    it("keeps the switch as saved when saving fails", async () => {
+      mocked.syncSave.mockRejectedValueOnce({ kind: "io", message: "Disk full", code: null });
+      renderGroup();
+
+      await userEvent.click(await screen.findByRole("switch", { name: switchName }));
+
+      await waitFor(() => expect(mocked.syncSave).toHaveBeenCalled());
+      expect(screen.getByRole("switch", { name: switchName })).not.toBeChecked();
+    });
+  });
+
+  describe("reset confirmation", () => {
+    it("says that what you've read stays", async () => {
+      renderGroup();
+
+      await userEvent.click(await screen.findByRole("button", { name: "Reset Cache" }));
+
+      expect(screen.getByRole("alertdialog")).toHaveTextContent("bookmarks and what you've read stay");
     });
   });
 

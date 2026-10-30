@@ -10,9 +10,9 @@ use crate::error::AppResult;
 
 /// An issue (alias `i`) with a change recorded after the owner last saw it, or marked unread.
 pub const UNSEEN: &str = "(EXISTS (SELECT 1 FROM cache.issue_change c
-    LEFT JOIN cache.issue_seen s ON s.issue_id = c.issue_id
+    LEFT JOIN issue_seen s ON s.issue_id = c.issue_id
     WHERE c.issue_id = i.id AND c.field != 'gone' AND (s.seen_at IS NULL OR c.changed_at > s.seen_at))
-    OR EXISTS (SELECT 1 FROM cache.issue_seen u WHERE u.issue_id = i.id AND u.unread = 1))";
+    OR EXISTS (SELECT 1 FROM issue_seen u WHERE u.issue_id = i.id AND u.unread = 1))";
 
 /// One row of `issue_change`.
 #[derive(Debug, Clone, PartialEq)]
@@ -39,7 +39,7 @@ pub fn unseen_changes(conn: &Connection, ids: &[&str]) -> AppResult<HashMap<Stri
     let mut query = conn.prepare(
         "SELECT c.issue_id, c.field, c.old_value, c.new_value, c.changed_at
          FROM json_each(?1) j JOIN cache.issue_change c ON c.issue_id = j.value
-         LEFT JOIN cache.issue_seen s ON s.issue_id = c.issue_id
+         LEFT JOIN issue_seen s ON s.issue_id = c.issue_id
          WHERE c.field != 'gone' AND (s.seen_at IS NULL OR c.changed_at > s.seen_at)
          ORDER BY c.changed_at, c.id",
     )?;
@@ -50,7 +50,7 @@ pub fn unseen_changes(conn: &Connection, ids: &[&str]) -> AppResult<HashMap<Stri
         by_issue.entry(id).or_default().push(change);
     }
     let mut marked = conn.prepare(
-        "SELECT s.issue_id FROM json_each(?1) j JOIN cache.issue_seen s ON s.issue_id = j.value
+        "SELECT s.issue_id FROM json_each(?1) j JOIN issue_seen s ON s.issue_id = j.value
          WHERE s.unread = 1",
     )?;
     for id in marked.query_map([&ids], |r| r.get::<_, String>(0))? {
@@ -88,7 +88,7 @@ pub fn unseen_since(conn: &Connection, id: &str) -> AppResult<Option<String>> {
 pub fn seen_at(conn: &Connection, id: &str) -> AppResult<Option<String>> {
     Ok(conn
         .query_row(
-            "SELECT seen_at FROM cache.issue_seen WHERE issue_id = ?1",
+            "SELECT seen_at FROM issue_seen WHERE issue_id = ?1",
             [id],
             |r| r.get(0),
         )
@@ -114,7 +114,7 @@ mod tests {
         INSERT INTO cache.issue_change (issue_id, field, old_value, new_value, changed_at) VALUES
           ('20001', 'status', '1', '2', '2026-01-06T09:00:00Z'),
           ('20002', 'status', '1', '3', '2026-01-06T10:00:00Z');
-        INSERT INTO cache.issue_seen (issue_id, seen_at, unread) VALUES
+        INSERT INTO issue_seen (issue_id, seen_at, unread) VALUES
           ('20003', '2026-01-05T09:00:00Z', 1);";
 
     fn change(field: &str, old: &str, new: &str, at: &str) -> Change {

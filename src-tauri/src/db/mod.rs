@@ -380,7 +380,14 @@ mod tests {
              VALUES ('issue', '20001', '2026-01-05T09:00:00Z')",
         )
         .await;
+        exec(
+            &db,
+            "INSERT INTO issue_seen (issue_id, seen_at, unread) \
+             VALUES ('20001', '2026-01-05T09:00:00.000Z', 1)",
+        )
+        .await;
         let tables = [
+            ("issue_seen", "SELECT COUNT(*) FROM issue_seen"),
             ("space", "SELECT COUNT(*) FROM space"),
             ("filter_list", "SELECT COUNT(*) FROM filter_list"),
             ("view", "SELECT COUNT(*) FROM view"),
@@ -405,6 +412,36 @@ mod tests {
         );
         exec(&db, PROJECT).await;
         assert_eq!(count(&db, "SELECT COUNT(*) FROM cache.space").await, 1);
+    }
+
+    #[tokio::test]
+    async fn an_issue_marked_unread_stays_unread_after_a_reset_and_storing_it_again() {
+        let (_dir, db) = open_db();
+        exec(&db, PROJECT).await;
+        exec(&db, ISSUE).await;
+        exec(
+            &db,
+            "INSERT INTO issue_seen (issue_id, seen_at, unread) \
+             VALUES ('20001', '2026-01-05T09:00:00.000Z', 1)",
+        )
+        .await;
+
+        db.reset_cache().await.unwrap();
+        exec(&db, PROJECT).await;
+        exec(&db, ISSUE).await;
+
+        let row: (String, i64) = db
+            .read(|conn| {
+                Ok(conn.query_row(
+                    "SELECT s.seen_at, s.unread FROM cache.issue i \
+                     JOIN issue_seen s ON s.issue_id = i.id WHERE i.key = 'NW-1'",
+                    [],
+                    |row| Ok((row.get(0)?, row.get(1)?)),
+                )?)
+            })
+            .await
+            .unwrap();
+        assert_eq!(row, ("2026-01-05T09:00:00.000Z".to_string(), 1));
     }
 
     #[tokio::test]

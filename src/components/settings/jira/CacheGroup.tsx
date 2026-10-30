@@ -1,13 +1,15 @@
 import { useState } from "react";
-import { api, type ProjectCounts } from "../../../api";
+import { useQueryClient } from "@tanstack/react-query";
+import { api, type ProjectCounts, type Settings } from "../../../api";
 import { formatLocalTime } from "../../../lib/time";
+import { SETTINGS_KEYS, useSettings } from "../../../queries/settings";
 import { describeSyncState, useSyncOverview } from "../../../queries/sync";
 import { fail, useStore } from "../../../state/store";
 import { ConfirmSheet } from "../../ConfirmSheet";
-import { Group, Row } from "../controls";
+import { Group, Row, Switch } from "../controls";
 import { useBusyAction } from "../useBusyAction";
 
-const WHAT_STAYS = "Taskboard deletes its copy of your Jira issues and fetches them again. Spaces, filter lists, views and bookmarks stay.";
+const WHAT_STAYS = "Taskboard deletes its copy of your Jira issues and fetches them again. Spaces, filter lists, views, bookmarks and what you've read stay.";
 
 const issues = (n: number) => (n === 1 ? "1 issue" : `${n} issues`);
 
@@ -23,8 +25,28 @@ function ProjectRow({ project }: { project: ProjectCounts }) {
   );
 }
 
-/** Sync → Cache: the sync state with Sync Now, what the cache holds per tracked project, and Reset Cache
- *  (after a confirmation). */
+/** Empties the cache whenever Taskboard quits, so no Jira data stays on the Mac between sessions. */
+function ClearOnQuit() {
+  const client = useQueryClient();
+  const { data: settings } = useSettings();
+  if (!settings) return null;
+  const save = (clearCacheOnQuit: boolean) =>
+    void api.syncSave({ ...settings.sync, clearCacheOnQuit }).then(
+      (saved) => client.setQueryData<Settings>(SETTINGS_KEYS.settings, (current) => current && { ...current, sync: saved }),
+      (e: unknown) => fail(e, "Could not save the setting"),
+    );
+  return (
+    <Switch
+      label="Clear the cache when Taskboard quits"
+      description="No copy of your issues stays on this Mac; each launch fetches them again."
+      checked={settings.sync.clearCacheOnQuit}
+      onChange={save}
+    />
+  );
+}
+
+/** Sync → Cache: the sync state with Sync Now, what the cache holds per tracked project, Reset Cache (after a
+ *  confirmation) and clearing it on quit. */
 export function CacheGroup() {
   const [confirming, setConfirming] = useState(false);
   const [busy, run] = useBusyAction();
@@ -63,6 +85,7 @@ export function CacheGroup() {
           Reset Cache
         </button>
       </Row>
+      <ClearOnQuit />
       {confirming && <ConfirmSheet title="Reset the cache?" text={WHAT_STAYS} action="Reset Cache" onCancel={() => setConfirming(false)} onConfirm={reset} />}
     </Group>
   );

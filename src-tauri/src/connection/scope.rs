@@ -140,6 +140,37 @@ mod tests {
         }
     }
 
+    #[tokio::test]
+    async fn saving_the_intervals_keeps_the_scope_override_and_saves_clear_on_quit() {
+        let dir = crate::test_support::temp_config_dir();
+        let settings = SettingsStore::open(dir.path());
+        settings
+            .edit(|s| s.sync.scope_override = Some("project = NW".into()))
+            .await
+            .unwrap();
+
+        let saved = save_intervals(
+            &settings,
+            SyncSettings {
+                scope_override: None,
+                focused_minutes: 10,
+                clear_cache_on_quit: true,
+                ..SyncSettings::default()
+            },
+        )
+        .await
+        .unwrap();
+
+        let expected = SyncSettings {
+            scope_override: Some("project = NW".into()),
+            focused_minutes: 10,
+            clear_cache_on_quit: true,
+            ..SyncSettings::default()
+        };
+        assert_eq!(saved, expected);
+        assert_eq!(SettingsStore::open(dir.path()).get().sync, expected);
+    }
+
     #[test]
     fn the_scope_view_uses_camel_case_names_for_the_page() {
         let view = ScopeView {

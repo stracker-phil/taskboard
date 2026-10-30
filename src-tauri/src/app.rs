@@ -66,6 +66,7 @@ pub fn start(
             clear_attachments(app.handle());
             app.set_menu(menu::build(app.handle(), &menu::place::Place::default())?)?;
             let state = app.state::<AppState>();
+            clear_cache_if_asked(&state);
             follow_the_place_in_the_menus(app.handle(), &state);
             announce_db_changes(app.handle(), &state.db);
             give_spaces_their_lists(&state.db);
@@ -93,9 +94,24 @@ pub fn start(
                 code: None, api, ..
             } => api.prevent_exit(),
             RunEvent::Reopen { .. } => window::show_main(app),
-            RunEvent::Exit => clear_attachments(app),
+            RunEvent::Exit => {
+                clear_attachments(app);
+                clear_cache_if_asked(&app.state::<AppState>());
+            }
             _ => {}
         });
+}
+
+/// With `sync.clearCacheOnQuit` no copy of the Jira issues outlives a session: it runs at quit, and at launch
+/// for a session that didn't quit cleanly.
+fn clear_cache_if_asked(state: &AppState) {
+    if !state.settings.get().sync.clear_cache_on_quit {
+        return;
+    }
+    match tauri::async_runtime::block_on(state.db.reset_cache()) {
+        Ok(()) => log::info!("Cache cleared (clear on quit)"),
+        Err(e) => log::warn!("The cache wasn't cleared: {e}"),
+    }
 }
 
 /// Downloaded attachments live only while the app runs.
