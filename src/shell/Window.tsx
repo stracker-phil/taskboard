@@ -38,9 +38,12 @@ export function Window({ sidebarHidden, children }: Props) {
             <>
               <div className="content-panel__main">
                 <LevelChrome />
-                <div className="content-panel__body">{children}</div>
+                {/* The preview lies over the view, so opening it never narrows or reflows what is under the cursor. */}
+                <div className="content-panel__body">
+                  {children}
+                  <CurrentPeek />
+                </div>
               </div>
-              <CurrentPeek />
             </>
           )}
         </main>

@@ -1,7 +1,7 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
 
@@ -140,5 +140,48 @@ describe("CurrentPeek", () => {
 
     expect(useStore.getState().places["11:101"]).toMatchObject({ selectedId: "10042", peekOpen: false });
     expect(screen.queryByRole("complementary", { name: "Issue preview" })).not.toBeInTheDocument();
+  });
+
+  describe("while the preview slides out", () => {
+    const preview = () => screen.queryByRole("complementary", { name: "Issue preview" });
+
+    beforeEach(() => {
+      document.documentElement.style.setProperty("--motion-base", "150ms");
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+      document.documentElement.style.removeProperty("--motion-base");
+    });
+
+    const closePeek = () => act(() => useStore.getState().updatePlace(11, 101, { peekOpen: false }));
+
+    it("keeps the same issue shown, marked as leaving and inert, until the motion time has passed", async () => {
+      resetStore({ places: { "11:101": PLACE } });
+      renderPeek();
+      await screen.findByRole("heading", { name: "Redesign the pricing page" });
+
+      closePeek();
+
+      const presence = preview()?.parentElement;
+      expect(presence).toHaveClass("peek-presence", "peek-presence--leaving");
+      expect(presence).toHaveAttribute("inert");
+      expect(screen.getByRole("heading", { name: "Redesign the pricing page" })).toBeInTheDocument();
+
+      await act(() => vi.advanceTimersByTimeAsync(200));
+
+      expect(preview()).not.toBeInTheDocument();
+    });
+
+    it("is open and not inert while the peek is shown", async () => {
+      resetStore({ places: { "11:101": PLACE } });
+      renderPeek();
+
+      const presence = (await screen.findByRole("complementary", { name: "Issue preview" })).parentElement;
+
+      expect(presence).toHaveClass("peek-presence--open");
+      expect(presence).not.toHaveAttribute("inert");
+    });
   });
 });

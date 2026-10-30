@@ -189,6 +189,25 @@ describe("Window", () => {
     });
   });
 
+  describe("with a preview open", () => {
+    it("lays the preview over the view body, next to the view's content", async () => {
+      resetStore({ places: { "11:101": { scrollTop: 0, toggled: {}, collapsedParents: [], selectedId: "10042", peekOpen: true } } });
+      render(
+        <QueryClientProvider client={client}>
+          <Window sidebarHidden>
+            <p>View body</p>
+          </Window>
+        </QueryClientProvider>,
+      );
+
+      const preview = await screen.findByRole("complementary", { name: "Issue preview" });
+      const body = screen.getByText("View body").parentElement;
+
+      expect(body).toHaveClass("content-panel__body");
+      expect(body).toContainElement(preview);
+    });
+  });
+
   describe("without an Issue view", () => {
     it("shows the view body and stays that way when the place changes", async () => {
       await renderWindow(false);
