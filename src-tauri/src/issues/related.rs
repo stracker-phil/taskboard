@@ -131,9 +131,11 @@ fn key_number(key: &str) -> u64 {
 /// From the issue's raw `issuelinks`; a linked issue the cache holds shows its cached status.
 fn links(conn: &Connection, id: &str, me: Option<&str>) -> AppResult<Vec<IssueLink>> {
     let raw: Option<String> = conn
-        .query_row("SELECT raw FROM cache.issue_body WHERE issue_id = ?1", [id], |r| {
-            r.get(0)
-        })
+        .query_row(
+            "SELECT raw FROM cache.issue_body WHERE issue_id = ?1",
+            [id],
+            |r| r.get(0),
+        )
         .optional()?;
     let raw: Value = raw
         .and_then(|r| serde_json::from_str(&r).ok())

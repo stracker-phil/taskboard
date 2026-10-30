@@ -1295,7 +1295,10 @@ async fn two_links_to_the_same_cached_issue_both_resolve_to_it_whatever_the_keys
     second["id"] = serde_json::json!("99001");
     second["type"] = serde_json::json!({ "outward": "relates to", "inward": "relates to" });
     second["outwardIssue"]["key"] = serde_json::json!("nw-1051");
-    raw["fields"]["issuelinks"].as_array_mut().unwrap().push(second);
+    raw["fields"]["issuelinks"]
+        .as_array_mut()
+        .unwrap()
+        .push(second);
     let raw = raw.to_string();
     site.db()
         .write(move |tx, _| {
@@ -1314,7 +1317,13 @@ async fn two_links_to_the_same_cached_issue_both_resolve_to_it_whatever_the_keys
     let blocked = site.id_of("NW-1051").await;
     let resolved: Vec<(&str, Option<&str>, &str)> = links
         .iter()
-        .map(|l| (l.relation.as_str(), l.issue.id.as_deref(), l.issue.key.as_str()))
+        .map(|l| {
+            (
+                l.relation.as_str(),
+                l.issue.id.as_deref(),
+                l.issue.key.as_str(),
+            )
+        })
         .collect();
     assert_eq!(
         resolved,

@@ -102,8 +102,14 @@ pub async fn inline_image(app: &AppHandle, path: &str) -> Response<Vec<u8>> {
                 attachment_cache(app),
             ) {
                 (Ok(source), Ok(root)) => {
-                    super::attachment_image(&state.db, source.as_ref(), &root, issue_id, attachment_id)
-                        .await
+                    super::attachment_image(
+                        &state.db,
+                        source.as_ref(),
+                        &root,
+                        issue_id,
+                        attachment_id,
+                    )
+                    .await
                 }
                 (Err(e), _) | (_, Err(e)) => Err(e),
             }

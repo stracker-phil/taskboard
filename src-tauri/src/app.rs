@@ -14,8 +14,8 @@ use crate::events::{
     SYNC_STATE_EVENT,
 };
 use crate::handlers::handlers;
-use crate::issues::INLINE_IMAGE_SCHEME;
 use crate::ipc::IpcMessage;
+use crate::issues::INLINE_IMAGE_SCHEME;
 use crate::state::AppState;
 use crate::sync::schedule::{Focus, start_schedule};
 use crate::sync::{SyncContext, SyncEngine, SyncEvent};
@@ -37,13 +37,16 @@ pub fn start(
         .plugin(init_logging(log_level))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_deep_link::init())
-        .register_asynchronous_uri_scheme_protocol(INLINE_IMAGE_SCHEME, |ctx, request, responder| {
-            let app = ctx.app_handle().clone();
-            let path = request.uri().path().to_owned();
-            tauri::async_runtime::spawn(async move {
-                responder.respond(crate::issues::commands::inline_image(&app, &path).await);
-            });
-        })
+        .register_asynchronous_uri_scheme_protocol(
+            INLINE_IMAGE_SCHEME,
+            |ctx, request, responder| {
+                let app = ctx.app_handle().clone();
+                let path = request.uri().path().to_owned();
+                tauri::async_runtime::spawn(async move {
+                    responder.respond(crate::issues::commands::inline_image(&app, &path).await);
+                });
+            },
+        )
         .on_menu_event(|app, event| menu::clicked(app, event.id().as_ref()))
         .on_window_event(|window, event| {
             if let WindowEvent::Focused(focused) = event

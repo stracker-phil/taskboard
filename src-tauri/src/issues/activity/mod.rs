@@ -108,9 +108,11 @@ fn at(item: &ActivityItem) -> &str {
 
 fn comments(conn: &Connection, id: &str, values: &Values) -> AppResult<Vec<ActivityItem>> {
     let raw: Option<String> = conn
-        .query_row("SELECT raw FROM cache.issue_body WHERE issue_id = ?1", [id], |r| {
-            r.get(0)
-        })
+        .query_row(
+            "SELECT raw FROM cache.issue_body WHERE issue_id = ?1",
+            [id],
+            |r| r.get(0),
+        )
         .optional()?;
     let files = media_files(&attachments_of(raw.as_deref().unwrap_or_default()));
     let mut query = conn.prepare(

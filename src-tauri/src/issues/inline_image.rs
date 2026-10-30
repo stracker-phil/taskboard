@@ -4,7 +4,7 @@
 
 use std::path::Path;
 
-use tauri::http::{Response, StatusCode, header};
+use tauri::http::{HeaderValue, Response, StatusCode, header};
 
 use super::preview::{issue_attachment, local_copy};
 use crate::db::Db;
@@ -60,7 +60,7 @@ pub async fn attachment_image(
 
 /// The raster format the attachment claims: its MIME type, else (without an image MIME type) its extension.
 /// SVG and other types are none.
-pub fn declared_kind(attachment: &dto::Attachment) -> Option<ImageKind> {
+fn declared_kind(attachment: &dto::Attachment) -> Option<ImageKind> {
     let mime = attachment
         .mime_type
         .as_deref()
@@ -72,13 +72,11 @@ pub fn declared_kind(attachment: &dto::Attachment) -> Option<ImageKind> {
     }
 }
 
-/// The bytes are `declared` and within `MAX_INLINE_IMAGE_BYTES`.
-pub fn is_inline_image(declared: ImageKind, bytes: &[u8]) -> bool {
+fn is_inline_image(declared: ImageKind, bytes: &[u8]) -> bool {
     bytes.len() as u64 <= MAX_INLINE_IMAGE_BYTES && ImageKind::sniff(bytes) == Some(declared)
 }
 
-/// The scheme's answer: the image with its type, else 404 (no image, keep the chip) or 500. Never stored
-/// by the webview: the bytes stay in the app's cache folder only.
+/// The scheme's answer; `no-store` keeps the webview from caching the bytes.
 pub fn image_response(answer: AppResult<Option<InlineImage>>) -> Response<Vec<u8>> {
     let (status, image) = match answer {
         Ok(Some(image)) => (StatusCode::OK, Some(image)),
@@ -90,16 +88,18 @@ pub fn image_response(answer: AppResult<Option<InlineImage>>) -> Response<Vec<u8
             (StatusCode::INTERNAL_SERVER_ERROR, None)
         }
     };
-    let builder = Response::builder()
-        .status(status)
-        .header(header::CACHE_CONTROL, "no-store");
-    let response = match image {
-        Some(image) => builder
-            .header(header::CONTENT_TYPE, image.kind.mime())
-            .body(image.bytes),
-        None => builder.body(Vec::new()),
-    };
-    response.unwrap_or_else(|_| Response::new(Vec::new()))
+    let mut response = Response::new(Vec::new());
+    *response.status_mut() = status;
+    let headers = response.headers_mut();
+    headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    if let Some(image) = image {
+        headers.insert(
+            header::CONTENT_TYPE,
+            HeaderValue::from_static(image.kind.mime()),
+        );
+        *response.body_mut() = image.bytes;
+    }
+    response
 }
 
 #[cfg(test)]
@@ -202,15 +202,16 @@ mod tests {
         for (answer, label) in [
             (Ok(None), "none"),
             (Err(AppError::NotFound("attachment".into())), "not found"),
-            (
-                Err(AppError::InvalidInput("id".into())),
-                "invalid input",
-            ),
+            (Err(AppError::InvalidInput("id".into())), "invalid input"),
         ] {
             let response = image_response(answer);
 
             assert_eq!(response.status(), StatusCode::NOT_FOUND, "{label}");
-            assert_eq!(response.headers()[header::CACHE_CONTROL], "no-store", "{label}");
+            assert_eq!(
+                response.headers()[header::CACHE_CONTROL],
+                "no-store",
+                "{label}"
+            );
             assert!(response.body().is_empty(), "{label}");
         }
     }
@@ -270,5 +271,4 @@ mod tests {
             );
         }
     }
-
 }

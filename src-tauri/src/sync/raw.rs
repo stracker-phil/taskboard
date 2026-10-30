@@ -1,51 +1,44 @@
 //! What of an issue's JSON the cache keeps beside its columns. Pure.
 //!
 //! `issue.custom` holds the custom fields' values, so views and filters read a small object. `issue_body.raw`
-//! holds the rest of the issue minus what other columns and tables keep: the description (`issue_body`), the
-//! comments (`comment`; only their ids and edit times stay, so an edited comment still changes it), the custom
-//! fields, and every rendered field but the custom ones (`issues::detail` falls back to them). Jira renders
-//! dates relative to now ("2 hours ago"), so keeping them would make an unchanged issue look changed.
+//! drops what other columns and tables keep; comments shrink to their ids and edit times, so an edit still
+//! changes it. Rendered fields stay only for custom text fields (`issues::detail` falls back to them): Jira
+//! renders dates relative to now, which would make an unchanged issue look changed.
 
 use serde_json::{Map, Value};
 
 use crate::jira::dto::Issue;
 
-pub fn is_custom(id: &str) -> bool {
+fn is_custom(id: &str) -> bool {
     id.starts_with("customfield_")
+}
+
+/// The entries of a JSON object that `keep` accepts; empty for anything but an object.
+fn pick(object: &Value, keep: impl Fn(&str, &Value) -> bool) -> Map<String, Value> {
+    object
+        .as_object()
+        .into_iter()
+        .flatten()
+        .filter(|(id, value)| keep(id, value))
+        .map(|(id, value)| (id.clone(), value.clone()))
+        .collect()
 }
 
 /// The custom fields Jira filled, as a JSON object; none when it filled none.
 pub fn custom_values(fields: &Value) -> Option<String> {
-    let filled: Map<String, Value> = fields
-        .as_object()?
-        .iter()
-        .filter(|(id, value)| is_custom(id) && !value.is_null())
-        .map(|(id, value)| (id.clone(), value.clone()))
-        .collect();
+    let filled = pick(fields, |id, value| is_custom(id) && !value.is_null());
     (!filled.is_empty()).then(|| Value::Object(filled).to_string())
 }
 
 /// The issue as `issue_body.raw` keeps it.
 pub fn kept_raw(issue: &Issue) -> String {
-    let mut fields: Map<String, Value> = issue
-        .fields
-        .as_object()
-        .into_iter()
-        .flatten()
-        .filter(|(id, _)| !is_custom(id) && *id != "description" && *id != "comment")
-        .map(|(id, value)| (id.clone(), value.clone()))
-        .collect();
-    if let Some(comment) = issue.fields.get("comment").filter(|c| c.is_object()) {
-        fields.insert("comment".into(), comment_versions(comment));
+    let mut fields = pick(&issue.fields, |id, _| !is_custom(id) && id != "description");
+    if let Some(comment) = fields.remove("comment").filter(Value::is_object) {
+        fields.insert("comment".into(), comment_versions(&comment));
     }
-    let rendered: Map<String, Value> = issue
-        .rendered_fields
-        .as_object()
-        .into_iter()
-        .flatten()
-        .filter(|(id, value)| is_custom(id) && value.is_string())
-        .map(|(id, value)| (id.clone(), value.clone()))
-        .collect();
+    let rendered = pick(&issue.rendered_fields, |id, value| {
+        is_custom(id) && value.is_string()
+    });
     serde_json::json!({
         "id": issue.id,
         "key": issue.key,

@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 use super::{Changes, Notifier};
 use crate::lock::MutexExt;
 
-/// How often a burst of writes is announced.
+/// The least time between two announcements.
 pub const ANNOUNCE_EVERY: Duration = Duration::from_millis(500);
 
 #[derive(Default)]
@@ -29,30 +29,37 @@ pub fn coalesce(window: Duration, notify: Notifier) -> Notifier {
             return;
         }
         let now = Instant::now();
-        let due = state
+        match state
             .last
             .map(|last| last + window)
-            .filter(|due| *due > now);
-        let Some(due) = due else {
-            state.last = Some(now);
-            drop(state);
-            notify(changes);
-            return;
-        };
-        state.changes = Some(changes.clone());
-        drop(state);
-        let (pending, notify) = (Arc::clone(&pending), Arc::clone(&notify));
-        thread::spawn(move || {
-            thread::sleep(due.saturating_duration_since(Instant::now()));
-            let mut state = pending.lock_unpoisoned();
-            let changes = state.changes.take();
-            state.last = Some(Instant::now());
-            drop(state);
-            if let Some(changes) = changes {
-                notify(&changes);
+            .filter(|due| *due > now)
+        {
+            None => {
+                state.last = Some(now);
+                drop(state);
+                notify(changes);
             }
-        });
+            Some(due) => {
+                state.changes = Some(changes.clone());
+                drop(state);
+                flush_at(due, Arc::clone(&pending), Arc::clone(&notify));
+            }
+        }
     })
+}
+
+/// Announces what has gathered in `pending` once `due` has passed.
+fn flush_at(due: Instant, pending: Arc<Mutex<Pending>>, notify: Arc<Notifier>) {
+    thread::spawn(move || {
+        thread::sleep(due.saturating_duration_since(Instant::now()));
+        let mut state = pending.lock_unpoisoned();
+        let changes = state.changes.take();
+        state.last = Some(Instant::now());
+        drop(state);
+        if let Some(changes) = changes {
+            notify(&changes);
+        }
+    });
 }
 
 #[cfg(test)]

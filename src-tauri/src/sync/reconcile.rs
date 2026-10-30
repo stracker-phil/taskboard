@@ -9,9 +9,7 @@ use chrono::{Duration, Utc};
 
 use super::full::{current_scope, refresh_fields, search_fields};
 use super::map::format_utc;
-use super::retention::{
-    live_issues, mark_gone, mark_left_scope, prune_seen_changes, purge_gone,
-};
+use super::retention::{live_issues, mark_gone, mark_left_scope, prune_seen_changes, purge_gone};
 use super::store::{record_reconcile, store_page};
 use super::{SyncContext, SyncEvent};
 use crate::error::AppResult;

@@ -104,13 +104,13 @@ mod tests {
     const SETUP: &str = "
         INSERT INTO cache.space (id, key, name, raw) VALUES ('10001', 'NW', 'Northwind', '{}');
         INSERT INTO cache.issue (id, key, project_id, summary, issue_type, status_id, status_category,
-          created_at, updated_at, raw, synced_at)
+          created_at, updated_at, synced_at)
         VALUES ('20001', 'NW-1', '10001', 'Mount the column', 'Task', '1', 'new',
-          '2026-01-05T09:00:00Z', '2026-01-05T09:00:00Z', '{}', '2026-01-05T09:00:00Z'),
+          '2026-01-05T09:00:00Z', '2026-01-05T09:00:00Z', '2026-01-05T09:00:00Z'),
          ('20002', 'NW-2', '10001', 'Paint the wall', 'Task', '1', 'new',
-          '2026-01-05T09:00:00Z', '2026-01-05T09:00:00Z', '{}', '2026-01-05T09:00:00Z'),
+          '2026-01-05T09:00:00Z', '2026-01-05T09:00:00Z', '2026-01-05T09:00:00Z'),
          ('20003', 'NW-3', '10001', 'Hang the door', 'Task', '1', 'new',
-          '2026-01-05T09:00:00Z', '2026-01-05T09:00:00Z', '{}', '2026-01-05T09:00:00Z');
+          '2026-01-05T09:00:00Z', '2026-01-05T09:00:00Z', '2026-01-05T09:00:00Z');
         INSERT INTO cache.issue_change (issue_id, field, old_value, new_value, changed_at) VALUES
           ('20001', 'status', '1', '2', '2026-01-06T09:00:00Z'),
           ('20002', 'status', '1', '3', '2026-01-06T10:00:00Z');

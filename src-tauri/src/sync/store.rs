@@ -10,7 +10,6 @@ use crate::db::Changes;
 use crate::error::AppResult;
 use crate::jira::dto::{Issue, Status, Version};
 
-
 /// The `sync_state` row of the whole scope.
 pub const SCOPE_ROW: &str = "scope";
 /// `sync_state` rows of single projects are this prefix plus the project id.

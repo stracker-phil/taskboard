@@ -173,18 +173,20 @@ fn read(conn: &Connection, viewer: &Viewer, id: &str) -> AppResult<IssueDetail> 
         Ok((detail, raw, custom, project_id))
     })
     .optional()?
-    .map(|(mut detail, raw, custom, project_id)| -> AppResult<IssueDetail> {
-        let files = media_files(&detail.attachments);
-        let media = adf::Media {
-            files: &files,
-            written_at: None,
-        };
-        let raw = with_custom_values(&raw, custom.as_deref());
-        detail.custom = custom_fields(conn, &project_id, &raw, me, &media)?;
-        detail.since = since_banner(conn, viewer, id)?;
-        detail.unread = unseen_since(conn, id)?.is_some();
-        Ok(detail)
-    })
+    .map(
+        |(mut detail, raw, custom, project_id)| -> AppResult<IssueDetail> {
+            let files = media_files(&detail.attachments);
+            let media = adf::Media {
+                files: &files,
+                written_at: None,
+            };
+            let raw = with_custom_values(&raw, custom.as_deref());
+            detail.custom = custom_fields(conn, &project_id, &raw, me, &media)?;
+            detail.since = since_banner(conn, viewer, id)?;
+            detail.unread = unseen_since(conn, id)?.is_some();
+            Ok(detail)
+        },
+    )
     .transpose()?
     .ok_or_else(|| AppError::NotFound(format!("Issue {id} isn't in the cache")))
 }

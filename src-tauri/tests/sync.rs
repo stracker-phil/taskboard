@@ -1762,12 +1762,18 @@ mod reconciliation {
         let asked = bulk_fetches(&rig);
         assert_eq!(asked.last(), Some(&vec![NW_1049.to_string()]));
         assert!(left_scope_at(db, NW_1049).await.is_some());
-        assert_eq!(count(db, "SELECT gone FROM cache.issue WHERE id = '101049'").await, 0);
+        assert_eq!(
+            count(db, "SELECT gone FROM cache.issue WHERE id = '101049'").await,
+            0
+        );
 
         rig.job(Job::Reconcile, None).await;
 
         assert_eq!(bulk_fetches(&rig), asked);
-        assert_eq!(count(db, "SELECT gone FROM cache.issue WHERE id = '101049'").await, 0);
+        assert_eq!(
+            count(db, "SELECT gone FROM cache.issue WHERE id = '101049'").await,
+            0
+        );
         assert_eq!(count(db, "SELECT COUNT(*) FROM cache.issue").await, TOTAL);
     }
 
@@ -1787,7 +1793,10 @@ mod reconciliation {
         let fetches = bulk_fetches(&rig);
         assert_eq!(fetches.len(), asked + 1);
         assert_eq!(fetches.last(), Some(&vec![NW_1049.to_string()]));
-        assert_eq!(count(db, "SELECT gone FROM cache.issue WHERE id = '101049'").await, 0);
+        assert_eq!(
+            count(db, "SELECT gone FROM cache.issue WHERE id = '101049'").await,
+            0
+        );
         let marked = left_scope_at(db, NW_1049).await.unwrap();
         assert!(marked.as_str() > FAR_PAST, "{marked}");
     }
