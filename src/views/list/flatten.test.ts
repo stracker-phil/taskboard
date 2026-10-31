@@ -8,7 +8,7 @@ const C = row({ id: "3", key: "NW-3" });
 const D = row({ id: "4", key: "NW-4" });
 
 const data = () => viewData([groupOf([A, B], { key: "g1" }), groupOf([C], { key: "g2" })], [A, B, C]);
-const kinds = (items: ReturnType<typeof flatten>) => items.map((i) => (i.kind === "group" ? `group:${i.group.key}` : `row:${i.row.id}`));
+const kinds = (items: ReturnType<typeof flatten>) => items.map((i) => (i.kind === "group" ? `group:${i.group.key}` : i.kind === "row" ? `row:${i.row.id}` : `more:${i.groupKey}`));
 const positions = (items: ReturnType<typeof flatten>) => items.flatMap((i) => (i.kind === "row" ? [i.position] : []));
 
 describe("flatten", () => {

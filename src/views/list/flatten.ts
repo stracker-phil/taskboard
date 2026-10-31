@@ -7,11 +7,13 @@ export type CardPosition = "first" | "middle" | "last" | "only";
  *  null in the other modes. */
 export type Nesting = { depth: number; parent: boolean } | null;
 
-/** One line of the virtual list: a group's header (tab and column headers) or an issue row. An ungrouped
- *  view has one header without a tab. */
+/** One line of the virtual list: a group's header (tab and column headers), an issue row, or, while an issue is
+ *  dragged, the piece that closes a group's card with its count of folded rows (`dragFold.ts`). An ungrouped view
+ *  has one header without a tab. */
 export type Item =
   | { kind: "group"; group: Group; open: boolean; first: boolean; tab: boolean }
-  | { kind: "row"; row: Row; groupKey: string; position: CardPosition; nesting: Nesting };
+  | { kind: "row"; row: Row; groupKey: string; position: CardPosition; nesting: Nesting }
+  | { kind: "more"; groupKey: string; tab: boolean; hidden: number };
 
 /** The rows of open groups; in Hierarchy without the subtrees of `collapsedParents`. */
 export function flatten(data: ViewData, isOpen: (group: Group) => boolean, collapsedParents: readonly string[] = []): Item[] {
@@ -68,11 +70,14 @@ export const GROUP_GAP = 44;
 
 /** Stable across refreshes, so a measured height stays with its row when rows come and go. */
 export function itemKey(item: Item): string {
-  return item.kind === "row" ? `row:${item.row.id}` : `group:${item.group.key}`;
+  if (item.kind === "row") return `row:${item.row.id}`;
+  return item.kind === "group" ? `group:${item.group.key}` : `more:${item.groupKey}`;
 }
 
+/** A `more` piece takes its height from the fold. */
 export function itemHeight(item: Item): number {
   if (item.kind === "row") return ROW_HEIGHT;
+  if (item.kind === "more") return 0;
   return item.first ? GROUP_HEIGHT : GROUP_HEIGHT + GROUP_GAP;
 }
 

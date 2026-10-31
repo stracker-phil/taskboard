@@ -77,15 +77,20 @@ width), and every group becomes an equally easy target:
   on the body with the custom properties the original inherits: the List's column template, the Table's column
   widths; a card tilts 2°). Over a zone that takes it, the copy shows what the drop would set: the status square and
   pill take the zone's style (and name, grouped by status), the priority flag the zone's priority.
-- **List and Table** (`views/list/DragList.tsx`, `dragGroups.ts`): the rows give way to every group, closed ones
-  too, with its header and its first two rows (the dragged one always among them) and "+N more", so each group's
-  card is the same height. The view scrolls to the dragged row's group and back to where it was after.
-- **Board:** every column (and collapsed strip) reaches the board's full height.
-- **Zones** (`writes/DropZone.tsx`): a group's zone is its own card (List), its block of rows (Table) or its column
-  (Board), with the same corners: an inner 2px ring and a light tint in the group's color (status style, avatar,
-  priority flag) with the action in a pill. Under the pointer the tint deepens and the card or column glows in its
-  color (the List's card lifts a little). Where the issue can't go the group fades; until Jira answers zones show a
-  dashed ring. The issue's own group has no zone.
+- **List and Table** (`views/list/dragFold.ts`, `useDragFold.ts`, `useFoldMotion.ts`): the view folds. Every
+  group, closed ones too, glides to the same height: its first two rows (the dragged one always among them, in its
+  place) and a `more` piece that closes the card ("+N more"). Rows beyond them shrink and fade at the group's
+  bottom edge, a closed group's rows grow in, and the groups below glide, like a group opening or closing
+  (`--motion-slow`, instant under reduced motion). The dragged row keeps its place on screen while the view folds
+  and unfolds: the view scrolls by as much as the row would move. After the drag the view unfolds the same way.
+- **Board:** every column (and collapsed strip) glides to the board's full height and back (`useHeightGlide` in
+  `lib/motion.ts`).
+- **Zones** (`writes/DropZone.tsx`): a group's zone lies exactly over its card below the header (List: the card's
+  corners, square under the tab), its rows (Table: square) or its column (Board: the column's corners): an inner
+  2px ring and a light tint in the group's color (status style, avatar, priority flag) with the action in a pill.
+  Under the pointer the tint deepens and an outer glow in the group's color shows it takes the drop. Where the issue
+  can't go the group fades under a veil of the canvas; until Jira answers zones show a dashed ring. The issue's own
+  group has no zone.
 - **The tray** (`DropTray`): places without a group in the view, as chips along the view's bottom edge.
 - Near the view's edge (top and bottom in the List and Table, left and right on the Board) the view scrolls.
 

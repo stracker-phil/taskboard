@@ -20,17 +20,21 @@ import { useRememberedScroll } from "../useRememberedScroll";
 import { useViewSettings } from "./useViewSettings";
 import { columnWidth, SUMMARY_MIN_WIDTH, widthVar } from "./widths";
 import { revealedHeights } from "../list/groupReveal";
-import { DragList, useDragScroll } from "../list/DragList";
-import { DropTray } from "../../writes/DropZone";
-import { useIssueDrag } from "../../writes/useIssueDrag";
+import { foldSpans, type Fold } from "../list/dragFold";
+import { useDragFold } from "../list/useDragFold";
+import { DropTray, DropZone, zoneOf } from "../../writes/DropZone";
+import { type Drag, useIssueDrag } from "../../writes/useIssueDrag";
 
 /** Every row, a group's heading row too: the Table never changes its rhythm. */
 const TABLE_ROW_HEIGHT = 30;
 const HEADER_HEIGHT = 34;
 const SIDE_PADDING = 24;
 const NO_HEADERS: string[] = [];
-/** Rows in the drag layout neither select nor open. */
-const NOTHING = () => {};
+/** The `more` piece's own height below a group's rows while an issue is dragged. */
+const TABLE_MORE_PX = 28;
+/** The Table's own header names the columns, so an ungrouped view draws no group header. */
+const drawn = (item: Item) => item.kind !== "group" || item.tab;
+const tableItemHeight = (item: Item) => (item.kind === "more" ? 0 : TABLE_ROW_HEIGHT);
 
 const isOpen = (group: Group, toggled: Record<string, boolean>) => toggled[group.key] ?? !group.collapsedByDefault;
 
@@ -73,13 +77,29 @@ function Table({ view, data }: { view: View; data: ViewData }) {
 
   // The Table's own header names the columns, so an ungrouped view needs no group header. A collapsing group
   // keeps its rows until they have shrunk away.
-  const items = useMemo(
-    () => flatten(data, (group: Group) => isOpen(group, toggled) || moving.has(group.key), collapsedParents).filter((item) => item.kind === "row" || item.tab),
+  const shownItems = useMemo(
+    () => flatten(data, (group: Group) => isOpen(group, toggled) || moving.has(group.key), collapsedParents).filter(drawn),
     [data, toggled, moving, collapsedParents],
   );
+  const dropGroups = useMemo(() => data.groups.map((group) => ({ key: group.key, label: group.label })), [data.groups]);
+  const { drag, onPointerDown } = useIssueDrag(data.groupBy, dropGroups, actions.openInJira, scrollRef, "y");
+  // While an issue is dragged in a grouped view, every group folds to the same height (`dragFold.ts`).
+  const openGroups = useMemo(() => new Set(data.groups.filter((group) => isOpen(group, toggled)).map((group) => group.key)), [data.groups, toggled]);
+  const { items, fold } = useDragFold({
+    data,
+    drag,
+    shownItems,
+    openGroups,
+    collapsedParents,
+    scrollRef,
+    height: tableItemHeight,
+    paddingTop: 0,
+    morePx: TABLE_MORE_PX,
+    keep: drawn,
+  });
   const rowIds = useMemo(() => items.flatMap((item) => (item.kind === "row" ? [item.row.id] : [])), [items]);
   const revealed = Object.keys(factors).length > 0 ? revealedHeights(items, factors, () => TABLE_ROW_HEIGHT) : null;
-  const heightOf = (index: number) => revealed?.[index] ?? TABLE_ROW_HEIGHT;
+  const heightOf = (index: number) => fold?.heights[index] ?? revealed?.[index] ?? TABLE_ROW_HEIGHT;
   const virtualizer = useVirtualizer({
     count: items.length,
     getScrollElement: () => scrollRef.current,
@@ -93,15 +113,9 @@ function Table({ view, data }: { view: View; data: ViewData }) {
   // A group in motion changes its rows' heights every frame; the virtualizer caches sizes.
   useLayoutEffect(() => {
     virtualizer.measure();
-  }, [factors, virtualizer]);
+  }, [factors, fold, virtualizer]);
 
   const tree = data.subtasks === "hierarchy";
-  const dropGroups = useMemo(() => data.groups.map((group) => ({ key: group.key, label: group.label })), [data.groups]);
-  const { drag, onPointerDown } = useIssueDrag(data.groupBy, dropGroups, actions.openInJira, scrollRef, "y");
-  // While an issue is dragged in a grouped view, every group shows with the same few rows (`DragList`).
-  const dragging = drag !== null && data.groupBy !== "none";
-  const dragLayout = useMemo(() => (dragging ? flatten(data, () => true).filter((item) => item.kind === "row" || item.tab) : null), [dragging, data]);
-  useDragScroll(scrollRef, dragging ? (drag?.issue.fromKey ?? null) : null);
   const toggle = (group: Group) => {
     const opening = !isOpen(group, toggled);
     setPlace({ toggled: { ...toggled, [group.key]: opening } });
@@ -128,72 +142,72 @@ function Table({ view, data }: { view: View; data: ViewData }) {
           onResizeStart={resize.start}
           tree={tree}
         />
-        {dragLayout && drag ? (
-          <DragList
-            drag={drag}
-            items={dragLayout}
-            variant="table"
-            header={(group) => (
-              <div className="table-item--group">
-                <GroupHeader group={group} open tab active={false} namesColumns={false} headers={NO_HEADERS} onToggle={NOTHING} />
+        <div className="table-space" style={{ height: virtualizer.getTotalSize() }}>
+          {virtualizer.getVirtualItems().map((virtual) => {
+            const item = items[virtual.index];
+            const factor = openness(item, factors);
+            return (
+              <div
+                key={virtual.key}
+                className={item.kind === "group" ? "table-item table-item--group" : "table-item"}
+                style={{
+                  height: virtual.size,
+                  transform: `translateY(${virtual.start - HEADER_HEIGHT}px)`,
+                  ...(factor < 1 && { opacity: factor, overflow: "hidden" }),
+                  ...(fold && { opacity: fold.opacity[virtual.index], overflowY: "clip" }),
+                }}
+                onPointerDown={
+                  item.kind === "row"
+                    ? (e) => onPointerDown(e, { id: item.row.id, key: item.row.key, summary: item.row.summary, fromKey: item.groupKey }, e.currentTarget)
+                    : undefined
+                }
+              >
+                {item.kind === "more" ? (
+                  <div className="table-more">{item.hidden > 0 ? `+${item.hidden} more` : ""}</div>
+                ) : item.kind === "group" ? (
+                  <GroupHeader
+                    group={item.group}
+                    open={item.open || (fold?.open.has(item.group.key) ?? false)}
+                    tab
+                    active
+                    namesColumns={false}
+                    headers={NO_HEADERS}
+                    onToggle={() => toggle(item.group)}
+                  />
+                ) : (
+                  <TableRow
+                    row={item.row}
+                    columns={columns}
+                    selected={selected === item.row.id}
+                    onSelect={onSelect}
+                    onOpen={onOpen}
+                    inlineLabels={inlineLabels}
+                    tree={tree}
+                    nesting={item.nesting}
+                    subtasksOpen={subtasksOpen(item.row.id)}
+                    onToggleSubtasks={onToggleSubtasks}
+                    childChip={data.subtasks === "hidden" || (item.nesting?.parent === true && !subtasksOpen(item.row.id))}
+                  />
+                )}
               </div>
-            )}
-            row={(item) => (
-              <TableRow row={item.row} columns={columns} selected={false} onSelect={NOTHING} onOpen={NOTHING} inlineLabels={inlineLabels} tree={tree} nesting={item.nesting} />
-            )}
-          />
-        ) : (
-          <div className="table-space" style={{ height: virtualizer.getTotalSize() }}>
-            {virtualizer.getVirtualItems().map((virtual) => {
-              const item = items[virtual.index];
-              const factor = openness(item, factors);
-              return (
-                <div
-                  key={virtual.key}
-                  className={item.kind === "group" ? "table-item table-item--group" : "table-item"}
-                  style={{
-                    height: virtual.size,
-                    transform: `translateY(${virtual.start - HEADER_HEIGHT}px)`,
-                    ...(factor < 1 && { opacity: factor, overflow: "hidden" }),
-                  }}
-                  onPointerDown={
-                    item.kind === "row"
-                      ? (e) => onPointerDown(e, { id: item.row.id, key: item.row.key, summary: item.row.summary, fromKey: item.groupKey }, e.currentTarget)
-                      : undefined
-                  }
-                >
-                  {item.kind === "group" ? (
-                    <GroupHeader
-                      group={item.group}
-                      open={item.open}
-                      tab
-                      active
-                      namesColumns={false}
-                      headers={NO_HEADERS}
-                      onToggle={() => toggle(item.group)}
-                    />
-                  ) : (
-                    <TableRow
-                      row={item.row}
-                      columns={columns}
-                      selected={selected === item.row.id}
-                      onSelect={onSelect}
-                      onOpen={onOpen}
-                      inlineLabels={inlineLabels}
-                      tree={tree}
-                      nesting={item.nesting}
-                      subtasksOpen={subtasksOpen(item.row.id)}
-                      onToggleSubtasks={onToggleSubtasks}
-                      childChip={data.subtasks === "hidden" || (item.nesting?.parent === true && !subtasksOpen(item.row.id))}
-                    />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
+            );
+          })}
+          {drag && fold && <TableZones drag={drag} items={items} fold={fold} />}
+        </div>
       </div>
       <DropTray drag={drag} groups={dropGroups} host={scrollRef} />
     </div>
+  );
+}
+
+/** Each group's drop zone, laid exactly over its rows. */
+function TableZones({ drag, items, fold }: { drag: Drag; items: Item[]; fold: Fold }) {
+  return (
+    <>
+      {[...foldSpans(items, fold.heights, 0)].map(([key, span]) => {
+        const zone = zoneOf(drag, key);
+        return zone ? <DropZone key={key} zone={zone} className="drop-zone--rows" style={{ top: span.top, height: span.height }} /> : null;
+      })}
+    </>
   );
 }

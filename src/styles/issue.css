@@ -130,15 +130,22 @@ body.is-dragging-issue, body.is-dragging-issue * { cursor: grabbing !important; 
 .drop-color--priority-4 { --drop-color: var(--flag-low); }
 .drop-color--plain { --drop-color: var(--text-muted); }
 
-/* A zone is the group's own card (List) or column (Board): it takes the card's corners and draws an inner ring and a
-   tint in the group's color, with the action in a pill. Under the pointer the card lifts a little. */
+/* A zone lies exactly over the group's card (List), its rows (Table) or its column (Board), with the same corners: an
+   inner ring and a light tint in the group's color, the action in a pill. Under the pointer it deepens and glows. */
 .drop-zone {
-  position: absolute; inset: 0; z-index: 2; display: flex; align-items: center; justify-content: center;
-  border-radius: inherit; pointer-events: auto; animation: fade-in var(--motion-fast) var(--ease-out);
+  position: absolute; left: 0; right: 0; z-index: 2; display: flex; align-items: center; justify-content: center;
+  border-radius: 10px; pointer-events: auto; animation: fade-in var(--motion-base) var(--ease-out);
   transition: background-color var(--motion-fast) var(--ease-out), box-shadow var(--motion-fast) var(--ease-out);
 }
+.drop-zone--tabbed { border-radius: 0 10px 10px 10px; }
+.drop-zone--rows { border-radius: 0; }
 .drop-zone--ok { box-shadow: inset 0 0 0 2px var(--drop-color); background: color-mix(in srgb, var(--drop-color) 8%, transparent); }
-.drop-zone--ok:hover { background: color-mix(in srgb, var(--drop-color) 16%, transparent); }
+.drop-zone--ok:hover {
+  background: color-mix(in srgb, var(--drop-color) 16%, transparent);
+  box-shadow: inset 0 0 0 2px var(--drop-color), 0 0 0 4px color-mix(in srgb, var(--drop-color) 22%, transparent);
+}
+/* Where the issue can't go, the group fades under a veil of the canvas. */
+.drop-zone--no { background: color-mix(in srgb, var(--list-bg) 55%, transparent); }
 .drop-zone--wait { outline: 2px dashed var(--border-strong); outline-offset: -2px; }
 .drop-zone__action {
   display: inline-flex; align-items: center; gap: 8px; max-width: calc(100% - 32px); padding: 5px 12px;
@@ -146,39 +153,23 @@ body.is-dragging-issue, body.is-dragging-issue * { cursor: grabbing !important; 
   color: var(--text); font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   pointer-events: none;
 }
+.drop-zone--column, .drop-zone--strip { inset: 0; border-radius: 12px; }
 .drop-zone--strip .drop-zone__action { padding: 10px 3px; writing-mode: vertical-rl; }
 
-/* List: while dragging, each group is a card of the same height with its first rows (`DragList`). */
-.drag-list { padding: 22px 0 40px; }
-.drag-list__group--gap { margin-top: 32px; }
-.drag-card {
-  position: relative; height: 120px; overflow: hidden; border-radius: 10px; background: var(--panel-bg);
-  box-shadow: var(--shadow-group-card);
-  transition: transform var(--motion-fast) var(--ease-out), box-shadow var(--motion-fast) var(--ease-out), opacity var(--motion-fast) var(--ease-out);
+/* While an issue is dragged, the piece that closes a folded group's card, with how many rows are folded away. */
+.list-more {
+  display: flex; align-items: flex-end; height: 100%; box-sizing: border-box; padding: 0 16px 9px; background: var(--panel-bg);
+  border-top: 1px solid var(--row-hairline); border-radius: 0 0 10px 10px; box-shadow: var(--shadow-group-card);
+  clip-path: inset(0 -4px -4px -4px); color: var(--text-muted); font-size: 12px;
 }
-.drag-card--tabbed { border-radius: 0 10px 10px 10px; }
-.drag-card .list-row { border-radius: 0; box-shadow: none; clip-path: none; }
-.drag-card__more { display: flex; align-items: center; height: 32px; padding: 0 16px; color: var(--text-muted); font-size: 12px; }
-.drag-card__more:not(:empty):not(:first-child) { border-top: 1px solid var(--row-hairline); }
-.drag-card--no { opacity: 0.45; }
-/* The Table's rows run edge to edge; its zone is the group's block of rows, as square as the rows. */
-.drag-list--table { padding: 0 0 24px; }
-.drag-list--table .drag-list__group--gap { margin-top: 12px; }
-.drag-list--table .drag-card { height: 88px; border-radius: 0; background: transparent; box-shadow: none; }
-.drag-list--table .drag-card__more { height: 28px; padding: 0 24px; }
-.drag-card:has(.drop-zone--ok:hover) {
-  transform: scale(1.008); box-shadow: 0 0 0 4px color-mix(in srgb, var(--drop-color) 22%, transparent), var(--shadow-hover);
+.table-more {
+  display: flex; align-items: flex-end; height: 100%; box-sizing: border-box; padding: 0 24px 6px;
+  color: var(--text-muted); font-size: 12px;
 }
 
 /* Board: while dragging, every column reaches the board's full height, so each is an equally easy target. */
 .board--dragging .board-column, .board--dragging .board-strip__item { align-self: stretch; }
 .board--dragging .board-strip { height: auto; }
-.board-column:has(> .drop-zone--no), .board-strip__item:has(> .drop-zone--no) { opacity: 0.45; }
-.board-column:has(> .drop-zone--ok:hover), .board-strip__item:has(> .drop-zone--ok:hover) {
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--drop-color) 22%, transparent);
-}
-.board-column, .board-strip__item { transition: opacity var(--motion-fast) var(--ease-out), box-shadow var(--motion-fast) var(--ease-out); }
-.board-strip__item { border-radius: 12px; }
 
 /* Places the view has no group for, along its bottom edge. */
 .drop-tray {

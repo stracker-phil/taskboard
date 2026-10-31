@@ -12,8 +12,7 @@ const VARIANTS = ["peek", "activity", "tab", "vertical", "closed"];
 /** A copy of the dragged row or card that follows the pointer where it was grabbed, while the original stays in
  *  place dimmed (`[data-drag-source]`). The copy hangs on the body (a moving ancestor would carry a fixed element
  *  along) and takes the custom properties the original inherits (the List's column template, the Table's column
- *  widths), so it looks exactly like the row or card. Near the view's edge along
- *  `axis` the view scrolls. */
+ *  widths), so it looks exactly like the row or card. */
 export function followDraggedCopy(element: HTMLElement, press: Point, view: HTMLElement, axis: ScrollAxis) {
   const rect = element.getBoundingClientRect();
   const grab = { x: press.x - rect.left, y: press.y - rect.top };
@@ -54,7 +53,7 @@ export function followDraggedCopy(element: HTMLElement, press: Point, view: HTML
     preview(target: DropTarget | null, named: boolean) {
       if (target === shown) return;
       shown = target;
-      copy.replaceChildren(...[...pristine.cloneNode(true).childNodes]);
+      copy.replaceChildren(...pristine.cloneNode(true).childNodes);
       if (target) restyle(copy, target, named);
     },
     remove() {
@@ -80,7 +79,7 @@ function restyle(copy: HTMLElement, target: DropTarget, named: boolean) {
       if (named && node.classList.contains("status-pill")) node.textContent = target.label;
     }
   } else if (mark?.kind === "priority") {
-    const flag = PRIORITY_FLAGS[Math.min(Math.max(mark.level, 1), 4) - 1];
+    const flag = PRIORITY_FLAGS[Math.min(Math.max(mark.level, 1), PRIORITY_FLAGS.length) - 1];
     for (const node of copy.querySelectorAll<SVGElement>(".priority-flag")) swapModifier(node, "priority-flag--", flag);
   }
 }

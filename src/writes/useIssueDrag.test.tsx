@@ -113,13 +113,13 @@ describe("dragging in the List", () => {
       ]);
     });
 
-    it("keeps the row in the drag layout, marked as the drag's source, and follows the pointer with an aria-hidden copy on the body", async () => {
+    it("keeps the row in the folded view, marked as the drag's source, and follows the pointer with an aria-hidden copy on the body", async () => {
       await renderList();
 
       dragPricing();
 
-      expect(rowOf("NW-1042").closest("[data-drag-source]")).not.toBeNull();
-      expect(rowOf("NW-1042").closest(".drag-list")).not.toBeNull();
+      expect(rowOf("NW-1042").closest(".list-item")).toHaveAttribute("data-drag-source");
+      expect(rowOf("NW-1042").closest(".list-scroll__space")).not.toBeNull();
       expect(rowOf("NW-1003").closest("[data-drag-source]")).toBeNull();
       const copy = copyOf()!;
       expect(copy.parentElement).toBe(document.body);
@@ -203,17 +203,17 @@ describe("dragging in the List", () => {
     it("brings the normal rows back after Escape and after the release", async () => {
       await renderList();
       dragPricing();
-      expect(document.querySelector(".drag-list")).not.toBeNull();
+      expect(document.querySelector(".list-more")).not.toBeNull();
 
       fireEvent.keyDown(window, { key: "Escape" });
 
-      expect(document.querySelector(".drag-list")).toBeNull();
+      expect(document.querySelector(".list-more")).toBeNull();
       expect(rowOf("NW-1042").closest(".list-scroll__space")).not.toBeNull();
 
       dragPricing();
       pointer.release();
 
-      expect(document.querySelector(".drag-list")).toBeNull();
+      expect(document.querySelector(".list-more")).toBeNull();
       expect(rowOf("NW-1042").closest(".list-scroll__space")).not.toBeNull();
     });
 
@@ -223,48 +223,54 @@ describe("dragging in the List", () => {
       dragPricing();
 
       expect(copyOf()).not.toBeNull();
-      expect(document.querySelector(".drag-list")).toBeNull();
+      expect(document.querySelector(".list-more")).toBeNull();
     });
   });
 
-  describe("the drag layout", () => {
-    it("shows a card for every group, a closed one with its rows too", async () => {
+  describe("the folded view", () => {
+    const moreOf = () => [...document.querySelectorAll<HTMLElement>(".list-more")];
+
+    it("shows a closing piece for every group, and the rows of a closed group too", async () => {
       const closed = groupOf([MIGRATION], { key: "c", label: "Gamma", collapsedByDefault: true });
       await renderList(viewData([GROUPS[0], GROUPS[1], closed], [PRICING, FOOTER, MIGRATION]));
       expect(screen.queryByRole("row", { name: /NW-1004/ })).toBeNull();
 
       dragPricing();
 
-      expect(document.querySelectorAll(".drag-card")).toHaveLength(3);
-      expect(rowOf("NW-1004").closest(".drag-card")).not.toBeNull();
+      expect(moreOf()).toHaveLength(3);
+      expect(rowOf("NW-1004")).toBeInTheDocument();
     });
 
-    it("shows two rows and a count of the rest, keeps the dragged row among them, and says when a group is empty", async () => {
+    it("counts the rows beyond the two it keeps as more, and says nothing for a group that fits", async () => {
       const extra = [row({ id: "5", key: "NW-1005" }), row({ id: "6", key: "NW-1006" })];
       const crowded = groupOf([FOOTER, ...extra], { key: "b", label: "Beta" });
       const last = groupOf([PRICING], { key: "z", label: "Zulu" });
-      const empty = groupOf([], { key: "c", label: "Gamma" });
-      await renderList(viewData([crowded, empty, last], [FOOTER, ...extra, PRICING]));
+      await renderList(viewData([crowded, last], [FOOTER, ...extra, PRICING]));
 
       dragPricing();
 
-      const cards = [...document.querySelectorAll<HTMLElement>(".drag-card")];
-      expect(cards[0]).toHaveTextContent("+1 more");
-      expect(within(cards[0]).queryByRole("row", { name: /NW-1006/ })).toBeNull();
-      expect(cards[1]).toHaveTextContent("No issues");
-      expect(cards[2]).not.toHaveTextContent("more");
+      const [first, second] = moreOf();
+      expect(first).toHaveTextContent("+1 more");
+      expect(second).toBeEmptyDOMElement();
     });
 
-    it("lets the dragged row displace the last shown row of its own group", async () => {
+    it("keeps the dragged row visible when it is beyond the rows its group keeps", async () => {
       const others = [row({ id: "5", key: "NW-1005" }), row({ id: "6", key: "NW-1006" })];
       const crowded = groupOf([...others, PRICING], { key: "a", label: "Alpha" });
       await renderList(viewData([crowded, GROUPS[1]], [...others, PRICING, FOOTER]));
 
       dragPricing();
 
-      expect(rowOf("NW-1042").closest("[data-drag-source]")).not.toBeNull();
-      expect(screen.queryByRole("row", { name: /NW-1006/ })).toBeNull();
-      expect(rowOf("NW-1005")).toBeInTheDocument();
+      expect(rowOf("NW-1042").closest(".list-item")).toHaveAttribute("data-drag-source");
+      expect(moreOf()[0]).toHaveTextContent("+1 more");
+    });
+
+    it("gives a group with rows from a tabbed header a tabbed piece", async () => {
+      await renderList();
+
+      dragPricing();
+
+      moreOf().forEach((piece) => expect(piece).toHaveClass("list-more--tabbed"));
     });
   });
 
@@ -297,17 +303,18 @@ describe("dragging in the List", () => {
       expect(zones("no")[0]).toBeEmptyDOMElement();
     });
 
-    it("puts each zone in its group's card, which takes the zone's state, and leaves the issue's own card without one", async () => {
+    it("lays the zones inside the scroll space, tabbed under their group's header, and none over the issue's own group", async () => {
       answer([target("b", "Set status to Beta")]);
       await renderList();
 
       dragPricing();
 
       await answered();
-      zones().forEach((zone) => expect(zone.parentElement).toHaveClass("drag-card"));
-      expect(zones("ok")[0].parentElement).toHaveClass("drag-card--ok");
-      expect(zones("no")[0].parentElement).toHaveClass("drag-card--no");
-      expect(rowOf("NW-1042").closest(".drag-card")!.querySelector(".drop-zone")).toBeNull();
+      expect(zones()).toHaveLength(2);
+      zones().forEach((zone) => {
+        expect(zone.parentElement).toHaveClass("list-scroll__space");
+        expect(zone).toHaveClass("drop-zone--tabbed");
+      });
     });
 
     it("gives a closed group a zone as well", async () => {
@@ -320,7 +327,6 @@ describe("dragging in the List", () => {
       await answered();
       expect(zones("ok")).toHaveLength(1);
       expect(zones("ok")[0]).toHaveAttribute("data-drop-key", "c");
-      expect(zones("ok")[0].closest("[data-drag-group]")).toHaveAttribute("data-drag-group", "c");
     });
 
     it("gives every other group a zone when Rust answers with no targets", async () => {
@@ -580,20 +586,30 @@ describe("dragging in the Table", () => {
     ]);
   });
 
-  it("swaps the rows for a card per group, closed ones too, with the dragged row marked and the column header still there", async () => {
+  it("folds the groups in place, closed ones open too, with the dragged row marked and the column header still there", async () => {
     await renderTable();
     expect(screen.queryByRole("row", { name: /NW-1004/ })).toBeNull();
+    expect(document.querySelector(".table-more")).toBeNull();
 
     dragPricing();
 
-    expect(document.querySelectorAll(".drag-card")).toHaveLength(3);
+    expect(document.querySelectorAll(".table-more")).toHaveLength(3);
     expect(rowOf("NW-1042").closest("[data-drag-source]")).not.toBeNull();
-    expect(rowOf("NW-1004").closest(".drag-card")).not.toBeNull();
+    expect(rowOf("NW-1004")).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Summary" })).toBeInTheDocument();
     expect(copyOf()).toHaveTextContent("Redesign the pricing page");
   });
 
-  it("puts the zones in the cards of the other groups once Rust answers", async () => {
+  it("counts the folded rows of a group as more", async () => {
+    const extra = [row({ id: "5", key: "NW-1005" }), row({ id: "6", key: "NW-1006" })];
+    await renderTable(viewData([groupOf([PRICING, FOOTER, ...extra], { key: "a", label: "Alpha" })], [PRICING, FOOTER, ...extra]));
+
+    dragPricing();
+
+    expect(document.querySelector(".table-more")).toHaveTextContent("+2 more");
+  });
+
+  it("puts the zones over the rows of the other groups once Rust answers", async () => {
     answer([target("b", "Set status to Beta")]);
     await renderTable();
 
@@ -601,9 +617,12 @@ describe("dragging in the Table", () => {
 
     await answered();
     expect(zones()).toHaveLength(2);
+    zones().forEach((zone) => {
+      expect(zone).toHaveClass("drop-zone--rows");
+      expect(zone.closest(".table-space")).not.toBeNull();
+    });
     expect(zones("ok")[0]).toHaveAttribute("data-drop-key", "b");
     expect(zones("ok")[0]).toHaveTextContent("Set status to Beta");
-    expect(zones("ok")[0].parentElement).toHaveClass("drag-card", "drag-card--ok");
     expect(zones("no")).toHaveLength(1);
   });
 
@@ -637,7 +656,7 @@ describe("dragging in the Table", () => {
 
     fireEvent.keyDown(window, { key: "Escape" });
 
-    expect(document.querySelector(".drag-list")).toBeNull();
+    expect(document.querySelector(".table-more")).toBeNull();
     expect(rowOf("NW-1042").closest(".table-space")).not.toBeNull();
     expect(copyOf()).toBeNull();
   });
@@ -648,7 +667,7 @@ describe("dragging in the Table", () => {
     dragPricing();
 
     expect(copyOf()).not.toBeNull();
-    expect(document.querySelector(".drag-list")).toBeNull();
+    expect(document.querySelector(".table-more")).toBeNull();
     expect(rowOf("NW-1042").closest(".table-space")).not.toBeNull();
   });
 
@@ -658,7 +677,7 @@ describe("dragging in the Table", () => {
     dragPricing();
 
     expect(copyOf()).toBeNull();
-    expect(document.querySelector(".drag-list")).toBeNull();
+    expect(document.querySelector(".table-more")).toBeNull();
     expect(mocked.issueDropTargets).not.toHaveBeenCalled();
   });
 });

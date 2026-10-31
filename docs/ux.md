@@ -492,6 +492,9 @@ movement is instant and fades are short.
 - Expand and collapse animate like the sidebar's Spaces (`components/Disclosure`): a List or Table group's rows
   keep their height and fade while the group's height opens or closes, so rows appear and vanish at its bottom
   edge and the groups below glide (`useGroupMotion` drives the openness, `groupReveal.ts` cuts the rows).
+- Dragging an issue folds a List or Table the same way: every group glides to the same height while the dragged row
+  stays where it is, and unfolds after; a Board's columns glide to the board's height and back
+  ([writes.md](writes.md#drag-and-drop)).
 
 ## Toolbar
 

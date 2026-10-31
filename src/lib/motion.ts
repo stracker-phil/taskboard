@@ -65,6 +65,39 @@ export function useGlide(row: RefObject<HTMLElement | null>, scope?: unknown) {
   });
 }
 
+/** The children of `row` glide to their new height when `state` changes (a Board's columns reaching the board's
+ *  height while an issue is dragged, and back), instead of jumping. The heights before the change are read while
+ *  rendering the change, before it reaches the page, so a glide that is still running continues from where it is. */
+export function useHeightGlide(row: RefObject<HTMLElement | null>, state: unknown) {
+  const shown = useRef(state);
+  const before = useRef<Map<Element, number> | null>(null);
+  if (shown.current !== state) {
+    shown.current = state;
+    before.current = heightsOf(row.current);
+  }
+  useLayoutEffect(() => {
+    const was = before.current;
+    before.current = null;
+    const element = row.current;
+    const ms = motionMs("--motion-slow");
+    if (!was || !element || ms === 0) return;
+    const easing = getComputedStyle(document.documentElement).getPropertyValue("--ease-out").trim() || "ease-out";
+    for (const child of element.children) {
+      if (!(child instanceof HTMLElement) || typeof child.animate !== "function") continue;
+      child.getAnimations().forEach((animation) => animation.cancel());
+      const from = was.get(child);
+      const to = child.getBoundingClientRect().height;
+      if (from !== undefined && from !== to) child.animate([{ height: `${from}px` }, { height: `${to}px` }], { duration: ms, easing });
+    }
+  });
+}
+
+function heightsOf(element: HTMLElement | null): Map<Element, number> {
+  const heights = new Map<Element, number>();
+  for (const child of element?.children ?? []) heights.set(child, child.getBoundingClientRect().height);
+  return heights;
+}
+
 /** Turns off `element`'s transitions until the frame with its new state is drawn. */
 function instantly(element: HTMLElement) {
   element.classList.add("motion-off");

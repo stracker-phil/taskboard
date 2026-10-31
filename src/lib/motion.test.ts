@@ -1,7 +1,8 @@
 import { act, renderHook } from "@testing-library/react";
+import { useLayoutEffect } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { startMotionTimers, stubMotion } from "../test/motion";
-import { motionMs, useGlide, usePresence } from "./motion";
+import { motionMs, useGlide, useHeightGlide, usePresence } from "./motion";
 
 let spy: { mockRestore(): void } | undefined;
 
@@ -127,6 +128,70 @@ describe("useGlide", () => {
     lefts.b = 80;
 
     rerender({ scope: "view-1" });
+
+    expect(animate).not.toHaveBeenCalled();
+  });
+});
+
+describe("useHeightGlide", () => {
+  const animate = vi.fn();
+  let heights: Record<string, number>;
+  let row: HTMLElement;
+
+  function child(id: string) {
+    const element = document.createElement("div");
+    element.getBoundingClientRect = () => ({ height: heights[id] }) as DOMRect;
+    element.getAnimations = () => [];
+    return element;
+  }
+
+  // The page changes in the commit, after the render that reads the old heights.
+  const renderRow = (state: string, tall = false) =>
+    renderHook(
+      ({ state, tall }) => {
+        useLayoutEffect(() => {
+          heights.a = tall ? 300 : 100;
+        });
+        useHeightGlide({ current: row }, state);
+      },
+      { initialProps: { state, tall } },
+    );
+
+  beforeEach(() => {
+    animate.mockClear();
+    HTMLElement.prototype.animate = animate;
+    heights = { a: 100, b: 100 };
+    row = document.createElement("div");
+    row.append(child("a"), child("b"));
+  });
+
+  afterEach(() => {
+    delete (HTMLElement.prototype as Partial<HTMLElement>).animate;
+  });
+
+  it("glides a child from its old to its new height when the state changes", () => {
+    spy = stubMotion({ "--motion-slow": "200ms" });
+    const { rerender } = renderRow("idle");
+
+    rerender({ state: "dragging", tall: true });
+
+    expect(animate).toHaveBeenCalledTimes(1);
+    expect(animate).toHaveBeenCalledWith([{ height: "100px" }, { height: "300px" }], expect.objectContaining({ duration: 200 }));
+  });
+
+  it("does not animate while the state stays the same", () => {
+    spy = stubMotion({ "--motion-slow": "200ms" });
+    const { rerender } = renderRow("idle");
+
+    rerender({ state: "idle", tall: true });
+
+    expect(animate).not.toHaveBeenCalled();
+  });
+
+  it("neither animates nor throws when the motion time is 0", () => {
+    const { rerender } = renderRow("idle");
+
+    expect(() => rerender({ state: "dragging", tall: true })).not.toThrow();
 
     expect(animate).not.toHaveBeenCalled();
   });
