@@ -50,7 +50,7 @@ export const TableRow = memo(function TableRow(props: Props) {
       </span>
       <span className="table-row__cell table-row__status" role="gridcell" style={cellWidth("status")}>
         <StatusSquare style={row.style} />
-        {row.statusName}
+        <span className="status-name">{row.statusName}</span>
       </span>
       {columns.map((id) => (
         <span key={id} className="table-row__cell" role="gridcell" style={cellWidth(id)}>

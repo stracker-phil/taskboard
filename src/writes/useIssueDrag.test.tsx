@@ -626,6 +626,25 @@ describe("dragging in the Table", () => {
     expect(zones("no")).toHaveLength(1);
   });
 
+  it("shows the target status in the copy's status cell while over a zone that takes the drop, and the own one again after leaving it", async () => {
+    answer([target("b", "Set status to In Review", { kind: "status", style: "review" }, "In Review")]);
+    await renderTable();
+    dragPricing();
+    await answered();
+
+    pointer.over(zones("ok")[0]);
+    pointer.moveTo(50, 50);
+
+    expect(copyOf()!.querySelector(".status-name")).toHaveTextContent("In Review");
+    expect(copyOf()!.querySelector(".status-square")).toHaveClass("status-square--review");
+
+    pointer.over(null);
+    pointer.moveTo(60, 60);
+
+    expect(copyOf()!.querySelector(".status-name")).toHaveTextContent("In Progress");
+    expect(copyOf()!.querySelector(".status-square")).toHaveClass("status-square--progress");
+  });
+
   it("moves the issue onto the zone it is released over", async () => {
     answer([target("b", "Set status to Beta")]);
     await renderTable();

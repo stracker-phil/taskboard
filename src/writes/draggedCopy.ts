@@ -76,8 +76,8 @@ function restyle(copy: HTMLElement, target: DropTarget, named: boolean) {
   if (mark?.kind === "status") {
     for (const node of copy.querySelectorAll<HTMLElement>(".status-square, .status-pill")) {
       swapModifier(node, node.classList.contains("status-square") ? "status-square--" : "status-pill--", mark.style);
-      if (named && node.classList.contains("status-pill")) node.textContent = target.label;
     }
+    if (named) for (const node of copy.querySelectorAll<HTMLElement>(".status-pill, .status-name")) node.textContent = target.label;
   } else if (mark?.kind === "priority") {
     const flag = PRIORITY_FLAGS[Math.min(Math.max(mark.level, 1), PRIORITY_FLAGS.length) - 1];
     for (const node of copy.querySelectorAll<SVGElement>(".priority-flag")) swapModifier(node, "priority-flag--", flag);
