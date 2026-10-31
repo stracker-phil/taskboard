@@ -4,6 +4,7 @@ import type { api as realApi } from "../api";
 import {
   EMPTY_UI_STATE,
   type Appearance,
+  type Assignees,
   type Behaviour,
   type BoardData,
   type Connection,
@@ -157,6 +158,8 @@ export function createApiMock(): Api {
     issueDropTargets: vi.fn(async (): Promise<DropTargets> => ({ targets: [], refused: [], note: null })),
     issueDrop: vi.fn(async (): Promise<DropOutcome> => ({ kind: "done", outcome: { done: "Done", reverse: null } })),
     issueTransitions: vi.fn().mockResolvedValue([]),
+    issueAssignees: vi.fn(async (): Promise<Assignees> => ({ people: [], current: null })),
+    levelPeople: vi.fn().mockResolvedValue([]),
     issueWrite: vi.fn(async (): Promise<WriteOutcome> => ({ done: "Done", reverse: null })),
     issueToggleMine: vi.fn(async (): Promise<WriteOutcome> => ({ done: "Done", reverse: null })),
     issueSyncComments: vi.fn().mockResolvedValue(false),

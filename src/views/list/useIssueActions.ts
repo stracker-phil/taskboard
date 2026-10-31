@@ -8,6 +8,7 @@ import type { MenuAt } from "../../components/menu";
 import { runWrite } from "../../writes/runWrite";
 import { useJiraChanges } from "../../writes/useJiraChanges";
 import { openStatusMenu } from "../../writes/statusMenu";
+import { openAssignMenu } from "../../writes/assignMenu";
 
 /** Copies the text and confirms with a toast; subscribes to nothing, so every row can use it. */
 export function copyWithToast(text: string, done: string) {
@@ -17,7 +18,7 @@ export function copyWithToast(text: string, done: string) {
 }
 
 /** Per-issue actions; null when they can't run: the URL actions without a Jira site, the writes (`toggleMine`,
- *  `changeStatus`) while changes to Jira are off. */
+ *  `changeStatus`, `assignTo`) while changes to Jira are off. */
 export function useIssueActions() {
   const { data: connection } = useConnection();
   const site = connection?.connection.siteUrl;
@@ -39,6 +40,8 @@ export function useIssueActions() {
       toggleMine: jiraChanges ? (id: string) => runWrite(id, api.issueToggleMine(id), "Could not change the assignee") : null,
       /** Opens the status menu under `at`. */
       changeStatus: jiraChanges ? (issue: { id: string; key: string }, at: MenuAt) => openStatusMenu(issue, at, openInJira) : null,
+      /** Opens the assignee menu under `at`. */
+      assignTo: jiraChanges ? (issue: { id: string; key: string }, at: MenuAt) => openAssignMenu(issue, at) : null,
     };
   }, [site, jiraChanges]);
 }

@@ -93,6 +93,7 @@ the Issue view's activity (`CommentBox`): ⌘↩ sends, esc leaves it.
 |---|---|
 | `issue_write(id, change)` | `Change::Assign { accountId }` (null unassigns) |
 | `issue_toggle_mine(id)` | assigns to me, or unassigns when it is mine |
+| `issue_assignees(id)` | who the issue may be assigned to, and who has it |
 | `issue_write(id, Transition { transitionId })` | moves the issue along a transition from `issue_transitions` |
 | `issue_write(id, Priority { name })` | sets the priority to one the edit screen offers |
 | `issue_transitions(id)` | the moves Jira offers from the issue's status |
@@ -105,3 +106,7 @@ while it is mine), the key **I** (`issue.toggleMine`) and Issue → Assign to Me
 The status pill in the Preview and the Issue view's field grid is the status menu's button (`StatusMenuButton`);
 **S** (`issue.changeStatus`) and Issue → Change Status… open the same menu under the pill, or under the selected
 row or card. Rows and cards drag onto tiles of their groups (above).
+The Issue view's assignee is the assignee menu's button (`AssigneeMenuButton`); **A** (`issue.assignTo`) and
+Issue → Assign To… open it under the assignee, or under the selected row or card. `issue_assignees(id)`
+(`writes::assignees`) lists the issue's Space's active team, me first (`team::active`), and who has it now; the
+menu checks the current one and ends with Unassigned.

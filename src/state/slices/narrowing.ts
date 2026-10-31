@@ -10,6 +10,8 @@ export interface ViewNarrowing {
   epic: string | null;
   /** The Me chip's draft; null shows the view's saved one. */
   me: boolean | null;
+  /** Only issues assigned to this account (the person chip); never saved. */
+  person: string | null;
   /** Draft conditions in place of the filter list's own ones, as edited (incomplete ones too); null keeps the
    *  saved ones. */
   list: Condition[] | null;
@@ -21,7 +23,7 @@ export interface NarrowingSlice {
   /** By `narrowingKey`. */
   narrowings: Record<string, ViewNarrowing>;
   setNarrowing: (key: string, patch: Partial<ViewNarrowing>) => void;
-  /** Back to what the view saved: after Save View, or Revert View. The text and the epic stay. */
+  /** Back to what the view saved: after Save View, or Revert View. The text, the epic and the person stay. */
   clearDrafts: (key: string) => void;
   /** Drops every other view's narrowing and drafts: the window left them. */
   keepOnlyNarrowing: (key: string) => void;
@@ -30,7 +32,7 @@ export interface NarrowingSlice {
   requestFilter: () => void;
 }
 
-export const NO_VIEW_NARROWING: ViewNarrowing = { text: "", epic: null, me: null, list: null, view: null };
+export const NO_VIEW_NARROWING: ViewNarrowing = { text: "", epic: null, me: null, person: null, list: null, view: null };
 
 export const narrowingKey = (listId: number, viewId: number) => `${listId}:${viewId}`;
 

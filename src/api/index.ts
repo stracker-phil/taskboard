@@ -5,6 +5,7 @@ import type {
   ActivityItem,
   AppError,
   AppInfo,
+  Assignees,
   Appearance,
   Behaviour,
   BoardData,
@@ -36,6 +37,7 @@ import type {
   PaletteScope,
   SpaceConfig,
   SpaceLayouts,
+  Person,
   PinDuration,
   PinKind,
   Pins,
@@ -239,6 +241,10 @@ export const api = {
   spaceSetLayouts: (projectId: string, layouts: SpaceLayouts) => invoke<SpaceConfig>("space_set_layouts", { projectId, layouts }),
   spaceSetField: (projectId: string, fieldId: string, visibility: FieldVisibility) =>
     invoke<SpaceConfig>("space_set_field", { projectId, fieldId, visibility }),
+  /** The active teammates of the level's Spaces, without me; for the person chip. */
+  levelPeople: (listId: number) => invoke<Person[]>("level_people", { listId }),
+  /** Who the issue may be assigned to: its Space's active team, me first, and who has it now. */
+  issueAssignees: (id: string) => invoke<Assignees>("issue_assignees", { id }),
   spaceTeam: (projectId: string) => invoke<TeamMember[]>("space_team", { projectId }),
   spaceSetMember: (projectId: string, accountId: string, active: boolean) =>
     invoke<TeamMember[]>("space_set_member", { projectId, accountId, active }),

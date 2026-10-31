@@ -208,7 +208,16 @@ describe("MainBody", () => {
 
       renderBody();
 
-      await waitFor(() => expect(mocked.viewRows).toHaveBeenCalledWith(11, 101, { me: true, text: "", epic: null, listDraft: null, viewDraft: null }));
+      await waitFor(() => expect(mocked.viewRows).toHaveBeenCalledWith(11, 101, { me: true, text: "", epic: null, person: null, listDraft: null, viewDraft: null }));
+    });
+
+    it("asks for the rows narrowed to the picked person", async () => {
+      mocked.viewsOf.mockResolvedValue([view()]);
+      useStore.getState().setNarrowing(narrowingKey(11, 101), { person: "demo-account-2" });
+
+      renderBody();
+
+      await waitFor(() => expect(mocked.viewRows).toHaveBeenCalledWith(11, 101, expect.objectContaining({ me: false, person: "demo-account-2" })));
     });
 
     it("asks for the rows narrowed by the text of this view only", async () => {
@@ -218,7 +227,7 @@ describe("MainBody", () => {
 
       renderBody();
 
-      await waitFor(() => expect(mocked.viewRows).toHaveBeenCalledWith(11, 101, { me: false, text: "pricing", epic: null, listDraft: null, viewDraft: null }));
+      await waitFor(() => expect(mocked.viewRows).toHaveBeenCalledWith(11, 101, { me: false, text: "pricing", epic: null, person: null, listDraft: null, viewDraft: null }));
       expect(mocked.viewRows).not.toHaveBeenCalledWith(11, 101, expect.objectContaining({ me: true }));
     });
 

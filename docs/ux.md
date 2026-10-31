@@ -531,6 +531,11 @@ button, Escape and a press outside close it, focus goes back to the button).
 - **Me** chip (on: `--accent-soft-*` pill with the `--avatar-1` avatar and "Me ×") and **Filter this view**
   (190 wide, filters by key or summary as you type; esc clears it). Both narrow only the current view. A view opens with the Me
   chip it saved (`view.only_mine`); a click changes it as a draft. The text is never saved.
+- **Person** chip (`PersonChip.tsx`, beside Me, the same pill; a people icon and "Person", or the picked person's
+  avatar and first name in the active style): a [menu](#menus) "Issues assigned to" with Anyone and the active
+  teammates of the level's Space (every tracked Space outside one; `level_people`, without me). It narrows like
+  Me (`Narrowing.person`), is never saved and goes with the text when the view is left. Picking a person turns Me
+  off; turning Me on clears the person. Folded into "…" it reads "Assigned to…".
 - **Save View** (left of the Filter button, `SaveViewButton.tsx`, on `--accent` with `--text-on-accent`; pops in
   with a short fade and scale, instant under reduced motion) shows while the Me chip or any condition of either
   popover section differs from what the view and its list saved (`useViewDraft`). It saves the list's
@@ -541,7 +546,7 @@ button, Escape and a press outside close it, focus goes back to the button).
   Issue view, the preview, the Peek) and coming back, or switching windows, keeps them. The Filter badge counts
   the drafted conditions.
 - When the bar is narrow, the text filter shrinks to 96 first; then Columns, Subtasks, Filter, Group and finally
-  the Me chip move into a "…" menu (`fit.ts`, `useToolbarFit`), and come back as soon as they fit. Save View
+  the Me and Person chips (together) move into a "…" menu (`fit.ts`, `useToolbarFit`), and come back as soon as they fit. Save View
   never moves; while it shows, it and the "…" button (holding Revert View) take their room first.
 
 ## Board view

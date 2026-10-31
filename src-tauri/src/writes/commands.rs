@@ -2,7 +2,9 @@
 
 use tauri::State;
 
-use super::{Change, DropOutcome, DropTargets, TransitionOption, ViewGroup, WriteOutcome};
+use super::{
+    Assignees, Change, DropOutcome, DropTargets, TransitionOption, ViewGroup, WriteOutcome,
+};
 use crate::error::AppResult;
 use crate::state::AppState;
 use crate::views::GroupBy;
@@ -75,4 +77,11 @@ pub async fn issue_drop(
     let settings = state.settings.get();
     let source = crate::sync::source_for(&state.jira, &settings.connection)?;
     super::drop_on(&state.db, source.as_ref(), &settings, id, group_by, key).await
+}
+
+/// Who the issue may be assigned to.
+#[tauri::command]
+pub async fn issue_assignees(state: State<'_, AppState>, id: String) -> AppResult<Assignees> {
+    let me = state.settings.get().connection.account_id;
+    super::assignees(&state.db, id, me).await
 }

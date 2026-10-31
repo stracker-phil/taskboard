@@ -93,6 +93,12 @@
 /* The status pill as the status menu's button (writes on); the pill keeps its look. */
 .status-menu-button { display: inline-flex; padding: 0; border: 0; background: none; border-radius: 7px; cursor: pointer; }
 .status-menu-button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.assignee-menu-button {
+  display: inline-flex; align-items: center; gap: 8px; margin: -3px -6px; padding: 3px 6px; border: 0; border-radius: 7px;
+  background: none; color: inherit; font: inherit; cursor: pointer;
+}
+.assignee-menu-button:hover { background: var(--hover-bg); }
+.assignee-menu-button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 
 /* Dragging an issue onto another group (writes on, docs/writes.md). */
 body.is-dragging-issue, body.is-dragging-issue * { cursor: grabbing !important; user-select: none; }

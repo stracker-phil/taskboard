@@ -3,6 +3,7 @@ import type { BoardData } from "../../api";
 import { onIssueKeys } from "../../commands/issueKeys";
 import type { RowActionHandlers } from "../list/RowActions";
 import { explainWritesOff } from "../../writes/runWrite";
+import { assignMenuAnchor } from "../../writes/assignMenu";
 import { statusMenuAnchor } from "../../writes/statusMenu";
 
 /** The Board's issue keys: J/K (↓/↑) move through a column's cards, ←/→ to the neighboring open column, ↩
@@ -66,6 +67,13 @@ export function useBoardKeys(
         const row = selected ? data.rows[selected] : undefined;
         if (!row) return;
         if (actions.changeStatus) actions.changeStatus(row, statusMenuAnchor(row.id));
+        else explainWritesOff();
+      },
+      assignTo: () => {
+        const { selected, actions, data } = state.current;
+        const row = selected ? data.rows[selected] : undefined;
+        if (!row) return;
+        if (actions.assignTo) actions.assignTo(row, assignMenuAnchor(row.id));
         else explainWritesOff();
       },
       toggleRead: () => {

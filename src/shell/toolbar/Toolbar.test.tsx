@@ -13,7 +13,9 @@ import { paletteMenus } from "../../palette/menus";
 import { createQueryClient } from "../../queries/queryClient";
 import { resetStore, useStore } from "../../state/store";
 import type { View } from "../../api";
+import { narrowingKey } from "../../state/slices/narrowing";
 import { filterOptions, listConditions } from "../../test/filters";
+import { ALEX, SAM } from "../../test/issues";
 import { space } from "../../test/spaces";
 import { listNode, view } from "../../test/views";
 import type { Level } from "../levels";
@@ -45,6 +47,14 @@ const run = (id: string) => {
   });
   return offered;
 };
+
+/** Waits until the level's people have been asked for and delivered to the toolbar. */
+async function peopleLoaded() {
+  await vi.waitFor(() => expect(mocked.levelPeople).toHaveBeenCalled());
+  await act(async () => {
+    await mocked.levelPeople.mock.results[0]?.value;
+  });
+}
 
 const filterField = () => screen.getByRole("textbox", { name: "Filter this view" });
 
@@ -572,6 +582,127 @@ describe("Toolbar view drafts", () => {
   });
 });
 
+describe("Toolbar person chip", () => {
+  const personChip = () => screen.getByRole("button", { name: /^(Person|Alex|Sam)/ });
+  const personMenu = async () => within(await screen.findByRole("menu", { name: "Person" }));
+  const narrowedTo = () => useStore.getState().narrowings[narrowingKey(11, 101)]?.person ?? null;
+
+  async function pick(name: RegExp | string) {
+    await peopleLoaded();
+    await userEvent.click(personChip());
+    await userEvent.click((await personMenu()).getByRole("menuitemradio", { name }));
+  }
+
+  beforeEach(() => {
+    mocked.levelPeople.mockResolvedValue([ALEX, SAM]);
+    mocked.listConditions.mockResolvedValue(listConditions({ kind: "space" }));
+  });
+
+  it("shows an unpressed Person chip next to Me while nobody is picked", () => {
+    renderToolbar(SPACE_LEVEL);
+
+    expect(personChip()).toHaveTextContent("Person");
+    expect(personChip()).toHaveAttribute("aria-pressed", "false");
+    expect(meChip().nextElementSibling).toBe(personChip());
+  });
+
+  it("lists Anyone and the level's people under a caption, with Anyone checked", async () => {
+    renderToolbar(SPACE_LEVEL);
+    await peopleLoaded();
+
+    await userEvent.click(personChip());
+
+    const menu = await personMenu();
+    expect(screen.getByText("Issues assigned to")).toBeInTheDocument();
+    expect(menu.getByRole("menuitemradio", { name: "Anyone" })).toHaveAttribute("aria-checked", "true");
+    expect(menu.getByRole("menuitemradio", { name: /Alex Morgan/ })).toHaveAttribute("aria-checked", "false");
+    expect(menu.getByRole("menuitemradio", { name: /Sam Lee/ })).toHaveAttribute("aria-checked", "false");
+    expect(mocked.levelPeople).toHaveBeenCalledWith(11);
+  });
+
+  it("says there are no teammates yet, in a disabled row, when the level has none", async () => {
+    mocked.levelPeople.mockResolvedValue([]);
+    renderToolbar(SPACE_LEVEL);
+
+    await userEvent.click(personChip());
+
+    expect((await personMenu()).getByRole("menuitem", { name: "No teammates yet" })).toHaveAttribute("aria-disabled", "true");
+  });
+
+  it("narrows the view to the picked person and shows their first name on a pressed chip", async () => {
+    renderToolbar(SPACE_LEVEL);
+
+    await pick(/Sam Lee/);
+
+    expect(narrowedTo()).toBe("demo-account-2");
+    expect(personChip()).toHaveTextContent("Sam");
+    expect(personChip()).not.toHaveTextContent("Lee");
+    expect(personChip()).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("checks the picked person in the menu", async () => {
+    renderToolbar(SPACE_LEVEL);
+    await pick(/Sam Lee/);
+
+    await userEvent.click(personChip());
+
+    expect((await personMenu()).getByRole("menuitemradio", { name: /Sam Lee/ })).toHaveAttribute("aria-checked", "true");
+  });
+
+  it("clears the narrowing when Anyone is chosen", async () => {
+    renderToolbar(SPACE_LEVEL);
+    await pick(/Sam Lee/);
+
+    await pick("Anyone");
+
+    expect(narrowedTo()).toBeNull();
+    expect(personChip()).toHaveTextContent("Person");
+    expect(personChip()).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("turns the Me chip off when a person is picked", async () => {
+    renderToolbar(SPACE_LEVEL);
+    await userEvent.click(meChip());
+    expect(meChip()).toHaveAttribute("aria-pressed", "true");
+
+    await pick(/Alex Morgan/);
+
+    expect(meChip()).toHaveAttribute("aria-pressed", "false");
+    expect(personChip()).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("clears the person when Me is turned on", async () => {
+    renderToolbar(SPACE_LEVEL);
+    await pick(/Sam Lee/);
+
+    await userEvent.click(meChip());
+
+    expect(meChip()).toHaveAttribute("aria-pressed", "true");
+    expect(personChip()).toHaveTextContent("Person");
+    expect(personChip()).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("offers no Save View for a picked person, since it is never saved", async () => {
+    renderToolbar(SPACE_LEVEL);
+
+    await pick(/Sam Lee/);
+
+    expect(saveViewButton()).not.toBeInTheDocument();
+    expect(revertViewButton()).not.toBeInTheDocument();
+    expect(mocked.viewSetOnlyMine).not.toHaveBeenCalled();
+  });
+
+  it("keeps the picked person after Revert View drops a drafted condition", async () => {
+    renderToolbar(SPACE_LEVEL);
+    await pick(/Sam Lee/);
+    await addCondition("This view");
+
+    await userEvent.click(await screen.findByRole("button", { name: "Revert View" }));
+
+    expect(personChip()).toHaveAttribute("aria-pressed", "true");
+  });
+});
+
 describe("Toolbar folding", () => {
   const rects: { mockRestore: () => void }[] = [];
 
@@ -609,6 +740,34 @@ describe("Toolbar folding", () => {
     const menu = within(await screen.findByRole("menu", { name: "More toolbar items" }));
     expect(menu.getByRole("menuitem", { name: /^Columns/ })).toBeInTheDocument();
     expect(menu.getByRole("menuitem", { name: /^Filter/ })).toBeInTheDocument();
+  });
+
+  describe("with the Me chip folded away", () => {
+    const openMore = async () => {
+      narrowBar(310);
+      mocked.levelPeople.mockResolvedValue([ALEX, SAM]);
+      renderToolbar(SPACE_LEVEL);
+      await peopleLoaded();
+      await userEvent.click(await screen.findByRole("button", { name: "More toolbar items" }));
+      return within(await screen.findByRole("menu", { name: "More toolbar items" }));
+    };
+
+    it("offers Only my issues and Assigned to… in the More menu", async () => {
+      const menu = await openMore();
+
+      expect(menu.getByRole("menuitemcheckbox", { name: "Only my issues" })).toHaveAttribute("aria-checked", "false");
+      expect(menu.getByRole("menuitem", { name: "Assigned to…" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Me" })).not.toBeInTheDocument();
+    });
+
+    it("opens the people menu from Assigned to… and narrows the view to the chosen person", async () => {
+      const menu = await openMore();
+
+      await userEvent.click(menu.getByRole("menuitem", { name: "Assigned to…" }));
+      await userEvent.click(within(await screen.findByRole("menu", { name: "Person" })).getByRole("menuitemradio", { name: /Sam Lee/ }));
+
+      expect(useStore.getState().narrowings[narrowingKey(11, 101)]?.person).toBe("demo-account-2");
+    });
   });
 
   it("does not add a More button for a draft, nor Revert View to its menu", async () => {

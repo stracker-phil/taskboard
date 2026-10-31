@@ -81,6 +81,7 @@ pub fn handlers() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
         crate::writes::commands::issue_comment,
         crate::writes::commands::issue_drop_targets,
         crate::writes::commands::issue_drop,
+        crate::writes::commands::issue_assignees,
         crate::avatars::commands::user_avatar,
         views::views_of,
         views::view_create,
@@ -112,6 +113,7 @@ pub fn handlers() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
         crate::space_config::commands::space_set_field,
         crate::team::commands::space_team,
         crate::team::commands::space_set_member,
+        crate::team::commands::level_people,
         bus::app::run_command,
     ]
 }

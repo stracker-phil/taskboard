@@ -262,6 +262,148 @@ async fn a_person_off_in_every_given_project_is_left_out() {
     );
 }
 
+async fn track(db: &Db, projects: &[&str]) {
+    for project in projects {
+        crate::connection::track_project(db, project.to_string(), true)
+            .await
+            .unwrap();
+    }
+}
+
+async fn level_where(db: &Db, clause: impl Into<String>) -> i64 {
+    let clause = clause.into();
+    db.read(move |conn| {
+        Ok(conn.query_row(
+            &format!("SELECT id FROM filter_list WHERE {clause} ORDER BY id LIMIT 1"),
+            [],
+            |r| r.get(0),
+        )?)
+    })
+    .await
+    .unwrap()
+}
+
+async fn space_level(db: &Db, project: &'static str) -> i64 {
+    level_where(db, format!("kind = 'space' AND project_id = '{project}'")).await
+}
+
+async fn people_at(db: &Db, level: i64, me: Option<&str>) -> Vec<String> {
+    level_people(db, level, me.map(str::to_string))
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|p| p.account_id)
+        .collect()
+}
+
+#[tokio::test]
+async fn a_space_level_gives_that_spaces_team() {
+    let (_dir, db) = lab().await;
+    track(&db, &[WEB, SUPPORT]).await;
+
+    let web = space_level(&db, WEB).await;
+    let support = space_level(&db, SUPPORT).await;
+
+    assert_eq!(
+        people_at(&db, web, None).await,
+        [ALEX, BEA, CLEO, FINN, GUS]
+    );
+    assert_eq!(people_at(&db, support, None).await, [BEA, DAN]);
+}
+
+#[tokio::test]
+async fn a_filter_list_inside_a_space_gives_that_spaces_team() {
+    let (_dir, db) = lab().await;
+    track(&db, &[WEB, SUPPORT]).await;
+    let in_support = level_where(
+        &db,
+        "kind = 'list' AND parent_id IN (SELECT id FROM filter_list WHERE kind = 'space' AND project_id = '10002')",
+    )
+    .await;
+
+    assert_eq!(people_at(&db, in_support, None).await, [BEA, DAN]);
+}
+
+#[tokio::test]
+async fn everything_gives_the_people_of_every_tracked_space_once() {
+    let (_dir, db) = lab().await;
+    track(&db, &[WEB, SUPPORT]).await;
+    let everything = level_where(&db, "kind = 'everything'").await;
+
+    assert_eq!(
+        people_at(&db, everything, None).await,
+        [ALEX, BEA, CLEO, DAN, FINN, GUS]
+    );
+}
+
+#[tokio::test]
+async fn everything_leaves_out_the_people_of_untracked_spaces() {
+    let (_dir, db) = lab().await;
+    track(&db, &[SUPPORT]).await;
+    let everything = level_where(&db, "kind = 'everything'").await;
+
+    assert_eq!(people_at(&db, everything, None).await, [BEA, DAN]);
+}
+
+#[tokio::test]
+async fn level_people_never_include_me() {
+    let (_dir, db) = lab().await;
+    track(&db, &[WEB, SUPPORT]).await;
+    let web = space_level(&db, WEB).await;
+    let everything = level_where(&db, "kind = 'everything'").await;
+
+    assert_eq!(
+        people_at(&db, web, Some(BEA)).await,
+        [ALEX, CLEO, FINN, GUS]
+    );
+    assert_eq!(
+        people_at(&db, everything, Some(BEA)).await,
+        [ALEX, CLEO, DAN, FINN, GUS]
+    );
+}
+
+#[tokio::test]
+async fn people_switched_off_in_a_space_are_left_out_of_its_level() {
+    let (_dir, db) = lab().await;
+    track(&db, &[WEB, SUPPORT]).await;
+    set(&db, WEB, BEA, false).await.unwrap();
+    let web = space_level(&db, WEB).await;
+    let support = space_level(&db, SUPPORT).await;
+
+    assert_eq!(people_at(&db, web, None).await, [ALEX, CLEO, FINN, GUS]);
+    assert_eq!(people_at(&db, support, None).await, [BEA, DAN]);
+}
+
+#[tokio::test]
+async fn everything_keeps_a_person_who_is_switched_off_in_only_some_spaces() {
+    let (_dir, db) = lab().await;
+    track(&db, &[WEB, SUPPORT]).await;
+    let everything = level_where(&db, "kind = 'everything'").await;
+
+    set(&db, WEB, BEA, false).await.unwrap();
+    assert!(
+        people_at(&db, everything, None)
+            .await
+            .contains(&BEA.to_string())
+    );
+
+    set(&db, SUPPORT, BEA, false).await.unwrap();
+    assert!(
+        !people_at(&db, everything, None)
+            .await
+            .contains(&BEA.to_string())
+    );
+}
+
+#[tokio::test]
+async fn an_unknown_level_is_not_found() {
+    let (_dir, db) = lab().await;
+
+    let err = level_people(&db, 9999, None).await.unwrap_err();
+
+    assert_eq!(err.kind(), ErrorKind::NotFound);
+}
+
 #[tokio::test]
 async fn the_team_serializes_with_camel_case_fields() {
     let (_dir, db) = lab().await;

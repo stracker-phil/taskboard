@@ -85,7 +85,7 @@ describe("ListView", () => {
   it("asks Rust for the rows of the list and view", async () => {
     await renderList(viewData([groupOf([OPEN])], [OPEN]));
 
-    expect(mocked.viewRows).toHaveBeenCalledWith(11, 101, { me: false, text: "", epic: null, listDraft: null, viewDraft: null });
+    expect(mocked.viewRows).toHaveBeenCalledWith(11, 101, { me: false, text: "", epic: null, person: null, listDraft: null, viewDraft: null });
   });
 
   it("shows what the level is missing instead of a grid when the view has no issues", async () => {
@@ -987,6 +987,27 @@ describe("ListView", () => {
 
       expect(useStore.getState().toasts.map((t) => [t.kind, t.message])).toEqual([["info", "Changes to Jira are off. Turn them on in Settings → Connection."]]);
       expect(mocked.issueTransitions).not.toHaveBeenCalled();
+    });
+
+    it("A asks Rust for the selected issue's team while changes to Jira are on", async () => {
+      mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ allowJiraChanges: true }) }));
+      await renderList(viewData([groupOf(rows)], rows));
+      await userEvent.click(await screen.findByText("Fix the footer links"));
+      await screen.findByRole("button", { name: "Assign NW-1003 to me or unassign it" });
+
+      await press("issue.assignTo");
+
+      expect(mocked.issueAssignees).toHaveBeenCalledWith("3");
+    });
+
+    it("A explains that changes to Jira are off instead of opening the assignee menu", async () => {
+      await renderList(viewData([groupOf(rows)], rows));
+      await userEvent.click(await screen.findByText("Fix the footer links"));
+
+      await press("issue.assignTo");
+
+      expect(useStore.getState().toasts.map((t) => [t.kind, t.message])).toEqual([["info", "Changes to Jira are off. Turn them on in Settings → Connection."]]);
+      expect(mocked.issueAssignees).not.toHaveBeenCalled();
     });
 
     it("I does nothing without a selected issue", async () => {

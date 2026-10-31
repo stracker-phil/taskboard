@@ -46,6 +46,19 @@ export type AppErrorField = { path: string, message: string, };
  */
 export type Appearance = "light" | "dark" | "system";
 
+/**
+ * Who an issue may be assigned to, for the assignee menu.
+ */
+export type Assignees = { 
+/**
+ * The issue's Space's active team, me first.
+ */
+people: Array<Person>, 
+/**
+ * Who has the issue now.
+ */
+current: string | null, };
+
 export type Attachment = { id: string, 
 /**
  * Plain text: the page never renders it as HTML.
@@ -484,6 +497,10 @@ text: string,
  * Only children of this epic.
  */
 epic: string | null, 
+/**
+ * Only issues assigned to this account (the person chip).
+ */
+person: string | null, 
 /**
  * Unsaved conditions in place of the filter list's own ones; only a filter list has its own.
  */

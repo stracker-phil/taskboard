@@ -194,6 +194,19 @@ fn narrowing_text(text: &str) -> Narrowing {
     }
 }
 
+const JONAS_ACCOUNT_ID: &str = "712020:5a1e0c3f-8d2b-4f61-9c7e-1b2a3c4d5e02";
+
+fn narrowing_person(account_id: &str) -> Narrowing {
+    Narrowing {
+        person: Some(account_id.into()),
+        ..Narrowing::default()
+    }
+}
+
+fn is_assigned_to(row: &Row, account_id: &str) -> bool {
+    row.assignees.first().map(|p| p.account_id.as_str()) == Some(account_id)
+}
+
 fn style_of(group: &Group) -> Option<Style> {
     match &group.mark {
         Some(GroupMark::Status { style }) => Some(*style),
@@ -603,6 +616,130 @@ mod narrowing {
                 .all(|row| row.assignees.first().map(|p| p.account_id.as_str())
                     == Some(ME_ACCOUNT_ID))
         );
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn a_person_keeps_only_the_issues_assigned_to_them() {
+        let site = Site::new().await;
+
+        let data = site.nw_data(narrowing_person(JONAS_ACCOUNT_ID)).await;
+
+        let expected = strings(
+            site.db(),
+            format!(
+                "SELECT key FROM cache.issue
+                 WHERE project_id = '{NW}' AND gone = 0 AND assignee_id = '{JONAS_ACCOUNT_ID}'
+                 ORDER BY key"
+            ),
+        )
+        .await;
+        assert!(!expected.is_empty());
+        assert_eq!(sorted_keys(&data), expected);
+        assert!(
+            data.rows
+                .values()
+                .all(|row| is_assigned_to(row, JONAS_ACCOUNT_ID))
+        );
+        assert_consistent(&data);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn without_a_person_nobody_is_left_out() {
+        let site = Site::new().await;
+
+        let everyone = site.nw_data(Narrowing::default()).await;
+        let nobody_named = site
+            .nw_data(Narrowing {
+                person: None,
+                ..Narrowing::default()
+            })
+            .await;
+
+        assert_eq!(nobody_named, everyone);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn a_person_and_text_both_have_to_match() {
+        let site = Site::new().await;
+
+        let data = site
+            .nw_data(Narrowing {
+                person: Some(JONAS_ACCOUNT_ID.into()),
+                text: "nw-10".into(),
+                ..Narrowing::default()
+            })
+            .await;
+
+        let expected = strings(
+            site.db(),
+            format!(
+                "SELECT key FROM cache.issue
+                 WHERE project_id = '{NW}' AND gone = 0 AND assignee_id = '{JONAS_ACCOUNT_ID}'
+                   AND key LIKE '%NW-10%' ORDER BY key"
+            ),
+        )
+        .await;
+        assert!(!expected.is_empty());
+        assert_eq!(sorted_keys(&data), expected);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn a_person_in_list_mode_tests_every_row_on_its_own() {
+        let site = Site::new().await;
+        let (space, view) = site.nw().await;
+        let hidden = site
+            .data(space, view, narrowing_person(JONAS_ACCOUNT_ID))
+            .await;
+        view_set_subtasks(site.db(), view, SubtaskMode::List)
+            .await
+            .unwrap();
+
+        let data = site
+            .data(space, view, narrowing_person(JONAS_ACCOUNT_ID))
+            .await;
+
+        assert!(
+            data.rows
+                .values()
+                .all(|row| is_assigned_to(row, JONAS_ACCOUNT_ID))
+        );
+        let keys = sorted_keys(&data);
+        for key in sorted_keys(&hidden) {
+            assert!(keys.contains(&key), "{key}");
+        }
+        assert_consistent(&data);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn a_person_in_hierarchy_mode_narrows_the_roots_only() {
+        let site = Site::new().await;
+        let (space, view) = site.nw().await;
+        view_set_subtasks(site.db(), view, SubtaskMode::Hierarchy)
+            .await
+            .unwrap();
+
+        let data = site
+            .data(space, view, narrowing_person(JONAS_ACCOUNT_ID))
+            .await;
+
+        let top: Vec<&Row> = data
+            .rows
+            .values()
+            .filter(|row| {
+                row.parent_id
+                    .as_ref()
+                    .is_none_or(|parent| !data.rows.contains_key(parent))
+            })
+            .collect();
+        assert!(!top.is_empty());
+        for row in top {
+            assert!(is_assigned_to(row, JONAS_ACCOUNT_ID), "{}", row.key);
+        }
     }
 
     #[tokio::test]
@@ -1086,6 +1223,29 @@ mod board {
         keys.sort();
         assert_eq!(keys, expected);
         assert_eq!(shown(&found), expected.len());
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn a_person_narrows_the_cards_to_their_issues() {
+        let site = Site::new().await;
+
+        let board = site.nw_board(narrowing_person(JONAS_ACCOUNT_ID)).await;
+
+        let expected = strings(
+            site.db(),
+            format!(
+                "SELECT key FROM cache.issue
+                 WHERE project_id = '{NW}' AND gone = 0 AND assignee_id = '{JONAS_ACCOUNT_ID}'
+                 ORDER BY key"
+            ),
+        )
+        .await;
+        assert!(!expected.is_empty());
+        let mut keys: Vec<String> = board.rows.values().map(|r| r.key.clone()).collect();
+        keys.sort();
+        assert_eq!(keys, expected);
+        assert_eq!(shown(&board), expected.len());
     }
 
     #[tokio::test]

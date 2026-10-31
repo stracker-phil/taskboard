@@ -2,16 +2,19 @@
 
 use chrono::Utc;
 use rusqlite::{Connection, OptionalExtension};
+use serde::Serialize;
+use ts_rs::TS;
 
 use super::{
-    Begun, Change, Field, Me, Reverse, WriteOutcome, apply, ensure_allowed, issue_key, pending,
-    remember_me, send,
+    Begun, Change, Field, Me, Reverse, WriteOutcome, apply, ensure_allowed, issue_key,
+    issue_project, pending, remember_me, send,
 };
 use crate::db::Db;
 use crate::error::{AppError, AppResult};
 use crate::store::settings::Settings;
 use crate::sync::map::format_utc;
 use crate::sync::source::Source;
+use crate::views::rows::Person;
 
 /// Assigns the issue to me, or unassigns it when it already is mine.
 pub async fn toggle_mine(
@@ -143,4 +146,26 @@ fn person(conn: &Connection, me: &Me, account_id: Option<&str>) -> AppResult<Opt
         )
         .optional()?;
     Ok(Some(name.unwrap_or_else(|| account_id.to_string())))
+}
+
+/// Who an issue may be assigned to, for the assignee menu.
+#[derive(Serialize, Clone, Debug, PartialEq, TS)]
+#[ts(export, export_to = "src/api/types.gen.ts")]
+#[serde(rename_all = "camelCase")]
+pub struct Assignees {
+    /// The issue's Space's active team, me first.
+    pub people: Vec<Person>,
+    /// Who has the issue now.
+    pub current: Option<String>,
+}
+
+pub async fn assignees(db: &Db, issue_id: String, me: Option<String>) -> AppResult<Assignees> {
+    db.read(move |conn| {
+        let project = issue_project(conn, &issue_id)?;
+        Ok(Assignees {
+            people: crate::team::active(conn, &[project], me.as_deref())?,
+            current: assignee_of(conn, &issue_id)?,
+        })
+    })
+    .await
 }

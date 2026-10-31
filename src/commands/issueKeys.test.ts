@@ -24,6 +24,7 @@ function handlers(patch: Partial<IssueKeyHandlers> = {}) {
     toggleRead: vi.fn(),
     toggleMine: vi.fn(),
     changeStatus: vi.fn(),
+    assignTo: vi.fn(),
     togglePeek: vi.fn(),
     hasSelection: () => true,
     peekOpen: () => true,
@@ -66,6 +67,7 @@ describe("issue keys", () => {
       ["P", "p", {}],
       ["I", "i", {}],
       ["S", "s", {}],
+      ["A", "a", {}],
     ])("leaves %s to nobody", (_label, key, mods) => {
       expect(press(key, mods)).toBeNull();
     });
@@ -208,6 +210,23 @@ describe("issue keys", () => {
       register(handlers({ hasSelection: () => false }));
 
       expect(press("s")).toBeNull();
+    });
+  });
+
+  describe("assigning to someone", () => {
+    it("A opens the selected issue's assignee menu", () => {
+      const h = handlers();
+      register(h);
+
+      void press("a")?.run();
+
+      expect(h.assignTo).toHaveBeenCalled();
+    });
+
+    it("ignores A without a selected row", () => {
+      register(handlers({ hasSelection: () => false }));
+
+      expect(press("a")).toBeNull();
     });
   });
 

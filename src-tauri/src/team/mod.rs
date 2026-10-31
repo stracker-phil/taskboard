@@ -9,6 +9,7 @@ use ts_rs::TS;
 
 use crate::db::{Db, LocalPart};
 use crate::error::{AppError, AppResult};
+use crate::space_config::project_of_level;
 use crate::views::rows::{Person, person};
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
@@ -78,6 +79,26 @@ pub fn active(
         people.insert(0, mine);
     }
     Ok(people)
+}
+
+/// The active teammates of the level's Space, or of every tracked Space for a level outside one; without me.
+pub async fn level_people(db: &Db, list_id: i64, me: Option<String>) -> AppResult<Vec<Person>> {
+    db.read(move |conn| {
+        let projects = match project_of_level(conn, list_id)? {
+            Some(project) => vec![project],
+            None => tracked_projects(conn)?,
+        };
+        let mut people = active(conn, &projects, me.as_deref())?;
+        people.retain(|p| Some(p.account_id.as_str()) != me.as_deref());
+        Ok(people)
+    })
+    .await
+}
+
+fn tracked_projects(conn: &Connection) -> AppResult<Vec<String>> {
+    let mut query = conn.prepare("SELECT project_id FROM space WHERE tracked = 1")?;
+    let rows = query.query_map([], |r| r.get(0))?;
+    Ok(rows.collect::<Result<_, _>>()?)
 }
 
 pub async fn space_team(

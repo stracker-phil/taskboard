@@ -33,6 +33,7 @@ import { Children, Links } from "./Related";
 import { WebLinks } from "./WebLinks";
 import { explainWritesOff } from "../writes/runWrite";
 import { AssignMeButton } from "../writes/AssignMeButton";
+import { assignMenuAnchor } from "../writes/assignMenu";
 import { statusMenuAnchor } from "../writes/statusMenu";
 
 /** The issue's neighbors among the rows the origin view shows (open groups, expanded subtrees), for the
@@ -269,6 +270,12 @@ function IssueKeys({ issue, neighbors }: { issue: IssueDetail | undefined; neigh
         const { issue, actions } = state.current;
         if (!issue) return;
         if (actions.changeStatus) actions.changeStatus(issue, statusMenuAnchor(issue.id));
+        else explainWritesOff();
+      },
+      assignTo: () => {
+        const { issue, actions } = state.current;
+        if (!issue) return;
+        if (actions.assignTo) actions.assignTo(issue, assignMenuAnchor(issue.id));
         else explainWritesOff();
       },
       toggleRead: () => {

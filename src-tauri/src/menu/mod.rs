@@ -108,6 +108,7 @@ pub const ISSUE: &[Item] = &[
     plain("Mark as Read or Unread", "page:issue.markSeen"),
     plain("Assign to Me or Unassign", "page:issue.toggleMine"),
     plain("Change Status…", "page:issue.changeStatus"),
+    plain("Assign To…", "page:issue.assignTo"),
 ];
 /// The window's appearance only; what the page shows lives in Go, List and Issue.
 pub const VIEW: &[Item] = &[item(
@@ -393,6 +394,7 @@ mod tests {
                 "issue.markSeen",
                 "issue.toggleMine",
                 "issue.changeStatus",
+                "issue.assignTo",
             ]
         );
     }

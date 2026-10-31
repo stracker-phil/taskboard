@@ -243,6 +243,7 @@ mod tests {
                 "page:issue.markSeen",
                 "page:issue.toggleMine",
                 "page:issue.changeStatus",
+                "page:issue.assignTo",
             ]
         );
     }

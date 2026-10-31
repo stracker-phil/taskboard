@@ -267,7 +267,7 @@ describe("IssueView", () => {
       renderIssue("10042");
       act(() => useStore.getState().setNarrowing(narrowingKey(11, 101), { me: true, view: [draft] }));
 
-      await waitFor(() => expect(mocked.viewRows).toHaveBeenCalledWith(11, 101, { me: true, text: "", epic: null, listDraft: null, viewDraft: [draft] }));
+      await waitFor(() => expect(mocked.viewRows).toHaveBeenCalledWith(11, 101, { me: true, text: "", epic: null, person: null, listDraft: null, viewDraft: [draft] }));
     });
 
     it("follows the Me chip the origin view saved", async () => {
@@ -1038,6 +1038,40 @@ describe("IssueView", () => {
 
       expect(useStore.getState().toasts.map((t) => [t.kind, t.message])).toEqual([["info", "Changes to Jira are off. Turn them on in Settings → Connection."]]);
       expect(mocked.issueTransitions).not.toHaveBeenCalled();
+    });
+
+    it("A asks Rust for the open issue's team while changes to Jira are on", async () => {
+      mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ allowJiraChanges: true }) }));
+      renderIssue("10042");
+      await screen.findByRole("button", { name: "Assign NW-1042 to me" });
+
+      await press("issue.assignTo");
+
+      expect(mocked.issueAssignees).toHaveBeenCalledWith("10042");
+    });
+
+    it("A explains that changes to Jira are off instead of opening the assignee menu", async () => {
+      renderIssue("10042");
+      await title("Checkout: address validation for DACH postcodes");
+
+      await press("issue.assignTo");
+
+      expect(useStore.getState().toasts.map((t) => [t.kind, t.message])).toEqual([["info", "Changes to Jira are off. Turn them on in Settings → Connection."]]);
+      expect(mocked.issueAssignees).not.toHaveBeenCalled();
+    });
+
+    it("shows the assignee as a Change the assignee button while changes to Jira are on", async () => {
+      mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ allowJiraChanges: true }) }));
+      renderIssue("10042");
+
+      expect(await screen.findByRole("button", { name: "Change the assignee of NW-1042" })).toBeInTheDocument();
+    });
+
+    it("shows the plain assignee while changes to Jira are off", async () => {
+      renderIssue("10042");
+      await title("Checkout: address validation for DACH postcodes");
+
+      expect(screen.queryByRole("button", { name: "Change the assignee of NW-1042" })).not.toBeInTheDocument();
     });
 
     it("shows the status as a Change the status button while changes to Jira are on", async () => {

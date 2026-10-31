@@ -12,7 +12,7 @@ use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
-pub use assign::toggle_mine;
+pub use assign::{Assignees, assignees, toggle_mine};
 pub use comment::{MAX_COMMENT_CHARS, add_comment};
 pub use drop::{DropOutcome, DropTarget, DropTargets, ViewGroup, arrange, drop_on, drop_targets};
 pub use pending::{forget_all, overlay};

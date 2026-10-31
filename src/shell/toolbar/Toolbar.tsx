@@ -15,6 +15,8 @@ import type { Collapsible } from "./fit";
 import { GROUP_NAMES, groupMenu } from "./groupMenu";
 import { MODE_NAMES, SubtasksButton, subtasksMenu } from "./SubtasksButton";
 import { MeChip } from "./MeChip";
+import { openPeopleMenu, PersonChip } from "./PersonChip";
+import { useLevelPeople } from "../../queries/views";
 import { TextFilter } from "./TextFilter";
 import { DraftActions } from "./DraftActions";
 import { useToolbarFit } from "./useToolbarFit";
@@ -86,7 +88,11 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
   const space = spaceOf(level);
   // Both layers count, as drafted or saved: the filter list's own conditions and the view's.
   const own = draft.conditions;
-  const toggleMe = () => setNarrowing(key, { me: !draft.me });
+  // Me and one person exclude each other.
+  const setMe = (me: boolean) => setNarrowing(key, { me, person: me ? null : narrowing.person });
+  const toggleMe = () => setMe(!draft.me);
+  const { data: people = [] } = useLevelPeople(view.listId);
+  const setPerson = (person: string | null) => setNarrowing(key, { person, me: person ? false : draft.me });
   const save = () => void draft.save();
   const columnsLabel = view.layout === "board" ? "Card fields" : "Columns";
   const shows = (item: Collapsible) => !hidden.includes(item) && (item !== "subtasks" || hasSubtasks);
@@ -111,7 +117,7 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
   usePaletteMenu("toolbar.display", { section: THIS_VIEW, title: "Show", entries: displayEntries });
 
   const moreEntries = (): MenuEntry[] =>
-    hidden.map((item): MenuEntry => {
+    hidden.flatMap((item): MenuEntry | MenuEntry[] => {
       switch (item) {
         case "columns":
           return { text: `${columnsLabel}…`, run: () => setOpen("columns") };
@@ -122,7 +128,14 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
         case "group":
           return { text: `Group: ${GROUP_NAMES[view.groupBy]}`, items: groupEntries() };
         case "me":
-          return { text: "Only my issues", checked: draft.me, toggle: true, run: toggleMe };
+          return [
+            { text: "Only my issues", checked: draft.me, toggle: true, run: toggleMe },
+            {
+              text: "Assigned to…",
+              hint: people.find((p) => p.accountId === narrowing.person)?.name,
+              run: () => moreRef.current && openPeopleMenu(people, narrowing.person, setPerson, moreRef.current),
+            },
+          ];
       }
     });
 
@@ -187,7 +200,8 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
       )}
       {shows("me") && (
         <span ref={measure("me")} className="toolbar__item">
-          <MeChip on={draft.me} onChange={(me) => setNarrowing(key, { me })} />
+          <MeChip on={draft.me} onChange={setMe} />
+          <PersonChip listId={view.listId} person={narrowing.person} onChange={setPerson} />
         </span>
       )}
       {narrowing.epic && <EpicNarrowingChip epicId={narrowing.epic} onClear={() => setNarrowing(key, { epic: null })} />}

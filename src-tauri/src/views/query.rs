@@ -40,6 +40,8 @@ pub struct Narrowing {
     pub text: String,
     /// Only children of this epic.
     pub epic: Option<String>,
+    /// Only issues assigned to this account (the person chip).
+    pub person: Option<String>,
     /// Unsaved conditions in place of the filter list's own ones; only a filter list has its own.
     pub list_draft: Option<Vec<Condition>>,
     /// Unsaved conditions in place of the view's own ones.
@@ -121,6 +123,10 @@ pub(super) fn fetch_view(
     let narrowed = RowNarrowing::new(narrowing, ctx.me.as_deref());
     let base = Narrowing {
         me: narrowing.me && mode != SubtaskMode::List,
+        person: narrowing
+            .person
+            .clone()
+            .filter(|_| mode != SubtaskMode::List),
         ..narrowing.clone()
     };
     let (condition, params) = conditions(conn, viewer, &ctx, list_id, Some(&view), &base)?;
@@ -161,18 +167,20 @@ pub(super) fn fetch_view(
     })
 }
 
-/// The Me chip and the text field as a test on one row.
+/// The Me chip, the person chip and the text field as a test on one row.
 struct RowNarrowing<'a> {
     only_mine: bool,
     me: Option<&'a str>,
+    person: Option<&'a str>,
     needle: String,
 }
 
 impl<'a> RowNarrowing<'a> {
-    fn new(narrowing: &Narrowing, me: Option<&'a str>) -> Self {
+    fn new(narrowing: &'a Narrowing, me: Option<&'a str>) -> Self {
         Self {
             only_mine: narrowing.me,
             me,
+            person: narrowing.person.as_deref(),
             needle: fold(narrowing.text.trim()),
         }
     }
@@ -185,9 +193,10 @@ impl<'a> RowNarrowing<'a> {
 
     /// Without a connected account the Me chip matches nobody.
     fn matches(&self, item: &(Row, Facts)) -> bool {
-        let mine =
-            !self.only_mine || (self.me.is_some() && item.1.assignee_id.as_deref() == self.me);
-        mine && self.text_matches(item)
+        let assignee = item.1.assignee_id.as_deref();
+        let mine = !self.only_mine || (self.me.is_some() && assignee == self.me);
+        let theirs = self.person.is_none() || assignee == self.person;
+        mine && theirs && self.text_matches(item)
     }
 }
 
@@ -350,6 +359,10 @@ fn conditions(
     if narrowing.me {
         condition.push_str(" AND i.assignee_id = ?");
         params.push(ctx.me.clone().unwrap_or_default().into());
+    }
+    if let Some(person) = &narrowing.person {
+        condition.push_str(" AND i.assignee_id = ?");
+        params.push(person.clone().into());
     }
     if let Some(epic) = &narrowing.epic {
         condition.push_str(" AND i.parent_id = ?");

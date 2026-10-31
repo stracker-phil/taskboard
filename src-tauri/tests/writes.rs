@@ -11,19 +11,21 @@ use taskboard_lib::connection::{
     ConnectionInput, JiraAccess, refresh_projects, save, track_project,
 };
 use taskboard_lib::db::Db;
-use taskboard_lib::error::{AppError, ErrorKind};
+use taskboard_lib::error::{AppError, AppResult, ErrorKind};
 use taskboard_lib::issues::issue_sync_comments;
 use taskboard_lib::jira::{Limiter, TokenKind};
 use taskboard_lib::status_style::{Style, status_style_set};
 use taskboard_lib::store::settings::{Settings, SettingsStore};
 use taskboard_lib::sync::{Emit, SyncContext, SyncEvent, full_sync};
+use taskboard_lib::team::space_set_member;
 use taskboard_lib::test_support::demo::{self, DEMO_NOW, ME_EMAIL};
 use taskboard_lib::test_support::fake_jira::{DEMO_TOKEN, FakeJira};
 use taskboard_lib::test_support::{FakeSecrets, temp_config_dir};
 use taskboard_lib::views::GroupBy;
 use taskboard_lib::writes::{
-    Change, DropOutcome, DropTargets, MAX_COMMENT_CHARS, Reverse, TransitionOption, WriteOutcome,
-    add_comment, apply, drop_on, drop_targets, forget_all, toggle_mine, transitions,
+    Assignees, Change, DropOutcome, DropTargets, MAX_COMMENT_CHARS, Reverse, TransitionOption,
+    WriteOutcome, add_comment, apply, assignees, drop_on, drop_targets, forget_all, toggle_mine,
+    transitions,
 };
 
 const PROJECT_IDS: [&str; 5] = ["10001", "10002", "10003", "10004", "10005"];
@@ -556,6 +558,99 @@ fn outcome(done: &str, label: &str, back_to: Option<&str>) -> WriteOutcome {
                 account_id: back_to.map(String::from),
             },
         }),
+    }
+}
+
+mod assignee_menu {
+    use super::*;
+
+    async fn menu(rig: &Rig, issue_id: &str, me: Option<&str>) -> AppResult<Assignees> {
+        assignees(&rig.ctx.db, issue_id.into(), me.map(String::from)).await
+    }
+
+    fn names(menu: &Assignees) -> Vec<&str> {
+        menu.people.iter().map(|p| p.name.as_str()).collect()
+    }
+
+    #[tokio::test]
+    async fn the_menu_offers_the_issues_spaces_team_with_me_first() {
+        let rig = Rig::synced().await;
+
+        let menu = menu(&rig, NW_1044, Some(ALEX)).await.unwrap();
+
+        assert_eq!(
+            names(&menu),
+            ["Alex Morgan", "Anna Lutz", "Jonas Reiter", "Marta Klein"]
+        );
+        assert_eq!(menu.people[0].account_id, ALEX);
+    }
+
+    #[tokio::test]
+    async fn without_me_the_team_is_sorted_by_name() {
+        let rig = Rig::synced().await;
+
+        let menu = menu(&rig, NW_1044, None).await.unwrap();
+
+        assert_eq!(
+            names(&menu),
+            ["Alex Morgan", "Anna Lutz", "Jonas Reiter", "Marta Klein"]
+        );
+    }
+
+    #[tokio::test]
+    async fn the_current_assignee_is_the_one_the_issue_has() {
+        let rig = Rig::synced().await;
+
+        assert_eq!(
+            menu(&rig, NW_1044, Some(ALEX)).await.unwrap().current,
+            Some(MARTA.to_string())
+        );
+        assert_eq!(
+            menu(&rig, NW_1042, Some(ALEX)).await.unwrap().current,
+            Some(ALEX.to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn an_unassigned_issue_has_no_current_assignee() {
+        let rig = Rig::synced().await;
+        rig.apply(NW_1042, None).await;
+
+        let menu = menu(&rig, NW_1042, Some(ALEX)).await.unwrap();
+
+        assert_eq!(menu.current, None);
+    }
+
+    #[tokio::test]
+    async fn a_person_switched_off_in_the_space_is_not_offered() {
+        let rig = Rig::synced().await;
+        space_set_member(&rig.ctx.db, NW_PROJECT.into(), JONAS.into(), false, None)
+            .await
+            .unwrap();
+
+        let menu = menu(&rig, NW_1044, Some(ALEX)).await.unwrap();
+
+        assert_eq!(names(&menu), ["Alex Morgan", "Anna Lutz", "Marta Klein"]);
+    }
+
+    #[tokio::test]
+    async fn an_unknown_issue_is_not_found() {
+        let rig = Rig::synced().await;
+
+        let err = menu(&rig, "999999", Some(ALEX)).await.unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::NotFound);
+    }
+
+    #[tokio::test]
+    async fn the_menu_serializes_with_camel_case_fields() {
+        let rig = Rig::synced().await;
+
+        let menu = menu(&rig, NW_1044, Some(ALEX)).await.unwrap();
+
+        let json = serde_json::to_value(&menu).unwrap();
+        assert_eq!(json["current"], MARTA);
+        assert_eq!(json["people"][0]["accountId"], ALEX);
     }
 }
 

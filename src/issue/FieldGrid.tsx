@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import type { Cell, IssueDetail } from "../api";
 import { Avatar } from "../components/issue/Avatar";
 import { PriorityFlag } from "../components/issue/PriorityFlag";
+import { AssigneeMenuButton } from "../writes/AssigneeMenuButton";
 import { StatusMenuButton } from "../writes/StatusMenuButton";
 
 function Field({ icon: Icon, label, children }: { icon?: LucideIcon; label: string; children: ReactNode }) {
@@ -40,14 +41,16 @@ export function FieldGrid({ issue, onOpenEpic }: { issue: IssueDetail; onOpenEpi
         <StatusMenuButton issue={issue} />
       </Field>
       <Field icon={User} label="Assignee">
-        {issue.assignees.length > 0
-          ? issue.assignees.map((person) => (
-              <span key={person.accountId} className="field-grid__person">
-                <Avatar person={person} size={24} />
-                {person.name}
-              </span>
-            ))
-          : NONE}
+        <AssigneeMenuButton issue={issue}>
+          {issue.assignees.length > 0
+            ? issue.assignees.map((person) => (
+                <span key={person.accountId} className="field-grid__person">
+                  <Avatar person={person} size={24} />
+                  {person.name}
+                </span>
+              ))
+            : NONE}
+        </AssigneeMenuButton>
       </Field>
       {!issue.isEpic && (
         <Field icon={Zap} label="Epic">

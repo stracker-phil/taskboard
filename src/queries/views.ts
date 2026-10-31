@@ -6,7 +6,7 @@ import { useStore } from "../state/store";
 import { useViews } from "./sidebar";
 
 /** Rows asked for without any narrowing or draft. */
-export const NO_NARROWING: Narrowing = { me: false, text: "", epic: null, listDraft: null, viewDraft: null };
+export const NO_NARROWING: Narrowing = { me: false, text: "", epic: null, person: null, listDraft: null, viewDraft: null };
 
 /** What a view's rows are asked with (ADR 0038): the toolbar's narrowing, the Me chip as drafted or else as the
  *  view saved it, and the drafts' complete conditions in place of the saved ones. */
@@ -15,6 +15,7 @@ export function requestNarrowing(narrowing: ViewNarrowing, savedOnlyMine: boolea
     me: narrowing.me ?? savedOnlyMine,
     text: narrowing.text,
     epic: narrowing.epic,
+    person: narrowing.person,
     listDraft: narrowing.list?.filter(isComplete) ?? null,
     viewDraft: narrowing.view?.filter(isComplete) ?? null,
   };
@@ -78,6 +79,8 @@ export const useSpaceConfig = (projectId: string) =>
 /** Everyone with activity in a Space's issues, and who of them is switched off. */
 export const TEAM_KEY = ["team"] as const;
 export const spaceTeamKey = (projectId: string) => [...TEAM_KEY, "space", projectId] as const;
+export const levelPeopleKey = (listId: number) => [...TEAM_KEY, "level", listId] as const;
+export const useLevelPeople = (listId: number) => useQuery({ queryKey: levelPeopleKey(listId), queryFn: () => api.levelPeople(listId) });
 export const useSpaceTeam = (projectId: string) => useQuery({ queryKey: spaceTeamKey(projectId), queryFn: () => api.spaceTeam(projectId) });
 
 /** A level's locked and own conditions and the view's own ones, for the Filter popover. */
