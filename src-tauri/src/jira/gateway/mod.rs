@@ -21,7 +21,7 @@ pub use guard::check;
 pub use http::{MAX_ANSWER_BYTES, MAX_ATTACHMENT_BYTES};
 pub use params::{
     AccountId, AttachmentId, BULK_FETCH_MAX, Expand, FieldIds, IssueRef, IssueRefs, Jql, PageToken,
-    ProjectKey, TransitionId,
+    PriorityName, ProjectKey, TransitionId,
 };
 
 use super::limiter::Limiter;

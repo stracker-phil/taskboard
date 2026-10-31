@@ -154,7 +154,7 @@ export function createApiMock(): Api {
     issueSyncHistory: vi.fn().mockResolvedValue(false),
     issueForget: vi.fn().mockResolvedValue(undefined),
     issueComment: vi.fn(async (): Promise<WriteOutcome> => ({ done: "Done", reverse: null })),
-    issueDropTargets: vi.fn(async (): Promise<DropTargets> => ({ any: false, keys: [] })),
+    issueDropTargets: vi.fn(async (): Promise<DropTargets> => ({ targets: [], refused: [], note: null })),
     issueDrop: vi.fn(async (): Promise<DropOutcome> => ({ kind: "done", outcome: { done: "Done", reverse: null } })),
     issueTransitions: vi.fn().mockResolvedValue([]),
     issueWrite: vi.fn(async (): Promise<WriteOutcome> => ({ done: "Done", reverse: null })),

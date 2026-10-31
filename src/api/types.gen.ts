@@ -126,7 +126,7 @@ export type Cell = { "kind": "text", "value": string } | { "kind": "person", "va
 /**
  * A change to one issue, as the page asks for it.
  */
-export type Change = { "kind": "assign", accountId: string | null, } | { "kind": "transition", transitionId: string, };
+export type Change = { "kind": "assign", accountId: string | null, } | { "kind": "transition", transitionId: string, } | { "kind": "priority", name: string, };
 
 export type ChangeValue = { "kind": "status", "value": { name: string, style: Style, } } | { "kind": "person", "value": Person } | { "kind": "text", "value": string };
 
@@ -204,17 +204,26 @@ export type Diagnostics = { groups: Array<DiagnosticGroup>, };
 export type DropOutcome = { "kind": "done", outcome: WriteOutcome, } | { "kind": "choose", moves: Array<TransitionOption>, };
 
 /**
- * Which groups of a view may take the dragged issue.
+ * A group the issue may be dropped on, keyed like the view's groups (`views::groups`).
  */
-export type DropTargets = { 
+export type DropTarget = { key: string, label: string, 
 /**
- * Every group takes it (grouped by assignee).
+ * "Set status to Code Review", "Assign to Jamie Doe".
  */
-any: boolean, 
+action: string, mark: GroupMark | null, };
+
 /**
- * The group keys that take it, when not `any`.
+ * Where the dragged issue may go, each place with what a drop there does.
  */
-keys: Array<string>, };
+export type DropTargets = { targets: Array<DropTarget>, 
+/**
+ * The view's groups the issue can't go to, by label (`arrange`).
+ */
+refused: Array<string>, 
+/**
+ * Why there are no targets, when that isn't Jira's choice.
+ */
+note: string | null, };
 
 export type EpicChip = { id: string, name: string, 
 /**
@@ -874,6 +883,11 @@ isDefault: boolean,
 ownConditions: number, };
 
 export type ViewData = { groupBy: GroupBy, subtasks: SubtaskMode, groups: Array<Group>, rows: { [key in string]: Row }, columns: Array<string>, };
+
+/**
+ * A group of the view the drag starts in, in the view's order.
+ */
+export type ViewGroup = { key: string, label: string, };
 
 /**
  * One view of a level, opened at that view.

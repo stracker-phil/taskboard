@@ -1,4 +1,4 @@
-import type { Drag, DropState } from "./useIssueDrag";
+import type { Drag } from "./useIssueDrag";
 
 /** The dragged issue's key and summary at the pointer. */
 export function DragGhost({ drag }: { drag: Drag | null }) {
@@ -9,9 +9,4 @@ export function DragGhost({ drag }: { drag: Drag | null }) {
       <span className="drag-ghost__summary">{drag.issue.summary}</span>
     </div>
   );
-}
-
-/** The class a drop zone shows while an issue is dragged. */
-export function dropClass(state: DropState | null): string {
-  return state ? ` drop-zone drop-zone--${state}` : "";
 }

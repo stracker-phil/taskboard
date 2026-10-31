@@ -7,7 +7,7 @@ use url::Url;
 
 use super::{
     Access, AccountId, AttachmentId, BadRequest, Endpoint, Expand, FieldIds, IssueRef, IssueRefs,
-    Jql, PageToken, Planned, ProjectKey, TransitionId, check,
+    Jql, PageToken, Planned, PriorityName, ProjectKey, TransitionId, check,
 };
 use crate::error::AppError;
 use crate::jira::site::{Site, TokenKind};
@@ -180,6 +180,22 @@ fn allowlist() -> Vec<(Endpoint, Method, &'static str, Option<Value>)> {
             },
             Method::GET,
             "issue/10001/transitions",
+            None,
+        ),
+        (
+            Endpoint::IssueEditMeta {
+                issue: issue("NW-1042"),
+            },
+            Method::GET,
+            "issue/NW-1042/editmeta",
+            None,
+        ),
+        (
+            Endpoint::IssueEditMeta {
+                issue: issue("10001"),
+            },
+            Method::GET,
+            "issue/10001/editmeta",
             None,
         ),
         (
@@ -871,10 +887,9 @@ fn the_assign_request_is_refused_once_it_is_planned_as_a_read_or_changed_in_shap
 }
 
 #[test]
-fn only_the_assignee_path_may_be_written() {
+fn paths_beside_the_assignee_path_may_not_be_written() {
     let writes = [
         (Method::PUT, "rest/api/3/issue/NW-1/comment"),
-        (Method::PUT, "rest/api/3/issue/NW-1"),
         (Method::PUT, "rest/api/3/issue/NW-1/assignee/"),
         (Method::PUT, "rest/api/3/issue/NW-1/assignee/extra"),
         (Method::PUT, "rest/api/3/issue/NW-1/assignee?accountId=x"),
@@ -1139,6 +1154,144 @@ fn comments_are_read_with_their_own_keys_and_written_with_expand_only() {
             Access::Read,
         );
         assert_refused(&post_as_read, &site, &format!("{label} POST as a read"));
+    }
+}
+
+fn set_priority(issue_text: &str, name: &str) -> Endpoint {
+    Endpoint::SetPriority {
+        issue: issue(issue_text),
+        priority: PriorityName::parse(name).unwrap(),
+    }
+}
+
+#[test]
+fn setting_a_priority_plans_a_put_on_the_issue_with_the_name_in_the_fields() {
+    for (prefix, site) in sites() {
+        for (target, name) in [("NW-1042", "High"), ("10001", "Lowest")] {
+            let plan = set_priority(target, name).plan(&site).unwrap();
+
+            assert_eq!(
+                plan.url.as_str(),
+                format!("{prefix}issue/{target}"),
+                "{target} {name}"
+            );
+            assert_eq!(plan.method, Method::PUT, "{target} {name}");
+            assert_eq!(
+                plan.body,
+                Some(json!({ "fields": { "priority": { "name": name } } })),
+                "{target} {name}"
+            );
+            assert!(plan.authenticated, "{target} {name}");
+            assert_eq!(plan.access, Access::Write, "{target} {name}");
+            assert_eq!(plan.bad_request, BadRequest::Plain, "{target} {name}");
+            assert!(check(&plan, &site).is_ok(), "{prefix} {target} {name}");
+        }
+    }
+}
+
+#[test]
+fn the_priority_request_is_refused_once_it_is_planned_as_a_read_or_changed_in_shape() {
+    for (label, site) in sites() {
+        let plan = set_priority("NW-1", "High").plan(&site).unwrap();
+
+        let mut as_read = plan.clone();
+        as_read.access = Access::Read;
+        assert_refused(&as_read, &site, &format!("{label} planned as a read"));
+
+        let mut unauthenticated = plan.clone();
+        unauthenticated.authenticated = false;
+        assert_refused(&unauthenticated, &site, &format!("{label} unauthenticated"));
+
+        let mut with_query = plan.clone();
+        with_query
+            .url
+            .query_pairs_mut()
+            .append_pair("notifyUsers", "false");
+        assert_refused(&with_query, &site, &format!("{label} with a query"));
+
+        let mut with_fragment = plan.clone();
+        with_fragment.url.set_fragment(Some("frag"));
+        assert_refused(&with_fragment, &site, &format!("{label} with a fragment"));
+
+        for method in [Method::POST, Method::DELETE, Method::PATCH, Method::GET] {
+            let mut other = plan.clone();
+            other.method = method.clone();
+            assert_refused(&other, &site, &format!("{label} as {method}"));
+        }
+    }
+}
+
+#[test]
+fn only_a_plain_issue_reference_may_be_edited() {
+    let paths = [
+        "rest/api/3/issue/",
+        "rest/api/3/issue",
+        "rest/api/3/issue/NW-1/",
+        "rest/api/3/issue/%2e%2e",
+        "rest/api/3/issue/NW-1%2Fcomment",
+        "rest/api/3/issue/nw-1",
+        "rest/api/3/issue/-1",
+        "rest/api/2/issue/NW-1",
+        "rest/api/3/issue/NW-1?x=1",
+    ];
+    for (label, site) in sites() {
+        for relative in paths {
+            let plan = write_request(Method::PUT, &url_for(&site, relative), Access::Write);
+            assert_refused(&plan, &site, &format!("{label} PUT {relative}"));
+        }
+    }
+}
+
+#[test]
+fn reading_the_edit_screen_is_a_read_and_writing_it_is_refused() {
+    for (label, site) in sites() {
+        let url = url_for(&site, "rest/api/3/issue/NW-1/editmeta");
+
+        let get = planned(Method::GET, &url);
+        assert!(check(&get, &site).is_ok(), "{label} GET");
+
+        let mut get_as_write = get.clone();
+        get_as_write.access = Access::Write;
+        assert_refused(&get_as_write, &site, &format!("{label} GET as a write"));
+
+        for method in [Method::PUT, Method::POST] {
+            let plan = write_request(method.clone(), &url, Access::Write);
+            assert_refused(&plan, &site, &format!("{label} {method} editmeta"));
+        }
+    }
+}
+
+#[test]
+fn a_priority_name_is_text_up_to_255_bytes_without_control_characters() {
+    let longest = "a".repeat(255);
+    for name in [
+        "High",
+        "Highest",
+        "Won't fix",
+        "Très haut",
+        longest.as_str(),
+    ] {
+        assert_eq!(PriorityName::parse(name).unwrap().as_str(), name);
+    }
+}
+
+#[test]
+fn an_empty_blank_oversized_or_control_character_priority_name_is_refused() {
+    let too_long = "a".repeat(256);
+    for name in [
+        "",
+        " ",
+        "\t\n ",
+        "Hi\ngh",
+        "Hi\0gh",
+        "High\u{1b}[31m",
+        "\u{7f}",
+        too_long.as_str(),
+    ] {
+        assert!(
+            matches!(PriorityName::parse(name), Err(AppError::InvalidInput(_))),
+            "{name:?}"
+        );
     }
 }
 

@@ -82,6 +82,7 @@ pub fn overlay(conn: &Connection, row: &mut IssueRow) -> AppResult<()> {
                 Some(std::mem::replace(&mut row.status_id, status_id))
             }
             (Field::Status, None) => continue,
+            (Field::Priority, value) => std::mem::replace(&mut row.priority, value),
         };
         conn.execute(
             "UPDATE cache.pending_write SET base = ?3 WHERE issue_id = ?1 AND field = ?2",
@@ -95,6 +96,7 @@ fn shown_value(conn: &Connection, issue_id: &str, field: Field) -> AppResult<Opt
     let column = match field {
         Field::Assignee => "assignee_id",
         Field::Status => "status_id",
+        Field::Priority => "priority",
     };
     conn.query_row(
         &format!("SELECT {column} FROM cache.issue WHERE id = ?1 AND gone = 0"),
@@ -114,6 +116,10 @@ fn set_value(
     match field {
         Field::Assignee => conn.execute(
             "UPDATE cache.issue SET assignee_id = ?2 WHERE id = ?1",
+            params![issue_id, value],
+        )?,
+        Field::Priority => conn.execute(
+            "UPDATE cache.issue SET priority = ?2 WHERE id = ?1",
             params![issue_id, value],
         )?,
         Field::Status => conn.execute(

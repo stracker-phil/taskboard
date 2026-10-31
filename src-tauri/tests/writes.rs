@@ -451,6 +451,92 @@ impl Rig {
     }
 }
 
+impl Rig {
+    /// What the cache shows as the priority.
+    async fn cached_priority(&self, issue_id: &str) -> Option<String> {
+        let id = issue_id.to_string();
+        self.ctx
+            .db
+            .read(move |conn| {
+                Ok(conn.query_row(
+                    "SELECT priority FROM cache.issue WHERE id = ?1",
+                    [id],
+                    |row| row.get(0),
+                )?)
+            })
+            .await
+            .unwrap()
+    }
+
+    /// The priority name Jira (the fake) holds.
+    async fn jira_priority(&self, issue_id: &str) -> Option<String> {
+        let source = self.ctx.source().unwrap();
+        let found = source
+            .fetch(&[issue_id.to_string()], &["priority".to_string()])
+            .await
+            .unwrap();
+        found.issues[0].fields["priority"]["name"]
+            .as_str()
+            .map(String::from)
+    }
+
+    async fn try_set_priority(
+        &self,
+        issue_id: &str,
+        name: &str,
+    ) -> taskboard_lib::error::AppResult<WriteOutcome> {
+        let source = self.ctx.source().unwrap();
+        apply(
+            &self.ctx.db,
+            &*source,
+            &self.settings(),
+            issue_id.into(),
+            Change::Priority { name: name.into() },
+        )
+        .await
+    }
+
+    async fn set_priority(&self, issue_id: &str, name: &str) -> WriteOutcome {
+        self.try_set_priority(issue_id, name).await.unwrap()
+    }
+
+    /// Edits the fake received to change an issue's fields.
+    fn priorities_sent(&self) -> usize {
+        self.fake
+            .requests()
+            .iter()
+            .filter(|r| {
+                r.method == "PUT" && r.path.contains("/issue/") && !r.path.ends_with("/assignee")
+            })
+            .count()
+    }
+
+    /// A priority on its way: the row already shows `value`, as `writes::apply` leaves it.
+    async fn start_pending_priority(&self, issue_id: &'static str, value: &'static str) {
+        self.ctx
+            .db
+            .write(move |tx, _| {
+                let base: Option<String> = tx.query_row(
+                    "SELECT priority FROM cache.issue WHERE id = ?1",
+                    [issue_id],
+                    |row| row.get(0),
+                )?;
+                tx.execute(
+                    "INSERT INTO cache.pending_write (issue_id, field, value, base, created_at)
+                     VALUES (?1, 'priority', ?2, ?3, '2026-10-28T11:00:00.000Z')",
+                    rusqlite::params![issue_id, value, base],
+                )?;
+                tx.execute(
+                    "UPDATE cache.issue SET priority = ?2 WHERE id = ?1",
+                    rusqlite::params![issue_id, value],
+                )?;
+                Ok(())
+            })
+            .await
+            .unwrap();
+    }
+}
+
 fn option(id: &str, status_name: &str, style: Style, opens_jira: bool) -> TransitionOption {
     TransitionOption {
         id: id.into(),
@@ -1348,22 +1434,278 @@ mod the_comment_syncs_with_a_comment_on_its_way {
     }
 }
 
+mod setting_the_priority {
+    use super::*;
+
+    fn priority_outcome(done: &str, back_to: Option<&str>) -> WriteOutcome {
+        WriteOutcome {
+            done: done.into(),
+            reverse: back_to.map(|old| Reverse {
+                label: format!("Change back to {old}"),
+                change: Change::Priority { name: old.into() },
+            }),
+        }
+    }
+
+    #[tokio::test]
+    async fn shows_in_the_cache_and_in_jira_and_offers_the_old_priority_back() {
+        let rig = Rig::synced().await;
+
+        let done = rig.set_priority(NW_1042, "Low").await;
+
+        assert_eq!(
+            done,
+            priority_outcome("Set NW-1042 to Low priority", Some("High"))
+        );
+        assert_eq!(rig.cached_priority(NW_1042).await.as_deref(), Some("Low"));
+        assert_eq!(rig.jira_priority(NW_1042).await.as_deref(), Some("Low"));
+        assert_eq!(rig.pending_writes().await, 0);
+        assert_eq!(rig.priorities_sent(), 1);
+    }
+
+    #[tokio::test]
+    async fn is_still_shown_after_the_next_sync() {
+        let rig = Rig::synced().await;
+        rig.set_priority(NW_1042, "Lowest").await;
+
+        rig.sync().await;
+
+        assert_eq!(
+            rig.cached_priority(NW_1042).await.as_deref(),
+            Some("Lowest")
+        );
+    }
+
+    #[tokio::test]
+    async fn the_reverse_sets_the_old_priority_back() {
+        let rig = Rig::synced().await;
+        let done = rig.set_priority(NW_1042, "Low").await;
+
+        let back = done.reverse.unwrap().change;
+        let Change::Priority { name } = back else {
+            panic!("expected a priority change, got {back:?}");
+        };
+        rig.set_priority(NW_1042, &name).await;
+
+        assert_eq!(rig.cached_priority(NW_1042).await.as_deref(), Some("High"));
+        assert_eq!(rig.jira_priority(NW_1042).await.as_deref(), Some("High"));
+    }
+
+    #[tokio::test]
+    async fn an_issue_without_a_priority_gets_no_reverse() {
+        let rig = Rig::synced().await;
+        rig.ctx
+            .db
+            .write(|tx, _| {
+                tx.execute(
+                    "UPDATE cache.issue SET priority = NULL WHERE id = ?1",
+                    [NW_1042],
+                )?;
+                Ok(())
+            })
+            .await
+            .unwrap();
+
+        let done = rig.set_priority(NW_1042, "Low").await;
+
+        assert_eq!(done, priority_outcome("Set NW-1042 to Low priority", None));
+        assert_eq!(rig.cached_priority(NW_1042).await.as_deref(), Some("Low"));
+    }
+
+    #[tokio::test]
+    async fn the_current_priority_sends_nothing_and_offers_no_reverse() {
+        let rig = Rig::synced().await;
+
+        let done = rig.set_priority(NW_1042, "High").await;
+
+        assert_eq!(
+            done,
+            priority_outcome("NW-1042 already has High priority", None)
+        );
+        assert_eq!(rig.priorities_sent(), 0);
+        assert_eq!(rig.pending_writes().await, 0);
+    }
+
+    #[tokio::test]
+    async fn a_priority_the_edit_screen_does_not_offer_is_refused_and_nothing_changes() {
+        let rig = Rig::synced().await;
+
+        let err = rig.try_set_priority(NW_1042, "Urgent").await.unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::InvalidInput);
+        assert_eq!(rig.priorities_sent(), 0);
+        assert_eq!(rig.pending_writes().await, 0);
+        assert_eq!(rig.cached_priority(NW_1042).await.as_deref(), Some("High"));
+        assert_eq!(rig.jira_priority(NW_1042).await.as_deref(), Some("High"));
+    }
+
+    #[tokio::test]
+    async fn with_changes_off_nothing_is_sent_or_changed() {
+        let rig = Rig::synced().await;
+        rig.ctx
+            .settings
+            .edit(|s| s.behaviour.allow_jira_changes = false)
+            .await
+            .unwrap();
+
+        let err = rig.try_set_priority(NW_1042, "Low").await.unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::InvalidInput);
+        assert_eq!(rig.priorities_sent(), 0);
+        assert_eq!(rig.cached_priority(NW_1042).await.as_deref(), Some("High"));
+    }
+
+    #[tokio::test]
+    async fn a_write_jira_refuses_puts_the_old_priority_back_and_returns_the_error() {
+        let rig = Rig::synced().await;
+        rig.fake
+            .answer_next_write(400, json!({ "errorMessages": ["Not allowed"] }));
+
+        let err = rig.try_set_priority(NW_1042, "Low").await.unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::InvalidInput);
+        assert_eq!(rig.cached_priority(NW_1042).await.as_deref(), Some("High"));
+        assert_eq!(rig.jira_priority(NW_1042).await.as_deref(), Some("High"));
+        assert_eq!(rig.pending_writes().await, 0);
+        assert_eq!(rig.priorities_sent(), 1);
+    }
+
+    #[tokio::test]
+    async fn a_second_change_while_one_is_on_its_way_is_refused_and_sends_nothing() {
+        let rig = Rig::synced().await;
+        rig.start_pending_priority(NW_1042, "Lowest").await;
+
+        let err = rig.try_set_priority(NW_1042, "Low").await.unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::InvalidInput);
+        assert_eq!(rig.priorities_sent(), 0);
+        assert_eq!(
+            rig.cached_priority(NW_1042).await.as_deref(),
+            Some("Lowest")
+        );
+    }
+
+    #[tokio::test]
+    async fn the_sync_keeps_the_pending_priority_over_what_jira_sent_and_remembers_jiras_as_the_base()
+     {
+        let rig = Rig::synced().await;
+        rig.start_pending_priority(NW_1049, "Low").await;
+        rig.fake.set_now(demo_now() + chrono::Duration::hours(2));
+        rig.fake.edit_issue("NW-1049", |fields| {
+            fields["priority"] = json!({ "id": "3", "name": "Medium" })
+        });
+
+        rig.sync().await;
+
+        assert_eq!(rig.cached_priority(NW_1049).await.as_deref(), Some("Low"));
+        let base: Option<String> = rig
+            .ctx
+            .db
+            .read(|conn| {
+                Ok(conn.query_row(
+                    "SELECT base FROM cache.pending_write WHERE issue_id = ?1 AND field = 'priority'",
+                    [NW_1049],
+                    |row| row.get(0),
+                )?)
+            })
+            .await
+            .unwrap();
+        assert_eq!(base.as_deref(), Some("Medium"));
+    }
+
+    #[tokio::test]
+    async fn the_sync_takes_what_jira_sent_once_the_write_is_forgotten() {
+        let rig = Rig::synced().await;
+        rig.start_pending_priority(NW_1049, "Low").await;
+        rig.ctx.db.write(|tx, _| forget_all(tx)).await.unwrap();
+        rig.fake.set_now(demo_now() + chrono::Duration::hours(2));
+        rig.fake.edit_issue("NW-1049", |fields| {
+            fields["priority"] = json!({ "id": "3", "name": "Medium" })
+        });
+
+        rig.sync().await;
+
+        assert_eq!(
+            rig.cached_priority(NW_1049).await.as_deref(),
+            Some("Medium")
+        );
+    }
+}
+
 mod dropping {
     use super::*;
 
     const NOT_ALLOWED: &str = "Jira's workflow doesn't allow this move for the issue";
 
-    fn none() -> DropTargets {
+    use taskboard_lib::views::groups::GroupMark;
+    use taskboard_lib::views::rows::person;
+    use taskboard_lib::writes::DropTarget;
+
+    const CHANGES_OFF: &str = "Changes to Jira are off. Turn them on in Settings → Connection.";
+    const NO_FIELD: &str =
+        "Dragging changes the status, the assignee or the priority; group the view by one of them.";
+    const ANNA: &str = "712020:5a1e0c3f-8d2b-4f61-9c7e-1b2a3c4d5e04";
+
+    fn noted(note: &str) -> DropTargets {
         DropTargets {
-            any: false,
-            keys: Vec::new(),
+            targets: Vec::new(),
+            refused: Vec::new(),
+            note: Some(note.into()),
         }
     }
 
-    fn keys(keys: &[&str]) -> DropTargets {
+    fn offering(targets: Vec<DropTarget>) -> DropTargets {
         DropTargets {
-            any: false,
-            keys: keys.iter().map(|k| k.to_string()).collect(),
+            targets,
+            refused: Vec::new(),
+            note: None,
+        }
+    }
+
+    fn status_target(id: &str, name: &str, style: Style) -> DropTarget {
+        DropTarget {
+            key: id.into(),
+            label: name.into(),
+            action: format!("Set status to {name}"),
+            mark: Some(GroupMark::Status { style }),
+        }
+    }
+
+    fn type_target(key: &str, style: Style, action: &str) -> DropTarget {
+        DropTarget {
+            key: key.into(),
+            label: style.name().into(),
+            action: action.into(),
+            mark: Some(GroupMark::Status { style }),
+        }
+    }
+
+    fn person_target(account_id: &str, name: &str, action: &str) -> DropTarget {
+        DropTarget {
+            key: account_id.into(),
+            label: name.into(),
+            action: action.into(),
+            mark: Some(GroupMark::Person {
+                person: person(account_id, name, Some(ALEX)),
+            }),
+        }
+    }
+
+    fn unassigned_target() -> DropTarget {
+        DropTarget {
+            key: String::new(),
+            label: "Unassigned".into(),
+            action: "Unassign".into(),
+            mark: None,
+        }
+    }
+
+    fn priority_target(name: &str, level: u8) -> DropTarget {
+        DropTarget {
+            key: name.into(),
+            label: name.into(),
+            action: format!("Set priority to {name}"),
+            mark: Some(GroupMark::Priority { level }),
         }
     }
 
@@ -1414,12 +1756,14 @@ mod dropping {
     async fn nothing_written(rig: &Rig) {
         assert_eq!(rig.transitions_posted(), 0);
         assert_eq!(rig.assignments_sent(), 0);
+        assert_eq!(rig.priorities_sent(), 0);
         assert_eq!(rig.pending_writes().await, 0);
         assert_eq!(
             rig.cached_status(NW_1042).await,
             (IN_PROGRESS.to_string(), "indeterminate".to_string())
         );
         assert_eq!(rig.cached_assignee(NW_1042).await.as_deref(), Some(ALEX));
+        assert_eq!(rig.cached_priority(NW_1042).await.as_deref(), Some("High"));
     }
 
     #[tokio::test]
@@ -1432,15 +1776,24 @@ mod dropping {
             .unwrap();
         let requests_before = rig.fake.requests().len();
 
-        for group_by in [GroupBy::Assignee, GroupBy::Status, GroupBy::StatusType] {
-            assert_eq!(targets(&rig, group_by).await, none(), "{group_by:?}");
+        for group_by in [
+            GroupBy::Assignee,
+            GroupBy::Status,
+            GroupBy::StatusType,
+            GroupBy::Priority,
+        ] {
+            assert_eq!(
+                targets(&rig, group_by).await,
+                noted(CHANGES_OFF),
+                "{group_by:?}"
+            );
         }
 
         assert_eq!(rig.fake.requests().len(), requests_before);
     }
 
     #[tokio::test]
-    async fn grouped_by_assignee_every_group_takes_it_without_asking_jira() {
+    async fn grouped_by_assignee_the_targets_are_the_spaces_team_with_me_first_then_unassigned() {
         let rig = Rig::synced().await;
         let requests_before = rig.fake.requests().len();
 
@@ -1448,12 +1801,34 @@ mod dropping {
 
         assert_eq!(
             found,
-            DropTargets {
-                any: true,
-                keys: Vec::new()
-            }
+            offering(vec![
+                person_target(ALEX, "Alex Morgan", "Assign to me"),
+                person_target(ANNA, "Anna Lutz", "Assign to Anna Lutz"),
+                person_target(JONAS, "Jonas Reiter", "Assign to Jonas Reiter"),
+                person_target(MARTA, "Marta Klein", "Assign to Marta Klein"),
+                unassigned_target(),
+            ])
         );
         assert_eq!(rig.fake.requests().len(), requests_before);
+    }
+
+    #[tokio::test]
+    async fn grouped_by_assignee_people_switched_off_in_the_space_are_left_out() {
+        let rig = Rig::synced().await;
+        taskboard_lib::team::space_set_member(
+            &rig.ctx.db,
+            NW_PROJECT.into(),
+            JONAS.into(),
+            false,
+            Some(ALEX.into()),
+        )
+        .await
+        .unwrap();
+
+        let found = targets(&rig, GroupBy::Assignee).await;
+
+        let keys: Vec<&str> = found.targets.iter().map(|t| t.key.as_str()).collect();
+        assert_eq!(keys, [ALEX, ANNA, MARTA, ""]);
     }
 
     #[tokio::test]
@@ -1462,59 +1837,129 @@ mod dropping {
 
         assert_eq!(
             targets(&rig, GroupBy::Status).await,
-            keys(&[TO_DO, IN_REVIEW, BLOCKED, DONE])
+            offering(vec![
+                status_target(TO_DO, "To Do", Style::Todo),
+                status_target(IN_REVIEW, "In Review", Style::Review),
+                status_target(BLOCKED, "Blocked", Style::Blocked),
+                status_target(DONE, "Done", Style::Done),
+            ])
         );
 
         rig.fake.require_screen(BLOCKED);
 
         assert_eq!(
             targets(&rig, GroupBy::Status).await,
-            keys(&[TO_DO, IN_REVIEW, DONE])
+            offering(vec![
+                status_target(TO_DO, "To Do", Style::Todo),
+                status_target(IN_REVIEW, "In Review", Style::Review),
+                status_target(DONE, "Done", Style::Done),
+            ])
         );
     }
 
     #[tokio::test]
-    async fn grouped_by_status_type_the_targets_are_the_distinct_sorted_styles_of_those_moves() {
+    async fn grouped_by_status_type_the_targets_are_the_distinct_styles_of_those_moves_in_style_order()
+     {
         let rig = Rig::synced().await;
 
         assert_eq!(
             targets(&rig, GroupBy::StatusType).await,
-            keys(&["blocked", "done", "review", "todo"])
+            offering(vec![
+                type_target("review", Style::Review, "Set status to In Review"),
+                type_target("blocked", Style::Blocked, "Set status to Blocked"),
+                type_target("todo", Style::Todo, "Set status to To Do"),
+                type_target("done", Style::Done, "Set status to Done"),
+            ])
         );
 
         rig.fake.require_screen(BLOCKED);
         assert_eq!(
             targets(&rig, GroupBy::StatusType).await,
-            keys(&["done", "review", "todo"])
+            offering(vec![
+                type_target("review", Style::Review, "Set status to In Review"),
+                type_target("todo", Style::Todo, "Set status to To Do"),
+                type_target("done", Style::Done, "Set status to Done"),
+            ])
+        );
+    }
+
+    #[tokio::test]
+    async fn a_status_type_with_several_statuses_names_them_all_in_its_action() {
+        let rig = Rig::synced().await;
+        for status in [DONE, BLOCKED] {
+            status_style_set(
+                &rig.ctx.db,
+                NW_PROJECT.into(),
+                status.into(),
+                Some(Style::Review),
+            )
+            .await
+            .unwrap();
+        }
+
+        assert_eq!(
+            targets(&rig, GroupBy::StatusType).await,
+            offering(vec![
+                type_target(
+                    "review",
+                    Style::Review,
+                    "Set status to In Review, Blocked or Done"
+                ),
+                type_target("todo", Style::Todo, "Set status to To Do"),
+            ])
         );
 
         status_style_set(
             &rig.ctx.db,
             NW_PROJECT.into(),
-            DONE.into(),
-            Some(Style::Review),
+            BLOCKED.into(),
+            Some(Style::Blocked),
         )
         .await
         .unwrap();
+
         assert_eq!(
             targets(&rig, GroupBy::StatusType).await,
-            keys(&["review", "todo"])
+            offering(vec![
+                type_target("review", Style::Review, "Set status to In Review or Done"),
+                type_target("blocked", Style::Blocked, "Set status to Blocked"),
+                type_target("todo", Style::Todo, "Set status to To Do"),
+            ])
         );
     }
 
     #[tokio::test]
-    async fn other_groupings_take_no_drop() {
+    async fn grouped_by_priority_the_targets_are_the_priorities_of_the_edit_screen() {
+        let rig = Rig::synced().await;
+
+        assert_eq!(
+            targets(&rig, GroupBy::Priority).await,
+            offering(vec![
+                priority_target("Highest", 1),
+                priority_target("High", 2),
+                priority_target("Medium", 3),
+                priority_target("Low", 4),
+                priority_target("Lowest", 5),
+            ])
+        );
+    }
+
+    #[tokio::test]
+    async fn other_groupings_take_no_drop_and_say_what_to_group_by() {
         let rig = Rig::synced().await;
         for group_by in [
             GroupBy::Project,
             GroupBy::Client,
             GroupBy::Epic,
             GroupBy::Release,
-            GroupBy::Priority,
             GroupBy::Due,
             GroupBy::None,
         ] {
-            assert_eq!(targets(&rig, group_by).await, none(), "{group_by:?}");
+            assert_eq!(
+                targets(&rig, group_by).await,
+                noted(NO_FIELD),
+                "{group_by:?}"
+            );
         }
     }
 
@@ -1522,11 +1967,55 @@ mod dropping {
     async fn the_targets_serialize_for_the_page_in_camel_case() {
         let rig = Rig::synced().await;
 
-        let value = serde_json::to_value(targets(&rig, GroupBy::Status).await).unwrap();
+        let status = serde_json::to_value(targets(&rig, GroupBy::Status).await).unwrap();
+        let none = serde_json::to_value(targets(&rig, GroupBy::Epic).await).unwrap();
+        let assignee = serde_json::to_value(targets(&rig, GroupBy::Assignee).await).unwrap();
+        let priority = serde_json::to_value(targets(&rig, GroupBy::Priority).await).unwrap();
 
         assert_eq!(
-            value,
-            json!({ "any": false, "keys": [TO_DO, IN_REVIEW, BLOCKED, DONE] })
+            status,
+            json!({
+                "targets": [
+                    {
+                        "key": TO_DO, "label": "To Do", "action": "Set status to To Do",
+                        "mark": { "kind": "status", "style": "todo" },
+                    },
+                    {
+                        "key": IN_REVIEW, "label": "In Review", "action": "Set status to In Review",
+                        "mark": { "kind": "status", "style": "review" },
+                    },
+                    {
+                        "key": BLOCKED, "label": "Blocked", "action": "Set status to Blocked",
+                        "mark": { "kind": "status", "style": "blocked" },
+                    },
+                    {
+                        "key": DONE, "label": "Done", "action": "Set status to Done",
+                        "mark": { "kind": "status", "style": "done" },
+                    },
+                ],
+                "refused": [],
+                "note": null,
+            })
+        );
+        assert_eq!(
+            none,
+            json!({ "targets": [], "refused": [], "note": NO_FIELD })
+        );
+        assert_eq!(assignee["targets"][0]["mark"]["kind"], "person");
+        assert_eq!(
+            assignee["targets"][0]["mark"]["person"]["accountId"],
+            json!(ALEX)
+        );
+        assert_eq!(
+            assignee["targets"][4],
+            json!({ "key": "", "label": "Unassigned", "action": "Unassign", "mark": null })
+        );
+        assert_eq!(
+            priority["targets"][0],
+            json!({
+                "key": "Highest", "label": "Highest", "action": "Set priority to Highest",
+                "mark": { "kind": "priority", "level": 1 },
+            })
         );
     }
 
@@ -1564,6 +2053,28 @@ mod dropping {
         );
         assert_eq!(rig.cached_assignee(NW_1042).await, None);
         assert_eq!(rig.jira_assignee(NW_1042).await, None);
+    }
+
+    #[tokio::test]
+    async fn on_a_priority_group_sets_that_priority() {
+        let rig = Rig::synced().await;
+
+        let outcome = drop_done(&rig, GroupBy::Priority, "Low").await;
+
+        assert_eq!(
+            outcome,
+            WriteOutcome {
+                done: "Set NW-1042 to Low priority".into(),
+                reverse: Some(Reverse {
+                    label: "Change back to High".into(),
+                    change: Change::Priority {
+                        name: "High".into()
+                    },
+                }),
+            }
+        );
+        assert_eq!(rig.cached_priority(NW_1042).await.as_deref(), Some("Low"));
+        assert_eq!(rig.jira_priority(NW_1042).await.as_deref(), Some("Low"));
     }
 
     #[tokio::test]
@@ -1681,7 +2192,6 @@ mod dropping {
             GroupBy::Client,
             GroupBy::Epic,
             GroupBy::Release,
-            GroupBy::Priority,
             GroupBy::Due,
             GroupBy::None,
         ] {
@@ -1708,6 +2218,7 @@ mod dropping {
             (GroupBy::Assignee, MARTA),
             (GroupBy::Status, DONE),
             (GroupBy::StatusType, "done"),
+            (GroupBy::Priority, "Low"),
         ] {
             let err = try_drop(&rig, group_by, key).await.unwrap_err();
 

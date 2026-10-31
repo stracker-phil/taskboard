@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { api, type DropTargets, type GroupBy } from "../api";
+import { api, type DropTargets, type GroupBy, type ViewGroup } from "../api";
 import { attempt } from "../state/requests";
 import { followPointer, type Point } from "./followPointer";
 import { showOutcome } from "./runWrite";
@@ -21,11 +21,9 @@ export interface Drag {
   targets: DropTargets | null;
 }
 
-export type DropState = "ok" | "no" | "home";
-
-/** Rows and cards dragged onto another group change the field the view groups by (`docs/writes.md`); drop zones
- *  carry `data-drop-key`. */
-export function useIssueDrag(groupBy: GroupBy, openInJira: ((key: string) => void) | null) {
+/** Rows and cards dragged onto a tile of `DropOverlay` change the field the view groups by (`docs/writes.md`);
+ *  tiles carry `data-drop-key`. */
+export function useIssueDrag(groupBy: GroupBy, groups: ViewGroup[], openInJira: ((key: string) => void) | null) {
   const changesAllowed = useJiraChanges();
   const [drag, setDrag] = useState<Drag | null>(null);
   const latest = useRef<Drag | null>(null);
@@ -43,7 +41,7 @@ export function useIssueDrag(groupBy: GroupBy, openInJira: ((key: string) => voi
       {
         onStart: () => {
           update({ issue, at: { x: e.clientX, y: e.clientY }, targets: null });
-          void attempt(api.issueDropTargets(issue.id, groupBy), "Could not ask Jira where the issue may go").then((targets) => {
+          void attempt(api.issueDropTargets(issue.id, groupBy, issue.fromKey, groups), "Could not ask Jira where the issue may go").then((targets) => {
             if (latest.current?.issue.id === issue.id) update({ ...latest.current, targets });
           });
         },
@@ -51,21 +49,18 @@ export function useIssueDrag(groupBy: GroupBy, openInJira: ((key: string) => voi
         onDrop: (at) => {
           const key = dropKeyAt(at);
           const finished = latest.current;
-          if (finished && key !== null && dropState(finished, key) === "ok") drop(issue, groupBy, key, at, openInJira);
+          if (finished && key !== null && takesDrop(finished, key)) drop(issue, groupBy, key, at, openInJira);
         },
         onEnd: () => update(null),
       },
     );
   };
 
-  return { drag, onPointerDown, dropState: (key: string) => (drag ? dropState(drag, key) : null) };
+  return { drag, onPointerDown };
 }
 
-/** The issue's own group is home; a group takes it when Rust listed it (or every group). */
-function dropState(drag: Drag, key: string): DropState {
-  if (key === drag.issue.fromKey) return "home";
-  const targets = drag.targets;
-  return targets && (targets.any || targets.keys.includes(key)) ? "ok" : "no";
+function takesDrop(drag: Drag, key: string): boolean {
+  return drag.targets?.targets.some((target) => target.key === key) ?? false;
 }
 
 function dropKeyAt(at: Point): string | null {

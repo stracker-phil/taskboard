@@ -74,6 +74,10 @@ pub trait Source: Send + Sync {
     fn add_comment<'a>(&'a self, issue_id: &'a str, body: Value) -> Answer<'a, Comment>;
     /// Write: moves the issue (by id) along a transition.
     fn transition<'a>(&'a self, issue_id: &'a str, transition_id: &'a str) -> Answer<'a, ()>;
+    /// The priorities the issue's (by id) edit screen offers; empty when its priority can't be changed.
+    fn priorities<'a>(&'a self, issue_id: &'a str) -> Answer<'a, Vec<String>>;
+    /// Write: sets the issue's (by id) priority by name.
+    fn set_priority<'a>(&'a self, issue_id: &'a str, name: &'a str) -> Answer<'a, ()>;
     /// Write: assigns the issue (by id) to the account, or unassigns it.
     fn assign<'a>(&'a self, issue_id: &'a str, account_id: Option<&'a str>) -> Answer<'a, ()>;
 }

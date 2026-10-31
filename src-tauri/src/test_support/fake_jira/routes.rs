@@ -58,6 +58,8 @@ pub fn route(site: &mut Content, request: &Recorded) -> Response {
         ("GET", ["attachment", "content", id]) => attachment_content(site, id, request),
         ("POST", ["jql", "parse"]) => parse_jql(&request.body),
         ("PUT", ["issue", key, "assignee"]) => writes::assign(site, key, &request.body),
+        ("GET", ["issue", key, "editmeta"]) => writes::edit_meta(site, key),
+        ("PUT", ["issue", key]) => writes::edit(site, key, &request.body),
         ("GET", ["issue", key, "transitions"]) => writes::transitions(site, key),
         ("POST", ["issue", key, "transitions"]) => writes::transition(site, key, &request.body),
         ("POST", ["issue", key, "comment"]) => writes::comment(site, key, &request.body),

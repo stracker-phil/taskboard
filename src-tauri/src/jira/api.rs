@@ -2,12 +2,13 @@
 
 use super::client::JiraClient;
 use super::dto::{
-    ApproximateCount, BulkFetch, Changelog, ChangelogPage, Comment, CommentPage, Field, Issue,
-    Myself, ParsedQueries, Project, ProjectPage, RemoteLink, SearchPage, Status, TenantInfo,
+    ApproximateCount, BulkFetch, Changelog, ChangelogPage, Comment, CommentPage, EditMeta, Field,
+    Issue, Myself, ParsedQueries, Project, ProjectPage, RemoteLink, SearchPage, Status, TenantInfo,
     Transition, Transitions, Version,
 };
 use super::gateway::{
-    AccountId, AttachmentId, Endpoint, FieldIds, IssueRef, IssueRefs, Jql, ProjectKey, TransitionId,
+    AccountId, AttachmentId, Endpoint, FieldIds, IssueRef, IssueRefs, Jql, PriorityName,
+    ProjectKey, TransitionId,
 };
 use super::paging::{SearchPages, SearchRequest};
 use crate::error::AppResult;
@@ -152,6 +153,25 @@ impl JiraClient {
         let endpoint = Endpoint::AssignIssue {
             issue: IssueRef::parse(issue_id)?,
             account: account_id.map(AccountId::parse).transpose()?,
+        };
+        self.gateway().send(endpoint).await
+    }
+
+    /// The priorities the issue's edit screen offers; empty when its priority can't be changed.
+    pub async fn priorities(&self, issue_id: &str) -> AppResult<Vec<String>> {
+        let issue = IssueRef::parse(issue_id)?;
+        let meta: EditMeta = self
+            .gateway()
+            .send(Endpoint::IssueEditMeta { issue })
+            .await?;
+        Ok(meta.priorities())
+    }
+
+    /// Sets the issue's priority by name. A write: sent once, never retried.
+    pub async fn set_priority(&self, issue_id: &str, name: &str) -> AppResult<()> {
+        let endpoint = Endpoint::SetPriority {
+            issue: IssueRef::parse(issue_id)?,
+            priority: PriorityName::parse(name)?,
         };
         self.gateway().send(endpoint).await
     }

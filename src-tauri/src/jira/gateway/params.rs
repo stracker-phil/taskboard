@@ -111,6 +111,30 @@ impl TransitionId {
     }
 }
 
+/// A priority's name as the issue's edit screen offers it ("High"); it goes into a request body, never a URL.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PriorityName(String);
+
+/// Longer than any priority name Jira allows.
+const PRIORITY_NAME_MAX: usize = 255;
+
+impl PriorityName {
+    pub fn parse(text: &str) -> AppResult<Self> {
+        let fits = !text.trim().is_empty()
+            && text.len() <= PRIORITY_NAME_MAX
+            && !text.chars().any(char::is_control);
+        if fits {
+            Ok(Self(text.into()))
+        } else {
+            Err(refused("priority", text))
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
 /// An attachment's numeric id.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AttachmentId(String);

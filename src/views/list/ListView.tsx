@@ -19,7 +19,8 @@ import { useRowClicks } from "./useRowClicks";
 import { useRowKeys } from "./useRowKeys";
 import { useRowSizing } from "./useRowSizing";
 import { useRowsPlace } from "./useRowsPlace";
-import { DragGhost, dropClass } from "../../writes/DragGhost";
+import { DragGhost } from "../../writes/DragGhost";
+import { DropOverlay } from "../../writes/DropOverlay";
 import { useIssueDrag } from "../../writes/useIssueDrag";
 
 interface Props {
@@ -77,7 +78,8 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
   const width = useElementWidth(scrollRef);
   const { data: catalog = NO_COLUMNS } = useColumnsCatalogue(listId);
   const onScroll = useRememberedScroll(listId, viewId, scrollRef);
-  const { drag, onPointerDown, dropState } = useIssueDrag(data.groupBy, actions.openInJira);
+  const dropGroups = useMemo(() => data.groups.map((group) => ({ key: group.key, label: group.label })), [data.groups]);
+  const { drag, onPointerDown } = useIssueDrag(data.groupBy, dropGroups, actions.openInJira);
 
   const headers = useMemo(() => data.columns.map((id) => catalog.find((c) => c.id === id)?.name ?? id), [data.columns, catalog]);
   const widths = useMemo(
@@ -130,9 +132,8 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
             <div
               key={itemKey(item)}
               {...itemProps(virtual, item)}
-              className={itemClass(item) + dropClass(dropState(group))}
+              className={itemClass(item)}
               data-group={group}
-              data-drop-key={group}
               onPointerDown={
                 item.kind === "row"
                   ? (e) => onPointerDown(e, { id: item.row.id, key: item.row.key, summary: item.row.summary, fromKey: group })
@@ -171,6 +172,7 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
           );
         })}
       </div>
+      <DropOverlay drag={drag} host={scrollRef} />
       <DragGhost drag={drag} />
     </div>
   );

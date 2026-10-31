@@ -5,6 +5,7 @@ pub mod commands;
 mod comment;
 mod drop;
 mod pending;
+mod priority;
 mod transition;
 
 use rusqlite::{Connection, OptionalExtension, params};
@@ -13,7 +14,7 @@ use ts_rs::TS;
 
 pub use assign::toggle_mine;
 pub use comment::{MAX_COMMENT_CHARS, add_comment};
-pub use drop::{DropOutcome, DropTargets, drop_on, drop_targets};
+pub use drop::{DropOutcome, DropTarget, DropTargets, ViewGroup, arrange, drop_on, drop_targets};
 pub use pending::{forget_all, overlay};
 pub use transition::{TransitionOption, transitions};
 
@@ -36,6 +37,8 @@ pub enum Change {
     Assign { account_id: Option<String> },
     /// Moves the issue along a workflow transition (`issue_transitions`).
     Transition { transition_id: String },
+    /// Sets the issue's priority to one its edit screen offers.
+    Priority { name: String },
 }
 
 /// What a write did, for the page's toast.
@@ -64,6 +67,7 @@ pub struct Reverse {
 pub enum Field {
     Assignee,
     Status,
+    Priority,
 }
 
 impl Field {
@@ -71,6 +75,7 @@ impl Field {
         match self {
             Self::Assignee => "assignee",
             Self::Status => "status",
+            Self::Priority => "priority",
         }
     }
 
@@ -78,6 +83,7 @@ impl Field {
         match text {
             "assignee" => Some(Self::Assignee),
             "status" => Some(Self::Status),
+            "priority" => Some(Self::Priority),
             _ => None,
         }
     }
@@ -121,6 +127,7 @@ pub async fn apply(
         Change::Transition { transition_id } => {
             transition::transition(db, source, issue_id, transition_id).await
         }
+        Change::Priority { name } => priority::set_priority(db, source, issue_id, name).await,
     }
 }
 
@@ -192,6 +199,17 @@ enum Begun<T> {
 fn issue_key(conn: &Connection, id: &str) -> AppResult<String> {
     conn.query_row(
         "SELECT key FROM cache.issue WHERE id = ?1 AND gone = 0",
+        [id],
+        |row| row.get(0),
+    )
+    .optional()?
+    .ok_or_else(|| AppError::NotFound("The issue isn't in the cache".into()))
+}
+
+/// The Jira project the issue belongs to, which is its Space.
+fn issue_project(conn: &Connection, id: &str) -> AppResult<String> {
+    conn.query_row(
+        "SELECT project_id FROM cache.issue WHERE id = ?1 AND gone = 0",
         [id],
         |row| row.get(0),
     )

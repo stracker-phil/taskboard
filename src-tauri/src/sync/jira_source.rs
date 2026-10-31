@@ -104,6 +104,14 @@ impl Source for JiraSource {
         Box::pin(self.client.transition(issue_id, transition_id))
     }
 
+    fn priorities<'a>(&'a self, issue_id: &'a str) -> Answer<'a, Vec<String>> {
+        Box::pin(self.client.priorities(issue_id))
+    }
+
+    fn set_priority<'a>(&'a self, issue_id: &'a str, name: &'a str) -> Answer<'a, ()> {
+        Box::pin(self.client.set_priority(issue_id, name))
+    }
+
     fn assign<'a>(&'a self, issue_id: &'a str, account_id: Option<&'a str>) -> Answer<'a, ()> {
         Box::pin(self.client.assign(issue_id, account_id))
     }

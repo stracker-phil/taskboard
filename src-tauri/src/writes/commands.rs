@@ -2,7 +2,7 @@
 
 use tauri::State;
 
-use super::{Change, DropOutcome, DropTargets, TransitionOption, WriteOutcome};
+use super::{Change, DropOutcome, DropTargets, TransitionOption, ViewGroup, WriteOutcome};
 use crate::error::AppResult;
 use crate::state::AppState;
 use crate::views::GroupBy;
@@ -55,10 +55,13 @@ pub async fn issue_drop_targets(
     state: State<'_, AppState>,
     id: String,
     group_by: GroupBy,
+    from_key: String,
+    groups: Vec<ViewGroup>,
 ) -> AppResult<DropTargets> {
     let settings = state.settings.get();
     let source = crate::sync::source_for(&state.jira, &settings.connection)?;
-    super::drop_targets(&state.db, source.as_ref(), &settings, id, group_by).await
+    let found = super::drop_targets(&state.db, source.as_ref(), &settings, id, group_by).await?;
+    Ok(super::arrange(found, &from_key, &groups))
 }
 
 /// Moves the issue into the group `key` of a view grouped by `group_by`.

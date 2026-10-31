@@ -13,7 +13,8 @@ import { useIssueActions } from "../list/useIssueActions";
 import { usePinnedIssues } from "../list/usePinnedIssues";
 import { BoardColumnCards } from "./BoardColumnCards";
 import { useBoardKeys } from "./useBoardKeys";
-import { DragGhost, dropClass } from "../../writes/DragGhost";
+import { DragGhost } from "../../writes/DragGhost";
+import { DropOverlay } from "../../writes/DropOverlay";
 import { useIssueDrag } from "../../writes/useIssueDrag";
 
 interface Props {
@@ -55,7 +56,8 @@ function Board({ view, data }: { view: View; data: BoardData }) {
   );
   useBoardKeys(data, selected, select, open, actions);
   // A Board that groups by nothing shows status columns.
-  const { drag, onPointerDown, dropState } = useIssueDrag(view.groupBy === "none" ? "status" : view.groupBy, actions.openInJira);
+  const columnGroups = data.columns.map((column) => ({ key: column.key, label: column.name }));
+  const { drag, onPointerDown } = useIssueDrag(view.groupBy === "none" ? "status" : view.groupBy, columnGroups, actions.openInJira);
   const dragCard = (e: PointerEvent<HTMLElement>, column: BoardColumn) => {
     const id = (e.target as HTMLElement).closest<HTMLElement>("[data-issue-id]")?.dataset.issueId;
     const row = id ? data.rows[id] : undefined;
@@ -71,7 +73,7 @@ function Board({ view, data }: { view: View; data: BoardData }) {
     <div ref={boardRef} className="board" role="list" aria-label="Board">
       {data.columns.map((column) =>
         column.collapsed ? (
-          <div key={column.key} role="listitem" className={"board-strip__item" + dropClass(dropState(column.key))} aria-label={column.name} data-drop-key={column.key}>
+          <div key={column.key} role="listitem" className="board-strip__item" aria-label={column.name}>
             <button
               type="button"
               className={`board-strip board--${column.style}`}
@@ -86,9 +88,8 @@ function Board({ view, data }: { view: View; data: BoardData }) {
           <section
             key={column.key}
             data-column={column.key}
-            data-drop-key={column.key}
             role="listitem"
-            className={`board-column board--${column.style}` + dropClass(dropState(column.key))}
+            className={`board-column board--${column.style}`}
             aria-label={column.name}
             onPointerDown={(e) => dragCard(e, column)}
           >
@@ -113,6 +114,7 @@ function Board({ view, data }: { view: View; data: BoardData }) {
           </section>
         ),
       )}
+      <DropOverlay drag={drag} host={boardRef} />
       <DragGhost drag={drag} />
     </div>
   );

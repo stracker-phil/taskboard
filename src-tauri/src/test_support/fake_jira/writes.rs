@@ -42,6 +42,51 @@ fn assignee_for(site: &Content, body: &Value) -> Result<Value, Response> {
         })
 }
 
+/// The priorities every demo issue may take, Jira's defaults.
+const PRIORITIES: [(&str, &str); 5] = [
+    ("1", "Highest"),
+    ("2", "High"),
+    ("3", "Medium"),
+    ("4", "Low"),
+    ("5", "Lowest"),
+];
+
+/// `GET /issue/{id}/editmeta`: the edit screen offers the priority with Jira's five defaults.
+pub fn edit_meta(site: &Content, id_or_key: &str) -> Response {
+    if visible_issue(site, id_or_key).is_none() {
+        return not_found();
+    }
+    let allowed: Vec<Value> = PRIORITIES
+        .iter()
+        .map(|(id, name)| json!({ "id": id, "name": name }))
+        .collect();
+    Response::json(
+        200,
+        json!({ "fields": { "priority": { "name": "Priority", "allowedValues": allowed } } }),
+    )
+}
+
+/// `PUT /issue/{id}` with `{ "fields": { "priority": { "name": "…" } } }`; other fields are refused like a field
+/// missing from the edit screen.
+pub fn edit(site: &mut Content, id_or_key: &str, body: &Value) -> Response {
+    let fields = body["fields"].as_object().cloned().unwrap_or_default();
+    let asked = fields.get("priority").and_then(|p| p["name"].as_str());
+    let priority = asked.and_then(|name| PRIORITIES.iter().find(|(_, n)| *n == name));
+    let (Some((id, name)), 1) = (priority, fields.len()) else {
+        return Response::json(
+            400,
+            json!({ "errorMessages": [], "errors": { "priority": "Field cannot be set. It is not on the appropriate screen, or unknown." } }),
+        );
+    };
+    let now = site.now;
+    let Some(issue) = visible_issue_mut(site, id_or_key) else {
+        return not_found();
+    };
+    issue["fields"]["priority"] = json!({ "id": id, "name": name });
+    stamp_after(issue, now);
+    Response::raw(204, "text/plain", "")
+}
+
 /// `GET /issue/{id}/transitions`: one move to every other status, named like it; the move's id is the status's.
 pub fn transitions(site: &Content, id_or_key: &str) -> Response {
     let Some(issue) = visible_issue(site, id_or_key) else {

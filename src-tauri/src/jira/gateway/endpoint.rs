@@ -5,8 +5,8 @@ use serde_json::{Value, json};
 use url::Url;
 
 use super::params::{
-    AccountId, AttachmentId, Expand, FieldIds, IssueRef, IssueRefs, Jql, PageToken, ProjectKey,
-    TransitionId,
+    AccountId, AttachmentId, Expand, FieldIds, IssueRef, IssueRefs, Jql, PageToken, PriorityName,
+    ProjectKey, TransitionId,
 };
 use crate::error::{AppError, AppResult};
 use crate::jira::site::Site;
@@ -105,6 +105,15 @@ pub enum Endpoint {
     AddComment {
         issue: IssueRef,
         body: Value,
+    },
+    /// The fields the issue's edit screen offers, with their allowed values.
+    IssueEditMeta {
+        issue: IssueRef,
+    },
+    /// Write: sets the issue's priority by name.
+    SetPriority {
+        issue: IssueRef,
+        priority: PriorityName,
     },
     /// Write: assigns the issue to the account, or unassigns it (`None`).
     AssignIssue {
@@ -214,6 +223,15 @@ impl Endpoint {
                 json!({ "body": body }),
             )
             .query("expand", "renderedBody")
+            .plan(site),
+            Self::IssueEditMeta { issue } => {
+                Rest::get(&["issue", issue.as_str(), "editmeta"]).plan(site)
+            }
+            Self::SetPriority { issue, priority } => Rest::write(
+                Method::PUT,
+                &["issue", issue.as_str()],
+                json!({ "fields": { "priority": { "name": priority.as_str() } } }),
+            )
             .plan(site),
             Self::AssignIssue { issue, account } => Rest::write(
                 Method::PUT,

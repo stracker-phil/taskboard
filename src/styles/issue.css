@@ -103,6 +103,34 @@ body.is-dragging-issue, body.is-dragging-issue * { cursor: grabbing !important; 
 }
 .drag-ghost__key { color: var(--text-muted); font-family: var(--font-mono); font-size: 12px; }
 .drag-ghost__summary { overflow: hidden; text-overflow: ellipsis; }
-.drop-zone { transition: opacity var(--motion-fast) var(--ease-out), background-color var(--motion-fast) var(--ease-out); }
-.drop-zone--no { opacity: 0.45; }
-.drop-zone--ok { background-color: var(--accent-soft-bg); }
+/* While an issue is dragged, tiles of the places it may go cover the view; each is outlined in its group's color. */
+.drop-overlay {
+  position: fixed; z-index: 900; display: flex; flex-direction: column; gap: 12px; padding: 16px 20px; overflow: auto;
+  background: var(--panel-bg); animation: fade-in var(--motion-fast) var(--ease-out);
+}
+.drop-overlay__caption, .drop-overlay__note { margin: 0; color: var(--text-muted); font-size: 12px; }
+.drop-overlay__caption kbd { font-family: var(--font-mono); font-size: 11px; }
+.drop-overlay__tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); grid-auto-rows: 64px; gap: 10px; }
+.drop-tile {
+  --drop-color: var(--accent);
+  display: flex; align-items: center; gap: 10px; min-width: 0; padding: 0 14px; border: 2px solid var(--drop-color);
+  border-radius: 10px; font-size: 13px; font-weight: 500; transition: background-color var(--motion-fast) var(--ease-out);
+}
+.drop-tile:hover { background: color-mix(in srgb, var(--drop-color) 14%, transparent); }
+.drop-tile__action { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.drop-tile > .status-square, .drop-tile > .avatar, .drop-tile > .priority-flag { flex: none; }
+.drop-tile--status-backlog { --drop-color: var(--status-backlog-square); }
+.drop-tile--status-todo { --drop-color: var(--status-todo-square); }
+.drop-tile--status-progress { --drop-color: var(--status-progress-square); }
+.drop-tile--status-review { --drop-color: var(--status-review-square); }
+.drop-tile--status-blocked { --drop-color: var(--status-blocked-square); }
+.drop-tile--status-done { --drop-color: var(--status-done-square); }
+.drop-tile--avatar-1 { --drop-color: var(--avatar-1); }
+.drop-tile--avatar-2 { --drop-color: var(--avatar-2); }
+.drop-tile--avatar-3 { --drop-color: var(--avatar-3); }
+.drop-tile--avatar-4 { --drop-color: var(--avatar-4); }
+.drop-tile--priority-1 { --drop-color: var(--flag-highest); }
+.drop-tile--priority-2 { --drop-color: var(--flag-high); }
+.drop-tile--priority-3 { --drop-color: var(--flag-medium); }
+.drop-tile--priority-4 { --drop-color: var(--flag-low); }
+.drop-tile--plain { --drop-color: var(--text-muted); }

@@ -103,6 +103,12 @@ const RULES: &[Rule] = &[
         &[Literal("issue"), IssueIdOrKey, Literal("transitions")],
         &[],
     ),
+    read(
+        Get,
+        &[Literal("issue"), IssueIdOrKey, Literal("editmeta")],
+        &[],
+    ),
+    write(Put, &[Literal("issue"), IssueIdOrKey], &[]),
     write(
         Put,
         &[Literal("issue"), IssueIdOrKey, Literal("assignee")],

@@ -107,6 +107,8 @@ One method on `JiraClient` each (`jira/api.rs`), one `Endpoint` each; the answer
 | `transitions` | `GET issue/{id}/transitions` | `Transition`: id, name, `to` status, `hasScreen` |
 | `transition` (write) | `POST issue/{id}/transitions` with `{"transition": {"id": …}}` (`TransitionId`: digits) | nothing (`204`) |
 | `add_comment` (write) | `POST issue/{id}/comment?expand=renderedBody` with `{"body": <ADF>}` | `Comment` as Jira stored it (`201`) |
+| `priorities` | `GET issue/{id}/editmeta` | the names of the priority field's allowed values; empty without the field |
+| `set_priority` (write) | `PUT issue/{id}` with `{"fields": {"priority": {"name": …}}}` (`PriorityName`: not blank, no control characters, up to 255) | nothing (`204`) |
 | `assign` (write) | `PUT issue/{id}/assignee` with `{"accountId": …}` (`AccountId`: letters, digits, `:`, `_`, `-`, up to 128; null unassigns) | nothing (`204`) |
 | `used_custom_fields` | `POST search/jql`: `project = "KEY" ORDER BY updated DESC`, one page of 100, `*all` without the large system fields | the custom field ids with a value |
 

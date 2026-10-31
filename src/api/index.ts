@@ -56,6 +56,7 @@ import type {
   UiState,
   View,
   ViewData,
+  ViewGroup,
   ViewPlace,
   TransitionOption,
   WebLink,
@@ -215,7 +216,9 @@ export const api = {
   /** Adds a plain-text comment in Jira; it shows in the activity at once. */
   issueComment: (id: string, text: string) => invoke<WriteOutcome>("issue_comment", { id, text }),
   /** The groups of a view grouped this way that may take the dragged issue. */
-  issueDropTargets: (id: string, groupBy: GroupBy) => invoke<DropTargets>("issue_drop_targets", { id, groupBy }),
+  /** `groups`: the view's groups in its order; the issue comes from the group `fromKey`. */
+  issueDropTargets: (id: string, groupBy: GroupBy, fromKey: string, groups: ViewGroup[]) =>
+    invoke<DropTargets>("issue_drop_targets", { id, groupBy, fromKey, groups }),
   /** Moves the issue into a group of a view grouped this way (a drop). */
   issueDrop: (id: string, groupBy: GroupBy, key: string) => invoke<DropOutcome>("issue_drop", { id, groupBy, key }),
   /** The moves Jira offers from the issue's status. */

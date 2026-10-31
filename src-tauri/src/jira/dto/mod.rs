@@ -3,6 +3,7 @@
 mod attachment;
 mod changelog;
 mod comment;
+mod edit_meta;
 mod issue;
 mod meta;
 mod remote_link;
@@ -13,6 +14,7 @@ pub(crate) use changelog::ChangelogPage;
 pub use changelog::{ChangeItem, Changelog};
 pub use comment::Comment;
 pub(crate) use comment::{CommentPage, ParsedQueries};
+pub(crate) use edit_meta::EditMeta;
 pub use issue::{ApproximateCount, BulkFetch, Issue, SearchPage, parse_jira_time};
 pub use meta::{
     Field, FieldSchema, Myself, Project, Status, StatusCategory, TenantInfo, User, Version,
