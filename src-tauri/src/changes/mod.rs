@@ -10,12 +10,12 @@ use rusqlite::Connection;
 use serde::Serialize;
 use ts_rs::TS;
 
-pub use facts::{Names, chip, facts};
+pub use facts::{Names, chip, facts, sentence};
 pub use seen::{mark_all_seen, mark_seen, mark_unread};
 pub use unseen::{UNSEEN, seen_at, unseen_changes, unseen_since};
 
-use facts::sentence;
-use unseen::{Change, changes_after};
+pub use unseen::Change;
+use unseen::changes_after;
 
 use crate::error::AppResult;
 use crate::lists::Viewer;

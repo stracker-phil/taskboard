@@ -1,4 +1,4 @@
-import { api, type Behaviour as BehaviourSettings, type IssueOpening, type PinDuration } from "../../api";
+import { api, type Behaviour as BehaviourSettings, type IssueOpening, type NotifyAbout, type PinDuration } from "../../api";
 import { useSettings } from "../../queries/settings";
 import { attempt } from "../../state/requests";
 import { useAppInfo } from "../../queries/useAppInfo";
@@ -26,6 +26,8 @@ const PIN_DURATIONS = ["today", "twoDays", "week", "untilUnpinned"] as const sat
 const OPENINGS = ["preview", "full"] as const satisfies readonly IssueOpening[];
 const OPENING_LABELS: Record<IssueOpening, string> = { preview: "Preview", full: "Full view" };
 const PIN_LABELS: Record<PinDuration, string> = { today: "Today", twoDays: "2 days", week: "1 week", untilUnpinned: "Until removed" };
+const NOTIFY_ABOUT = ["nothing", "mentionsAndAssignments", "myIssues"] as const satisfies readonly NotifyAbout[];
+const NOTIFY_LABELS: Record<NotifyAbout, string> = { nothing: "Nothing", mentionsAndAssignments: "Mentions and assignments", myIssues: "My issues" };
 
 /** When an open issue counts as seen, and what a new pin starts with. */
 function Behaviour() {
@@ -59,6 +61,14 @@ function Behaviour() {
         labels={PIN_LABELS}
         value={settings.behaviour.pinDefault}
         onChange={(pinDefault) => save({ pinDefault })}
+      />
+      <Segmented
+        label="Notify me about"
+        description="A macOS notification after a sync, while Taskboard isn't in front: mentions of you and issues assigned to you, or also any change of an issue assigned to or reported by you."
+        options={NOTIFY_ABOUT}
+        labels={NOTIFY_LABELS}
+        value={settings.behaviour.notifyAbout}
+        onChange={(notifyAbout) => save({ notifyAbout })}
       />
     </Group>
   );

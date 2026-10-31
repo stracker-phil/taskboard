@@ -39,6 +39,9 @@ support. To build it or port it, point a coding agent at [AGENTS.md](AGENTS.md).
   assignee group; only the moves Jira's workflow allows take the drop. The change shows at once; if Jira refuses it, the
   old value comes back. The confirmation offers the opposite change ("Change back to Jamie Doe"), which is a
   second change in Jira, not an undo.
+- **Notifications:** after a sync, while Taskboard isn't in front, macOS notifications for mentions of you and
+  issues assigned to you (or every change of your issues, or none: Settings → General), with a button that opens
+  the issue.
 - **Keyboard first:** ⌘K finds issues by key or text and runs any command (`>` commands, `#` issues, `/` Spaces
   and lists), J/K move, every action has a menu item and a rebindable key, right-click menus offer the rest,
   and the `taskboard` command line drives the window from scripts.

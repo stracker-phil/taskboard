@@ -28,7 +28,7 @@ The Jira token is in the Keychain only, never in a file or a log.
 | Section | Holds | Changed by |
 |---|---|---|
 | `connection` | site URL (normalized), email, token kind, token expiry date, cloud id, and what Test Connection found: account id, display name, time zone. Never the token (Keychain, service `APP_NAME`, account = email) | `connection_save`, `connection_test` |
-| `behaviour` | the read delay, the default bookmark duration, what a click opens, `allowJiraChanges` (Settings → Connection → Changes; off by default, [writes.md](writes.md)) | `behaviour_set` |
+| `behaviour` | the read delay, the default bookmark duration, what a click opens, `notifyAbout` ([notifications.md](notifications.md)), `allowJiraChanges` (Settings → Connection → Changes; off by default, [writes.md](writes.md)) | `behaviour_set` |
 | `sync` | scope override (JQL or none), delta interval in front (1–60 min) and in the background (5–120 min), days to keep done issues (7–365), `clearCacheOnQuit` (empty the cache at quit and at launch, `app::clear_cache_if_asked`) | `scope_save`, `sync_save` |
 
 `update_settings` replaces only what the page owns; `connection` and `sync` change through their own

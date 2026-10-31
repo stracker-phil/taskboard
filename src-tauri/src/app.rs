@@ -16,9 +16,10 @@ use crate::events::{
 use crate::handlers::handlers;
 use crate::ipc::IpcMessage;
 use crate::issues::INLINE_IMAGE_SCHEME;
+use crate::notify::{self, FinishedJobs, Notifier};
 use crate::state::AppState;
 use crate::sync::schedule::{Focus, start_schedule};
-use crate::sync::{SyncContext, SyncEngine, SyncEvent};
+use crate::sync::{Job, SyncContext, SyncEngine, SyncEvent};
 use crate::{bus, ipc, menu, remote, window};
 
 const MAX_LOG_BYTES: u128 = 5 * 1024 * 1024;
@@ -37,6 +38,7 @@ pub fn start(
         .plugin(init_logging(log_level))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_notification::init())
         .register_asynchronous_uri_scheme_protocol(
             INLINE_IMAGE_SCHEME,
             |ctx, request, responder| {
@@ -80,6 +82,7 @@ pub fn start(
             crate::dev::start_fake_jira(app.handle().clone());
             start_ipc(app.handle().clone(), &socket);
             listen_for_links(app.handle());
+            notify::show::install(app.handle());
             // The window starts invisible (tauri.conf.json), so a hidden start never flashes it.
             if !hidden {
                 window::show_main(app.handle());
@@ -236,9 +239,21 @@ fn start_sync(app: &AppHandle, state: &AppState) {
         db: state.db.clone(),
     };
     let ctx_for_schedule = ctx.clone();
+    let focus = Focus::default();
+    let notifier = start_notifier(&state.db);
+    let jobs = FinishedJobs::default();
+    let watched_focus = focus.clone();
+    let notify_ctx = ctx.clone();
     let engine = SyncEngine::start(
         ctx,
         Arc::new(move |event| {
+            if let SyncEvent::State(state) = &event
+                && let Some(job) = jobs.observe(state)
+            {
+                // Only a change sync's news is announced, and not while the window is in front.
+                let announce = job == Job::Delta && !watched_focus.get();
+                notify_after_sync(&handle, &notifier, &notify_ctx, announce);
+            }
             let sent = match event {
                 SyncEvent::State(state) => handle.emit(SYNC_STATE_EVENT, state),
                 SyncEvent::Progress(progress) => handle.emit(SYNC_PROGRESS_EVENT, progress),
@@ -248,16 +263,41 @@ fn start_sync(app: &AppHandle, state: &AppState) {
             }
         }),
     );
-    let focus = Focus::default();
     start_schedule(ctx_for_schedule, engine.clone(), focus.clone());
     app.manage(focus);
     app.manage(engine);
+}
+
+/// Starts after the changes already cached, so a launch announces nothing old.
+fn start_notifier(db: &Db) -> Notifier {
+    tauri::async_runtime::block_on(Notifier::start(db)).unwrap_or_else(|e| {
+        log::warn!("Notifications start from scratch: {e}");
+        Notifier::default()
+    })
+}
+
+fn notify_after_sync(app: &AppHandle, notifier: &Notifier, ctx: &SyncContext, announce: bool) {
+    let (app, notifier, ctx) = (app.clone(), notifier.clone(), ctx.clone());
+    tauri::async_runtime::spawn(async move {
+        match notifier.take(&ctx.db, &ctx.settings.get(), announce).await {
+            Ok(notices) => {
+                if !notices.is_empty() {
+                    log::info!("Announcing {} notifications", notices.len());
+                }
+                for notice in &notices {
+                    notify::show::show(&app, notice);
+                }
+            }
+            Err(e) => log::warn!("Couldn't look for news to announce: {e}"),
+        }
+    });
 }
 
 fn commands_bus() -> bus::Commands {
     let mut commands = bus::CommandBus::default();
     bus::register(&mut commands);
     crate::nav::commands::register(&mut commands);
+    crate::notify::commands::register(&mut commands);
     bus::Commands(commands)
 }
 

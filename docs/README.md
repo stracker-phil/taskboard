@@ -9,6 +9,7 @@ use it, see the [project README](../README.md).
 | [ux.md](ux.md) | Design language: the mockup's window, tokens, type, metrics, Settings, keys |
 | [data.md](data.md) | The two SQLite files, their tables, the write path, migration rules |
 | [sync.md](sync.md) | The sync engine: jobs, states, storing pages, change records, events |
+| [notifications.md](notifications.md) | macOS notifications after a change sync: when, what, the buttons |
 | [scopes.md](scopes.md) | The API token scopes the app needs and what each one is for |
 | [writes.md](writes.md) | Changes to Jira: the two locks, pending writes, the flow, "Change back to …" |
 | [jira.md](jira.md) | The Jira client: site and tokens, endpoints, limits, retries, errors, JQL, the fake Jira |

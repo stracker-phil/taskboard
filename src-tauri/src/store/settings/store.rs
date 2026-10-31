@@ -305,6 +305,7 @@ mod tests {
                 pin_default: PinDuration::UntilUnpinned,
                 open_issues_in: IssueOpening::Preview,
                 allow_jira_changes: false,
+                notify_about: crate::store::settings::NotifyAbout::default(),
             }
         );
     }
@@ -351,6 +352,7 @@ mod tests {
                 pin_default: PinDuration::Week,
                 open_issues_in: IssueOpening::Preview,
                 allow_jira_changes: false,
+                notify_about: crate::store::settings::NotifyAbout::default(),
             }
         );
     }
@@ -384,6 +386,7 @@ mod tests {
             pin_default: PinDuration::TwoDays,
             open_issues_in: IssueOpening::Full,
             allow_jira_changes: true,
+            notify_about: crate::store::settings::NotifyAbout::MyIssues,
         };
 
         let saved = store.edit(move |s| s.behaviour = behaviour).await.unwrap();
@@ -395,7 +398,7 @@ mod tests {
             serde_json::from_str(&fs::read_to_string(dir.path().join(FILE_NAME)).unwrap()).unwrap();
         assert_eq!(
             file["behaviour"],
-            serde_json::json!({"seenAfterSeconds": 5, "pinDefault": "twoDays", "openIssuesIn": "full", "allowJiraChanges": true})
+            serde_json::json!({"seenAfterSeconds": 5, "pinDefault": "twoDays", "openIssuesIn": "full", "allowJiraChanges": true, "notifyAbout": "myIssues"})
         );
     }
 
@@ -417,6 +420,7 @@ mod tests {
                 pin_default: PinDuration::Week,
                 open_issues_in: IssueOpening::Preview,
                 allow_jira_changes: false,
+                notify_about: crate::store::settings::NotifyAbout::default(),
             }
         );
         assert_eq!(MAX_SEEN_AFTER_SECONDS, 10);
@@ -441,6 +445,7 @@ mod tests {
                     pin_default: PinDuration::UntilUnpinned,
                     open_issues_in: IssueOpening::Preview,
                     allow_jira_changes: false,
+                    notify_about: crate::store::settings::NotifyAbout::default(),
                 },
                 sync: SyncSettings {
                     focused_minutes: 10,

@@ -3,6 +3,8 @@
 mod levels;
 mod places;
 
+pub(crate) use places::open_issue;
+
 use std::time::Duration;
 
 use serde::Serialize;

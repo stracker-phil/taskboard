@@ -28,6 +28,7 @@ pub mod look;
 pub mod menu;
 pub mod nav;
 pub mod net;
+pub mod notify;
 mod order;
 pub mod pins;
 #[cfg(target_os = "macos")]

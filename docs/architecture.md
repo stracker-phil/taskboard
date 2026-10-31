@@ -122,6 +122,7 @@ src-tauri/
                              the avatar client (avatar.rs)
   src/connection/            the Jira connection: Keychain access, Test Connection, tracked projects, scope
   src/sync/                  the sync engine: one task, the full sync, Jira JSON to rows, change records
+  src/notify/                macOS notifications for news that concerns the owner, after a change sync
   src/writes/                changes to Jira (assign): shown at once, sent once, settled by fetching the issue again
   src/adf/                   Atlassian Document Format to HTML for descriptions, rich fields and comments (pure;
                              media.rs: attached images as placeholders the page fills)

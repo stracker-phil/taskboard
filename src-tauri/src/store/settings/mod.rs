@@ -43,6 +43,21 @@ pub struct Behaviour {
     pub open_issues_in: IssueOpening,
     /// Whether Taskboard may change Jira; off by default.
     pub allow_jira_changes: bool,
+    /// Which changes a macOS notification announces.
+    pub notify_about: NotifyAbout,
+}
+
+/// What macOS notifications announce after a change sync (`notify/`).
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq, TS)]
+#[ts(export, export_to = "src/api/types.gen.ts")]
+#[serde(rename_all = "camelCase")]
+pub enum NotifyAbout {
+    Nothing,
+    /// Mentions of me and issues assigned to me.
+    #[default]
+    MentionsAndAssignments,
+    /// Also any change of an issue assigned to or reported by me.
+    MyIssues,
 }
 
 impl Default for Behaviour {
@@ -52,6 +67,7 @@ impl Default for Behaviour {
             pin_default: PinDuration::UntilUnpinned,
             open_issues_in: IssueOpening::Preview,
             allow_jira_changes: false,
+            notify_about: NotifyAbout::default(),
         }
     }
 }

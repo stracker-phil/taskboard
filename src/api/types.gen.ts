@@ -87,7 +87,11 @@ openIssuesIn: IssueOpening,
 /**
  * Whether Taskboard may change Jira; off by default.
  */
-allowJiraChanges: boolean, };
+allowJiraChanges: boolean, 
+/**
+ * Which changes a macOS notification announces.
+ */
+notifyAbout: NotifyAbout, };
 
 export type BoardColumn = { 
 /**
@@ -492,6 +496,11 @@ location: Location | null,
  * Space nodes the owner expanded; the active Space shows expanded regardless.
  */
 expanded: Array<number>, };
+
+/**
+ * What macOS notifications announce after a change sync (`notify/`).
+ */
+export type NotifyAbout = "nothing" | "mentionsAndAssignments" | "myIssues";
 
 export type Op = "is" | "isNot" | "in" | "notIn" | "isEmpty" | "isNotEmpty" | "contains" | "before" | "after" | "withinLastDays" | "withinNextDays";
 
