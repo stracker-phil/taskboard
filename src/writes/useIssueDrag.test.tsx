@@ -20,6 +20,7 @@ import { sidebarTree } from "../test/spaces";
 import { view } from "../test/views";
 import { BoardView } from "../views/board/BoardView";
 import { ListView } from "../views/list/ListView";
+import { TableView } from "../views/table/TableView";
 import { colorClass } from "./DropZone";
 
 const mocked = vi.mocked(api, true);
@@ -112,12 +113,14 @@ describe("dragging in the List", () => {
       ]);
     });
 
-    it("keeps the row in the document, marked as the drag's source, and follows the pointer with an aria-hidden copy on the body", async () => {
+    it("keeps the row in the drag layout, marked as the drag's source, and follows the pointer with an aria-hidden copy on the body", async () => {
       await renderList();
 
       dragPricing();
 
       expect(rowOf("NW-1042").closest("[data-drag-source]")).not.toBeNull();
+      expect(rowOf("NW-1042").closest(".drag-list")).not.toBeNull();
+      expect(rowOf("NW-1003").closest("[data-drag-source]")).toBeNull();
       const copy = copyOf()!;
       expect(copy.parentElement).toBe(document.body);
       expect(copy).toHaveAttribute("aria-hidden", "true");
@@ -196,6 +199,73 @@ describe("dragging in the List", () => {
       expect(copyOf()).toBeNull();
       expect(rowOf("NW-1042").closest("[data-drag-source]")).toBeNull();
     });
+
+    it("brings the normal rows back after Escape and after the release", async () => {
+      await renderList();
+      dragPricing();
+      expect(document.querySelector(".drag-list")).not.toBeNull();
+
+      fireEvent.keyDown(window, { key: "Escape" });
+
+      expect(document.querySelector(".drag-list")).toBeNull();
+      expect(rowOf("NW-1042").closest(".list-scroll__space")).not.toBeNull();
+
+      dragPricing();
+      pointer.release();
+
+      expect(document.querySelector(".drag-list")).toBeNull();
+      expect(rowOf("NW-1042").closest(".list-scroll__space")).not.toBeNull();
+    });
+
+    it("keeps the normal rows in an ungrouped view", async () => {
+      await renderList(viewData([groupOf([PRICING, FOOTER])], [PRICING, FOOTER], { groupBy: "none" }));
+
+      dragPricing();
+
+      expect(copyOf()).not.toBeNull();
+      expect(document.querySelector(".drag-list")).toBeNull();
+    });
+  });
+
+  describe("the drag layout", () => {
+    it("shows a card for every group, a closed one with its rows too", async () => {
+      const closed = groupOf([MIGRATION], { key: "c", label: "Gamma", collapsedByDefault: true });
+      await renderList(viewData([GROUPS[0], GROUPS[1], closed], [PRICING, FOOTER, MIGRATION]));
+      expect(screen.queryByRole("row", { name: /NW-1004/ })).toBeNull();
+
+      dragPricing();
+
+      expect(document.querySelectorAll(".drag-card")).toHaveLength(3);
+      expect(rowOf("NW-1004").closest(".drag-card")).not.toBeNull();
+    });
+
+    it("shows two rows and a count of the rest, keeps the dragged row among them, and says when a group is empty", async () => {
+      const extra = [row({ id: "5", key: "NW-1005" }), row({ id: "6", key: "NW-1006" })];
+      const crowded = groupOf([FOOTER, ...extra], { key: "b", label: "Beta" });
+      const last = groupOf([PRICING], { key: "z", label: "Zulu" });
+      const empty = groupOf([], { key: "c", label: "Gamma" });
+      await renderList(viewData([crowded, empty, last], [FOOTER, ...extra, PRICING]));
+
+      dragPricing();
+
+      const cards = [...document.querySelectorAll<HTMLElement>(".drag-card")];
+      expect(cards[0]).toHaveTextContent("+1 more");
+      expect(within(cards[0]).queryByRole("row", { name: /NW-1006/ })).toBeNull();
+      expect(cards[1]).toHaveTextContent("No issues");
+      expect(cards[2]).not.toHaveTextContent("more");
+    });
+
+    it("lets the dragged row displace the last shown row of its own group", async () => {
+      const others = [row({ id: "5", key: "NW-1005" }), row({ id: "6", key: "NW-1006" })];
+      const crowded = groupOf([...others, PRICING], { key: "a", label: "Alpha" });
+      await renderList(viewData([crowded, GROUPS[1]], [...others, PRICING, FOOTER]));
+
+      dragPricing();
+
+      expect(rowOf("NW-1042").closest("[data-drag-source]")).not.toBeNull();
+      expect(screen.queryByRole("row", { name: /NW-1006/ })).toBeNull();
+      expect(rowOf("NW-1005")).toBeInTheDocument();
+    });
   });
 
   describe("the zones", () => {
@@ -227,14 +297,30 @@ describe("dragging in the List", () => {
       expect(zones("no")[0]).toBeEmptyDOMElement();
     });
 
-    it("lays the zones over the list's scroll space", async () => {
+    it("puts each zone in its group's card, which takes the zone's state, and leaves the issue's own card without one", async () => {
       answer([target("b", "Set status to Beta")]);
       await renderList();
 
       dragPricing();
 
       await answered();
-      zones().forEach((zone) => expect(zone.parentElement).toHaveClass("list-scroll__space"));
+      zones().forEach((zone) => expect(zone.parentElement).toHaveClass("drag-card"));
+      expect(zones("ok")[0].parentElement).toHaveClass("drag-card--ok");
+      expect(zones("no")[0].parentElement).toHaveClass("drag-card--no");
+      expect(rowOf("NW-1042").closest(".drag-card")!.querySelector(".drop-zone")).toBeNull();
+    });
+
+    it("gives a closed group a zone as well", async () => {
+      answer([target("c", "Set status to Gamma")]);
+      const closed = groupOf([MIGRATION], { key: "c", label: "Gamma", collapsedByDefault: true });
+      await renderList(viewData([GROUPS[0], GROUPS[1], closed], [PRICING, FOOTER, MIGRATION]));
+
+      dragPricing();
+
+      await answered();
+      expect(zones("ok")).toHaveLength(1);
+      expect(zones("ok")[0]).toHaveAttribute("data-drop-key", "c");
+      expect(zones("ok")[0].closest("[data-drag-group]")).toHaveAttribute("data-drag-group", "c");
     });
 
     it("gives every other group a zone when Rust answers with no targets", async () => {
@@ -456,6 +542,127 @@ describe("dragging in the List", () => {
   });
 });
 
+describe("dragging in the Table", () => {
+  const GROUPS = [
+    groupOf([PRICING], { key: "a", label: "Alpha" }),
+    groupOf([FOOTER], { key: "b", label: "Beta" }),
+    groupOf([MIGRATION], { key: "c", label: "Gamma", collapsedByDefault: true }),
+  ];
+
+  async function renderTable(data: ViewData = viewData(GROUPS, [PRICING, FOOTER, MIGRATION]), withChanges = true) {
+    allowChanges(withChanges);
+    mocked.viewRows.mockResolvedValue(data);
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <TableView view={view({ layout: "table" })} />
+      </QueryClientProvider>,
+    );
+    await screen.findByRole("grid");
+    await waitFor(() => expect(mocked.getSettings).toHaveBeenCalled());
+    await act(async () => {});
+  }
+
+  const rowOf = (key: string) => screen.getByRole("row", { name: new RegExp(key) });
+  const dragPricing = () => {
+    pointer.press(rowOf("NW-1042"));
+    pointer.moveTo(40, 40);
+  };
+
+  it("asks Rust where the issue may go, with the view's groups and the row's own group", async () => {
+    await renderTable();
+
+    dragPricing();
+
+    expect(mocked.issueDropTargets).toHaveBeenCalledWith("1", "status", "a", [
+      expect.objectContaining({ key: "a", label: "Alpha" }),
+      expect.objectContaining({ key: "b", label: "Beta" }),
+      expect.objectContaining({ key: "c", label: "Gamma" }),
+    ]);
+  });
+
+  it("swaps the rows for a card per group, closed ones too, with the dragged row marked and the column header still there", async () => {
+    await renderTable();
+    expect(screen.queryByRole("row", { name: /NW-1004/ })).toBeNull();
+
+    dragPricing();
+
+    expect(document.querySelectorAll(".drag-card")).toHaveLength(3);
+    expect(rowOf("NW-1042").closest("[data-drag-source]")).not.toBeNull();
+    expect(rowOf("NW-1004").closest(".drag-card")).not.toBeNull();
+    expect(screen.getByRole("columnheader", { name: "Summary" })).toBeInTheDocument();
+    expect(copyOf()).toHaveTextContent("Redesign the pricing page");
+  });
+
+  it("puts the zones in the cards of the other groups once Rust answers", async () => {
+    answer([target("b", "Set status to Beta")]);
+    await renderTable();
+
+    dragPricing();
+
+    await answered();
+    expect(zones()).toHaveLength(2);
+    expect(zones("ok")[0]).toHaveAttribute("data-drop-key", "b");
+    expect(zones("ok")[0]).toHaveTextContent("Set status to Beta");
+    expect(zones("ok")[0].parentElement).toHaveClass("drag-card", "drag-card--ok");
+    expect(zones("no")).toHaveLength(1);
+  });
+
+  it("moves the issue onto the zone it is released over", async () => {
+    answer([target("b", "Set status to Beta")]);
+    await renderTable();
+    dragPricing();
+    await answered();
+    pointer.over(zones("ok")[0]);
+
+    pointer.release();
+
+    expect(mocked.issueDrop).toHaveBeenCalledWith("1", "status", "b");
+  });
+
+  it("does nothing when released over a zone that refuses the drop", async () => {
+    answer([target("b", "Set status to Beta")]);
+    await renderTable();
+    dragPricing();
+    await answered();
+    pointer.over(zones("no")[0]);
+
+    pointer.release();
+
+    expect(mocked.issueDrop).not.toHaveBeenCalled();
+  });
+
+  it("brings the normal rows back on Escape", async () => {
+    await renderTable();
+    dragPricing();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    expect(document.querySelector(".drag-list")).toBeNull();
+    expect(rowOf("NW-1042").closest(".table-space")).not.toBeNull();
+    expect(copyOf()).toBeNull();
+  });
+
+  it("keeps its layout in an ungrouped view", async () => {
+    await renderTable(viewData([groupOf([PRICING, FOOTER])], [PRICING, FOOTER], { groupBy: "none" }));
+
+    dragPricing();
+
+    expect(copyOf()).not.toBeNull();
+    expect(document.querySelector(".drag-list")).toBeNull();
+    expect(rowOf("NW-1042").closest(".table-space")).not.toBeNull();
+  });
+
+  it("does not start without changes to Jira", async () => {
+    await renderTable(undefined, false);
+
+    dragPricing();
+
+    expect(copyOf()).toBeNull();
+    expect(document.querySelector(".drag-list")).toBeNull();
+    expect(mocked.issueDropTargets).not.toHaveBeenCalled();
+  });
+});
+
 describe("dragging on the Board", () => {
   const TODO = boardColumn({ key: "1", name: "To Do", style: "todo", mark: { kind: "status", style: "todo" } });
   const PROGRESS = boardColumn({ key: "3", name: "In Progress", style: "progress", ids: ["1"] });
@@ -531,6 +738,23 @@ describe("dragging on the Board", () => {
     const ok = column("Done").querySelector(".drop-zone--ok");
     expect(ok).toHaveAttribute("data-drop-key", "5");
     expect(ok).toHaveTextContent("Set status to Done");
+  });
+
+  it("marks the board as dragging while the drag lasts, and puts the zones inside the columns and strips", async () => {
+    answer([target("5", "Set status to Done")]);
+    await renderBoard(view({ layout: "board" }), [TODO, PROGRESS, DONE, BLOCKED]);
+    const board = screen.getByRole("list", { name: "Board" });
+    expect(board).not.toHaveClass("board--dragging");
+
+    dragCard();
+
+    await answered();
+    expect(board).toHaveClass("board--dragging");
+    zones().forEach((zone) => expect(zone.closest(".board-column, .board-strip__item")).not.toBeNull());
+
+    pointer.release();
+
+    expect(board).not.toHaveClass("board--dragging");
   });
 
   it("waits in every other column until Rust answers", async () => {

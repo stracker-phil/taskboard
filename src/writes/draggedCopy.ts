@@ -11,7 +11,8 @@ const VARIANTS = ["peek", "activity", "tab", "vertical", "closed"];
 
 /** A copy of the dragged row or card that follows the pointer where it was grabbed, while the original stays in
  *  place dimmed (`[data-drag-source]`). The copy hangs on the body (a moving ancestor would carry a fixed element
- *  along) and takes the view's column template, so it looks exactly like the row or card. Near the view's edge along
+ *  along) and takes the custom properties the original inherits (the List's column template, the Table's column
+ *  widths), so it looks exactly like the row or card. Near the view's edge along
  *  `axis` the view scrolls. */
 export function followDraggedCopy(element: HTMLElement, press: Point, view: HTMLElement, axis: ScrollAxis) {
   const rect = element.getBoundingClientRect();
@@ -23,7 +24,7 @@ export function followDraggedCopy(element: HTMLElement, press: Point, view: HTML
   copy.classList.add("drag-copy");
   copy.setAttribute("aria-hidden", "true");
   copy.inert = true;
-  copy.style.setProperty("--list-columns", getComputedStyle(view).getPropertyValue("--list-columns"));
+  carryCustomProperties(element, copy);
   Object.assign(copy.style, { left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px` });
   document.body.appendChild(copy);
   element.setAttribute("data-drag-source", "");
@@ -62,6 +63,13 @@ export function followDraggedCopy(element: HTMLElement, press: Point, view: HTML
       element.removeAttribute("data-drag-source");
     },
   };
+}
+
+function carryCustomProperties(from: HTMLElement, to: HTMLElement) {
+  const style = getComputedStyle(from);
+  for (const name of Array.from(style)) {
+    if (name.startsWith("--")) to.style.setProperty(name, style.getPropertyValue(name));
+  }
 }
 
 function restyle(copy: HTMLElement, target: DropTarget, named: boolean) {

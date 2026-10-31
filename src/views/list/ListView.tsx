@@ -19,9 +19,9 @@ import { useRowClicks } from "./useRowClicks";
 import { useRowKeys } from "./useRowKeys";
 import { useRowSizing } from "./useRowSizing";
 import { useRowsPlace } from "./useRowsPlace";
-import { DropTray, DropZone, zoneOf } from "../../writes/DropZone";
-import { groupSpans } from "./dropSpans";
-import { type Drag, useIssueDrag } from "../../writes/useIssueDrag";
+import { DropTray } from "../../writes/DropZone";
+import { DragList, useDragScroll } from "./DragList";
+import { useIssueDrag } from "../../writes/useIssueDrag";
 
 interface Props {
   listId: number;
@@ -50,6 +50,9 @@ const NO_COLUMNS: Column[] = [];
 const GRID_INSET = 52 + 24 + 32;
 
 const isOpen = (group: Group, toggled: Record<string, boolean>) => toggled[group.key] ?? !group.collapsedByDefault;
+
+/** Rows in the drag layout neither select nor open. */
+const NOTHING = () => {};
 
 function itemClass(item: Item): string {
   if (item.kind === "row") return "list-item";
@@ -80,6 +83,10 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
   const onScroll = useRememberedScroll(listId, viewId, scrollRef);
   const dropGroups = useMemo(() => data.groups.map((group) => ({ key: group.key, label: group.label })), [data.groups]);
   const { drag, onPointerDown } = useIssueDrag(data.groupBy, dropGroups, actions.openInJira, scrollRef, "y");
+  // While an issue is dragged in a grouped view, every group shows as an equal card (`DragList`).
+  const dragging = drag !== null && data.groupBy !== "none";
+  const dragLayout = useMemo(() => (dragging ? flatten(data, () => true) : null), [dragging, data]);
+  useDragScroll(scrollRef, dragging ? (drag?.issue.fromKey ?? null) : null);
 
   const headers = useMemo(() => data.columns.map((id) => catalog.find((c) => c.id === id)?.name ?? id), [data.columns, catalog]);
   const widths = useMemo(
@@ -124,71 +131,79 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
       onScroll={onScroll}
       {...highlight.handlers}
     >
-      <div className="list-scroll__space" style={{ height: virtualizer.getTotalSize() }}>
-        {virtualizer.getVirtualItems().map((virtual) => {
-          const item = items[virtual.index];
-          const group = itemGroupKey(item);
-          return (
-            <div
-              key={itemKey(item)}
-              {...itemProps(virtual, item)}
-              className={itemClass(item)}
-              data-group={group}
-              onPointerDown={
-                item.kind === "row"
-                  ? (e) => onPointerDown(e, { id: item.row.id, key: item.row.key, summary: item.row.summary, fromKey: group }, e.currentTarget)
-                  : undefined
-              }
-            >
-              {item.kind === "group" ? (
-                <GroupHeader
-                  group={item.group}
-                  open={isOpen(item.group, toggled)}
-                  tab={item.tab}
-                  active={highlight.isActive(group)}
-                  namesColumns
-                  headers={shownHeaders}
-                  onToggle={() => toggle(item.group)}
-                />
-              ) : (
-                <IssueRow
-                  row={item.row}
-                  columns={columns}
-                  position={item.position}
-                  wrap={wrapTitles}
-                  inlineLabels={inlineLabels}
-                  selected={selected === item.row.id}
-                  onSelect={onSelect}
-                  onOpen={onOpen}
-                  actions={actions}
-                  nesting={item.nesting}
-                  subtasksOpen={subtasksOpen(item.row.id)}
-                  onToggleSubtasks={onToggleSubtasks}
-                  childChip={data.subtasks === "hidden" || (item.nesting?.parent === true && !subtasksOpen(item.row.id))}
-                  pinned={pinned.has(item.row.id)}
-                />
-              )}
-            </div>
-          );
-        })}
-        {drag && <DropZones drag={drag} items={items} measured={virtualizer.measurementsCache} total={virtualizer.getTotalSize()} />}
-      </div>
+      {dragLayout && drag ? (
+        <DragList
+          drag={drag}
+          items={dragLayout}
+          variant="list"
+          header={(group, tab) => <GroupHeader group={group} open tab={tab} active={false} namesColumns headers={shownHeaders} onToggle={NOTHING} />}
+          row={(item) => (
+            <IssueRow
+              row={item.row}
+              columns={columns}
+              position={item.position}
+              wrap={wrapTitles}
+              inlineLabels={inlineLabels}
+              selected={false}
+              onSelect={NOTHING}
+              onOpen={NOTHING}
+              actions={actions}
+              nesting={item.nesting}
+              pinned={pinned.has(item.row.id)}
+            />
+          )}
+        />
+      ) : (
+        <div className="list-scroll__space" style={{ height: virtualizer.getTotalSize() }}>
+          {virtualizer.getVirtualItems().map((virtual) => {
+            const item = items[virtual.index];
+            const group = itemGroupKey(item);
+            return (
+              <div
+                key={itemKey(item)}
+                {...itemProps(virtual, item)}
+                className={itemClass(item)}
+                data-group={group}
+                onPointerDown={
+                  item.kind === "row"
+                    ? (e) => onPointerDown(e, { id: item.row.id, key: item.row.key, summary: item.row.summary, fromKey: group }, e.currentTarget)
+                    : undefined
+                }
+              >
+                {item.kind === "group" ? (
+                  <GroupHeader
+                    group={item.group}
+                    open={isOpen(item.group, toggled)}
+                    tab={item.tab}
+                    active={highlight.isActive(group)}
+                    namesColumns
+                    headers={shownHeaders}
+                    onToggle={() => toggle(item.group)}
+                  />
+                ) : (
+                  <IssueRow
+                    row={item.row}
+                    columns={columns}
+                    position={item.position}
+                    wrap={wrapTitles}
+                    inlineLabels={inlineLabels}
+                    selected={selected === item.row.id}
+                    onSelect={onSelect}
+                    onOpen={onOpen}
+                    actions={actions}
+                    nesting={item.nesting}
+                    subtasksOpen={subtasksOpen(item.row.id)}
+                    onToggleSubtasks={onToggleSubtasks}
+                    childChip={data.subtasks === "hidden" || (item.nesting?.parent === true && !subtasksOpen(item.row.id))}
+                    pinned={pinned.has(item.row.id)}
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
       <DropTray drag={drag} groups={dropGroups} host={scrollRef} />
     </div>
-  );
-}
-
-/** One zone per group but the dragged issue's own, laid over the group's rows in the scroll space. */
-function DropZones({ drag, items, measured, total }: { drag: Drag; items: Item[]; measured: { start: number; end: number }[]; total: number }) {
-  const spans = groupSpans(items, measured, total);
-  return (
-    <>
-      {[...spans].map(([key, span]) => {
-        const zone = zoneOf(drag, key);
-        return zone ? (
-          <DropZone key={key} zone={zone} className={span.compact ? "drop-zone--compact" : ""} style={{ top: span.top, height: span.height }} />
-        ) : null;
-      })}
-    </>
   );
 }

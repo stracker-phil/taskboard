@@ -20,12 +20,17 @@ import { useRememberedScroll } from "../useRememberedScroll";
 import { useViewSettings } from "./useViewSettings";
 import { columnWidth, SUMMARY_MIN_WIDTH, widthVar } from "./widths";
 import { revealedHeights } from "../list/groupReveal";
+import { DragList, useDragScroll } from "../list/DragList";
+import { DropTray } from "../../writes/DropZone";
+import { useIssueDrag } from "../../writes/useIssueDrag";
 
 /** Every row, a group's heading row too: the Table never changes its rhythm. */
 const TABLE_ROW_HEIGHT = 30;
 const HEADER_HEIGHT = 34;
 const SIDE_PADDING = 24;
 const NO_HEADERS: string[] = [];
+/** Rows in the drag layout neither select nor open. */
+const NOTHING = () => {};
 
 const isOpen = (group: Group, toggled: Record<string, boolean>) => toggled[group.key] ?? !group.collapsedByDefault;
 
@@ -91,6 +96,12 @@ function Table({ view, data }: { view: View; data: ViewData }) {
   }, [factors, virtualizer]);
 
   const tree = data.subtasks === "hierarchy";
+  const dropGroups = useMemo(() => data.groups.map((group) => ({ key: group.key, label: group.label })), [data.groups]);
+  const { drag, onPointerDown } = useIssueDrag(data.groupBy, dropGroups, actions.openInJira, scrollRef, "y");
+  // While an issue is dragged in a grouped view, every group shows with the same few rows (`DragList`).
+  const dragging = drag !== null && data.groupBy !== "none";
+  const dragLayout = useMemo(() => (dragging ? flatten(data, () => true).filter((item) => item.kind === "row" || item.tab) : null), [dragging, data]);
+  useDragScroll(scrollRef, dragging ? (drag?.issue.fromKey ?? null) : null);
   const toggle = (group: Group) => {
     const opening = !isOpen(group, toggled);
     setPlace({ toggled: { ...toggled, [group.key]: opening } });
@@ -117,50 +128,72 @@ function Table({ view, data }: { view: View; data: ViewData }) {
           onResizeStart={resize.start}
           tree={tree}
         />
-        <div className="table-space" style={{ height: virtualizer.getTotalSize() }}>
-          {virtualizer.getVirtualItems().map((virtual) => {
-            const item = items[virtual.index];
-            const factor = openness(item, factors);
-            return (
-              <div
-                key={virtual.key}
-                className={item.kind === "group" ? "table-item table-item--group" : "table-item"}
-                style={{
-                  height: virtual.size,
-                  transform: `translateY(${virtual.start - HEADER_HEIGHT}px)`,
-                  ...(factor < 1 && { opacity: factor, overflow: "hidden" }),
-                }}
-              >
-                {item.kind === "group" ? (
-                  <GroupHeader
-                    group={item.group}
-                    open={item.open}
-                    tab
-                    active
-                    namesColumns={false}
-                    headers={NO_HEADERS}
-                    onToggle={() => toggle(item.group)}
-                  />
-                ) : (
-                  <TableRow
-                    row={item.row}
-                    columns={columns}
-                    selected={selected === item.row.id}
-                    onSelect={onSelect}
-                    onOpen={onOpen}
-                    inlineLabels={inlineLabels}
-                    tree={tree}
-                    nesting={item.nesting}
-                    subtasksOpen={subtasksOpen(item.row.id)}
-                    onToggleSubtasks={onToggleSubtasks}
-                    childChip={data.subtasks === "hidden" || (item.nesting?.parent === true && !subtasksOpen(item.row.id))}
-                  />
-                )}
+        {dragLayout && drag ? (
+          <DragList
+            drag={drag}
+            items={dragLayout}
+            variant="table"
+            header={(group) => (
+              <div className="table-item--group">
+                <GroupHeader group={group} open tab active={false} namesColumns={false} headers={NO_HEADERS} onToggle={NOTHING} />
               </div>
-            );
-          })}
-        </div>
+            )}
+            row={(item) => (
+              <TableRow row={item.row} columns={columns} selected={false} onSelect={NOTHING} onOpen={NOTHING} inlineLabels={inlineLabels} tree={tree} nesting={item.nesting} />
+            )}
+          />
+        ) : (
+          <div className="table-space" style={{ height: virtualizer.getTotalSize() }}>
+            {virtualizer.getVirtualItems().map((virtual) => {
+              const item = items[virtual.index];
+              const factor = openness(item, factors);
+              return (
+                <div
+                  key={virtual.key}
+                  className={item.kind === "group" ? "table-item table-item--group" : "table-item"}
+                  style={{
+                    height: virtual.size,
+                    transform: `translateY(${virtual.start - HEADER_HEIGHT}px)`,
+                    ...(factor < 1 && { opacity: factor, overflow: "hidden" }),
+                  }}
+                  onPointerDown={
+                    item.kind === "row"
+                      ? (e) => onPointerDown(e, { id: item.row.id, key: item.row.key, summary: item.row.summary, fromKey: item.groupKey }, e.currentTarget)
+                      : undefined
+                  }
+                >
+                  {item.kind === "group" ? (
+                    <GroupHeader
+                      group={item.group}
+                      open={item.open}
+                      tab
+                      active
+                      namesColumns={false}
+                      headers={NO_HEADERS}
+                      onToggle={() => toggle(item.group)}
+                    />
+                  ) : (
+                    <TableRow
+                      row={item.row}
+                      columns={columns}
+                      selected={selected === item.row.id}
+                      onSelect={onSelect}
+                      onOpen={onOpen}
+                      inlineLabels={inlineLabels}
+                      tree={tree}
+                      nesting={item.nesting}
+                      subtasksOpen={subtasksOpen(item.row.id)}
+                      onToggleSubtasks={onToggleSubtasks}
+                      childChip={data.subtasks === "hidden" || (item.nesting?.parent === true && !subtasksOpen(item.row.id))}
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
+      <DropTray drag={drag} groups={dropGroups} host={scrollRef} />
     </div>
   );
 }

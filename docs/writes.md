@@ -69,20 +69,25 @@ key, a label, the group mark and the action in words ("Set status to Code Review
 priority to High"). `issue_drop(id, groupBy, key)` checks again and writes through `apply`
 (`DropOutcome::Done { outcome }`, or `Choose { moves }` for a status type several statuses fit).
 
-The page keeps its layout while a drag lasts (`src/writes/`):
+While a drag lasts the view keeps its layout (a List stays a List, a Table a Table, Board columns keep their
+width), and every group becomes an equally easy target:
 
-- **The issue:** its row or card stays where it is at a third of its opacity (`[data-drag-source]`), so it can go
-  back; a copy of exactly that row or card follows the pointer where it was grabbed (`draggedCopy.ts`; a card tilts
-  2°). Over a zone that takes it, the copy shows what the drop would set: the status square and pill take the
-  zone's style (and name, grouped by status), the priority flag the zone's priority.
-- **Zones** (`DropZone`): every other group gets one, laid over its rows (List: from its first row into the gap
-  before the next group, `dropSpans.ts`; a closed group over its header row) or its cards (Board: the column's body,
-  at least 180 high; a collapsed column's strip). The headers stay clear. A zone that takes the issue is outlined 2px
-  and tinted in the group's color (status style, avatar, priority flag) with the action in a pill that stays in
-  sight while a tall group scrolls; under the pointer the tint deepens. Where the issue can't go the group fades;
-  until Jira answers zones show a dashed outline.
-- **The tray** (`DropTray`): places without a group in the view as chips along the view's bottom edge.
-- Near the view's edge (top and bottom in the List, left and right on the Board) the view scrolls.
+- **The issue:** its row or card stays in its own group at a third of its opacity (`[data-drag-source]`), so it can
+  go back; a copy of exactly that row or card follows the pointer where it was grabbed (`writes/draggedCopy.ts`,
+  on the body with the custom properties the original inherits: the List's column template, the Table's column
+  widths; a card tilts 2°). Over a zone that takes it, the copy shows what the drop would set: the status square and
+  pill take the zone's style (and name, grouped by status), the priority flag the zone's priority.
+- **List and Table** (`views/list/DragList.tsx`, `dragGroups.ts`): the rows give way to every group, closed ones
+  too, with its header and its first two rows (the dragged one always among them) and "+N more", so each group's
+  card is the same height. The view scrolls to the dragged row's group and back to where it was after.
+- **Board:** every column (and collapsed strip) reaches the board's full height.
+- **Zones** (`writes/DropZone.tsx`): a group's zone is its own card (List), its block of rows (Table) or its column
+  (Board), with the same corners: an inner 2px ring and a light tint in the group's color (status style, avatar,
+  priority flag) with the action in a pill. Under the pointer the tint deepens and the card or column glows in its
+  color (the List's card lifts a little). Where the issue can't go the group fades; until Jira answers zones show a
+  dashed ring. The issue's own group has no zone.
+- **The tray** (`DropTray`): places without a group in the view, as chips along the view's bottom edge.
+- Near the view's edge (top and bottom in the List and Table, left and right on the Board) the view scrolls.
 
 The drag is pointer-driven (the webview's file drops take the HTML drag events): it starts after 6 px, esc or a
 release outside a zone cancels, and the click that ends it selects nothing. No drag starts while changes to Jira

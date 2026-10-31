@@ -13,7 +13,7 @@ import { useIssueActions } from "../list/useIssueActions";
 import { usePinnedIssues } from "../list/usePinnedIssues";
 import { BoardColumnCards } from "./BoardColumnCards";
 import { useBoardKeys } from "./useBoardKeys";
-import { DropTray, DropZone, zoneOf } from "../../writes/DropZone";
+import { colorClass, DropTray, DropZone, zoneOf } from "../../writes/DropZone";
 import { type Drag, useIssueDrag } from "../../writes/useIssueDrag";
 
 interface Props {
@@ -69,10 +69,10 @@ function Board({ view, data }: { view: View; data: BoardData }) {
   const inlineLabels = view.inlineLabels && !data.cardFields.includes("labels");
   if (data.columns.length === 0) return <EmptyLevel listId={view.listId} viewId={view.id} />;
   return (
-    <div ref={boardRef} className="board" role="list" aria-label="Board">
+    <div ref={boardRef} className={drag ? "board board--dragging" : "board"} role="list" aria-label="Board">
       {data.columns.map((column) =>
         column.collapsed ? (
-          <div key={column.key} role="listitem" className="board-strip__item" aria-label={column.name}>
+          <div key={column.key} role="listitem" className={`board-strip__item ${zoneColor(drag, column.key)}`} aria-label={column.name}>
             <button
               type="button"
               className={`board-strip board--${column.style}`}
@@ -89,7 +89,7 @@ function Board({ view, data }: { view: View; data: BoardData }) {
             key={column.key}
             data-column={column.key}
             role="listitem"
-            className={`board-column board--${column.style}`}
+            className={`board-column board--${column.style} ${zoneColor(drag, column.key)}`}
             aria-label={column.name}
             onPointerDown={(e) => dragCard(e, column)}
           >
@@ -146,8 +146,14 @@ function useCurrentColumnInView(boardRef: RefObject<HTMLDivElement | null>, data
   }, [boardRef, data, selected]);
 }
 
-/** A column's drop zone over its cards (at least a hand's height, so a short column is easy to hit), or over a
- *  collapsed column's strip. */
+/** The group color a column glows in while the pointer is over its zone. */
+function zoneColor(drag: Drag | null, columnKey: string): string {
+  const target = zoneOf(drag, columnKey)?.target;
+  return target ? colorClass(target.mark) : "";
+}
+
+/** A column's drop zone: the whole column (they all reach the board's height while dragging), or a collapsed
+ *  column's strip. */
 function ColumnZone({ drag, columnKey, strip = false }: { drag: Drag | null; columnKey: string; strip?: boolean }) {
   const zone = zoneOf(drag, columnKey);
   return zone ? <DropZone zone={zone} className={strip ? "drop-zone--strip" : "drop-zone--column"} /> : null;

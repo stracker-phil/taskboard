@@ -552,8 +552,9 @@ button, Escape and a press outside close it, focus goes back to the button).
 ## Board view
 
 `src/views/board/`, styled in `styles/board.css`. With changes to Jira on, cards drag like List rows: the card
-stays in its column dimmed, a copy follows the pointer, and every other column shows a drop zone over its cards with
-the action, in the column's color; the columns keep their width ([writes.md](writes.md#drag-and-drop)).
+stays in its column dimmed, a copy follows the pointer, every column reaches the board's height and every other
+column is a drop zone with the action, in the column's color; the columns keep their width; List and Table rows drag
+the same way ([writes.md](writes.md#drag-and-drop)).
 
 - Columns scroll sideways (padding 6 20 20 24, gap 12), one per group of the view's Group by: per status in the
   Board order (also when ungrouped), else one per person, priority, epic, release, due bucket or Space as the List
