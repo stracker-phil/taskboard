@@ -8,6 +8,8 @@ use crate::views::rows;
 /// What a run of changes amounts to; each kind once, with its latest value.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Fact {
+    /// New comments mention accounts; only mentions of "you" count.
+    Mentioned(Vec<Mention>),
     New,
     Comments(i64),
     /// To this status id.
@@ -17,6 +19,13 @@ pub enum Fact {
     /// To this account id; none when unassigned.
     Assigned(Option<String>),
     Due,
+}
+
+/// A new comment's mention of an account.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Mention {
+    pub comment: String,
+    pub account: String,
 }
 
 /// The ids in the facts resolved to names.
@@ -46,6 +55,17 @@ fn of_field<'a>(changes: &'a [Change], field: &'a str) -> impl Iterator<Item = &
 pub fn facts(changes: &[Change]) -> Vec<Fact> {
     let of = |field| of_field(changes, field);
     let mut facts = Vec::new();
+    let mentioned: Vec<Mention> = of("mention")
+        .filter_map(|c| {
+            Some(Mention {
+                comment: c.old_value.clone()?,
+                account: c.new_value.clone()?,
+            })
+        })
+        .collect();
+    if !mentioned.is_empty() {
+        facts.push(Fact::Mentioned(mentioned));
+    }
     if of("created").next().is_some() {
         facts.push(Fact::New);
     }
@@ -93,9 +113,36 @@ fn comments(n: i64) -> String {
     }
 }
 
+/// The facts as the owner reads them: mentions of others go, and comments that mention the owner count as the
+/// mention, not again as new comments.
+fn for_me(facts: &[Fact], names: &Names) -> Vec<Fact> {
+    let mine: std::collections::BTreeSet<&str> = facts
+        .iter()
+        .flat_map(|fact| match fact {
+            Fact::Mentioned(mentions) => mentions.as_slice(),
+            _ => &[],
+        })
+        .filter(|m| names.me == Some(m.account.as_str()))
+        .map(|m| m.comment.as_str())
+        .collect();
+    facts
+        .iter()
+        .filter_map(|fact| match fact {
+            Fact::Mentioned(_) if mine.is_empty() => None,
+            Fact::Comments(n) => {
+                let others = n - mine.len() as i64;
+                (others > 0).then_some(Fact::Comments(others))
+            }
+            other => Some(other.clone()),
+        })
+        .collect()
+}
+
 /// The row's chip: the most important fact, and how many more there are ("Moved to Review +1").
 pub fn chip(facts: &[Fact], names: &Names) -> Option<String> {
+    let facts = for_me(facts, names);
     let text = match facts.first()? {
+        Fact::Mentioned(_) => "Mentioned you".into(),
         Fact::New => "New".into(),
         Fact::Comments(n) => comments(*n),
         Fact::Moved(id) => format!("Moved to {}", status(names, id)),
@@ -114,9 +161,10 @@ pub fn chip(facts: &[Fact], names: &Names) -> Option<String> {
 
 /// Every fact as a clause of the banner's sentence ("2 new comments, moved to Review.").
 pub fn sentence(facts: &[Fact], names: &Names) -> Option<String> {
-    let clauses: Vec<String> = facts
+    let clauses: Vec<String> = for_me(facts, names)
         .iter()
         .map(|fact| match fact {
+            Fact::Mentioned(_) => "mentioned you".into(),
             Fact::New => "created".into(),
             Fact::Comments(n) => comments(*n),
             Fact::Moved(id) => format!("moved to {}", status(names, id)),
@@ -325,6 +373,140 @@ mod tests {
                 Fact::Assigned(Some(ME.into())),
                 Fact::Due,
             ]
+        );
+    }
+
+    fn mention(comment: &str, account: &str) -> Change {
+        change("mention", Some(comment), Some(account))
+    }
+
+    #[test]
+    fn mentions_are_one_fact_that_ranks_first() {
+        let found = facts(&[
+            change("comment_added", Some("1"), Some("3")),
+            mention("90001", MARTA),
+            change("created", None, Some("NW-1")),
+            mention("90002", ME),
+        ]);
+
+        assert_eq!(
+            found,
+            [
+                Fact::Mentioned(vec![
+                    Mention {
+                        comment: "90001".into(),
+                        account: MARTA.into()
+                    },
+                    Mention {
+                        comment: "90002".into(),
+                        account: ME.into()
+                    },
+                ]),
+                Fact::New,
+                Fact::Comments(2),
+            ]
+        );
+    }
+
+    #[test]
+    fn the_chip_says_mentioned_you_only_when_the_connected_account_is_mentioned() {
+        let cases: Vec<(Vec<Change>, Option<&str>)> = vec![
+            (vec![mention("90001", ME)], Some("Mentioned you")),
+            (
+                vec![mention("90001", MARTA), mention("90002", ME)],
+                Some("Mentioned you"),
+            ),
+            (
+                vec![
+                    mention("90001", ME),
+                    change("comment_added", Some("4"), Some("5")),
+                ],
+                Some("Mentioned you"),
+            ),
+            (
+                vec![
+                    mention("90001", ME),
+                    change("comment_added", Some("4"), Some("6")),
+                ],
+                Some("Mentioned you +1"),
+            ),
+            (
+                vec![
+                    mention("90001", ME),
+                    mention("90002", ME),
+                    change("comment_added", Some("4"), Some("6")),
+                ],
+                Some("Mentioned you"),
+            ),
+            (
+                vec![
+                    mention("90001", ME),
+                    change("comment_added", Some("4"), Some("5")),
+                    change("status", Some("10002"), Some("10003")),
+                ],
+                Some("Mentioned you +1"),
+            ),
+            (vec![mention("90001", MARTA)], None),
+            (
+                vec![
+                    mention("90001", MARTA),
+                    change("comment_added", Some("4"), Some("5")),
+                ],
+                Some("1 new comment"),
+            ),
+        ];
+        for (changes, expected) in cases {
+            assert_eq!(chip_of(&changes).as_deref(), expected, "{changes:?}");
+        }
+    }
+
+    #[test]
+    fn the_sentence_says_mentioned_you_first_and_skips_mentions_of_others() {
+        let cases: Vec<(Vec<Change>, Option<&str>)> = vec![
+            (
+                vec![
+                    change("comment_added", Some("4"), Some("5")),
+                    mention("90001", ME),
+                ],
+                Some("mentioned you."),
+            ),
+            (
+                vec![
+                    change("comment_added", Some("4"), Some("6")),
+                    mention("90001", ME),
+                ],
+                Some("mentioned you, 1 new comment."),
+            ),
+            (
+                vec![
+                    change("comment_added", Some("4"), Some("5")),
+                    mention("90001", MARTA),
+                ],
+                Some("1 new comment."),
+            ),
+            (vec![mention("90001", MARTA)], None),
+        ];
+        for (changes, expected) in cases {
+            assert_eq!(sentence_of(&changes).as_deref(), expected, "{changes:?}");
+        }
+    }
+
+    #[test]
+    fn without_a_connected_account_mentions_never_count() {
+        let none = HashMap::new();
+        let changes = [
+            mention("90001", ME),
+            change("comment_added", Some("4"), Some("5")),
+        ];
+        let facts = facts(&changes);
+
+        assert_eq!(
+            chip(&facts, &names(None, &none, &none)).as_deref(),
+            Some("1 new comment")
+        );
+        assert_eq!(
+            sentence(&facts, &names(None, &none, &none)).as_deref(),
+            Some("1 new comment.")
         );
     }
 

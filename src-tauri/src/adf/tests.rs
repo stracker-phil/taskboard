@@ -565,6 +565,91 @@ fn a_mention_name_is_escaped() {
     );
 }
 
+fn mention(id: &str, name: &str) -> Value {
+    json!({ "type": "mention", "attrs": { "id": id, "text": format!("@{name}") } })
+}
+
+#[test]
+fn a_mention_of_the_connected_account_is_marked_and_others_are_not() {
+    let mine = Media {
+        me: Some("account-me"),
+        ..Media::NONE
+    };
+    let document = doc(json!([paragraph(json!([
+        mention("account-me", "Alex Morgan"),
+        text(" "),
+        mention("account-marta", "Marta Klein"),
+    ]))]));
+
+    assert_eq!(
+        to_html(&document, &mine).unwrap(),
+        "<p><span class=\"adf-mention adf-mention--me\">@Alex Morgan</span> \
+         <span class=\"adf-mention\">@Marta Klein</span></p>"
+    );
+    assert_eq!(
+        to_html(&document, &Media::NONE).unwrap(),
+        "<p><span class=\"adf-mention\">@Alex Morgan</span> \
+         <span class=\"adf-mention\">@Marta Klein</span></p>"
+    );
+}
+
+#[test]
+fn a_mention_without_an_id_is_never_marked_as_mine() {
+    let mine = Media {
+        me: Some("account-me"),
+        ..Media::NONE
+    };
+    let document = doc(json!([paragraph(json!([
+        { "type": "mention", "attrs": { "text": "@Someone" } }
+    ]))]));
+
+    assert_eq!(
+        to_html(&document, &mine).unwrap(),
+        "<p><span class=\"adf-mention\">@Someone</span></p>"
+    );
+}
+
+#[test]
+fn the_mentioned_accounts_come_once_each_in_document_order_also_from_nested_nodes() {
+    let document = doc(json!([
+        paragraph(json!([
+            mention("account-marta", "Marta Klein"),
+            text(" and "),
+            mention("account-me", "Alex Morgan"),
+            mention("account-marta", "Marta Klein"),
+        ])),
+        { "type": "bulletList", "content": [
+            { "type": "listItem", "content": [
+                paragraph(json!([mention("account-jonas", "Jonas Reiter")]))
+            ] }
+        ] },
+    ]));
+
+    assert_eq!(
+        mentions(&document),
+        ["account-marta", "account-me", "account-jonas"]
+    );
+}
+
+#[test]
+fn a_document_without_mentions_or_a_mention_without_an_id_names_nobody() {
+    for (label, document) in [
+        (
+            "no mention",
+            doc(json!([paragraph(json!([text("hello")]))])),
+        ),
+        (
+            "no id",
+            doc(json!([paragraph(json!([
+                { "type": "mention", "attrs": { "text": "@Someone" } }
+            ]))])),
+        ),
+        ("empty", doc(json!([]))),
+    ] {
+        assert_eq!(mentions(&document), Vec::<String>::new(), "{label}");
+    }
+}
+
 #[test]
 fn an_emoji_shows_its_text_else_its_short_name() {
     for (attrs, expected) in [

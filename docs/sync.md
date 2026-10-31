@@ -86,7 +86,8 @@ write on its way (`writes::overlay`, [writes.md](writes.md)): the issue row, its
 the cached ones is skipped, so a sync without changes announces nothing; the kept JSON leaves out Jira's
 relative rendered dates and keeps each comment's edit time, so an edited comment still counts. Otherwise `diff.rs` compares the tracked fields with the cached row and writes
 `issue_change` rows (`status`, `assignee`, `due_date`, `priority`, `comment_added`, `created`), stamped with the
-new `updated`. A project's first sync records no changes and marks every issue seen. When the search returned
+new `updated`, and a `mention` row for each account an ADF `mention` node of a comment the cache hadn't seen
+names (`sync::mentions`, `adf::mentions`). A project's first sync records no changes and marks every issue seen. When the search returned
 all of an issue's comments, they replace the cached ones.
 
 ## Events

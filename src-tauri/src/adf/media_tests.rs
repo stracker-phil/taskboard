@@ -16,7 +16,11 @@ fn png(id: &str, filename: &str) -> File {
 }
 
 fn render(files: &[File], written_at: Option<&str>, content: Value) -> String {
-    let media = Media { files, written_at };
+    let media = Media {
+        files,
+        written_at,
+        me: None,
+    };
     let doc = json!({ "type": "doc", "version": 1, "content": content });
     to_html(&doc, &media).expect("a document")
 }

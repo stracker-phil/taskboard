@@ -1381,4 +1381,68 @@ mod after_a_delta_sync {
         expected.sort();
         assert_eq!(sorted_keys(&recent), expected);
     }
+
+    fn demo_user(account_id: &str) -> serde_json::Value {
+        demo::demo()
+            .users
+            .into_iter()
+            .find(|user| user["accountId"] == account_id)
+            .unwrap()
+    }
+
+    async fn mention_then_delta(site: &Site, key: &str, author: &str, mentioned: &str) {
+        site.run(format!("UPDATE issue_seen SET seen_at = '{TEN}'"))
+            .await;
+        site.fake
+            .set_now(DELTA_AT.parse::<DateTime<Utc>>().unwrap());
+        site.fake.add_mention(
+            key,
+            demo_user(author),
+            "Please check the Alpine",
+            &demo_user(mentioned),
+        );
+        let emit: Emit = Arc::new(|_| {});
+        run_job(&site.ctx, Job::Delta, &*emit, None).await;
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn a_comment_mentioning_me_shows_mentioned_you_first_on_the_row() {
+        let site = Site::new().await;
+
+        mention_then_delta(
+            &site,
+            "NW-1049",
+            "712020:5a1e0c3f-8d2b-4f61-9c7e-1b2a3c4d5e03",
+            ME_ACCOUNT_ID,
+        )
+        .await;
+
+        let data = site.nw_data().await;
+        assert_eq!(
+            state(row_of(&data, "NW-1049")),
+            (true, Some("Mentioned you"))
+        );
+        assert_eq!(state(row_of(&data, "NW-1042")), (false, None));
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn a_comment_mentioning_someone_else_shows_only_the_new_comment() {
+        let site = Site::new().await;
+
+        mention_then_delta(
+            &site,
+            "NW-1049",
+            ME_ACCOUNT_ID,
+            "712020:5a1e0c3f-8d2b-4f61-9c7e-1b2a3c4d5e03",
+        )
+        .await;
+
+        let data = site.nw_data().await;
+        assert_eq!(
+            state(row_of(&data, "NW-1049")),
+            (true, Some("1 new comment"))
+        );
+    }
 }

@@ -125,6 +125,7 @@ fn comments(conn: &Connection, id: &str, values: &Values) -> AppResult<Vec<Activ
         let media = adf::Media {
             files: &files,
             written_at: Some(&created),
+            me: values.me(),
         };
         Ok(ActivityItem::Comment {
             id: r.get(0)?,

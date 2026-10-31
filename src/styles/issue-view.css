@@ -114,6 +114,7 @@
 .jira-html th { background: var(--fill-subtle); font-weight: 600; }
 .jira-html > :last-child, .jira-html :is(blockquote, td, th, li, .adf-panel, .adf-expand) > :last-child { margin-bottom: 0; }
 .jira-html .adf-mention { color: var(--accent-text); font-weight: 600; }
+.jira-html .adf-mention--me { padding: 0 3px; border-radius: 4px; background: var(--accent-soft-bg); }
 .jira-html .adf-panel { margin: 0 0 10px; padding: 10px 12px; border-radius: 8px; background: var(--banner-info-bg); }
 .jira-html .adf-panel--note { background: var(--accent-soft-bg); }
 .jira-html .adf-panel--warning { background: var(--banner-warn-bg); }

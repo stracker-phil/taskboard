@@ -229,6 +229,25 @@ impl FakeJira {
 
     /// Adds a comment by `author` (a user object) and stamps `updated`.
     pub fn add_comment(&self, id_or_key: &str, author: Value, text: &str) {
+        let body = json!({ "type": "doc", "version": 1, "content": [
+            { "type": "paragraph", "content": [{ "type": "text", "text": text }] }
+        ] });
+        self.add_comment_doc(id_or_key, author, body, &format!("<p>{text}</p>"));
+    }
+
+    /// Adds a comment by `author` that says `text` and then mentions `mentioned` (a user object).
+    pub fn add_mention(&self, id_or_key: &str, author: Value, text: &str, mentioned: &Value) {
+        let name = mentioned["displayName"].as_str().unwrap_or_default();
+        let body = json!({ "type": "doc", "version": 1, "content": [
+            { "type": "paragraph", "content": [
+                { "type": "text", "text": format!("{text} ") },
+                { "type": "mention", "attrs": { "id": mentioned["accountId"], "text": format!("@{name}") } }
+            ] }
+        ] });
+        self.add_comment_doc(id_or_key, author, body, &format!("<p>{text} @{name}</p>"));
+    }
+
+    fn add_comment_doc(&self, id_or_key: &str, author: Value, body: Value, rendered_body: &str) {
         let mut content = self.content();
         let now = content.now;
         let stamp = jira_time(now);
@@ -237,16 +256,14 @@ impl FakeJira {
         let comment = json!({
             "id": next_id.to_string(),
             "author": author,
-            "body": { "type": "doc", "version": 1, "content": [
-                { "type": "paragraph", "content": [{ "type": "text", "text": text }] }
-            ] },
-            "renderedBody": format!("<p>{text}</p>"),
+            "body": body,
+            "renderedBody": rendered_body,
             "created": stamp,
             "updated": stamp,
         });
         push_comment(&mut issue["fields"]["comment"], comment.clone());
         let mut rendered = comment.clone();
-        rendered["body"] = json!(format!("<p>{text}</p>"));
+        rendered["body"] = json!(rendered_body);
         push_comment(&mut issue["renderedFields"]["comment"], rendered);
         stamp_issue(issue, now);
         let id = issue["id"].as_str().unwrap_or_default().to_string();

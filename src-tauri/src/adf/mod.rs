@@ -40,6 +40,25 @@ pub fn html_or(adf: Option<&str>, fallback: Option<String>, media: &Media) -> Op
     }
 }
 
+/// The accounts the document mentions, each once, in order.
+pub fn mentions(doc: &Value) -> Vec<String> {
+    let mut found = Vec::new();
+    collect_mentions(doc, &mut found);
+    found
+}
+
+fn collect_mentions(node: &Value, found: &mut Vec<String>) {
+    if node["type"] == "mention"
+        && let Some(id) = node["attrs"]["id"].as_str()
+        && !found.iter().any(|f| f == id)
+    {
+        found.push(id.to_string());
+    }
+    for child in node["content"].as_array().into_iter().flatten() {
+        collect_mentions(child, found);
+    }
+}
+
 /// One node of any kind; an unknown one renders its text or its children.
 fn node(node: &Value, media: &Media, out: &mut String) {
     let Some(kind) = node["type"].as_str() else {

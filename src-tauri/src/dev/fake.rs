@@ -120,6 +120,20 @@ pub fn drift() -> AppResult<String> {
         colleague,
         "Pushed a fix for the totals, please have a look.",
     );
+    let people = demo::demo().users;
+    let person = |name: &str| {
+        people
+            .iter()
+            .find(|u| u["displayName"] == name)
+            .cloned()
+            .ok_or_else(|| AppError::Internal(format!("The demo site has no {name}")))
+    };
+    fake.add_mention(
+        "NW-1049",
+        person("Marta Klein")?,
+        "Can you double-check the Apple Pay button on Safari,",
+        &person("Alex Morgan")?,
+    );
     let done = demo::demo()
         .statuses
         .into_iter()
@@ -132,6 +146,6 @@ pub fn drift() -> AppResult<String> {
     let added = fake.add_issue("NW-1042", "NW", "Update the cookie banner copy");
     fake.delete_issue("NW-1055");
     Ok(format!(
-        "Drifted the fake Jira: comment on NW-1042, NW-1044 done, NW-1049 lowered to Low, new {added}, NW-1055 deleted"
+        "Drifted the fake Jira: comment on NW-1042, a mention of you on NW-1049, NW-1044 done, NW-1049 lowered to Low, new {added}, NW-1055 deleted"
     ))
 }

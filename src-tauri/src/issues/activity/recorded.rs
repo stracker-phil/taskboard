@@ -6,7 +6,7 @@ use super::values::Values;
 use super::{ActivityItem, ChangeValue};
 use crate::error::AppResult;
 
-/// `comment_added` is left out: the comment itself is in the feed. Once the issue has history, changes at or
+/// `comment_added` and `mention` are left out: the comment itself is in the feed. Once the issue has history, changes at or
 /// before its newest entry are left out too (the history has them, with authors), except `created`.
 pub fn items(
     conn: &Connection,
@@ -16,7 +16,7 @@ pub fn items(
 ) -> AppResult<Vec<ActivityItem>> {
     let mut query = conn.prepare(
         "SELECT field, old_value, new_value, changed_at FROM cache.issue_change
-         WHERE issue_id = ?1 AND field != 'comment_added'
+         WHERE issue_id = ?1 AND field NOT IN ('comment_added', 'mention')
            AND (field = 'created' OR ?2 IS NULL OR changed_at > ?2)",
     )?;
     let rows = query.query_map(params![id, newest_history], |r| {

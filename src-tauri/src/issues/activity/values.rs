@@ -19,6 +19,11 @@ pub struct Values {
 }
 
 impl Values {
+    /// The connected account, when known.
+    pub fn me(&self) -> Option<&str> {
+        self.me.as_deref()
+    }
+
     pub fn load(conn: &Connection, id: &str, me: Option<&str>) -> AppResult<Self> {
         let project_id = conn.query_row(
             "SELECT project_id FROM cache.issue WHERE id = ?1",

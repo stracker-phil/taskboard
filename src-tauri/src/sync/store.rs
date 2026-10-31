@@ -6,6 +6,7 @@ pub use super::fields::{fetched_fields, shown_fields, store_field_usage, store_f
 
 use super::diff::{Snapshot, diff};
 use super::map::{FieldIds, IssueRow, Mapped, map_issue};
+use super::mentions::record_mentions;
 use crate::db::Changes;
 use crate::error::AppResult;
 use crate::jira::dto::{Issue, Status, Version};
@@ -233,6 +234,9 @@ fn store_issue(conn: &Connection, mapped: &Mapped, first: bool, now: &str) -> Ap
     upsert_issue(conn, &row, now)?;
     upsert_body(conn, &row)?;
     store_users(conn, mapped)?;
+    if !first {
+        record_mentions(conn, mapped)?;
+    }
     store_comments(conn, mapped, now)?;
     replace_search_doc(conn, mapped)?;
     if first {

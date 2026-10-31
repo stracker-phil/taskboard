@@ -19,7 +19,12 @@ pub(super) fn render(kind: &str, node: &Value, media: &Media, out: &mut String) 
         "hardBreak" => out.push_str("<br>"),
         "mention" => {
             let name = attrs["text"].as_str().unwrap_or_default();
-            out.push_str("<span class=\"adf-mention\">@");
+            let mine = media.me.is_some() && attrs["id"].as_str() == media.me;
+            out.push_str(if mine {
+                "<span class=\"adf-mention adf-mention--me\">@"
+            } else {
+                "<span class=\"adf-mention\">@"
+            });
             escape(name.strip_prefix('@').unwrap_or(name), out);
             out.push_str("</span>");
         }

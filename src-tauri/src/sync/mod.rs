@@ -8,6 +8,7 @@ mod fields;
 mod full;
 mod jira_source;
 pub mod map;
+mod mentions;
 mod overview;
 pub mod raw;
 mod reconcile;

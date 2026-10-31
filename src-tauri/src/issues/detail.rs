@@ -121,6 +121,7 @@ fn read(conn: &Connection, viewer: &Viewer, id: &str) -> AppResult<IssueDetail> 
         let media = adf::Media {
             files: &files,
             written_at: None,
+            me: viewer.me.as_deref(),
         };
         let detail = IssueDetail {
             id: r.get(0)?,
@@ -181,6 +182,7 @@ fn read(conn: &Connection, viewer: &Viewer, id: &str) -> AppResult<IssueDetail> 
             let media = adf::Media {
                 files: &files,
                 written_at: None,
+                me: viewer.me.as_deref(),
             };
             let raw = with_custom_values(&raw, custom.as_deref());
             detail.custom = custom_fields(conn, &project_id, &raw, me, &media)?;

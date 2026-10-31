@@ -458,6 +458,98 @@ fn later() -> DateTime<Utc> {
     DEMO_NOW.parse::<DateTime<Utc>>().unwrap() + chrono::Duration::hours(2)
 }
 
+const MENTION_ME: &str = "<span class=\"adf-mention adf-mention--me\">@Alex Morgan</span>";
+const MENTION_MARTA: &str = "<span class=\"adf-mention\">@Marta Klein</span>";
+
+fn demo_user(account_id: &str) -> serde_json::Value {
+    demo::demo()
+        .users
+        .into_iter()
+        .find(|user| user["accountId"] == account_id)
+        .unwrap()
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn a_comment_marks_the_viewers_own_mention_and_leaves_others_plain() {
+    let site = Site::new().await;
+    site.fake.set_now(later());
+    let me = demo_user(ME_ACCOUNT_ID);
+    let marta = demo_user(MARTA_ACCOUNT_ID);
+    site.fake
+        .add_mention("NW-1042", marta.clone(), "Please check the Alpine", &me);
+    site.fake
+        .add_mention("NW-1042", me.clone(), "Marta knows the Danube", &marta);
+    let emit: Emit = Arc::new(|_| {});
+    full_sync(&site.ctx, &*emit).await.unwrap();
+
+    let bodies: Vec<String> = site
+        .activity("NW-1042")
+        .await
+        .into_iter()
+        .filter_map(|item| match item {
+            ActivityItem::Comment { body_html, .. } => body_html,
+            ActivityItem::Change { .. } => None,
+        })
+        .collect();
+
+    let body_with = |text: &str| bodies.iter().find(|b| b.contains(text)).expect(text);
+    let mine = body_with("Alpine");
+    assert!(mine.contains(MENTION_ME), "{mine}");
+    let hers = body_with("Danube");
+    assert!(hers.contains(MENTION_MARTA), "{hers}");
+    assert!(!hers.contains("adf-mention--me"), "{hers}");
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn the_activity_lists_no_change_for_a_mention() {
+    let site = Site::new().await;
+    site.fake.set_now(later());
+    site.fake.add_mention(
+        "NW-1042",
+        demo_user(MARTA_ACCOUNT_ID),
+        "Please check the Alpine",
+        &demo_user(ME_ACCOUNT_ID),
+    );
+    let emit: Emit = Arc::new(|_| {});
+    full_sync(&site.ctx, &*emit).await.unwrap();
+
+    let fields: Vec<String> = site
+        .activity("NW-1042")
+        .await
+        .into_iter()
+        .filter_map(|item| match item {
+            ActivityItem::Change { field, .. } => Some(field),
+            ActivityItem::Comment { .. } => None,
+        })
+        .collect();
+
+    assert!(!fields.contains(&"mention".to_string()), "{fields:?}");
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn the_description_marks_the_viewers_own_mention_and_leaves_others_plain() {
+    let site = Site::new().await;
+    site.execute(
+        r#"UPDATE cache.issue_body SET
+             description_adf = '{"type":"doc","version":1,"content":[{"type":"paragraph","content":[
+               {"type":"mention","attrs":{"id":"712020:5a1e0c3f-8d2b-4f61-9c7e-1b2a3c4d5e01","text":"@Alex Morgan"}},
+               {"type":"text","text":" and "},
+               {"type":"mention","attrs":{"id":"712020:5a1e0c3f-8d2b-4f61-9c7e-1b2a3c4d5e03","text":"@Marta Klein"}}]}]}'
+           WHERE issue_id = (SELECT id FROM cache.issue WHERE key = 'NW-1042')"#,
+    )
+    .await;
+
+    let html = site.detail("NW-1042").await.description_html;
+
+    assert_eq!(
+        html,
+        Some(format!("<p>{MENTION_ME} and {MENTION_MARTA}</p>"))
+    );
+}
+
 #[tokio::test]
 #[ignore = "syncs the demo site into a temp database"]
 async fn an_issue_shows_its_key_type_summary_and_status() {

@@ -1950,6 +1950,123 @@ mod reconciliation {
     }
 }
 
+mod mentions {
+    use super::*;
+
+    const ALEX: &str = "712020:5a1e0c3f-8d2b-4f61-9c7e-1b2a3c4d5e01";
+    const JONAS: &str = "712020:5a1e0c3f-8d2b-4f61-9c7e-1b2a3c4d5e02";
+    const MARTA: &str = "712020:5a1e0c3f-8d2b-4f61-9c7e-1b2a3c4d5e03";
+
+    fn user(account_id: &str) -> Value {
+        demo::demo()
+            .users
+            .into_iter()
+            .find(|user| user["accountId"] == account_id)
+            .unwrap()
+    }
+
+    /// `(comment id, mentioned account, changed_at)` of the recorded mentions, in a fixed order.
+    async fn mention_rows(db: &Db) -> Vec<(String, String, String)> {
+        rows(
+            db,
+            "SELECT old_value, new_value, changed_at FROM cache.issue_change
+             WHERE field = 'mention' ORDER BY new_value, old_value",
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .await
+    }
+
+    async fn comment_id_by(db: &Db, text: &'static str) -> String {
+        let sql = format!(
+            "SELECT id FROM cache.comment WHERE issue_id = '101042' AND body_text LIKE '%{text}%'"
+        );
+        db.read(move |conn| Ok(conn.query_row(&sql, [], |row| row.get::<_, String>(0))?))
+            .await
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn a_new_comment_records_one_mention_per_mentioned_account_at_its_created_time() {
+        let rig = Rig::connected().await;
+        rig.full_sync().await;
+        rig.fake.set_now(later());
+        rig.fake.add_mention(
+            "NW-1042",
+            user(JONAS),
+            "Please check the Alpine",
+            &user(ALEX),
+        );
+        rig.fake.add_mention(
+            "NW-1042",
+            user(JONAS),
+            "Marta knows the Danube",
+            &user(MARTA),
+        );
+
+        rig.job(Job::Delta, None).await;
+
+        let alex_comment = comment_id_by(&rig.ctx.db, "Alpine").await;
+        let marta_comment = comment_id_by(&rig.ctx.db, "Danube").await;
+        assert_eq!(
+            mention_rows(&rig.ctx.db).await,
+            vec![
+                (alex_comment, ALEX.to_string(), LATER_UTC.to_string()),
+                (marta_comment, MARTA.to_string(), LATER_UTC.to_string()),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn a_comment_that_is_cached_already_records_nothing_again() {
+        let rig = Rig::connected().await;
+        rig.full_sync().await;
+        rig.fake.set_now(later());
+        rig.fake.add_mention(
+            "NW-1042",
+            user(JONAS),
+            "Please check the Alpine",
+            &user(ALEX),
+        );
+        rig.job(Job::Delta, None).await;
+        let recorded = mention_rows(&rig.ctx.db).await;
+        rig.fake.set_now(later() + chrono::Duration::hours(1));
+        rig.fake.edit_issue("NW-1042", low_priority);
+
+        rig.full_sync().await;
+
+        assert_eq!(recorded.len(), 1);
+        assert_eq!(mention_rows(&rig.ctx.db).await, recorded);
+    }
+
+    #[tokio::test]
+    async fn a_projects_first_sync_records_no_mentions() {
+        let rig = Rig::connected().await;
+        rig.fake.add_mention(
+            "NW-1042",
+            user(JONAS),
+            "Please check the Alpine",
+            &user(ALEX),
+        );
+
+        rig.full_sync().await;
+
+        assert_eq!(mention_rows(&rig.ctx.db).await, vec![]);
+    }
+
+    #[tokio::test]
+    async fn a_comment_without_a_mention_records_none() {
+        let rig = Rig::connected().await;
+        rig.full_sync().await;
+        rig.fake.set_now(later());
+        rig.fake
+            .add_comment("NW-1042", user(JONAS), "Looks good to me");
+
+        rig.job(Job::Delta, None).await;
+
+        assert_eq!(mention_rows(&rig.ctx.db).await, vec![]);
+    }
+}
+
 mod the_source {
     use super::*;
     use taskboard_lib::sync::source::SourceKind;

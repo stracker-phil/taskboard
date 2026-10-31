@@ -13,7 +13,7 @@ const PLACEHOLDER_ATTR = ["data-attachment-id", "width", "height"];
 const DIGITS = /^\d+$/;
 /** The only class names that survive: the ones Rust's ADF renderer writes (`src-tauri/src/adf/`). */
 const ALLOWED_CLASSES = new Set([
-  "jira-chip", "adf-mention", "adf-expand", "adf-expand__title", "adf-panel", "adf-status",
+  "jira-chip", "adf-mention", "adf-mention--me", "adf-expand", "adf-expand__title", "adf-panel", "adf-status",
   ...["info", "note", "warning", "success", "error", "tip", "custom"].map((tone) => `adf-panel--${tone}`),
   ...["neutral", "purple", "blue", "red", "yellow", "green"].map((color) => `adf-status--${color}`),
 ]);

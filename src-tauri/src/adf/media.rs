@@ -20,11 +20,12 @@ pub struct File {
 }
 
 /// What a document's media nodes may show: the issue's attachments, and when the document was written (a
-/// comment's time; none for a description or field).
+/// comment's time; none for a description or field). `me`: the connected account, whose mentions are marked.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Media<'a> {
     pub files: &'a [File],
     pub written_at: Option<&'a str>,
+    pub me: Option<&'a str>,
 }
 
 impl Media<'_> {
@@ -32,6 +33,7 @@ impl Media<'_> {
     pub const NONE: Media<'static> = Media {
         files: &[],
         written_at: None,
+        me: None,
     };
 
     /// The attachment called `name`. Of several, the newest created at or before the document was written,

@@ -66,6 +66,18 @@ describe("sanitizeJiraHtml", () => {
       expect(out.querySelector(tag)?.getAttribute("class")).toBe(classes);
     });
 
+    it("keeps both classes of a mention of the connected account", () => {
+      const out = clean('<span class="adf-mention adf-mention--me">@Alex Morgan</span>');
+
+      expect(out.querySelector("span")?.getAttribute("class")).toBe("adf-mention adf-mention--me");
+    });
+
+    it("drops an unknown class beside the mention's classes", () => {
+      const out = clean('<span class="adf-mention adf-mention--me evil">@Alex Morgan</span>');
+
+      expect(out.querySelector("span")?.getAttribute("class")).toBe("adf-mention adf-mention--me");
+    });
+
     it("removes unknown classes but keeps allowed ones on the same element", () => {
       const out = clean('<span class="adf-status evil">Done</span>');
 

@@ -23,7 +23,8 @@ support. To build it or port it, point a coding agent at [AGENTS.md](AGENTS.md).
   get their own icon and color.
 - **Space settings:** per Space, the layouts its views offer and how new views start, its own status colors
   (six status types from Backlog to Done, which views can also group by) and where each custom field shows.
-- **What changed:** Unread collects new comments, status and assignee changes since you last looked, and
+- **What changed:** Unread collects mentions of you ("Mentioned you", your name marked in the comment), new
+  comments, status and assignee changes since you last looked, and
   anything you mark unread; read marks survive a cache reset. Bookmarks keep issues, comments, lists and views
   at hand, for good or for a while.
 - **The Issue view:** description and the filled custom fields (acceptance criteria, steps to reproduce)
