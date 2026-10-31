@@ -18,4 +18,13 @@
 .menu__text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .menu__hint { margin-left: 12px; font-size: 12px; color: var(--text-muted); }
 .menu__mark { flex: none; color: var(--text-tertiary); }
+/* A menu that searches (the status and assignee menus): the field above its rows, like the Columns popover's. */
+.menu__search {
+  display: flex; flex: none; align-items: center; gap: 6px; height: 30px; margin: 0 0 6px; padding: 0 9px;
+  border: 1px solid var(--border); border-radius: 7px; color: var(--text-muted);
+  transition: border-color var(--motion-fast) var(--ease-out);
+}
+.menu__search:focus-within { border-color: var(--border-strong); }
+.menu__search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text); font: inherit; font-size: 13px; }
+.menu__empty { padding: 6px 8px; font-size: 13px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .menu__separator { flex: none; height: 1px; margin: 4px 8px; background: var(--hairline); }

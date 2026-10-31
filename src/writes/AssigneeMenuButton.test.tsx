@@ -99,6 +99,17 @@ describe("AssigneeMenuButton", () => {
       expect(screen.queryByRole("menu")).not.toBeInTheDocument();
     });
 
+    it("has a focused search field that assigns the person typed, on Enter", async () => {
+      mocked.issueWrite.mockResolvedValue({ done: "Assigned NW-1042 to Sam Lee", reverse: null });
+      const menu = await openMenu();
+
+      expect(within(menu).getByRole("textbox", { name: "Search people" })).toHaveFocus();
+      await userEvent.keyboard("sam{Enter}");
+
+      expect(mocked.issueWrite).toHaveBeenCalledWith("10042", { kind: "assign", accountId: "demo-account-2" });
+      expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    });
+
     it("unassigns with a null account when Unassigned is chosen", async () => {
       mocked.issueWrite.mockResolvedValue({ done: "Unassigned NW-1042", reverse: null });
       const menu = await openMenu();

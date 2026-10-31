@@ -12,7 +12,7 @@ interface Issue {
 /** Asks Rust who is on the issue's team, then offers each of them and Unassign. */
 export function openAssignMenu(issue: Issue, at: MenuAt) {
   void attempt(api.issueAssignees(issue.id), "Could not load the team").then((assignees) => {
-    if (assignees) openMenu(assignEntries(issue, assignees), at, `Assignee of ${issue.key}`);
+    if (assignees) openMenu(assignEntries(issue, assignees), at, `Assignee of ${issue.key}`, { search: "Search people" });
   });
 }
 

@@ -18,7 +18,7 @@ export function openStatusMenu(issue: Issue, at: MenuAt, openInJira: ((key: stri
 
 /** A menu of these moves (a drop on a status type that several statuses can follow). */
 export function openMoveMenu(issue: Issue, moves: TransitionOption[], at: MenuAt, openInJira: ((key: string) => void) | null) {
-  openMenu(statusEntries(issue, moves, openInJira), at, `Status of ${issue.key}`);
+  openMenu(statusEntries(issue, moves, openInJira), at, `Status of ${issue.key}`, { search: "Search statuses" });
 }
 
 function statusEntries(issue: Issue, moves: TransitionOption[], openInJira: ((key: string) => void) | null): MenuEntry[] {

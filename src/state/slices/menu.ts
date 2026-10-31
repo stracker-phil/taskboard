@@ -35,12 +35,18 @@ export interface OpenMenu {
   label: string;
   /** Where the focus goes back to when it closes. */
   opener: HTMLElement | null;
+  /** A search field's placeholder: the menu opens with the field focused and narrows its rows as you type. */
+  search?: string;
+}
+
+export interface MenuOptions {
+  search?: string;
 }
 
 export interface MenuSlice {
   menu: OpenMenu | null;
   /** Shows a menu, replacing an open one; opening it again on the same element closes it. */
-  openMenu: (entries: MenuEntry[], at: MenuAt, label?: string) => void;
+  openMenu: (entries: MenuEntry[], at: MenuAt, label?: string, options?: MenuOptions) => void;
   closeMenu: () => void;
 }
 
@@ -49,12 +55,12 @@ let opened = 0;
 export const menuSlice: Slice<MenuSlice> = {
   create: (set, get) => ({
     menu: null,
-    openMenu: (entries, at, label = "Menu") => {
+    openMenu: (entries, at, label = "Menu", options = {}) => {
       if (at instanceof HTMLElement && get().menu?.at === at) return set({ menu: null });
       const focused = document.activeElement;
       const opener = at instanceof HTMLElement ? at : focused instanceof HTMLElement && focused !== document.body ? focused : null;
       opened += 1;
-      set({ menu: { id: opened, entries, at, label, opener } });
+      set({ menu: { id: opened, entries, at, label, opener, search: options.search } });
     },
     closeMenu: () => set({ menu: null }),
   }),

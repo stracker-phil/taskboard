@@ -463,6 +463,10 @@ menu ([ADR 0034](adr/0034-menus-are-drawn-in-the-page.md)); only the app's menu 
   from a button or a key starts on its first row. The command keys stay off while a menu has the focus.
 - **Roles**: `menu` and `menuitem`; a choice is `menuitemradio` (`menuitemcheckbox` for an on/off one) with
   `aria-checked`; a caption's rows are a `group` named by it; disabled rows are `aria-disabled`.
+- **Search**: a menu of many similar choices (the status and assignee menus) opens with a search field on top,
+  focused (`openMenu(…, { search })`): typing narrows the rows to those containing the text (ignoring case, captions
+  kept with their rows), the first match highlighted; ↑ ↓ move, ↩ runs the highlighted row, Esc closes. "No match
+  for …" when nothing fits. The panel keeps the width it opened with.
 - **Choices are inline**: a short set of choices is a captioned group with the current one checked (the view
   tab's Layout group), not a submenu; long ones (Sort by) stay a submenu.
 

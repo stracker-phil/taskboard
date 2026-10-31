@@ -5,8 +5,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { resetStore } from "../../state/store";
 import { MenuHost, openContextMenu, openMenu, type MenuAt, type MenuEntry } from ".";
 
-function show(entries: MenuEntry[], at: MenuAt = { x: 20, y: 30 }, label?: string) {
-  act(() => openMenu(entries, at, label));
+function show(entries: MenuEntry[], at: MenuAt = { x: 20, y: 30 }, label?: string, options?: Parameters<typeof openMenu>[3]) {
+  act(() => openMenu(entries, at, label, options));
 }
 
 function Anchored() {
@@ -310,6 +310,130 @@ describe("Menu", () => {
 
       expect(screen.getByRole("menuitemcheckbox", { name: "Show closed" })).toHaveAttribute("aria-checked", "true");
       expect(screen.getByRole("menuitemcheckbox", { name: "Show empty" })).toHaveAttribute("aria-checked", "false");
+    });
+  });
+
+  describe("search", () => {
+    const team: MenuEntry[] = [{ caption: "Team" }, { text: "Alex Morgan" }, { text: "Sam Lee" }, "separator", { text: "Unassigned" }];
+    const showSearch = (entries: MenuEntry[] = team) => show(entries, { x: 20, y: 30 }, "People", { search: "Search people" });
+    const field = () => screen.getByRole("textbox", { name: "Search people" });
+    const shown = () => screen.getAllByRole("menuitem").map((row) => row.textContent);
+
+    it("opens with the field focused and the first enabled row highlighted", () => {
+      render(<MenuHost />);
+
+      showSearch([{ text: "Archived", enabled: false }, { text: "Alex Morgan" }, { text: "Sam Lee" }]);
+
+      expect(field()).toHaveFocus();
+      expect(screen.getByRole("menuitem", { name: "Alex Morgan" })).toHaveAttribute("data-active", "true");
+      expect(screen.getByRole("menuitem", { name: "Sam Lee" })).not.toHaveAttribute("data-active");
+    });
+
+    it("narrows the rows to those containing the typed text, ignoring case", async () => {
+      render(<MenuHost />);
+      showSearch();
+
+      await userEvent.type(field(), "SAM");
+
+      expect(shown()).toEqual(["Sam Lee"]);
+    });
+
+    it("keeps a caption while one of its rows matches", async () => {
+      render(<MenuHost />);
+      showSearch();
+
+      await userEvent.type(field(), "alex");
+
+      expect(screen.getByRole("group", { name: "Team" })).toBeInTheDocument();
+    });
+
+    it("drops a caption and the separators when none of its rows match", async () => {
+      render(<MenuHost />);
+      showSearch();
+
+      await userEvent.type(field(), "unass");
+
+      expect(shown()).toEqual(["Unassigned"]);
+      expect(screen.queryByRole("group", { name: "Team" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("separator")).not.toBeInTheDocument();
+    });
+
+    it("highlights the first matching enabled row while narrowing", async () => {
+      render(<MenuHost />);
+      showSearch([{ text: "Alpha", enabled: false }, { text: "Beta" }, { text: "Alps" }, { text: "Alder" }]);
+
+      await userEvent.type(field(), "al");
+
+      expect(screen.getByRole("menuitem", { name: "Alps" })).toHaveAttribute("data-active", "true");
+      expect(screen.getByRole("menuitem", { name: "Alder" })).not.toHaveAttribute("data-active");
+    });
+
+    it("moves the highlight among the shown rows with the arrows while the field keeps the focus", async () => {
+      render(<MenuHost />);
+      showSearch();
+
+      await userEvent.keyboard("{ArrowDown}");
+      expect(screen.getByRole("menuitem", { name: "Sam Lee" })).toHaveAttribute("data-active", "true");
+      await userEvent.keyboard("{ArrowDown}");
+      expect(screen.getByRole("menuitem", { name: "Unassigned" })).toHaveAttribute("data-active", "true");
+      await userEvent.keyboard("{ArrowUp}");
+      expect(screen.getByRole("menuitem", { name: "Sam Lee" })).toHaveAttribute("data-active", "true");
+      expect(field()).toHaveFocus();
+    });
+
+    it("runs the highlighted row on Enter and closes the menu", async () => {
+      const run = vi.fn();
+      render(<MenuHost />);
+      showSearch([{ text: "Alex Morgan" }, { text: "Sam Lee", run }, { text: "Sam Park" }]);
+      await userEvent.type(field(), "sam");
+
+      await userEvent.keyboard("{Enter}");
+
+      expect(run).toHaveBeenCalled();
+      expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    });
+
+    it("types letters and spaces into the field instead of jumping to rows", async () => {
+      render(<MenuHost />);
+      showSearch();
+
+      await userEvent.keyboard("x m");
+
+      expect(field()).toHaveValue("x m");
+      expect(shown()).toEqual(["Alex Morgan"]);
+    });
+
+    it("says nothing matches, naming the text, and shows every row again once it is cleared", async () => {
+      render(<MenuHost />);
+      showSearch();
+
+      await userEvent.type(field(), "zzz");
+      expect(screen.getByText("No match for “zzz”")).toBeInTheDocument();
+      expect(screen.queryAllByRole("menuitem")).toHaveLength(0);
+
+      await userEvent.clear(field());
+
+      expect(screen.queryByText(/No match for/)).not.toBeInTheDocument();
+      expect(shown()).toEqual(["Alex Morgan", "Sam Lee", "Unassigned"]);
+    });
+
+    it("closes on Escape", async () => {
+      render(<MenuHost />);
+      showSearch();
+
+      await userEvent.keyboard("{Escape}");
+
+      expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    });
+
+    it("has no field in a menu without search, where a letter still jumps to a row", async () => {
+      render(<Anchored />);
+      show(team, anchorButton());
+
+      await userEvent.keyboard("s");
+
+      expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+      expect(screen.getByRole("menuitem", { name: "Sam Lee" })).toHaveFocus();
     });
   });
 

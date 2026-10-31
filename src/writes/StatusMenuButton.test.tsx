@@ -96,6 +96,17 @@ describe("StatusMenuButton", () => {
       expect(screen.queryByRole("menu")).not.toBeInTheDocument();
     });
 
+    it("has a focused search field that moves the issue to the status typed, on Enter", async () => {
+      mocked.issueWrite.mockResolvedValue({ done: "Moved NW-1042 to Done", reverse: null });
+      const menu = await openMenu();
+
+      expect(within(menu).getByRole("textbox", { name: "Search statuses" })).toHaveFocus();
+      await userEvent.keyboard("don{Enter}");
+
+      expect(mocked.issueWrite).toHaveBeenCalledWith("10042", { kind: "transition", transitionId: "41" });
+      expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    });
+
     it("shows an error toast when Jira refuses the transition", async () => {
       mocked.issueWrite.mockRejectedValue({ kind: "invalid_input", message: "The issue needs a resolution", code: null });
       const menu = await openMenu();

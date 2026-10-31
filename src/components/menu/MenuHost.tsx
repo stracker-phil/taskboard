@@ -74,6 +74,7 @@ function OpenMenuLayer({ menu, onClose }: { menu: OpenMenu; onClose: () => void 
       <MenuPanel
         entries={menu.entries}
         label={menu.label}
+        search={menu.search}
         placement={placement}
         highlightFirst={menu.at instanceof HTMLElement}
         onChoose={choose}

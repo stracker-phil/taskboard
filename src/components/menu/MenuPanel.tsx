@@ -1,4 +1,4 @@
-import { Check, ChevronRight } from "lucide-react";
+import { Check, ChevronRight, Search } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 import type { MenuEntry, MenuItem } from "../../state/slices/menu";
 import { place, type Placement } from "./placement";
@@ -6,6 +6,8 @@ import { place, type Placement } from "./placement";
 interface Props {
   entries: MenuEntry[];
   label: string;
+  /** A search field's placeholder (`openMenu`'s `search`). */
+  search?: string;
   placement: Placement;
   /** Opened from the keyboard: the first row starts highlighted. */
   highlightFirst: boolean;
@@ -24,6 +26,34 @@ interface Section {
 const isItem = (entry: MenuEntry): entry is MenuItem => entry !== "separator" && !("caption" in entry);
 const isEnabled = (entry: MenuEntry | undefined) => !!entry && isItem(entry) && entry.enabled !== false;
 
+/** The rows whose text contains `query` (ignoring case). A caption stays while one of its rows does; a separator
+ *  stays only between rows that do, so a row after it never joins the caption above. */
+function matching(entries: MenuEntry[], query: string): MenuEntry[] {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return entries;
+  const kept: MenuEntry[] = [];
+  let caption: MenuEntry | null = null;
+  let separated = false;
+  for (const entry of entries) {
+    if (entry === "separator") {
+      caption = null;
+      separated = kept.length > 0;
+      continue;
+    }
+    if ("caption" in entry) {
+      caption = entry;
+      continue;
+    }
+    if (!entry.text.toLowerCase().includes(needle)) continue;
+    if (separated) kept.push("separator");
+    if (caption) kept.push(caption);
+    caption = null;
+    separated = false;
+    kept.push(entry);
+  }
+  return kept;
+}
+
 /** A caption starts a captioned section, which runs to the next caption or separator. */
 function sectionsOf(entries: MenuEntry[]): Section[] {
   const sections: Section[] = [{ entries: [] }];
@@ -37,10 +67,15 @@ function sectionsOf(entries: MenuEntry[]): Section[] {
 }
 
 /** One menu panel: its rows, the keys that move through them, and the submenu of the highlighted row. */
-export function MenuPanel({ entries, label, placement, highlightFirst, onChoose, onBack }: Props) {
+export function MenuPanel({ entries: all, label, search, placement, highlightFirst, onChoose, onBack }: Props) {
   const ref = useRef<HTMLDivElement>(null);
+  const field = useRef<HTMLInputElement>(null);
+  const [query, setQuery] = useState("");
+  const entries = search ? matching(all, query) : all;
   const enabled = entries.flatMap((entry, index) => (isEnabled(entry) ? [index] : []));
-  const [active, setActive] = useState(highlightFirst ? (enabled[0] ?? -1) : -1);
+  const [active, setActive] = useState(highlightFirst || search ? (enabled[0] ?? -1) : -1);
+  // The width it opened with, so narrowing the rows doesn't make it jump.
+  const [width, setWidth] = useState<number | null>(null);
   const [submenu, setSubmenu] = useState<{ index: number; placement: Placement; focused: boolean } | null>(null);
   const [position, setPosition] = useState<CSSProperties>({ left: 0, top: 0, visibility: "hidden" });
 
@@ -49,14 +84,25 @@ export function MenuPanel({ entries, label, placement, highlightFirst, onChoose,
     if (!panel) return;
     const size = { width: panel.offsetWidth, height: panel.offsetHeight };
     setPosition(place(placement, size, { width: window.innerWidth, height: window.innerHeight }));
+    setWidth(panel.offsetWidth);
   }, [placement]);
 
-  // The focus follows the highlight, unless a submenu opened from the keyboard holds it.
+  // The focus follows the highlight, unless a submenu opened from the keyboard holds it, or the search field.
   useEffect(() => {
+    if (search) {
+      field.current?.focus({ preventScroll: true });
+      return;
+    }
     if (submenu?.focused) return;
     const row = active >= 0 ? ref.current?.querySelector<HTMLElement>(`[data-index="${active}"]`) : null;
     (row ?? ref.current)?.focus({ preventScroll: true });
-  }, [active, submenu]);
+  }, [active, submenu, search]);
+
+  const narrow = (text: string) => {
+    setQuery(text);
+    const shown = matching(all, text);
+    setActive(shown.findIndex(isEnabled));
+  };
 
   const rowOf = (index: number) => ref.current?.querySelector<HTMLElement>(`[data-index="${index}"]`);
   const openSubmenu = (index: number, focused: boolean) => {
@@ -97,6 +143,8 @@ export function MenuPanel({ entries, label, placement, highlightFirst, onChoose,
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     const entry = entries[active];
+    // In the search field only the keys that move through the rows or choose one belong to the menu.
+    if (search && !["ArrowDown", "ArrowUp", "Enter"].includes(e.key)) return;
     switch (e.key) {
       case "ArrowDown":
         step(1);
@@ -139,15 +187,23 @@ export function MenuPanel({ entries, label, placement, highlightFirst, onChoose,
         role="menu"
         aria-label={label}
         tabIndex={-1}
-        style={position}
+        style={width ? { ...position, width } : position}
         onKeyDown={onKeyDown}
         onMouseLeave={() => {
-          if (!submenu) setActive(-1);
+          // With a search field the highlight stays for ↩.
+          if (!submenu && !search) setActive(-1);
         }}
       >
+        {search && (
+          <label className="menu__search">
+            <Search size={13} strokeWidth={2} aria-hidden="true" />
+            <input ref={field} aria-label={search} placeholder={search} value={query} onChange={(e) => narrow(e.target.value)} />
+          </label>
+        )}
         {sectionsOf(entries).map((section, at) => (
           <MenuSection key={at} section={section} active={active} openIndex={submenu?.index ?? null} onHover={hover} onChoose={choose} />
         ))}
+        {search && entries.length === 0 && <div className="menu__empty">No match for “{query.trim()}”</div>}
       </div>
       {submenu && subEntry && isItem(subEntry) && subEntry.items && (
         <MenuPanel
