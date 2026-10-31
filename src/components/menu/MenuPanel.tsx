@@ -87,7 +87,8 @@ export function MenuPanel({ entries: all, label, search, placement, highlightFir
     setWidth(panel.offsetWidth);
   }, [placement]);
 
-  // The focus follows the highlight, unless a submenu opened from the keyboard holds it, or the search field.
+  // The focus follows the highlight, unless a submenu opened from the keyboard holds it, or the search field. The
+  // panel is hidden until it is placed, and a hidden element takes no focus, so it focuses again once placed.
   useEffect(() => {
     if (search) {
       field.current?.focus({ preventScroll: true });
@@ -96,7 +97,7 @@ export function MenuPanel({ entries: all, label, search, placement, highlightFir
     if (submenu?.focused) return;
     const row = active >= 0 ? ref.current?.querySelector<HTMLElement>(`[data-index="${active}"]`) : null;
     (row ?? ref.current)?.focus({ preventScroll: true });
-  }, [active, submenu, search]);
+  }, [active, submenu, search, position]);
 
   const narrow = (text: string) => {
     setQuery(text);
