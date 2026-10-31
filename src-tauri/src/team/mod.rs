@@ -1,7 +1,10 @@
-//! A Space's team: everyone with activity in its synced issues, minus the people switched off
-//! (`space_member_off`).
+//! Who is on a Space's team. Someone ever assigned one of its synced issues is on it unless the owner switched them
+//! off; anyone else with activity there (reporter, commenter, history author) or anyone the owner switched on joins
+//! only when switched on (`space_member`). Settings → Team edits every Space at once.
 
 pub mod commands;
+
+use std::collections::HashMap;
 
 use rusqlite::{Connection, params};
 use serde::Serialize;
@@ -12,65 +15,149 @@ use crate::error::{AppError, AppResult};
 use crate::space_config::project_of_level;
 use crate::views::rows::{Person, person};
 
+/// Everyone with activity in a tracked Space, and on which Spaces' teams they are.
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
 #[ts(export, export_to = "src/api/types.gen.ts")]
 #[serde(rename_all = "camelCase")]
-pub struct TeamMember {
-    pub person: Person,
-    pub active: bool,
-    /// Open issues of the Space assigned to them.
-    pub assigned: u32,
+pub struct TeamMatrix {
+    /// The tracked Spaces' project ids, in sidebar order: the columns.
+    pub spaces: Vec<String>,
+    /// Sorted by name.
+    pub people: Vec<TeamRow>,
 }
 
-/// Assignees, reporters, comment authors and history authors of the projects' issues.
-const PEOPLE: &str = "
-    WITH scoped AS (SELECT id, assignee_id, reporter_id FROM cache.issue
-                    WHERE gone = 0 AND project_id IN (SELECT value FROM json_each(?1))),
-    seen AS (
-        SELECT assignee_id AS account_id FROM scoped
-        UNION SELECT reporter_id FROM scoped
-        UNION SELECT c.author_id FROM cache.comment c JOIN scoped s ON s.id = c.issue_id
-        UNION SELECT h.author_id FROM cache.issue_history h JOIN scoped s ON s.id = h.issue_id
-    )
-    SELECT u.account_id, u.name FROM seen JOIN cache.user u ON u.account_id = seen.account_id";
+#[derive(Serialize, Clone, Debug, PartialEq, TS)]
+#[ts(export, export_to = "src/api/types.gen.ts")]
+#[serde(rename_all = "camelCase")]
+pub struct TeamRow {
+    pub person: Person,
+    /// One per column of `spaces`.
+    pub cells: Vec<TeamCell>,
+}
 
-/// The Space's team sorted by name, the switched-off people included.
-pub fn team(conn: &Connection, project_id: &str, me: Option<&str>) -> AppResult<Vec<TeamMember>> {
-    let mut query = conn.prepare(&format!(
-        "SELECT p.account_id, p.name,
-                NOT EXISTS (SELECT 1 FROM space_member_off o WHERE o.project_id = ?2 AND o.account_id = p.account_id),
-                (SELECT COUNT(*) FROM cache.issue i WHERE i.project_id = ?2 AND i.gone = 0
-                   AND i.status_category != 'done' AND i.assignee_id = p.account_id)
-         FROM ({PEOPLE}) p ORDER BY lower(p.name), p.account_id"
-    ))?;
-    let projects = serde_json::to_string(&[project_id])?;
-    let rows = query.query_map(params![projects, project_id], |r| {
-        Ok(TeamMember {
-            person: person(&r.get::<_, String>(0)?, &r.get::<_, String>(1)?, me),
-            active: r.get(2)?,
-            assigned: r.get(3)?,
+#[derive(Serialize, Clone, Copy, Debug, Default, PartialEq, TS)]
+#[ts(export, export_to = "src/api/types.gen.ts")]
+#[serde(rename_all = "camelCase")]
+pub struct TeamCell {
+    pub active: bool,
+    /// Ever assigned one of the Space's issues: on the team unless switched off.
+    pub assignee: bool,
+    /// Reported, commented on or changed one of its issues.
+    pub involved: bool,
+}
+
+/// `?1`: a JSON array of project ids. One row per Space and person with activity there or switched on there: whether
+/// they were ever assigned an issue of it (now, in the recorded changes or in an issue's history), and the owner's
+/// choice, if any.
+const MEMBERSHIPS: &str = "
+    WITH scoped AS (SELECT id, project_id, assignee_id, reporter_id FROM cache.issue
+                    WHERE gone = 0 AND project_id IN (SELECT value FROM json_each(?1))),
+    assigned AS (
+        SELECT project_id, assignee_id AS account_id FROM scoped WHERE assignee_id IS NOT NULL
+        UNION SELECT s.project_id, c.new_value FROM cache.issue_change c JOIN scoped s ON s.id = c.issue_id
+              WHERE c.field = 'assignee' AND c.new_value IS NOT NULL
+        UNION SELECT s.project_id, h.to_value FROM cache.issue_history h JOIN scoped s ON s.id = h.issue_id
+              WHERE h.field_id = 'assignee' AND h.to_value IS NOT NULL
+    ),
+    involved AS (
+        SELECT project_id, account_id FROM assigned
+        UNION SELECT project_id, reporter_id FROM scoped WHERE reporter_id IS NOT NULL
+        UNION SELECT s.project_id, c.author_id FROM cache.comment c JOIN scoped s ON s.id = c.issue_id
+              WHERE c.author_id IS NOT NULL
+        UNION SELECT s.project_id, h.author_id FROM cache.issue_history h JOIN scoped s ON s.id = h.issue_id
+              WHERE h.author_id IS NOT NULL
+    ),
+    listed AS (
+        SELECT project_id, account_id FROM involved
+        UNION SELECT project_id, account_id FROM space_member
+              WHERE active = 1 AND project_id IN (SELECT value FROM json_each(?1))
+    )
+    SELECT l.project_id, l.account_id, u.name,
+           EXISTS (SELECT 1 FROM assigned a WHERE a.project_id = l.project_id AND a.account_id = l.account_id),
+           EXISTS (SELECT 1 FROM involved i WHERE i.project_id = l.project_id AND i.account_id = l.account_id),
+           (SELECT m.active FROM space_member m WHERE m.project_id = l.project_id AND m.account_id = l.account_id)
+    FROM listed l JOIN cache.user u ON u.account_id = l.account_id";
+
+struct Membership {
+    project_id: String,
+    account_id: String,
+    name: String,
+    cell: TeamCell,
+}
+
+fn memberships(conn: &Connection, project_ids: &[String]) -> AppResult<Vec<Membership>> {
+    let mut query = conn.prepare(MEMBERSHIPS)?;
+    let projects = serde_json::to_string(project_ids)?;
+    let rows = query.query_map([projects], |r| {
+        let assignee: bool = r.get(3)?;
+        let chosen: Option<bool> = r.get(5)?;
+        Ok(Membership {
+            project_id: r.get(0)?,
+            account_id: r.get(1)?,
+            name: r.get(2)?,
+            cell: TeamCell {
+                active: chosen.unwrap_or(assignee),
+                assignee,
+                involved: r.get(4)?,
+            },
         })
     })?;
     Ok(rows.collect::<Result<_, _>>()?)
 }
 
-/// Who is active in any of the projects' teams, sorted by name; `me` comes first whenever it is among them.
+fn tracked_projects(conn: &Connection) -> AppResult<Vec<String>> {
+    let mut query = conn
+        .prepare("SELECT project_id FROM space WHERE tracked = 1 ORDER BY position, project_id")?;
+    let rows = query.query_map([], |r| r.get(0))?;
+    Ok(rows.collect::<Result<_, _>>()?)
+}
+
+/// Every tracked Space's team in one grid, people by name.
+pub fn team_matrix(conn: &Connection, me: Option<&str>) -> AppResult<TeamMatrix> {
+    let spaces = tracked_projects(conn)?;
+    let column: HashMap<&str, usize> = spaces
+        .iter()
+        .enumerate()
+        .map(|(i, p)| (p.as_str(), i))
+        .collect();
+    let mut rows: HashMap<String, TeamRow> = HashMap::new();
+    for m in memberships(conn, &spaces)? {
+        let Some(&at) = column.get(m.project_id.as_str()) else {
+            continue;
+        };
+        let row = rows.entry(m.account_id.clone()).or_insert_with(|| TeamRow {
+            person: person(&m.account_id, &m.name, me),
+            cells: vec![TeamCell::default(); spaces.len()],
+        });
+        row.cells[at] = m.cell;
+    }
+    let mut people: Vec<TeamRow> = rows.into_values().collect();
+    people.sort_by(|a, b| {
+        (a.person.name.to_lowercase(), &a.person.account_id)
+            .cmp(&(b.person.name.to_lowercase(), &b.person.account_id))
+    });
+    Ok(TeamMatrix { spaces, people })
+}
+
+/// Who is on the team of any of the projects, sorted by name; `me` comes first whenever it is among them.
 pub fn active(
     conn: &Connection,
     project_ids: &[String],
     me: Option<&str>,
 ) -> AppResult<Vec<Person>> {
-    let mut query = conn.prepare(&format!(
-        "SELECT p.account_id, p.name FROM ({PEOPLE}) p
-         WHERE EXISTS (SELECT 1 FROM json_each(?1) j WHERE NOT EXISTS (
-                 SELECT 1 FROM space_member_off o WHERE o.project_id = j.value AND o.account_id = p.account_id))
-         ORDER BY lower(p.name), p.account_id"
-    ))?;
-    let projects = serde_json::to_string(project_ids)?;
-    let rows = query.query_map([projects], |r| {
-        Ok(person(&r.get::<_, String>(0)?, &r.get::<_, String>(1)?, me))
-    })?;
-    let mut people: Vec<Person> = rows.collect::<Result<_, _>>()?;
+    let mut named: HashMap<String, String> = HashMap::new();
+    for m in memberships(conn, project_ids)? {
+        if m.cell.active {
+            named.insert(m.account_id, m.name);
+        }
+    }
+    let mut people: Vec<Person> = named
+        .iter()
+        .map(|(id, name)| person(id, name, me))
+        .collect();
+    people.sort_by(|a, b| {
+        (a.name.to_lowercase(), &a.account_id).cmp(&(b.name.to_lowercase(), &b.account_id))
+    });
     if let Some(at) = people
         .iter()
         .position(|p| Some(p.account_id.as_str()) == me)
@@ -95,49 +182,50 @@ pub async fn level_people(db: &Db, list_id: i64, me: Option<String>) -> AppResul
     .await
 }
 
-fn tracked_projects(conn: &Connection) -> AppResult<Vec<String>> {
-    let mut query = conn.prepare("SELECT project_id FROM space WHERE tracked = 1")?;
-    let rows = query.query_map([], |r| r.get(0))?;
-    Ok(rows.collect::<Result<_, _>>()?)
+pub async fn team_matrix_of(db: &Db, me: Option<String>) -> AppResult<TeamMatrix> {
+    db.read(move |conn| team_matrix(conn, me.as_deref())).await
 }
 
-pub async fn space_team(
-    db: &Db,
-    project_id: String,
-    me: Option<String>,
-) -> AppResult<Vec<TeamMember>> {
-    db.read(move |conn| team(conn, &project_id, me.as_deref()))
-        .await
-}
-
-/// Switches a person on or off in the Space's team; returns the team.
+/// Puts a person on a Space's team or takes them off; returns the grid. A choice that matches the default (on for
+/// someone ever assigned there) is forgotten, so the default keeps following the issues.
 pub async fn space_set_member(
     db: &Db,
     project_id: String,
     account_id: String,
     active: bool,
     me: Option<String>,
-) -> AppResult<Vec<TeamMember>> {
+) -> AppResult<TeamMatrix> {
     db.write(move |tx, changes| {
-        let members = team(tx, &project_id, me.as_deref())?;
-        if !members.iter().any(|m| m.person.account_id == account_id) {
+        if !tracked_projects(tx)?.contains(&project_id) {
+            return Err(AppError::NotFound("That Space isn't tracked".into()));
+        }
+        let known: bool = tx.query_row(
+            "SELECT EXISTS (SELECT 1 FROM cache.user WHERE account_id = ?1)",
+            [&account_id],
+            |r| r.get(0),
+        )?;
+        if !known {
             return Err(AppError::NotFound(
-                "That person has no activity in this Space".into(),
+                "That person isn't known from the synced issues".into(),
             ));
         }
-        if active {
+        let assignee = memberships(tx, std::slice::from_ref(&project_id))?
+            .iter()
+            .any(|m| m.account_id == account_id && m.cell.assignee);
+        if active == assignee {
             tx.execute(
-                "DELETE FROM space_member_off WHERE project_id = ?1 AND account_id = ?2",
+                "DELETE FROM space_member WHERE project_id = ?1 AND account_id = ?2",
                 params![project_id, account_id],
             )?;
         } else {
             tx.execute(
-                "INSERT INTO space_member_off (project_id, account_id) VALUES (?1, ?2) ON CONFLICT DO NOTHING",
-                params![project_id, account_id],
+                "INSERT INTO space_member (project_id, account_id, active) VALUES (?1, ?2, ?3)
+                 ON CONFLICT (project_id, account_id) DO UPDATE SET active = excluded.active",
+                params![project_id, account_id, active],
             )?;
         }
         changes.local_changed(LocalPart::Spaces);
-        team(tx, &project_id, me.as_deref())
+        team_matrix(tx, me.as_deref())
     })
     .await
 }

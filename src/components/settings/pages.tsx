@@ -1,5 +1,5 @@
 /** The core settings pages. Modules register their own pages from their install function. */
-import { Activity, FolderKanban, Keyboard, LayoutGrid, Palette, PlugZap, RefreshCw, SlidersHorizontal } from "lucide-react";
+import { Activity, FolderKanban, Keyboard, LayoutGrid, Palette, PlugZap, RefreshCw, SlidersHorizontal, Users } from "lucide-react";
 import { registerSettingsPage } from "../../registry/settingsPages";
 import { AppearancePage } from "./AppearancePage";
 import { GeneralPage } from "./GeneralPage";
@@ -8,6 +8,7 @@ import { ConnectionPage } from "./jira/ConnectionPage";
 import { ProjectsPage } from "./jira/ProjectsPage";
 import { SpacesPage } from "./jira/SpacesPage";
 import { SyncPage } from "./jira/SyncPage";
+import { TeamPage } from "./jira/TeamPage";
 import { StatusPage } from "./status/StatusPage";
 
 /** Ids match the pages `settings:open:<page>` and `open_settings` name. */
@@ -44,10 +45,18 @@ export function registerCoreSettingsPages() {
       { id: "spaces", title: "Spaces" },
       { id: "layouts", title: "Layouts" },
       { id: "statuses", title: "Statuses" },
-      { id: "team", title: "Team" },
       { id: "fields", title: "Custom fields" },
     ],
     Body: SpacesPage,
+  });
+  registerSettingsPage({
+    id: "team",
+    group: "Jira",
+    label: "Team",
+    icon: Users,
+    order: 2.5,
+    sections: [{ id: "team", title: "Team" }],
+    Body: TeamPage,
   });
   registerSettingsPage({
     id: "sync",

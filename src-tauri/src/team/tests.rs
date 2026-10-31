@@ -1,3 +1,5 @@
+use serde_json::json;
+
 use super::*;
 use crate::error::ErrorKind;
 
@@ -11,6 +13,39 @@ const DAN: &str = "acc-dan";
 const ELI: &str = "acc-eli";
 const FINN: &str = "acc-finn";
 const GUS: &str = "acc-gus";
+const HAL: &str = "acc-hal";
+const IVY: &str = "acc-ivy";
+
+const ASSIGNEE_ON: TeamCell = TeamCell {
+    active: true,
+    assignee: true,
+    involved: true,
+};
+const ASSIGNEE_OFF: TeamCell = TeamCell {
+    active: false,
+    assignee: true,
+    involved: true,
+};
+const INVOLVED_OFF: TeamCell = TeamCell {
+    active: false,
+    assignee: false,
+    involved: true,
+};
+const INVOLVED_ON: TeamCell = TeamCell {
+    active: true,
+    assignee: false,
+    involved: true,
+};
+const NO_ACTIVITY: TeamCell = TeamCell {
+    active: false,
+    assignee: false,
+    involved: false,
+};
+const SWITCHED_ON_WITHOUT_ACTIVITY: TeamCell = TeamCell {
+    active: true,
+    assignee: false,
+    involved: false,
+};
 
 fn issue_sql(
     id: u32,
@@ -37,8 +72,18 @@ fn issue_sql(
     )
 }
 
-/// Website: Bea has two open issues and a gone one, Alex a finished one, Cleo reports, Finn comments,
-/// Gus changed something, Eli only appears on the gone issue. Support: Dan assigned, Bea reporting.
+async fn exec(db: &Db, sql: &'static str) {
+    db.write(move |tx, _| {
+        tx.execute_batch(sql)?;
+        Ok(())
+    })
+    .await
+    .unwrap();
+}
+
+/// Website: Bea has two open issues and a gone one, Alex a finished one, Hal was assigned one in a recorded change,
+/// Ivy in an issue's history, Cleo reports, Finn comments, Gus changed something, Eli only appears on the gone issue.
+/// Dan is only named in a status change. Support: Dan assigned, Bea reporting.
 async fn lab() -> (tempfile::TempDir, Db) {
     let dir = crate::test_support::temp_config_dir();
     let db = Db::open(dir.path()).unwrap();
@@ -48,7 +93,7 @@ async fn lab() -> (tempfile::TempDir, Db) {
          INSERT INTO cache.user (account_id, name) VALUES
            ('acc-alex', 'alex Stone'), ('acc-bea', 'Bea Carter'), ('acc-cleo', 'Cleo Dunn'),
            ('acc-dan', 'Dan Evers'), ('acc-eli', 'Eli Ford'), ('acc-finn', 'Finn Gray'),
-           ('acc-gus', 'Gus Hart');",
+           ('acc-gus', 'Gus Hart'), ('acc-hal', 'Hal Imre'), ('acc-ivy', 'ivy Quill');",
     );
     for issue in [
         issue_sql(1, WEB, "indeterminate", BEA, CLEO, 0),
@@ -56,14 +101,20 @@ async fn lab() -> (tempfile::TempDir, Db) {
         issue_sql(3, WEB, "indeterminate", BEA, ELI, 1),
         issue_sql(4, SUPPORT, "new", DAN, BEA, 0),
         issue_sql(5, WEB, "new", BEA, "", 0),
+        issue_sql(6, WEB, "new", "", "", 0),
+        issue_sql(7, WEB, "new", "", "", 0),
     ] {
         sql.push_str(&issue);
     }
     sql.push_str(
         "INSERT INTO cache.comment (id, issue_id, author_id, created_at, updated_at)
            VALUES ('c1', '1', 'acc-finn', '2026-01-02T00:00:00Z', '2026-01-02T00:00:00Z');
-         INSERT INTO cache.issue_history (issue_id, position, field, author_id, changed_at)
-           VALUES ('2', 0, 'status', 'acc-gus', '2026-01-02T00:00:00Z');",
+         INSERT INTO cache.issue_history (issue_id, position, field, field_id, to_value, author_id, changed_at)
+           VALUES ('2', 0, 'status', 'status', NULL, 'acc-gus', '2026-01-02T00:00:00Z'),
+                  ('7', 0, 'assignee', 'assignee', 'acc-ivy', 'acc-gus', '2026-01-02T00:00:00Z');
+         INSERT INTO cache.issue_change (issue_id, field, old_value, new_value, changed_at)
+           VALUES ('6', 'assignee', NULL, 'acc-hal', '2026-01-02T00:00:00Z'),
+                  ('1', 'status', NULL, 'acc-dan', '2026-01-02T00:00:00Z');",
     );
     db.write(move |tx, _| {
         tx.execute_batch(&sql)?;
@@ -74,19 +125,38 @@ async fn lab() -> (tempfile::TempDir, Db) {
     (dir, db)
 }
 
-fn ids(members: &[TeamMember]) -> Vec<&str> {
-    members
+async fn track(db: &Db, projects: &[&str]) {
+    for project in projects {
+        crate::connection::track_project(db, project.to_string(), true)
+            .await
+            .unwrap();
+    }
+}
+
+async fn matrix(db: &Db) -> TeamMatrix {
+    team_matrix_of(db, None).await.unwrap()
+}
+
+fn ids(matrix: &TeamMatrix) -> Vec<&str> {
+    matrix
+        .people
         .iter()
-        .map(|m| m.person.account_id.as_str())
+        .map(|row| row.person.account_id.as_str())
         .collect()
 }
 
-fn active_of(members: &[TeamMember], account_id: &str) -> bool {
-    members
+fn cell(matrix: &TeamMatrix, account_id: &str, project: &str) -> TeamCell {
+    let column = matrix.spaces.iter().position(|p| p == project).unwrap();
+    matrix
+        .people
         .iter()
-        .find(|m| m.person.account_id == account_id)
-        .unwrap()
-        .active
+        .find(|row| row.person.account_id == account_id)
+        .unwrap_or_else(|| panic!("{account_id} is not listed"))
+        .cells[column]
+}
+
+async fn set(db: &Db, project: &str, account: &str, on: bool) -> AppResult<TeamMatrix> {
+    space_set_member(db, project.into(), account.into(), on, None).await
 }
 
 async fn active_people(db: &Db, projects: &[&str], me: Option<&str>) -> Vec<String> {
@@ -100,174 +170,334 @@ async fn active_people(db: &Db, projects: &[&str], me: Option<&str>) -> Vec<Stri
         .collect()
 }
 
-async fn set(db: &Db, project: &str, account: &str, on: bool) -> AppResult<Vec<TeamMember>> {
-    space_set_member(db, project.into(), account.into(), on, None).await
+#[tokio::test]
+async fn people_are_listed_once_sorted_by_name_ignoring_case() {
+    let (_dir, db) = lab().await;
+    track(&db, &[WEB]).await;
+
+    assert_eq!(
+        ids(&matrix(&db).await),
+        [ALEX, BEA, CLEO, FINN, GUS, HAL, IVY]
+    );
 }
 
 #[tokio::test]
-async fn the_team_lists_everyone_with_activity_once_sorted_by_name_ignoring_case() {
+async fn only_activity_on_non_gone_issues_of_tracked_spaces_lists_a_person() {
     let (_dir, db) = lab().await;
-    let members = space_team(&db, WEB.into(), None).await.unwrap();
-    assert_eq!(ids(&members), [ALEX, BEA, CLEO, FINN, GUS]);
-}
+    track(&db, &[WEB]).await;
+    let web = matrix(&db).await;
 
-#[tokio::test]
-async fn people_of_another_space_or_only_on_gone_issues_are_not_in_the_team() {
-    let (_dir, db) = lab().await;
-    let web = space_team(&db, WEB.into(), None).await.unwrap();
     assert!(!ids(&web).contains(&DAN));
     assert!(!ids(&web).contains(&ELI));
-    let support = space_team(&db, SUPPORT.into(), None).await.unwrap();
-    assert_eq!(ids(&support), [BEA, DAN]);
+
+    track(&db, &[SUPPORT]).await;
+    let both = matrix(&db).await;
+    assert!(ids(&both).contains(&DAN));
+    assert!(!ids(&both).contains(&ELI));
 }
 
 #[tokio::test]
-async fn assigned_counts_only_open_issues_of_the_space_that_are_not_gone() {
+async fn anyone_ever_assigned_a_non_gone_issue_is_on_the_team_by_default() {
     let (_dir, db) = lab().await;
-    let members = space_team(&db, WEB.into(), None).await.unwrap();
-    let counts: Vec<(&str, u32)> = members
-        .iter()
-        .map(|m| (m.person.account_id.as_str(), m.assigned))
-        .collect();
-    assert_eq!(
-        counts,
-        [(ALEX, 0), (BEA, 2), (CLEO, 0), (FINN, 0), (GUS, 0)]
-    );
-    let support = space_team(&db, SUPPORT.into(), None).await.unwrap();
-    assert_eq!(
-        support
-            .iter()
-            .find(|m| m.person.account_id == BEA)
-            .unwrap()
-            .assigned,
-        0
-    );
+    track(&db, &[WEB]).await;
+    let web = matrix(&db).await;
+
+    for (account, why) in [
+        (BEA, "current assignee"),
+        (ALEX, "current assignee of a finished issue"),
+        (HAL, "assignee in a recorded change"),
+        (IVY, "assignee in an issue's history"),
+    ] {
+        assert_eq!(cell(&web, account, WEB), ASSIGNEE_ON, "{account} {why}");
+    }
+}
+
+#[tokio::test]
+async fn reporters_commenters_and_history_authors_are_listed_but_off_by_default() {
+    let (_dir, db) = lab().await;
+    track(&db, &[WEB]).await;
+    let web = matrix(&db).await;
+
+    for (account, role) in [
+        (CLEO, "reporter"),
+        (FINN, "commenter"),
+        (GUS, "history author"),
+    ] {
+        assert_eq!(cell(&web, account, WEB), INVOLVED_OFF, "{account} {role}");
+    }
+}
+
+#[tokio::test]
+async fn a_person_is_on_in_the_space_they_are_assigned_in_and_off_in_the_one_they_only_report_in() {
+    let (_dir, db) = lab().await;
+    track(&db, &[WEB, SUPPORT]).await;
+    let both = matrix(&db).await;
+
+    assert_eq!(cell(&both, BEA, WEB), ASSIGNEE_ON);
+    assert_eq!(cell(&both, BEA, SUPPORT), INVOLVED_OFF);
+    assert_eq!(cell(&both, DAN, SUPPORT), ASSIGNEE_ON);
+    assert_eq!(cell(&both, DAN, WEB), NO_ACTIVITY);
+}
+
+#[tokio::test]
+async fn columns_are_the_tracked_spaces_in_sidebar_order() {
+    let (_dir, db) = lab().await;
+    track(&db, &[SUPPORT, WEB]).await;
+
+    let both = matrix(&db).await;
+
+    assert_eq!(both.spaces, [SUPPORT, WEB]);
+    assert!(both.people.iter().all(|row| row.cells.len() == 2));
+}
+
+#[tokio::test]
+async fn an_untracked_space_is_not_a_column_and_its_choices_are_not_shown() {
+    let (_dir, db) = lab().await;
+    track(&db, &[WEB, SUPPORT]).await;
+    set(&db, SUPPORT, CLEO, true).await.unwrap();
+
+    crate::connection::track_project(&db, SUPPORT.into(), false)
+        .await
+        .unwrap();
+    let web = matrix(&db).await;
+
+    assert_eq!(web.spaces, [WEB]);
+    assert!(web.people.iter().all(|row| row.cells.len() == 1));
+    assert_eq!(cell(&web, CLEO, WEB), INVOLVED_OFF);
+    assert!(!ids(&web).contains(&DAN));
+}
+
+#[tokio::test]
+async fn nothing_tracked_gives_an_empty_grid() {
+    let (_dir, db) = lab().await;
+
+    let empty = matrix(&db).await;
+
+    assert!(empty.spaces.is_empty());
+    assert!(empty.people.is_empty());
 }
 
 #[tokio::test]
 async fn the_person_marked_as_me_gets_the_first_color() {
     let (_dir, db) = lab().await;
-    let members = space_team(&db, WEB.into(), Some(CLEO.into()))
-        .await
-        .unwrap();
-    let cleo = members
-        .iter()
-        .find(|m| m.person.account_id == CLEO)
-        .unwrap();
-    assert_eq!(cleo.person.color, 1);
-    assert!(
-        members
-            .iter()
-            .filter(|m| m.person.account_id != CLEO)
-            .all(|m| m.person.color != 1)
+    track(&db, &[WEB]).await;
+
+    let grid = team_matrix_of(&db, Some(CLEO.into())).await.unwrap();
+
+    for row in &grid.people {
+        let is_me = row.person.account_id == CLEO;
+        assert_eq!(row.person.color == 1, is_me, "{}", row.person.account_id);
+    }
+}
+
+#[tokio::test]
+async fn switching_someone_on_makes_them_active_in_that_space_only() {
+    let (_dir, db) = lab().await;
+    track(&db, &[WEB, SUPPORT]).await;
+    set(&db, SUPPORT, CLEO, true).await.unwrap();
+
+    let grid = matrix(&db).await;
+
+    assert_eq!(cell(&grid, CLEO, SUPPORT), SWITCHED_ON_WITHOUT_ACTIVITY);
+    assert_eq!(cell(&grid, CLEO, WEB), INVOLVED_OFF);
+}
+
+#[tokio::test]
+async fn switching_an_involved_person_on_keeps_their_activity_flags() {
+    let (_dir, db) = lab().await;
+    track(&db, &[WEB]).await;
+
+    let grid = set(&db, WEB, CLEO, true).await.unwrap();
+
+    assert_eq!(cell(&grid, CLEO, WEB), INVOLVED_ON);
+}
+
+#[tokio::test]
+async fn switching_an_assignee_off_affects_only_that_space() {
+    let (_dir, db) = lab().await;
+    track(&db, &[WEB, SUPPORT]).await;
+    set(&db, SUPPORT, BEA, true).await.unwrap();
+
+    let grid = set(&db, WEB, BEA, false).await.unwrap();
+
+    assert_eq!(cell(&grid, BEA, WEB), ASSIGNEE_OFF);
+    assert_eq!(
+        cell(&grid, BEA, SUPPORT),
+        TeamCell {
+            active: true,
+            assignee: false,
+            involved: true
+        }
     );
+    assert_eq!(cell(&grid, ALEX, WEB), ASSIGNEE_ON);
 }
 
 #[tokio::test]
-async fn everyone_starts_active() {
+async fn switching_off_twice_keeps_the_person_off() {
     let (_dir, db) = lab().await;
-    let members = space_team(&db, WEB.into(), None).await.unwrap();
-    assert!(members.iter().all(|m| m.active));
-}
-
-#[tokio::test]
-async fn switching_a_person_off_affects_only_that_space() {
-    let (_dir, db) = lab().await;
-    let web = set(&db, WEB, BEA, false).await.unwrap();
-    assert!(!active_of(&web, BEA));
-    assert!(
-        web.iter()
-            .filter(|m| m.person.account_id != BEA)
-            .all(|m| m.active)
-    );
-    let support = space_team(&db, SUPPORT.into(), None).await.unwrap();
-    assert!(active_of(&support, BEA));
-}
-
-#[tokio::test]
-async fn switching_a_person_back_on_makes_them_active_again() {
-    let (_dir, db) = lab().await;
+    track(&db, &[WEB]).await;
     set(&db, WEB, BEA, false).await.unwrap();
-    let members = set(&db, WEB, BEA, true).await.unwrap();
-    assert!(active_of(&members, BEA));
+
+    let grid = set(&db, WEB, BEA, false).await.unwrap();
+
+    assert_eq!(cell(&grid, BEA, WEB), ASSIGNEE_OFF);
+}
+
+#[tokio::test]
+async fn switching_back_to_the_default_restores_it() {
+    let (_dir, db) = lab().await;
+    track(&db, &[WEB]).await;
+    let before = matrix(&db).await;
+
+    set(&db, WEB, BEA, false).await.unwrap();
+    set(&db, WEB, CLEO, true).await.unwrap();
+    set(&db, WEB, BEA, true).await.unwrap();
+    let after = set(&db, WEB, CLEO, false).await.unwrap();
+
+    assert_eq!(after, before);
+}
+
+#[tokio::test]
+async fn an_assignee_switched_off_and_back_on_stops_being_on_once_unassigned() {
+    let (_dir, db) = lab().await;
+    track(&db, &[WEB]).await;
+    set(&db, WEB, ALEX, false).await.unwrap();
+    set(&db, WEB, ALEX, true).await.unwrap();
+
+    exec(
+        &db,
+        "UPDATE cache.issue SET assignee_id = NULL WHERE id = '2'",
+    )
+    .await;
+
     assert!(
-        space_team(&db, WEB.into(), None)
+        !active_people(&db, &[WEB], None)
             .await
-            .unwrap()
-            .iter()
-            .all(|m| m.active)
+            .contains(&ALEX.into())
     );
 }
 
 #[tokio::test]
-async fn switching_off_twice_keeps_the_person_inactive() {
+async fn a_person_switched_on_and_back_off_follows_a_later_assignment() {
     let (_dir, db) = lab().await;
-    set(&db, WEB, BEA, false).await.unwrap();
-    let members = set(&db, WEB, BEA, false).await.unwrap();
-    assert!(!active_of(&members, BEA));
+    track(&db, &[WEB]).await;
+    set(&db, WEB, CLEO, true).await.unwrap();
+    set(&db, WEB, CLEO, false).await.unwrap();
+
+    exec(
+        &db,
+        "UPDATE cache.issue SET assignee_id = 'acc-cleo' WHERE id = '6'",
+    )
+    .await;
+
+    assert_eq!(cell(&matrix(&db).await, CLEO, WEB), ASSIGNEE_ON);
 }
 
 #[tokio::test]
-async fn an_account_without_activity_in_the_space_is_not_found() {
+async fn switching_on_someone_without_activity_adds_them_to_that_column() {
     let (_dir, db) = lab().await;
-    for (project, account) in [(WEB, DAN), (WEB, ELI), (WEB, "acc-nobody")] {
-        let err = set(&db, project, account, false).await.unwrap_err();
+    track(&db, &[WEB, SUPPORT]).await;
+    assert_eq!(cell(&matrix(&db).await, DAN, WEB), NO_ACTIVITY);
+
+    set(&db, WEB, ELI, true).await.unwrap();
+    let grid = set(&db, WEB, DAN, true).await.unwrap();
+
+    assert_eq!(cell(&grid, DAN, WEB), SWITCHED_ON_WITHOUT_ACTIVITY);
+    assert_eq!(cell(&grid, DAN, SUPPORT), ASSIGNEE_ON);
+    assert_eq!(cell(&grid, ELI, WEB), SWITCHED_ON_WITHOUT_ACTIVITY);
+    assert_eq!(cell(&grid, ELI, SUPPORT), NO_ACTIVITY);
+}
+
+#[tokio::test]
+async fn someone_without_activity_who_is_switched_on_only_appears_while_the_choice_stands() {
+    let (_dir, db) = lab().await;
+    track(&db, &[WEB]).await;
+
+    assert!(!ids(&matrix(&db).await).contains(&ELI));
+    assert!(ids(&set(&db, WEB, ELI, true).await.unwrap()).contains(&ELI));
+    assert!(!ids(&set(&db, WEB, ELI, false).await.unwrap()).contains(&ELI));
+}
+
+#[tokio::test]
+async fn setting_a_member_returns_the_same_grid_as_reading_it() {
+    let (_dir, db) = lab().await;
+    track(&db, &[SUPPORT, WEB]).await;
+
+    let returned = set(&db, WEB, CLEO, true).await.unwrap();
+
+    assert_eq!(returned, matrix(&db).await);
+}
+
+#[tokio::test]
+async fn an_untracked_space_or_an_unknown_account_is_not_found() {
+    let (_dir, db) = lab().await;
+    track(&db, &[WEB]).await;
+
+    for (project, account) in [(SUPPORT, DAN), ("99999", BEA), (WEB, "acc-nobody")] {
+        let err = set(&db, project, account, true).await.unwrap_err();
         assert_eq!(err.kind(), ErrorKind::NotFound, "{project} {account}");
     }
 }
 
 #[tokio::test]
-async fn active_lists_people_of_the_projects_sorted_by_name() {
+async fn active_lists_the_default_and_chosen_team_of_the_projects_sorted_by_name() {
     let (_dir, db) = lab().await;
     assert_eq!(
         active_people(&db, &[WEB, SUPPORT], None).await,
-        [ALEX, BEA, CLEO, DAN, FINN, GUS]
+        [ALEX, BEA, DAN, HAL, IVY]
     );
-    assert_eq!(active_people(&db, &[SUPPORT], None).await, [BEA, DAN]);
+    assert_eq!(active_people(&db, &[SUPPORT], None).await, [DAN]);
+
+    track(&db, &[WEB]).await;
+    set(&db, WEB, CLEO, true).await.unwrap();
+    assert_eq!(
+        active_people(&db, &[WEB], None).await,
+        [ALEX, BEA, CLEO, HAL, IVY]
+    );
 }
 
 #[tokio::test]
 async fn active_puts_me_first_when_among_the_people() {
     let (_dir, db) = lab().await;
     assert_eq!(
-        active_people(&db, &[WEB, SUPPORT], Some(GUS)).await,
-        [GUS, ALEX, BEA, CLEO, DAN, FINN]
+        active_people(&db, &[WEB, SUPPORT], Some(IVY)).await,
+        [IVY, ALEX, BEA, DAN, HAL]
     );
-    assert_eq!(active_people(&db, &[SUPPORT], Some(GUS)).await, [BEA, DAN]);
+    assert_eq!(
+        active_people(&db, &[WEB, SUPPORT], Some(GUS)).await,
+        [ALEX, BEA, DAN, HAL, IVY]
+    );
 }
 
 #[tokio::test]
-async fn a_person_off_in_one_project_but_active_in_another_still_counts() {
+async fn a_person_on_in_one_project_and_off_in_another_still_counts() {
     let (_dir, db) = lab().await;
-    set(&db, WEB, BEA, false).await.unwrap();
+    track(&db, &[WEB, SUPPORT]).await;
+    set(&db, WEB, DAN, true).await.unwrap();
+    set(&db, SUPPORT, DAN, false).await.unwrap();
+
     assert!(
         active_people(&db, &[WEB, SUPPORT], None)
             .await
-            .contains(&BEA.to_string())
+            .contains(&DAN.to_string())
+    );
+    assert!(
+        !active_people(&db, &[SUPPORT], None)
+            .await
+            .contains(&DAN.to_string())
     );
 }
 
 #[tokio::test]
 async fn a_person_off_in_every_given_project_is_left_out() {
     let (_dir, db) = lab().await;
+    track(&db, &[WEB, SUPPORT]).await;
     set(&db, WEB, BEA, false).await.unwrap();
-    set(&db, SUPPORT, BEA, false).await.unwrap();
+
     assert_eq!(
         active_people(&db, &[WEB, SUPPORT], None).await,
-        [ALEX, CLEO, DAN, FINN, GUS]
+        [ALEX, DAN, HAL, IVY]
     );
-    assert_eq!(
-        active_people(&db, &[WEB], None).await,
-        [ALEX, CLEO, FINN, GUS]
-    );
-}
-
-async fn track(db: &Db, projects: &[&str]) {
-    for project in projects {
-        crate::connection::track_project(db, project.to_string(), true)
-            .await
-            .unwrap();
-    }
 }
 
 async fn level_where(db: &Db, clause: impl Into<String>) -> i64 {
@@ -304,11 +534,8 @@ async fn a_space_level_gives_that_spaces_team() {
     let web = space_level(&db, WEB).await;
     let support = space_level(&db, SUPPORT).await;
 
-    assert_eq!(
-        people_at(&db, web, None).await,
-        [ALEX, BEA, CLEO, FINN, GUS]
-    );
-    assert_eq!(people_at(&db, support, None).await, [BEA, DAN]);
+    assert_eq!(people_at(&db, web, None).await, [ALEX, BEA, HAL, IVY]);
+    assert_eq!(people_at(&db, support, None).await, [DAN]);
 }
 
 #[tokio::test]
@@ -321,7 +548,7 @@ async fn a_filter_list_inside_a_space_gives_that_spaces_team() {
     )
     .await;
 
-    assert_eq!(people_at(&db, in_support, None).await, [BEA, DAN]);
+    assert_eq!(people_at(&db, in_support, None).await, [DAN]);
 }
 
 #[tokio::test]
@@ -332,7 +559,7 @@ async fn everything_gives_the_people_of_every_tracked_space_once() {
 
     assert_eq!(
         people_at(&db, everything, None).await,
-        [ALEX, BEA, CLEO, DAN, FINN, GUS]
+        [ALEX, BEA, DAN, HAL, IVY]
     );
 }
 
@@ -342,7 +569,7 @@ async fn everything_leaves_out_the_people_of_untracked_spaces() {
     track(&db, &[SUPPORT]).await;
     let everything = level_where(&db, "kind = 'everything'").await;
 
-    assert_eq!(people_at(&db, everything, None).await, [BEA, DAN]);
+    assert_eq!(people_at(&db, everything, None).await, [DAN]);
 }
 
 #[tokio::test]
@@ -352,46 +579,45 @@ async fn level_people_never_include_me() {
     let web = space_level(&db, WEB).await;
     let everything = level_where(&db, "kind = 'everything'").await;
 
-    assert_eq!(
-        people_at(&db, web, Some(BEA)).await,
-        [ALEX, CLEO, FINN, GUS]
-    );
+    assert_eq!(people_at(&db, web, Some(BEA)).await, [ALEX, HAL, IVY]);
     assert_eq!(
         people_at(&db, everything, Some(BEA)).await,
-        [ALEX, CLEO, DAN, FINN, GUS]
+        [ALEX, DAN, HAL, IVY]
     );
 }
 
 #[tokio::test]
-async fn people_switched_off_in_a_space_are_left_out_of_its_level() {
+async fn people_switched_off_in_a_space_are_left_out_of_its_level_and_those_switched_on_join_it() {
     let (_dir, db) = lab().await;
     track(&db, &[WEB, SUPPORT]).await;
     set(&db, WEB, BEA, false).await.unwrap();
+    set(&db, WEB, CLEO, true).await.unwrap();
     let web = space_level(&db, WEB).await;
     let support = space_level(&db, SUPPORT).await;
 
-    assert_eq!(people_at(&db, web, None).await, [ALEX, CLEO, FINN, GUS]);
-    assert_eq!(people_at(&db, support, None).await, [BEA, DAN]);
+    assert_eq!(people_at(&db, web, None).await, [ALEX, CLEO, HAL, IVY]);
+    assert_eq!(people_at(&db, support, None).await, [DAN]);
 }
 
 #[tokio::test]
-async fn everything_keeps_a_person_who_is_switched_off_in_only_some_spaces() {
+async fn everything_keeps_a_person_who_is_on_in_only_some_spaces() {
     let (_dir, db) = lab().await;
     track(&db, &[WEB, SUPPORT]).await;
     let everything = level_where(&db, "kind = 'everything'").await;
+    set(&db, WEB, DAN, true).await.unwrap();
 
-    set(&db, WEB, BEA, false).await.unwrap();
+    set(&db, SUPPORT, DAN, false).await.unwrap();
     assert!(
         people_at(&db, everything, None)
             .await
-            .contains(&BEA.to_string())
+            .contains(&DAN.to_string())
     );
 
-    set(&db, SUPPORT, BEA, false).await.unwrap();
+    set(&db, WEB, DAN, false).await.unwrap();
     assert!(
         !people_at(&db, everything, None)
             .await
-            .contains(&BEA.to_string())
+            .contains(&DAN.to_string())
     );
 }
 
@@ -405,11 +631,21 @@ async fn an_unknown_level_is_not_found() {
 }
 
 #[tokio::test]
-async fn the_team_serializes_with_camel_case_fields() {
+async fn the_matrix_serializes_with_camel_case_fields() {
     let (_dir, db) = lab().await;
-    let members = space_team(&db, SUPPORT.into(), None).await.unwrap();
-    let json = serde_json::to_value(&members[1]).unwrap();
-    assert_eq!(json["active"], true);
-    assert_eq!(json["assigned"], 1);
-    assert_eq!(json["person"]["accountId"], DAN);
+    track(&db, &[SUPPORT]).await;
+
+    let json = serde_json::to_value(matrix(&db).await).unwrap();
+
+    assert_eq!(json["spaces"], json!([SUPPORT]));
+    assert_eq!(json["people"][0]["person"]["accountId"], BEA);
+    assert_eq!(
+        json["people"][0]["cells"],
+        json!([{ "active": false, "assignee": false, "involved": true }])
+    );
+    assert_eq!(json["people"][1]["person"]["accountId"], DAN);
+    assert_eq!(
+        json["people"][1]["cells"],
+        json!([{ "active": true, "assignee": true, "involved": true }])
+    );
 }

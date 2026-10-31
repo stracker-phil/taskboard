@@ -111,7 +111,7 @@ pub fn handlers() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
         crate::space_config::commands::space_config,
         crate::space_config::commands::space_set_layouts,
         crate::space_config::commands::space_set_field,
-        crate::team::commands::space_team,
+        crate::team::commands::team_matrix,
         crate::team::commands::space_set_member,
         crate::team::commands::level_people,
         bus::app::run_command,

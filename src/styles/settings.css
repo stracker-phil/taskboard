@@ -179,3 +179,19 @@
 .diagnostic-value[data-tone="info"] svg { color: var(--settings-text-tertiary); }
 .settings-row-control:has(.diagnostic-value) { flex: 0 1 auto; min-width: 0; margin-left: auto; }
 .settings-row:has(.diagnostic-value) .settings-row-text { flex: none; }
+
+/* Settings → Team: people against Spaces; the header row and the name column stay while the grid scrolls. */
+.team-matrix { max-height: 520px; overflow: auto; background: var(--settings-bg); }
+.team-matrix table { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; }
+.team-matrix th, .team-matrix td {
+  height: 36px; padding: 0 10px; border-bottom: 1px solid var(--settings-hairline); background: var(--settings-bg);
+  font-weight: 400; text-align: center; white-space: nowrap;
+}
+.team-matrix thead th { position: sticky; top: 0; z-index: 2; font-size: 11px; color: var(--settings-text-tertiary); }
+.team-matrix__space > .tile { display: flex; margin: 4px auto 2px; }
+.team-matrix__person { position: sticky; left: 0; z-index: 1; min-width: 200px; text-align: left; }
+.team-matrix thead .team-matrix__person { z-index: 3; }
+.team-matrix__name { display: flex; align-items: center; gap: 8px; max-width: 240px; }
+.team-matrix__check { accent-color: var(--accent); }
+/* Boxes of Spaces where the person has no activity are quieter until ticked. */
+.team-matrix__cell:not(.team-matrix__cell--involved) .team-matrix__check:not(:checked) { opacity: 0.45; }

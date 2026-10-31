@@ -22,6 +22,7 @@ pub const LOCAL: &[&str] = &[
     include_str!("../../migrations/local/0014_view_only_mine.sql"),
     include_str!("../../migrations/local/0015_issue_seen.sql"),
     include_str!("../../migrations/local/0016_space_member_off.sql"),
+    include_str!("../../migrations/local/0017_space_member.sql"),
 ];
 pub const CACHE: &[&str] = &[
     include_str!("../../migrations/cache/0001_init.sql"),
@@ -181,6 +182,36 @@ mod tests {
             assert!(rows.contains(&(name.to_string(), false)), "{name}");
         }
         assert!(rows.iter().all(|(_, only_mine)| !only_mine), "{rows:?}");
+    }
+
+    #[test]
+    fn people_switched_off_before_the_member_table_stay_switched_off_after_it() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        migrate(&mut conn, "local", &LOCAL[..16]).unwrap();
+        conn.execute_batch(
+            "INSERT INTO space_member_off (project_id, account_id)
+             VALUES ('10001', 'acc-bea'), ('10002', 'acc-dan')",
+        )
+        .unwrap();
+
+        migrate(&mut conn, "local", LOCAL).unwrap();
+
+        let mut query = conn
+            .prepare("SELECT project_id, account_id, active FROM space_member ORDER BY 1, 2")
+            .unwrap();
+        let rows: Vec<(String, String, bool)> = query
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect();
+        assert_eq!(
+            rows,
+            [
+                ("10001".to_string(), "acc-bea".to_string(), false),
+                ("10002".to_string(), "acc-dan".to_string(), false),
+            ]
+        );
+        assert!(!tables(&conn).contains(&"space_member_off".to_string()));
     }
 
     #[test]

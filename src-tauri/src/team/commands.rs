@@ -1,19 +1,16 @@
-//! The Tauri commands of a Space's Team settings.
+//! The Tauri commands of Settings → Team.
 
 use tauri::State;
 
-use super::TeamMember;
+use super::TeamMatrix;
 use crate::error::AppResult;
 use crate::state::AppState;
 use crate::views::rows::Person;
 
 #[tauri::command]
-pub async fn space_team(
-    state: State<'_, AppState>,
-    project_id: String,
-) -> AppResult<Vec<TeamMember>> {
+pub async fn team_matrix(state: State<'_, AppState>) -> AppResult<TeamMatrix> {
     let me = state.settings.get().connection.account_id;
-    super::space_team(&state.db, project_id, me).await
+    super::team_matrix_of(&state.db, me).await
 }
 
 #[tauri::command]
@@ -22,7 +19,7 @@ pub async fn space_set_member(
     project_id: String,
     account_id: String,
     active: bool,
-) -> AppResult<Vec<TeamMember>> {
+) -> AppResult<TeamMatrix> {
     let me = state.settings.get().connection.account_id;
     super::space_set_member(&state.db, project_id, account_id, active, me).await
 }

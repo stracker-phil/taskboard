@@ -9,6 +9,7 @@ import { api, type SpaceConfig, type SpaceLayouts } from "../../../api";
 import { createQueryClient } from "../../../queries/queryClient";
 import { resetStore } from "../../../state/store";
 import { space, spaceConfig } from "../../../test/spaces";
+import { teamCell, teamMatrix } from "../../../test/team";
 import { MenuHost } from "../../menu";
 import { Toasts } from "../../Toasts";
 import { SpaceSettings } from "./SpaceSettings";
@@ -169,6 +170,42 @@ describe("SpaceSettings", () => {
 
       expect(await screen.findByRole("alert")).toHaveTextContent("Could not change the layouts: Disk full");
       expect(screen.getByRole("switch", { name: "Offer Board" })).toBeChecked();
+    });
+  });
+
+  describe("team", () => {
+    it("counts the people on the team and those with activity in this Space", async () => {
+      mocked.teamMatrix.mockResolvedValue(teamMatrix());
+      await renderSettings();
+
+      expect(await screen.findByText("1 person on the team")).toBeInTheDocument();
+      expect(screen.getByText("2 with activity in this Space")).toBeInTheDocument();
+    });
+
+    it("counts people in the plural and reads the column of this Space only", async () => {
+      const matrix = teamMatrix();
+      matrix.people[1].cells[0] = teamCell({ active: true, involved: true });
+      mocked.teamMatrix.mockResolvedValue(matrix);
+      await renderSettings();
+
+      expect(await screen.findByText("2 people on the team")).toBeInTheDocument();
+      expect(screen.getByText("2 with activity in this Space")).toBeInTheDocument();
+    });
+
+    it("shows nobody on the team before the matrix has this Space", async () => {
+      mocked.teamMatrix.mockResolvedValue({ spaces: [], people: [] });
+      await renderSettings();
+
+      expect(await screen.findByText("0 people on the team")).toBeInTheDocument();
+      expect(screen.getByText("0 with activity in this Space")).toBeInTheDocument();
+    });
+
+    it("opens the Team settings when Edit Team… is clicked", async () => {
+      await renderSettings();
+
+      await userEvent.click(screen.getByRole("button", { name: "Edit Team…" }));
+
+      expect(mocked.runCommand).toHaveBeenCalledWith("app:settings:team");
     });
   });
 

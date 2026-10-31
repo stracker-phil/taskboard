@@ -804,11 +804,34 @@ clearCacheOnQuit: boolean, };
 
 export type SyncState = { "state": "idle", lastOk: string | null, } | { "state": "running", job: Job, } | { "state": "error", kind: ErrorKind, message: string, } | { "state": "offline", since: string, } | { "state": "paused", message: string, };
 
-export type TeamMember = { person: Person, active: boolean, 
+export type TeamCell = { active: boolean, 
 /**
- * Open issues of the Space assigned to them.
+ * Ever assigned one of the Space's issues: on the team unless switched off.
  */
-assigned: number, };
+assignee: boolean, 
+/**
+ * Reported, commented on or changed one of its issues.
+ */
+involved: boolean, };
+
+/**
+ * Everyone with activity in a tracked Space, and on which Spaces' teams they are.
+ */
+export type TeamMatrix = { 
+/**
+ * The tracked Spaces' project ids, in sidebar order: the columns.
+ */
+spaces: Array<string>, 
+/**
+ * Sorted by name.
+ */
+people: Array<TeamRow>, };
+
+export type TeamRow = { person: Person, 
+/**
+ * One per column of `spaces`.
+ */
+cells: Array<TeamCell>, };
 
 /**
  * Text with its matches marked; the page bolds the `strong` parts.

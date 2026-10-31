@@ -705,13 +705,19 @@ no separate Settings design; owner, 2026-10-28). Its colors are the `--settings-
     "N issues", and a button (the style's square and "Automatic · X" or the style's name) with a menu of
     Automatic and the six styles, the chosen one checked. *Custom fields*: a row per field with a menu of
     Visible, Hidden in list (no column choice), Hidden in detail (not in the Issue view) and Hidden everywhere.
-    *Team* (`spaces/SpaceTeam`): everyone who is assigned, reported, commented or changed something in the
-    Space's issues (`team::team`), by name, a row: avatar, name, "N open issues" and a switch; switched off (left
-    the team), a person is no longer offered to assign to or to filter by. A search field from 9 people on.
+    *Team* (`spaces/SpaceTeam`): how many people are on the Space's team and how many have activity there, with
+    Edit Team… (`app:settings:team`).
     Each field saves on its own with Rust's field error under it. The header's tile opens `LookPopover`.
     "Track projects under Projects to get Spaces." when none is tracked. The sidebar's "Client label…" item
     opens `SpacePopover` (300px, 12px radius, `--shadow-popover`, at the top left of the content panel) with the
     Client field; Esc, Done or a click outside close it.
+  - **Team** (`jira/TeamPage`): one grid of everyone with activity in a tracked Space (rows, by name, with a
+    search field) against the tracked Spaces (columns in sidebar order: tile and key, the name as tooltip); a
+    checkbox per cell puts the person on that Space's team (`space_set_member`). By default everyone ever assigned
+    one of the Space's issues is on its team and nobody else; a box where the person has no activity is quieter
+    until ticked, and its tooltip says why a box is on. The header row and the name column stay while the grid
+    scrolls; rows keep their order while boxes are ticked. The team is who Assign to…, the person chip and assignee
+    drops offer.
   - **Sync**: *Scope* (the effective JQL in a monospaced field; Validate, Save, Reset to Default), *Intervals*
     (minutes in front and in the background, days to keep done issues) and *Cache* (the sync state line with
     Sync Now, one row per tracked project with its key, last full sync and "N issues · M open", then Reset

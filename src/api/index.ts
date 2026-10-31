@@ -54,7 +54,7 @@ import type {
   Style,
   SyncOverview,
   SyncSettings,
-  TeamMember,
+  TeamMatrix,
   UiState,
   View,
   ViewData,
@@ -245,9 +245,10 @@ export const api = {
   levelPeople: (listId: number) => invoke<Person[]>("level_people", { listId }),
   /** Who the issue may be assigned to: its Space's active team, me first, and who has it now. */
   issueAssignees: (id: string) => invoke<Assignees>("issue_assignees", { id }),
-  spaceTeam: (projectId: string) => invoke<TeamMember[]>("space_team", { projectId }),
+  /** Every person with activity in a tracked Space against every Space (Settings → Team). */
+  teamMatrix: () => invoke<TeamMatrix>("team_matrix"),
   spaceSetMember: (projectId: string, accountId: string, active: boolean) =>
-    invoke<TeamMember[]>("space_set_member", { projectId, accountId, active }),
+    invoke<TeamMatrix>("space_set_member", { projectId, accountId, active }),
   appInfo: async (): Promise<AppInfo> => {
     const [name, version] = await Promise.all([getName(), getVersion()]);
     return { name, version };
