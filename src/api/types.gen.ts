@@ -194,6 +194,24 @@ export type DiagnosticTone = "ok" | "warn" | "error" | "info";
 
 export type Diagnostics = { groups: Array<DiagnosticGroup>, };
 
+/**
+ * What a drop did, or the moves to choose from when several statuses of the dropped-on type can follow.
+ */
+export type DropOutcome = { "kind": "done", outcome: WriteOutcome, } | { "kind": "choose", moves: Array<TransitionOption>, };
+
+/**
+ * Which groups of a view may take the dragged issue.
+ */
+export type DropTargets = { 
+/**
+ * Every group takes it (grouped by assignee).
+ */
+any: boolean, 
+/**
+ * The group keys that take it, when not `any`.
+ */
+keys: Array<string>, };
+
 export type EpicChip = { id: string, name: string, 
 /**
  * The `--epic-N-*` token pair.
@@ -770,7 +788,7 @@ export type TokenKind = "classic" | "scoped";
 /**
  * One move the status menu offers, named by the status it leads to.
  */
-export type TransitionOption = { id: string, statusName: string, style: Style, 
+export type TransitionOption = { id: string, statusId: string, statusName: string, style: Style, 
 /**
  * Needs Jira's screen: the page opens the issue in Jira.
  */

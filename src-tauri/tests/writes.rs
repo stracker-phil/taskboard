@@ -20,9 +20,10 @@ use taskboard_lib::sync::{Emit, SyncContext, SyncEvent, full_sync};
 use taskboard_lib::test_support::demo::{self, DEMO_NOW, ME_EMAIL};
 use taskboard_lib::test_support::fake_jira::{DEMO_TOKEN, FakeJira};
 use taskboard_lib::test_support::{FakeSecrets, temp_config_dir};
+use taskboard_lib::views::GroupBy;
 use taskboard_lib::writes::{
-    Change, MAX_COMMENT_CHARS, Reverse, TransitionOption, WriteOutcome, add_comment, apply,
-    forget_all, toggle_mine, transitions,
+    Change, DropOutcome, DropTargets, MAX_COMMENT_CHARS, Reverse, TransitionOption, WriteOutcome,
+    add_comment, apply, drop_on, drop_targets, forget_all, toggle_mine, transitions,
 };
 
 const PROJECT_IDS: [&str; 5] = ["10001", "10002", "10003", "10004", "10005"];
@@ -453,6 +454,7 @@ impl Rig {
 fn option(id: &str, status_name: &str, style: Style, opens_jira: bool) -> TransitionOption {
     TransitionOption {
         id: id.into(),
+        status_id: id.into(),
         status_name: status_name.into(),
         style,
         opens_jira,
@@ -877,6 +879,7 @@ mod the_moves_of_an_issue {
             serde_json::to_value(&moves[3]).unwrap(),
             json!({
                 "id": DONE,
+                "statusId": DONE,
                 "statusName": "Done",
                 "style": "done",
                 "opensJira": true,
@@ -1342,6 +1345,375 @@ mod the_comment_syncs_with_a_comment_on_its_way {
         assert!(fetched);
         assert_eq!(rig.pending_comments(NW_1042).await, 1);
         assert_eq!(rig.cached_comments(NW_1042).await, COMMENTS_ON_NW_1042);
+    }
+}
+
+mod dropping {
+    use super::*;
+
+    const NOT_ALLOWED: &str = "Jira's workflow doesn't allow this move for the issue";
+
+    fn none() -> DropTargets {
+        DropTargets {
+            any: false,
+            keys: Vec::new(),
+        }
+    }
+
+    fn keys(keys: &[&str]) -> DropTargets {
+        DropTargets {
+            any: false,
+            keys: keys.iter().map(|k| k.to_string()).collect(),
+        }
+    }
+
+    async fn targets(rig: &Rig, group_by: GroupBy) -> DropTargets {
+        let source = rig.ctx.source().unwrap();
+        drop_targets(
+            &rig.ctx.db,
+            &*source,
+            &rig.settings(),
+            NW_1042.into(),
+            group_by,
+        )
+        .await
+        .unwrap()
+    }
+
+    async fn try_drop(
+        rig: &Rig,
+        group_by: GroupBy,
+        key: &str,
+    ) -> taskboard_lib::error::AppResult<DropOutcome> {
+        let source = rig.ctx.source().unwrap();
+        drop_on(
+            &rig.ctx.db,
+            &*source,
+            &rig.settings(),
+            NW_1042.into(),
+            group_by,
+            key.into(),
+        )
+        .await
+    }
+
+    async fn drop_done(rig: &Rig, group_by: GroupBy, key: &str) -> WriteOutcome {
+        match try_drop(rig, group_by, key).await.unwrap() {
+            DropOutcome::Done { outcome } => outcome,
+            other => panic!("expected a done drop, got {other:?}"),
+        }
+    }
+
+    fn refused(result: taskboard_lib::error::AppResult<DropOutcome>) -> String {
+        match result {
+            Err(AppError::InvalidInput(message)) => message,
+            other => panic!("expected InvalidInput, got {other:?}"),
+        }
+    }
+
+    async fn nothing_written(rig: &Rig) {
+        assert_eq!(rig.transitions_posted(), 0);
+        assert_eq!(rig.assignments_sent(), 0);
+        assert_eq!(rig.pending_writes().await, 0);
+        assert_eq!(
+            rig.cached_status(NW_1042).await,
+            (IN_PROGRESS.to_string(), "indeterminate".to_string())
+        );
+        assert_eq!(rig.cached_assignee(NW_1042).await.as_deref(), Some(ALEX));
+    }
+
+    #[tokio::test]
+    async fn with_changes_off_no_group_takes_the_issue_and_jira_is_not_asked() {
+        let rig = Rig::synced().await;
+        rig.ctx
+            .settings
+            .edit(|s| s.behaviour.allow_jira_changes = false)
+            .await
+            .unwrap();
+        let requests_before = rig.fake.requests().len();
+
+        for group_by in [GroupBy::Assignee, GroupBy::Status, GroupBy::StatusType] {
+            assert_eq!(targets(&rig, group_by).await, none(), "{group_by:?}");
+        }
+
+        assert_eq!(rig.fake.requests().len(), requests_before);
+    }
+
+    #[tokio::test]
+    async fn grouped_by_assignee_every_group_takes_it_without_asking_jira() {
+        let rig = Rig::synced().await;
+        let requests_before = rig.fake.requests().len();
+
+        let found = targets(&rig, GroupBy::Assignee).await;
+
+        assert_eq!(
+            found,
+            DropTargets {
+                any: true,
+                keys: Vec::new()
+            }
+        );
+        assert_eq!(rig.fake.requests().len(), requests_before);
+    }
+
+    #[tokio::test]
+    async fn grouped_by_status_the_targets_are_the_statuses_of_the_moves_without_a_screen() {
+        let rig = Rig::synced().await;
+
+        assert_eq!(
+            targets(&rig, GroupBy::Status).await,
+            keys(&[TO_DO, IN_REVIEW, BLOCKED, DONE])
+        );
+
+        rig.fake.require_screen(BLOCKED);
+
+        assert_eq!(
+            targets(&rig, GroupBy::Status).await,
+            keys(&[TO_DO, IN_REVIEW, DONE])
+        );
+    }
+
+    #[tokio::test]
+    async fn grouped_by_status_type_the_targets_are_the_distinct_sorted_styles_of_those_moves() {
+        let rig = Rig::synced().await;
+
+        assert_eq!(
+            targets(&rig, GroupBy::StatusType).await,
+            keys(&["blocked", "done", "review", "todo"])
+        );
+
+        rig.fake.require_screen(BLOCKED);
+        assert_eq!(
+            targets(&rig, GroupBy::StatusType).await,
+            keys(&["done", "review", "todo"])
+        );
+
+        status_style_set(
+            &rig.ctx.db,
+            NW_PROJECT.into(),
+            DONE.into(),
+            Some(Style::Review),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            targets(&rig, GroupBy::StatusType).await,
+            keys(&["review", "todo"])
+        );
+    }
+
+    #[tokio::test]
+    async fn other_groupings_take_no_drop() {
+        let rig = Rig::synced().await;
+        for group_by in [
+            GroupBy::Project,
+            GroupBy::Client,
+            GroupBy::Epic,
+            GroupBy::Release,
+            GroupBy::Priority,
+            GroupBy::Due,
+            GroupBy::None,
+        ] {
+            assert_eq!(targets(&rig, group_by).await, none(), "{group_by:?}");
+        }
+    }
+
+    #[tokio::test]
+    async fn the_targets_serialize_for_the_page_in_camel_case() {
+        let rig = Rig::synced().await;
+
+        let value = serde_json::to_value(targets(&rig, GroupBy::Status).await).unwrap();
+
+        assert_eq!(
+            value,
+            json!({ "any": false, "keys": [TO_DO, IN_REVIEW, BLOCKED, DONE] })
+        );
+    }
+
+    #[tokio::test]
+    async fn on_an_assignee_group_assigns_to_that_account() {
+        let rig = Rig::synced().await;
+
+        let outcome = drop_done(&rig, GroupBy::Assignee, MARTA).await;
+
+        assert_eq!(
+            outcome,
+            outcome_of(
+                "Assigned NW-1042 to Marta Klein",
+                "Change back to you",
+                ALEX
+            )
+        );
+        assert_eq!(rig.cached_assignee(NW_1042).await.as_deref(), Some(MARTA));
+        assert_eq!(rig.jira_assignee(NW_1042).await.as_deref(), Some(MARTA));
+    }
+
+    fn outcome_of(done: &str, label: &str, back_to: &str) -> WriteOutcome {
+        super::outcome(done, label, Some(back_to))
+    }
+
+    #[tokio::test]
+    async fn on_the_unassigned_group_unassigns() {
+        let rig = Rig::synced().await;
+
+        let outcome = drop_done(&rig, GroupBy::Assignee, "").await;
+
+        assert_eq!(
+            outcome,
+            outcome_of("Unassigned NW-1042", "Change back to you", ALEX)
+        );
+        assert_eq!(rig.cached_assignee(NW_1042).await, None);
+        assert_eq!(rig.jira_assignee(NW_1042).await, None);
+    }
+
+    #[tokio::test]
+    async fn on_a_status_group_makes_the_move_into_that_status() {
+        let rig = Rig::synced().await;
+
+        let outcome = drop_done(&rig, GroupBy::Status, DONE).await;
+
+        assert_eq!(outcome.done, "Moved NW-1042 to Done");
+        assert_eq!(
+            rig.cached_status(NW_1042).await,
+            (DONE.to_string(), "done".to_string())
+        );
+        assert_eq!(rig.jira_status(NW_1042).await, DONE);
+    }
+
+    #[tokio::test]
+    async fn on_a_status_jira_does_not_offer_or_only_with_a_screen_nothing_is_written() {
+        let rig = Rig::synced().await;
+        rig.fake.require_screen(BLOCKED);
+
+        for (label, key) in [
+            ("an unknown status", "99999"),
+            ("the current status", IN_PROGRESS),
+            ("a status behind a screen", BLOCKED),
+        ] {
+            let message = refused(try_drop(&rig, GroupBy::Status, key).await);
+
+            assert_eq!(message, NOT_ALLOWED, "{label}");
+        }
+        nothing_written(&rig).await;
+    }
+
+    #[tokio::test]
+    async fn on_a_status_type_with_one_status_makes_that_move() {
+        let rig = Rig::synced().await;
+
+        let outcome = drop_done(&rig, GroupBy::StatusType, "done").await;
+
+        assert_eq!(outcome.done, "Moved NW-1042 to Done");
+        assert_eq!(rig.jira_status(NW_1042).await, DONE);
+    }
+
+    #[tokio::test]
+    async fn on_a_status_type_without_a_move_nothing_is_written() {
+        let rig = Rig::synced().await;
+        rig.fake.require_screen(BLOCKED);
+
+        for (label, key) in [
+            ("the issue's own type", "progress"),
+            ("a type behind a screen", "blocked"),
+            ("an unknown type", "nope"),
+        ] {
+            let message = refused(try_drop(&rig, GroupBy::StatusType, key).await);
+
+            assert_eq!(message, NOT_ALLOWED, "{label}");
+        }
+        nothing_written(&rig).await;
+    }
+
+    #[tokio::test]
+    async fn on_a_status_type_with_several_moves_the_choice_is_returned_and_nothing_is_written() {
+        let rig = Rig::synced().await;
+        status_style_set(
+            &rig.ctx.db,
+            NW_PROJECT.into(),
+            BLOCKED.into(),
+            Some(Style::Review),
+        )
+        .await
+        .unwrap();
+
+        let result = try_drop(&rig, GroupBy::StatusType, "review").await.unwrap();
+
+        assert_eq!(
+            result,
+            DropOutcome::Choose {
+                moves: vec![
+                    option(IN_REVIEW, "In Review", Style::Review, false),
+                    option(BLOCKED, "Blocked", Style::Review, false),
+                ]
+            }
+        );
+        nothing_written(&rig).await;
+    }
+
+    #[tokio::test]
+    async fn the_outcomes_serialize_with_a_kind_tag() {
+        let rig = Rig::synced().await;
+        status_style_set(
+            &rig.ctx.db,
+            NW_PROJECT.into(),
+            BLOCKED.into(),
+            Some(Style::Review),
+        )
+        .await
+        .unwrap();
+
+        let choose = try_drop(&rig, GroupBy::StatusType, "review").await.unwrap();
+        let done = try_drop(&rig, GroupBy::StatusType, "done").await.unwrap();
+
+        let choose = serde_json::to_value(choose).unwrap();
+        assert_eq!(choose["kind"], "choose");
+        assert_eq!(choose["moves"][0]["statusName"], "In Review");
+        let done = serde_json::to_value(done).unwrap();
+        assert_eq!(done["kind"], "done");
+        assert_eq!(done["outcome"]["done"], "Moved NW-1042 to Done");
+    }
+
+    #[tokio::test]
+    async fn on_other_groupings_nothing_is_written() {
+        let rig = Rig::synced().await;
+        for group_by in [
+            GroupBy::Project,
+            GroupBy::Client,
+            GroupBy::Epic,
+            GroupBy::Release,
+            GroupBy::Priority,
+            GroupBy::Due,
+            GroupBy::None,
+        ] {
+            let message = refused(try_drop(&rig, group_by, "x").await);
+
+            assert_eq!(
+                message, "Issues can't be moved between these groups",
+                "{group_by:?}"
+            );
+        }
+        nothing_written(&rig).await;
+    }
+
+    #[tokio::test]
+    async fn with_changes_off_a_drop_writes_nothing() {
+        let rig = Rig::synced().await;
+        rig.ctx
+            .settings
+            .edit(|s| s.behaviour.allow_jira_changes = false)
+            .await
+            .unwrap();
+
+        for (group_by, key) in [
+            (GroupBy::Assignee, MARTA),
+            (GroupBy::Status, DONE),
+            (GroupBy::StatusType, "done"),
+        ] {
+            let err = try_drop(&rig, group_by, key).await.unwrap_err();
+
+            assert_eq!(err.kind(), ErrorKind::InvalidInput, "{group_by:?}");
+        }
+        nothing_written(&rig).await;
     }
 }
 

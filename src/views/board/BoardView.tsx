@@ -1,6 +1,6 @@
 import { useGlide } from "../../lib/motion";
 import { ChevronLeft } from "lucide-react";
-import { type RefObject, useCallback, useEffect, useRef } from "react";
+import { type PointerEvent, type RefObject, useCallback, useEffect, useRef } from "react";
 import { api, type BoardColumn, type BoardData, type Narrowing, type View } from "../../api";
 import { StatusPill } from "../../components/issue/StatusPill";
 import { EmptyLevel } from "../../shell/EmptyLevel";
@@ -13,6 +13,8 @@ import { useIssueActions } from "../list/useIssueActions";
 import { usePinnedIssues } from "../list/usePinnedIssues";
 import { BoardColumnCards } from "./BoardColumnCards";
 import { useBoardKeys } from "./useBoardKeys";
+import { DragGhost, dropClass } from "../../writes/DragGhost";
+import { useIssueDrag } from "../../writes/useIssueDrag";
 
 interface Props {
   view: View;
@@ -52,6 +54,13 @@ function Board({ view, data }: { view: View; data: BoardData }) {
     [select, open],
   );
   useBoardKeys(data, selected, select, open, actions);
+  // A Board that groups by nothing shows status columns.
+  const { drag, onPointerDown, dropState } = useIssueDrag(view.groupBy === "none" ? "status" : view.groupBy, actions.openInJira);
+  const dragCard = (e: PointerEvent<HTMLElement>, column: BoardColumn) => {
+    const id = (e.target as HTMLElement).closest<HTMLElement>("[data-issue-id]")?.dataset.issueId;
+    const row = id ? data.rows[id] : undefined;
+    if (row) onPointerDown(e, { id: row.id, key: row.key, summary: row.summary, fromKey: column.key });
+  };
   const boardRef = useRef<HTMLDivElement>(null);
   useCurrentColumnInView(boardRef, data, selected);
   // A column that collapses or opens moves the ones after it smoothly.
@@ -62,7 +71,7 @@ function Board({ view, data }: { view: View; data: BoardData }) {
     <div ref={boardRef} className="board" role="list" aria-label="Board">
       {data.columns.map((column) =>
         column.collapsed ? (
-          <div key={column.key} role="listitem" className="board-strip__item" aria-label={column.name}>
+          <div key={column.key} role="listitem" className={"board-strip__item" + dropClass(dropState(column.key))} aria-label={column.name} data-drop-key={column.key}>
             <button
               type="button"
               className={`board-strip board--${column.style}`}
@@ -74,7 +83,15 @@ function Board({ view, data }: { view: View; data: BoardData }) {
             </button>
           </div>
         ) : (
-          <section key={column.key} data-column={column.key} role="listitem" className={`board-column board--${column.style}`} aria-label={column.name}>
+          <section
+            key={column.key}
+            data-column={column.key}
+            data-drop-key={column.key}
+            role="listitem"
+            className={`board-column board--${column.style}` + dropClass(dropState(column.key))}
+            aria-label={column.name}
+            onPointerDown={(e) => dragCard(e, column)}
+          >
             <header className="board-column__header">
               <ColumnTitle column={column} />
               <span className="board-column__count">{column.ids.length}</span>
@@ -96,6 +113,7 @@ function Board({ view, data }: { view: View; data: BoardData }) {
           </section>
         ),
       )}
+      <DragGhost drag={drag} />
     </div>
   );
 }

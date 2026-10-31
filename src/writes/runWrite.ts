@@ -5,10 +5,14 @@ import { useStore } from "../state/store";
 /** Awaits a Jira change and toasts it with a "Change back" action, which is a new change and never an undo. */
 export function runWrite(issueId: string, call: Promise<WriteOutcome>, failure: string) {
   void attempt(call, failure).then((outcome) => {
-    if (!outcome) return;
-    const action = outcome.reverse ? changeBackAction(issueId, outcome.reverse) : undefined;
-    useStore.getState().toast("success", outcome.done, action);
+    if (outcome) showOutcome(issueId, outcome);
   });
+}
+
+/** The toast for a change Jira took, with its "Change back" action when there is one. */
+export function showOutcome(issueId: string, outcome: WriteOutcome) {
+  const action = outcome.reverse ? changeBackAction(issueId, outcome.reverse) : undefined;
+  useStore.getState().toast("success", outcome.done, action);
 }
 
 function changeBackAction(issueId: string, reverse: Reverse) {

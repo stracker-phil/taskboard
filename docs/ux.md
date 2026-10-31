@@ -546,7 +546,8 @@ button, Escape and a press outside close it, focus goes back to the button).
 
 ## Board view
 
-`src/views/board/`, read-only (no drag and drop before writes), styled in `styles/board.css`.
+`src/views/board/`, styled in `styles/board.css`. With changes to Jira on, cards drag between columns, as List
+rows drag between groups ([writes.md](writes.md#drag-and-drop)).
 
 - Columns scroll sideways (padding 6 20 20 24, gap 12), one per group of the view's Group by: per status in the
   Board order (also when ungrouped), else one per person, priority, epic, release, due bucket or Space as the List

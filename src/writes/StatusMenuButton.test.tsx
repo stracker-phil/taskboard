@@ -16,9 +16,9 @@ import { StatusMenuButton } from "./StatusMenuButton";
 
 const mocked = vi.mocked(api, true);
 
-const REVIEW: TransitionOption = { id: "31", statusName: "In Review", style: "review", opensJira: false };
-const DONE: TransitionOption = { id: "41", statusName: "Done", style: "done", opensJira: false };
-const SCREEN_MOVE: TransitionOption = { id: "51", statusName: "Released", style: "done", opensJira: true };
+const REVIEW: TransitionOption = { id: "31", statusId: "3", statusName: "In Review", style: "review", opensJira: false };
+const DONE: TransitionOption = { id: "41", statusId: "4", statusName: "Done", style: "done", opensJira: false };
+const SCREEN_MOVE: TransitionOption = { id: "51", statusId: "5", statusName: "Released", style: "done", opensJira: true };
 
 function renderButton() {
   render(

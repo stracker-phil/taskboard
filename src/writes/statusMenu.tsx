@@ -12,8 +12,13 @@ interface Issue {
 /** Asks Jira for the issue's moves, then shows one row per move. */
 export function openStatusMenu(issue: Issue, at: MenuAt, openInJira: ((key: string) => void) | null) {
   void attempt(api.issueTransitions(issue.id), "Could not load the statuses").then((moves) => {
-    if (moves) openMenu(statusEntries(issue, moves, openInJira), at, `Status of ${issue.key}`);
+    if (moves) openMoveMenu(issue, moves, at, openInJira);
   });
+}
+
+/** A menu of these moves (a drop on a status type that several statuses can follow). */
+export function openMoveMenu(issue: Issue, moves: TransitionOption[], at: MenuAt, openInJira: ((key: string) => void) | null) {
+  openMenu(statusEntries(issue, moves, openInJira), at, `Status of ${issue.key}`);
 }
 
 function statusEntries(issue: Issue, moves: TransitionOption[], openInJira: ((key: string) => void) | null): MenuEntry[] {

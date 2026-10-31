@@ -20,6 +20,7 @@ use crate::sync::source::Source;
 #[serde(rename_all = "camelCase")]
 pub struct TransitionOption {
     pub id: String,
+    pub status_id: String,
     pub status_name: String,
     pub style: Style,
     /// Needs Jira's screen: the page opens the issue in Jira.
@@ -40,6 +41,7 @@ pub async fn transitions(
             .iter()
             .map(|t| TransitionOption {
                 id: t.id.clone(),
+                status_id: t.to.id.clone(),
                 status_name: t.to.name.clone(),
                 style: styles.of(&project_id, &t.to.id, &t.to.status_category.key, &t.to.name),
                 opens_jira: t.has_screen,

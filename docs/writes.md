@@ -45,7 +45,25 @@ Taskboard doesn't show: the menu marks it "Opens Jira" and opens the issue in th
 `apply` asks for the moves again before it writes, so a move Jira no longer offers fails with a reason. The row
 shows the target status (and its category) at once; the pending row holds the status id. The reverse is the move
 back to the old status when Jira offers one without a screen ("Change back to In Progress"); otherwise none.
-Board drag and drop between status columns isn't built yet.
+## Drag and drop
+
+A List row or a Board card dragged onto another group changes the field the view groups by (`writes/drop.rs`,
+`src/writes/useIssueDrag.ts`). Rust decides what a group means:
+
+| Grouped by | A drop | Groups that take it |
+|---|---|---|
+| Status (a Board grouped by nothing shows status columns) | the move into that status | the statuses Jira's moves lead to, without moves that need a screen |
+| Status type | the one move into a status of that type; several → a menu of those moves at the drop point | the types of those statuses |
+| Assignee | assigns to that person; Unassigned unassigns | every group |
+| anything else | refused | none |
+
+When a drag starts, `issue_drop_targets(id, groupBy)` asks Jira for the issue's moves (`DropTargets { any, keys }`);
+until it answers no group takes the drop. Groups that take it are tinted, the rest fade, the issue's own group
+stays as it is. `issue_drop(id, groupBy, key)` checks the move again and writes through `apply`
+(`DropOutcome::Done { outcome }`, or `Choose { moves }` for a status type several statuses fit). The drag is
+pointer-driven (the webview's file drops take the HTML drag events): it starts after 6 px, a ghost with the key
+and summary follows the pointer, esc cancels, and the click that ends it selects nothing. No drag starts while
+changes to Jira are off, with a modifier key, or on a button in the row.
 
 ## Comments
 
@@ -68,9 +86,11 @@ the Issue view's activity (`CommentBox`): ⌘↩ sends, esc leaves it.
 | `issue_write(id, Transition { transitionId })` | moves the issue along a transition from `issue_transitions` |
 | `issue_transitions(id)` | the moves Jira offers from the issue's status |
 | `issue_comment(id, text)` | adds a plain-text comment |
+| `issue_drop_targets(id, groupBy)` | the groups a dragged issue may go to |
+| `issue_drop(id, groupBy, key)` | moves the issue into a group of the view (a drop) |
 
 In the page: the row hover toolbar's person button, the Issue view's and the Preview's header button (pressed
 while it is mine), the key **I** (`issue.toggleMine`) and Issue → Assign to Me or Unassign (also in the palette).
 The status pill in the Preview and the Issue view's field grid is the status menu's button (`StatusMenuButton`);
 **S** (`issue.changeStatus`) and Issue → Change Status… open the same menu under the pill, or under the selected
-row or card.
+row or card. Rows and cards drag onto other groups (above).

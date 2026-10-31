@@ -13,6 +13,8 @@ import type {
   ConnectionTest,
   ConnectionView,
   Diagnostics,
+  DropOutcome,
+  DropTargets,
   ErrorKind,
   EventName,
   EventPayloads,
@@ -211,6 +213,10 @@ export const api = {
   issueToggleMine: (id: string) => invoke<WriteOutcome>("issue_toggle_mine", { id }),
   /** Adds a plain-text comment in Jira; it shows in the activity at once. */
   issueComment: (id: string, text: string) => invoke<WriteOutcome>("issue_comment", { id, text }),
+  /** The groups of a view grouped this way that may take the dragged issue. */
+  issueDropTargets: (id: string, groupBy: GroupBy) => invoke<DropTargets>("issue_drop_targets", { id, groupBy }),
+  /** Moves the issue into a group of a view grouped this way (a drop). */
+  issueDrop: (id: string, groupBy: GroupBy, key: string) => invoke<DropOutcome>("issue_drop", { id, groupBy, key }),
   /** The moves Jira offers from the issue's status. */
   issueTransitions: (id: string) => invoke<TransitionOption[]>("issue_transitions", { id }),
   /** The person's profile picture as a `data:` URL, fetched and cached by Rust; null shows initials. */

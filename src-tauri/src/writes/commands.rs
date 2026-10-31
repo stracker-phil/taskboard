@@ -2,9 +2,10 @@
 
 use tauri::State;
 
-use super::{Change, TransitionOption, WriteOutcome};
+use super::{Change, DropOutcome, DropTargets, TransitionOption, WriteOutcome};
 use crate::error::AppResult;
 use crate::state::AppState;
+use crate::views::GroupBy;
 
 #[tauri::command]
 pub async fn issue_write(
@@ -46,4 +47,29 @@ pub async fn issue_comment(
     let settings = state.settings.get();
     let source = crate::sync::source_for(&state.jira, &settings.connection)?;
     super::add_comment(&state.db, source.as_ref(), &settings, id, text).await
+}
+
+/// The groups of a view grouped by `group_by` that may take the dragged issue.
+#[tauri::command]
+pub async fn issue_drop_targets(
+    state: State<'_, AppState>,
+    id: String,
+    group_by: GroupBy,
+) -> AppResult<DropTargets> {
+    let settings = state.settings.get();
+    let source = crate::sync::source_for(&state.jira, &settings.connection)?;
+    super::drop_targets(&state.db, source.as_ref(), &settings, id, group_by).await
+}
+
+/// Moves the issue into the group `key` of a view grouped by `group_by`.
+#[tauri::command]
+pub async fn issue_drop(
+    state: State<'_, AppState>,
+    id: String,
+    group_by: GroupBy,
+    key: String,
+) -> AppResult<DropOutcome> {
+    let settings = state.settings.get();
+    let source = crate::sync::source_for(&state.jira, &settings.connection)?;
+    super::drop_on(&state.db, source.as_ref(), &settings, id, group_by, key).await
 }

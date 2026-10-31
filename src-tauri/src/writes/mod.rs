@@ -3,6 +3,7 @@
 mod assign;
 pub mod commands;
 mod comment;
+mod drop;
 mod pending;
 mod transition;
 
@@ -12,6 +13,7 @@ use ts_rs::TS;
 
 pub use assign::toggle_mine;
 pub use comment::{MAX_COMMENT_CHARS, add_comment};
+pub use drop::{DropOutcome, DropTargets, drop_on, drop_targets};
 pub use pending::{forget_all, overlay};
 pub use transition::{TransitionOption, transitions};
 

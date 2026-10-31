@@ -34,7 +34,8 @@ support. To build it or port it, point a coding agent at [AGENTS.md](AGENTS.md).
   ⌥ + hover peeks at any issue. A click on an issue key copies it.
 - **Quick changes:** with Settings → Connection → Allow changes to Jira on (off by default), assign an issue to
   yourself or unassign it from its row, its header or with I, and move it to another status from its status pill
-  or with S (moves that need Jira's own screen open Jira), and comment on it from the Issue view. The change shows at once; if Jira refuses it, the
+  or with S (moves that need Jira's own screen open Jira), and comment on it from the Issue view. Drag rows and cards onto another status, status type or
+  assignee group; only the moves Jira's workflow allows take the drop. The change shows at once; if Jira refuses it, the
   old value comes back. The confirmation offers the opposite change ("Change back to Jamie Doe"), which is a
   second change in Jira, not an undo.
 - **Keyboard first:** ⌘K finds issues by key or text and runs any command (`>` commands, `#` issues, `/` Spaces
