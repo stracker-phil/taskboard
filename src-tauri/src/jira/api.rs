@@ -166,6 +166,15 @@ impl JiraClient {
         Ok(answer.transitions)
     }
 
+    /// Adds a comment (an ADF document) and returns it as Jira stored it. A write: sent once, never retried.
+    pub async fn add_comment(&self, issue_id: &str, body: Value) -> AppResult<Comment> {
+        let endpoint = Endpoint::AddComment {
+            issue: IssueRef::parse(issue_id)?,
+            body,
+        };
+        self.gateway().send(endpoint).await
+    }
+
     /// Moves the issue along a transition. A write: sent once, never retried.
     pub async fn transition(&self, issue_id: &str, transition_id: &str) -> AppResult<()> {
         let endpoint = Endpoint::TransitionIssue {

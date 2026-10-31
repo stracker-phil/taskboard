@@ -58,42 +58,17 @@ fn snapshot(conn: &Connection, id: &str) -> AppResult<Vec<Vec<SqlValue>>> {
 /// Replaces the issue's comments. Returns whether an author's name or picture changed.
 fn store(conn: &Connection, id: &str, comments: &[Comment], now: &str) -> AppResult<bool> {
     let mut authors_changed = false;
-    conn.execute("DELETE FROM cache.comment WHERE issue_id = ?1", [id])?;
+    // A comment on its way to Jira (`writes::comment`) stays until it settles.
+    conn.execute(
+        "DELETE FROM cache.comment WHERE issue_id = ?1 AND id NOT LIKE 'pending:%'",
+        [id],
+    )?;
     let mut texts = Vec::new();
     for comment in comments {
-        let stamp = |text: &str| utc(&Value::from(text));
-        let (Some(created), Some(updated)) = (stamp(&comment.created), stamp(&comment.updated))
-        else {
-            continue;
-        };
-        let body_text = comment
-            .rendered_body
-            .as_deref()
-            .map(html_to_text)
-            .unwrap_or_default();
-        if let Some(author) = &comment.author {
-            authors_changed |= conn.execute(
-                "INSERT INTO cache.user (account_id, name, avatar_url) VALUES (?1, ?2, ?3)
-                 ON CONFLICT (account_id) DO UPDATE SET name = excluded.name, avatar_url = excluded.avatar_url
-                 WHERE name IS NOT excluded.name OR avatar_url IS NOT excluded.avatar_url",
-                params![author.account_id, author.display_name, author.avatar_url()],
-            )? > 0;
+        if let Some(stored) = store_comment(conn, id, comment)? {
+            authors_changed |= stored.author_changed;
+            texts.push(stored.text);
         }
-        conn.execute(
-            "INSERT INTO cache.comment (id, issue_id, author_id, body_html, body_text, created_at, updated_at, body_adf)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-            params![
-                comment.id,
-                id,
-                comment.author.as_ref().map(|a| a.account_id.clone()),
-                comment.rendered_body,
-                body_text,
-                created,
-                updated,
-                Some(&comment.body).filter(|b| b.is_object()).map(Value::to_string)
-            ],
-        )?;
-        texts.push(body_text);
     }
     conn.execute(
         "UPDATE cache.issue SET comments_synced_at = ?2, comment_count = ?3 WHERE id = ?1",
@@ -104,4 +79,57 @@ fn store(conn: &Connection, id: &str, comments: &[Comment], now: &str) -> AppRes
         params![id.parse::<i64>().unwrap_or_default(), texts.join("\n")],
     )?;
     Ok(authors_changed)
+}
+
+pub struct StoredComment {
+    /// The comment's plain text, for search.
+    pub text: String,
+    pub author_changed: bool,
+}
+
+/// Stores one of the issue's comments as Jira sent it, with its author; `None` when its dates can't be read.
+pub fn store_comment(
+    conn: &Connection,
+    issue_id: &str,
+    comment: &Comment,
+) -> AppResult<Option<StoredComment>> {
+    let stamp = |text: &str| utc(&Value::from(text));
+    let (Some(created), Some(updated)) = (stamp(&comment.created), stamp(&comment.updated)) else {
+        return Ok(None);
+    };
+    let text = comment
+        .rendered_body
+        .as_deref()
+        .map(html_to_text)
+        .unwrap_or_default();
+    let mut author_changed = false;
+    if let Some(author) = &comment.author {
+        author_changed = conn.execute(
+            "INSERT INTO cache.user (account_id, name, avatar_url) VALUES (?1, ?2, ?3)
+             ON CONFLICT (account_id) DO UPDATE SET name = excluded.name, avatar_url = excluded.avatar_url
+             WHERE name IS NOT excluded.name OR avatar_url IS NOT excluded.avatar_url",
+            params![author.account_id, author.display_name, author.avatar_url()],
+        )? > 0;
+    }
+    conn.execute(
+        "INSERT INTO cache.comment (id, issue_id, author_id, body_html, body_text, created_at, updated_at, body_adf)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+         ON CONFLICT (id) DO UPDATE SET issue_id = excluded.issue_id, author_id = excluded.author_id,
+           body_html = excluded.body_html, body_text = excluded.body_text, created_at = excluded.created_at,
+           updated_at = excluded.updated_at, body_adf = excluded.body_adf",
+        params![
+            comment.id,
+            issue_id,
+            comment.author.as_ref().map(|a| a.account_id.clone()),
+            comment.rendered_body,
+            text,
+            created,
+            updated,
+            Some(&comment.body).filter(|b| b.is_object()).map(Value::to_string)
+        ],
+    )?;
+    Ok(Some(StoredComment {
+        text,
+        author_changed,
+    }))
 }

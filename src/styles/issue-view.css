@@ -217,3 +217,14 @@ button.web-link:hover { background: var(--row-hover-bg); }
 .attachment__name, .attachment__meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .attachment__name { font-size: 13px; font-weight: 500; }
 .attachment__meta { font-size: 11px; color: var(--text-muted); }
+
+/* Add a comment (writes on), above the activity. */
+.comment-box { display: flex; flex: none; flex-direction: column; gap: 8px; padding: 4px 16px 12px; }
+.comment-box__input {
+  min-height: 64px; max-height: 240px; padding: 10px 12px; box-sizing: border-box; resize: vertical;
+  border: 1px solid var(--card-border); border-radius: 10px; background: var(--panel-bg); color: inherit;
+  font: inherit; font-size: 14px; line-height: 1.5;
+}
+.comment-box__input:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -1px; }
+.comment-box__actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
+.comment-box__hint { font-size: 12px; color: var(--text-muted); }

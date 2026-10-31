@@ -2,14 +2,16 @@
 
 mod assign;
 pub mod commands;
+mod comment;
 mod pending;
 mod transition;
 
-use rusqlite::{Connection, OptionalExtension};
+use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 pub use assign::toggle_mine;
+pub use comment::{MAX_COMMENT_CHARS, add_comment};
 pub use pending::{forget_all, overlay};
 pub use transition::{TransitionOption, transitions};
 
@@ -193,4 +195,13 @@ fn issue_key(conn: &Connection, id: &str) -> AppResult<String> {
     )
     .optional()?
     .ok_or_else(|| AppError::NotFound("The issue isn't in the cache".into()))
+}
+
+/// Rows name the assignee from `cache.user`, which may not know the connected account yet.
+fn remember_me(conn: &Connection, me: &Me) -> AppResult<()> {
+    conn.execute(
+        "INSERT INTO cache.user (account_id, name) VALUES (?1, ?2) ON CONFLICT (account_id) DO NOTHING",
+        params![me.account_id, me.name],
+    )?;
+    Ok(())
 }

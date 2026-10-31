@@ -106,6 +106,7 @@ One method on `JiraClient` each (`jira/api.rs`), one `Endpoint` each; the answer
 | `check_jql` | `POST jql/parse?validation=strict` | Jira's messages; empty when valid |
 | `transitions` | `GET issue/{id}/transitions` | `Transition`: id, name, `to` status, `hasScreen` |
 | `transition` (write) | `POST issue/{id}/transitions` with `{"transition": {"id": …}}` (`TransitionId`: digits) | nothing (`204`) |
+| `add_comment` (write) | `POST issue/{id}/comment?expand=renderedBody` with `{"body": <ADF>}` | `Comment` as Jira stored it (`201`) |
 | `assign` (write) | `PUT issue/{id}/assignee` with `{"accountId": …}` (`AccountId`: letters, digits, `:`, `_`, `-`, up to 128; null unassigns) | nothing (`204`) |
 | `used_custom_fields` | `POST search/jql`: `project = "KEY" ORDER BY updated DESC`, one page of 100, `*all` without the large system fields | the custom field ids with a value |
 
@@ -125,6 +126,9 @@ once.
 `parse_jira_time` reads Jira's `2026-10-20T09:14:03.120+0200`.
 
 ## Rich text (ADF)
+
+Comments typed in Taskboard go the other way: `adf::from_plain_text` (`adf/from_text.rs`) turns plain text into
+an ADF document ([writes.md](writes.md#comments)).
 
 Descriptions, rich text custom fields and comments are shown from their Atlassian Document Format, not from
 Jira's `renderedFields` HTML ([ADR 0036](adr/0036-rich-text-renders-from-adf-not-renderedfields.md)): Jira builds

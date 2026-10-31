@@ -1038,6 +1038,110 @@ fn reading_transitions_is_a_read_and_writing_them_is_a_write() {
     }
 }
 
+fn add_comment(issue_text: &str) -> Endpoint {
+    Endpoint::AddComment {
+        issue: issue(issue_text),
+        body: crate::adf::from_plain_text("Checked on staging"),
+    }
+}
+
+#[test]
+fn adding_a_comment_plans_a_post_with_the_adf_body_and_the_rendered_body_expansion() {
+    for (prefix, site) in sites() {
+        for target in ["NW-1042", "10001"] {
+            let plan = add_comment(target).plan(&site).unwrap();
+
+            assert_eq!(
+                plan.url.as_str(),
+                format!("{prefix}issue/{target}/comment?expand=renderedBody"),
+                "{target}"
+            );
+            assert_eq!(plan.method, Method::POST, "{target}");
+            assert_eq!(
+                plan.body,
+                Some(json!({ "body": crate::adf::from_plain_text("Checked on staging") })),
+                "{target}"
+            );
+            assert!(plan.authenticated, "{target}");
+            assert_eq!(plan.access, Access::Write, "{target}");
+            assert_eq!(plan.bad_request, BadRequest::Plain, "{target}");
+            assert!(check(&plan, &site).is_ok(), "{prefix} {target}");
+        }
+    }
+}
+
+#[test]
+fn the_comment_request_is_refused_once_it_is_planned_as_a_read_or_changed_in_shape() {
+    for (label, site) in sites() {
+        let plan = add_comment("NW-1").plan(&site).unwrap();
+
+        let mut as_read = plan.clone();
+        as_read.access = Access::Read;
+        assert_refused(&as_read, &site, &format!("{label} planned as a read"));
+
+        let mut unauthenticated = plan.clone();
+        unauthenticated.authenticated = false;
+        assert_refused(&unauthenticated, &site, &format!("{label} unauthenticated"));
+
+        let mut other_key = plan.clone();
+        other_key
+            .url
+            .query_pairs_mut()
+            .append_pair("notifyUsers", "false");
+        assert_refused(&other_key, &site, &format!("{label} with another key"));
+
+        let mut twice = plan.clone();
+        twice.url.query_pairs_mut().append_pair("expand", "x");
+        assert_refused(&twice, &site, &format!("{label} with expand twice"));
+
+        let mut with_fragment = plan.clone();
+        with_fragment.url.set_fragment(Some("frag"));
+        assert_refused(&with_fragment, &site, &format!("{label} with a fragment"));
+
+        for method in [Method::PUT, Method::DELETE, Method::PATCH] {
+            let mut other = plan.clone();
+            other.method = method.clone();
+            assert_refused(&other, &site, &format!("{label} as {method}"));
+        }
+    }
+}
+
+#[test]
+fn comments_are_read_with_their_own_keys_and_written_with_expand_only() {
+    for (label, site) in sites() {
+        let base = url_for(&site, "rest/api/3/issue/NW-1/comment");
+
+        let read = planned(Method::GET, &format!("{base}?startAt=0&orderBy=created"));
+        assert!(check(&read, &site).is_ok(), "{label} read with its keys");
+
+        let mut read_as_write = read.clone();
+        read_as_write.access = Access::Write;
+        assert_refused(&read_as_write, &site, &format!("{label} GET as a write"));
+
+        let write = write_request(
+            Method::POST,
+            &format!("{base}?expand=renderedBody"),
+            Access::Write,
+        );
+        assert!(check(&write, &site).is_ok(), "{label} write with expand");
+
+        let write_with_read_keys =
+            write_request(Method::POST, &format!("{base}?startAt=0"), Access::Write);
+        assert_refused(
+            &write_with_read_keys,
+            &site,
+            &format!("{label} write with a read key"),
+        );
+
+        let post_as_read = write_request(
+            Method::POST,
+            &format!("{base}?expand=renderedBody"),
+            Access::Read,
+        );
+        assert_refused(&post_as_read, &site, &format!("{label} POST as a read"));
+    }
+}
+
 fn url_special_text() -> impl Strategy<Value = String> {
     prop_oneof![
         any::<String>(),

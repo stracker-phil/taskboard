@@ -35,3 +35,15 @@ pub async fn issue_transitions(
     let source = crate::sync::source_for(&state.jira, &settings.connection)?;
     super::transitions(&state.db, source.as_ref(), id).await
 }
+
+/// Adds a comment, typed as plain text.
+#[tauri::command]
+pub async fn issue_comment(
+    state: State<'_, AppState>,
+    id: String,
+    text: String,
+) -> AppResult<WriteOutcome> {
+    let settings = state.settings.get();
+    let source = crate::sync::source_for(&state.jira, &settings.connection)?;
+    super::add_comment(&state.db, source.as_ref(), &settings, id, text).await
+}

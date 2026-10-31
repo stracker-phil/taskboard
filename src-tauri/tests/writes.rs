@@ -11,7 +11,8 @@ use taskboard_lib::connection::{
     ConnectionInput, JiraAccess, refresh_projects, save, track_project,
 };
 use taskboard_lib::db::Db;
-use taskboard_lib::error::ErrorKind;
+use taskboard_lib::error::{AppError, ErrorKind};
+use taskboard_lib::issues::issue_sync_comments;
 use taskboard_lib::jira::{Limiter, TokenKind};
 use taskboard_lib::status_style::{Style, status_style_set};
 use taskboard_lib::store::settings::{Settings, SettingsStore};
@@ -20,7 +21,8 @@ use taskboard_lib::test_support::demo::{self, DEMO_NOW, ME_EMAIL};
 use taskboard_lib::test_support::fake_jira::{DEMO_TOKEN, FakeJira};
 use taskboard_lib::test_support::{FakeSecrets, temp_config_dir};
 use taskboard_lib::writes::{
-    Change, Reverse, TransitionOption, WriteOutcome, apply, forget_all, toggle_mine, transitions,
+    Change, MAX_COMMENT_CHARS, Reverse, TransitionOption, WriteOutcome, add_comment, apply,
+    forget_all, toggle_mine, transitions,
 };
 
 const PROJECT_IDS: [&str; 5] = ["10001", "10002", "10003", "10004", "10005"];
@@ -343,6 +345,103 @@ impl Rig {
                 tx.execute(
                     "UPDATE cache.issue SET status_id = ?2, status_category = ?3 WHERE id = ?1",
                     rusqlite::params![issue_id, status, category],
+                )?;
+                Ok(())
+            })
+            .await
+            .unwrap();
+    }
+}
+
+const COMMENTS_ON_NW_1042: i64 = 4;
+
+impl Rig {
+    async fn number(&self, sql: &'static str, issue_id: &str) -> i64 {
+        let id = issue_id.to_string();
+        self.ctx
+            .db
+            .read(move |conn| Ok(conn.query_row(sql, [id], |row| row.get(0))?))
+            .await
+            .unwrap()
+    }
+
+    /// The `comment_count` the issue row shows.
+    async fn shown_comment_count(&self, issue_id: &str) -> i64 {
+        self.number(
+            "SELECT comment_count FROM cache.issue WHERE id = ?1",
+            issue_id,
+        )
+        .await
+    }
+
+    async fn cached_comments(&self, issue_id: &str) -> i64 {
+        self.number(
+            "SELECT COUNT(*) FROM cache.comment WHERE issue_id = ?1 AND id NOT LIKE 'pending:%'",
+            issue_id,
+        )
+        .await
+    }
+
+    async fn pending_comments(&self, issue_id: &str) -> i64 {
+        self.number(
+            "SELECT COUNT(*) FROM cache.comment WHERE issue_id = ?1 AND id LIKE 'pending:%'",
+            issue_id,
+        )
+        .await
+    }
+
+    async fn jira_comments(&self, issue_key: &str) -> usize {
+        let source = self.ctx.source().unwrap();
+        source.comments(issue_key).await.unwrap().len()
+    }
+
+    async fn comment(
+        &self,
+        issue_id: &str,
+        text: &str,
+    ) -> taskboard_lib::error::AppResult<WriteOutcome> {
+        self.comment_with(&self.settings(), issue_id, text).await
+    }
+
+    async fn comment_with(
+        &self,
+        settings: &Settings,
+        issue_id: &str,
+        text: &str,
+    ) -> taskboard_lib::error::AppResult<WriteOutcome> {
+        let source = self.ctx.source().unwrap();
+        add_comment(
+            &self.ctx.db,
+            &*source,
+            settings,
+            issue_id.into(),
+            text.into(),
+        )
+        .await
+    }
+
+    fn comments_posted(&self) -> usize {
+        self.fake
+            .requests()
+            .iter()
+            .filter(|r| r.method == "POST" && r.path.ends_with("/comment"))
+            .count()
+    }
+
+    /// A comment on its way, as `writes::add_comment` leaves it: shown, counted, not yet in Jira.
+    async fn start_pending_comment(&self, issue_id: &'static str) {
+        self.ctx
+            .db
+            .write(move |tx, _| {
+                tx.execute(
+                    "INSERT INTO cache.comment (id, issue_id, author_id, body_html, body_text, created_at, updated_at)
+                     VALUES ('pending:1', ?1, ?2, '<p>On its way</p>', 'On its way',
+                             '2026-10-28T11:00:00.000Z', '2026-10-28T11:00:00.000Z')",
+                    rusqlite::params![issue_id, ALEX],
+                )?;
+                tx.execute(
+                    "UPDATE cache.issue SET comment_count = comment_count + 1 WHERE id = ?1",
+                    [issue_id],
                 )?;
                 Ok(())
             })
@@ -1040,6 +1139,209 @@ mod the_sync_with_a_move_on_its_way {
             rig.cached_status(NW_1049).await,
             (IN_REVIEW.to_string(), "indeterminate".to_string())
         );
+    }
+}
+
+mod commenting {
+    use super::*;
+
+    fn invalid_input(result: taskboard_lib::error::AppResult<WriteOutcome>) -> String {
+        match result {
+            Err(AppError::InvalidInput(message)) => message,
+            other => panic!("expected InvalidInput, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn stores_jiras_comment_in_place_of_the_pending_one_without_a_new_change() {
+        let rig = Rig::synced().await;
+
+        let done = rig.comment(NW_1042, "Checked on staging").await.unwrap();
+
+        assert_eq!(
+            done,
+            WriteOutcome {
+                done: "Commented on NW-1042".into(),
+                reverse: None
+            }
+        );
+        assert_eq!(rig.pending_comments(NW_1042).await, 0);
+        assert_eq!(rig.cached_comments(NW_1042).await, COMMENTS_ON_NW_1042 + 1);
+        assert_eq!(
+            rig.shown_comment_count(NW_1042).await,
+            rig.jira_comments("NW-1042").await as i64
+        );
+        let (author, text): (String, String) = rig
+            .ctx
+            .db
+            .read(|conn| {
+                Ok(conn.query_row(
+                    "SELECT author_id, body_text FROM cache.comment
+                     WHERE issue_id = '101042' ORDER BY created_at DESC, id DESC LIMIT 1",
+                    [],
+                    |row| Ok((row.get(0)?, row.get(1)?)),
+                )?)
+            })
+            .await
+            .unwrap();
+        assert_eq!(
+            (author.as_str(), text.as_str()),
+            (ALEX, "Checked on staging")
+        );
+        assert_eq!(rig.recorded_changes().await, 0);
+        assert_eq!(rig.comments_posted(), 1);
+    }
+
+    #[tokio::test]
+    async fn shows_the_comment_and_its_count_at_once_while_it_is_on_its_way() {
+        let rig = Rig::synced().await;
+        rig.fake.set_latency(std::time::Duration::from_millis(100));
+
+        let (result, seen) = tokio::join!(rig.comment(NW_1042, "Checked on staging"), async {
+            tokio::time::timeout(std::time::Duration::from_secs(30), async {
+                loop {
+                    if rig.pending_comments(NW_1042).await == 1 {
+                        return rig.shown_comment_count(NW_1042).await;
+                    }
+                    tokio::time::sleep(std::time::Duration::from_millis(2)).await;
+                }
+            })
+            .await
+            .expect("the pending comment never showed")
+        });
+
+        result.unwrap();
+        assert_eq!(seen, COMMENTS_ON_NW_1042 + 1);
+        assert_eq!(rig.pending_comments(NW_1042).await, 0);
+    }
+
+    #[tokio::test]
+    async fn text_that_is_empty_or_only_whitespace_is_refused_and_nothing_is_sent() {
+        let rig = Rig::synced().await;
+        let requests_before = rig.fake.requests().len();
+        for text in ["", "   ", "\n\t \n"] {
+            let message = invalid_input(rig.comment(NW_1042, text).await);
+
+            assert_eq!(message, "Write something first", "{text:?}");
+        }
+        assert_eq!(rig.fake.requests().len(), requests_before);
+        assert_eq!(rig.pending_comments(NW_1042).await, 0);
+        assert_eq!(rig.shown_comment_count(NW_1042).await, COMMENTS_ON_NW_1042);
+    }
+
+    #[tokio::test]
+    async fn text_over_the_limit_is_refused_and_nothing_is_sent() {
+        let rig = Rig::synced().await;
+        let requests_before = rig.fake.requests().len();
+
+        let message = invalid_input(
+            rig.comment(NW_1042, &"a".repeat(MAX_COMMENT_CHARS + 1))
+                .await,
+        );
+
+        assert_eq!(
+            message,
+            format!("Jira takes comments of up to {MAX_COMMENT_CHARS} characters")
+        );
+        assert_eq!(MAX_COMMENT_CHARS, 32_767);
+        assert_eq!(rig.fake.requests().len(), requests_before);
+        assert_eq!(rig.pending_comments(NW_1042).await, 0);
+        assert_eq!(rig.shown_comment_count(NW_1042).await, COMMENTS_ON_NW_1042);
+    }
+
+    #[tokio::test]
+    async fn changes_to_jira_that_are_off_send_nothing_and_add_nothing() {
+        let rig = Rig::synced().await;
+        rig.ctx
+            .settings
+            .edit(|s| s.behaviour.allow_jira_changes = false)
+            .await
+            .unwrap();
+        let requests_before = rig.fake.requests().len();
+
+        let err = rig.comment(NW_1042, "Checked").await.unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::InvalidInput);
+        assert_eq!(rig.fake.requests().len(), requests_before);
+        assert_eq!(rig.pending_comments(NW_1042).await, 0);
+        assert_eq!(rig.shown_comment_count(NW_1042).await, COMMENTS_ON_NW_1042);
+    }
+
+    #[tokio::test]
+    async fn an_issue_missing_from_the_cache_is_not_found_and_nothing_is_sent() {
+        let rig = Rig::synced().await;
+
+        let err = rig.comment("999999", "Checked").await.unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::NotFound);
+        assert_eq!(rig.comments_posted(), 0);
+    }
+
+    #[tokio::test]
+    async fn a_comment_jira_refuses_is_withdrawn_with_its_count_and_the_error_returned() {
+        let rig = Rig::synced().await;
+        rig.fake
+            .answer_next_write(400, json!({ "errorMessages": ["Not allowed"] }));
+
+        let err = rig.comment(NW_1042, "Checked").await.unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::InvalidInput);
+        assert_eq!(rig.pending_comments(NW_1042).await, 0);
+        assert_eq!(rig.cached_comments(NW_1042).await, COMMENTS_ON_NW_1042);
+        assert_eq!(rig.shown_comment_count(NW_1042).await, COMMENTS_ON_NW_1042);
+        assert_eq!(rig.recorded_changes().await, 0);
+        assert_eq!(rig.comments_posted(), 1);
+        assert_eq!(
+            rig.jira_comments("NW-1042").await as i64,
+            COMMENTS_ON_NW_1042
+        );
+    }
+}
+
+mod the_comment_syncs_with_a_comment_on_its_way {
+    use super::*;
+
+    #[tokio::test]
+    async fn a_sync_page_keeps_the_pending_comment_and_stores_jiras_comments() {
+        let rig = Rig::synced().await;
+        rig.start_pending_comment(NW_1042).await;
+        rig.fake.set_now(demo_now() + chrono::Duration::hours(2));
+        rig.fake.add_comment(
+            "NW-1042",
+            demo_user(JONAS),
+            "Merged into the release branch",
+        );
+
+        rig.sync().await;
+
+        assert_eq!(rig.pending_comments(NW_1042).await, 1);
+        assert_eq!(rig.cached_comments(NW_1042).await, COMMENTS_ON_NW_1042 + 1);
+    }
+
+    #[tokio::test]
+    async fn fetching_an_issues_comments_keeps_the_pending_comment() {
+        let rig = Rig::synced().await;
+        rig.start_pending_comment(NW_1042).await;
+        rig.ctx
+            .db
+            .write(|tx, _| {
+                tx.execute(
+                    "UPDATE cache.issue SET comments_synced_at = NULL WHERE id = ?1",
+                    [NW_1042],
+                )?;
+                Ok(())
+            })
+            .await
+            .unwrap();
+        let source = rig.ctx.source().unwrap();
+
+        let fetched = issue_sync_comments(&rig.ctx.db, &*source, NW_1042.into())
+            .await
+            .unwrap();
+
+        assert!(fetched);
+        assert_eq!(rig.pending_comments(NW_1042).await, 1);
+        assert_eq!(rig.cached_comments(NW_1042).await, COMMENTS_ON_NW_1042);
     }
 }
 

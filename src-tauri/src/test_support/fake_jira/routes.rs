@@ -60,6 +60,7 @@ pub fn route(site: &mut Content, request: &Recorded) -> Response {
         ("PUT", ["issue", key, "assignee"]) => writes::assign(site, key, &request.body),
         ("GET", ["issue", key, "transitions"]) => writes::transitions(site, key),
         ("POST", ["issue", key, "transitions"]) => writes::transition(site, key, &request.body),
+        ("POST", ["issue", key, "comment"]) => writes::comment(site, key, &request.body),
         _ => not_found(),
     }
 }

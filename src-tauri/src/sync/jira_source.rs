@@ -6,6 +6,8 @@ use std::pin::Pin;
 use std::sync::Arc;
 
 use super::source::{Answer, IssuePages, Source, SourceKind};
+use serde_json::Value;
+
 use crate::error::AppResult;
 use crate::jira::dto::{
     BulkFetch, Changelog, Comment, Field, Myself, Project, RemoteLink, SearchPage, Status,
@@ -88,6 +90,10 @@ impl Source for JiraSource {
 
     fn used_custom_fields<'a>(&'a self, space_key: &'a str) -> Answer<'a, BTreeSet<String>> {
         Box::pin(self.client.used_custom_fields(space_key))
+    }
+
+    fn add_comment<'a>(&'a self, issue_id: &'a str, body: Value) -> Answer<'a, Comment> {
+        Box::pin(self.client.add_comment(issue_id, body))
     }
 
     fn transitions<'a>(&'a self, issue_id: &'a str) -> Answer<'a, Vec<Transition>> {

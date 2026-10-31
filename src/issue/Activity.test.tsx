@@ -9,6 +9,7 @@ import { api, type ActivityItem } from "../api";
 import { createQueryClient } from "../queries/queryClient";
 import { resetStore, useStore } from "../state/store";
 import { ALEX, SAM, changeItem, commentItem } from "../test/issues";
+import { behaviour, settings } from "../test/settings";
 import { Activity } from "./Activity";
 
 const mocked = vi.mocked(api, true);
@@ -30,6 +31,7 @@ const lineOf = async (text: string) => (await screen.findByText(text, { exact: f
 beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
+  mocked.getSettings.mockResolvedValue(settings());
 });
 
 describe("Activity", () => {
@@ -38,6 +40,21 @@ describe("Activity", () => {
 
     expect(await screen.findByText("Sam Lee")).toBeInTheDocument();
     expect(screen.getByText("Ship it after the postcode fix.")).toBeInTheDocument();
+  });
+
+  it("offers the comment box while changes to Jira are on", async () => {
+    mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ allowJiraChanges: true }) }));
+    renderActivity([commentItem()]);
+
+    expect(await screen.findByRole("textbox", { name: "Add a comment" })).toBeInTheDocument();
+  });
+
+  it("offers no comment box while changes to Jira are off", async () => {
+    renderActivity([commentItem()]);
+    await screen.findByText("Sam Lee");
+    await waitFor(() => expect(mocked.getSettings).toHaveBeenCalled());
+
+    expect(screen.queryByRole("textbox", { name: "Add a comment" })).not.toBeInTheDocument();
   });
 
   it("marks an edited comment and names an unknown author", async () => {

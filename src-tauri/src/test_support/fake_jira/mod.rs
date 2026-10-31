@@ -355,7 +355,7 @@ pub(super) fn jira_time(at: DateTime<Utc>) -> String {
     at.format("%Y-%m-%dT%H:%M:%S%.3f+0000").to_string()
 }
 
-fn push_comment(list: &mut Value, comment: Value) {
+pub(super) fn push_comment(list: &mut Value, comment: Value) {
     if !list["comments"].is_array() {
         *list = json!({ "comments": [], "maxResults": 0, "total": 0, "startAt": 0 });
     }

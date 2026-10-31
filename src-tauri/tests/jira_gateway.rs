@@ -739,6 +739,149 @@ mod writes {
         assert_eq!(fake.requests().len(), 1);
         assert_eq!(status_id_of(&client).await, "3");
     }
+
+    fn comment_body(text: &str) -> serde_json::Value {
+        taskboard_lib::adf::from_plain_text(text)
+    }
+
+    async fn comment_count(client: &JiraClient) -> usize {
+        client.comments(ISSUE).await.unwrap().len()
+    }
+
+    #[tokio::test]
+    async fn adding_a_comment_posts_the_body_once_and_returns_the_stored_comment() {
+        for kind in [TokenKind::Classic, TokenKind::Scoped] {
+            let fake = FakeJira::start_demo().await;
+            let client = fake.client(kind);
+            let before = comment_count(&client).await;
+            let requests_before = fake.requests().len();
+
+            let stored = client
+                .add_comment(ISSUE, comment_body("Checked on staging\n\nAll green"))
+                .await
+                .unwrap();
+
+            assert_eq!(
+                stored.rendered_body.as_deref(),
+                Some("<p>Checked on staging</p><p>All green</p>"),
+                "{kind:?}"
+            );
+            assert_eq!(
+                stored.author.as_ref().map(|a| a.display_name.as_str()),
+                Some("Alex Morgan"),
+                "{kind:?}"
+            );
+            assert_eq!(stored.created, stored.updated, "{kind:?}");
+            assert_eq!(
+                stored.body,
+                comment_body("Checked on staging\n\nAll green"),
+                "{kind:?}"
+            );
+            let posts: Vec<_> = fake
+                .requests()
+                .into_iter()
+                .skip(requests_before)
+                .filter(|r| r.method == "POST")
+                .collect();
+            assert_eq!(posts.len(), 1, "{kind:?}");
+            let base = fake.site(kind).api_base().unwrap();
+            assert_eq!(
+                posts[0].path,
+                format!("{}issue/NW-1042/comment", base.path()),
+                "{kind:?}"
+            );
+            assert_eq!(
+                posts[0].query,
+                [("expand".to_string(), "renderedBody".to_string())],
+                "{kind:?}"
+            );
+            assert_eq!(
+                posts[0].body,
+                json!({ "body": comment_body("Checked on staging\n\nAll green") }),
+                "{kind:?}"
+            );
+            assert_eq!(comment_count(&client).await, before + 1, "{kind:?}");
+        }
+    }
+
+    #[tokio::test]
+    async fn adding_a_comment_makes_the_issue_newer() {
+        let fake = FakeJira::start_demo().await;
+        let client = fake.client(TokenKind::Classic);
+        let (_, updated_before) = issue_state(&client).await;
+
+        client
+            .add_comment(ISSUE, comment_body("Checked"))
+            .await
+            .unwrap();
+
+        let (_, updated_after) = issue_state(&client).await;
+        assert!(
+            parse_jira_time(&updated_after).unwrap() > parse_jira_time(&updated_before).unwrap(),
+            "{updated_before} -> {updated_after}"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_body_that_is_not_an_adf_document_is_refused_and_adds_nothing() {
+        let fake = FakeJira::start_demo().await;
+        let client = fake.client(TokenKind::Classic);
+        let before = comment_count(&client).await;
+
+        let err = client
+            .add_comment(ISSUE, json!("plain text"))
+            .await
+            .unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::InvalidInput);
+        assert_eq!(comment_count(&client).await, before);
+    }
+
+    #[tokio::test]
+    async fn commenting_on_a_hidden_issue_is_not_found() {
+        let fake = FakeJira::start_demo().await;
+        fake.revoke_access("NW-1020");
+
+        let err = fake
+            .client(TokenKind::Classic)
+            .add_comment("NW-1020", comment_body("Checked"))
+            .await
+            .unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::NotFound);
+    }
+
+    #[tokio::test]
+    async fn a_comment_is_sent_once_when_jira_is_rate_limited() {
+        let fake = FakeJira::start_demo().await;
+        fake.answer_next_write(429, json!({ "errorMessages": ["Slow down"] }));
+        let client = fake.client(TokenKind::Classic);
+        let before = comment_count(&client).await;
+        let requests_before = fake.requests().len();
+
+        let err = client
+            .add_comment(ISSUE, comment_body("Checked"))
+            .await
+            .unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::Internal);
+        assert_eq!(fake.requests().len(), requests_before + 1);
+        assert_eq!(comment_count(&client).await, before);
+    }
+
+    #[tokio::test]
+    async fn an_issue_that_could_change_the_url_gets_no_comment_sent() {
+        let fake = FakeJira::start_demo().await;
+
+        let err = fake
+            .client(TokenKind::Classic)
+            .add_comment("../myself", comment_body("Checked"))
+            .await
+            .unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::InvalidInput);
+        assert!(fake.requests().is_empty());
+    }
 }
 
 mod audit {

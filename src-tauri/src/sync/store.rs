@@ -324,7 +324,10 @@ fn store_users(conn: &Connection, mapped: &Mapped) -> AppResult<()> {
 fn store_comments(conn: &Connection, mapped: &Mapped, now: &str) -> AppResult<()> {
     let issue_id = &mapped.issue.id;
     if mapped.issue.comments_complete {
-        conn.execute("DELETE FROM cache.comment WHERE issue_id = ?1", [issue_id])?;
+        conn.execute(
+            "DELETE FROM cache.comment WHERE issue_id = ?1 AND id NOT LIKE 'pending:%'",
+            [issue_id],
+        )?;
         conn.execute(
             "UPDATE cache.issue SET comments_synced_at = ?2 WHERE id = ?1",
             params![issue_id, now],

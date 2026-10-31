@@ -78,6 +78,7 @@ pub fn handlers() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
         crate::writes::commands::issue_write,
         crate::writes::commands::issue_toggle_mine,
         crate::writes::commands::issue_transitions,
+        crate::writes::commands::issue_comment,
         crate::avatars::commands::user_avatar,
         views::views_of,
         views::view_create,

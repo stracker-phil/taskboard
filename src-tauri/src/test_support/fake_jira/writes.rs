@@ -4,8 +4,8 @@ use chrono::{DateTime, Duration, Utc};
 use serde_json::{Value, json};
 
 use super::http::Response;
-use super::jira_time;
 use super::routes::{Content, is_issue};
+use super::{jira_time, push_comment};
 use crate::jira::dto::parse_jira_time;
 
 /// `PUT /issue/{id}/assignee` with `{ "accountId": "…" }`, or `null` to unassign.
@@ -94,6 +94,67 @@ pub fn transition(site: &mut Content, id_or_key: &str, body: &Value) -> Response
     issue["fields"]["status"] = target;
     stamp_after(issue, now);
     Response::raw(204, "text/plain", "")
+}
+
+/// `POST /issue/{id}/comment` with `{ "body": <ADF> }`: the comment by `myself`, answered `201` like Jira, with
+/// `renderedBody` (paragraphs of the body's text).
+pub fn comment(site: &mut Content, id_or_key: &str, body: &Value) -> Response {
+    let adf = &body["body"];
+    if adf["type"] != "doc" {
+        return Response::json(
+            400,
+            json!({ "errorMessages": [], "errors": { "comment": "Comment body can not be empty!" } }),
+        );
+    }
+    let next_id = site.data.comments.values().flatten().count() + 900_000;
+    let (now, author) = (site.now, site.data.myself.clone());
+    let Some(issue) = visible_issue_mut(site, id_or_key) else {
+        return not_found();
+    };
+    let stamp = jira_time(now);
+    let rendered = rendered_paragraphs(adf);
+    let comment = json!({
+        "id": next_id.to_string(),
+        "author": author,
+        "body": adf,
+        "renderedBody": rendered,
+        "created": stamp,
+        "updated": stamp,
+    });
+    push_comment(&mut issue["fields"]["comment"], comment.clone());
+    let mut shown = comment.clone();
+    shown["body"] = json!(rendered);
+    push_comment(&mut issue["renderedFields"]["comment"], shown);
+    stamp_after(issue, now);
+    let id = issue["id"].as_str().unwrap_or_default().to_string();
+    site.data
+        .comments
+        .entry(id)
+        .or_default()
+        .push(comment.clone());
+    Response::json(201, comment)
+}
+
+/// `<p>` per paragraph with its text, the way Jira renders a plain comment.
+fn rendered_paragraphs(adf: &Value) -> String {
+    let paragraphs = adf["content"].as_array().into_iter().flatten();
+    paragraphs
+        .map(|p| {
+            let texts = p["content"].as_array().into_iter().flatten();
+            let text: String = texts
+                .map(|node| {
+                    node["text"]
+                        .as_str()
+                        .unwrap_or(if node["type"] == "hardBreak" {
+                            "\n"
+                        } else {
+                            ""
+                        })
+                })
+                .collect();
+            format!("<p>{text}</p>")
+        })
+        .collect()
 }
 
 fn not_found() -> Response {

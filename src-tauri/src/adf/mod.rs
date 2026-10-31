@@ -1,4 +1,5 @@
-//! Atlassian Document Format (ADF) → HTML for the page. Pure: no database, no network.
+//! Atlassian Document Format (ADF) → HTML for the page, and plain text → ADF for comments typed in Taskboard.
+//! Pure: no database, no network.
 //!
 //! Jira's own rendering (`renderedFields`) goes through wiki markup and loses formatting: inline code comes back
 //! as `<tt>`, and `->text->` turns into strike-through. Rendering the ADF here keeps what the author wrote. Every
@@ -7,9 +8,11 @@
 //! the page fills (ADR 0039), other media become text chips (ADR 0020).
 
 mod blocks;
+mod from_text;
 mod inline;
 mod media;
 
+pub use from_text::from_plain_text;
 pub use media::{File, Media, is_inline_image};
 
 use serde_json::Value;

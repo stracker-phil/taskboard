@@ -69,5 +69,6 @@ export const ISSUE_KEY_COMMANDS: Command[] = [
     when: () => useStore.getState().issueView !== null && !document.querySelector("[role=dialog]") && !isTextInput(document.activeElement),
     run: () => useStore.getState().issueBack(),
   },
-  { id: "issue.openInJira", title: "Open issue in Jira", scope: "main", defaultBinding: "Mod+Enter", when: selected, run: () => handlers?.openInJira() },
+  // ⌘↩ in a text field is the field's (it sends a comment).
+  { id: "issue.openInJira", title: "Open issue in Jira", scope: "main", defaultBinding: "Mod+Enter", when: () => selected() && !isTextInput(document.activeElement), run: () => handlers?.openInJira() },
 ];

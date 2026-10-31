@@ -7,6 +7,8 @@ use std::collections::BTreeSet;
 use std::future::Future;
 use std::pin::Pin;
 
+use serde_json::Value;
+
 use crate::error::AppResult;
 use crate::jira::SearchRequest;
 use crate::jira::dto::{
@@ -68,6 +70,8 @@ pub trait Source: Send + Sync {
     fn used_custom_fields<'a>(&'a self, space_key: &'a str) -> Answer<'a, BTreeSet<String>>;
     /// The moves the workflow allows from the issue's status, by its id.
     fn transitions<'a>(&'a self, issue_id: &'a str) -> Answer<'a, Vec<Transition>>;
+    /// Write: adds a comment (an ADF document) to the issue (by id).
+    fn add_comment<'a>(&'a self, issue_id: &'a str, body: Value) -> Answer<'a, Comment>;
     /// Write: moves the issue (by id) along a transition.
     fn transition<'a>(&'a self, issue_id: &'a str, transition_id: &'a str) -> Answer<'a, ()>;
     /// Write: assigns the issue (by id) to the account, or unassigns it.

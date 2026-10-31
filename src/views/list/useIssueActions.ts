@@ -1,11 +1,12 @@
 import { useMemo } from "react";
 import { api } from "../../api";
 import { browseUrl } from "../../lib/jiraLinks";
-import { useConnection, useSettings } from "../../queries/settings";
+import { useConnection } from "../../queries/settings";
 import { attempt } from "../../state/requests";
 import { useStore } from "../../state/store";
 import type { MenuAt } from "../../components/menu";
 import { runWrite } from "../../writes/runWrite";
+import { useJiraChanges } from "../../writes/useJiraChanges";
 import { openStatusMenu } from "../../writes/statusMenu";
 
 /** Copies the text and confirms with a toast; subscribes to nothing, so every row can use it. */
@@ -19,9 +20,8 @@ export function copyWithToast(text: string, done: string) {
  *  `changeStatus`) while changes to Jira are off. */
 export function useIssueActions() {
   const { data: connection } = useConnection();
-  const { data: settings } = useSettings();
   const site = connection?.connection.siteUrl;
-  const jiraChanges = settings?.behaviour.allowJiraChanges ?? false;
+  const jiraChanges = useJiraChanges();
   // Stable, so memoized cards don't re-render with their parent.
   return useMemo(() => {
     const urlOf = (key: string) => browseUrl(site, key);

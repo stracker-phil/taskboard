@@ -34,7 +34,7 @@ support. To build it or port it, point a coding agent at [AGENTS.md](AGENTS.md).
   ⌥ + hover peeks at any issue. A click on an issue key copies it.
 - **Quick changes:** with Settings → Connection → Allow changes to Jira on (off by default), assign an issue to
   yourself or unassign it from its row, its header or with I, and move it to another status from its status pill
-  or with S (moves that need Jira's own screen open Jira). The change shows at once; if Jira refuses it, the
+  or with S (moves that need Jira's own screen open Jira), and comment on it from the Issue view. The change shows at once; if Jira refuses it, the
   old value comes back. The confirmation offers the opposite change ("Change back to Jamie Doe"), which is a
   second change in Jira, not an undo.
 - **Keyboard first:** ⌘K finds issues by key or text and runs any command (`>` commands, `#` issues, `/` Spaces
@@ -55,7 +55,7 @@ All screenshots show made-up demo data from the debug build.
 - A scoped API token needs the scopes in [docs/scopes.md](docs/scopes.md); `write:jira-work` only for changes.
 - The API token lives only in the macOS Keychain; it is never written to the settings, the cache or the logs.
 - Network traffic goes only to your Jira site and `api.atlassian.com`, through one allowlisted gateway that
-  refuses anything but the reads Taskboard needs and its few changes (assigning, moving an issue), which are sent once
+  refuses anything but the reads Taskboard needs and its few changes (assigning, moving and commenting on an issue), which are sent once
   and only while you allow changes to Jira. Profile pictures come from Atlassian's avatar host,
   without credentials.
 - The cache stays on your Mac (`~/Library/Application Support/com.philippstracker.taskboard/`). Settings →

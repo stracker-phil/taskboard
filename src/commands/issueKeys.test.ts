@@ -376,10 +376,32 @@ describe("issue keys", () => {
       expect(h.openInJira).toHaveBeenCalled();
     });
 
+    it.each(["textarea", "input"])("⌘↵ leaves the key to a focused %s", (tag) => {
+      register(handlers());
+      const field = document.createElement(tag);
+      document.body.append(field);
+      field.focus();
+
+      expect(press("Enter", { meta: true })).toBeNull();
+    });
+
+    it("⌘↵ opens Jira again once the text field has lost focus", () => {
+      const h = handlers();
+      register(h);
+      const field = document.createElement("textarea");
+      document.body.append(field);
+      field.focus();
+      field.blur();
+
+      void press("Enter", { meta: true })?.run();
+
+      expect(h.openInJira).toHaveBeenCalled();
+    });
+
     it.each([
       ["⌘⇧C", "c", { meta: true, shift: true }],
       ["⌘↵", "Enter", { meta: true }],
-    ])("ignore %s without a selected row", (_label, key, mods) => {
+    ])("ignore %s without a selected row",(_label, key, mods) => {
       register(handlers({ hasSelection: () => false }));
 
       expect(press(key, mods)).toBeNull();

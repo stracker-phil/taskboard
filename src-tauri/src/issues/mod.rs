@@ -16,7 +16,7 @@ mod web_links;
 pub use activity::{ActivityItem, ChangeValue, issue_activity};
 pub(crate) use activity::{status_names, user_names};
 pub use attachments::{Attachment, attachments_of, is_on_site, keep_site_urls};
-pub use comments::issue_sync_comments;
+pub use comments::{issue_sync_comments, store_comment};
 pub use detail::{CustomField, IssueDetail, issue_forget, issue_get};
 pub use history::issue_sync_history;
 pub use inline_image::{

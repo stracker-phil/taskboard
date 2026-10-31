@@ -46,11 +46,11 @@ const fn read(verb: Verb, path: &'static [Part], query: &'static [&'static str])
     }
 }
 
-const fn write(verb: Verb, path: &'static [Part]) -> Rule {
+const fn write(verb: Verb, path: &'static [Part], query: &'static [&'static str]) -> Rule {
     Rule {
         verb,
         path,
-        query: &[],
+        query,
         access: Access::Write,
     }
 }
@@ -103,10 +103,20 @@ const RULES: &[Rule] = &[
         &[Literal("issue"), IssueIdOrKey, Literal("transitions")],
         &[],
     ),
-    write(Put, &[Literal("issue"), IssueIdOrKey, Literal("assignee")]),
+    write(
+        Put,
+        &[Literal("issue"), IssueIdOrKey, Literal("assignee")],
+        &[],
+    ),
     write(
         Post,
         &[Literal("issue"), IssueIdOrKey, Literal("transitions")],
+        &[],
+    ),
+    write(
+        Post,
+        &[Literal("issue"), IssueIdOrKey, Literal("comment")],
+        &["expand"],
     ),
 ];
 

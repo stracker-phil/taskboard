@@ -1,7 +1,7 @@
 # Writes
 
-`src-tauri/src/writes/` changes Jira: it assigns issues (`assign.rs`) and moves them along their workflow
-(`transition.rs`) ([ADR 0044](adr/0044-writes-show-at-once-and-settle-after-jira.md)).
+`src-tauri/src/writes/` changes Jira: it assigns issues (`assign.rs`), moves them along their workflow
+(`transition.rs`) and adds comments (`comment.rs`) ([ADR 0044](adr/0044-writes-show-at-once-and-settle-after-jira.md)).
 Every write is an allowlisted gateway endpoint with `Access::Write` ([jira.md](jira.md#gateway-and-allowlist)),
 sent once and never retried.
 
@@ -47,6 +47,18 @@ shows the target status (and its category) at once; the pending row holds the st
 back to the old status when Jira offers one without a screen ("Change back to In Progress"); otherwise none.
 Board drag and drop between status columns isn't built yet.
 
+## Comments
+
+`issue_comment(id, text)` (`writes::add_comment`) takes plain text, at most `MAX_COMMENT_CHARS` (Jira's 32,767),
+and turns it into ADF (`adf::from_plain_text`: a blank line starts a paragraph, a line break is a hard break,
+`http(s)://` addresses become links). The comment shows in the activity at once as a `cache.comment` row with
+the id `pending:<random>` by the connected account, and the issue's `comment_count` goes up, so the fetch that
+brings Jira's comment records no change and the own comment isn't unread. Both comment replacements (the sync's
+and `issue_sync_comments`) keep `pending:` rows. Jira accepts: its answer replaces the pending row
+(`issues::store_comment`) in the transaction that stores the fetched issue. Jira refuses: the row and the count go
+and the box keeps the text. There is no reverse; editing and deleting comments aren't built. The box sits above
+the Issue view's activity (`CommentBox`): ⌘↩ sends, esc leaves it.
+
 ## Commands
 
 | Command | Does |
@@ -55,6 +67,7 @@ Board drag and drop between status columns isn't built yet.
 | `issue_toggle_mine(id)` | assigns to me, or unassigns when it is mine |
 | `issue_write(id, Transition { transitionId })` | moves the issue along a transition from `issue_transitions` |
 | `issue_transitions(id)` | the moves Jira offers from the issue's status |
+| `issue_comment(id, text)` | adds a plain-text comment |
 
 In the page: the row hover toolbar's person button, the Issue view's and the Preview's header button (pressed
 while it is mine), the key **I** (`issue.toggleMine`) and Issue → Assign to Me or Unassign (also in the palette).

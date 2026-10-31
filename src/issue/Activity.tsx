@@ -11,6 +11,7 @@ import { attempt } from "../state/requests";
 import { JiraHtml } from "./JiraHtml";
 import { holdUnread } from "./useSeenAfter";
 import { ACTIVITY_WIDTH, useActivityWidth } from "./useActivityWidth";
+import { CommentBox } from "../writes/CommentBox";
 
 type Filter = "all" | "comments" | "changes";
 const FILTERS: { id: Filter; label: string }[] = [
@@ -161,6 +162,7 @@ export function Activity({ id }: { id: string }) {
           ))}
         </div>
       </header>
+      <CommentBox issueId={id} />
       <div className="activity__list">
         {shown.length === 0 ? <p className="activity__empty">Nothing here yet.</p> : <ActivityList items={shown} issueId={id} />}
       </div>

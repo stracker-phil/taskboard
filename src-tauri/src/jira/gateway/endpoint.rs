@@ -101,6 +101,11 @@ pub enum Endpoint {
         issue: IssueRef,
         transition: TransitionId,
     },
+    /// Write: adds a comment; `body` is an ADF document (`adf::from_plain_text`).
+    AddComment {
+        issue: IssueRef,
+        body: Value,
+    },
     /// Write: assigns the issue to the account, or unassigns it (`None`).
     AssignIssue {
         issue: IssueRef,
@@ -202,6 +207,13 @@ impl Endpoint {
                 &["issue", issue.as_str(), "transitions"],
                 json!({ "transition": { "id": transition.as_str() } }),
             )
+            .plan(site),
+            Self::AddComment { issue, body } => Rest::write(
+                Method::POST,
+                &["issue", issue.as_str(), "comment"],
+                json!({ "body": body }),
+            )
+            .query("expand", "renderedBody")
             .plan(site),
             Self::AssignIssue { issue, account } => Rest::write(
                 Method::PUT,

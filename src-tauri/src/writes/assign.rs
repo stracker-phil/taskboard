@@ -1,11 +1,11 @@
 //! Assigning an issue to someone, or to no one.
 
 use chrono::Utc;
-use rusqlite::{Connection, OptionalExtension, params};
+use rusqlite::{Connection, OptionalExtension};
 
 use super::{
     Begun, Change, Field, Me, Reverse, WriteOutcome, apply, ensure_allowed, issue_key, pending,
-    send,
+    remember_me, send,
 };
 use crate::db::Db;
 use crate::error::{AppError, AppResult};
@@ -143,13 +143,4 @@ fn person(conn: &Connection, me: &Me, account_id: Option<&str>) -> AppResult<Opt
         )
         .optional()?;
     Ok(Some(name.unwrap_or_else(|| account_id.to_string())))
-}
-
-/// Rows name the assignee from `cache.user`, which may not know the connected account yet.
-fn remember_me(conn: &Connection, me: &Me) -> AppResult<()> {
-    conn.execute(
-        "INSERT INTO cache.user (account_id, name) VALUES (?1, ?2) ON CONFLICT (account_id) DO NOTHING",
-        params![me.account_id, me.name],
-    )?;
-    Ok(())
 }
