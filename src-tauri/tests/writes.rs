@@ -1744,7 +1744,6 @@ mod dropping {
     fn noted(note: &str) -> DropTargets {
         DropTargets {
             targets: Vec::new(),
-            refused: Vec::new(),
             note: Some(note.into()),
         }
     }
@@ -1752,7 +1751,6 @@ mod dropping {
     fn offering(targets: Vec<DropTarget>) -> DropTargets {
         DropTargets {
             targets,
-            refused: Vec::new(),
             note: None,
         }
     }
@@ -2088,14 +2086,10 @@ mod dropping {
                         "mark": { "kind": "status", "style": "done" },
                     },
                 ],
-                "refused": [],
                 "note": null,
             })
         );
-        assert_eq!(
-            none,
-            json!({ "targets": [], "refused": [], "note": NO_FIELD })
-        );
+        assert_eq!(none, json!({ "targets": [], "note": NO_FIELD }));
         assert_eq!(assignee["targets"][0]["mark"]["kind"], "person");
         assert_eq!(
             assignee["targets"][0]["mark"]["person"]["accountId"],

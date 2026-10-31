@@ -13,9 +13,8 @@ import { useIssueActions } from "../list/useIssueActions";
 import { usePinnedIssues } from "../list/usePinnedIssues";
 import { BoardColumnCards } from "./BoardColumnCards";
 import { useBoardKeys } from "./useBoardKeys";
-import { DragGhost } from "../../writes/DragGhost";
-import { DropOverlay } from "../../writes/DropOverlay";
-import { useIssueDrag } from "../../writes/useIssueDrag";
+import { DropTray, DropZone, zoneOf } from "../../writes/DropZone";
+import { type Drag, useIssueDrag } from "../../writes/useIssueDrag";
 
 interface Props {
   view: View;
@@ -57,13 +56,13 @@ function Board({ view, data }: { view: View; data: BoardData }) {
   useBoardKeys(data, selected, select, open, actions);
   // A Board that groups by nothing shows status columns.
   const columnGroups = data.columns.map((column) => ({ key: column.key, label: column.name }));
-  const { drag, onPointerDown } = useIssueDrag(view.groupBy === "none" ? "status" : view.groupBy, columnGroups, actions.openInJira);
-  const dragCard = (e: PointerEvent<HTMLElement>, column: BoardColumn) => {
-    const id = (e.target as HTMLElement).closest<HTMLElement>("[data-issue-id]")?.dataset.issueId;
-    const row = id ? data.rows[id] : undefined;
-    if (row) onPointerDown(e, { id: row.id, key: row.key, summary: row.summary, fromKey: column.key });
-  };
   const boardRef = useRef<HTMLDivElement>(null);
+  const { drag, onPointerDown } = useIssueDrag(view.groupBy === "none" ? "status" : view.groupBy, columnGroups, actions.openInJira, boardRef, "x");
+  const dragCard = (e: PointerEvent<HTMLElement>, column: BoardColumn) => {
+    const card = (e.target as HTMLElement).closest<HTMLElement>("[data-issue-id]");
+    const row = card?.dataset.issueId ? data.rows[card.dataset.issueId] : undefined;
+    if (card && row) onPointerDown(e, { id: row.id, key: row.key, summary: row.summary, fromKey: column.key }, card);
+  };
   useCurrentColumnInView(boardRef, data, selected);
   // A column that collapses or opens moves the ones after it smoothly.
   useGlide(boardRef, view.id);
@@ -83,6 +82,7 @@ function Board({ view, data }: { view: View; data: BoardData }) {
               <ColumnTitle column={column} vertical />
               <span className="board-column__count board-column__count--vertical">{column.ids.length}</span>
             </button>
+            <ColumnZone drag={drag} columnKey={column.key} strip />
           </div>
         ) : (
           <section
@@ -111,11 +111,11 @@ function Board({ view, data }: { view: View; data: BoardData }) {
               actions={actions}
               pinned={pinned}
             />
+            <ColumnZone drag={drag} columnKey={column.key} />
           </section>
         ),
       )}
-      <DropOverlay drag={drag} host={boardRef} />
-      <DragGhost drag={drag} />
+      <DropTray drag={drag} groups={columnGroups} host={boardRef} />
     </div>
   );
 }
@@ -144,4 +144,11 @@ function useCurrentColumnInView(boardRef: RefObject<HTMLDivElement | null>, data
     const element = [...(boardRef.current?.querySelectorAll<HTMLElement>("[data-column]") ?? [])].find((e) => e.dataset.column === column.key);
     element?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
   }, [boardRef, data, selected]);
+}
+
+/** A column's drop zone over its cards (at least a hand's height, so a short column is easy to hit), or over a
+ *  collapsed column's strip. */
+function ColumnZone({ drag, columnKey, strip = false }: { drag: Drag | null; columnKey: string; strip?: boolean }) {
+  const zone = zoneOf(drag, columnKey);
+  return zone ? <DropZone zone={zone} className={strip ? "drop-zone--strip" : "drop-zone--column"} /> : null;
 }

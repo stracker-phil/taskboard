@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
 import { api, type DropTargets, type GroupBy, type ViewGroup } from "../api";
 import { attempt } from "../state/requests";
+import { followDraggedCopy } from "./draggedCopy";
 import { followPointer, type Point } from "./followPointer";
 import { showOutcome } from "./runWrite";
 import { openMoveMenu } from "./statusMenu";
@@ -16,14 +17,23 @@ interface Dragged {
 
 export interface Drag {
   issue: Dragged;
-  at: Point;
   /** Until Rust answers, no group takes the drop. */
   targets: DropTargets | null;
 }
 
-/** Rows and cards dragged onto a tile of `DropOverlay` change the field the view groups by (`docs/writes.md`);
- *  tiles carry `data-drop-key`. */
-export function useIssueDrag(groupBy: GroupBy, groups: ViewGroup[], openInJira: ((key: string) => void) | null) {
+/** Which way the view scrolls when the pointer nears its edge. */
+export type ScrollAxis = "x" | "y";
+
+/** Rows and cards dragged onto a group's drop zone change the field the view groups by (`docs/writes.md`); zones
+ *  carry `data-drop-key`. While a drag lasts the row or card stays in place, dimmed, and a copy of it follows the
+ *  pointer; near the view's edge the view scrolls. */
+export function useIssueDrag(
+  groupBy: GroupBy,
+  groups: ViewGroup[],
+  openInJira: ((key: string) => void) | null,
+  host: RefObject<HTMLElement | null>,
+  axis: ScrollAxis,
+) {
   const changesAllowed = useJiraChanges();
   const [drag, setDrag] = useState<Drag | null>(null);
   const latest = useRef<Drag | null>(null);
@@ -33,27 +43,37 @@ export function useIssueDrag(groupBy: GroupBy, groups: ViewGroup[], openInJira: 
   };
   useDraggingClass(drag !== null);
 
-  const onPointerDown = (e: ReactPointerEvent, issue: Dragged) => {
+  /** `element`: the row or card as it shows, which the copy repeats. */
+  const onPointerDown = (e: ReactPointerEvent, issue: Dragged, element: HTMLElement) => {
     if (!changesAllowed || e.button !== 0 || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
     if ((e.target as HTMLElement).closest("button, a, input, textarea")) return;
-    followPointer(
-      { x: e.clientX, y: e.clientY },
-      {
-        onStart: () => {
-          update({ issue, at: { x: e.clientX, y: e.clientY }, targets: null });
-          void attempt(api.issueDropTargets(issue.id, groupBy, issue.fromKey, groups), "Could not ask Jira where the issue may go").then((targets) => {
-            if (latest.current?.issue.id === issue.id) update({ ...latest.current, targets });
-          });
-        },
-        onMove: (at) => latest.current && update({ ...latest.current, at }),
-        onDrop: (at) => {
-          const key = dropKeyAt(at);
-          const finished = latest.current;
-          if (finished && key !== null && takesDrop(finished, key)) drop(issue, groupBy, key, at, openInJira);
-        },
-        onEnd: () => update(null),
+    const press = { x: e.clientX, y: e.clientY };
+    let copy: ReturnType<typeof followDraggedCopy> | null = null;
+    followPointer(press, {
+      onStart: () => {
+        const view = host.current;
+        if (view) copy = followDraggedCopy(element, press, view, axis);
+        update({ issue, targets: null });
+        void attempt(api.issueDropTargets(issue.id, groupBy, issue.fromKey, groups), "Could not ask Jira where the issue may go").then((targets) => {
+          if (latest.current?.issue.id === issue.id) update({ ...latest.current, targets });
+        });
       },
-    );
+      onMove: (at) => {
+        copy?.moveTo(at);
+        const key = dropKeyAt(at);
+        const target = key === null ? null : (latest.current?.targets?.targets.find((t) => t.key === key) ?? null);
+        copy?.preview(target, groupBy === "status");
+      },
+      onDrop: (at) => {
+        const key = dropKeyAt(at);
+        const finished = latest.current;
+        if (finished && key !== null && takesDrop(finished, key)) drop(issue, groupBy, key, at, openInJira);
+      },
+      onEnd: () => {
+        copy?.remove();
+        update(null);
+      },
+    });
   };
 
   return { drag, onPointerDown };

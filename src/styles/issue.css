@@ -102,41 +102,69 @@
 
 /* Dragging an issue onto another group (writes on, docs/writes.md). */
 body.is-dragging-issue, body.is-dragging-issue * { cursor: grabbing !important; user-select: none; }
-.drag-ghost {
-  position: fixed; z-index: 1000; display: flex; align-items: center; gap: 8px; max-width: 360px; padding: 6px 10px;
-  border: 1px solid var(--card-border); border-radius: 8px; background: var(--panel-bg); box-shadow: var(--shadow-popover);
-  font-size: 13px; pointer-events: none; white-space: nowrap; animation: fade-in var(--motion-fast) var(--ease-out);
+/* Dragging an issue (docs/writes.md → Drag and drop): the row or card stays in place dimmed, a copy of it follows the
+   pointer, and every other group shows a drop zone over its rows or cards. The layout never moves. */
+[data-drag-source] { opacity: 0.35; transition: opacity var(--motion-fast) var(--ease-out); }
+.drag-copy {
+  position: fixed !important; z-index: 1000; margin: 0; transform: none !important; opacity: 0.92; pointer-events: none;
+  border-radius: 10px; box-shadow: var(--shadow-popover); animation: fade-in var(--motion-fast) var(--ease-out);
 }
-.drag-ghost__key { color: var(--text-muted); font-family: var(--font-mono); font-size: 12px; }
-.drag-ghost__summary { overflow: hidden; text-overflow: ellipsis; }
-/* While an issue is dragged, tiles of the places it may go cover the view; each is outlined in its group's color. */
-.drop-overlay {
-  position: fixed; z-index: 900; display: flex; flex-direction: column; gap: 12px; padding: 16px 20px; overflow: auto;
-  background: var(--panel-bg); animation: fade-in var(--motion-fast) var(--ease-out);
+/* A card tilts a little as it is lifted; a full-width row stays straight. */
+.drag-copy.board-card { transform: rotate(2deg) !important; }
+.drag-copy .list-row { border-radius: 10px; border-top-color: transparent; clip-path: none; box-shadow: none; }
+.drag-copy .row-actions, .drag-copy .list-row-caret { display: none; }
+
+.drop-color--status-backlog { --drop-color: var(--status-backlog-square); }
+.drop-color--status-todo { --drop-color: var(--status-todo-square); }
+.drop-color--status-progress { --drop-color: var(--status-progress-square); }
+.drop-color--status-review { --drop-color: var(--status-review-square); }
+.drop-color--status-blocked { --drop-color: var(--status-blocked-square); }
+.drop-color--status-done { --drop-color: var(--status-done-square); }
+.drop-color--avatar-1 { --drop-color: var(--avatar-1); }
+.drop-color--avatar-2 { --drop-color: var(--avatar-2); }
+.drop-color--avatar-3 { --drop-color: var(--avatar-3); }
+.drop-color--avatar-4 { --drop-color: var(--avatar-4); }
+.drop-color--priority-1 { --drop-color: var(--flag-highest); }
+.drop-color--priority-2 { --drop-color: var(--flag-high); }
+.drop-color--priority-3 { --drop-color: var(--flag-medium); }
+.drop-color--priority-4 { --drop-color: var(--flag-low); }
+.drop-color--plain { --drop-color: var(--text-muted); }
+
+/* A zone lies over the group's rows (List) or cards (Board); the group's header stays clear. */
+.drop-zone {
+  position: absolute; left: -6px; right: -6px; z-index: 5; box-sizing: border-box; display: flex; align-items: center;
+  justify-content: center; border-radius: 12px; animation: fade-in var(--motion-fast) var(--ease-out);
+  transition: background-color var(--motion-fast) var(--ease-out);
 }
-.drop-overlay__caption, .drop-overlay__note { margin: 0; color: var(--text-muted); font-size: 12px; }
-.drop-overlay__caption kbd { font-family: var(--font-mono); font-size: 11px; }
-.drop-overlay__tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); grid-auto-rows: 64px; gap: 10px; }
-.drop-tile {
-  --drop-color: var(--accent);
-  display: flex; align-items: center; gap: 10px; min-width: 0; padding: 0 14px; border: 2px solid var(--drop-color);
-  border-radius: 10px; font-size: 13px; font-weight: 500; transition: background-color var(--motion-fast) var(--ease-out);
+.drop-zone--ok { border: 2px solid var(--drop-color); background: color-mix(in srgb, var(--drop-color) 14%, transparent); }
+.drop-zone--ok:hover { background: color-mix(in srgb, var(--drop-color) 28%, transparent); }
+/* Where the issue can't go, the group fades, so the places it can go stand out. */
+.drop-zone--no { background: color-mix(in srgb, var(--list-bg) 62%, transparent); }
+.drop-zone--wait { border: 2px dashed var(--border-strong); }
+/* The action stays in sight while a tall group scrolls. */
+.drop-zone__action {
+  position: sticky; top: 12px; bottom: 12px; display: inline-flex; align-items: center; gap: 8px; max-width: calc(100% - 24px);
+  padding: 7px 14px; border: 2px solid var(--drop-color); border-radius: 999px; background: var(--panel-bg);
+  box-shadow: var(--shadow-popover); color: var(--text); font-size: 14px; font-weight: 600; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; pointer-events: none;
 }
-.drop-tile:hover { background: color-mix(in srgb, var(--drop-color) 14%, transparent); }
-.drop-tile__action { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.drop-tile > .status-square, .drop-tile > .avatar, .drop-tile > .priority-flag { flex: none; }
-.drop-tile--status-backlog { --drop-color: var(--status-backlog-square); }
-.drop-tile--status-todo { --drop-color: var(--status-todo-square); }
-.drop-tile--status-progress { --drop-color: var(--status-progress-square); }
-.drop-tile--status-review { --drop-color: var(--status-review-square); }
-.drop-tile--status-blocked { --drop-color: var(--status-blocked-square); }
-.drop-tile--status-done { --drop-color: var(--status-done-square); }
-.drop-tile--avatar-1 { --drop-color: var(--avatar-1); }
-.drop-tile--avatar-2 { --drop-color: var(--avatar-2); }
-.drop-tile--avatar-3 { --drop-color: var(--avatar-3); }
-.drop-tile--avatar-4 { --drop-color: var(--avatar-4); }
-.drop-tile--priority-1 { --drop-color: var(--flag-highest); }
-.drop-tile--priority-2 { --drop-color: var(--flag-high); }
-.drop-tile--priority-3 { --drop-color: var(--flag-medium); }
-.drop-tile--priority-4 { --drop-color: var(--flag-low); }
-.drop-tile--plain { --drop-color: var(--text-muted); }
+.drop-zone--compact { justify-content: flex-end; padding-right: 10px; }
+.drop-zone--compact .drop-zone__action { padding: 3px 12px; font-size: 13px; }
+/* Board: the column's body, below its header, at least a hand's height. */
+.drop-zone--column { top: 48px; left: 0; right: 0; height: calc(100% - 48px); min-height: 180px; }
+.drop-zone--strip { inset: 0; }
+.drop-zone--strip .drop-zone__action { padding: 12px 4px; writing-mode: vertical-rl; }
+
+/* Places the view has no group for, along its bottom edge. */
+.drop-tray {
+  position: fixed; z-index: 20; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px;
+  border: 1px solid var(--card-border); border-radius: 12px; background: var(--panel-bg); box-shadow: var(--shadow-popover);
+  animation: fade-in var(--motion-fast) var(--ease-out);
+}
+.drop-tray__caption { color: var(--text-muted); font-size: 12px; font-weight: 600; }
+.drop-chip {
+  display: inline-flex; align-items: center; gap: 8px; height: 34px; padding: 0 12px; border: 2px solid var(--drop-color);
+  border-radius: 999px; background: color-mix(in srgb, var(--drop-color) 10%, transparent); font-size: 13px; font-weight: 600;
+  white-space: nowrap; transition: background-color var(--motion-fast) var(--ease-out);
+}
+.drop-chip:hover { background: color-mix(in srgb, var(--drop-color) 26%, transparent); }

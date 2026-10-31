@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
 
-import { api, type DropTarget, type GroupMark, type TransitionOption, type View } from "../api";
+import { api, type DropTarget, type GroupMark, type TransitionOption, type View, type ViewData } from "../api";
 import { MenuHost } from "../components/menu";
 import { createQueryClient } from "../queries/queryClient";
 import { NO_NARROWING } from "../queries/views";
@@ -20,6 +20,7 @@ import { sidebarTree } from "../test/spaces";
 import { view } from "../test/views";
 import { BoardView } from "../views/board/BoardView";
 import { ListView } from "../views/list/ListView";
+import { colorClass } from "./DropZone";
 
 const mocked = vi.mocked(api, true);
 
@@ -31,15 +32,15 @@ const REVIEW: TransitionOption = { id: "31", statusId: "3", statusName: "In Revi
 const TESTING: TransitionOption = { id: "32", statusId: "3", statusName: "In Testing", style: "review", opensJira: false };
 
 const allowChanges = (on = true) => mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ allowJiraChanges: on }) }));
-const target = (key: string, action: string, mark: GroupMark | null = null): DropTarget => ({ key, label: key, action, mark });
-const answer = (targets: DropTarget[], note: string | null = null, refused: string[] = []) =>
-  mocked.issueDropTargets.mockResolvedValue({ targets, refused, note });
+const target = (key: string, action: string, mark: GroupMark | null = null, label = key): DropTarget => ({ key, label, action, mark });
+const answer = (targets: DropTarget[], note: string | null = null) => mocked.issueDropTargets.mockResolvedValue({ targets, note });
 const toasts = () => useStore.getState().toasts.map((t) => [t.kind, t.message]);
-const overlay = () => screen.queryByRole("list", { name: "Places to move NW-1042 to" });
-const tileTexts = async () => (await within(await screen.findByRole("list", { name: "Places to move NW-1042 to" })).findAllByRole("listitem")).map((t) => t.textContent);
-const tile = async (action: string) => (await screen.findByText(action)).closest<HTMLElement>("[role=listitem]")!;
-/** The ghost repeats the dragged issue's summary next to the row's own. */
-const ghostShowing = (summary: string) => screen.queryAllByText(summary).length > 1;
+
+const copyOf = () => document.body.querySelector<HTMLElement>(".drag-copy");
+const zones = (state?: "ok" | "no" | "wait") => [...document.querySelectorAll<HTMLElement>(state ? `.drop-zone--${state}` : ".drop-zone")];
+const tray = () => document.querySelector<HTMLElement>(".drop-tray");
+const chips = () => [...document.querySelectorAll<HTMLElement>(".drop-chip")];
+const answered = () => waitFor(() => expect(zones("wait")).toHaveLength(0));
 
 let spies: { mockRestore: () => void }[] = [];
 
@@ -60,10 +61,12 @@ beforeEach(() => {
       return this.classList.contains("board-column__cards") ? 1000 : 110;
     }),
     vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(800),
+    vi.spyOn(window, "requestAnimationFrame").mockReturnValue(1),
   ];
 });
 
 afterEach(() => {
+  fireEvent.keyDown(window, { key: "Escape" });
   spies.forEach((s) => s.mockRestore());
   pointer.reset();
 });
@@ -75,9 +78,9 @@ describe("dragging in the List", () => {
     groupOf([MIGRATION], { key: "c", label: "Gamma" }),
   ];
 
-  async function renderList(withChanges = true) {
+  async function renderList(data: ViewData = viewData(GROUPS, [PRICING, FOOTER, MIGRATION]), withChanges = true) {
     allowChanges(withChanges);
-    mocked.viewRows.mockResolvedValue(viewData(GROUPS, [PRICING, FOOTER, MIGRATION]));
+    mocked.viewRows.mockResolvedValue(data);
     render(
       <QueryClientProvider client={createQueryClient()}>
         <ListView listId={11} viewId={101} openWith={null} narrowing={NO_NARROWING} />
@@ -91,26 +94,34 @@ describe("dragging in the List", () => {
   }
 
   const rowOf = (key: string) => screen.getByRole("row", { name: new RegExp(key) });
-  /** Presses the pricing row and moves far enough to start dragging, with the pointer over `over`. */
-  const dragPricing = (over: Element | null = null) => {
+  const dragPricing = () => {
     pointer.press(rowOf("NW-1042"));
-    pointer.over(over);
     pointer.moveTo(40, 40);
   };
 
   describe("starting", () => {
-    it("shows a ghost of the issue and asks Rust where it may go once the pointer moved past a few pixels", async () => {
+    it("asks Rust where the issue may go once the pointer moved past a few pixels", async () => {
       await renderList();
 
       dragPricing();
 
-      expect(ghostShowing("Redesign the pricing page")).toBe(true);
-      expect(screen.getAllByText("NW-1042").length).toBeGreaterThan(1);
       expect(mocked.issueDropTargets).toHaveBeenCalledWith("1", "status", "a", [
         expect.objectContaining({ key: "a", label: "Alpha" }),
         expect.objectContaining({ key: "b", label: "Beta" }),
         expect.objectContaining({ key: "c", label: "Gamma" }),
       ]);
+    });
+
+    it("keeps the row in the document, marked as the drag's source, and follows the pointer with an aria-hidden copy on the body", async () => {
+      await renderList();
+
+      dragPricing();
+
+      expect(rowOf("NW-1042").closest("[data-drag-source]")).not.toBeNull();
+      const copy = copyOf()!;
+      expect(copy.parentElement).toBe(document.body);
+      expect(copy).toHaveAttribute("aria-hidden", "true");
+      expect(copy).toHaveTextContent("Redesign the pricing page");
     });
 
     it("stays a click when the pointer barely moves", async () => {
@@ -120,7 +131,8 @@ describe("dragging in the List", () => {
       pointer.moveTo(12, 12);
       pointer.release(12, 12);
 
-      expect(ghostShowing("Redesign the pricing page")).toBe(false);
+      expect(copyOf()).toBeNull();
+      expect(rowOf("NW-1042").closest("[data-drag-source]")).toBeNull();
       expect(mocked.issueDropTargets).not.toHaveBeenCalled();
     });
 
@@ -134,11 +146,11 @@ describe("dragging in the List", () => {
     });
 
     it("does not start without changes to Jira", async () => {
-      await renderList(false);
+      await renderList(undefined, false);
 
       dragPricing();
 
-      expect(ghostShowing("Redesign the pricing page")).toBe(false);
+      expect(copyOf()).toBeNull();
       expect(mocked.issueDropTargets).not.toHaveBeenCalled();
     });
 
@@ -150,6 +162,7 @@ describe("dragging in the List", () => {
         pointer.press(rowOf("NW-1042"), modifier);
         pointer.moveTo(40, 40);
 
+        expect(copyOf()).toBeNull();
         expect(mocked.issueDropTargets).not.toHaveBeenCalled();
       },
     );
@@ -160,120 +173,220 @@ describe("dragging in the List", () => {
       pointer.press(within(rowOf("NW-1042")).getByRole("button", { name: "Copy NW-1042" }));
       pointer.moveTo(40, 40);
 
+      expect(copyOf()).toBeNull();
       expect(mocked.issueDropTargets).not.toHaveBeenCalled();
+    });
+
+    it("removes the copy and the source mark when the pointer is released", async () => {
+      await renderList();
+      dragPricing();
+
+      pointer.release();
+
+      expect(copyOf()).toBeNull();
+      expect(rowOf("NW-1042").closest("[data-drag-source]")).toBeNull();
+    });
+
+    it("removes the copy and the source mark on Escape", async () => {
+      await renderList();
+      dragPricing();
+
+      fireEvent.keyDown(window, { key: "Escape" });
+
+      expect(copyOf()).toBeNull();
+      expect(rowOf("NW-1042").closest("[data-drag-source]")).toBeNull();
     });
   });
 
-  describe("the drop overlay", () => {
-    it("says it is asking Jira until Rust answers", async () => {
+  describe("the zones", () => {
+    it("waits on every group but the issue's own, without a drop key, until Rust answers", async () => {
       mocked.issueDropTargets.mockReturnValue(new Promise(() => {}));
       await renderList();
 
       dragPricing();
 
-      expect(await screen.findByText("Asking Jira where NW-1042 can go…")).toBeInTheDocument();
-      expect(overlay()).toBeInTheDocument();
+      const waiting = zones("wait");
+      expect(waiting).toHaveLength(2);
+      expect(zones()).toHaveLength(2);
+      waiting.forEach((zone) => expect(zone).not.toHaveAttribute("data-drop-key"));
     });
 
-    it("offers a tile with the action text for each target", async () => {
-      answer([target("b", "Set status to Beta"), target("c", "Set status to Gamma")]);
-      await renderList();
-
-      dragPricing();
-
-      expect(await tileTexts()).toEqual(["Set status to Beta", "Set status to Gamma"]);
-    });
-
-    it("keeps the tiles in the order Rust answered", async () => {
-      answer([target("c", "Set status to Gamma"), target("x", "Assign to Sam Roe"), target("b", "Set status to Beta")]);
-      await renderList();
-
-      dragPricing();
-
-      expect(await tileTexts()).toEqual(["Set status to Gamma", "Assign to Sam Roe", "Set status to Beta"]);
-    });
-
-    it("names the groups Rust refused", async () => {
-      answer([target("b", "Set status to Beta")], null, ["Gamma", "None"]);
-      await renderList();
-
-      dragPricing();
-
-      expect(await screen.findByText("Not allowed here: Gamma, None")).toBeInTheDocument();
-    });
-
-    it("leaves out the refused line when nothing is refused", async () => {
+    it("keys and labels the groups the issue may go to, and marks the others as refused", async () => {
       answer([target("b", "Set status to Beta")]);
       await renderList();
 
       dragPricing();
 
-      await tile("Set status to Beta");
-      expect(screen.queryByText(/Not allowed here/)).not.toBeInTheDocument();
+      await answered();
+      const [ok] = zones("ok");
+      expect(zones("ok")).toHaveLength(1);
+      expect(ok).toHaveAttribute("data-drop-key", "b");
+      expect(ok).toHaveTextContent("Set status to Beta");
+      expect(zones("no")).toHaveLength(1);
+      expect(zones("no")[0]).not.toHaveAttribute("data-drop-key");
+      expect(zones("no")[0]).toBeEmptyDOMElement();
     });
 
-    it("shows Rust's note when there are no targets", async () => {
+    it("lays the zones over the list's scroll space", async () => {
+      answer([target("b", "Set status to Beta")]);
+      await renderList();
+
+      dragPricing();
+
+      await answered();
+      zones().forEach((zone) => expect(zone.parentElement).toHaveClass("list-scroll__space"));
+    });
+
+    it("gives every other group a zone when Rust answers with no targets", async () => {
       answer([], "Resolve the blocking issue first.");
       await renderList();
 
       dragPricing();
 
-      expect(await screen.findByText("Resolve the blocking issue first.")).toBeInTheDocument();
-      expect(within(overlay()!).queryAllByRole("listitem")).toHaveLength(0);
+      await answered();
+      expect(zones("no")).toHaveLength(2);
+      expect(zones("ok")).toHaveLength(0);
     });
 
-    it("says Jira does not let the issue move when there are no targets and no note", async () => {
+    it("removes the zones once the drag is over", async () => {
+      answer([target("b", "Set status to Beta")]);
+      await renderList();
+      dragPricing();
+      await answered();
+
+      pointer.release();
+
+      expect(zones()).toHaveLength(0);
+    });
+  });
+
+  describe("the tray", () => {
+    it("lists targets the view has no group for as chips with their action", async () => {
+      answer([target("b", "Set status to Beta"), target("sam", "Assign to Sam Lee")]);
+      await renderList();
+
+      dragPricing();
+
+      await answered();
+      expect(tray()).toHaveTextContent("Also");
+      expect(chips()).toHaveLength(1);
+      expect(chips()[0]).toHaveAttribute("data-drop-key", "sam");
+      expect(chips()[0]).toHaveTextContent("Assign to Sam Lee");
+    });
+
+    it("is absent when every target has a group in the view", async () => {
+      answer([target("b", "Set status to Beta")]);
+      await renderList();
+
+      dragPricing();
+
+      await answered();
+      expect(tray()).toBeNull();
+    });
+
+    it("is absent without targets", async () => {
       answer([]);
       await renderList();
 
       dragPricing();
 
-      expect(await screen.findByText("Jira doesn't let NW-1042 move anywhere from here.")).toBeInTheDocument();
+      await answered();
+      expect(tray()).toBeNull();
     });
 
-    it.each<[string, GroupMark | null, string]>([
-      ["a status", { kind: "status", style: "review" }, "drop-tile--status-review"],
-      ["a person", { kind: "person", person: { accountId: "u1", name: "Jamie Doe", initials: "JD", color: 3 } }, "drop-tile--avatar-3"],
-      ["a priority", { kind: "priority", level: 2 }, "drop-tile--priority-2"],
-      ["a priority level above the scale", { kind: "priority", level: 5 }, "drop-tile--priority-4"],
-      ["no mark", null, "drop-tile--plain"],
-    ])("outlines the tile by the color of %s", async (_name, mark, expected) => {
-      answer([target("b", "Move it over here", mark)]);
-      await renderList();
-
-      dragPricing();
-
-      expect(await tile("Move it over here")).toHaveClass(expected);
-    });
-
-    it("removes the overlay once the drag is over", async () => {
-      answer([target("b", "Set status to Beta")]);
+    it("takes a drop on a chip", async () => {
+      answer([target("sam", "Assign to Sam Lee")]);
       await renderList();
       dragPricing();
-      await tile("Set status to Beta");
+      await waitFor(() => expect(chips()).toHaveLength(1));
+      pointer.over(chips()[0]);
 
       pointer.release();
 
-      expect(overlay()).not.toBeInTheDocument();
+      expect(mocked.issueDrop).toHaveBeenCalledWith("1", "status", "sam");
+    });
+  });
+
+  describe("the copy's preview", () => {
+    const withColumns = (patch: Partial<ViewData>, rows = [PRICING, FOOTER, MIGRATION], groups = GROUPS) => viewData(groups, rows, patch);
+
+    it("takes the target status's style and, grouped by status, its name while over a zone that takes the drop", async () => {
+      answer([target("b", "Set status to In Review", { kind: "status", style: "review" }, "In Review")]);
+      await renderList(withColumns({ columns: ["status"] }));
+      dragPricing();
+      await answered();
+
+      pointer.over(zones("ok")[0]);
+      pointer.moveTo(50, 50);
+
+      const copy = copyOf()!;
+      expect(copy.querySelector(".status-square")).toHaveClass("status-square--review");
+      expect(copy.querySelector(".status-square")).not.toHaveClass("status-square--progress");
+      expect(copy.querySelector(".status-pill")).toHaveClass("status-pill--review");
+      expect(copy.querySelector(".status-pill")).toHaveTextContent("In Review");
+    });
+
+    it("shows the issue as it is again once the pointer leaves the zone", async () => {
+      answer([target("b", "Set status to In Review", { kind: "status", style: "review" }, "In Review")]);
+      await renderList(withColumns({ columns: ["status"] }));
+      dragPricing();
+      await answered();
+      pointer.over(zones("ok")[0]);
+      pointer.moveTo(50, 50);
+
+      pointer.over(null);
+      pointer.moveTo(60, 60);
+
+      const copy = copyOf()!;
+      expect(copy.querySelector(".status-square")).toHaveClass("status-square--progress");
+      expect(copy.querySelector(".status-pill")).toHaveClass("status-pill--progress");
+      expect(copy.querySelector(".status-pill")).toHaveTextContent("In Progress");
+    });
+
+    it("keeps the copy as it is over a zone that refuses the drop", async () => {
+      answer([target("b", "Set status to In Review", { kind: "status", style: "review" }, "In Review")]);
+      await renderList(withColumns({ columns: ["status"] }));
+      dragPricing();
+      await answered();
+
+      pointer.over(zones("no")[0]);
+      pointer.moveTo(50, 50);
+
+      expect(copyOf()!.querySelector(".status-square")).toHaveClass("status-square--progress");
+      expect(copyOf()!.querySelector(".status-pill")).toHaveTextContent("In Progress");
+    });
+
+    it("swaps the priority flag for the target priority's", async () => {
+      const high = row({ id: "1", key: "NW-1042", summary: "Redesign the pricing page", priority: { name: "High", level: 2 } });
+      const groups = [groupOf([high], { key: "p2", label: "High" }), groupOf([FOOTER], { key: "p1", label: "Highest" })];
+      answer([target("p1", "Set priority to Highest", { kind: "priority", level: 1 }, "Highest")]);
+      await renderList(withColumns({ groupBy: "priority", columns: ["priority"] }, [high, FOOTER], groups));
+      dragPricing();
+      await answered();
+
+      pointer.over(zones("ok")[0]);
+      pointer.moveTo(50, 50);
+
+      expect(copyOf()!.querySelector(".priority-flag")).toHaveClass("priority-flag--highest");
+      expect(copyOf()!.querySelector(".priority-flag")).not.toHaveClass("priority-flag--high");
     });
   });
 
   describe("dropping", () => {
-    async function dragOverTile(targets: DropTarget[] = [target("b", "Set status to Beta")]) {
-      answer(targets);
+    async function dragOverZone() {
+      answer([target("b", "Set status to Beta")]);
       await renderList();
       dragPricing();
-      const over = await tile(targets[0].action);
-      pointer.over(over);
-      return over;
+      await answered();
+      pointer.over(zones("ok")[0]);
     }
 
-    it("moves the issue onto the tile under the pointer and confirms with a Change back action", async () => {
+    it("moves the issue onto the zone under the pointer and confirms with a Change back action", async () => {
       mocked.issueDrop.mockResolvedValue({
         kind: "done",
         outcome: { done: "Moved NW-1042 to In Review", reverse: { label: "Change back to In Progress", change: { kind: "assign", accountId: null } } },
       });
-      await dragOverTile();
+      await dragOverZone();
 
       pointer.release();
 
@@ -284,7 +397,7 @@ describe("dragging in the List", () => {
 
     it("opens a status menu with the moves when Jira needs a choice", async () => {
       mocked.issueDrop.mockResolvedValue({ kind: "choose", moves: [REVIEW, TESTING] });
-      await dragOverTile();
+      await dragOverZone();
 
       pointer.release();
 
@@ -294,49 +407,46 @@ describe("dragging in the List", () => {
 
     it("shows an error toast when the drop fails", async () => {
       mocked.issueDrop.mockRejectedValue({ kind: "invalid_input", message: "The issue needs a resolution", code: null });
-      await dragOverTile();
+      await dragOverZone();
 
       pointer.release();
 
       await waitFor(() => expect(toasts()).toEqual([["error", "Could not move the issue: The issue needs a resolution"]]));
     });
 
-    it("does nothing when released over the overlay but not over a tile", async () => {
-      await dragOverTile();
-      pointer.over(screen.getByRole("list", { name: "Places to move NW-1042 to" }));
-      pointer.moveTo(50, 50);
+    it("does nothing when released over a zone that refuses the drop", async () => {
+      await dragOverZone();
+      pointer.over(zones("no")[0]);
 
-      pointer.release(50, 50);
+      pointer.release();
 
       expect(mocked.issueDrop).not.toHaveBeenCalled();
-      expect(overlay()).not.toBeInTheDocument();
+      expect(copyOf()).toBeNull();
     });
 
     it("does nothing when released over nothing", async () => {
-      await dragOverTile();
+      await dragOverZone();
       pointer.over(null);
       pointer.moveTo(50, 50);
 
       pointer.release(50, 50);
 
       expect(mocked.issueDrop).not.toHaveBeenCalled();
-      expect(ghostShowing("Redesign the pricing page")).toBe(false);
-      expect(overlay()).not.toBeInTheDocument();
+      expect(copyOf()).toBeNull();
     });
 
-    it("cancels on Escape: no ghost, no overlay and no drop on release", async () => {
-      await dragOverTile();
+    it("cancels on Escape: no copy and no drop on release", async () => {
+      await dragOverZone();
 
       fireEvent.keyDown(window, { key: "Escape" });
       pointer.release();
 
-      expect(ghostShowing("Redesign the pricing page")).toBe(false);
-      expect(overlay()).not.toBeInTheDocument();
+      expect(copyOf()).toBeNull();
       expect(mocked.issueDrop).not.toHaveBeenCalled();
     });
 
     it("does not select the row under the pointer with the click that ends the drag", async () => {
-      await dragOverTile();
+      await dragOverZone();
       pointer.release();
 
       fireEvent.click(rowOf("NW-1003"));
@@ -350,9 +460,10 @@ describe("dragging on the Board", () => {
   const TODO = boardColumn({ key: "1", name: "To Do", style: "todo", mark: { kind: "status", style: "todo" } });
   const PROGRESS = boardColumn({ key: "3", name: "In Progress", style: "progress", ids: ["1"] });
   const DONE = boardColumn({ key: "5", name: "Done", style: "done", mark: { kind: "status", style: "done" }, ids: [] });
+  const BLOCKED = boardColumn({ key: "7", name: "Blocked", style: "blocked", mark: { kind: "status", style: "blocked" }, collapsed: true });
 
-  async function renderBoard(current: View = view({ layout: "board" })) {
-    mocked.viewBoard.mockResolvedValue(boardData([TODO, PROGRESS, DONE], [PRICING]));
+  async function renderBoard(current: View = view({ layout: "board" }), columns = [TODO, PROGRESS, DONE]) {
+    mocked.viewBoard.mockResolvedValue(boardData(columns, [PRICING]));
     render(
       <QueryClientProvider client={createQueryClient()}>
         <BoardView view={current} />
@@ -365,15 +476,17 @@ describe("dragging on the Board", () => {
   }
 
   const column = (name: string) => screen.getByRole("listitem", { name });
-  const card = () => screen.getByText("Redesign the pricing page");
+  const card = () => screen.getByRole("article", { name: "NW-1042 Redesign the pricing page" });
+  const dragCard = () => {
+    pointer.press(screen.getByText("Redesign the pricing page"));
+    pointer.moveTo(40, 40);
+  };
 
-  it("shows a ghost and asks Rust where the card may go, by the view's grouping", async () => {
+  it("asks Rust where the card may go, by the view's grouping", async () => {
     await renderBoard(view({ layout: "board", groupBy: "assignee" }));
 
-    pointer.press(card());
-    pointer.moveTo(40, 40);
+    dragCard();
 
-    expect(ghostShowing("Redesign the pricing page")).toBe(true);
     expect(mocked.issueDropTargets).toHaveBeenCalledWith("1", "assignee", "3", [
       { key: "1", label: "To Do" },
       { key: "3", label: "In Progress" },
@@ -384,56 +497,107 @@ describe("dragging on the Board", () => {
   it("asks by status when the board groups by nothing", async () => {
     await renderBoard(view({ layout: "board", groupBy: "none" }));
 
-    pointer.press(card());
-    pointer.moveTo(40, 40);
+    dragCard();
 
     expect(mocked.issueDropTargets).toHaveBeenCalledWith("1", "status", "3", expect.any(Array));
   });
 
-  it("offers tiles for the answer's places and names the columns Rust refused", async () => {
-    answer([target("5", "Set status to Done")], null, ["To Do"]);
+  it("keeps the card in its column, marked as the source, with a copy on the body that goes away on release", async () => {
     await renderBoard();
 
-    pointer.press(card());
-    pointer.moveTo(40, 40);
+    dragCard();
 
-    expect(await tileTexts()).toEqual(["Set status to Done"]);
-    expect(screen.getByText("Not allowed here: To Do")).toBeInTheDocument();
+    expect(card()).toHaveAttribute("data-drag-source");
+    expect(column("In Progress")).toContainElement(card());
+    expect(copyOf()!.parentElement).toBe(document.body);
+    expect(copyOf()).toHaveAttribute("aria-hidden", "true");
+
+    pointer.release();
+
+    expect(copyOf()).toBeNull();
+    expect(card()).not.toHaveAttribute("data-drag-source");
   });
 
-  it("moves the card onto the tile it is released over", async () => {
+  it("puts a zone in each column but the card's own, and one in a collapsed column's strip", async () => {
+    answer([target("5", "Set status to Done", { kind: "status", style: "done" })]);
+    await renderBoard(view({ layout: "board" }), [TODO, PROGRESS, DONE, BLOCKED]);
+
+    dragCard();
+
+    await answered();
+    expect(column("In Progress").querySelector(".drop-zone")).toBeNull();
+    expect(column("To Do").querySelector(".drop-zone--no")).not.toBeNull();
+    expect(column("Blocked").querySelector(".drop-zone--no")).not.toBeNull();
+    const ok = column("Done").querySelector(".drop-zone--ok");
+    expect(ok).toHaveAttribute("data-drop-key", "5");
+    expect(ok).toHaveTextContent("Set status to Done");
+  });
+
+  it("waits in every other column until Rust answers", async () => {
+    mocked.issueDropTargets.mockReturnValue(new Promise(() => {}));
+    await renderBoard();
+
+    dragCard();
+
+    expect(zones("wait")).toHaveLength(2);
+    zones("wait").forEach((zone) => expect(zone).not.toHaveAttribute("data-drop-key"));
+  });
+
+  it("lists targets without a column in the tray", async () => {
+    answer([target("5", "Set status to Done"), target("sam", "Assign to Sam Lee")]);
+    await renderBoard();
+
+    dragCard();
+
+    await waitFor(() => expect(chips()).toHaveLength(1));
+    expect(tray()).toHaveTextContent("Also");
+    expect(chips()[0]).toHaveAttribute("data-drop-key", "sam");
+    expect(chips()[0]).toHaveTextContent("Assign to Sam Lee");
+  });
+
+  it("moves the card onto the column zone it is released over", async () => {
     answer([target("5", "Set status to Done")]);
     await renderBoard();
-    pointer.press(card());
-    pointer.moveTo(40, 40);
-    pointer.over(await tile("Set status to Done"));
+    dragCard();
+    await answered();
+    pointer.over(zones("ok")[0]);
 
     pointer.release();
 
     expect(mocked.issueDrop).toHaveBeenCalledWith("1", "status", "5");
   });
 
-  it("does nothing when released over a column of the board instead of a tile", async () => {
+  it("does nothing when released over a column that refuses the drop", async () => {
     answer([target("5", "Set status to Done")]);
     await renderBoard();
-    pointer.press(card());
-    pointer.moveTo(40, 40);
-    await tile("Set status to Done");
-    pointer.over(column("To Do"));
+    dragCard();
+    await answered();
+    pointer.over(column("To Do").querySelector(".drop-zone--no"));
 
     pointer.release();
 
     expect(mocked.issueDrop).not.toHaveBeenCalled();
-    expect(overlay()).not.toBeInTheDocument();
   });
 
   it("does not start without changes to Jira", async () => {
     allowChanges(false);
     await renderBoard();
 
-    pointer.press(card());
-    pointer.moveTo(40, 40);
+    dragCard();
 
+    expect(copyOf()).toBeNull();
     expect(mocked.issueDropTargets).not.toHaveBeenCalled();
+  });
+});
+
+describe("colorClass", () => {
+  it.each<[string, GroupMark | null, string]>([
+    ["a status", { kind: "status", style: "review" }, "drop-color--status-review"],
+    ["a person", { kind: "person", person: { accountId: "u1", name: "Jamie Doe", initials: "JD", color: 3 } }, "drop-color--avatar-3"],
+    ["a priority", { kind: "priority", level: 2 }, "drop-color--priority-2"],
+    ["a priority level above the scale", { kind: "priority", level: 5 }, "drop-color--priority-4"],
+    ["no mark", null, "drop-color--plain"],
+  ])("names the color of %s", (_name, mark, expected) => {
+    expect(colorClass(mark)).toBe(expected);
   });
 });

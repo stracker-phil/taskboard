@@ -230,10 +230,6 @@ action: string, mark: GroupMark | null, };
  */
 export type DropTargets = { targets: Array<DropTarget>, 
 /**
- * The view's groups the issue can't go to, by label (`arrange`).
- */
-refused: Array<string>, 
-/**
  * Why there are no targets, when that isn't Jira's choice.
  */
 note: string | null, };

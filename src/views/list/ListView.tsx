@@ -19,9 +19,9 @@ import { useRowClicks } from "./useRowClicks";
 import { useRowKeys } from "./useRowKeys";
 import { useRowSizing } from "./useRowSizing";
 import { useRowsPlace } from "./useRowsPlace";
-import { DragGhost } from "../../writes/DragGhost";
-import { DropOverlay } from "../../writes/DropOverlay";
-import { useIssueDrag } from "../../writes/useIssueDrag";
+import { DropTray, DropZone, zoneOf } from "../../writes/DropZone";
+import { groupSpans } from "./dropSpans";
+import { type Drag, useIssueDrag } from "../../writes/useIssueDrag";
 
 interface Props {
   listId: number;
@@ -79,7 +79,7 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
   const { data: catalog = NO_COLUMNS } = useColumnsCatalogue(listId);
   const onScroll = useRememberedScroll(listId, viewId, scrollRef);
   const dropGroups = useMemo(() => data.groups.map((group) => ({ key: group.key, label: group.label })), [data.groups]);
-  const { drag, onPointerDown } = useIssueDrag(data.groupBy, dropGroups, actions.openInJira);
+  const { drag, onPointerDown } = useIssueDrag(data.groupBy, dropGroups, actions.openInJira, scrollRef, "y");
 
   const headers = useMemo(() => data.columns.map((id) => catalog.find((c) => c.id === id)?.name ?? id), [data.columns, catalog]);
   const widths = useMemo(
@@ -136,7 +136,7 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
               data-group={group}
               onPointerDown={
                 item.kind === "row"
-                  ? (e) => onPointerDown(e, { id: item.row.id, key: item.row.key, summary: item.row.summary, fromKey: group })
+                  ? (e) => onPointerDown(e, { id: item.row.id, key: item.row.key, summary: item.row.summary, fromKey: group }, e.currentTarget)
                   : undefined
               }
             >
@@ -171,9 +171,24 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
             </div>
           );
         })}
+        {drag && <DropZones drag={drag} items={items} measured={virtualizer.measurementsCache} total={virtualizer.getTotalSize()} />}
       </div>
-      <DropOverlay drag={drag} host={scrollRef} />
-      <DragGhost drag={drag} />
+      <DropTray drag={drag} groups={dropGroups} host={scrollRef} />
     </div>
+  );
+}
+
+/** One zone per group but the dragged issue's own, laid over the group's rows in the scroll space. */
+function DropZones({ drag, items, measured, total }: { drag: Drag; items: Item[]; measured: { start: number; end: number }[]; total: number }) {
+  const spans = groupSpans(items, measured, total);
+  return (
+    <>
+      {[...spans].map(([key, span]) => {
+        const zone = zoneOf(drag, key);
+        return zone ? (
+          <DropZone key={key} zone={zone} className={span.compact ? "drop-zone--compact" : ""} style={{ top: span.top, height: span.height }} />
+        ) : null;
+      })}
+    </>
   );
 }

@@ -22,8 +22,6 @@ use crate::views::rows::priority;
 #[serde(rename_all = "camelCase")]
 pub struct DropTargets {
     pub targets: Vec<DropTarget>,
-    /// The view's groups the issue can't go to, by label (`arrange`).
-    pub refused: Vec<String>,
     /// Why there are no targets, when that isn't Jira's choice.
     pub note: Option<String>,
 }
@@ -95,7 +93,6 @@ pub async fn drop_targets(
     };
     Ok(DropTargets {
         targets,
-        refused: Vec::new(),
         note: None,
     })
 }
@@ -104,14 +101,13 @@ impl DropTargets {
     fn noted(note: &str) -> Self {
         Self {
             targets: Vec::new(),
-            refused: Vec::new(),
             note: Some(note.into()),
         }
     }
 }
 
-/// The tiles of a drag from the group `from_key`: the view's groups in its order, then places the view has no group
-/// for (a teammate without issues here), never the issue's own group; `refused` names the view's other groups.
+/// The places of a drag from the group `from_key`, never that group: the view's groups in its order, then places
+/// the view has no group for (a teammate without issues here), which the page lists along the view's edge.
 pub fn arrange(mut found: DropTargets, from_key: &str, groups: &[ViewGroup]) -> DropTargets {
     let rank = |key: &str| {
         groups
@@ -121,13 +117,6 @@ pub fn arrange(mut found: DropTargets, from_key: &str, groups: &[ViewGroup]) -> 
     };
     found.targets.retain(|t| t.key != from_key);
     found.targets.sort_by_key(|t| rank(&t.key));
-    if found.note.is_none() {
-        found.refused = groups
-            .iter()
-            .filter(|g| g.key != from_key && found.targets.iter().all(|t| t.key != g.key))
-            .map(|g| g.label.clone())
-            .collect();
-    }
     found
 }
 
@@ -306,7 +295,6 @@ mod tests {
     fn offering(keys: &[&str]) -> DropTargets {
         DropTargets {
             targets: keys.iter().map(|k| target(k)).collect(),
-            refused: Vec::new(),
             note: None,
         }
     }
@@ -357,28 +345,20 @@ mod tests {
     }
 
     #[test]
-    fn refused_are_the_labels_of_view_groups_that_are_no_targets_in_view_order() {
+    fn view_groups_that_are_no_targets_add_nothing() {
         let found = arrange(
             offering(&["b", "d"]),
             "a",
             &groups(&["e", "a", "d", "c", "b"]),
         );
 
-        assert_eq!(found.refused, ["Group e", "Group c"]);
+        assert_eq!(keys(&found), ["d", "b"]);
     }
 
     #[test]
-    fn nothing_is_refused_when_every_other_group_is_a_target() {
-        let found = arrange(offering(&["a", "b", "c"]), "a", &groups(&["a", "b", "c"]));
-
-        assert_eq!(found.refused, Vec::<String>::new());
-    }
-
-    #[test]
-    fn with_a_note_there_are_no_targets_and_nothing_is_refused() {
+    fn with_a_note_there_are_no_targets() {
         let noted = DropTargets {
             targets: Vec::new(),
-            refused: Vec::new(),
             note: Some("Group the view by status".into()),
         };
 

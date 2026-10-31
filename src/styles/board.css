@@ -11,7 +11,7 @@
 .board--done { --column-tint: var(--status-done-tint); --column-count: var(--status-done-count); }
 
 .board-column {
-  display: flex; flex: none; flex-direction: column; gap: 8px; width: 300px; max-height: 100%; box-sizing: border-box;
+  position: relative; display: flex; flex: none; flex-direction: column; gap: 8px; width: 300px; max-height: 100%; box-sizing: border-box;
   padding: 10px; border-radius: 12px; background: var(--column-tint); animation: fade-in var(--motion-base) var(--ease-out);
 }
 .board-column__header { display: flex; flex: none; align-items: center; gap: 8px; height: 30px; padding: 0 2px; }
@@ -64,7 +64,7 @@
 .board-card .row-actions { position: static; transform: translateY(2px); transition: opacity var(--motion-base) var(--ease-out), transform var(--motion-base) var(--ease-out); }
 .board-card:hover .row-actions, .board-card:focus-within .row-actions { transform: none; }
 .board-card:hover .row-actions, .board-card:focus-within .row-actions { opacity: 1; pointer-events: auto; }
-.board-strip__item { display: flex; flex: none; }
+.board-strip__item { position: relative; display: flex; flex: none; }
 .board-card--selected { border-color: var(--accent); box-shadow: var(--shadow-hover); }
 
 /* A column of a grouping other than status: the neutral pill with the List's group mark (avatar, flag) before the name. */
