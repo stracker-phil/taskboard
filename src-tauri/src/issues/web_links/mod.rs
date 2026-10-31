@@ -112,6 +112,8 @@ fn web_link(row: Row) -> WebLink {
         .title
         .filter(|title| !title.trim().is_empty())
         .unwrap_or_else(|| row.url.clone());
+    // A link named after its pull request shows its host beside it rather than the same name twice.
+    let reference = reference.filter(|reference| *reference != title);
     WebLink {
         id: row.id,
         url: row.url,

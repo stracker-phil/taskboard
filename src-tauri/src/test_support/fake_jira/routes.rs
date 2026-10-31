@@ -54,6 +54,7 @@ pub fn route(site: &mut Content, request: &Recorded) -> Response {
         ("POST", ["issue", "bulkfetch"]) => bulk_fetch(site, &request.body),
         ("GET", ["issue", key, "comment"]) => comments(site, key, request),
         ("GET", ["issue", key, "remotelink"]) => remote_links(site, key),
+        ("POST", ["issue", key, "remotelink"]) => writes::add_remote_link(site, key, &request.body),
         ("GET", ["issue", key, "changelog"]) => changelog(site, key, request),
         ("GET", ["attachment", "content", id]) => attachment_content(site, id, request),
         ("POST", ["jql", "parse"]) => parse_jql(&request.body),

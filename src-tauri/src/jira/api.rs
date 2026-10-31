@@ -2,13 +2,13 @@
 
 use super::client::JiraClient;
 use super::dto::{
-    ApproximateCount, BulkFetch, Changelog, ChangelogPage, Comment, CommentPage, EditMeta, Field,
-    Issue, Myself, ParsedQueries, Project, ProjectPage, RemoteLink, SearchPage, Status, TenantInfo,
-    Transition, Transitions, Version,
+    ApproximateCount, BulkFetch, Changelog, ChangelogPage, Comment, CommentPage, CreatedRemoteLink,
+    EditMeta, Field, Issue, Myself, ParsedQueries, Project, ProjectPage, RemoteLink, SearchPage,
+    Status, TenantInfo, Transition, Transitions, Version,
 };
 use super::gateway::{
-    AccountId, AttachmentId, Endpoint, FieldIds, IssueRef, IssueRefs, Jql, PriorityName,
-    ProjectKey, TransitionId,
+    AccountId, AttachmentId, Endpoint, FieldIds, IssueRef, IssueRefs, Jql, LinkTitle, PriorityName,
+    ProjectKey, TransitionId, WebUrl,
 };
 use super::paging::{SearchPages, SearchRequest};
 use crate::error::AppResult;
@@ -155,6 +155,22 @@ impl JiraClient {
             account: account_id.map(AccountId::parse).transpose()?,
         };
         self.gateway().send(endpoint).await
+    }
+
+    /// Adds a web link to the issue and returns its id. A write: sent once, never retried.
+    pub async fn add_remote_link(
+        &self,
+        issue_id: &str,
+        url: &str,
+        title: &str,
+    ) -> AppResult<String> {
+        let endpoint = Endpoint::AddRemoteLink {
+            issue: IssueRef::parse(issue_id)?,
+            url: WebUrl::parse(url)?,
+            title: LinkTitle::parse(title)?,
+        };
+        let created: CreatedRemoteLink = self.gateway().send(endpoint).await?;
+        Ok(created.id.to_string())
     }
 
     /// The priorities the issue's edit screen offers; empty when its priority can't be changed.

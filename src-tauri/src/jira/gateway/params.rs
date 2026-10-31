@@ -135,6 +135,54 @@ impl PriorityName {
     }
 }
 
+/// A web address for a web link: http or https, at most `WEB_URL_MAX` long. It goes into a request body, never a URL.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WebUrl(String);
+
+/// Jira's own limit for a remote link's address.
+const WEB_URL_MAX: usize = 2000;
+
+impl WebUrl {
+    pub fn parse(text: &str) -> AppResult<Self> {
+        let text = text.trim();
+        let web = url::Url::parse(text)
+            .is_ok_and(|url| matches!(url.scheme(), "http" | "https") && url.host().is_some());
+        if web && text.len() <= WEB_URL_MAX && !text.chars().any(char::is_control) {
+            Ok(Self(text.into()))
+        } else {
+            Err(refused("web address", text))
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+/// A web link's title: not blank, no control characters, at most 255 characters.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LinkTitle(String);
+
+const LINK_TITLE_MAX: usize = 255;
+
+impl LinkTitle {
+    pub fn parse(text: &str) -> AppResult<Self> {
+        let text = text.trim();
+        if !text.is_empty()
+            && text.chars().count() <= LINK_TITLE_MAX
+            && !text.chars().any(char::is_control)
+        {
+            Ok(Self(text.into()))
+        } else {
+            Err(refused("link title", text))
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
 /// An attachment's numeric id.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AttachmentId(String);

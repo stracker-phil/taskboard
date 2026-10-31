@@ -76,6 +76,13 @@ pub trait Source: Send + Sync {
     fn transition<'a>(&'a self, issue_id: &'a str, transition_id: &'a str) -> Answer<'a, ()>;
     /// The priorities the issue's (by id) edit screen offers; empty when its priority can't be changed.
     fn priorities<'a>(&'a self, issue_id: &'a str) -> Answer<'a, Vec<String>>;
+    /// Write: adds a web link to the issue (by id); answers the link's id.
+    fn add_remote_link<'a>(
+        &'a self,
+        issue_id: &'a str,
+        url: &'a str,
+        title: &'a str,
+    ) -> Answer<'a, String>;
     /// Write: sets the issue's (by id) priority by name.
     fn set_priority<'a>(&'a self, issue_id: &'a str, name: &'a str) -> Answer<'a, ()>;
     /// Write: assigns the issue (by id) to the account, or unassigns it.

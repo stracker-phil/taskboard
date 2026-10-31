@@ -7,7 +7,7 @@ use url::Url;
 
 use super::{
     Access, AccountId, AttachmentId, BadRequest, Endpoint, Expand, FieldIds, IssueRef, IssueRefs,
-    Jql, PageToken, Planned, PriorityName, ProjectKey, TransitionId, check,
+    Jql, LinkTitle, PageToken, Planned, PriorityName, ProjectKey, TransitionId, WebUrl, check,
 };
 use crate::error::AppError;
 use crate::jira::site::{Site, TokenKind};
@@ -1291,6 +1291,168 @@ fn an_empty_blank_oversized_or_control_character_priority_name_is_refused() {
         assert!(
             matches!(PriorityName::parse(name), Err(AppError::InvalidInput(_))),
             "{name:?}"
+        );
+    }
+}
+
+fn add_remote_link(issue_text: &str, url: &str, title: &str) -> Endpoint {
+    Endpoint::AddRemoteLink {
+        issue: issue(issue_text),
+        url: WebUrl::parse(url).unwrap(),
+        title: LinkTitle::parse(title).unwrap(),
+    }
+}
+
+#[test]
+fn adding_a_web_link_plans_a_post_on_the_issues_remotelink_with_the_object_in_the_body() {
+    for (prefix, site) in sites() {
+        for target in ["NW-1042", "10001"] {
+            let url = "https://github.com/example/shop/pull/481";
+            let plan = add_remote_link(target, url, "shop#481")
+                .plan(&site)
+                .unwrap();
+
+            assert_eq!(
+                plan.url.as_str(),
+                format!("{prefix}issue/{target}/remotelink"),
+                "{target}"
+            );
+            assert_eq!(plan.method, Method::POST, "{target}");
+            assert_eq!(
+                plan.body,
+                Some(json!({ "object": { "url": url, "title": "shop#481" } })),
+                "{target}"
+            );
+            assert!(plan.authenticated, "{target}");
+            assert_eq!(plan.access, Access::Write, "{target}");
+            assert_eq!(plan.bad_request, BadRequest::Plain, "{target}");
+            assert!(check(&plan, &site).is_ok(), "{prefix} {target}");
+        }
+    }
+}
+
+#[test]
+fn the_web_link_request_is_refused_once_it_is_planned_as_a_read_or_changed_in_shape() {
+    for (label, site) in sites() {
+        let plan = add_remote_link("NW-1", "https://example.com/spec", "Spec")
+            .plan(&site)
+            .unwrap();
+
+        let mut as_read = plan.clone();
+        as_read.access = Access::Read;
+        assert_refused(&as_read, &site, &format!("{label} planned as a read"));
+
+        let mut unauthenticated = plan.clone();
+        unauthenticated.authenticated = false;
+        assert_refused(&unauthenticated, &site, &format!("{label} unauthenticated"));
+
+        let mut with_query = plan.clone();
+        with_query
+            .url
+            .query_pairs_mut()
+            .append_pair("globalId", "x");
+        assert_refused(&with_query, &site, &format!("{label} with a query"));
+
+        let mut with_fragment = plan.clone();
+        with_fragment.url.set_fragment(Some("frag"));
+        assert_refused(&with_fragment, &site, &format!("{label} with a fragment"));
+
+        for method in [Method::PUT, Method::DELETE, Method::PATCH, Method::GET] {
+            let mut other = plan.clone();
+            other.method = method.clone();
+            assert_refused(&other, &site, &format!("{label} as {method}"));
+        }
+    }
+}
+
+#[test]
+fn only_a_plain_issue_reference_may_get_a_web_link() {
+    let paths = [
+        "rest/api/3/issue//remotelink",
+        "rest/api/3/issue/%2e%2e/remotelink",
+        "rest/api/3/issue/nw-1/remotelink",
+        "rest/api/3/issue/-1/remotelink",
+        "rest/api/3/issue/NW-1/remotelink/",
+        "rest/api/3/issue/NW-1/remotelink/70001",
+        "rest/api/2/issue/NW-1/remotelink",
+    ];
+    for (label, site) in sites() {
+        for relative in paths {
+            let plan = write_request(Method::POST, &url_for(&site, relative), Access::Write);
+            assert_refused(&plan, &site, &format!("{label} POST {relative}"));
+        }
+    }
+}
+
+#[test]
+fn a_web_address_is_a_trimmed_http_or_https_address_with_a_host() {
+    let longest = format!("https://example.com/{}", "a".repeat(2000 - 20));
+    for (input, expected) in [
+        ("https://example.com/spec", "https://example.com/spec"),
+        ("http://example.com", "http://example.com"),
+        ("  https://example.com/spec \n", "https://example.com/spec"),
+        ("https://example.com/a?b=1#c", "https://example.com/a?b=1#c"),
+        (longest.as_str(), longest.as_str()),
+    ] {
+        assert_eq!(WebUrl::parse(input).unwrap().as_str(), expected, "{input}");
+    }
+}
+
+#[test]
+fn an_address_that_is_not_web_oversized_or_with_control_characters_is_refused() {
+    let too_long = format!("https://example.com/{}", "a".repeat(2000 - 19));
+    for input in [
+        "",
+        "   ",
+        "example.com/spec",
+        "ftp://example.com/spec",
+        "javascript:alert(1)",
+        "file:///etc/hosts",
+        "mailto:alex.morgan@example.com",
+        "https://",
+        "https://exa\nmple.com/",
+        "https://example.com/a\u{1b}b",
+        too_long.as_str(),
+    ] {
+        assert!(
+            matches!(WebUrl::parse(input), Err(AppError::InvalidInput(_))),
+            "{input:?}"
+        );
+    }
+}
+
+#[test]
+fn a_link_title_is_trimmed_text_up_to_255_characters_without_control_characters() {
+    let longest = "é".repeat(255);
+    for (input, expected) in [
+        ("shop#481", "shop#481"),
+        ("  Release notes  ", "Release notes"),
+        ("Très haut", "Très haut"),
+        (longest.as_str(), longest.as_str()),
+    ] {
+        assert_eq!(
+            LinkTitle::parse(input).unwrap().as_str(),
+            expected,
+            "{input}"
+        );
+    }
+}
+
+#[test]
+fn an_empty_blank_oversized_or_control_character_link_title_is_refused() {
+    let too_long = "a".repeat(256);
+    for input in [
+        "",
+        " ",
+        "\t\n ",
+        "Re\nlease",
+        "Re\0lease",
+        "Notes\u{1b}[31m",
+        too_long.as_str(),
+    ] {
+        assert!(
+            matches!(LinkTitle::parse(input), Err(AppError::InvalidInput(_))),
+            "{input:?}"
         );
     }
 }

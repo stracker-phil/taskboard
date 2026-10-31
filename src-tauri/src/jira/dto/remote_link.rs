@@ -40,3 +40,9 @@ pub struct RemoteIcon {
     #[serde(default)]
     pub title: Option<String>,
 }
+
+/// `POST issue/{id}/remotelink`'s answer: the new link's id.
+#[derive(Deserialize, Debug, Clone, PartialEq)]
+pub struct CreatedRemoteLink {
+    pub id: u64,
+}

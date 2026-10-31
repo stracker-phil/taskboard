@@ -179,7 +179,17 @@
 
 /* Web links: pull requests and documents; a row opens its https address in the browser. */
 .web-links { display: flex; flex-direction: column; gap: 2px; }
-.web-links h2 { margin: 0 0 8px; font-weight: 700; }
+.web-links h2 { margin: 0; font-weight: 700; }
+.web-links__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.web-links__add { display: inline-flex; align-items: center; gap: 5px; }
+/* "Add link": the address and an optional title, then the buttons, like the comment box. */
+.web-link-form { display: flex; flex-direction: column; gap: 8px; padding: 2px 0 12px; }
+.web-link-form__field {
+  height: 34px; padding: 0 12px; box-sizing: border-box; border: 1px solid var(--card-border); border-radius: 8px;
+  background: var(--panel-bg); color: inherit; font: inherit; font-size: 14px;
+}
+.web-link-form__field:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -1px; }
+.web-link-form__actions { display: flex; justify-content: flex-end; gap: 8px; }
 .web-links--issue { padding-top: 14px; border-top: 1px solid var(--hairline); }
 .web-links--issue h2 { font-size: 16px; }
 .web-links--peek h2 { font-size: 13px; color: var(--text-secondary); }

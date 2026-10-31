@@ -42,6 +42,33 @@ fn assignee_for(site: &Content, body: &Value) -> Result<Value, Response> {
         })
 }
 
+/// `POST /issue/{id}/remotelink` with `{ "object": { "url", "title" } }`: the link joins the issue's web links,
+/// answered `201` with its id like Jira; an address or title missing is Jira's `400`.
+pub fn add_remote_link(site: &mut Content, id_or_key: &str, body: &Value) -> Response {
+    let object = &body["object"];
+    let (Some(url), Some(title)) = (object["url"].as_str(), object["title"].as_str()) else {
+        return Response::json(
+            400,
+            json!({ "errorMessages": [], "errors": { "object": "A url and a title are required." } }),
+        );
+    };
+    let Some(id) =
+        visible_issue(site, id_or_key).and_then(|issue| issue["id"].as_str().map(str::to_string))
+    else {
+        return not_found();
+    };
+    let next = 80_000 + site.data.remote_links.values().map(Vec::len).sum::<usize>() as u64 + 1;
+    site.data
+        .remote_links
+        .entry(id)
+        .or_default()
+        .push(json!({ "id": next, "object": { "url": url, "title": title } }));
+    Response::json(
+        201,
+        json!({ "id": next, "self": format!("{}/rest/api/3/issue/{id_or_key}/remotelink/{next}", crate::test_support::demo::SITE_URL) }),
+    )
+}
+
 /// The priorities every demo issue may take, Jira's defaults.
 const PRIORITIES: [(&str, &str); 5] = [
     ("1", "Highest"),

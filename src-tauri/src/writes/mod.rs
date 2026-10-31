@@ -7,6 +7,7 @@ mod drop;
 mod pending;
 mod priority;
 mod transition;
+mod web_link;
 
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
@@ -17,6 +18,7 @@ pub use comment::{MAX_COMMENT_CHARS, add_comment};
 pub use drop::{DropOutcome, DropTarget, DropTargets, ViewGroup, arrange, drop_on, drop_targets};
 pub use pending::{forget_all, overlay};
 pub use transition::{TransitionOption, transitions};
+pub use web_link::add_web_link;
 
 use crate::db::Db;
 use crate::error::{AppError, AppResult};

@@ -51,6 +51,19 @@ pub async fn issue_comment(
     super::add_comment(&state.db, source.as_ref(), &settings, id, text).await
 }
 
+/// Adds a web link; without a title the link is named after its pull request or address.
+#[tauri::command]
+pub async fn issue_add_web_link(
+    state: State<'_, AppState>,
+    id: String,
+    url: String,
+    title: Option<String>,
+) -> AppResult<WriteOutcome> {
+    let settings = state.settings.get();
+    let source = crate::sync::source_for(&state.jira, &settings.connection)?;
+    super::add_web_link(&state.db, source.as_ref(), &settings, id, url, title).await
+}
+
 /// The groups of a view grouped by `group_by` that may take the dragged issue.
 #[tauri::command]
 pub async fn issue_drop_targets(

@@ -10,7 +10,7 @@ the gateway's allowlist (`jira/gateway/guard.rs` `RULES`): every new endpoint na
 |---|---|---|
 | `read:jira-work` | Syncing issues, projects, fields, statuses, releases, comments, history, web links, attachments; checking JQL | Nothing syncs; Test Connection may pass, the sync fails |
 | `read:jira-user` | Who you are (Test Connection, the Me chip, "Assigned to you") | Test Connection fails; the app doesn't know which issues are yours |
-| `write:jira-work` | Assigning issues, changing their status or priority and adding comments | Changes fail with "a scoped token lacks write:jira-work"; reading keeps working |
+| `write:jira-work` | Assigning issues, changing their status or priority, adding comments and web links | Changes fail with "a scoped token lacks write:jira-work"; reading keeps working |
 
 `write:jira-work` is only needed with Settings → Connection → **Allow changes to Jira** on
 ([writes.md](writes.md)). Leave it out for a token that can only read.
@@ -49,3 +49,4 @@ Changes, sent once and only while changes to Jira are allowed ([writes.md](write
 - `POST issue/{id}/transitions`: a move from the status menu or a drag, and its "Change back to …".
 - `PUT issue/{id}`: a priority from a drag, and its "Change back to …"; only the priority field is ever sent.
 - `POST issue/{id}/comment`: a comment from the Issue view's comment box.
+- `POST issue/{id}/remotelink`: a web link (a pull request) from the Issue view's "Add link".

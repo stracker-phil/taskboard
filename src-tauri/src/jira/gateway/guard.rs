@@ -110,6 +110,11 @@ const RULES: &[Rule] = &[
     ),
     write(Put, &[Literal("issue"), IssueIdOrKey], &[]),
     write(
+        Post,
+        &[Literal("issue"), IssueIdOrKey, Literal("remotelink")],
+        &[],
+    ),
+    write(
         Put,
         &[Literal("issue"), IssueIdOrKey, Literal("assignee")],
         &[],

@@ -217,6 +217,8 @@ export const api = {
   issueToggleMine: (id: string) => invoke<WriteOutcome>("issue_toggle_mine", { id }),
   /** Adds a plain-text comment in Jira; it shows in the activity at once. */
   issueComment: (id: string, text: string) => invoke<WriteOutcome>("issue_comment", { id, text }),
+  /** `title` null: named after its pull request or address. */
+  issueAddWebLink: (id: string, url: string, title: string | null) => invoke<WriteOutcome>("issue_add_web_link", { id, url, title }),
   /** The groups of a view grouped this way that may take the dragged issue. */
   /** `groups`: the view's groups in its order; the issue comes from the group `fromKey`. */
   issueDropTargets: (id: string, groupBy: GroupBy, fromKey: string, groups: ViewGroup[]) =>

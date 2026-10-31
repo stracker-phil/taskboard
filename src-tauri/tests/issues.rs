@@ -1744,6 +1744,35 @@ async fn changed_web_links_replace_the_cached_ones() {
 
 #[tokio::test]
 #[ignore = "syncs the demo site into a temp database"]
+async fn a_pull_request_link_named_after_its_reference_shows_its_host_instead_of_the_name_twice() {
+    let site = Site::new().await;
+    site.fake.set_remote_links(
+        "NW-1042",
+        vec![remote_link(
+            70_020,
+            "https://github.com/example/shop/pull/512",
+            Some("shop#512"),
+        )],
+    );
+
+    assert!(site.sync_web_links("NW-1042").await);
+
+    assert_eq!(
+        site.web_links("NW-1042").await,
+        [WebLink {
+            id: "70020".into(),
+            url: "https://github.com/example/shop/pull/512".into(),
+            title: "shop#512".into(),
+            host: Some("github.com".into()),
+            kind: WebLinkKind::PullRequest,
+            reference: None,
+            openable: true,
+        }]
+    );
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
 async fn web_links_fetched_within_five_minutes_are_not_asked_for_again() {
     let site = Site::new().await;
     assert!(site.try_sync_web_links_at("NW-1042", 0).await.unwrap());

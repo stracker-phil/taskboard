@@ -1,7 +1,7 @@
 # Writes
 
 `src-tauri/src/writes/` changes Jira: it assigns issues (`assign.rs`), moves them along their workflow
-(`transition.rs`), sets their priority (`priority.rs`) and adds comments (`comment.rs`) ([ADR 0044](adr/0044-writes-show-at-once-and-settle-after-jira.md)).
+(`transition.rs`), sets their priority (`priority.rs`), adds comments (`comment.rs`) and web links (`web_link.rs`) ([ADR 0044](adr/0044-writes-show-at-once-and-settle-after-jira.md)).
 Every write is an allowlisted gateway endpoint with `Access::Write` ([jira.md](jira.md#gateway-and-allowlist)),
 sent once and never retried.
 
@@ -112,6 +112,16 @@ and `issue_sync_comments`) keep `pending:` rows. Jira accepts: its answer replac
 and the box keeps the text. There is no reverse; editing and deleting comments aren't built. The box sits above
 the Issue view's activity (`CommentBox`): ⌘↩ sends, esc leaves it.
 
+## Web links
+
+`issue_add_web_link(id, url, title)` (`writes::add_web_link`) adds a web link (Jira's remote link: a pull request,
+a document) with `POST issue/{id}/remotelink`. The address must be http or https (`WebUrl`, at most 2000
+characters); without a title the link is named after its pull request (`repo#481`, `issues::classify`) or its
+address. Jira answers the link's id; the link joins the cached web links at once (`cache.remote_link`) and the next
+fetch of the issue's links replaces them as usual. There is no reverse and no removing. In the Issue view the Web
+links section shows while changes to Jira are on, even without links, with an "Add link" button that grows a form
+open (`AddWebLink.tsx`): the address, focused, and an optional title; ↩ adds, esc closes.
+
 ## Commands
 
 | Command | Does |
@@ -123,6 +133,7 @@ the Issue view's activity (`CommentBox`): ⌘↩ sends, esc leaves it.
 | `issue_write(id, Priority { name })` | sets the priority to one the edit screen offers |
 | `issue_transitions(id)` | the moves Jira offers from the issue's status |
 | `issue_comment(id, text)` | adds a plain-text comment |
+| `issue_add_web_link(id, url, title)` | adds a web link; `title` null names it after its pull request or address |
 | `issue_drop_targets(id, groupBy, fromKey, groups)` | the places a dragged issue may go, each with its action, in the view's order |
 | `issue_drop(id, groupBy, key)` | moves the issue into a group of the view (a drop) |
 

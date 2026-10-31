@@ -108,6 +108,15 @@ impl Source for JiraSource {
         Box::pin(self.client.priorities(issue_id))
     }
 
+    fn add_remote_link<'a>(
+        &'a self,
+        issue_id: &'a str,
+        url: &'a str,
+        title: &'a str,
+    ) -> Answer<'a, String> {
+        Box::pin(self.client.add_remote_link(issue_id, url, title))
+    }
+
     fn set_priority<'a>(&'a self, issue_id: &'a str, name: &'a str) -> Answer<'a, ()> {
         Box::pin(self.client.set_priority(issue_id, name))
     }

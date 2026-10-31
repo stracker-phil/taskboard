@@ -1,15 +1,20 @@
 import { GitPullRequest, Link } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { api, type WebLink } from "../api";
 import { useIssueWebLinks, webLinksKey } from "../queries/issues";
 import { attempt } from "../state/requests";
+import { AddWebLinkButton, AddWebLinkForm } from "../writes/AddWebLink";
+import { useJiraChanges } from "../writes/useJiraChanges";
 
-/** The issue's web links (pull requests, documents), fetched again whenever the issue is shown. Hidden when
- *  there are none. Only https links open, in the default browser; the rest show as text. */
+/** The issue's web links (pull requests, documents), fetched again whenever the issue is shown. Only https links
+ *  open, in the default browser; the rest show as text. Hidden when there are none, except in the Issue view while
+ *  changes to Jira are on, where "Add link" adds one. */
 export function WebLinks({ id, variant }: { id: string; variant: "issue" | "peek" }) {
   const client = useQueryClient();
   const { data: links = [] } = useIssueWebLinks(id);
+  const adding = useJiraChanges() && variant === "issue";
+  const [formOpen, setFormOpen] = useState(false);
   useEffect(() => {
     // A failure (offline) leaves the cached links; Rust logs it. New links are read again and set directly: an
     // invalidation would join a first read still in flight and keep its old answer.
@@ -18,10 +23,14 @@ export function WebLinks({ id, variant }: { id: string; variant: "issue" | "peek
       .then((changed) => (changed ? api.issueWebLinks(id).then((links) => client.setQueryData(webLinksKey(id), links)) : undefined))
       .catch(() => {});
   }, [id, client]);
-  if (links.length === 0) return null;
+  if (links.length === 0 && !adding) return null;
   return (
     <section className={`web-links web-links--${variant}`} aria-label="Web links">
-      <h2>Web links</h2>
+      <div className="web-links__head">
+        <h2>Web links</h2>
+        {adding && <AddWebLinkButton open={formOpen} onOpen={() => setFormOpen(true)} />}
+      </div>
+      {adding && <AddWebLinkForm issueId={id} open={formOpen} onClose={() => setFormOpen(false)} />}
       {links.map((link) => (
         <WebLinkRow key={link.id} link={link} />
       ))}

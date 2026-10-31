@@ -12,7 +12,9 @@ use taskboard_lib::connection::{
 };
 use taskboard_lib::db::Db;
 use taskboard_lib::error::{AppError, AppResult, ErrorKind};
-use taskboard_lib::issues::issue_sync_comments;
+use taskboard_lib::issues::{
+    WebLink, WebLinkKind, issue_sync_comments, issue_sync_web_links, issue_web_links,
+};
 use taskboard_lib::jira::{Limiter, TokenKind};
 use taskboard_lib::status_style::{Style, status_style_set};
 use taskboard_lib::store::settings::{Settings, SettingsStore};
@@ -24,8 +26,8 @@ use taskboard_lib::test_support::{FakeSecrets, temp_config_dir};
 use taskboard_lib::views::GroupBy;
 use taskboard_lib::writes::{
     Assignees, Change, DropOutcome, DropTargets, MAX_COMMENT_CHARS, Reverse, TransitionOption,
-    WriteOutcome, add_comment, apply, assignees, drop_on, drop_targets, forget_all, toggle_mine,
-    transitions,
+    WriteOutcome, add_comment, add_web_link, apply, assignees, drop_on, drop_targets, forget_all,
+    toggle_mine, transitions,
 };
 
 const PROJECT_IDS: [&str; 5] = ["10001", "10002", "10003", "10004", "10005"];
@@ -1724,6 +1726,254 @@ mod setting_the_priority {
             rig.cached_priority(NW_1049).await.as_deref(),
             Some("Medium")
         );
+    }
+}
+
+mod adding_a_web_link {
+    use super::*;
+
+    const SPEC_URL: &str = "https://docs.example.com/checkout/spec";
+
+    fn invalid_input(result: AppResult<WriteOutcome>) {
+        match result {
+            Err(AppError::InvalidInput(_)) => {}
+            other => panic!("expected InvalidInput, got {other:?}"),
+        }
+    }
+
+    impl Rig {
+        async fn add_link(
+            &self,
+            issue_id: &str,
+            url: &str,
+            title: Option<&str>,
+        ) -> AppResult<WriteOutcome> {
+            let source = self.ctx.source().unwrap();
+            add_web_link(
+                &self.ctx.db,
+                &*source,
+                &self.settings(),
+                issue_id.into(),
+                url.into(),
+                title.map(String::from),
+            )
+            .await
+        }
+
+        /// The issue with one known link, cached as a sync of its web links leaves it.
+        async fn with_one_link(&self, issue_id: &str, issue_key: &str) {
+            self.fake.set_remote_links(
+                issue_key,
+                vec![json!({
+                    "id": 70_001,
+                    "object": { "url": "https://example.com/brief", "title": "Brief" }
+                })],
+            );
+            let source = self.ctx.source().unwrap();
+            issue_sync_web_links(&self.ctx.db, &*source, issue_id.into(), demo_now())
+                .await
+                .unwrap();
+        }
+
+        async fn shown_links(&self, issue_id: &str) -> Vec<WebLink> {
+            issue_web_links(&self.ctx.db, issue_id.into())
+                .await
+                .unwrap()
+        }
+
+        /// `(id, title)` of the links Jira (the fake) holds, in its order.
+        async fn jira_links(&self, issue_key: &str) -> Vec<(String, String)> {
+            let source = self.ctx.source().unwrap();
+            source
+                .remote_links(issue_key)
+                .await
+                .unwrap()
+                .into_iter()
+                .map(|link| (link.id.to_string(), link.object.title.unwrap_or_default()))
+                .collect()
+        }
+
+        fn links_posted(&self) -> usize {
+            self.fake
+                .requests()
+                .iter()
+                .filter(|r| r.method == "POST" && r.path.ends_with("/remotelink"))
+                .count()
+        }
+    }
+
+    #[tokio::test]
+    async fn puts_the_link_last_in_jira_and_in_the_cache_at_once_under_jiras_id() {
+        let rig = Rig::synced().await;
+        rig.with_one_link(NW_1042, "NW-1042").await;
+
+        let done = rig
+            .add_link(NW_1042, SPEC_URL, Some("  Checkout spec "))
+            .await
+            .unwrap();
+
+        assert_eq!(
+            done,
+            WriteOutcome {
+                done: "Added the link to NW-1042".into(),
+                reverse: None
+            }
+        );
+        let jira = rig.jira_links("NW-1042").await;
+        assert_eq!(jira.len(), 2);
+        assert_eq!(jira[0], ("70001".to_string(), "Brief".to_string()));
+        assert_eq!(jira[1].1, "Checkout spec");
+        let shown = rig.shown_links(NW_1042).await;
+        assert_eq!(
+            shown,
+            [
+                WebLink {
+                    id: "70001".into(),
+                    url: "https://example.com/brief".into(),
+                    title: "Brief".into(),
+                    host: Some("example.com".into()),
+                    kind: WebLinkKind::Link,
+                    reference: None,
+                    openable: true,
+                },
+                WebLink {
+                    id: jira[1].0.clone(),
+                    url: SPEC_URL.into(),
+                    title: "Checkout spec".into(),
+                    host: Some("docs.example.com".into()),
+                    kind: WebLinkKind::Link,
+                    reference: None,
+                    openable: true,
+                },
+            ]
+        );
+        assert_eq!(rig.links_posted(), 1);
+        assert_eq!(rig.recorded_changes().await, 0);
+    }
+
+    #[tokio::test]
+    async fn a_blank_title_takes_the_pull_request_reference_and_keeps_the_host_beside_it() {
+        for title in [None, Some(""), Some("  \t ")] {
+            let rig = Rig::synced().await;
+
+            rig.add_link(NW_1042, "https://github.com/example/shop/pull/512", title)
+                .await
+                .unwrap();
+
+            let shown = rig.shown_links(NW_1042).await;
+            let added = shown.last().unwrap();
+            assert_eq!(added.title, "shop#512", "{title:?}");
+            assert_eq!(added.reference, None, "{title:?}");
+            assert_eq!(added.host.as_deref(), Some("github.com"), "{title:?}");
+            assert_eq!(added.kind, WebLinkKind::PullRequest, "{title:?}");
+            let jira = rig.jira_links("NW-1042").await;
+            assert_eq!(jira.last().unwrap().1, "shop#512", "{title:?}");
+        }
+    }
+
+    #[tokio::test]
+    async fn a_blank_title_on_another_address_takes_the_address() {
+        let rig = Rig::synced().await;
+
+        rig.add_link(NW_1042, SPEC_URL, None).await.unwrap();
+
+        let shown = rig.shown_links(NW_1042).await;
+        assert_eq!(shown.last().unwrap().title, SPEC_URL);
+        assert_eq!(rig.jira_links("NW-1042").await.last().unwrap().1, SPEC_URL);
+    }
+
+    #[tokio::test]
+    async fn an_address_longer_than_a_title_may_be_is_cut_to_255_characters_as_the_title() {
+        let rig = Rig::synced().await;
+        let url = format!("https://docs.example.com/{}", "a".repeat(300));
+
+        rig.add_link(NW_1042, &url, None).await.unwrap();
+
+        let expected: String = url.chars().take(255).collect();
+        let shown = rig.shown_links(NW_1042).await;
+        assert_eq!(shown.last().unwrap().title, expected);
+        assert_eq!(shown.last().unwrap().url, url);
+        assert_eq!(rig.jira_links("NW-1042").await.last().unwrap().1, expected);
+    }
+
+    #[tokio::test]
+    async fn an_address_that_is_not_web_is_refused_and_nothing_is_sent() {
+        let rig = Rig::synced().await;
+        let requests_before = rig.fake.requests().len();
+        for url in [
+            "",
+            "   ",
+            "docs.example.com/spec",
+            "ftp://docs.example.com/spec",
+            "javascript:alert(1)",
+            "https://",
+        ] {
+            invalid_input(rig.add_link(NW_1042, url, Some("Spec")).await);
+            assert_eq!(rig.shown_links(NW_1042).await, [], "{url:?}");
+        }
+        assert_eq!(rig.fake.requests().len(), requests_before);
+    }
+
+    #[tokio::test]
+    async fn a_title_over_255_characters_or_with_control_characters_is_refused_and_nothing_is_sent()
+    {
+        let rig = Rig::synced().await;
+        let requests_before = rig.fake.requests().len();
+        let too_long = "a".repeat(256);
+        for title in [too_long.as_str(), "Spec\nsheet", "Spec\u{1b}[31m"] {
+            invalid_input(rig.add_link(NW_1042, SPEC_URL, Some(title)).await);
+        }
+        assert_eq!(rig.fake.requests().len(), requests_before);
+        assert_eq!(rig.shown_links(NW_1042).await, []);
+    }
+
+    #[tokio::test]
+    async fn changes_to_jira_that_are_off_send_nothing_and_add_nothing() {
+        let rig = Rig::synced().await;
+        rig.ctx
+            .settings
+            .edit(|s| s.behaviour.allow_jira_changes = false)
+            .await
+            .unwrap();
+        let requests_before = rig.fake.requests().len();
+
+        let result = rig.add_link(NW_1042, SPEC_URL, Some("Spec")).await;
+
+        invalid_input(result);
+        assert_eq!(rig.fake.requests().len(), requests_before);
+        assert_eq!(rig.shown_links(NW_1042).await, []);
+    }
+
+    #[tokio::test]
+    async fn an_issue_missing_from_the_cache_is_not_found_and_nothing_is_sent() {
+        let rig = Rig::synced().await;
+
+        let err = rig
+            .add_link("999999", SPEC_URL, Some("Spec"))
+            .await
+            .unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::NotFound);
+        assert_eq!(rig.links_posted(), 0);
+    }
+
+    #[tokio::test]
+    async fn a_link_jira_refuses_returns_the_error_and_stores_nothing() {
+        let rig = Rig::synced().await;
+        rig.with_one_link(NW_1042, "NW-1042").await;
+        let before = rig.shown_links(NW_1042).await;
+        rig.fake
+            .answer_next_write(400, json!({ "errorMessages": ["Not allowed"] }));
+
+        let err = rig
+            .add_link(NW_1042, SPEC_URL, Some("Spec"))
+            .await
+            .unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::InvalidInput);
+        assert_eq!(rig.shown_links(NW_1042).await, before);
+        assert_eq!(rig.links_posted(), 1);
+        assert_eq!(rig.jira_links("NW-1042").await.len(), 1);
     }
 }
 

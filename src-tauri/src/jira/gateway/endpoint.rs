@@ -5,8 +5,8 @@ use serde_json::{Value, json};
 use url::Url;
 
 use super::params::{
-    AccountId, AttachmentId, Expand, FieldIds, IssueRef, IssueRefs, Jql, PageToken, PriorityName,
-    ProjectKey, TransitionId,
+    AccountId, AttachmentId, Expand, FieldIds, IssueRef, IssueRefs, Jql, LinkTitle, PageToken,
+    PriorityName, ProjectKey, TransitionId, WebUrl,
 };
 use crate::error::{AppError, AppResult};
 use crate::jira::site::Site;
@@ -105,6 +105,12 @@ pub enum Endpoint {
     AddComment {
         issue: IssueRef,
         body: Value,
+    },
+    /// Write: adds a web link (a remote link) to the issue.
+    AddRemoteLink {
+        issue: IssueRef,
+        url: WebUrl,
+        title: LinkTitle,
     },
     /// The fields the issue's edit screen offers, with their allowed values.
     IssueEditMeta {
@@ -223,6 +229,12 @@ impl Endpoint {
                 json!({ "body": body }),
             )
             .query("expand", "renderedBody")
+            .plan(site),
+            Self::AddRemoteLink { issue, url, title } => Rest::write(
+                Method::POST,
+                &["issue", issue.as_str(), "remotelink"],
+                json!({ "object": { "url": url.as_str(), "title": title.as_str() } }),
+            )
             .plan(site),
             Self::IssueEditMeta { issue } => {
                 Rest::get(&["issue", issue.as_str(), "editmeta"]).plan(site)
