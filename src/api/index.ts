@@ -8,6 +8,8 @@ import type {
   Assignees,
   Appearance,
   Behaviour,
+  Capability,
+  CapabilityRow,
   BoardData,
   Change,
   ConnectionInput,
@@ -216,6 +218,9 @@ export const api = {
   /** Assigns the issue to me, or unassigns it when it is mine. */
   issueToggleMine: (id: string) => invoke<WriteOutcome>("issue_toggle_mine", { id }),
   /** Adds a plain-text comment in Jira; it shows in the activity at once. */
+  /** What Taskboard does with Jira; the changes allowed or not. */
+  jiraCapabilities: () => invoke<CapabilityRow[]>("jira_capabilities"),
+  jiraCapabilitySet: (capability: Capability, enabled: boolean) => invoke<Settings>("jira_capability_set", { capability, enabled }),
   issueComment: (id: string, text: string) => invoke<WriteOutcome>("issue_comment", { id, text }),
   /** `title` null: named after its pull request or address. */
   issueAddWebLink: (id: string, url: string, title: string | null) => invoke<WriteOutcome>("issue_add_web_link", { id, url, title }),

@@ -6,6 +6,7 @@ use super::{WriteOutcome, ensure_allowed, issue_key};
 use crate::db::Db;
 use crate::error::AppResult;
 use crate::issues::classify;
+use crate::jira::capability::Capability;
 use crate::jira::gateway::{LinkTitle, WebUrl};
 use crate::store::settings::Settings;
 use crate::sync::source::Source;
@@ -23,7 +24,7 @@ pub async fn add_web_link(
     url: String,
     title: Option<String>,
 ) -> AppResult<WriteOutcome> {
-    ensure_allowed(settings)?;
+    ensure_allowed(settings, Capability::AddWebLink)?;
     let url = WebUrl::parse(&url)?.as_str().to_string();
     let title = match title.filter(|t| !t.trim().is_empty()) {
         Some(title) => LinkTitle::parse(&title)?.as_str().to_string(),

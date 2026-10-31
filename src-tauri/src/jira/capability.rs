@@ -1,0 +1,244 @@
+//! What Taskboard does with Jira, one entry per kind of request. Every gateway endpoint names its capability
+//! (`Endpoint::capability`), so this list can't drift from what the app sends. Settings → Connection lists the reads
+//! and lets the owner switch each kind of change on or off (`Behaviour::disabled_changes`).
+
+use serde::{Deserialize, Serialize};
+use ts_rs::TS;
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Hash, TS)]
+#[ts(export, export_to = "src/api/types.gen.ts")]
+#[serde(rename_all = "camelCase")]
+pub enum Capability {
+    Account,
+    Projects,
+    Issues,
+    IssueDetails,
+    CheckQueries,
+    Assign,
+    ChangeStatus,
+    ChangePriority,
+    Comment,
+    AddWebLink,
+}
+
+impl Capability {
+    pub const ALL: [Self; 10] = [
+        Self::Account,
+        Self::Projects,
+        Self::Issues,
+        Self::IssueDetails,
+        Self::CheckQueries,
+        Self::Assign,
+        Self::ChangeStatus,
+        Self::ChangePriority,
+        Self::Comment,
+        Self::AddWebLink,
+    ];
+
+    /// Changes Jira; the rest only read.
+    pub fn is_change(self) -> bool {
+        matches!(
+            self,
+            Self::Assign
+                | Self::ChangeStatus
+                | Self::ChangePriority
+                | Self::Comment
+                | Self::AddWebLink
+        )
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Account => "Your account",
+            Self::Projects => "List projects",
+            Self::Issues => "Read issues",
+            Self::IssueDetails => "Read an issue's details",
+            Self::CheckQueries => "Check filter queries",
+            Self::Assign => "Change the assignee",
+            Self::ChangeStatus => "Change the status",
+            Self::ChangePriority => "Change the priority",
+            Self::Comment => "Add comments",
+            Self::AddWebLink => "Add web links",
+        }
+    }
+
+    pub fn detail(self) -> &'static str {
+        match self {
+            Self::Account => "Your name, account and time zone, to know which issues are yours",
+            Self::Projects => "Projects, their statuses, fields and releases",
+            Self::Issues => "The issues in the sync scope, with their fields",
+            Self::IssueDetails => {
+                "Comments, history, web links, attachments and the statuses and priorities an issue can take"
+            }
+            Self::CheckQueries => "Whether the sync scope's query is valid",
+            Self::Assign => "Assign issues to you or a teammate, or unassign them",
+            Self::ChangeStatus => "Move issues along their workflow",
+            Self::ChangePriority => "Set an issue's priority, by dragging it",
+            Self::Comment => "Comment on issues from the Issue view",
+            Self::AddWebLink => "Add links such as a pull request to issues",
+        }
+    }
+}
+
+/// A capability as Settings → Connection shows it.
+#[derive(Serialize, Clone, Debug, PartialEq, TS)]
+#[ts(export, export_to = "src/api/types.gen.ts")]
+#[serde(rename_all = "camelCase")]
+pub struct CapabilityRow {
+    pub capability: Capability,
+    pub label: String,
+    pub detail: String,
+    pub change: bool,
+    /// A change: allowed now (changes to Jira on and this one not switched off). A read: always.
+    pub enabled: bool,
+}
+
+/// Every capability, reads first, as allowed by `allow_changes` and `disabled`.
+pub fn capability_rows(allow_changes: bool, disabled: &[Capability]) -> Vec<CapabilityRow> {
+    Capability::ALL
+        .iter()
+        .map(|&capability| CapabilityRow {
+            capability,
+            label: capability.label().into(),
+            detail: capability.detail().into(),
+            change: capability.is_change(),
+            enabled: !capability.is_change() || (allow_changes && !disabled.contains(&capability)),
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+
+    const CHANGES: [Capability; 5] = [
+        Capability::Assign,
+        Capability::ChangeStatus,
+        Capability::ChangePriority,
+        Capability::Comment,
+        Capability::AddWebLink,
+    ];
+
+    #[test]
+    fn the_list_holds_every_capability_once() {
+        let unique: HashSet<Capability> = Capability::ALL.into_iter().collect();
+
+        assert_eq!(unique.len(), Capability::ALL.len());
+        assert_eq!(unique.len(), 10);
+    }
+
+    #[test]
+    fn the_list_has_the_reads_first_and_then_the_changes() {
+        let flags: Vec<bool> = Capability::ALL.iter().map(|c| c.is_change()).collect();
+
+        assert_eq!(
+            flags,
+            [
+                false, false, false, false, false, true, true, true, true, true
+            ]
+        );
+    }
+
+    #[test]
+    fn exactly_the_five_kinds_of_write_are_changes() {
+        let changes: Vec<Capability> = Capability::ALL
+            .into_iter()
+            .filter(|c| c.is_change())
+            .collect();
+
+        assert_eq!(changes, CHANGES);
+    }
+
+    #[test]
+    fn every_capability_has_a_label_and_a_detail() {
+        for capability in Capability::ALL {
+            assert!(!capability.label().is_empty(), "{capability:?}");
+            assert!(!capability.detail().is_empty(), "{capability:?}");
+        }
+    }
+
+    #[test]
+    fn reads_are_always_enabled() {
+        for (allow, disabled) in [
+            (false, vec![]),
+            (true, vec![]),
+            (false, Capability::ALL.to_vec()),
+            (true, Capability::ALL.to_vec()),
+        ] {
+            for row in capability_rows(allow, &disabled)
+                .iter()
+                .filter(|row| !row.change)
+            {
+                assert!(row.enabled, "{:?} allow={allow}", row.capability);
+            }
+        }
+    }
+
+    #[test]
+    fn changes_are_all_off_while_changes_to_jira_are_off() {
+        for row in capability_rows(false, &[]).iter().filter(|row| row.change) {
+            assert!(!row.enabled, "{:?}", row.capability);
+        }
+    }
+
+    #[test]
+    fn changes_are_all_on_when_allowed_and_none_is_disabled() {
+        for row in capability_rows(true, &[]).iter().filter(|row| row.change) {
+            assert!(row.enabled, "{:?}", row.capability);
+        }
+    }
+
+    #[test]
+    fn a_disabled_change_is_off_while_the_others_stay_on() {
+        let rows = capability_rows(true, &[Capability::Comment, Capability::ChangePriority]);
+
+        let enabled: Vec<(Capability, bool)> = rows
+            .iter()
+            .filter(|row| row.change)
+            .map(|row| (row.capability, row.enabled))
+            .collect();
+        assert_eq!(
+            enabled,
+            [
+                (Capability::Assign, true),
+                (Capability::ChangeStatus, true),
+                (Capability::ChangePriority, false),
+                (Capability::Comment, false),
+                (Capability::AddWebLink, true),
+            ]
+        );
+    }
+
+    #[test]
+    fn rows_follow_the_list_and_carry_the_label_detail_and_change_flag() {
+        let rows = capability_rows(true, &[]);
+
+        assert_eq!(rows.len(), Capability::ALL.len());
+        for (row, capability) in rows.iter().zip(Capability::ALL) {
+            assert_eq!(row.capability, capability);
+            assert_eq!(row.label, capability.label(), "{capability:?}");
+            assert_eq!(row.detail, capability.detail(), "{capability:?}");
+            assert_eq!(row.change, capability.is_change(), "{capability:?}");
+        }
+    }
+
+    #[test]
+    fn a_row_serializes_with_camel_case_names() {
+        let row = capability_rows(true, &[])
+            .into_iter()
+            .find(|row| row.capability == Capability::AddWebLink)
+            .unwrap();
+
+        assert_eq!(
+            serde_json::to_value(&row).unwrap(),
+            serde_json::json!({
+                "capability": "addWebLink",
+                "label": "Add web links",
+                "detail": "Add links such as a pull request to issues",
+                "change": true,
+                "enabled": true,
+            })
+        );
+    }
+}

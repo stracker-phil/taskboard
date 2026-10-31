@@ -19,6 +19,7 @@ export const behaviour = (patch: Partial<Behaviour> = {}): Behaviour => ({
   pinDefault: "untilUnpinned",
   openIssuesIn: "preview",
   allowJiraChanges: false,
+  disabledChanges: [],
   notifyAbout: "mentionsAndAssignments",
   ...patch,
 });

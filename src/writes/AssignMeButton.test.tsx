@@ -57,6 +57,21 @@ describe("AssignMeButton", () => {
     expect(mocked.issueToggleMine).toHaveBeenCalledWith("10042");
   });
 
+  it("is absent while assigning is switched off, though changes to Jira are on", async () => {
+    mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ allowJiraChanges: true, disabledChanges: ["assign"] }) }));
+    renderButton();
+    await vi.waitFor(() => expect(mocked.getSettings).toHaveBeenCalled());
+
+    expect(screen.queryByRole("button", { name: /NW-1042/ })).not.toBeInTheDocument();
+  });
+
+  it("stays when only another kind of change is switched off", async () => {
+    mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ allowJiraChanges: true, disabledChanges: ["changeStatus"] }) }));
+    renderButton(issueDetail({ assignedToMe: false }));
+
+    expect(await screen.findByRole("button", { name: "Assign NW-1042 to me" })).toBeInTheDocument();
+  });
+
   it("is absent while changes to Jira are off", async () => {
     allowChanges(false);
     renderButton();

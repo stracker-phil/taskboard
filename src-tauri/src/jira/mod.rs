@@ -2,6 +2,7 @@
 //! Every request goes through `gateway` (ADR 0025).
 
 mod api;
+pub mod capability;
 mod client;
 pub mod dto;
 pub mod gateway;

@@ -12,7 +12,9 @@ the gateway's allowlist (`jira/gateway/guard.rs` `RULES`): every new endpoint na
 | `read:jira-user` | Who you are (Test Connection, the Me chip, "Assigned to you") | Test Connection fails; the app doesn't know which issues are yours |
 | `write:jira-work` | Assigning issues, changing their status or priority, adding comments and web links | Changes fail with "a scoped token lacks write:jira-work"; reading keeps working |
 
-`write:jira-work` is only needed with Settings → Connection → **Allow changes to Jira** on
+Settings → Connection lists the same in plain words: what Taskboard reads, and each kind of change with its own
+switch (`jira::capability`, named by every request the gateway sends). `write:jira-work` is only needed with
+**Allow changes to Jira** on
 ([writes.md](writes.md)). Leave it out for a token that can only read.
 
 No scope covers profile pictures: they come from Atlassian's public avatar host without the token

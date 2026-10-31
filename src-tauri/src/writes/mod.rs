@@ -22,6 +22,7 @@ pub use web_link::add_web_link;
 
 use crate::db::Db;
 use crate::error::{AppError, AppResult};
+use crate::jira::capability::Capability;
 use crate::store::settings::Settings;
 use crate::sync::refetch_issue;
 use crate::sync::source::Source;
@@ -121,7 +122,7 @@ pub async fn apply(
     issue_id: String,
     change: Change,
 ) -> AppResult<WriteOutcome> {
-    ensure_allowed(settings)?;
+    ensure_allowed(settings, change.capability())?;
     match change {
         Change::Assign { account_id } => {
             assign::assign(db, source, Me::of(settings)?, issue_id, account_id).await
@@ -133,13 +134,29 @@ pub async fn apply(
     }
 }
 
-fn ensure_allowed(settings: &Settings) -> AppResult<()> {
-    if settings.behaviour.allow_jira_changes {
-        Ok(())
-    } else {
-        Err(AppError::InvalidInput(
+/// Changes to Jira are on, and this kind of change isn't switched off.
+fn ensure_allowed(settings: &Settings, capability: Capability) -> AppResult<()> {
+    if !settings.behaviour.allow_jira_changes {
+        return Err(AppError::InvalidInput(
             "Changes to Jira are off. Turn them on in Settings → Connection.".into(),
-        ))
+        ));
+    }
+    if settings.behaviour.disabled_changes.contains(&capability) {
+        return Err(AppError::InvalidInput(format!(
+            "“{}” is switched off in Settings → Connection.",
+            capability.label()
+        )));
+    }
+    Ok(())
+}
+
+impl Change {
+    pub fn capability(&self) -> Capability {
+        match self {
+            Self::Assign { .. } => Capability::Assign,
+            Self::Transition { .. } => Capability::ChangeStatus,
+            Self::Priority { .. } => Capability::ChangePriority,
+        }
     }
 }
 

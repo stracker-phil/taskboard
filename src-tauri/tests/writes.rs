@@ -15,6 +15,7 @@ use taskboard_lib::error::{AppError, AppResult, ErrorKind};
 use taskboard_lib::issues::{
     WebLink, WebLinkKind, issue_sync_comments, issue_sync_web_links, issue_web_links,
 };
+use taskboard_lib::jira::capability::Capability;
 use taskboard_lib::jira::{Limiter, TokenKind};
 use taskboard_lib::status_style::{Style, status_style_set};
 use taskboard_lib::store::settings::{Settings, SettingsStore};
@@ -2564,6 +2565,274 @@ mod dropping {
             assert_eq!(err.kind(), ErrorKind::InvalidInput, "{group_by:?}");
         }
         nothing_written(&rig).await;
+    }
+}
+
+mod a_kind_of_change_switched_off {
+    use super::*;
+
+    const SPEC_URL: &str = "https://docs.example.com/checkout/spec";
+
+    async fn switch_off(rig: &Rig, capability: Capability) {
+        rig.ctx
+            .settings
+            .edit(move |s| s.behaviour.disabled_changes = vec![capability])
+            .await
+            .unwrap();
+    }
+
+    fn off_message(label: &str) -> String {
+        format!("“{label}” is switched off in Settings → Connection.")
+    }
+
+    fn refused<T: std::fmt::Debug>(result: AppResult<T>) -> String {
+        match result {
+            Err(AppError::InvalidInput(message)) => message,
+            other => panic!("expected InvalidInput, got {other:?}"),
+        }
+    }
+
+    async fn add_link(rig: &Rig) -> AppResult<WriteOutcome> {
+        let source = rig.ctx.source().unwrap();
+        add_web_link(
+            &rig.ctx.db,
+            &*source,
+            &rig.settings(),
+            NW_1042.into(),
+            SPEC_URL.into(),
+            Some("Spec".into()),
+        )
+        .await
+    }
+
+    fn links_posted(rig: &Rig) -> usize {
+        rig.fake
+            .requests()
+            .iter()
+            .filter(|r| r.method == "POST" && r.path.ends_with("/remotelink"))
+            .count()
+    }
+
+    async fn drop_on_group(rig: &Rig, group_by: GroupBy, key: &str) -> AppResult<DropOutcome> {
+        let source = rig.ctx.source().unwrap();
+        drop_on(
+            &rig.ctx.db,
+            &*source,
+            &rig.settings(),
+            NW_1042.into(),
+            group_by,
+            key.into(),
+        )
+        .await
+    }
+
+    async fn targets(rig: &Rig, group_by: GroupBy) -> DropTargets {
+        let source = rig.ctx.source().unwrap();
+        drop_targets(
+            &rig.ctx.db,
+            &*source,
+            &rig.settings(),
+            NW_1042.into(),
+            group_by,
+        )
+        .await
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn assigning_is_refused_naming_the_label_and_changes_nothing() {
+        let rig = Rig::synced().await;
+        switch_off(&rig, Capability::Assign).await;
+
+        let message = refused(rig.try_apply(NW_1044, Some(ALEX)).await);
+
+        assert_eq!(message, off_message("Change the assignee"));
+        assert_eq!(rig.assignments_sent(), 0);
+        assert_eq!(rig.cached_assignee(NW_1044).await.as_deref(), Some(MARTA));
+        assert_eq!(rig.jira_assignee(NW_1044).await.as_deref(), Some(MARTA));
+        assert_eq!(rig.pending_writes().await, 0);
+    }
+
+    #[tokio::test]
+    async fn toggling_mine_is_refused_naming_the_label_and_changes_nothing() {
+        let rig = Rig::synced().await;
+        switch_off(&rig, Capability::Assign).await;
+        let source = rig.ctx.source().unwrap();
+
+        let message =
+            refused(toggle_mine(&rig.ctx.db, &*source, &rig.settings(), NW_1044.into()).await);
+
+        assert_eq!(message, off_message("Change the assignee"));
+        assert_eq!(rig.assignments_sent(), 0);
+        assert_eq!(rig.cached_assignee(NW_1044).await.as_deref(), Some(MARTA));
+        assert_eq!(rig.pending_writes().await, 0);
+    }
+
+    #[tokio::test]
+    async fn moving_is_refused_naming_the_label_and_changes_nothing() {
+        let rig = Rig::synced().await;
+        switch_off(&rig, Capability::ChangeStatus).await;
+
+        let message = refused(rig.try_move_to(NW_1042, DONE).await);
+
+        assert_eq!(message, off_message("Change the status"));
+        assert_eq!(rig.transitions_posted(), 0);
+        assert_eq!(
+            rig.cached_status(NW_1042).await,
+            (IN_PROGRESS.to_string(), "indeterminate".to_string())
+        );
+        assert_eq!(rig.pending_writes().await, 0);
+    }
+
+    #[tokio::test]
+    async fn setting_the_priority_is_refused_naming_the_label_and_changes_nothing() {
+        let rig = Rig::synced().await;
+        switch_off(&rig, Capability::ChangePriority).await;
+
+        let message = refused(rig.try_set_priority(NW_1042, "Low").await);
+
+        assert_eq!(message, off_message("Change the priority"));
+        assert_eq!(rig.priorities_sent(), 0);
+        assert_eq!(rig.cached_priority(NW_1042).await.as_deref(), Some("High"));
+        assert_eq!(rig.pending_writes().await, 0);
+    }
+
+    #[tokio::test]
+    async fn commenting_is_refused_naming_the_label_and_adds_nothing() {
+        let rig = Rig::synced().await;
+        switch_off(&rig, Capability::Comment).await;
+
+        let message = refused(rig.comment(NW_1042, "Checked").await);
+
+        assert_eq!(message, off_message("Add comments"));
+        assert_eq!(rig.comments_posted(), 0);
+        assert_eq!(rig.pending_comments(NW_1042).await, 0);
+        assert_eq!(rig.shown_comment_count(NW_1042).await, COMMENTS_ON_NW_1042);
+    }
+
+    #[tokio::test]
+    async fn adding_a_web_link_is_refused_naming_the_label_and_adds_nothing() {
+        let rig = Rig::synced().await;
+        switch_off(&rig, Capability::AddWebLink).await;
+
+        let message = refused(add_link(&rig).await);
+
+        assert_eq!(message, off_message("Add web links"));
+        assert_eq!(links_posted(&rig), 0);
+        assert_eq!(
+            issue_web_links(&rig.ctx.db, NW_1042.into()).await.unwrap(),
+            []
+        );
+    }
+
+    #[tokio::test]
+    async fn the_other_kinds_of_change_still_go_through() {
+        let rig = Rig::synced().await;
+        switch_off(&rig, Capability::Comment).await;
+
+        rig.apply(NW_1044, Some(ALEX)).await;
+        rig.move_to(NW_1042, DONE).await;
+        rig.set_priority(NW_1042, "Low").await;
+        add_link(&rig).await.unwrap();
+
+        assert_eq!(rig.jira_assignee(NW_1044).await.as_deref(), Some(ALEX));
+        assert_eq!(rig.jira_status(NW_1042).await, DONE);
+        assert_eq!(rig.jira_priority(NW_1042).await.as_deref(), Some("Low"));
+        assert_eq!(links_posted(&rig), 1);
+        assert_eq!(rig.comments_posted(), 0);
+    }
+
+    #[tokio::test]
+    async fn a_drop_on_a_grouping_whose_change_is_off_is_refused_and_writes_nothing() {
+        for (capability, group_by, key, label) in [
+            (
+                Capability::Assign,
+                GroupBy::Assignee,
+                MARTA,
+                "Change the assignee",
+            ),
+            (
+                Capability::ChangeStatus,
+                GroupBy::Status,
+                DONE,
+                "Change the status",
+            ),
+            (
+                Capability::ChangeStatus,
+                GroupBy::StatusType,
+                "done",
+                "Change the status",
+            ),
+            (
+                Capability::ChangePriority,
+                GroupBy::Priority,
+                "Low",
+                "Change the priority",
+            ),
+        ] {
+            let rig = Rig::synced().await;
+            switch_off(&rig, capability).await;
+
+            let message = refused(drop_on_group(&rig, group_by, key).await);
+
+            assert_eq!(message, off_message(label), "{group_by:?}");
+            assert_eq!(rig.transitions_posted(), 0, "{group_by:?}");
+            assert_eq!(rig.assignments_sent(), 0, "{group_by:?}");
+            assert_eq!(rig.priorities_sent(), 0, "{group_by:?}");
+            assert_eq!(rig.pending_writes().await, 0, "{group_by:?}");
+        }
+    }
+
+    #[tokio::test]
+    async fn a_grouping_whose_change_is_off_offers_no_drop_targets_and_says_why() {
+        for (capability, group_by, label) in [
+            (Capability::Assign, GroupBy::Assignee, "Change the assignee"),
+            (
+                Capability::ChangeStatus,
+                GroupBy::Status,
+                "Change the status",
+            ),
+            (
+                Capability::ChangeStatus,
+                GroupBy::StatusType,
+                "Change the status",
+            ),
+            (
+                Capability::ChangePriority,
+                GroupBy::Priority,
+                "Change the priority",
+            ),
+        ] {
+            let rig = Rig::synced().await;
+            switch_off(&rig, capability).await;
+            let requests_before = rig.fake.requests().len();
+
+            let found = targets(&rig, group_by).await;
+
+            assert_eq!(
+                found,
+                DropTargets {
+                    targets: Vec::new(),
+                    note: Some(off_message(label)),
+                },
+                "{group_by:?}"
+            );
+            assert_eq!(rig.fake.requests().len(), requests_before, "{group_by:?}");
+        }
+    }
+
+    #[tokio::test]
+    async fn the_groupings_of_the_other_changes_still_offer_their_targets() {
+        let rig = Rig::synced().await;
+        switch_off(&rig, Capability::ChangeStatus).await;
+
+        let assignee = targets(&rig, GroupBy::Assignee).await;
+        let priority = targets(&rig, GroupBy::Priority).await;
+
+        assert_eq!(assignee.note, None);
+        assert_eq!(assignee.targets.len(), 5);
+        assert_eq!(priority.note, None);
+        assert_eq!(priority.targets.len(), 5);
     }
 }
 

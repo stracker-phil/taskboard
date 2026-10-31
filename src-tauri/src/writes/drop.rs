@@ -8,6 +8,7 @@ use super::transition::{TransitionOption, transitions};
 use super::{Change, WriteOutcome, apply, issue_project};
 use crate::db::Db;
 use crate::error::{AppError, AppResult};
+use crate::jira::capability::Capability;
 use crate::status_style::Style;
 use crate::store::settings::Settings;
 use crate::sync::source::Source;
@@ -68,10 +69,10 @@ pub async fn drop_targets(
     issue_id: String,
     group_by: GroupBy,
 ) -> AppResult<DropTargets> {
-    if !settings.behaviour.allow_jira_changes {
-        return Ok(DropTargets::noted(
-            "Changes to Jira are off. Turn them on in Settings → Connection.",
-        ));
+    if let Some(capability) = drop_capability(group_by)
+        && let Err(AppError::InvalidInput(why)) = super::ensure_allowed(settings, capability)
+    {
+        return Ok(DropTargets::noted(&why));
     }
     let targets = match group_by {
         GroupBy::Status => status_targets(&free_moves(db, source, issue_id).await?),
@@ -95,6 +96,16 @@ pub async fn drop_targets(
         targets,
         note: None,
     })
+}
+
+/// What a drop changes when the view groups by `group_by`; none for groupings Taskboard can't change.
+fn drop_capability(group_by: GroupBy) -> Option<Capability> {
+    match group_by {
+        GroupBy::Status | GroupBy::StatusType => Some(Capability::ChangeStatus),
+        GroupBy::Assignee => Some(Capability::Assign),
+        GroupBy::Priority => Some(Capability::ChangePriority),
+        _ => None,
+    }
 }
 
 impl DropTargets {

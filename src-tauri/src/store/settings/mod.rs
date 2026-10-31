@@ -8,6 +8,7 @@ mod sync;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
+use crate::jira::capability::Capability;
 use crate::pins::PinDuration;
 use crate::views::IssueOpening;
 
@@ -31,7 +32,7 @@ pub struct Settings {
 pub const MAX_SEEN_AFTER_SECONDS: u8 = 10;
 
 /// How issues and pins behave by default (Settings → General).
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, TS)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, TS)]
 #[ts(export, export_to = "src/api/types.gen.ts")]
 #[serde(default, rename_all = "camelCase")]
 pub struct Behaviour {
@@ -43,6 +44,8 @@ pub struct Behaviour {
     pub open_issues_in: IssueOpening,
     /// Whether Taskboard may change Jira; off by default.
     pub allow_jira_changes: bool,
+    /// Kinds of change switched off while changes to Jira are on (`jira::capability`).
+    pub disabled_changes: Vec<Capability>,
     /// Which changes a macOS notification announces.
     pub notify_about: NotifyAbout,
 }
@@ -67,6 +70,7 @@ impl Default for Behaviour {
             pin_default: PinDuration::UntilUnpinned,
             open_issues_in: IssueOpening::Preview,
             allow_jira_changes: false,
+            disabled_changes: Vec::new(),
             notify_about: NotifyAbout::default(),
         }
     }

@@ -58,6 +58,22 @@ describe("StatusMenuButton", () => {
       expect(button).toHaveTextContent("In Progress");
     });
 
+    it("shows just the status pill while status changes are switched off, though changes to Jira are on", async () => {
+      mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ allowJiraChanges: true, disabledChanges: ["changeStatus"] }) }));
+      renderButton();
+      await vi.waitFor(() => expect(mocked.getSettings).toHaveBeenCalled());
+
+      expect(screen.getByText("In Progress")).toBeInTheDocument();
+      expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    });
+
+    it("stays a button when only assigning is switched off", async () => {
+      mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ allowJiraChanges: true, disabledChanges: ["assign"] }) }));
+      renderButton();
+
+      expect(await screen.findByRole("button", { name: "Change the status of NW-1042" })).toBeInTheDocument();
+    });
+
     it("shows just the status pill while changes to Jira are off", async () => {
       allowChanges(false);
       renderButton();

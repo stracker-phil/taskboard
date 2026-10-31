@@ -11,6 +11,7 @@ use super::{
 };
 use crate::db::Db;
 use crate::error::{AppError, AppResult};
+use crate::jira::capability::Capability;
 use crate::store::settings::Settings;
 use crate::sync::map::format_utc;
 use crate::sync::source::Source;
@@ -24,7 +25,7 @@ pub async fn toggle_mine(
     issue_id: String,
 ) -> AppResult<WriteOutcome> {
     // Says "changes are off" before asking who I am.
-    ensure_allowed(settings)?;
+    ensure_allowed(settings, Capability::Assign)?;
     let me = Me::of(settings)?;
     let id = issue_id.clone();
     let current = db.read(move |conn| assignee_of(conn, &id)).await?;

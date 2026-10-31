@@ -102,6 +102,10 @@ openIssuesIn: IssueOpening,
  */
 allowJiraChanges: boolean, 
 /**
+ * Kinds of change switched off while changes to Jira are on (`jira::capability`).
+ */
+disabledChanges: Array<Capability>, 
+/**
  * Which changes a macOS notification announces.
  */
 notifyAbout: NotifyAbout, };
@@ -133,6 +137,17 @@ export type BoardData = { columns: Array<BoardColumn>, rows: { [key in string]: 
  * What a card shows besides its key and summary, in order.
  */
 cardFields: Array<string>, };
+
+export type Capability = "account" | "projects" | "issues" | "issueDetails" | "checkQueries" | "assign" | "changeStatus" | "changePriority" | "comment" | "addWebLink";
+
+/**
+ * A capability as Settings → Connection shows it.
+ */
+export type CapabilityRow = { capability: Capability, label: string, detail: string, change: boolean, 
+/**
+ * A change: allowed now (changes to Jira on and this one not switched off). A read: always.
+ */
+enabled: boolean, };
 
 export type Cell = { "kind": "text", "value": string } | { "kind": "person", "value": Person };
 

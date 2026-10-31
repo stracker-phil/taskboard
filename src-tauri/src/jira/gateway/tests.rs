@@ -10,6 +10,7 @@ use super::{
     Jql, LinkTitle, PageToken, Planned, PriorityName, ProjectKey, TransitionId, WebUrl, check,
 };
 use crate::error::AppError;
+use crate::jira::capability::Capability;
 use crate::jira::site::{Site, TokenKind};
 
 const CLOUD_ID: &str = "11111111-2222-3333-4444-555555555555";
@@ -1454,6 +1455,47 @@ fn an_empty_blank_oversized_or_control_character_link_title_is_refused() {
             matches!(LinkTitle::parse(input), Err(AppError::InvalidInput(_))),
             "{input:?}"
         );
+    }
+}
+
+fn every_endpoint_kind() -> Vec<Endpoint> {
+    let mut endpoints: Vec<Endpoint> = allowlist()
+        .into_iter()
+        .map(|(endpoint, ..)| endpoint)
+        .collect();
+    endpoints.extend([
+        Endpoint::TenantInfo,
+        assign("NW-1042", Some(account(ACCOUNT))),
+        transition("NW-1042", "31"),
+        add_comment("NW-1042"),
+        add_remote_link("NW-1042", "https://example.com/spec", "Spec"),
+        set_priority("NW-1042", "High"),
+    ]);
+    endpoints
+}
+
+#[test]
+fn an_endpoint_is_a_change_exactly_when_it_plans_a_write() {
+    for (_, site) in sites() {
+        for endpoint in every_endpoint_kind() {
+            assert_eq!(
+                endpoint.capability().is_change(),
+                endpoint.plan(&site).unwrap().access == Access::Write,
+                "{endpoint:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn every_capability_is_named_by_an_endpoint() {
+    let named: Vec<Capability> = every_endpoint_kind()
+        .iter()
+        .map(Endpoint::capability)
+        .collect();
+
+    for capability in Capability::ALL {
+        assert!(named.contains(&capability), "{capability:?}");
     }
 }
 

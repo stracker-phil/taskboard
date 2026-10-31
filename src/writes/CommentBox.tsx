@@ -2,11 +2,11 @@ import { useState, type KeyboardEvent } from "react";
 import { api } from "../api";
 import { attempt } from "../state/requests";
 import { useStore } from "../state/store";
-import { useJiraChanges } from "./useJiraChanges";
+import { useJiraChange } from "./useJiraChanges";
 
-/** Absent while changes to Jira are off. */
+/** Absent while changes to Jira, or comments, are off. */
 export function CommentBox({ issueId }: { issueId: string }) {
-  const jiraChanges = useJiraChanges();
+  const jiraChanges = useJiraChange("comment");
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   if (!jiraChanges) return null;

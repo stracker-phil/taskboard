@@ -8,6 +8,7 @@ export const SETTINGS_KEYS = {
   projects: ["projects"],
   scope: ["scope"],
   keybindings: ["keybindings"],
+  capabilities: ["capabilities"],
 } as const;
 
 export const useSettings = () => useQuery({ queryKey: SETTINGS_KEYS.settings, queryFn: api.getSettings });
@@ -15,3 +16,4 @@ export const useConnection = () => useQuery({ queryKey: SETTINGS_KEYS.connection
 export const useProjects = () => useQuery({ queryKey: SETTINGS_KEYS.projects, queryFn: api.projectsList });
 export const useScope = () => useQuery({ queryKey: SETTINGS_KEYS.scope, queryFn: api.scopeGet });
 export const useKeybindings = () => useQuery({ queryKey: SETTINGS_KEYS.keybindings, queryFn: api.getKeybindings });
+export const useCapabilities = () => useQuery({ queryKey: SETTINGS_KEYS.capabilities, queryFn: api.jiraCapabilities });

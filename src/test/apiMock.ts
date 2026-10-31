@@ -7,6 +7,7 @@ import {
   type Assignees,
   type Behaviour,
   type BoardData,
+  type CapabilityRow,
   type Connection,
   type ConnectionInput,
   type ConnectionView,
@@ -37,6 +38,7 @@ import {
   type ViewData,
   type WriteOutcome,
 } from "../api/types";
+import { capabilityRows } from "./capabilities";
 import { filterOptions } from "./filters";
 import { issueDetail } from "./issues";
 import { settings } from "./settings";
@@ -77,6 +79,8 @@ export function createApiMock(): Api {
     updateSettings: vi.fn(async (s: Settings) => s),
     appearanceSet: vi.fn(async (appearance: Appearance): Promise<Settings> => settings({ appearance })),
     behaviourSet: vi.fn(async (behaviour: Behaviour): Promise<Settings> => settings({ behaviour })),
+    jiraCapabilities: vi.fn(async (): Promise<CapabilityRow[]> => capabilityRows()),
+    jiraCapabilitySet: vi.fn(async (): Promise<Settings> => settings()),
     getKeybindings:vi.fn().mockResolvedValue({}),
     setKeybindings: vi.fn(async (bindings: Keybindings) => bindings),
     getUiState: vi.fn().mockResolvedValue(EMPTY_UI_STATE),

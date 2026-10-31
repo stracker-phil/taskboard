@@ -5,7 +5,7 @@ import { api, type WebLink } from "../api";
 import { useIssueWebLinks, webLinksKey } from "../queries/issues";
 import { attempt } from "../state/requests";
 import { AddWebLinkButton, AddWebLinkForm } from "../writes/AddWebLink";
-import { useJiraChanges } from "../writes/useJiraChanges";
+import { useJiraChange } from "../writes/useJiraChanges";
 
 /** The issue's web links (pull requests, documents), fetched again whenever the issue is shown. Only https links
  *  open, in the default browser; the rest show as text. Hidden when there are none, except in the Issue view while
@@ -13,7 +13,7 @@ import { useJiraChanges } from "../writes/useJiraChanges";
 export function WebLinks({ id, variant }: { id: string; variant: "issue" | "peek" }) {
   const client = useQueryClient();
   const { data: links = [] } = useIssueWebLinks(id);
-  const adding = useJiraChanges() && variant === "issue";
+  const adding = useJiraChange("addWebLink") && variant === "issue";
   const [formOpen, setFormOpen] = useState(false);
   useEffect(() => {
     // A failure (offline) leaves the cached links; Rust logs it. New links are read again and set directly: an

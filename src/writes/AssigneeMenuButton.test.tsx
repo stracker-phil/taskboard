@@ -52,6 +52,22 @@ describe("AssigneeMenuButton", () => {
       expect(button).toHaveTextContent("Alex Morgan");
     });
 
+    it("shows the plain assignee while assigning is switched off, though changes to Jira are on", async () => {
+      mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ allowJiraChanges: true, disabledChanges: ["assign"] }) }));
+      renderButton();
+      await vi.waitFor(() => expect(mocked.getSettings).toHaveBeenCalled());
+
+      expect(screen.getByText("Alex Morgan")).toBeInTheDocument();
+      expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    });
+
+    it("stays a button when only the status change is switched off", async () => {
+      mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ allowJiraChanges: true, disabledChanges: ["changeStatus"] }) }));
+      renderButton();
+
+      expect(await screen.findByRole("button", { name: "Change the assignee of NW-1042" })).toBeInTheDocument();
+    });
+
     it("shows the plain assignee while changes to Jira are off", async () => {
       allowChanges(false);
       renderButton();

@@ -42,6 +42,21 @@ describe("CommentBox", () => {
     expect(screen.queryByRole("button", { name: "Comment" })).not.toBeInTheDocument();
   });
 
+  it("is absent while commenting is switched off, though changes to Jira are on", async () => {
+    mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ allowJiraChanges: true, disabledChanges: ["comment"] }) }));
+    renderBox();
+    await vi.waitFor(() => expect(mocked.getSettings).toHaveBeenCalled());
+
+    expect(screen.queryByRole("textbox", { name: "Add a comment" })).not.toBeInTheDocument();
+  });
+
+  it("stays when only another kind of change is switched off", async () => {
+    mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ allowJiraChanges: true, disabledChanges: ["assign", "addWebLink"] }) }));
+    renderBox();
+
+    expect(await box()).toBeInTheDocument();
+  });
+
   it("keeps Comment disabled until there is text beyond whitespace", async () => {
     renderBox();
     const input = await box();

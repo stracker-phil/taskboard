@@ -9,9 +9,14 @@ sent once and never retried.
 
 - The build: `jira/gateway/guard.rs` `WRITES_ENABLED`.
 - The user: Settings → Connection → Changes → **Allow changes to Jira** (`behaviour.allowJiraChanges`, off by
-  default; the debug build turns it on when it first connects to the fake Jira). Off, a write fails as
-  `invalid_input` ("Changes to Jira are off…"), the row toolbar and the headers hide their write buttons, and
-  the I key shows that hint.
+  default; the debug build turns it on when it first connects to the fake Jira), then each kind of change on its own
+  (`behaviour.disabledChanges`: Change the assignee, Change the status, Change the priority, Add comments, Add web
+  links). Off, a write fails as `invalid_input` ("Changes to Jira are off…" or "“Add comments” is switched off…"),
+  the page hides that change's buttons, menu items and keys, and a drag onto groups it would change says why.
+- The list is `jira::capability`: every gateway endpoint names its `Capability` (`Endpoint::capability`, an
+  exhaustive match), so a new request can't exist without one, and `writes::ensure_allowed` checks the change's
+  capability before anything is sent. `jira_capabilities` gives the page the list (the reads as information, the
+  changes as switches); `jira_capability_set` switches a change.
 - A scoped token needs `write:jira-work`. A `403` on a write is `invalid_input` naming that scope; it never
   pauses the sync. A `400` shows Jira's reason.
 

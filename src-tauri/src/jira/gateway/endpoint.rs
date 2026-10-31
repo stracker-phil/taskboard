@@ -9,6 +9,7 @@ use super::params::{
     PriorityName, ProjectKey, TransitionId, WebUrl,
 };
 use crate::error::{AppError, AppResult};
+use crate::jira::capability::Capability;
 use crate::jira::site::Site;
 
 /// Results per search, comment or changelog page.
@@ -140,6 +141,34 @@ pub struct Planned {
 }
 
 impl Endpoint {
+    /// What the request does for the owner (`jira::capability`): every endpoint names one, so the capability list
+    /// is what Taskboard can do.
+    pub fn capability(&self) -> Capability {
+        match self {
+            Self::Myself | Self::TenantInfo => Capability::Account,
+            Self::Fields
+            | Self::Statuses
+            | Self::ProjectSearch { .. }
+            | Self::ProjectVersions { .. }
+            | Self::FieldUsage { .. } => Capability::Projects,
+            Self::SearchJql { .. } | Self::BulkFetch { .. } | Self::ApproximateCount { .. } => {
+                Capability::Issues
+            }
+            Self::IssueComments { .. }
+            | Self::IssueRemoteLinks { .. }
+            | Self::IssueChangelog { .. }
+            | Self::AttachmentContent { .. }
+            | Self::IssueTransitions { .. }
+            | Self::IssueEditMeta { .. } => Capability::IssueDetails,
+            Self::JqlParse { .. } => Capability::CheckQueries,
+            Self::AssignIssue { .. } => Capability::Assign,
+            Self::TransitionIssue { .. } => Capability::ChangeStatus,
+            Self::SetPriority { .. } => Capability::ChangePriority,
+            Self::AddComment { .. } => Capability::Comment,
+            Self::AddRemoteLink { .. } => Capability::AddWebLink,
+        }
+    }
+
     pub fn plan(&self, site: &Site) -> AppResult<Planned> {
         match self {
             Self::Myself => Rest::get(&["myself"]).plan(site),

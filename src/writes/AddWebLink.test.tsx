@@ -87,6 +87,22 @@ describe("Add link", () => {
       expect(screen.queryByRole("region", { name: "Web links" })).not.toBeInTheDocument();
     });
 
+    it("has no button while adding links is switched off, but still lists the links", async () => {
+      mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ allowJiraChanges: true, disabledChanges: ["addWebLink"] }) }));
+      mocked.issueWebLinks.mockResolvedValue([webLink()]);
+      renderLinks();
+
+      expect(await screen.findByRole("button", { name: /Postcode guide/ })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Add link" })).not.toBeInTheDocument();
+    });
+
+    it("keeps the button when only another kind of change is switched off", async () => {
+      mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ allowJiraChanges: true, disabledChanges: ["comment"] }) }));
+      renderLinks();
+
+      expect(await addButton()).toBeInTheDocument();
+    });
+
     it("has no button while changes to Jira are off, but still lists the links", async () => {
       allowChanges(false);
       mocked.issueWebLinks.mockResolvedValue([webLink()]);

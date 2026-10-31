@@ -6,6 +6,7 @@ use tauri_plugin_opener::OpenerExt;
 
 use crate::error::{AppError, AppResult};
 use crate::events::{KEYBINDINGS_CHANGED_EVENT, announce_settings};
+use crate::jira::capability::{Capability, CapabilityRow, capability_rows};
 use crate::launch::LaunchEvent;
 use crate::state::AppState;
 use crate::store::keybindings::Keybindings;
@@ -59,6 +60,41 @@ pub async fn behaviour_set(
     let saved = state
         .settings
         .edit(move |s| s.behaviour = behaviour)
+        .await?;
+    announce_settings(&app, &saved);
+    Ok(saved)
+}
+
+/// What Taskboard does with Jira, each change allowed or not (Settings → Connection).
+#[tauri::command]
+pub fn jira_capabilities(state: State<'_, AppState>) -> Vec<CapabilityRow> {
+    let behaviour = state.settings.get().behaviour;
+    capability_rows(behaviour.allow_jira_changes, &behaviour.disabled_changes)
+}
+
+/// Switches one kind of change on or off; reads can't be switched.
+#[tauri::command]
+pub async fn jira_capability_set(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    capability: Capability,
+    enabled: bool,
+) -> AppResult<Settings> {
+    if !capability.is_change() {
+        return Err(AppError::InvalidInput(format!(
+            "“{}” is always on",
+            capability.label()
+        )));
+    }
+    let saved = state
+        .settings
+        .edit(move |s| {
+            let disabled = &mut s.behaviour.disabled_changes;
+            disabled.retain(|c| *c != capability);
+            if !enabled {
+                disabled.push(capability);
+            }
+        })
         .await?;
     announce_settings(&app, &saved);
     Ok(saved)

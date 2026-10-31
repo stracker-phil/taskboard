@@ -55,6 +55,7 @@ impl SettingsStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::jira::capability::Capability;
     use crate::pins::PinDuration;
     use crate::store::settings::{
         Appearance, Behaviour, Connection, MAX_SEEN_AFTER_SECONDS, SyncSettings,
@@ -305,6 +306,7 @@ mod tests {
                 pin_default: PinDuration::UntilUnpinned,
                 open_issues_in: IssueOpening::Preview,
                 allow_jira_changes: false,
+                disabled_changes: Vec::new(),
                 notify_about: crate::store::settings::NotifyAbout::default(),
             }
         );
@@ -352,6 +354,7 @@ mod tests {
                 pin_default: PinDuration::Week,
                 open_issues_in: IssueOpening::Preview,
                 allow_jira_changes: false,
+                disabled_changes: Vec::new(),
                 notify_about: crate::store::settings::NotifyAbout::default(),
             }
         );
@@ -386,10 +389,12 @@ mod tests {
             pin_default: PinDuration::TwoDays,
             open_issues_in: IssueOpening::Full,
             allow_jira_changes: true,
+            disabled_changes: vec![Capability::Comment, Capability::AddWebLink],
             notify_about: crate::store::settings::NotifyAbout::MyIssues,
         };
+        let stored = behaviour.clone();
 
-        let saved = store.edit(move |s| s.behaviour = behaviour).await.unwrap();
+        let saved = store.edit(move |s| s.behaviour = stored).await.unwrap();
 
         assert_eq!(saved.behaviour, behaviour);
         assert_eq!(store.get().behaviour, behaviour);
@@ -398,8 +403,23 @@ mod tests {
             serde_json::from_str(&fs::read_to_string(dir.path().join(FILE_NAME)).unwrap()).unwrap();
         assert_eq!(
             file["behaviour"],
-            serde_json::json!({"seenAfterSeconds": 5, "pinDefault": "twoDays", "openIssuesIn": "full", "allowJiraChanges": true, "notifyAbout": "myIssues"})
+            serde_json::json!({"seenAfterSeconds": 5, "pinDefault": "twoDays", "openIssuesIn": "full", "allowJiraChanges": true, "disabledChanges": ["comment", "addWebLink"], "notifyAbout": "myIssues"})
         );
+    }
+
+    #[test]
+    fn a_behavior_in_the_file_without_disabled_changes_reads_as_none_disabled() {
+        let dir = temp_config_dir();
+        fs::write(
+            dir.path().join(FILE_NAME),
+            r#"{"behaviour":{"allowJiraChanges":true}}"#,
+        )
+        .unwrap();
+
+        let behaviour = SettingsStore::open(dir.path()).get().behaviour;
+
+        assert!(behaviour.allow_jira_changes);
+        assert_eq!(behaviour.disabled_changes, Vec::<Capability>::new());
     }
 
     #[test]
@@ -420,6 +440,7 @@ mod tests {
                 pin_default: PinDuration::Week,
                 open_issues_in: IssueOpening::Preview,
                 allow_jira_changes: false,
+                disabled_changes: Vec::new(),
                 notify_about: crate::store::settings::NotifyAbout::default(),
             }
         );
@@ -445,6 +466,7 @@ mod tests {
                     pin_default: PinDuration::UntilUnpinned,
                     open_issues_in: IssueOpening::Preview,
                     allow_jira_changes: false,
+                    disabled_changes: Vec::new(),
                     notify_about: crate::store::settings::NotifyAbout::default(),
                 },
                 sync: SyncSettings {

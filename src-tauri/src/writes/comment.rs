@@ -9,6 +9,7 @@ use crate::adf::{self, Media};
 use crate::db::Db;
 use crate::error::{AppError, AppResult};
 use crate::issues::store_comment;
+use crate::jira::capability::Capability;
 use crate::jira::dto::Comment;
 use crate::store::settings::Settings;
 use crate::sync::map::format_utc;
@@ -25,7 +26,7 @@ pub async fn add_comment(
     issue_id: String,
     text: String,
 ) -> AppResult<WriteOutcome> {
-    ensure_allowed(settings)?;
+    ensure_allowed(settings, Capability::Comment)?;
     let me = Me::of(settings)?;
     let text = checked_text(&text)?;
     let body = adf::from_plain_text(&text);

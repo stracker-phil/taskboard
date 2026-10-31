@@ -22,6 +22,8 @@ export function registerCoreSettingsPages() {
     sections: [
       { id: "site", title: "Jira site" },
       { id: "token", title: "Token" },
+      { id: "changes", title: "Changes" },
+      { id: "reads", title: "What Taskboard reads" },
     ],
     Body: ConnectionPage,
   });
