@@ -43,11 +43,11 @@ beforeEach(() => {
 });
 
 describe("SpaceSettings", () => {
-  it("shows the Space's name and the General, Layouts, Statuses and Custom fields groups", async () => {
+  it("shows the Space's name and the General, Layouts, Statuses, Team and Custom fields groups", async () => {
     await renderSettings();
 
     expect(screen.getByRole("heading", { name: "Website relaunch" })).toBeInTheDocument();
-    for (const name of ["General", "Layouts", "Statuses", "Custom fields"]) expect(await screen.findByRole("region", { name })).toBeInTheDocument();
+    for (const name of ["General", "Layouts", "Statuses", "Team", "Custom fields"]) expect(await screen.findByRole("region", { name })).toBeInTheDocument();
     expect(mocked.spaceConfig).toHaveBeenCalledWith("10001");
     expect(mocked.statusStylesList).toHaveBeenCalledWith("10001");
   });

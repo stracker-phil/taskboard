@@ -52,6 +52,7 @@ import type {
   Style,
   SyncOverview,
   SyncSettings,
+  TeamMember,
   UiState,
   View,
   ViewData,
@@ -235,6 +236,9 @@ export const api = {
   spaceSetLayouts: (projectId: string, layouts: SpaceLayouts) => invoke<SpaceConfig>("space_set_layouts", { projectId, layouts }),
   spaceSetField: (projectId: string, fieldId: string, visibility: FieldVisibility) =>
     invoke<SpaceConfig>("space_set_field", { projectId, fieldId, visibility }),
+  spaceTeam: (projectId: string) => invoke<TeamMember[]>("space_team", { projectId }),
+  spaceSetMember: (projectId: string, accountId: string, active: boolean) =>
+    invoke<TeamMember[]>("space_set_member", { projectId, accountId, active }),
   appInfo: async (): Promise<AppInfo> => {
     const [name, version] = await Promise.all([getName(), getVersion()]);
     return { name, version };

@@ -75,6 +75,11 @@ export const SPACE_CONFIG_KEY = ["spaceConfig"] as const;
 export const useSpaceConfig = (projectId: string) =>
   useQuery({ queryKey: [...SPACE_CONFIG_KEY, projectId], queryFn: () => api.spaceConfig(projectId) });
 
+/** Everyone with activity in a Space's issues, and who of them is switched off. */
+export const TEAM_KEY = ["team"] as const;
+export const spaceTeamKey = (projectId: string) => [...TEAM_KEY, "space", projectId] as const;
+export const useSpaceTeam = (projectId: string) => useQuery({ queryKey: spaceTeamKey(projectId), queryFn: () => api.spaceTeam(projectId) });
+
 /** A level's locked and own conditions and the view's own ones, for the Filter popover. */
 export const LIST_CONDITIONS_KEY = ["listConditions"] as const;
 export const listConditionsKey = (listId: number, viewId: number) => [...LIST_CONDITIONS_KEY, listId, viewId] as const;

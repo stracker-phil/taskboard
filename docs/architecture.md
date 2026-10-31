@@ -139,6 +139,7 @@ src-tauri/
   src/quicklook.rs           macOS only: the Quick Look panel on one file (ADR 0035)
   src/status_style/          the six status styles (status types): detection and the owner's overrides per Space
   src/space_config/          a Space's own settings: offered layouts, new views' layout and grouping, field visibility
+  src/team/                  a Space's team: everyone with activity in its issues, minus the people switched off
   src/avatars/               people's profile pictures: freshness, the `cache.avatar` rows, `user_avatar` (data URLs)
   src/nav/                   where the main window is (level and view, nav.json); previous/next Space
   src/<feature>/             one folder per feature: types, pure logic, commands.rs, tests

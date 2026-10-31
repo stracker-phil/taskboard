@@ -10,6 +10,7 @@ import { openMenu } from "../../menu";
 import { SpaceLookButton } from "../../SpaceLookButton";
 import { Group, Row, Segmented, SwitchInput } from "../controls";
 import { SpaceStatuses } from "./SpaceStatuses";
+import { SpaceTeam } from "./SpaceTeam";
 
 const LAYOUTS: Layout[] = ["list", "board", "table"];
 const LAYOUT_NAMES: Record<Layout, string> = { list: "List", board: "Board", table: "Table" };
@@ -48,6 +49,7 @@ export function SpaceSettings({ space, onBack }: { space: SpaceNode; onBack: () 
       </Group>
       {config && <LayoutsGroup config={config} />}
       <SpaceStatuses projectId={space.projectId} />
+      <SpaceTeam projectId={space.projectId} />
       {config && <FieldsGroup config={config} />}
     </>
   );

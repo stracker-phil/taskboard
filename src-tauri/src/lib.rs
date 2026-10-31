@@ -41,6 +41,7 @@ pub mod state;
 pub mod status_style;
 pub mod store;
 pub mod sync;
+pub mod team;
 #[cfg(any(test, debug_assertions, feature = "test-util"))]
 pub mod test_support;
 pub mod views;

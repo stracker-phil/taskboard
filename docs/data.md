@@ -84,6 +84,7 @@ unique across sources (Jira's numeric ids; another source prefixes its own):
 | `pin` | bookmarked issues, comments, filter lists and views (Bookmarks in the UI; `target_kind` `issue`, `comment`, `filter_list`, `view`), with an optional reason and expiry; active while not removed and not expired (`pins::active`); ended bookmarks stay in Recently removed for 7 days |
 | `space_status_style` | overrides the detected style of a status in one Space (`local/0007`; the old app-wide `status_style` rows were copied to every Space) |
 | `space_field` | how a custom field shows in one Space: `hiddenInList`, `hiddenInDetail` or `hidden`; no row = visible (`space_config`) |
+| `space_member_off` | people switched off in a Space's team (they left it); no row = active (`team`, `local/0016`) |
 | `issue_seen` | when the owner last looked at an issue: changes after it are unseen (`changes::UNSEEN`); `unread`: marked unread by the owner, unread until read again. In the local file since `local/0015`, so a cache reset keeps it (`db::connection::carry_over_seen` copied the cache's rows once); no foreign key to `cache.issue`, `sync::store::forget_issue` deletes the row with its issue |
 
 Project ids in `local` point into `cache`; SQLite can't enforce that across files, so code cleans up.

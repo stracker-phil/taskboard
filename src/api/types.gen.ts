@@ -782,6 +782,12 @@ clearCacheOnQuit: boolean, };
 
 export type SyncState = { "state": "idle", lastOk: string | null, } | { "state": "running", job: Job, } | { "state": "error", kind: ErrorKind, message: string, } | { "state": "offline", since: string, } | { "state": "paused", message: string, };
 
+export type TeamMember = { person: Person, active: boolean, 
+/**
+ * Open issues of the Space assigned to them.
+ */
+assigned: number, };
+
 /**
  * Text with its matches marked; the page bolds the `strong` parts.
  */

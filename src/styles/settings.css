@@ -166,6 +166,7 @@
 .status-row .status-pill { flex: none; }
 .status-row__count { font-size: 12px; color: var(--settings-text-tertiary); white-space: nowrap; }
 .status-row__spacer { flex: 1; }
+.team-row__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .status-row__style { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
 
 /* Settings → Status: a value with its tone icon. */

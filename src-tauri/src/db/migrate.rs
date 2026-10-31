@@ -21,6 +21,7 @@ pub const LOCAL: &[&str] = &[
     include_str!("../../migrations/local/0013_view_subtasks.sql"),
     include_str!("../../migrations/local/0014_view_only_mine.sql"),
     include_str!("../../migrations/local/0015_issue_seen.sql"),
+    include_str!("../../migrations/local/0016_space_member_off.sql"),
 ];
 pub const CACHE: &[&str] = &[
     include_str!("../../migrations/cache/0001_init.sql"),

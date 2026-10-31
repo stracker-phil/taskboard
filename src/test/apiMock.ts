@@ -119,6 +119,8 @@ export function createApiMock(): Api {
     spaceConfig: vi.fn(async (projectId: string): Promise<SpaceConfig> => spaceConfig({ projectId })),
     spaceSetLayouts: vi.fn(),
     spaceSetField: vi.fn(),
+    spaceTeam: vi.fn().mockResolvedValue([]),
+    spaceSetMember: vi.fn().mockResolvedValue([]),
     navCurrent: vi.fn(async (): Promise<Nav> => ({ location: null, expanded: [] })),
     navGo: vi.fn(async (listId: number, viewId: number | null): Promise<Nav> => ({ location: { listId, viewId: viewId ?? 0 }, expanded: [] })),
     navSetExpanded: vi.fn(async (expanded: number[]): Promise<Nav> => ({ location: null, expanded })),

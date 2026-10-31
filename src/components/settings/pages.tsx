@@ -44,6 +44,7 @@ export function registerCoreSettingsPages() {
       { id: "spaces", title: "Spaces" },
       { id: "layouts", title: "Layouts" },
       { id: "statuses", title: "Statuses" },
+      { id: "team", title: "Team" },
       { id: "fields", title: "Custom fields" },
     ],
     Body: SpacesPage,

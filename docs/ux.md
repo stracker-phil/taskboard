@@ -695,6 +695,9 @@ no separate Settings design; owner, 2026-10-28). Its colors are the `--settings-
     "N issues", and a button (the style's square and "Automatic · X" or the style's name) with a menu of
     Automatic and the six styles, the chosen one checked. *Custom fields*: a row per field with a menu of
     Visible, Hidden in list (no column choice), Hidden in detail (not in the Issue view) and Hidden everywhere.
+    *Team* (`spaces/SpaceTeam`): everyone who is assigned, reported, commented or changed something in the
+    Space's issues (`team::team`), by name, a row: avatar, name, "N open issues" and a switch; switched off (left
+    the team), a person is no longer offered to assign to or to filter by. A search field from 9 people on.
     Each field saves on its own with Rust's field error under it. The header's tile opens `LookPopover`.
     "Track projects under Projects to get Spaces." when none is tracked. The sidebar's "Client label…" item
     opens `SpacePopover` (300px, 12px radius, `--shadow-popover`, at the top left of the content panel) with the
