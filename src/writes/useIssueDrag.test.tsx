@@ -340,6 +340,36 @@ describe("dragging in the List", () => {
       expect(zones("ok")).toHaveLength(0);
     });
 
+    it("marks only the zone under the pointer that takes the drop as over, and unmarks it when the pointer leaves", async () => {
+      answer([target("b", "Set status to Beta"), target("c", "Set status to Gamma")]);
+      await renderList();
+      dragPricing();
+      await answered();
+
+      pointer.over(zones("ok")[0]);
+      pointer.moveTo(50, 50);
+
+      expect(zones("ok")[0]).toHaveClass("drop-zone--over");
+      expect(zones("ok")[1]).not.toHaveClass("drop-zone--over");
+
+      pointer.over(null);
+      pointer.moveTo(60, 60);
+
+      expect(zones().filter((zone) => zone.classList.contains("drop-zone--over"))).toHaveLength(0);
+    });
+
+    it("never marks a zone that refuses the drop as over", async () => {
+      answer([target("b", "Set status to Beta")]);
+      await renderList();
+      dragPricing();
+      await answered();
+
+      pointer.over(zones("no")[0]);
+      pointer.moveTo(50, 50);
+
+      expect(zones("no")[0]).not.toHaveClass("drop-zone--over");
+    });
+
     it("removes the zones once the drag is over", async () => {
       answer([target("b", "Set status to Beta")]);
       await renderList();
@@ -384,6 +414,19 @@ describe("dragging in the List", () => {
 
       await answered();
       expect(tray()).toBeNull();
+    });
+
+    it("marks the chip under the pointer as over", async () => {
+      answer([target("sam", "Assign to Sam Lee")]);
+      await renderList();
+      dragPricing();
+      await waitFor(() => expect(chips()).toHaveLength(1));
+      expect(chips()[0]).not.toHaveClass("drop-chip--over");
+
+      pointer.over(chips()[0]);
+      pointer.moveTo(50, 50);
+
+      expect(chips()[0]).toHaveClass("drop-chip--over");
     });
 
     it("takes a drop on a chip", async () => {
@@ -815,6 +858,48 @@ describe("dragging on the Board", () => {
     expect(tray()).toHaveTextContent("Also");
     expect(chips()[0]).toHaveAttribute("data-drop-key", "sam");
     expect(chips()[0]).toHaveTextContent("Assign to Sam Lee");
+  });
+
+  it("marks the column zone under the pointer as over, and unmarks it when the pointer leaves", async () => {
+    answer([target("5", "Set status to Done")]);
+    await renderBoard();
+    dragCard();
+    await answered();
+
+    pointer.over(zones("ok")[0]);
+    pointer.moveTo(50, 50);
+
+    expect(zones("ok")[0]).toHaveClass("drop-zone--over");
+    expect(zones("no")[0]).not.toHaveClass("drop-zone--over");
+
+    pointer.over(null);
+    pointer.moveTo(60, 60);
+
+    expect(zones("ok")[0]).not.toHaveClass("drop-zone--over");
+  });
+
+  it("never marks a column that refuses the drop as over", async () => {
+    answer([target("5", "Set status to Done")]);
+    await renderBoard();
+    dragCard();
+    await answered();
+
+    pointer.over(zones("no")[0]);
+    pointer.moveTo(50, 50);
+
+    expect(zones("no")[0]).not.toHaveClass("drop-zone--over");
+  });
+
+  it("marks the chip under the pointer as over", async () => {
+    answer([target("sam", "Assign to Sam Lee")]);
+    await renderBoard();
+    dragCard();
+    await waitFor(() => expect(chips()).toHaveLength(1));
+
+    pointer.over(chips()[0]);
+    pointer.moveTo(50, 50);
+
+    expect(chips()[0]).toHaveClass("drop-chip--over");
   });
 
   it("moves the card onto the column zone it is released over", async () => {

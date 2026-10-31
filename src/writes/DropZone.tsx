@@ -7,23 +7,25 @@ import type { Drag } from "./useIssueDrag";
 export interface Zone {
   state: "ok" | "no" | "wait";
   target: DropTarget | null;
+  /** The pointer is over it. */
+  over: boolean;
 }
 
 /** How the group `key` shows during the drag; null without a drag and for the issue's own group, which stays as it
  *  is so the issue can go back there. */
 export function zoneOf(drag: Drag | null, key: string): Zone | null {
   if (!drag || key === drag.issue.fromKey) return null;
-  if (!drag.targets) return { state: "wait", target: null };
+  if (!drag.targets) return { state: "wait", target: null, over: false };
   const target = drag.targets.targets.find((t) => t.key === key) ?? null;
-  return { state: target ? "ok" : "no", target };
+  return { state: target ? "ok" : "no", target, over: target !== null && drag.over === key };
 }
 
 /** A group's drop zone over its rows or cards: outlined and tinted in the group's color with the action across
  *  it, or faded where the issue can't go. Only a zone that takes the drop carries `data-drop-key`. */
 export function DropZone({ zone, style, className = "" }: { zone: Zone; style?: CSSProperties; className?: string }) {
-  const { state, target } = zone;
+  const { state, target, over } = zone;
   return (
-    <div className={`drop-zone drop-zone--${state} ${colorClass(target?.mark ?? null)} ${className}`} style={style} data-drop-key={target?.key}>
+    <div className={`drop-zone drop-zone--${state} ${over ? "drop-zone--over" : ""} ${colorClass(target?.mark ?? null)} ${className}`} style={style} data-drop-key={target?.key}>
       {target && (
         <span className="drop-zone__action">
           <TargetMark mark={target.mark} />
@@ -43,7 +45,7 @@ export function DropTray({ drag, groups, host }: { drag: Drag | null; groups: Vi
     <div className="drop-tray" style={area}>
       <span className="drop-tray__caption">Also</span>
       {extra.map((target) => (
-        <div key={target.key} className={`drop-chip ${colorClass(target.mark)}`} data-drop-key={target.key}>
+        <div key={target.key} className={`drop-chip ${drag?.over === target.key ? "drop-chip--over" : ""} ${colorClass(target.mark)}`} data-drop-key={target.key}>
           <TargetMark mark={target.mark} />
           {target.action}
         </div>

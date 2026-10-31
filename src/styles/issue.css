@@ -139,20 +139,27 @@ body.is-dragging-issue, body.is-dragging-issue * { cursor: grabbing !important; 
 }
 .drop-zone--tabbed { border-radius: 0 10px 10px 10px; }
 .drop-zone--rows { border-radius: 0; }
-.drop-zone--ok { box-shadow: inset 0 0 0 2px var(--drop-color); background: color-mix(in srgb, var(--drop-color) 8%, transparent); }
-.drop-zone--ok:hover {
-  background: color-mix(in srgb, var(--drop-color) 16%, transparent);
-  box-shadow: inset 0 0 0 2px var(--drop-color), 0 0 0 4px color-mix(in srgb, var(--drop-color) 22%, transparent);
+/* A place that takes the drop: a dashed outline in the group's color; under the pointer it turns solid, darker, and a
+   halo grows around it. */
+.drop-zone--ok {
+  outline: 2px dashed var(--drop-color); outline-offset: -2px; background: color-mix(in srgb, var(--drop-color) 6%, transparent);
+}
+.drop-zone--over {
+  outline-style: solid; background: color-mix(in srgb, var(--drop-color) 20%, transparent);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--drop-color) 24%, transparent);
 }
 /* Where the issue can't go, the group fades under a veil of the canvas. */
 .drop-zone--no { background: color-mix(in srgb, var(--list-bg) 55%, transparent); }
-.drop-zone--wait { outline: 2px dashed var(--border-strong); outline-offset: -2px; }
+.drop-zone--wait { outline: 2px dashed var(--border); outline-offset: -2px; }
 .drop-zone__action {
   display: inline-flex; align-items: center; gap: 8px; max-width: calc(100% - 32px); padding: 5px 12px;
   border: 1px solid var(--drop-color); border-radius: 999px; background: var(--panel-bg); box-shadow: var(--shadow-card);
   color: var(--text); font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  pointer-events: none;
+  pointer-events: none; opacity: 0; transform: scale(0.96);
+  transition: opacity var(--motion-base) var(--ease-out), transform var(--motion-base) var(--ease-out);
 }
+/* The action shows once the pointer is over the zone. */
+.drop-zone--over .drop-zone__action { opacity: 1; transform: none; }
 .drop-zone--column, .drop-zone--strip { inset: 0; border-radius: 12px; }
 .drop-zone--strip .drop-zone__action { padding: 10px 3px; writing-mode: vertical-rl; }
 
@@ -183,4 +190,8 @@ body.is-dragging-issue, body.is-dragging-issue * { cursor: grabbing !important; 
   border-radius: 999px; background: color-mix(in srgb, var(--drop-color) 10%, transparent); font-size: 13px; font-weight: 600;
   white-space: nowrap; transition: background-color var(--motion-fast) var(--ease-out);
 }
-.drop-chip:hover { background: color-mix(in srgb, var(--drop-color) 26%, transparent); }
+.drop-chip { border-style: dashed; }
+.drop-chip--over {
+  border-style: solid; background: color-mix(in srgb, var(--drop-color) 24%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--drop-color) 22%, transparent);
+}

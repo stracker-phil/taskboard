@@ -19,6 +19,8 @@ export interface Drag {
   issue: Dragged;
   /** Until Rust answers, no group takes the drop. */
   targets: DropTargets | null;
+  /** The place under the pointer that takes the drop. (`:hover` doesn't follow the pointer while a button is held.) */
+  over: string | null;
 }
 
 /** Which way the view scrolls when the pointer nears its edge. */
@@ -53,7 +55,7 @@ export function useIssueDrag(
       onStart: () => {
         const view = host.current;
         if (view) copy = followDraggedCopy(element, press, view, axis);
-        update({ issue, targets: null });
+        update({ issue, targets: null, over: null });
         void attempt(api.issueDropTargets(issue.id, groupBy, issue.fromKey, groups), "Could not ask Jira where the issue may go").then((targets) => {
           if (latest.current?.issue.id === issue.id) update({ ...latest.current, targets });
         });
@@ -63,6 +65,8 @@ export function useIssueDrag(
         const key = dropKeyAt(at);
         const target = key === null ? null : (latest.current?.targets?.targets.find((t) => t.key === key) ?? null);
         copy?.preview(target, groupBy === "status");
+        const over = target?.key ?? null;
+        if (latest.current && latest.current.over !== over) update({ ...latest.current, over });
       },
       onDrop: (at) => {
         const key = dropKeyAt(at);

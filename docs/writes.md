@@ -86,12 +86,14 @@ width), and every group becomes an equally easy target:
 - **Board:** every column (and collapsed strip) glides to the board's full height and back (`useHeightGlide` in
   `lib/motion.ts`).
 - **Zones** (`writes/DropZone.tsx`): a group's zone lies exactly over its card below the header (List: the card's
-  corners, square under the tab), its rows (Table: square) or its column (Board: the column's corners): an inner
-  2px ring and a light tint in the group's color (status style, avatar, priority flag) with the action in a pill.
-  Under the pointer the tint deepens and an outer glow in the group's color shows it takes the drop. Where the issue
-  can't go the group fades under a veil of the canvas; until Jira answers zones show a dashed ring. The issue's own
-  group has no zone.
-- **The tray** (`DropTray`): places without a group in the view, as chips along the view's bottom edge.
+  corners, square under the tab), its rows (Table: square) or its column (Board: the column's corners). A place that
+  takes the issue has a dashed outline and a light tint in the group's color (status style, avatar, priority flag).
+  Under the pointer (`Drag.over`, followed in code: `:hover` doesn't update while a button is held) the outline turns
+  solid, the tint darker, a halo grows around it and the action fades in as a pill ("Set status to Code Review").
+  Where the issue can't go the group fades under a veil of the canvas; until Jira answers zones show a faint dashed
+  outline. The issue's own group has no zone.
+- **The tray** (`DropTray`): places without a group in the view, as chips with their action along the view's bottom
+  edge, dashed, solid under the pointer.
 - Near the view's edge (top and bottom in the List and Table, left and right on the Board) the view scrolls.
 
 The drag is pointer-driven (the webview's file drops take the HTML drag events): it starts after 6 px, esc or a
