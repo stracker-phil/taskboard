@@ -139,7 +139,7 @@ Jira's `renderedFields` HTML ([ADR 0036](adr/0036-rich-text-renders-from-adf-not
 that HTML through wiki markup, so inline code comes back as `<tt>` and `->text->` as strike-through. The cache
 keeps the ADF (`issue_body.description_adf`, `comment.body_adf`, the custom field in `issue.custom`) next to Jira's HTML;
 `issues/detail.rs` and `issues/activity/` render it with `adf::html_or` and fall back to the HTML when there is no
-ADF or it isn't a document. Search text still comes from the HTML (`sync::map::html_to_text`).
+ADF or it isn't a document. Search text still comes from the HTML (`text::html_to_text`).
 
 `src-tauri/src/adf/` is pure. It escapes all text and writes only tags the page's sanitizer allows:
 

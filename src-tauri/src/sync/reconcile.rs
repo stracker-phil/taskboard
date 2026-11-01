@@ -8,12 +8,12 @@ use std::collections::HashSet;
 use chrono::{Duration, Utc};
 
 use super::full::{current_scope, refresh_fields, search_fields};
-use super::map::format_utc;
 use super::retention::{live_issues, mark_gone, mark_left_scope, prune_seen_changes, purge_gone};
 use super::store::{record_reconcile, store_page};
 use super::{SyncContext, SyncEvent};
 use crate::error::AppResult;
 use crate::jira::{BULK_FETCH_MAX, SearchRequest};
+use crate::time::format_utc;
 
 /// Gone issues stay reachable from pins, links and search this long, then leave the cache.
 const KEEP_GONE: Duration = Duration::days(7);

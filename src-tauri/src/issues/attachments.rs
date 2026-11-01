@@ -8,7 +8,7 @@ use url::Url;
 
 use crate::adf;
 use crate::jira::dto;
-use crate::sync::map::utc;
+use crate::time::utc;
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
 #[ts(export, export_to = "src/api/types.gen.ts")]

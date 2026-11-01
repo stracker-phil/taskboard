@@ -6,8 +6,8 @@ use rusqlite::{Connection, OptionalExtension};
 use super::{Begun, Change, Field, Reverse, WriteOutcome, issue_key, pending, send};
 use crate::db::Db;
 use crate::error::{AppError, AppResult};
-use crate::sync::map::format_utc;
 use crate::sync::source::Source;
+use crate::time::format_utc;
 
 pub(super) async fn set_priority(
     db: &Db,

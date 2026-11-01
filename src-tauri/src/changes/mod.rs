@@ -19,7 +19,7 @@ use unseen::changes_after;
 
 use crate::error::AppResult;
 use crate::lists::Viewer;
-use crate::sync::map::format_utc;
+use crate::time::format_utc;
 
 /// The banner over an issue with unseen changes.
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]

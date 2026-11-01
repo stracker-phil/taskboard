@@ -4,11 +4,11 @@ use chrono::Utc;
 use rusqlite::Transaction;
 
 use super::full::{refresh_fields, search_fields};
-use super::map::format_utc;
 use super::source::Source;
 use super::store::store_page;
 use crate::db::Db;
 use crate::error::AppResult;
+use crate::time::format_utc;
 
 /// Fetches the issue with the sync's fields and stores it like a sync page, then runs `then` in the same
 /// transaction. A missing issue stores nothing.

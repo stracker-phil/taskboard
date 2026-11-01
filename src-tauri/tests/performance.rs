@@ -16,10 +16,10 @@ use taskboard_lib::db::Db;
 use taskboard_lib::jira::dto::{Field, Issue, Project, Status, Version};
 use taskboard_lib::lists::{Viewer, sidebar_tree};
 use taskboard_lib::search::palette_query;
-use taskboard_lib::sync::map::format_utc;
 use taskboard_lib::sync::store::{store_fields, store_page, store_statuses, store_versions};
 use taskboard_lib::test_support::demo::{DEMO_NOW, synthetic};
 use taskboard_lib::test_support::temp_config_dir;
+use taskboard_lib::time::format_utc;
 use taskboard_lib::views::{GroupBy, Narrowing, view_rows, view_set_group, views_of};
 
 const ME_ACCOUNT_ID: &str = "712020:5a1e0c3f-8d2b-4f61-9c7e-1b2a3c4d5e01";

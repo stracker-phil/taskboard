@@ -7,7 +7,7 @@ use tauri::State;
 use crate::error::AppResult;
 use crate::lists::Viewer;
 use crate::state::AppState;
-use crate::sync::map::format_utc;
+use crate::time::format_utc;
 use crate::views::{Narrowing, ViewAt};
 
 #[tauri::command]

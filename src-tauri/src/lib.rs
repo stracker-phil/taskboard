@@ -45,6 +45,8 @@ pub mod sync;
 pub mod team;
 #[cfg(any(test, debug_assertions, feature = "test-util"))]
 pub mod test_support;
+pub mod text;
+pub mod time;
 pub mod views;
 pub mod window;
 pub mod writes;

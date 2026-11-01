@@ -77,9 +77,10 @@ sync chip and `taskboard sync`) queues a delta, ⌘⇧R (`sync:full`, `taskboard
 
 ## Storing a page
 
-`map.rs` turns an issue's JSON into rows (pure): the issue with every column `docs/data.md` lists, its comments
-(Jira's HTML plus plain text for search), the people it names, and the search document. Timestamps are stored
-as UTC with milliseconds, so they sort as text. The sprint is the active one, else the one with the highest id;
+`map/` turns an issue's JSON into rows (pure): the issue with every column `docs/data.md` lists and the search
+document (`issue.rs`), its comments (`comments.rs`: Jira's HTML plus plain text for search, `text::html_to_text`),
+and the people it names (`users.rs`). Timestamps are stored as UTC with milliseconds, so they sort as text
+(`time::utc`, `time::format_utc`). The sprint is the active one, else the one with the highest id;
 an epic is hierarchy level 1 or type "Epic".
 
 `store.rs` writes them, skipping a page older than the cached issue (`updated`) and keeping the value of a

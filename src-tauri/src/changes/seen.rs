@@ -6,7 +6,7 @@ use rusqlite::{Connection, params};
 use super::UNSEEN;
 use crate::db::{Changes, Db};
 use crate::error::{AppError, AppResult};
-use crate::sync::map::format_utc;
+use crate::time::format_utc;
 
 /// Seen at `now`, or at the issue's newest change or comment when Jira's clock runs ahead of this Mac's, so
 /// nothing already shown stays unseen. Only an issue that was unseen counts as changed: reading a read issue

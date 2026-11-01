@@ -11,7 +11,7 @@ use crate::db::Db;
 use crate::error::AppResult;
 use crate::lists::Viewer;
 use crate::status_style::{Style, Styles};
-use crate::sync::map::format_utc;
+use crate::time::format_utc;
 use crate::views::rows::{self, Person};
 use crate::views::{Layout, list_views};
 

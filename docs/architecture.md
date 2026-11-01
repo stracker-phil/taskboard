@@ -113,6 +113,7 @@ src-tauri/
                              names sidebar levels and views; remote/places lists and opens them)
   src/events.rs state.rs     every event name; AppState
   src/error.rs lock.rs       AppError (+ ErrorKind); poison-tolerant lock helpers
+  src/time.rs text.rs        stored timestamps (UTC text with milliseconds); HTML as plain text for search
   src/store/                 JsonFile, JsonStore, settings/, keybindings, ui_state, modes (app-wide Me, Unread, bookmarks bar),
                              places (each view's place)
   src/bus/                   the command bus

@@ -12,9 +12,9 @@ use crate::issues::store_comment;
 use crate::jira::capability::Capability;
 use crate::jira::dto::Comment;
 use crate::store::settings::Settings;
-use crate::sync::map::format_utc;
 use crate::sync::refetch_issue;
 use crate::sync::source::Source;
+use crate::time::format_utc;
 
 /// Jira's comment length cap, in characters.
 pub const MAX_COMMENT_CHARS: usize = 32_767;

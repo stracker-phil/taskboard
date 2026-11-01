@@ -18,7 +18,6 @@ use taskboard_lib::jira::jql::{date_literal, default_scope};
 use taskboard_lib::jira::{Limiter, TokenKind};
 use taskboard_lib::lists::{Viewer, filter_options, sidebar_tree};
 use taskboard_lib::store::settings::SettingsStore;
-use taskboard_lib::sync::map::utc;
 use taskboard_lib::sync::store::last_delta_at;
 use taskboard_lib::sync::{
     Emit, Job, SyncContext, SyncEngine, SyncEvent, SyncProgress, SyncState, full_sync, overview,
@@ -27,6 +26,7 @@ use taskboard_lib::sync::{
 use taskboard_lib::test_support::demo::{self, DEMO_NOW, ME_EMAIL};
 use taskboard_lib::test_support::fake_jira::{DEMO_TOKEN, FakeJira};
 use taskboard_lib::test_support::{FakeSecrets, temp_config_dir};
+use taskboard_lib::time::utc;
 use taskboard_lib::views::columns_catalogue;
 
 const SEARCH_PATH: &str = "/rest/api/3/search/jql";

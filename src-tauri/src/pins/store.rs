@@ -9,7 +9,7 @@ use super::duration::{PinDuration, expires_at};
 use crate::db::{Changes, Db, LocalPart};
 use crate::error::{AppError, AppResult};
 use crate::lists::Viewer;
-use crate::sync::map::format_utc;
+use crate::time::format_utc;
 
 /// A pin (alias `p`) that hasn't been unpinned and hasn't run out at the time bound to `now_param`.
 pub fn active(now_param: &str) -> String {

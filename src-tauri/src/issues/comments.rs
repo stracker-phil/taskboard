@@ -8,8 +8,9 @@ use serde_json::Value;
 use crate::db::Db;
 use crate::error::AppResult;
 use crate::jira::dto::Comment;
-use crate::sync::map::{format_utc, html_to_text, utc};
 use crate::sync::source::Source;
+use crate::text::html_to_text;
+use crate::time::{format_utc, utc};
 
 /// Fetches the issue's comments unless they were fetched in full after its last update. Returns whether it
 /// fetched; the cache emits `issues_changed` for the issue when the comments or their authors changed.

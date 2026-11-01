@@ -4,7 +4,7 @@
 use chrono::{DateTime, Duration, Utc};
 
 use super::SyncState;
-use super::map::format_utc;
+use crate::time::format_utc;
 
 const OFFLINE_RETRY: Duration = Duration::minutes(1);
 const FIRST_RETRY: Duration = Duration::minutes(1);

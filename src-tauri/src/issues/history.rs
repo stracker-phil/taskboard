@@ -9,8 +9,8 @@ use super::fetched::{self, Detail};
 use crate::db::Db;
 use crate::error::AppResult;
 use crate::jira::dto::Changelog;
-use crate::sync::map::utc;
 use crate::sync::source::Source;
+use crate::time::utc;
 
 /// Fetches the issue's changelog and replaces the cached history, unless it was fetched within `FRESH_FOR` of
 /// `now`. Returns whether it changed; the cache emits `issue_details_changed` for the issue when it did. On a

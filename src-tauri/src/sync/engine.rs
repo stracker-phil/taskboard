@@ -9,12 +9,12 @@ use tokio::sync::mpsc;
 use super::backoff::Failures;
 use super::delta::delta_sync;
 use super::full::full_sync;
-use super::map::format_utc;
 use super::reconcile::reconcile;
 use super::store::last_full_at;
 use super::{Job, SyncContext, SyncEvent, SyncState};
 use crate::error::{AppError, AppResult};
 use crate::lock::MutexExt;
+use crate::time::format_utc;
 
 pub type Emit = Arc<dyn Fn(SyncEvent) + Send + Sync>;
 

@@ -4,7 +4,7 @@ use std::collections::BTreeSet;
 
 use chrono::Utc;
 
-use super::map::{FieldIds, format_utc};
+use super::map::FieldIds;
 use super::source::Source;
 use super::store::{
     fetched_fields, has_project_sync, record_project_sync, record_scope_sync, store_field_usage,
@@ -17,6 +17,7 @@ use crate::error::AppResult;
 use crate::jira::dto::Myself;
 use crate::jira::{SearchRequest, jql};
 use crate::store::settings::Connection;
+use crate::time::format_utc;
 
 /// Every issue field the cache maps, besides the site's sprint and epic color fields.
 const SEARCH_FIELDS: &[&str] = &[

@@ -8,7 +8,7 @@ use super::{Compiled, Ctx, ScalarKind, Sql};
 use crate::error::{AppError, AppResult};
 use crate::filter::model::{Condition, ME, Op, Value};
 use crate::search::{TEXT_MATCH, match_expression};
-use crate::sync::map::format_utc;
+use crate::time::format_utc;
 
 const SPRINT_STATES: [&str; 3] = ["active", "future", "closed"];
 

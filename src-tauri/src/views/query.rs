@@ -28,8 +28,8 @@ use crate::lists::{Kind, Viewer, all_nodes, scope_of};
 use crate::me_mode::{self, MeRule};
 use crate::pins::active;
 use crate::status_style::Styles;
-use crate::sync::map::format_utc;
 use crate::team::{Me, with_me_first};
+use crate::time::format_utc;
 
 /// The toolbar's narrowing on top of the level's filter, and the Filter popover's unsaved conditions (ADR 0038).
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, TS)]

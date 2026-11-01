@@ -11,8 +11,8 @@ use crate::db::Db;
 use crate::error::{AppError, AppResult};
 use crate::jira::dto::{Status, Transition};
 use crate::status_style::{Style, Styles};
-use crate::sync::map::format_utc;
 use crate::sync::source::Source;
+use crate::time::format_utc;
 
 /// One move the status menu offers, named by the status it leads to.
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]

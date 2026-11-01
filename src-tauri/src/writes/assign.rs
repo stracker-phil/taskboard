@@ -13,8 +13,8 @@ use crate::db::Db;
 use crate::error::{AppError, AppResult};
 use crate::jira::capability::Capability;
 use crate::store::settings::Settings;
-use crate::sync::map::format_utc;
 use crate::sync::source::Source;
+use crate::time::format_utc;
 use crate::views::rows::Person;
 
 /// Assigns the issue to me, or unassigns it when it already is mine.

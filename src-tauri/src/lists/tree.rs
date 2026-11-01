@@ -11,7 +11,7 @@ use crate::db::Db;
 use crate::error::AppResult;
 use crate::filter::{Compiled, Ctx, Names, OPEN_ISSUES, TRACKED_ISSUES, compile, describe};
 use crate::pins::active;
-use crate::sync::map::format_utc;
+use crate::time::format_utc;
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
 #[ts(export, export_to = "src/api/types.gen.ts")]

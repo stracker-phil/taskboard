@@ -3,12 +3,12 @@
 use chrono::{DateTime, Duration, Utc};
 
 use super::full::{current_scope, full_sync, refresh_fields, search_fields};
-use super::map::format_utc;
 use super::store::{last_delta_at, recently_updated, record_delta, store_page};
 use super::{Job, SyncContext, SyncEvent, SyncProgress};
 use crate::error::{AppError, AppResult};
 use crate::issues::issue_sync_comments;
 use crate::jira::{SearchRequest, jql};
+use crate::time::format_utc;
 
 /// Jira's JQL dates have minute precision; the overlap makes sure no change slips between two runs.
 const OVERLAP: Duration = Duration::minutes(2);

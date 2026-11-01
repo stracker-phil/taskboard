@@ -5,7 +5,7 @@ use rusqlite::{Connection, params};
 
 use crate::db::Db;
 use crate::error::{AppError, AppResult};
-use crate::sync::map::format_utc;
+use crate::time::format_utc;
 
 /// How long a record is kept.
 pub const KEEP_DAYS: i64 = 180;
