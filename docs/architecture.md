@@ -48,7 +48,7 @@ These rules hold everywhere in the code. Keep them when you change things.
 │  └──────────────────────┘                                                 │
 │  Native menu ◀────────────────────────────────▶ Rust                      │
 └───────────────────────────────────────────────┬───────────────────────────┘
-                     Unix socket (ipc.rs)       │
+                     Unix socket (ipc/)         │
   `taskboard …` (2nd process, CLI) ─────────────┘
   taskboard://… (deep link) → tauri-plugin-deep-link → launch queue
 ```
@@ -107,7 +107,8 @@ src-tauri/
   src/main.rs lib.rs         entry; identity (IDENTIFIER, APP_NAME, LINK_SCHEME), argv, then app::start
   src/app.rs handlers.rs     Tauri builder; every registered command (the install list)
   src/commands.rs launch.rs  settings, key bindings, UI state, links, logs; launch events pulled by the page
-  src/instance.rs ipc.rs     socket handoff to the running app, instance lock; the socket protocol
+  src/instance.rs ipc/       socket handoff to the running app, instance lock; ipc/: the wire types (protocol.rs),
+                             the sending side (client.rs) and the listening side (server.rs)
   src/cli/ remote/           the clap command line and its replies; the app's side of each request (remote/levels
                              names sidebar levels and views; remote/places lists and opens them)
   src/events.rs state.rs     every event name; AppState
