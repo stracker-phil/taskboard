@@ -120,6 +120,15 @@ describe("useAppEvents launch events", () => {
     });
   });
 
+  it("opens the palette with the text of a search event", async () => {
+    mocked.takeLaunchEvents.mockResolvedValue([{ type: "search", text: "contact form" }]);
+
+    await mountEvents();
+
+    await waitFor(() => expect(useStore.getState().paletteOpen).toBe(true));
+    expect(useStore.getState().paletteText).toBe("contact form");
+  });
+
   it("shows an error event as a toast", async () => {
     mocked.takeLaunchEvents.mockResolvedValue([{ type: "error", message: "No such issue DEMO-404" }]);
 

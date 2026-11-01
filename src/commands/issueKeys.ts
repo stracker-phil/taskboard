@@ -10,6 +10,7 @@ export interface IssueKeyHandlers {
   closePeek: () => void;
   copyKey: () => void;
   copyUrl: () => void;
+  copyAppLink: () => void;
   openInJira: () => void;
   /** ↩: the selected issue in the full Issue view; absent where the issue is already open. */
   open?: () => void;
@@ -55,6 +56,7 @@ export const ISSUE_KEY_COMMANDS: Command[] = [
   { id: "peek.close", title: "Close the preview", scope: "main", defaultBinding: "Escape", when: () => (handlers?.peekOpen() ?? false) && !document.querySelector("[role=dialog]"), run: () => handlers?.closePeek() },
   { id: "issue.copyKey", title: "Copy issue key", scope: "main", defaultBinding: "Mod+C", when: () => selected() && nothingElseToCopy(), run: () => handlers?.copyKey() },
   { id: "issue.copyUrl", title: "Copy issue URL", scope: "main", defaultBinding: "Mod+Shift+C", when: selected, run: () => handlers?.copyUrl() },
+  { id: "issue.copyAppLink", title: "Copy Taskboard link", scope: "main", defaultBinding: "Mod+Alt+Shift+C", when: selected, run: () => handlers?.copyAppLink() },
   { id: "issue.open", title: "Open the issue", scope: "main", defaultBinding: "Enter", when: () => selected() && handlers?.open !== undefined, run: () => handlers?.open?.() },
   { id: "issue.openEpic", title: "Open the issue's epic", scope: "main", defaultBinding: "E", when: selected, run: () => handlers?.openEpic() },
   { id: "issue.togglePin", title: "Bookmark the issue or remove its bookmark", scope: "main", defaultBinding: "P", when: selected, run: () => handlers?.togglePin() },

@@ -17,6 +17,7 @@ function handlers(patch: Partial<IssueKeyHandlers> = {}) {
     closePeek: vi.fn(),
     copyKey: vi.fn(),
     copyUrl: vi.fn(),
+    copyAppLink: vi.fn(),
     openInJira: vi.fn(),
     open: vi.fn(),
     openEpic: vi.fn(),
@@ -430,6 +431,23 @@ describe("issue keys", () => {
       register(handlers({ hasSelection: () => false }));
 
       expect(press(key, mods)).toBeNull();
+    });
+  });
+
+  describe("copy Taskboard link (⌘⌥⇧C)", () => {
+    it("copies the Taskboard link of the selected issue", () => {
+      const h = handlers();
+      register(h);
+
+      void resolveKeydown({ key: "c", metaKey: true, shiftKey: true, ctrlKey: false, altKey: true }, SCOPES)?.run();
+
+      expect(h.copyAppLink).toHaveBeenCalled();
+    });
+
+    it("is disabled without a selected row", () => {
+      register(handlers({ hasSelection: () => false }));
+
+      expect(getCommand("issue.copyAppLink")?.when?.()).toBe(false);
     });
   });
 

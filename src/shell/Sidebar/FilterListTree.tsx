@@ -8,6 +8,7 @@ import { Tile } from "../../components/look/Tile";
 import { usePinOf } from "../../queries/pins";
 import { attempt } from "../../state/requests";
 import { useStore } from "../../state/store";
+import { copyAppLink } from "../../views/list/useIssueActions";
 import { DropLine } from "./DropLine";
 import { ListCount } from "./ListCount";
 import { useDragReorder } from "./useDragReorder";
@@ -89,6 +90,7 @@ function FilterListRow({ list, active, renaming, onOpen, onRename, onRenameDone,
         pin
           ? { text: "Remove from Home", run: () => void attempt(api.pinRemove(pin.id), "Could not remove the filter list from Home") }
           : { text: "Add to Home", run: () => void attempt(api.pinCreate("filterList", String(list.id), "untilUnpinned", null), "Could not add the filter list to Home") },
+        { text: "Copy Taskboard Link", run: () => copyAppLink({ kind: "level", listId: list.id, viewId: null }, `Copied the Taskboard link to ${list.name}`) },
         "separator",
         { text: "Delete", danger: true, run: () => void deleteList(list) },
       ],

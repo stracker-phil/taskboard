@@ -13,7 +13,7 @@ export function useBoardKeys(
   selected: string | null,
   select: (id: string) => void,
   open: (id: string) => void,
-  actions: RowActionHandlers & { copyUrl: (key: string) => void },
+  actions: RowActionHandlers & { copyUrl: (key: string) => void; copyAppLink: (key: string) => void },
 ) {
   const state = useRef({ data, selected, select, open, actions });
   useEffect(() => {
@@ -47,6 +47,7 @@ export function useBoardKeys(
       closePeek: () => {},
       copyKey: () => withKey((key) => state.current.actions.copyKey(key)),
       copyUrl: () => withKey((key) => state.current.actions.copyUrl(key)),
+      copyAppLink: () => withKey((key) => state.current.actions.copyAppLink(key)),
       openInJira: () => withKey((key) => state.current.actions.openInJira?.(key)),
       open: () => {
         if (state.current.selected) state.current.open(state.current.selected);

@@ -407,9 +407,14 @@ tint: number, };
  * Something the page acts on once it listens: from the launch that started the app, a later launch,
  * or a deep link.
  */
-export type LaunchEvent = { "type": "error", message: string, } | { "type": "activate" } | { "type": "openIssue", id: string, origin: Location, } | { "type": "onlyMine", on: boolean | null, };
+export type LaunchEvent = { "type": "error", message: string, } | { "type": "activate" } | { "type": "openIssue", id: string, origin: Location, } | { "type": "onlyMine", on: boolean | null, } | { "type": "search", text: string, };
 
 export type Layout = "list" | "board" | "table";
+
+/**
+ * What the app hands out a link to.
+ */
+export type LinkTarget = { "kind": "issue", key: string, } | { "kind": "level", listId: number, viewId: number | null, };
 
 export type ListConditions = { kind: ListKind, 
 /**

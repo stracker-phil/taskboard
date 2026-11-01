@@ -306,13 +306,29 @@ fn commands_bus() -> bus::Commands {
     bus::Commands(commands)
 }
 
-/// Links (`taskboard://…`) bring the window forward.
+/// Links (`taskboard://…`) open what they name (`docs/links.md`).
 fn listen_for_links(app: &AppHandle) {
     let handle = app.clone();
-    app.deep_link().on_open_url(move |_| {
+    app.deep_link().on_open_url(move |event| {
         log::info!("Opened by a link");
         window::show_main(&handle);
+        follow_links(&handle, event.urls());
     });
+    // The link that started the app may have come before the listener.
+    match app.deep_link().get_current() {
+        Ok(Some(urls)) => follow_links(app, urls),
+        Ok(None) => {}
+        Err(e) => log::warn!("Couldn't read the link that started the app: {e}"),
+    }
+}
+
+fn follow_links(app: &AppHandle, urls: Vec<tauri::Url>) {
+    for url in urls {
+        let app = app.clone();
+        tauri::async_runtime::spawn(async move {
+            remote::links::open(&app, url.as_str()).await;
+        });
+    }
 }
 
 fn log_plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> {

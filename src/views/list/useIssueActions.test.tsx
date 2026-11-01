@@ -81,6 +81,29 @@ describe("useIssueActions", () => {
     });
   });
 
+  describe("copyAppLink", () => {
+    it("copies the Taskboard link to the issue and says so", async () => {
+      mocked.appLink.mockResolvedValue("taskboard-debug://issue/NW-1042");
+      const actions = await renderActions("");
+
+      actions.current.copyAppLink("NW-1042");
+
+      await waitFor(() => expect(toasts()).toEqual([["success", "Copied the Taskboard link to NW-1042"]]));
+      expect(mocked.appLink).toHaveBeenCalledWith({ kind: "issue", key: "NW-1042" });
+      expect(mocked.copyText).toHaveBeenCalledWith("taskboard-debug://issue/NW-1042");
+    });
+
+    it("shows an error and copies nothing when the link cannot be made", async () => {
+      mocked.appLink.mockRejectedValue({ kind: "io", message: "No scheme", code: null });
+      const actions = await renderActions("");
+
+      actions.current.copyAppLink("NW-1042");
+
+      await waitFor(() => expect(toasts()).toEqual([["error", "Could not make the link: No scheme"]]));
+      expect(mocked.copyText).not.toHaveBeenCalled();
+    });
+  });
+
   describe("markUnread", () => {
     it("marks the whole issue unread", async () => {
       const actions = await renderActions("");

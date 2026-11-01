@@ -20,6 +20,7 @@ import {
   type FilterOptions,
   type IssueDetail,
   type Keybindings,
+  type LinkTarget,
   type ListConditions,
   type MenuCommand,
   type Nav,
@@ -188,6 +189,9 @@ export function createApiMock(): Api {
     placeGet:vi.fn().mockResolvedValue(null),
     placeSet: vi.fn().mockResolvedValue(undefined),
     copyText: vi.fn().mockResolvedValue(undefined),
+    appLink: vi.fn(async (target: LinkTarget) =>
+      target.kind === "issue" ? `taskboard-debug://issue/${target.key}` : `taskboard-debug://level/${target.listId}/${target.viewId ?? ""}`,
+    ),
     paletteQuery: vi.fn(async (): Promise<PaletteResults> => ({ issues: [], lists: [], views: [] })),
     menuCommands: vi.fn(async (): Promise<MenuCommand[]> => []),
     columnsCatalogue: vi.fn().mockResolvedValue([]),

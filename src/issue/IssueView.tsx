@@ -254,6 +254,7 @@ function IssueKeys({ issue, neighbors }: { issue: IssueDetail | undefined; neigh
       closePeek: () => {},
       copyKey: () => withKey((key) => state.current.actions.copyKey(key)),
       copyUrl: () => withKey((key) => state.current.actions.copyUrl(key)),
+      copyAppLink: () => withKey((key) => state.current.actions.copyAppLink(key)),
       openInJira: () => withKey((key) => state.current.actions.openInJira?.(key)),
       openEpic: () => {
         const epic = state.current.issue?.epic;

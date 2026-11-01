@@ -51,15 +51,17 @@ function commandSections(commands: PaletteCommand[], query: string): Section[] {
 /** ⌘K over a dimmed window (artboard 7): issues, filter lists and commands; `>`, `#` and `/` narrow it to one kind. */
 export function CommandPalette() {
   const open = useStore((s) => s.paletteOpen);
-  return open ? <Palette /> : null;
+  const text = useStore((s) => s.paletteText);
+  // A link that opens the palette again with other text starts it afresh.
+  return open ? <Palette key={text} initialText={text} /> : null;
 }
 
-function Palette() {
+function Palette({ initialText }: { initialText: string }) {
   const close = useStore((s) => s.setPaletteOpen);
   const updatePlace = useStore((s) => s.updatePlace);
   const loadPlace = useStore((s) => s.loadPlace);
   const showIssue = useStore((s) => s.openIssue);
-  const [text, setText] = useState("");
+  const [text, setText] = useState(initialText);
   const [active, setActive] = useState(0);
   // Before the palette is on screen, while the page still has the focus it had.
   const [page] = useState(snapshotPage);

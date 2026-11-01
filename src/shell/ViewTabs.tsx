@@ -13,6 +13,7 @@ import { useDragReorder } from "./Sidebar/useDragReorder";
 import { useNavGo, useViews } from "../queries/sidebar";
 import { attempt } from "../state/requests";
 import { useStore } from "../state/store";
+import { copyAppLink } from "../views/list/useIssueActions";
 import { LAYOUT_ORDER, LAYOUTS, LayoutTile } from "./viewLayouts";
 import { ViewTab } from "./ViewTab";
 
@@ -76,6 +77,7 @@ export function ViewTabs({ listId, viewId }: { listId: number; viewId: number })
     { text: "Icon and Color…", run: () => editLook(view, document.querySelector(`[data-view-look="${view.id}"]`)) },
     { text: "Duplicate", run: () => void attempt(api.viewDuplicate(view.id), "Could not duplicate the view") },
     bookmarking(view),
+    { text: "Copy Taskboard Link", run: () => copyAppLink({ kind: "level", listId: view.listId, viewId: view.id }, `Copied the Taskboard link to ${view.name}`) },
   ];
   const deleting = (view: View): MenuEntry => ({ text: "Delete", danger: true, enabled: views.length > 1, run: () => void remove(view) });
   const tabMenu = (e: MouseEvent, view: View): void =>

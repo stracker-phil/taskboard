@@ -50,7 +50,7 @@ These rules hold everywhere in the code. Keep them when you change things.
 └───────────────────────────────────────────────┬───────────────────────────┘
                      Unix socket (ipc/)         │
   `taskboard …` (2nd process, CLI) ─────────────┘
-  taskboard://… (deep link) → tauri-plugin-deep-link → launch queue
+  taskboard://… (deep link) → tauri-plugin-deep-link → links.rs → remote/ (docs/links.md)
 ```
 
 - **One instance.** The first process binds `taskboard.sock` in the config dir and holds `taskboard.lock`; a
@@ -110,7 +110,8 @@ src-tauri/
   src/instance.rs ipc/       socket handoff to the running app, instance lock; ipc/: the wire types (protocol.rs),
                              the sending side (client.rs) and the listening side (server.rs)
   src/cli/ remote/           the clap command line and its replies; the app's side of each request (remote/levels
-                             names sidebar levels and views; remote/places lists and opens them)
+                             names sidebar levels and views; remote/places lists and opens them;
+                             remote/links follows a taskboard:// link that links.rs parsed)
   src/events.rs state.rs     every event name; AppState
   src/error.rs lock.rs       AppError (+ ErrorKind); poison-tolerant lock helpers
   src/time.rs text.rs        stored timestamps (UTC text with milliseconds); HTML as plain text for search

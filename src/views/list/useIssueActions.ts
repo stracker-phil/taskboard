@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { api } from "../../api";
+import { api, type LinkTarget } from "../../api";
 import { browseUrl } from "../../lib/jiraLinks";
 import { useConnection } from "../../queries/settings";
 import { attempt } from "../../state/requests";
@@ -14,6 +14,13 @@ import { openAssignMenu } from "../../writes/assignMenu";
 export function copyWithToast(text: string, done: string) {
   void attempt(api.copyText(text), "Could not copy").then((copied) => {
     if (copied !== null) useStore.getState().toast("success", done);
+  });
+}
+
+/** Copies the `taskboard://` link to an issue or a sidebar level. */
+export function copyAppLink(target: LinkTarget, done: string) {
+  void attempt(api.appLink(target), "Could not make the link").then((link) => {
+    if (link !== null) copyWithToast(link, done);
   });
 }
 
@@ -34,6 +41,7 @@ export function useIssueActions() {
         const url = urlOf(key);
         if (url) copyWithToast(url, `Copied the link to ${key}`);
       },
+      copyAppLink: (key: string) => copyAppLink({ kind: "issue", key }, `Copied the Taskboard link to ${key}`),
       openInJira,
       markSeen: (id: string) => void attempt(api.issuesMarkSeen([id]), "Could not mark it read"),
       markUnread: (id: string) => void attempt(api.issueMarkUnread(id), "Could not mark it unread"),

@@ -18,7 +18,7 @@ export interface RowKeyState {
   toggle: (group: Group) => void;
   setSubtasksOpen: (id: string, open: boolean) => void;
   subtasksOpen: (id: string) => boolean;
-  actions: RowActionHandlers & { copyUrl: (key: string) => void };
+  actions: RowActionHandlers & { copyUrl: (key: string) => void; copyAppLink: (key: string) => void };
   scrollToIndex: (index: number) => void;
   setPlace: (patch: Partial<ViewPlace>) => void;
   open: (id: string) => void;
@@ -67,6 +67,7 @@ export function useRowKeys(current: RowKeyState): RefObject<RowKeyState> {
       closePeek: () => state.current.setPlace({ peekOpen: false }),
       copyKey: () => withSelected((key) => state.current.actions.copyKey(key)),
       copyUrl: () => withSelected((key) => state.current.actions.copyUrl(key)),
+      copyAppLink: () => withSelected((key) => state.current.actions.copyAppLink(key)),
       openInJira: () => withSelected((key) => state.current.actions.openInJira?.(key)),
       open: () => {
         const { selected, open } = state.current;

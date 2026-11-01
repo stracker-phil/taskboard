@@ -30,6 +30,7 @@ async function handleLaunchEvents(events: LaunchEvent[]) {
     if (event.type === "error") toast("error", event.message);
     if (event.type === "openIssue") await openIssue(event.id, event.origin);
     if (event.type === "onlyMine") await onlyMine(event.on);
+    if (event.type === "search") useStore.getState().setPaletteOpen(true, event.text);
   }
 }
 
@@ -40,7 +41,7 @@ function runPageCommand(id: string) {
 }
 
 /** The main window's state from Rust: loads the window layout, takes the launch requests (now and on `launch`:
- *  errors, and the command line's `open` and `me`),
+ *  errors, the command line's `open` and `me`, and `search` links),
  *  follows `toggle_sidebar` (the View menu and the `view:toggleSidebar` bus command) and runs the menus' page
  *  commands (`page_command`). */
 export function useAppEvents() {

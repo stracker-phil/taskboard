@@ -32,6 +32,10 @@ pub enum LaunchEvent {
     OnlyMine {
         on: Option<bool>,
     },
+    /// The palette with the text typed in (a `search` link).
+    Search {
+        text: String,
+    },
 }
 
 /// `LaunchEvent`s waiting for the page to take them (`take_launch_events`).

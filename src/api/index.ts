@@ -27,6 +27,7 @@ import type {
   FieldVisibility,
   Keybindings,
   LaunchEvent,
+  LinkTarget,
   Layout,
   MenuCommand,
   FilterOptions,
@@ -255,6 +256,8 @@ export const api = {
   placeSet: (listId: number, viewId: number, place: ViewPlace) => invoke<void>("place_set", { listId, viewId, place }),
   /** The system clipboard; only text. */
   copyText: (text: string) => navigator.clipboard.writeText(text),
+  /** The `taskboard://` link to an issue or a sidebar level. */
+  appLink: (target: LinkTarget) => invoke<string>("app_link", { target }),
   /** Every column a view can show: the standard ones, then the site's custom fields. */
   columnsCatalogue: (listId: number) => invoke<Column[]>("columns_catalogue", { listId }),
   statusStylesList: (projectId: string) => invoke<StatusStyleRow[]>("status_styles_list", { projectId }),

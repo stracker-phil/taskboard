@@ -9,6 +9,7 @@ import { SpaceLookButton } from "../../components/SpaceLookButton";
 import { renameSpace } from "../../components/spaceUpdates";
 import { attempt, runBusCommand } from "../../state/requests";
 import { useStore } from "../../state/store";
+import { copyAppLink } from "../../views/list/useIssueActions";
 
 interface Props {
   space: SpaceNode;
@@ -41,6 +42,7 @@ export function SpaceRow({ space, active, holdsActive, expanded, renaming, onOpe
         { text: "Icon and Color…", run: () => setEditingLook(true) },
         { text: "Client label…", run: onEditClient },
         { text: "Space Settings…", run: () => runBusCommand(`app:settings:space:${space.projectId}`, "Could not open the Space's settings") },
+        { text: "Copy Taskboard Link", run: () => copyAppLink({ kind: "level", listId: space.listId, viewId: null }, `Copied the Taskboard link to ${space.name}`) },
         "separator",
         { text: "Stop tracking", danger: true, run: () => void stopTracking(space) },
       ],

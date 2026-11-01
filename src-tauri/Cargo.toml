@@ -28,6 +28,7 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync"
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1", features = ["v4"] }
 url = "2"
+percent-encoding = "2"
 ts-rs = { version = "12", features = ["serde-compat", "serde-json-impl", "no-serde-warnings"] }
 libc = "0.2"
 tempfile = { version = "3", optional = true }

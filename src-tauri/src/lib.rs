@@ -22,6 +22,7 @@ pub mod ipc;
 pub mod issues;
 pub mod jira;
 pub mod launch;
+pub mod links;
 pub mod lists;
 pub mod lock;
 pub mod look;

@@ -1,6 +1,7 @@
 //! Requests from the CLI: `handle` maps each `IpcMessage` to the module that does it.
 
 mod levels;
+pub(crate) mod links;
 mod places;
 
 pub(crate) use places::open_issue;

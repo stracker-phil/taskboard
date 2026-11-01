@@ -11,6 +11,7 @@ use it, see the [project README](../README.md).
 | [sync.md](sync.md) | The sync engine: jobs, states, storing pages, change records, events |
 | [notifications.md](notifications.md) | macOS notifications after a change sync: when, what, the buttons |
 | [scopes.md](scopes.md) | The API token scopes the app needs and what each one is for |
+| [links.md](links.md) | `taskboard://` links: what each opens, Copy Taskboard Link, the command allowlist |
 | [writes.md](writes.md) | Changes to Jira: the two locks, pending writes, the flow, "Change back to …" |
 | [jira.md](jira.md) | The Jira client: site and tokens, endpoints, limits, retries, errors, JQL, the fake Jira |
 | [testing.md](testing.md) | Unit and integration tests, the test agents, the demo seed, scripts that drive the app, signing |

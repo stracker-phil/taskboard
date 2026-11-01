@@ -127,6 +127,25 @@ describe("CommandPalette", () => {
       expect(await screen.findByRole("dialog", { name: "Command palette" })).toBeInTheDocument();
     });
 
+    it("opens with the given text typed in and shows its results at once", async () => {
+      resetStore({ paletteOpen: false });
+      await renderPalette({ results: { issues: [issueHit()], lists: [] } });
+
+      act(() => useStore.getState().setPaletteOpen(true, "contact"));
+
+      expect(await screen.findByRole("option", { name: /NW-43/ })).toBeInTheDocument();
+      expect(input()).toHaveValue("contact");
+    });
+
+    it("opens by hand with an empty field", async () => {
+      resetStore({ paletteOpen: false });
+      await renderPalette();
+
+      act(() => useStore.getState().setPaletteOpen(true));
+
+      expect(await screen.findByRole("combobox")).toHaveValue("");
+    });
+
     it("closes on Escape", async () => {
       await renderPalette();
 

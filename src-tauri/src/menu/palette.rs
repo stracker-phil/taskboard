@@ -241,6 +241,7 @@ mod tests {
                 "page:issue.openInJira",
                 "page:issue.copyKey",
                 "page:issue.copyUrl",
+                "page:issue.copyAppLink",
                 "page:issue.togglePin",
                 "page:issue.markSeen",
                 "page:issue.toggleMine",

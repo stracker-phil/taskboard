@@ -558,7 +558,17 @@ describe("Sidebar", () => {
 
     it("opens a menu named after the list with Rename, Icon and Color, Duplicate, Add to Home and Delete", () => {
       expect(screen.getByRole("menu", { name: "Epics" })).toBeInTheDocument();
-      expect(menuRows()).toEqual(["Rename", "Icon and Color…", "Duplicate", "Add to Home", "Delete"]);
+      expect(menuRows()).toEqual(["Rename", "Icon and Color…", "Duplicate", "Add to Home", "Copy Taskboard Link", "Delete"]);
+    });
+
+    it("copies the Taskboard link to the list and says so", async () => {
+      mocked.appLink.mockResolvedValue("taskboard-debug://level/22");
+
+      await chooseFromMenu("Copy Taskboard Link");
+
+      await waitFor(() => expect(mocked.copyText).toHaveBeenCalledWith("taskboard-debug://level/22"));
+      expect(mocked.appLink).toHaveBeenCalledWith({ kind: "level", listId: EPICS.id, viewId: null });
+      expect(await screen.findByText("Copied the Taskboard link to Epics")).toBeInTheDocument();
     });
 
     it("opens the Icon and color popover for the list", async () => {
@@ -745,7 +755,17 @@ describe("Sidebar", () => {
 
     it("opens a menu named after the Space with Rename, Icon and Color, Client label, Space Settings and Stop tracking", () => {
       expect(screen.getByRole("menu", { name: "Website relaunch" })).toBeInTheDocument();
-      expect(menuRows()).toEqual(["Rename", "Icon and Color…", "Client label…", "Space Settings…", "Stop tracking"]);
+      expect(menuRows()).toEqual(["Rename", "Icon and Color…", "Client label…", "Space Settings…", "Copy Taskboard Link", "Stop tracking"]);
+    });
+
+    it("copies the Taskboard link to the Space and says so", async () => {
+      mocked.appLink.mockResolvedValue("taskboard-debug://level/11");
+
+      await chooseFromMenu("Copy Taskboard Link");
+
+      await waitFor(() => expect(mocked.copyText).toHaveBeenCalledWith("taskboard-debug://level/11"));
+      expect(mocked.appLink).toHaveBeenCalledWith({ kind: "level", listId: NW_ID, viewId: null });
+      expect(await screen.findByText("Copied the Taskboard link to Website relaunch")).toBeInTheDocument();
     });
 
     it("opens the Space's settings through the bus command", async () => {

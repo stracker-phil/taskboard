@@ -427,7 +427,7 @@ describe("ViewTabs", () => {
       await rightClick("Sprint board");
 
       const menu = within(screen.getByRole("menu", { name: "Sprint board" }));
-      expect(menu.getAllByRole("menuitem").map((r) => r.textContent)).toEqual(["Rename", "Icon and Color…", "Duplicate", "Bookmark View", "Delete"]);
+      expect(menu.getAllByRole("menuitem").map((r) => r.textContent)).toEqual(["Rename", "Icon and Color…", "Duplicate", "Bookmark View", "Copy Taskboard Link", "Delete"]);
       expect(menu.getByRole("group", { name: "Layout" })).toBeInTheDocument();
     });
 
@@ -482,6 +482,18 @@ describe("ViewTabs", () => {
 
         await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not bookmark the view: Disk full"));
       });
+    });
+
+    it("copies the Taskboard link to the view and says so", async () => {
+      mocked.appLink.mockResolvedValue("taskboard-debug://level/11/102");
+      await renderTabs();
+      await rightClick("Sprint board");
+
+      await choose("Copy Taskboard Link");
+
+      await waitFor(() => expect(mocked.copyText).toHaveBeenCalledWith("taskboard-debug://level/11/102"));
+      expect(mocked.appLink).toHaveBeenCalledWith({ kind: "level", listId: LIST.listId, viewId: 102 });
+      await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Copied the Taskboard link to Sprint board"));
     });
 
     it("checks the view's current layout in the Layout group", async () => {
@@ -743,14 +755,14 @@ describe("ViewTabs", () => {
     it("offers renaming, styling, duplicating, bookmarking and deleting the current view", async () => {
       await renderTabs([LIST, BOARD]);
 
-      expect(entriesOf("View").map((e) => e.text)).toEqual(["Rename", "Icon and Color…", "Duplicate", "Bookmark View", "Delete"]);
+      expect(entriesOf("View").map((e) => e.text)).toEqual(["Rename", "Icon and Color…", "Duplicate", "Bookmark View", "Copy Taskboard Link", "Delete"]);
     });
 
     it("offers Remove Bookmark for the current view once it is bookmarked", async () => {
       mocked.pinsList.mockResolvedValue(pins([pinItem({ id: 8, target: viewTarget({ id: 101 }) })]));
       await renderTabs([LIST, BOARD]);
 
-      await waitFor(() => expect(entriesOf("View").map((e) => e.text)).toEqual(["Rename", "Icon and Color…", "Duplicate", "Remove Bookmark", "Delete"]));
+      await waitFor(() => expect(entriesOf("View").map((e) => e.text)).toEqual(["Rename", "Icon and Color…", "Duplicate", "Remove Bookmark", "Copy Taskboard Link", "Delete"]));
     });
 
     it("greys out Delete while the view is the only one", async () => {
