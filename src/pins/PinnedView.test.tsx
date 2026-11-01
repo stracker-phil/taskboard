@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -176,16 +176,16 @@ describe("PinnedView", () => {
     });
 
     it("is refreshed from Rust every minute while the view is open", async () => {
-      vi.useFakeTimers({ shouldAdvanceTime: true });
+      vi.useFakeTimers();
       mocked.pinsList.mockResolvedValueOnce(pins([pinItem({ timeLeft: "3h left" })])).mockResolvedValue(pins([pinItem({ timeLeft: "2h left" })]));
       renderPinned();
-      expect(await screen.findByText("3h left")).toBeInTheDocument();
+      await vi.waitFor(() => expect(screen.getByText("3h left")).toBeInTheDocument());
 
-      await vi.advanceTimersByTimeAsync(30_000);
+      await act(() => vi.advanceTimersByTimeAsync(30_000));
       expect(screen.getByText("3h left")).toBeInTheDocument();
-      await vi.advanceTimersByTimeAsync(31_000);
+      await act(() => vi.advanceTimersByTimeAsync(31_000));
 
-      expect(await screen.findByText("2h left")).toBeInTheDocument();
+      await vi.waitFor(() => expect(screen.getByText("2h left")).toBeInTheDocument());
     });
 
   });

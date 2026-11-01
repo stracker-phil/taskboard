@@ -728,11 +728,11 @@ describe("IssueView", () => {
     });
 
     async function openUnseen() {
-      vi.useFakeTimers({ shouldAdvanceTime: true });
+      vi.useFakeTimers();
       serve(UNREAD);
       const view = renderIssue();
-      await screen.findByRole("status");
-      await vi.advanceTimersByTimeAsync(0);
+      await vi.waitFor(() => expect(screen.getByRole("status")).toBeInTheDocument());
+      await act(() => vi.advanceTimersByTimeAsync(0));
       return view;
     }
 

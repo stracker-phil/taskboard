@@ -1,4 +1,4 @@
-import { render } from "@testing-library/react";
+import { act, render } from "@testing-library/react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -16,7 +16,8 @@ function Mounted() {
   return null;
 }
 
-const inMs = (ms: number) => new Date(Date.now() + ms).toISOString();
+const advance = (ms: number) => act(() => vi.advanceTimersByTimeAsync(ms));
+const inMs =(ms: number) => new Date(Date.now() + ms).toISOString();
 
 async function mount() {
   render(
@@ -25,12 +26,13 @@ async function mount() {
     </QueryClientProvider>,
   );
   await vi.waitFor(() => expect(mocked.pinsList).toHaveBeenCalledTimes(1));
+  await advance(0);
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   mocked.pinsList.mockResolvedValue(pins());
-  vi.useFakeTimers({ shouldAdvanceTime: true });
+  vi.useFakeTimers();
 });
 
 afterEach(() => {
@@ -69,10 +71,10 @@ describe("usePinExpiry", () => {
     mocked.pinsList.mockResolvedValue(pins([pinItem({ id: 1, expiresAt: inMs(3_600_000) }), pinItem({ id: 2, expiresAt: inMs(60_000) })]));
     await mount();
 
-    await vi.advanceTimersByTimeAsync(30_000);
+    await advance(30_000);
     expect(mocked.pinsList).toHaveBeenCalledTimes(1);
 
-    await vi.advanceTimersByTimeAsync(31_000);
+    await advance(31_000);
     await vi.waitFor(() => expect(mocked.pinsList).toHaveBeenCalledTimes(2));
   });
 
@@ -80,7 +82,7 @@ describe("usePinExpiry", () => {
     mocked.pinsList.mockResolvedValue(pins([pinItem({ expiresAt: null })]));
     await mount();
 
-    await vi.advanceTimersByTimeAsync(7 * 24 * 3_600_000);
+    await advance(7 * 24 * 3_600_000);
 
     expect(mocked.pinsList).toHaveBeenCalledTimes(1);
   });

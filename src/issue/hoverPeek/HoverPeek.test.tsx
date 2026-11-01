@@ -13,7 +13,10 @@ import { HoverPeek } from "./HoverPeek";
 const mocked = vi.mocked(api, true);
 
 const advance = (ms: number) => act(() => vi.advanceTimersByTimeAsync(ms));
-const peek = (key: string) => screen.findByRole("tooltip", { name: `Peek at ${key}` });
+const peek = async (key: string) => {
+  await vi.waitFor(() => expect(screen.getByRole("tooltip", { name: `Peek at ${key}` })).toBeInTheDocument());
+  return screen.getByRole("tooltip", { name: `Peek at ${key}` });
+};
 
 function renderPeek() {
   return render(
@@ -33,7 +36,7 @@ const first = () => screen.getByText("NW-1042");
 beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
-  vi.useFakeTimers({ shouldAdvanceTime: true });
+  vi.useFakeTimers();
   mocked.issueGet.mockImplementation(async (id: string) =>
     id === "2" ? issueDetail({ id: "2", key: "NW-2000", summary: "Second issue", descriptionHtml: null }) : issueDetail({ id: "1" }),
   );
@@ -50,9 +53,9 @@ describe("HoverPeek", () => {
     await advance(150);
 
     const card = await peek("NW-1042");
+    await vi.waitFor(() => expect(within(card).getByText("Validate German, Austrian and Swiss postcodes.")).toBeInTheDocument());
     expect(within(card).getByText("Checkout: address validation for DACH postcodes")).toBeInTheDocument();
     expect(within(card).getByText("In Progress")).toBeInTheDocument();
-    expect(within(card).getByText("Validate German, Austrian and Swiss postcodes.")).toBeInTheDocument();
   });
 
   it("shows a placeholder when the issue has no description", async () => {
@@ -61,7 +64,7 @@ describe("HoverPeek", () => {
     await advance(150);
 
     const card = await peek("NW-2000");
-    expect(within(card).getByText("No description.")).toBeInTheDocument();
+    await vi.waitFor(() => expect(within(card).getByText("No description.")).toBeInTheDocument());
   });
 
   it("shows nothing before the 150 ms rest has passed", async () => {

@@ -15,7 +15,7 @@ const toasts = () => useStore.getState().toasts.map((t) => [t.kind, t.message]);
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.useFakeTimers({ shouldAdvanceTime: true });
+  vi.useFakeTimers();
   resetStore();
 });
 

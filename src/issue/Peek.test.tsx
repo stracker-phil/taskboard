@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -273,7 +273,7 @@ describe("Peek", () => {
     const SINCE = { label: "Since yesterday", text: "1 new comment." };
 
     beforeEach(() => {
-      vi.useFakeTimers({ shouldAdvanceTime: true });
+      vi.useFakeTimers();
     });
 
     afterEach(() => {
@@ -284,10 +284,12 @@ describe("Peek", () => {
       if (seenAfterSeconds !== undefined) mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ seenAfterSeconds }) }));
       serveByKey();
       const view = renderSwitchable("10042");
-      await screen.findByRole("status");
-      await vi.advanceTimersByTimeAsync(0);
+      await vi.waitFor(() => expect(screen.getByRole("status")).toBeInTheDocument());
+      await advance(0);
       return view;
     }
+
+    const advance = (ms: number) => act(() => vi.advanceTimersByTimeAsync(ms));
 
     function renderSwitchable(id: string) {
       const client = createQueryClient();
@@ -347,8 +349,8 @@ describe("Peek", () => {
 
       await vi.advanceTimersByTimeAsync(1000);
       show("10043");
-      await screen.findByRole("heading", { name: "Issue 10043" });
-      await vi.advanceTimersByTimeAsync(5000);
+      await vi.waitFor(() => expect(screen.getByRole("heading", { name: "Issue 10043" })).toBeInTheDocument());
+      await advance(5000);
 
       expect(mocked.issuesMarkSeen).not.toHaveBeenCalled();
     });
@@ -356,9 +358,9 @@ describe("Peek", () => {
     it("does not mark an issue without unseen changes", async () => {
       serveByKey();
       renderSwitchable("10043");
-      await screen.findByRole("heading", { name: "Issue 10043" });
+      await vi.waitFor(() => expect(screen.getByRole("heading", { name: "Issue 10043" })).toBeInTheDocument());
 
-      await vi.advanceTimersByTimeAsync(5000);
+      await advance(5000);
 
       expect(mocked.issuesMarkSeen).not.toHaveBeenCalled();
     });
