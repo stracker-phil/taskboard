@@ -151,8 +151,8 @@ src-tauri/
   src/avatars/               people's profile pictures: freshness, the `cache.avatar` rows, `user_avatar` (data URLs)
   src/nav/                   where the main window is (level and view, nav.json); previous/next Space
   src/<feature>/             one folder per feature: types, pure logic, commands.rs, tests
-  src/window/ menu/          the main and Settings windows, the native app menu (menu/palette.rs: its items for the
-                             palette)
+  src/window/ menu/          the main and Settings windows, the native app menu (menu/items.rs: the items and
+                             menus; build.rs: the menu bar; palette.rs: its items for the palette)
   src/dev/                   debug builds only: window frame, background launch, eval; fake.rs the fake Jira's server
   src/diagnostics/           Settings → Status: what the connection, the sync and this Mac report
   src/test_support/          fixtures, fakes (cfg test, test-util); the demo Jira site and the fake Jira (also debug)
