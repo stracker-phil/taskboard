@@ -6,6 +6,8 @@ import type { ScrollAxis } from "./useIssueDrag";
 const EDGE_PX = 56;
 const MAX_STEP = 18;
 const PRIORITY_FLAGS = ["highest", "high", "medium", "low"] as const;
+/** Inline styles a list places or fades a row with, which the copy drops. */
+const PLACEMENT = ["opacity", "transform", "overflow", "overflow-y"];
 /** Class modifiers that say how a pill is drawn, not which status it shows. */
 const VARIANTS = ["peek", "activity", "tab", "vertical", "closed"];
 
@@ -24,6 +26,9 @@ export function followDraggedCopy(element: HTMLElement, press: Point, view: HTML
   copy.setAttribute("aria-hidden", "true");
   copy.inert = true;
   carryCustomProperties(element, copy);
+  // A virtualized row's wrapper places and fades it in the list (a group opening, the fold); the copy is the row
+  // itself, whole and fully drawn.
+  for (const name of PLACEMENT) copy.style.removeProperty(name);
   Object.assign(copy.style, { left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px` });
   document.body.appendChild(copy);
   element.setAttribute("data-drag-source", "");
