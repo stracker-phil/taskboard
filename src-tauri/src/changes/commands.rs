@@ -42,8 +42,10 @@ pub async fn list_mark_all_seen(
         view_id,
         narrowing: {
             let narrowing = narrowing.unwrap_or_default();
+            let modes = state.modes.get();
             Narrowing {
-                me: narrowing.me || state.modes.get().me_everywhere,
+                me: narrowing.me || modes.me_everywhere,
+                unread: modes.unread_only,
                 me_rules: settings.behaviour.me_rules,
                 ..narrowing
             }

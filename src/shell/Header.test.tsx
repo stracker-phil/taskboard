@@ -23,7 +23,9 @@ const LIST_LEVEL: Level = { kind: "list", space: space(), node: listNode() };
 const EVERYTHING: Level = { kind: "home", node: listNode({ id: 1, kind: "everything", name: "Everything" }) };
 const PINNED: Level = { kind: "home", node: listNode({ id: 3, kind: "pinned", name: "Pinned" }) };
 
-const recent = (count: number | null): Level => ({ kind: "home", node: listNode({ id: 2, kind: "recent", name: "Unread", count }) });
+const everything = (count: number | null): Level => ({ kind: "home", node: listNode({ id: 1, kind: "everything", name: "Everything", count }) });
+const filterList = (count: number | null): Level => ({ kind: "list", space: space(), node: listNode({ count }) });
+const spaceWith = (openCount: number): Level => ({ kind: "space", space: space({ openCount }) });
 
 async function renderHeader(level: Level) {
   render(
@@ -35,6 +37,10 @@ async function renderHeader(level: Level) {
   await act(async () => {
     await mocked.connectionGet.mock.results[0].value;
   });
+  await waitFor(() => expect(mocked.modesGet).toHaveBeenCalled());
+  await act(async () => {
+    await mocked.modesGet.mock.results[0].value;
+  });
 }
 
 beforeEach(() => {
@@ -42,6 +48,7 @@ beforeEach(() => {
   resetStore();
   mocked.connectionGet.mockResolvedValue(connectionView());
   mocked.pinsList.mockResolvedValue(pins());
+  mocked.modesGet.mockResolvedValue({ meEverywhere: false, unreadOnly: false });
   mocked.listMarkAllSeen.mockResolvedValue(undefined);
   mocked.openUrl.mockResolvedValue(undefined);
 });
@@ -160,7 +167,6 @@ describe("Header", () => {
 
     it.each([
       ["Everything", EVERYTHING],
-      ["Unread", recent(3)],
       ["Bookmarks", PINNED],
     ])("is absent on the Home level %s", async (_name, level) => {
       await renderHeader(level);
@@ -197,125 +203,151 @@ describe("Header", () => {
   });
 
   describe("Mark all as read", () => {
-    it("is offered by the header of the Unread level", async () => {
-      await renderHeader(recent(3));
+    const markAll = () => screen.getByRole("button", { name: "Mark all as read" });
 
-      expect(screen.getByRole("heading", { level: 1, name: "Unread" })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Mark all as read" })).toBeEnabled();
+    describe("while Unread only is off", () => {
+      it.each([
+        ["Everything", everything(3)],
+        ["a Space", spaceWith(3)],
+        ["a filter list", filterList(3)],
+      ])("is absent on %s", async (_name, level) => {
+        await renderHeader(level);
+
+        expect(screen.queryByRole("button", { name: "Mark all as read" })).not.toBeInTheDocument();
+      });
+
+      it("is not offered as a page action", async () => {
+        await renderHeader(everything(3));
+
+        expect(runPageAction("view.markAllSeen")).toBe(false);
+      });
     });
 
-    it("marks every issue of Unread read when no view of it is open", async () => {
-      await renderHeader(recent(3));
-
-      await userEvent.click(screen.getByRole("button", { name: "Mark all as read" }));
-
-      expect(mocked.listMarkAllSeen).toHaveBeenCalledWith(2, null, null);
-    });
-
-    it("passes the open view and its narrowing when Unread is on screen", async () => {
-      mocked.navCurrent.mockResolvedValue({ location: { listId: 2, viewId: 7 }, expanded: [] });
-      mocked.viewsOf.mockResolvedValue([view({ id: 7, listId: 2, onlyMine: true })]);
-      await renderHeader(recent(3));
-      await waitFor(() => expect(mocked.viewsOf).toHaveBeenCalledWith(2));
-      await act(async () => {});
-
-      await userEvent.click(screen.getByRole("button", { name: "Mark all as read" }));
-
-      expect(mocked.listMarkAllSeen).toHaveBeenCalledWith(2, 7, expect.objectContaining({ me: true, text: "" }));
-    });
-
-    it("passes no view when another level is open", async () => {
-      mocked.navCurrent.mockResolvedValue({ location: { listId: 11, viewId: 101 }, expanded: [] });
-      await renderHeader(recent(3));
-      await act(async () => {});
-
-      await userEvent.click(screen.getByRole("button", { name: "Mark all as read" }));
-
-      expect(mocked.listMarkAllSeen).toHaveBeenCalledWith(2, null, null);
-    });
-
-    it.each([0, null])("is disabled when the unseen count is %s", async (count) => {
-      await renderHeader(recent(count));
-
-      expect(screen.getByRole("button", { name: "Mark all as read" })).toBeDisabled();
-    });
-
-    it.each([
-      ["Everything", EVERYTHING],
-      ["a Space", SPACE_LEVEL],
-      ["a filter list", LIST_LEVEL],
-    ])("is absent on %s", async (_name, level) => {
-      await renderHeader(level);
-
-      expect(screen.queryByRole("button", { name: "Mark all as read" })).not.toBeInTheDocument();
-    });
-
-    it("shows an error toast when marking fails", async () => {
-      mocked.listMarkAllSeen.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
-      await renderHeader(recent(3));
-
-      await userEvent.click(screen.getByRole("button", { name: "Mark all as read" }));
-
-      await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not mark them read: Disk full"));
-    });
-
-    describe("as a page action (recent.markAllSeen)", () => {
+    describe("while Unread only is on", () => {
       const run = () => {
         let offered = false;
         act(() => {
-          offered = runPageAction("recent.markAllSeen");
+          offered = runPageAction("view.markAllSeen");
         });
         return offered;
       };
 
-      it("marks every issue of Unread read", async () => {
-        await renderHeader(recent(3));
-
-        expect(run()).toBe(true);
-
-        expect(mocked.listMarkAllSeen).toHaveBeenCalledWith(2, null, null);
+      beforeEach(() => {
+        mocked.modesGet.mockResolvedValue({ meEverywhere: false, unreadOnly: true });
       });
 
-      it.each([0, null])("is not offered when the unseen count is %s", async (count) => {
-        await renderHeader(recent(count));
+      it.each([
+        ["Everything", everything(3)],
+        ["a Space", spaceWith(3)],
+        ["a filter list", filterList(3)],
+      ])("is offered on %s", async (_name, level) => {
+        await renderHeader(level);
 
+        expect(markAll()).toBeEnabled();
+      });
+
+      it("is absent on Bookmarks", async () => {
+        await renderHeader(PINNED);
+
+        expect(screen.queryByRole("button", { name: "Mark all as read" })).not.toBeInTheDocument();
+        expect(run()).toBe(false);
+      });
+
+      it("marks every issue of the level read when no view of it is open", async () => {
+        await renderHeader(everything(3));
+
+        await userEvent.click(markAll());
+
+        expect(mocked.listMarkAllSeen).toHaveBeenCalledWith(1, null, null);
+      });
+
+      it("counts a Space's unseen issues from its open count and passes the Space's list", async () => {
+        await renderHeader(spaceWith(4));
+
+        await userEvent.click(markAll());
+
+        expect(mocked.listMarkAllSeen).toHaveBeenCalledWith(11, null, null);
+      });
+
+      it("passes the open view and its narrowing when the level is on screen", async () => {
+        mocked.navCurrent.mockResolvedValue({ location: { listId: 1, viewId: 7 }, expanded: [] });
+        mocked.viewsOf.mockResolvedValue([view({ id: 7, listId: 1, onlyMine: true })]);
+        await renderHeader(everything(3));
+        await waitFor(() => expect(mocked.viewsOf).toHaveBeenCalledWith(1));
+        await act(async () => {});
+
+        await userEvent.click(markAll());
+
+        expect(mocked.listMarkAllSeen).toHaveBeenCalledWith(1, 7, expect.objectContaining({ me: true, text: "" }));
+      });
+
+      it("passes no view when another level is open", async () => {
+        mocked.navCurrent.mockResolvedValue({ location: { listId: 11, viewId: 101 }, expanded: [] });
+        await renderHeader(everything(3));
+        await act(async () => {});
+
+        await userEvent.click(markAll());
+
+        expect(mocked.listMarkAllSeen).toHaveBeenCalledWith(1, null, null);
+      });
+
+      it.each([
+        ["a count of 0", everything(0)],
+        ["a null count", everything(null)],
+        ["a Space without open issues", spaceWith(0)],
+      ])("is disabled and not offered as a page action with %s", async (_name, level) => {
+        await renderHeader(level);
+
+        expect(markAll()).toBeDisabled();
         expect(run()).toBe(false);
         expect(mocked.listMarkAllSeen).not.toHaveBeenCalled();
       });
 
-      it.each([
-        ["Everything", EVERYTHING],
-        ["a Space", SPACE_LEVEL],
-      ])("is not offered on %s", async (_name, level) => {
-        await renderHeader(level);
-
-        expect(run()).toBe(false);
-      });
-
-      it("is withdrawn once every issue is read", async () => {
-        const view = render(
-          <QueryClientProvider client={createQueryClient()}>
-            <Header level={recent(3)} />
-          </QueryClientProvider>,
-        );
-        expect(run()).toBe(true);
-
-        view.rerender(
-          <QueryClientProvider client={createQueryClient()}>
-            <Header level={recent(0)} />
-          </QueryClientProvider>,
-        );
-
-        expect(run()).toBe(false);
-      });
-
       it("shows an error toast when marking fails", async () => {
         mocked.listMarkAllSeen.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
-        await renderHeader(recent(3));
+        await renderHeader(everything(3));
 
-        run();
+        await userEvent.click(markAll());
 
         await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not mark them read: Disk full"));
+      });
+
+      describe("as the view.markAllSeen page action", () => {
+        it("marks every issue of the level read", async () => {
+          await renderHeader(everything(3));
+
+          expect(run()).toBe(true);
+
+          expect(mocked.listMarkAllSeen).toHaveBeenCalledWith(1, null, null);
+        });
+
+        it("is withdrawn once every issue is read", async () => {
+          const client = createQueryClient();
+          const rendered = render(
+            <QueryClientProvider client={client}>
+              <Header level={everything(3)} />
+            </QueryClientProvider>,
+          );
+          await screen.findByRole("button", { name: "Mark all as read" });
+          expect(run()).toBe(true);
+
+          rendered.rerender(
+            <QueryClientProvider client={client}>
+              <Header level={everything(0)} />
+            </QueryClientProvider>,
+          );
+
+          expect(run()).toBe(false);
+        });
+
+        it("shows an error toast when marking fails", async () => {
+          mocked.listMarkAllSeen.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
+          await renderHeader(everything(3));
+
+          run();
+
+          await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not mark them read: Disk full"));
+        });
       });
     });
   });

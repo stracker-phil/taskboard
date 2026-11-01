@@ -128,9 +128,9 @@ describe("page action commands", () => {
 
 describe("page action titles", () => {
   it.each([
-    ["go.recent", "Go to Unread"],
     ["go.pinned", "Go to Bookmarks"],
-    ["recent.markAllSeen", "Mark All as Read"],
+    ["view.markAllSeen", "Mark All as Read"],
+    ["toolbar.unread", "Unread Only"],
   ])("name %s %s", (id, title) => {
     expect(getCommand(id)?.title).toBe(title);
   });

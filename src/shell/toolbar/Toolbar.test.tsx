@@ -978,6 +978,121 @@ describe("Toolbar folding", () => {
   });
 });
 
+describe("Toolbar Unread only", () => {
+  const unreadButton = () => screen.getByRole("button", { name: "Unread only" });
+
+  beforeEach(() => {
+    mocked.modesGet.mockResolvedValue({ meEverywhere: false, unreadOnly: false });
+    mocked.modeSet.mockResolvedValue({ meEverywhere: false, unreadOnly: true });
+  });
+
+  it("sits after the Filter button and before the Me chip", async () => {
+    renderToolbar(SPACE_LEVEL);
+
+    expect(screen.getByRole("button", { name: /^Filter/ }).compareDocumentPosition(unreadButton()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(unreadButton().compareDocumentPosition(meChip()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("turns Unread only on when clicked while it is off", async () => {
+    renderToolbar(SPACE_LEVEL);
+    expect(unreadButton()).toHaveAttribute("aria-pressed", "false");
+
+    await userEvent.click(unreadButton());
+
+    expect(mocked.modeSet).toHaveBeenCalledWith("unreadOnly", true);
+  });
+
+  it("shows pressed while Unread only is on, and turns it off when clicked", async () => {
+    mocked.modesGet.mockResolvedValue({ meEverywhere: false, unreadOnly: true });
+    renderToolbar(SPACE_LEVEL);
+    await waitFor(() => expect(unreadButton()).toHaveAttribute("aria-pressed", "true"));
+
+    await userEvent.click(unreadButton());
+
+    expect(mocked.modeSet).toHaveBeenCalledWith("unreadOnly", false);
+  });
+
+  it("turns Unread only on through the toolbar.unread page action", async () => {
+    renderToolbar(SPACE_LEVEL);
+
+    run("toolbar.unread");
+
+    await waitFor(() => expect(mocked.modeSet).toHaveBeenCalledWith("unreadOnly", true));
+  });
+
+  it("turns Unread only on with ⌘⇧U", async () => {
+    renderToolbar(SPACE_LEVEL);
+
+    await userEvent.keyboard("{Meta>}{Shift>}u{/Shift}{/Meta}");
+
+    await waitFor(() => expect(mocked.modeSet).toHaveBeenCalledWith("unreadOnly", true));
+  });
+
+  it("shows an error toast when the mode cannot be changed", async () => {
+    mocked.modeSet.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
+    renderToolbar(SPACE_LEVEL);
+
+    await userEvent.click(unreadButton());
+
+    await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not change Unread only: Disk full"));
+  });
+
+  describe("folded into the More menu", () => {
+    const rects: { mockRestore: () => void }[] = [];
+
+    beforeEach(() => {
+      vi.stubGlobal(
+        "ResizeObserver",
+        class {
+          callback: ResizeObserverCallback;
+          constructor(callback: ResizeObserverCallback) {
+            this.callback = callback;
+          }
+          observe() {
+            this.callback([], this);
+          }
+          unobserve() {}
+          disconnect() {}
+        },
+      );
+      rects.push(vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(310));
+      rects.push(vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ width: 100, height: 20, top: 0, left: 0, right: 100, bottom: 20, x: 0, y: 0, toJSON: () => ({}) }));
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      rects.splice(0).forEach((spy) => spy.mockRestore());
+    });
+
+    const openMore = async () => {
+      renderToolbar(SPACE_LEVEL);
+      await vi.waitFor(() => expect(mocked.modesGet).toHaveBeenCalled());
+      await act(async () => {
+        await mocked.modesGet.mock.results[0]?.value;
+      });
+      await userEvent.click(await screen.findByRole("button", { name: "More toolbar items" }));
+      return within(await screen.findByRole("menu", { name: "More toolbar items" }));
+    };
+
+    it("offers an unchecked Unread only toggle in place of the button", async () => {
+      const menu = await openMore();
+
+      expect(menu.getByRole("menuitemcheckbox", { name: "Unread only" })).toHaveAttribute("aria-checked", "false");
+      expect(screen.queryByRole("button", { name: "Unread only" })).not.toBeInTheDocument();
+    });
+
+    it("shows the toggle checked when Unread only is on, and turns it off when chosen", async () => {
+      mocked.modesGet.mockResolvedValue({ meEverywhere: false, unreadOnly: true });
+      const menu = await openMore();
+      expect(menu.getByRole("menuitemcheckbox", { name: "Unread only" })).toHaveAttribute("aria-checked", "true");
+
+      await userEvent.click(menu.getByRole("menuitemcheckbox", { name: "Unread only" }));
+
+      expect(mocked.modeSet).toHaveBeenCalledWith("unreadOnly", false);
+    });
+  });
+});
+
 describe("Toolbar palette entries", () => {
   const offered = (title: string) => paletteMenus().find((menu) => menu.title === title);
   const texts = (title: string) => (offered(title)?.entries() ?? []).flatMap((entry) => (typeof entry === "string" || "caption" in entry ? [] : [entry.text]));

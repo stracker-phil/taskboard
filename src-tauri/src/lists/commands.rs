@@ -14,7 +14,8 @@ fn viewer(state: &AppState) -> Viewer {
 
 #[tauri::command]
 pub async fn sidebar_tree(state: State<'_, AppState>) -> AppResult<SidebarTree> {
-    super::sidebar_tree(&state.db, viewer(&state)).await
+    let unread = state.modes.get().unread_only;
+    super::sidebar_tree(&state.db, viewer(&state), unread).await
 }
 
 /// `parent_id`: a Space's node, or Everything's for a list under Home. Returns the new list's id.

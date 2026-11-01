@@ -23,6 +23,7 @@ pub const LOCAL: &[&str] = &[
     include_str!("../../migrations/local/0015_issue_seen.sql"),
     include_str!("../../migrations/local/0016_space_member_off.sql"),
     include_str!("../../migrations/local/0017_space_member.sql"),
+    include_str!("../../migrations/local/0018_drop_unread_list.sql"),
 ];
 pub const CACHE: &[&str] = &[
     include_str!("../../migrations/cache/0001_init.sql"),
@@ -212,6 +213,68 @@ mod tests {
             ]
         );
         assert!(!tables(&conn).contains(&"space_member_off".to_string()));
+    }
+
+    #[test]
+    fn dropping_the_unread_list_removes_its_views_and_pins_and_nothing_else() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        migrate(&mut conn, "local", &LOCAL[..17]).unwrap();
+        let id_of = |conn: &Connection, kind: &str| -> i64 {
+            conn.query_row("SELECT id FROM filter_list WHERE kind = ?1", [kind], |r| {
+                r.get(0)
+            })
+            .unwrap()
+        };
+        let view_of = |conn: &Connection, list: i64| -> i64 {
+            conn.query_row("SELECT id FROM view WHERE list_id = ?1", [list], |r| {
+                r.get(0)
+            })
+            .unwrap()
+        };
+        let (unread, pinned) = (id_of(&conn, "recent"), id_of(&conn, "pinned"));
+        let (unread_view, pinned_view) = (view_of(&conn, unread), view_of(&conn, pinned));
+        for (kind, target) in [
+            ("filter_list", unread.to_string()),
+            ("filter_list", pinned.to_string()),
+            ("view", unread_view.to_string()),
+            ("view", pinned_view.to_string()),
+            ("issue", "NW-1".to_string()),
+        ] {
+            conn.execute(
+                "INSERT INTO pin (target_kind, target_id, created_at) \
+                 VALUES (?1, ?2, '2026-01-05T09:00:00Z')",
+                [kind, &target],
+            )
+            .unwrap();
+        }
+
+        migrate(&mut conn, "local", LOCAL).unwrap();
+
+        let strings = |sql: &str| -> Vec<String> {
+            conn.prepare(sql)
+                .unwrap()
+                .query_map([], |r| r.get(0))
+                .unwrap()
+                .map(Result::unwrap)
+                .collect()
+        };
+        assert_eq!(
+            strings("SELECT kind FROM filter_list ORDER BY id"),
+            ["everything", "pinned"]
+        );
+        assert_eq!(
+            strings("SELECT CAST(id AS TEXT) FROM view ORDER BY id").len(),
+            2
+        );
+        assert!(!strings("SELECT CAST(id AS TEXT) FROM view").contains(&unread_view.to_string()));
+        assert_eq!(
+            strings("SELECT target_kind || ':' || target_id FROM pin ORDER BY id"),
+            [
+                format!("filter_list:{pinned}"),
+                format!("view:{pinned_view}"),
+                "issue:NW-1".to_string(),
+            ]
+        );
     }
 
     #[test]

@@ -151,7 +151,7 @@ impl Rig {
             time_zone: Some("Europe/Berlin".into()),
             now: DEMO_NOW.parse::<DateTime<Utc>>().unwrap(),
         };
-        let tree = sidebar_tree(&self.ctx.db, viewer).await.unwrap();
+        let tree = sidebar_tree(&self.ctx.db, viewer, false).await.unwrap();
         let nw = tree.spaces.iter().find(|s| s.key == "NW").unwrap();
         (tree.everything.count, nw.open_count)
     }

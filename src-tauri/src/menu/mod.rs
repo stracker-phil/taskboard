@@ -55,7 +55,6 @@ pub const PALETTE: Item = item("Command Palette…", "page:palette.open", "CmdOr
 pub const GO_LEVELS: &[Item] = &[
     PALETTE,
     item("Everything", "page:go.everything", "CmdOrCtrl+Shift+E"),
-    item("Unread", "page:go.recent", "CmdOrCtrl+Shift+U"),
     item("Bookmarks", "page:go.pinned", "CmdOrCtrl+Shift+P"),
 ];
 pub const GO_MOVES: &[Item] = &[
@@ -89,13 +88,14 @@ pub const LIST_TOOLBAR: &[Item] = &[
     item("Edit Filter…", "page:toolbar.filter", "CmdOrCtrl+Alt+F"),
     item("Only My Issues", "page:toolbar.me", "CmdOrCtrl+Shift+M"),
     plain("Me Mode Options…", "page:toolbar.meOptions"),
+    item("Unread Only", "page:toolbar.unread", "CmdOrCtrl+Shift+U"),
     item("Filter This View", "page:toolbar.search", "CmdOrCtrl+F"),
     item("Save View", "page:view.save", "CmdOrCtrl+S"),
     plain("Revert View", "page:view.revert"),
 ];
 pub const LIST_SEEN: &[Item] = &[item(
     "Mark All as Read",
-    "page:recent.markAllSeen",
+    "page:view.markAllSeen",
     "CmdOrCtrl+Shift+A",
 )];
 pub const ISSUE: &[Item] = &[
@@ -370,7 +370,6 @@ mod tests {
                 "view.new",
                 "palette.open",
                 "go.everything",
-                "go.recent",
                 "go.pinned",
                 "view.previous",
                 "view.next",
@@ -379,10 +378,11 @@ mod tests {
                 "toolbar.filter",
                 "toolbar.me",
                 "toolbar.meOptions",
+                "toolbar.unread",
                 "toolbar.search",
                 "view.save",
                 "view.revert",
-                "recent.markAllSeen",
+                "view.markAllSeen",
                 "view.layout.list",
                 "view.layout.board",
                 "view.layout.table",
@@ -533,8 +533,8 @@ mod tests {
         fn commands(items: &[Item]) -> Vec<&str> {
             items.iter().map(|item| item.command).collect()
         }
-        assert_eq!(commands(LIST_SEEN), ["page:recent.markAllSeen"]);
-        assert!(!commands(ISSUE).contains(&"page:recent.markAllSeen"));
+        assert_eq!(commands(LIST_SEEN), ["page:view.markAllSeen"]);
+        assert!(!commands(ISSUE).contains(&"page:view.markAllSeen"));
     }
 
     #[test]
@@ -563,10 +563,14 @@ mod tests {
                 .find(|item| item.command == command)
                 .map(|item| item.label)
         };
-        assert_eq!(label_of(GO_LEVELS, "page:go.recent"), Some("Unread"));
+        assert_eq!(label_of(GO_LEVELS, "page:go.recent"), None);
         assert_eq!(label_of(GO_LEVELS, "page:go.pinned"), Some("Bookmarks"));
         assert_eq!(
-            label_of(LIST_SEEN, "page:recent.markAllSeen"),
+            label_of(LIST_TOOLBAR, "page:toolbar.unread"),
+            Some("Unread Only")
+        );
+        assert_eq!(
+            label_of(LIST_SEEN, "page:view.markAllSeen"),
             Some("Mark All as Read")
         );
         assert_eq!(

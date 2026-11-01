@@ -27,7 +27,7 @@ The owner's rule (2026-10-30), for every control, list and popover:
   replace what was clicked.
 - **Lists don't re-sort while they are used.** A popover or picker keeps the order it opened with; ticking or
   switching an item changes only its box or switch (`ValuePicker`, `ColumnsPopover`). A row removed from a list
-  on screen keeps its place, grayed, until the page is left (Bookmarks); Unread keeps the issues read there.
+  on screen keeps its place, grayed, until the page is left (Bookmarks); Unread only keeps the issues read there.
 - **Controls keep their size.** A toggle shows its state in color and outline, never by adding an icon or text
   that changes its width (the Me chip). Buttons that only sometimes apply keep their slot, invisible, so their
   neighbors don't move (Settings → Shortcuts). New controls appear where the row has free room, not where they
@@ -71,11 +71,11 @@ The owner's rule (2026-10-30), for every control, list and popover:
 - **Traffic-light strip** (18px, a drag region) for the native window buttons.
 - **Search**: 34px, 9px radius, a `--border` frame on `--panel-bg`, `--text-muted`; Search icon 15/2, the
   label, a "⌘K" key hint (11px, `--fill-subtle`, 5px radius). Disabled until the palette exists.
-- **Home** (`HomeRows`): Everything (`Layers2`), then the Home lists in Rust's order: Unread
-  (`History`), Bookmarks (`Bookmark`) and global filter lists (`Folder`). 34px rows, 10px padding and gap, 8px radius,
-  `--text-strong-body`; icons 17/1.8; the count 12px `--text-muted`, hidden while Rust has none. Recently
-  changed has no count: while it has unseen issues its label is 600 and a badge (20px, `--accent`, white
-  11/700) shows how many.
+- **Home** (`HomeRows`): Everything (`Layers2`), then the Home lists in Rust's order: Bookmarks (`Bookmark`)
+  and global filter lists (`Folder`). 34px rows, 10px padding and gap, 8px radius, `--text-strong-body`; icons
+  17/1.8; the count 12px `--text-muted`, hidden while Rust has none.
+- **Counts under Unread only** (`ListCount`): every list counts its unread issues, open or done, after a 6px
+  `--accent` dot, in `--accent-text` 600; a list with none shows no number. Bookmarks keeps its bookmark count.
 - **Spaces** (`SpacesSection`, scrolls): the "Spaces" header (12/600 `--text-muted`); Spaces are added in
   Settings → Projects, not here. Each Space (`SpaceRow`): 36px, the shared 12px chevron (`DisclosureChevron`, the one of every disclosure) in `--text-muted` at 0.4
   opacity, full while the Space has the pointer or holds the shown level, the 22px
@@ -121,8 +121,9 @@ with a 10px gap.
 - The level shown is the selected one: a click on a Space's or list's name renames it in place, one on its
   tile or folder opens `LookPopover` under it.
 - Everything and the Home lists: their sidebar icon (20/1.8, `--text-tertiary`) and name.
-- **Mark all as read** on the right for Unread: 28px, 7px radius, a `--border` frame, 12/600; disabled
-  while nothing is unseen. It marks what the current view shows, in its subtask mode and with its drafts.
+- **Mark all as read** on the right while Unread only is on (every level but Bookmarks): 28px, 7px radius, a
+  `--border` frame, 12/600; disabled while the level has nothing unread. It marks what the current view shows, in
+  its subtask mode and with its drafts.
 - **Open in Jira ↗** on the right for a Space and its lists: 32px, 12px padding, 8px radius, a `--border`
   frame, 13px `--text-secondary`; opens `<site>/browse/<KEY>`. Hidden elsewhere and without a site.
 
@@ -283,8 +284,11 @@ unread (`src-tauri/src/changes/`). The UI says read and unread; the code says se
   (`issue_seen.unread`). Hovering a comment or change in the activity shows Mark unread from here: that item
   and everything newer count as new again. An issue marked unread while it is open stays unread until it is
   opened again (`holdUnread`).
-- Unread keeps the issues read there (`NavStore` remembers them) until the owner goes to another level or
-  view; they lose the unread look but don't vanish.
+- **Unread only** ([ADR 0046](adr/0046-unread-is-a-mode-of-every-view.md); the bell button in the toolbar,
+  `UnreadButton.tsx`, ⇧⌘U, `modes.json` `unreadOnly`) narrows every view to its unread issues and turns every
+  sidebar count into an unread count, so the sidebar shows where the news is. Issues read while it is on stay
+  (`NavStore` remembers them) until the owner goes to another level or view; they lose the unread look but don't
+  vanish.
 
 ## Command palette
 
@@ -525,7 +529,7 @@ button, Escape and a press outside close it, focus goes back to the button).
   with a condition or with the Me chip on, "N open issues" before any); inherited conditions locked on `--fill-subtle` with a lock,
   "from Space" or "this Space"; then two sections under small caps headings ([ADR 0033](adr/0033-views-can-hold-their-own-filter.md)):
   "All views of this list" (the filter list's own conditions, only on a filter list) and "This view" (the
-  view's own conditions; Everything, a Space, Unread and Bookmarks show only this one). Each holds conditions as
+  view's own conditions; Everything, a Space and Bookmarks show only this one). Each holds conditions as
   field / operator / value selects (value pickers from the cache, dates, days, text) with × and its own
   "+ Add condition". Inside a Space the Project field isn't offered (`projectFixed`). Changes apply to the rows
   at once as drafts and are not saved ([ADR 0038](adr/0038-filter-changes-are-drafts-until-the-view-is-saved.md)):
@@ -758,10 +762,10 @@ global shortcuts.
 - **Menus** (`src-tauri/src/menu/`), in the Mac order: Taskboard, File, Edit, Go, List, Issue, View, Window, Help.
   File holds the core actions (New Filter List ⌘N, New View ⌘T; Refresh ⌘R, Full Sync ⇧⌘R; Reset Cache…,
   which opens Settings → Sync → Cache to confirm; Close Window ⌘W). Go moves around (Command Palette ⌘K,
-  Everything ⇧⌘E, Unread ⇧⌘U, Bookmarks ⇧⌘P, Previous/Next Space ⌥⌘↑/↓, Previous/Next List ⌥⌘[/] (within the
+  Everything ⇧⌘E, Bookmarks ⇧⌘P, Previous/Next Space ⌥⌘↑/↓, Previous/Next List ⌥⌘[/] (within the
   Space, or among the levels outside the Spaces, wrapping), Previous/Next View ⌃⇧⇥/⌃⇥, then the level's views by
   name with ⌘1–⌘9, the shown one checked). List acts on the shown issues (Group and Sort… ⌥⌘G, Columns… ⌥⌘C, Edit
-  Filter… ⌥⌘F, Only My Issues ⇧⌘M, Me Mode Options…, Filter This View ⌘F, Save View ⌘S, Revert View; Mark All as Read ⇧⌘A; last, as
+  Filter… ⌥⌘F, Only My Issues ⇧⌘M, Me Mode Options…, Unread Only ⇧⌘U, Filter This View ⌘F, Save View ⌘S, Revert View; Mark All as Read ⇧⌘A; last, as
   it is rare: Show as List / Board / Table ⌃⌘1–3, the shown layout checked). The menus follow the place:
   `menu/place.rs` builds them again whenever the place moves (`NavStore::on_move`) or views, lists or Spaces change. Issue acts on the selected one
   (Open, Open or Close Preview, Open Epic, Open in Jira ⌘↩, Copy Key, Copy Link ⇧⌘C, Add or Remove Bookmark, Mark as Read or Unread).

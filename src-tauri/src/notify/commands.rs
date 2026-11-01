@@ -1,8 +1,11 @@
 //! The commands a notification's button runs.
 
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 
 use crate::bus::{Command, CommandBus};
+use crate::events::announce_modes;
+use crate::state::AppState;
+use crate::store::modes::Mode;
 use crate::window;
 
 pub fn register(bus: &mut CommandBus<AppHandle>) {
@@ -18,11 +21,17 @@ pub fn register(bus: &mut CommandBus<AppHandle>) {
     );
     bus.add(
         Command::new("unread:show", "Show Unread")
-            .help("Show the window at Unread")
+            .help("Show the window at Everything with Unread only on")
             .hidden()
-            .run(|app| async move {
+            .run(|app: AppHandle| async move {
+                let modes = app
+                    .state::<AppState>()
+                    .modes
+                    .set(Mode::UnreadOnly, true)
+                    .await?;
+                announce_modes(&app, modes);
                 window::show_main(&app);
-                window::run_page_command(&app, "page:go.recent");
+                window::run_page_command(&app, "page:go.everything");
                 Ok(())
             }),
     );

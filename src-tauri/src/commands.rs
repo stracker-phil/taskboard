@@ -142,11 +142,8 @@ pub async fn mode_set(
     mode: Mode,
     on: bool,
 ) -> AppResult<Modes> {
-    use tauri::Emitter;
     let modes = state.modes.set(mode, on).await?;
-    if let Err(e) = app.emit(crate::events::MODES_CHANGED_EVENT, modes) {
-        log::warn!("Couldn't announce the modes: {e}");
-    }
+    crate::events::announce_modes(&app, modes);
     Ok(modes)
 }
 

@@ -18,9 +18,11 @@ import { MODE_NAMES, SubtasksButton, subtasksMenu } from "./SubtasksButton";
 import { MeChip } from "./MeChip";
 import { MePopover } from "./MePopover";
 import { openPeopleMenu, PersonChip } from "./PersonChip";
+import { useModes } from "../../queries/modes";
 import { useLevelPeople } from "../../queries/views";
 import { TextFilter } from "./TextFilter";
 import { DraftActions } from "./DraftActions";
+import { UnreadButton } from "./UnreadButton";
 import { useMeMode } from "./useMeMode";
 import { useToolbarFit } from "./useToolbarFit";
 import { useViewDraft } from "./useViewDraft";
@@ -94,6 +96,8 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
   // Both layers count, as drafted or saved: the filter list's own conditions and the view's.
   const own = draft.conditions;
   const me = useMeMode(key, draft.me);
+  const { unreadOnly } = useModes();
+  const setUnread = (on: boolean) => void attempt(api.modeSet("unreadOnly", on), "Could not change Unread only");
   const { data: people = [] } = useLevelPeople(view.listId);
   const save = () => void draft.save();
   const columnsLabel = view.layout === "board" ? "Card fields" : "Columns";
@@ -101,6 +105,7 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
 
   usePageAction("toolbar.me", me.toggle);
   usePageAction("toolbar.meOptions", () => setOpen("me"));
+  usePageAction("toolbar.unread", () => setUnread(!unreadOnly));
   usePageAction("view.save", draft.dirty ? save : null);
   usePageAction("view.revert", draft.dirty ? draft.revert : null);
   usePageAction("toolbar.search", () => {
@@ -130,6 +135,8 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
           return { text: own > 0 ? `Filter · ${own}…` : "Filter…", run: () => setOpen("filter") };
         case "group":
           return { text: `Group: ${GROUP_NAMES[view.groupBy]}`, items: groupEntries() };
+        case "unread":
+          return { text: "Unread only", checked: unreadOnly, toggle: true, run: () => setUnread(!unreadOnly) };
         case "me":
           return [
             { text: "Only my issues", checked: me.on, toggle: true, run: me.toggle },
@@ -217,6 +224,7 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
           {filterPopover(filterRef)}
         </span>
       )}
+      {shows("unread") && <UnreadButton ref={measure("unread")} on={unreadOnly} onChange={setUnread} />}
       {shows("me") && (
         <span ref={measure("me")} className="toolbar__item toolbar__item--chips">
           <span className="toolbar__anchor">

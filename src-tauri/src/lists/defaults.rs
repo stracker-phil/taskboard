@@ -100,7 +100,7 @@ pub fn list_siblings(parent_id: Option<i64>) -> Siblings<'static> {
         None => Siblings {
             table: "filter_list",
             key: "id",
-            of: "parent_id IS NULL AND kind IN ('recent', 'pinned', 'list')",
+            of: "parent_id IS NULL AND kind IN ('pinned', 'list')",
             params: Vec::new(),
         },
     }

@@ -29,7 +29,6 @@ export function Sidebar() {
   const homeOf = (kind: string) => tree?.home.find((node) => node.kind === kind);
   const goTo = (listId: number | undefined) => (listId === undefined ? null : () => void open(listId));
   usePageAction("go.everything", goTo(tree?.everything.id));
-  usePageAction("go.recent", goTo(homeOf("recent")?.id));
   usePageAction("go.pinned", goTo(homeOf("pinned")?.id));
   // In the current Space (opened and named in place) or, outside any, under Everything.
   const newList = async () => {

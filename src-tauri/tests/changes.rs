@@ -16,7 +16,8 @@ use taskboard_lib::error::ErrorKind;
 use taskboard_lib::filter::{Condition, Field, Filter};
 use taskboard_lib::issues::{ActivityItem, issue_activity, issue_get, issue_related};
 use taskboard_lib::jira::{Limiter, TokenKind};
-use taskboard_lib::lists::{Kind, Viewer, list_create, sidebar_tree};
+use taskboard_lib::lists::{Kind, SidebarTree, Viewer, list_create, sidebar_tree};
+use taskboard_lib::pins::{PinDuration, PinKind, pin_create};
 use taskboard_lib::store::settings::SettingsStore;
 use taskboard_lib::sync::{Emit, Job, SyncContext, full_sync, run_job};
 use taskboard_lib::test_support::demo::{self, DEMO_NOW, ME_EMAIL};
@@ -153,8 +154,13 @@ impl Site {
         self.data_of(self.nw_list().await).await
     }
 
+    /// Everything with Unread only on.
     async fn recent_data(&self) -> ViewData {
-        self.data_of(self.list_of_kind("recent").await).await
+        let list = self.list_of_kind("everything").await;
+        let view = views_of(self.db(), list).await.unwrap()[0].id;
+        view_rows(self.db(), viewer(), list, view, unread_only(&[]))
+            .await
+            .unwrap()
     }
 
     async fn run(&self, sql: String) {
@@ -233,9 +239,13 @@ impl Site {
         issue_get(self.db(), viewer(), id).await.unwrap().since
     }
 
-    async fn badge(&self, kind: Kind) -> Option<i64> {
-        let tree = sidebar_tree(self.db(), viewer()).await.unwrap();
-        tree.home.iter().find(|n| n.kind == kind).unwrap().count
+    /// The unread count of Everything in the sidebar.
+    async fn badge(&self) -> Option<i64> {
+        self.tree(true).await.everything.count
+    }
+
+    async fn tree(&self, unread: bool) -> SidebarTree {
+        sidebar_tree(self.db(), viewer(), unread).await.unwrap()
     }
 
     /// The view at `index` of the list, in the given subtask mode.
@@ -281,6 +291,15 @@ fn at(view_id: i64, narrowing: Narrowing) -> Option<ViewAt> {
     Some(ViewAt { view_id, narrowing })
 }
 
+/// Unread only on, keeping the issues with these ids that were read since the owner came here.
+fn unread_only(read_here: &[String]) -> Narrowing {
+    Narrowing {
+        unread: true,
+        read_here: read_here.to_vec(),
+        ..Narrowing::default()
+    }
+}
+
 fn of_type(name: &str) -> Vec<Condition> {
     vec![Condition::is(Field::Type, name)]
 }
@@ -315,9 +334,7 @@ mod rows {
 
         assert!(nw.rows.values().all(|row| state(row) == (false, None)));
         assert!(recent.rows.is_empty());
-        let tree = sidebar_tree(site.db(), viewer()).await.unwrap();
-        let badge = tree.home.iter().find(|n| n.kind == Kind::Recent).unwrap();
-        assert_eq!(badge.count, Some(0));
+        assert_eq!(site.badge().await, Some(0));
     }
 
     #[tokio::test]
@@ -691,22 +708,16 @@ mod mark_all_as_read_per_view {
     async fn on_unread_a_view_with_its_own_filter_leaves_out_the_unread_issues_outside_it() {
         let site = Site::new().await;
         site.unread_story_subtask_and_task().await;
-        let recent = site.list_of_kind("recent").await;
-        let view = site.view_in(recent, 0, SubtaskMode::Hidden).await;
+        let all = site.list_of_kind("everything").await;
+        let view = site.view_in(all, 0, SubtaskMode::Hidden).await;
 
-        let everything = site
-            .unseen_keys(recent, at(view, Narrowing::default()))
-            .await;
+        let everything = site.unseen_keys(all, at(view, unread_only(&[]))).await;
         site.filter_view(view, of_type("Story")).await;
-        let stories = site
-            .unseen_keys(recent, at(view, Narrowing::default()))
-            .await;
+        let stories = site.unseen_keys(all, at(view, unread_only(&[]))).await;
         view_set_subtasks(site.db(), view, SubtaskMode::Hierarchy)
             .await
             .unwrap();
-        let with_descendants = site
-            .unseen_keys(recent, at(view, Narrowing::default()))
-            .await;
+        let with_descendants = site.unseen_keys(all, at(view, unread_only(&[]))).await;
 
         assert_eq!(everything, ["NW-1042", "NW-1044", "NW-1059"]);
         assert_eq!(stories, ["NW-1042"]);
@@ -738,7 +749,7 @@ mod mark_all_as_read_per_view {
     }
 }
 
-mod recently_changed {
+mod unread_only_mode {
     use super::*;
 
     #[tokio::test]
@@ -750,7 +761,7 @@ mod recently_changed {
         let data = site.recent_data().await;
 
         assert_eq!(sorted_keys(&data), ["NW-1059"]);
-        assert_eq!(site.badge(Kind::Recent).await, Some(1));
+        assert_eq!(site.badge().await, Some(1));
     }
 
     #[tokio::test]
@@ -775,9 +786,7 @@ mod recently_changed {
         let data = site.recent_data().await;
 
         assert_eq!(sorted_keys(&data), expected);
-        let tree = sidebar_tree(site.db(), viewer()).await.unwrap();
-        let badge = tree.home.iter().find(|n| n.kind == Kind::Recent).unwrap();
-        assert_eq!(badge.count, Some(3));
+        assert_eq!(site.badge().await, Some(3));
     }
 
     #[tokio::test]
@@ -804,9 +813,90 @@ mod recently_changed {
 
         let data = site.recent_data().await;
         assert_eq!(sorted_keys(&data), ["NW-1044"]);
-        let tree = sidebar_tree(site.db(), viewer()).await.unwrap();
-        let badge = tree.home.iter().find(|n| n.kind == Kind::Recent).unwrap();
-        assert_eq!(badge.count, Some(1));
+        assert_eq!(site.badge().await, Some(1));
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn unread_counts_in_the_sidebar_cover_every_list_open_or_done_and_leave_the_bookmark_count()
+     {
+        let site = Site::new().await;
+        let done = site
+            .text(format!(
+                "SELECT key FROM cache.issue
+                 WHERE project_id = '{NW}' AND status_category = 'done' AND gone = 0 ORDER BY key LIMIT 1"
+            ))
+            .await;
+        site.comment_after_seen("NW-1042").await;
+        site.comment_after_seen(&done).await;
+        site.comment_after_seen("LUM-318").await;
+        let bookmarked = site.id_of("NW-1044").await;
+        pin_create(
+            site.db(),
+            viewer(),
+            PinKind::Issue,
+            bookmarked,
+            PinDuration::UntilUnpinned,
+            None,
+        )
+        .await
+        .unwrap();
+
+        let unread = site.tree(true).await;
+        let open = site.tree(false).await;
+
+        let nw_unread = |tree: &SidebarTree| {
+            tree.spaces
+                .iter()
+                .find(|s| s.key == "NW")
+                .unwrap()
+                .open_count
+        };
+        let lum_unread = unread.spaces.iter().find(|s| s.key == "LUM").unwrap();
+        assert_eq!(unread.everything.count, Some(3));
+        assert_eq!(nw_unread(&unread), 2);
+        assert_eq!(lum_unread.open_count, 1);
+        assert!(nw_unread(&open) > nw_unread(&unread));
+        let bookmarks = |tree: &SidebarTree| {
+            tree.home
+                .iter()
+                .find(|n| n.kind == Kind::Pinned)
+                .unwrap()
+                .count
+        };
+        assert_eq!(bookmarks(&unread), Some(1));
+        assert_eq!(bookmarks(&open), Some(1));
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn a_view_shows_the_unseen_issues_and_those_read_here_in_any_list() {
+        let site = Site::new().await;
+        site.comment_after_seen("NW-1042").await;
+        site.comment_after_seen("NW-1044").await;
+        site.comment_after_seen("LUM-318").await;
+        site.mark(&["NW-1042"], LATER).await;
+        let read_here = [site.id_of("NW-1042").await];
+        let everything = site.list_of_kind("everything").await;
+        let nw = site.nw_list().await;
+
+        for (list, kept, expected) in [
+            (
+                everything,
+                &read_here[..],
+                vec!["LUM-318", "NW-1042", "NW-1044"],
+            ),
+            (everything, &[][..], vec!["LUM-318", "NW-1044"]),
+            (nw, &read_here[..], vec!["NW-1042", "NW-1044"]),
+            (nw, &[][..], vec!["NW-1044"]),
+        ] {
+            let view = views_of(site.db(), list).await.unwrap()[0].id;
+            let data = view_rows(site.db(), viewer(), list, view, unread_only(kept))
+                .await
+                .unwrap();
+
+            assert_eq!(sorted_keys(&data), expected, "list {list}, kept {kept:?}");
+        }
     }
 }
 
@@ -818,12 +908,7 @@ mod marking_unread {
     }
 
     async fn badge(site: &Site) -> Option<i64> {
-        let tree = sidebar_tree(site.db(), viewer()).await.unwrap();
-        tree.home
-            .iter()
-            .find(|n| n.kind == Kind::Recent)
-            .unwrap()
-            .count
+        site.badge().await
     }
 
     #[tokio::test]
@@ -995,11 +1080,7 @@ mod read_here {
         for key in keys {
             read_here.push(site.id_of(key).await);
         }
-        let narrowing = Narrowing {
-            read_here,
-            ..Narrowing::default()
-        };
-        view_rows(site.db(), viewer(), list, view, narrowing)
+        view_rows(site.db(), viewer(), list, view, unread_only(&read_here))
             .await
             .unwrap()
     }
@@ -1012,7 +1093,7 @@ mod read_here {
         site.comment_after_seen("NW-1044").await;
         site.mark(&["NW-1042"], LATER).await;
 
-        let data = data_keeping(&site, "recent", &["NW-1042"]).await;
+        let data = data_keeping(&site, "everything", &["NW-1042"]).await;
 
         assert_eq!(sorted_keys(&data), ["NW-1042", "NW-1044"]);
         assert!(!row_of(&data, "NW-1042").changed);
@@ -1026,14 +1107,14 @@ mod read_here {
         site.comment_after_seen("NW-1042").await;
         site.mark(&["NW-1042"], LATER).await;
 
-        let data = data_keeping(&site, "recent", &[]).await;
+        let data = data_keeping(&site, "everything", &[]).await;
 
         assert!(data.rows.is_empty());
     }
 
     #[tokio::test]
     #[ignore = "syncs the demo site into a temp database"]
-    async fn other_levels_ignore_read_here() {
+    async fn read_here_never_adds_issues_outside_the_list() {
         let site = Site::new().await;
 
         let bookmarks = data_keeping(&site, "pinned", &["NW-1042"]).await;

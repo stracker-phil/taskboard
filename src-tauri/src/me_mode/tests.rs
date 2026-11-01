@@ -86,8 +86,8 @@ impl Site {
                 (10, Some(LEA), None, None, Some(2), 1),
             ];
             for (id, assignee, reported_by, reviewed_by, parent, subtask) in issues {
-                let custom =
-                    reviewed_by.map(|account| json!({REVIEWER: {"accountId": account}}).to_string());
+                let custom = reviewed_by
+                    .map(|account| json!({REVIEWER: {"accountId": account}}).to_string());
                 tx.execute(
                     "INSERT INTO cache.issue (id, key, project_id, parent_id, summary, issue_type,
                         type_is_subtask, status_id, status_category, assignee_id, reporter_id,

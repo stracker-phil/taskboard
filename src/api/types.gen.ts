@@ -428,7 +428,7 @@ projectId: string | null,
  */
 isSpace: boolean, };
 
-export type ListKind = "everything" | "space" | "list" | "recent" | "pinned";
+export type ListKind = "everything" | "space" | "list" | "pinned";
 
 export type ListNode = { id: number, kind: ListKind, name: string, 
 /**

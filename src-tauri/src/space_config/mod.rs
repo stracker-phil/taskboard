@@ -112,7 +112,7 @@ pub fn project_of_level(conn: &Connection, list_id: i64) -> AppResult<Option<Str
             }
             None => Ok(None),
         },
-        Kind::Everything | Kind::Recent | Kind::Pinned => Ok(None),
+        Kind::Everything | Kind::Pinned => Ok(None),
     }
 }
 
@@ -652,11 +652,11 @@ mod tests {
         let space = space_node_id(&db, A).await;
         let in_space = id_where(&db, "kind = 'list' AND parent_id IN (SELECT id FROM filter_list WHERE kind = 'space' AND project_id = '10001')").await;
         let everything = id_where(&db, "kind = 'everything'").await;
-        let recent = id_where(&db, "kind = 'recent'").await;
+        let pinned = id_where(&db, "kind = 'pinned'").await;
 
         let found = db
             .read(move |conn| {
-                Ok([space, in_space, everything, recent]
+                Ok([space, in_space, everything, pinned]
                     .map(|id| project_of_level(conn, id).unwrap()))
             })
             .await

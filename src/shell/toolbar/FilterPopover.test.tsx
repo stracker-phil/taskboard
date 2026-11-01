@@ -507,7 +507,7 @@ describe("FilterPopover", () => {
   });
 
   describe("built-in levels", () => {
-    it.each<ListConditions["kind"]>(["everything", "space", "recent", "pinned"])(
+    it.each<ListConditions["kind"]>(["everything", "space", "pinned"])(
       "offers only This view on a %s level and drafts its conditions for the view",
       async (kind) => {
         const popover = await openFilter(listConditions({ kind, view: [NO_DUE_DATE] }));
@@ -524,8 +524,8 @@ describe("FilterPopover", () => {
       },
     );
 
-    it.each<ListConditions["kind"]>(["recent", "pinned"])("offers no Save as filter list on a %s level", async (kind) => {
-      const popover = await openFilter(listConditions({ kind }));
+    it("offers no Save as filter list on a pinned level", async () => {
+      const popover = await openFilter(listConditions({ kind: "pinned" }));
 
       expect(within(popover).queryByRole("button", { name: "Save as filter list" })).not.toBeInTheDocument();
     });

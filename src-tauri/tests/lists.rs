@@ -325,7 +325,7 @@ mod defaults_on_tracking {
         track_project(&db, NWS.into(), true).await.unwrap();
 
         track_project(&db, NW.into(), false).await.unwrap();
-        let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
+        let tree = sidebar_tree(&db, viewer(None), false).await.unwrap();
         assert_eq!(
             tree.spaces
                 .iter()
@@ -335,7 +335,7 @@ mod defaults_on_tracking {
         );
 
         track_project(&db, NW.into(), true).await.unwrap();
-        let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
+        let tree = sidebar_tree(&db, viewer(None), false).await.unwrap();
         let nw = find_space(&tree, "NW");
         assert_eq!(
             nw.lists.iter().map(|l| l.name.as_str()).collect::<Vec<_>>(),
@@ -385,11 +385,7 @@ mod the_seeded_levels {
     async fn everything_and_the_home_lists_start_with_one_all_issues_view() {
         let (_dir, db) = lab().await;
 
-        for (kind, group) in [
-            ("everything", GroupBy::Project),
-            ("recent", GroupBy::Project),
-            ("pinned", GroupBy::None),
-        ] {
+        for (kind, group) in [("everything", GroupBy::Project), ("pinned", GroupBy::None)] {
             let views = views_of(&db, node_id(&db, kind).await).await.unwrap();
 
             assert_eq!(view_names(&views), ["All issues"], "{kind}");
@@ -400,23 +396,17 @@ mod the_seeded_levels {
     }
 
     #[tokio::test]
-    async fn home_holds_recently_changed_with_its_unseen_count_and_pinned_with_its_active_pins() {
+    async fn home_holds_bookmarks_with_its_active_pins_and_no_unread_list() {
         let (_dir, db) = lab().await;
 
-        let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
+        let tree = sidebar_tree(&db, viewer(None), false).await.unwrap();
 
         let home: Vec<(Kind, &str, Option<i64>)> = tree
             .home
             .iter()
             .map(|n| (n.kind, n.name.as_str(), n.count))
             .collect();
-        assert_eq!(
-            home,
-            [
-                (Kind::Recent, "Unread", Some(0)),
-                (Kind::Pinned, "Bookmarks", Some(0))
-            ]
-        );
+        assert_eq!(home, [(Kind::Pinned, "Bookmarks", Some(0))]);
         assert!(tree.pinned_lists.is_empty());
         assert_eq!(tree.everything.kind, Kind::Everything);
         assert_eq!(tree.everything.count, Some(0));
@@ -432,7 +422,7 @@ mod the_seeded_levels {
         )
         .await;
 
-        let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
+        let tree = sidebar_tree(&db, viewer(None), false).await.unwrap();
 
         let nw = find_space(&tree, "NW");
         let epics = find_list(nw, "Epics");
@@ -447,7 +437,7 @@ mod the_seeded_levels {
     async fn every_list_node_carries_its_own_conditions_and_a_description() {
         let (_dir, db) = tracked_lab().await;
 
-        let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
+        let tree = sidebar_tree(&db, viewer(None), false).await.unwrap();
 
         let nw = find_space(&tree, "NW");
         let bugs = find_list(nw, "Open bugs");
@@ -522,7 +512,7 @@ mod the_tree_on_the_demo_site {
         }
 
         async fn tree(&self) -> SidebarTree {
-            sidebar_tree(self.db(), viewer(Some(ME_ACCOUNT_ID)))
+            sidebar_tree(self.db(), viewer(Some(ME_ACCOUNT_ID)), false)
                 .await
                 .unwrap()
         }
@@ -1130,7 +1120,7 @@ mod the_conditions_a_level_shows {
     async fn the_home_lists_leave_the_project_free() {
         let (_dir, db) = tracked_lab().await;
 
-        for kind in ["recent", "pinned"] {
+        for kind in ["pinned"] {
             let shown = list_conditions(&db, node_id(&db, kind).await, None)
                 .await
                 .unwrap();
@@ -1298,22 +1288,22 @@ mod editing_filter_lists {
             .await
             .unwrap();
 
-        let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
+        let tree = sidebar_tree(&db, viewer(None), false).await.unwrap();
         assert_eq!(
             tree.home
                 .iter()
                 .map(|n| n.name.as_str())
                 .collect::<Vec<_>>(),
-            ["Unread", "Bookmarks", "My bugs"]
+            ["Bookmarks", "My bugs"]
         );
-        assert_eq!(tree.home[2].kind, Kind::List);
+        assert_eq!(tree.home[1].kind, Kind::List);
         assert_eq!(
             number(
                 &db,
                 "SELECT position FROM filter_list WHERE name = 'My bugs'"
             )
             .await,
-            2
+            1
         );
     }
 
@@ -1522,11 +1512,11 @@ mod editing_filter_lists {
         let home = rows(
             &db,
             "SELECT name, position FROM filter_list
-             WHERE parent_id IS NULL AND kind IN ('recent', 'pinned', 'list') ORDER BY position",
+             WHERE parent_id IS NULL AND kind IN ('pinned', 'list') ORDER BY position",
             |row| Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?)),
         )
         .await;
-        assert_eq!(names(&home), ["Unread", "Bookmarks", "Second"]);
+        assert_eq!(names(&home), ["Bookmarks", "Second"]);
         assert_dense(&positions(&home));
     }
 
@@ -1535,7 +1525,7 @@ mod editing_filter_lists {
         let (_dir, db) = tracked_lab().await;
         let nodes_before = number(&db, "SELECT COUNT(*) FROM filter_list").await;
 
-        for kind in ["space", "everything", "recent", "pinned"] {
+        for kind in ["space", "everything", "pinned"] {
             let id = node_id(&db, kind).await;
             let errors = [
                 list_rename(&db, id, "Renamed".into()).await.unwrap_err(),
@@ -1638,7 +1628,7 @@ mod the_look_of_filter_lists {
     use super::*;
 
     async fn nw_list(db: &Db, name: &str) -> ListNode {
-        let tree = sidebar_tree(db, viewer(None)).await.unwrap();
+        let tree = sidebar_tree(db, viewer(None), false).await.unwrap();
         find_list(find_space(&tree, "NW"), name).clone()
     }
 
@@ -2842,7 +2832,7 @@ mod editing_spaces {
         .await
         .unwrap();
 
-        let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
+        let tree = sidebar_tree(&db, viewer(None), false).await.unwrap();
         let space = find_space(&tree, "NW");
         assert_eq!(space.name, "Storefront");
         assert_eq!(space.icon.as_deref(), Some("S"));
@@ -2888,7 +2878,7 @@ mod editing_spaces {
         )
         .await;
         assert_eq!(stored, [[1, 1, 1, 1]]);
-        let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
+        let tree = sidebar_tree(&db, viewer(None), false).await.unwrap();
         let space = find_space(&tree, "NW");
         assert_eq!(space.name, "Website relaunch");
         assert_eq!(space.icon, None);
@@ -2919,7 +2909,7 @@ mod editing_spaces {
         .unwrap();
 
         assert_eq!(name_is_null().await, [1]);
-        let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
+        let tree = sidebar_tree(&db, viewer(None), false).await.unwrap();
         let space = find_space(&tree, "NW");
         assert_eq!(space.name, "Website relaunch");
         assert_eq!(space.project_name, "Website relaunch");
@@ -2936,7 +2926,7 @@ mod editing_spaces {
         .unwrap();
 
         assert_eq!(name_is_null().await, [0]);
-        let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
+        let tree = sidebar_tree(&db, viewer(None), false).await.unwrap();
         let space = find_space(&tree, "NW");
         assert_eq!(space.name, "Storefront");
         assert_eq!(space.project_name, "Website relaunch");
@@ -2975,7 +2965,7 @@ mod editing_spaces {
             .await
             .unwrap();
 
-            let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
+            let tree = sidebar_tree(&db, viewer(None), false).await.unwrap();
             assert_eq!(find_space(&tree, "NW").icon.as_deref(), Some(icon));
         }
     }
@@ -3067,7 +3057,7 @@ mod editing_spaces {
 
         space_move(&db, NWS.into(), 0).await.unwrap();
 
-        let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
+        let tree = sidebar_tree(&db, viewer(None), false).await.unwrap();
         assert_eq!(
             tree.spaces
                 .iter()
@@ -3082,7 +3072,7 @@ mod editing_spaces {
         assert_dense(&stored);
 
         space_move(&db, NWS.into(), 99).await.unwrap();
-        let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
+        let tree = sidebar_tree(&db, viewer(None), false).await.unwrap();
         assert_eq!(
             tree.spaces
                 .iter()
@@ -3112,19 +3102,19 @@ mod editing_spaces {
 
         space_move(&db, LUM.into(), 0).await.unwrap();
 
-        let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
+        let tree = sidebar_tree(&db, viewer(None), false).await.unwrap();
         assert_eq!(spaces(&tree), ["LUM", "NW"]);
 
         space_move(&db, NW.into(), 0).await.unwrap();
         space_move(&db, NW.into(), 1).await.unwrap();
 
-        let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
+        let tree = sidebar_tree(&db, viewer(None), false).await.unwrap();
         assert_eq!(spaces(&tree), ["LUM", "NW"]);
 
         space_move(&db, LUM.into(), 0).await.unwrap();
         track_project(&db, NWS.into(), true).await.unwrap();
 
-        let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
+        let tree = sidebar_tree(&db, viewer(None), false).await.unwrap();
         let keys = spaces(&tree);
         let position = |key: &str| keys.iter().position(|k| k == key).unwrap();
         assert_eq!(keys.len(), 3);

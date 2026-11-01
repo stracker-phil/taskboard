@@ -55,5 +55,6 @@ stands in Taskboard. The numbers in this table are Taskboard's.
 | [0043](0043-the-palette-runs-the-menus.md) | The palette runs the menus | Accepted (2026-10-30) |
 | [0044](0044-writes-show-at-once-and-settle-after-jira.md) | Writes show at once and settle after Jira | Accepted (2026-10-31) |
 | [0045](0045-me-mode-is-a-set-of-rules-in-a-scope.md) | Me mode is a set of rules in a scope | Accepted (2026-11-01) |
+| [0046](0046-unread-is-a-mode-of-every-view.md) | Unread is a mode of every view | Accepted (2026-11-01) |
 
 Open: integrations with Daybook and TimeTracker.

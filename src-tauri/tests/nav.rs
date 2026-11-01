@@ -33,8 +33,8 @@ async fn everything(db: &Db) -> i64 {
     id_where(db, "kind = 'everything'").await
 }
 
-async fn recent(db: &Db) -> i64 {
-    id_where(db, "kind = 'recent'").await
+async fn bookmarks(db: &Db) -> i64 {
+    id_where(db, "kind = 'pinned'").await
 }
 
 async fn space(db: &Db, project_id: &'static str) -> i64 {
@@ -275,12 +275,12 @@ mod issues_read_here {
     async fn going_to_the_same_place_keeps_them() {
         let (dir, db) = lab().await;
         let nav = NavStore::open(dir.path());
-        let recent = recent(&db).await;
-        let at = nav.go(&db, recent, None).await.unwrap();
+        let bookmarks = bookmarks(&db).await;
+        let at = nav.go(&db, bookmarks, None).await.unwrap();
         nav.keep_read(&ids(&["a"]));
 
-        nav.go(&db, recent, None).await.unwrap();
-        nav.go(&db, recent, at.location.map(|l| l.view_id))
+        nav.go(&db, bookmarks, None).await.unwrap();
+        nav.go(&db, bookmarks, at.location.map(|l| l.view_id))
             .await
             .unwrap();
 
@@ -291,7 +291,7 @@ mod issues_read_here {
     async fn going_to_another_list_clears_them() {
         let (dir, db) = lab().await;
         let nav = NavStore::open(dir.path());
-        nav.go(&db, recent(&db).await, None).await.unwrap();
+        nav.go(&db, bookmarks(&db).await, None).await.unwrap();
         nav.keep_read(&ids(&["a"]));
 
         nav.go(&db, everything(&db).await, None).await.unwrap();
@@ -320,7 +320,7 @@ mod issues_read_here {
     async fn a_failed_go_keeps_them() {
         let (dir, db) = lab().await;
         let nav = NavStore::open(dir.path());
-        nav.go(&db, recent(&db).await, None).await.unwrap();
+        nav.go(&db, bookmarks(&db).await, None).await.unwrap();
         nav.keep_read(&ids(&["a"]));
 
         nav.go(&db, 9999, None).await.unwrap_err();
@@ -562,18 +562,17 @@ mod stepping_through_lists {
         let (dir, db) = lab().await;
         let nav = NavStore::open(dir.path());
         let everything = everything(&db).await;
-        let recent = recent(&db).await;
-        let bookmarks = id_where(&db, "kind = 'pinned'").await;
+        let bookmarks = bookmarks(&db).await;
         let weekly = home_list(&db, "Weekly review").await;
         nav.go(&db, everything, None).await.unwrap();
 
         let forward = walk(&nav, &db, 1, 5).await;
         let backward = walk(&nav, &db, -1, 5).await;
 
-        assert_eq!(forward, [recent, bookmarks, weekly, everything, recent]);
+        assert_eq!(forward, [bookmarks, weekly, everything, bookmarks, weekly]);
         assert_eq!(
             backward,
-            [everything, weekly, bookmarks, recent, everything]
+            [bookmarks, everything, weekly, bookmarks, everything]
         );
     }
 
@@ -596,7 +595,7 @@ mod stepping_through_lists {
 
         let visited = walk(&nav, &db, 1, 1).await;
 
-        assert_eq!(visited, [recent(&db).await]);
+        assert_eq!(visited, [bookmarks(&db).await]);
     }
 }
 
@@ -766,7 +765,7 @@ mod stepping_through_spaces {
         let nav = NavStore::open(dir.path());
         let first = space(&db, LUM).await;
         let last = space(&db, NWS).await;
-        let outside = [everything(&db).await, recent(&db).await];
+        let outside = [everything(&db).await, bookmarks(&db).await];
 
         for from in outside {
             nav.go(&db, from, None).await.unwrap();

@@ -9,21 +9,18 @@ interface Props {
   open: (listId: number) => void;
 }
 
-/** Everything, Unread, Bookmarks and the global filter lists: icon, label, count. Unread shows
- *  its unread issues as a badge instead. */
+/** Everything, Bookmarks and the global filter lists: icon, label, count. */
 export function HomeRows({ rows, activeId, open }: Props) {
   return (
     <nav className="sb-home" aria-label="Home">
       {rows.map((node) => {
         const active = node.id === activeId;
-        const unread = node.kind === "recent" && (node.count ?? 0) > 0;
         return (
           <button
             key={node.id}
             type="button"
             className="sb-row sb-home__row"
             data-state={active ? "active" : undefined}
-            data-unread={unread || undefined}
             aria-current={active ? "page" : undefined}
             onClick={() => open(node.id)}
           >
@@ -33,13 +30,7 @@ export function HomeRows({ rows, activeId, open }: Props) {
               <HomeIcon kind={node.kind} />
             )}
             <span className="sb-row__label">{node.name}</span>
-            {unread ? (
-              <span className="sb-row__badge" aria-label={`${node.count} unread`}>
-                {node.count}
-              </span>
-            ) : (
-              node.kind !== "recent" && <ListCount list={node} />
-            )}
+            <ListCount list={node} />
           </button>
         );
       })}

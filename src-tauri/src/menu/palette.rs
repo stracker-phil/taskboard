@@ -158,7 +158,6 @@ mod tests {
             in_menu(&items, "Go"),
             [
                 "page:go.everything",
-                "page:go.recent",
                 "page:go.pinned",
                 "nav:previousSpace",
                 "nav:nextSpace",

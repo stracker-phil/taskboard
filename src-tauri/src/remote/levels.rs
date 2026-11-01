@@ -36,7 +36,6 @@ fn named(tree: &SidebarTree) -> Vec<Named> {
 fn home_words(node: &ListNode) -> Vec<String> {
     let keyword = match node.kind {
         Kind::Everything => Some("everything"),
-        Kind::Recent => Some("recent"),
         Kind::Pinned => Some("pinned"),
         Kind::Space | Kind::List => None,
     };

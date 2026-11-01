@@ -138,7 +138,7 @@ impl Site {
     }
 
     async fn tree(&self) -> SidebarTree {
-        sidebar_tree(self.db(), viewer()).await.unwrap()
+        sidebar_tree(self.db(), viewer(), false).await.unwrap()
     }
 
     async fn everything(&self) -> i64 {

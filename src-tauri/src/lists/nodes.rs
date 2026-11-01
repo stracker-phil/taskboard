@@ -15,7 +15,6 @@ pub enum Kind {
     Everything,
     Space,
     List,
-    Recent,
     Pinned,
 }
 

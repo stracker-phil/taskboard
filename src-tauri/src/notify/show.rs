@@ -1,4 +1,4 @@
-//! Hands notices to macOS. A notice's button opens its issue (`issue:open:<KEY>`) or Unread (`unread:show`).
+//! Hands notices to macOS. A notice's button opens its issue (`issue:open:<KEY>`) or Everything with Unread only on (`unread:show`).
 
 use tauri::{AppHandle, Manager};
 use tauri_plugin_notification::{Action, ActionType, NotificationExt};

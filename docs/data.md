@@ -127,8 +127,9 @@ them, and nothing is written until Save View calls `list_set_filter`, `view_set_
 `list_match_count`, the popover's live count, counts every matching issue, like the sidebar, and with `me` only
 the connected account's issues, like a view's `Narrowing.me`.
 
-Built in (migration `local/0002`): Everything (one "All issues" view grouped by Space), and under Home Unread
-(kind `recent`) and Bookmarks (kind `pinned`; renamed by `local/0008`). Tracking a project (`lists::ensure_space`) adds its Space node with three views (All issues,
+Built in (migration `local/0002`): Everything (one "All issues" view grouped by Space), and under Home
+Bookmarks (kind `pinned`; renamed by `local/0008`). The Unread list (kind `recent`) is gone since `local/0018`,
+with its views and bookmarks: Unread only is a mode of every view ([ADR 0046](adr/0046-unread-is-a-mode-of-every-view.md)). Tracking a project (`lists::ensure_space`) adds its Space node with three views (All issues,
 Board, Table; grouped by status; the Space's default columns, else Assignee, Epic, Release, Priority) and the
 filter lists Current sprint, Epics, Release *next unreleased version* (when the project has one), Open bugs, each
 with one List view. Positions among siblings stay 0, 1, 2, … (`order.rs`). Deleting a filter list deletes its
@@ -137,9 +138,9 @@ views and bookmarks; a level keeps at least one view.
 ### Group and sort keys
 
 `view_rows(listId, viewId, narrowing)` returns the view's issues as `ViewData { groupBy, subtasks, groups,
-rows, columns }`: the level's filter, plus the view's own conditions, plus the kind's own rule (Unread: issues with unseen changes or marked
-unread, open or done, plus those read since the owner came to this place; Bookmarks: the actively bookmarked
-issues), plus the narrowing (`me`: the view's Me chip as drafted or saved, `text` in the key or summary ignoring
+rows, columns }`: the level's filter, plus the view's own conditions, plus the kind's own rule (Bookmarks: the actively bookmarked issues), plus Unread only when it is on
+(`modes.json`; issues with unseen changes or marked unread, open or done, plus those read since the owner came to
+this place), plus the narrowing (`me`: the view's Me chip as drafted or saved, `text` in the key or summary ignoring
 case and accents, `epic`, and the draft conditions `listDraft` and `viewDraft`).
 
 A view's subtasks are the descendants of its results through `cache.issue.parent_id`, of any type

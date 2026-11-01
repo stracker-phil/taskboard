@@ -47,7 +47,11 @@ pub struct Narrowing {
     pub list_draft: Option<Vec<Condition>>,
     /// Unsaved conditions in place of the view's own ones.
     pub view_draft: Option<Vec<Condition>>,
-    /// Unread keeps these read issues (read since the owner came here); set by Rust, never by the page.
+    /// Only unread issues, and the ones read since the owner came here (`read_here`): Unread only is on.
+    #[serde(skip)]
+    #[ts(skip)]
+    pub unread: bool,
+    /// Unread only keeps these read issues (read since the owner came here); set by Rust, never by the page.
     #[serde(skip)]
     #[ts(skip)]
     pub read_here: Vec<String>,
@@ -359,20 +363,17 @@ fn conditions(
     let compiled = compile(&chain, ctx)?;
     let mut condition = compiled.where_clause();
     let mut params = compiled.params;
-    match node.kind {
-        Kind::Recent => {
-            let kept = vec!["?"; narrowing.read_here.len()].join(", ");
-            condition.push_str(&format!(" AND ({UNSEEN} OR i.id IN ({kept}))"));
-            params.extend(narrowing.read_here.iter().map(|id| id.clone().into()));
-        }
-        Kind::Pinned => {
-            condition.push_str(&format!(
-                " AND i.id IN (SELECT p.target_id FROM pin p WHERE p.target_kind = 'issue' AND {})",
-                active("?")
-            ));
-            params.push(format_utc(viewer.now).into());
-        }
-        _ => {}
+    if node.kind == Kind::Pinned {
+        condition.push_str(&format!(
+            " AND i.id IN (SELECT p.target_id FROM pin p WHERE p.target_kind = 'issue' AND {})",
+            active("?")
+        ));
+        params.push(format_utc(viewer.now).into());
+    }
+    if narrowing.unread {
+        let kept = vec!["?"; narrowing.read_here.len()].join(", ");
+        condition.push_str(&format!(" AND ({UNSEEN} OR i.id IN ({kept}))"));
+        params.extend(narrowing.read_here.iter().map(|id| id.clone().into()));
     }
     if narrowing.me {
         let (mine, mine_params) = me_mode::condition(&narrowing.me_rules, ctx)?;

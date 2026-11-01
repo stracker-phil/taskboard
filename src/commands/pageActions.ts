@@ -48,6 +48,7 @@ export const PAGE_ACTION_COMMANDS: Command[] = [
   action("view.layout.table", "Show as Table", "Mod+Ctrl+3"),
   action("toolbar.me", "Only My Issues", "Mod+Shift+M"),
   action("toolbar.meOptions", "Me Mode Options…"),
+  action("toolbar.unread", "Unread Only", "Mod+Shift+U"),
   action("toolbar.search", "Filter This View", "Mod+F"),
   action("toolbar.filter", "Edit Filter…", "Mod+Alt+F"),
   action("toolbar.columns", "Columns…", "Mod+Alt+C"),
@@ -55,7 +56,6 @@ export const PAGE_ACTION_COMMANDS: Command[] = [
   action("view.save", "Save View", "Mod+S"),
   action("view.revert", "Revert View"),
   action("go.everything", "Go to Everything", "Mod+Shift+E"),
-  action("go.recent", "Go to Unread", "Mod+Shift+U"),
   action("go.pinned", "Go to Bookmarks", "Mod+Shift+P"),
-  action("recent.markAllSeen", "Mark All as Read", "Mod+Shift+A"),
+  action("view.markAllSeen", "Mark All as Read", "Mod+Shift+A"),
 ];

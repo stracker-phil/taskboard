@@ -2,6 +2,7 @@ import { usePageAction } from "../commands/pageActions";
 import { OpenInJiraButton } from "../components/OpenInJiraButton";
 import { browseUrl } from "../lib/jiraLinks";
 import { api, type SpaceNode } from "../api";
+import { useModes } from "../queries/modes";
 import { useConnection } from "../queries/settings";
 import { useNav } from "../queries/sidebar";
 import { useRequestNarrowing } from "../queries/views";
@@ -11,14 +12,18 @@ import { HeaderTitle } from "./HeaderTitle";
 import { spaceOf, type Level } from "./levels";
 
 /** The content header: the level's tile or icon and name (a filter list as Space / folder / name) and its bookmark,
- *  then Mark all as read for Unread and Open in Jira for a Space and its lists. */
+ *  then Mark all as read while Unread only is on, and Open in Jira for a Space and its lists. */
 export function Header({ level }: { level: Level }) {
+  const { unreadOnly } = useModes();
+  const listId = level.kind === "space" ? level.space.listId : level.node.id;
+  const unseen = level.kind === "space" ? level.space.openCount : (level.node.count ?? 0);
+  const marks = unreadOnly && !(level.kind === "home" && level.node.kind === "pinned");
   return (
     <header className="content-header">
       <HeaderTitle key={level.kind === "space" ? level.space.listId : level.node.id} level={level} />
       <LevelBookmark level={level} />
       <div className="content-header__spacer" />
-      {level.kind === "home" && level.node.kind === "recent" && <MarkAllSeen listId={level.node.id} unseen={level.node.count ?? 0} />}
+      {marks && <MarkAllSeen listId={listId} unseen={unseen} />}
       <OpenInJira space={spaceOf(level)} />
     </header>
   );
@@ -33,13 +38,13 @@ function LevelBookmark({ level }: { level: Level }) {
   return <PinButton kind="filterList" target={String(id)} label={level.kind === "space" ? "Bookmark this Space" : "Bookmark this list"} meta={name} className="content-header__pin" iconSize={16} />;
 }
 
-/** Unread's header action: marks what the current view shows read; disabled while nothing is unread. */
+/** Marks what the current view shows read; disabled while the level has nothing unread. */
 function MarkAllSeen({ listId, unseen }: { listId: number; unseen: number }) {
   const { data: nav } = useNav();
   const viewId = nav?.location?.listId === listId ? nav.location.viewId : null;
   const narrowing = useRequestNarrowing(listId, viewId ?? -1) ?? null;
   const markAll = () => void attempt(api.listMarkAllSeen(listId, viewId, viewId === null ? null : narrowing), "Could not mark them read");
-  usePageAction("recent.markAllSeen", unseen > 0 ? markAll : null);
+  usePageAction("view.markAllSeen", unseen > 0 ? markAll : null);
   return (
     <button type="button" className="content-header__action" disabled={unseen === 0} onClick={markAll}>
       Mark all as read

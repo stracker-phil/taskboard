@@ -43,7 +43,6 @@ fn tree() -> SidebarTree {
     SidebarTree {
         everything: node(1, Kind::Everything, "Everything", Some(40)),
         home: vec![
-            node(2, Kind::Recent, "Unread", Some(4)),
             node(3, Kind::Pinned, "Bookmarks", Some(2)),
             node(4, Kind::List, "Weekly review", Some(9)),
         ],
@@ -114,8 +113,6 @@ fn a_level_is_found_by_its_keyword_name_or_key_in_any_case() {
     for (word, id) in [
         ("everything", 1),
         ("EVERYTHING", 1),
-        ("recent", 2),
-        ("Unread", 2),
         ("pinned", 3),
         ("Bookmarks", 3),
         ("NW", 10),
@@ -252,7 +249,6 @@ fn an_unknown_view_is_an_error_pointing_to_the_listing() {
 fn levels_are_labeled_the_way_messages_show_them() {
     for (id, label) in [
         (1, Some("Everything")),
-        (2, Some("Unread")),
         (4, Some("Weekly review")),
         (10, Some("NW Website relaunch")),
         (11, Some("NW/Open bugs")),
@@ -318,7 +314,6 @@ fn level_rows_list_home_first_then_every_spaces_lists_under_their_key() {
         level_rows(&tree(), None, Some(11)),
         vec![
             level_row(1, Kind::Everything, "Everything", None, Some(40), false),
-            level_row(2, Kind::Recent, "Unread", None, Some(4), false),
             level_row(3, Kind::Pinned, "Bookmarks", None, Some(2), false),
             level_row(4, Kind::List, "Weekly review", None, Some(9), false),
             level_row(11, Kind::List, "Open bugs", Some("NW"), Some(12), true),

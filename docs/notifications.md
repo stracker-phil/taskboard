@@ -4,8 +4,8 @@
 
 ## When
 
-- After a **change sync** (delta) finishes, while the main window **doesn't have the focus** (in front, Unread
-  already shows them). A full sync, a reconciliation or a launch announces nothing; their changes are passed by.
+- After a **change sync** (delta) finishes, while the main window **doesn't have the focus** (in front, the
+  unread rows already show them). A full sync, a reconciliation or a launch announces nothing; their changes are passed by.
 - `Notifier` keeps the newest `cache.issue_change` row it has looked at (`rowid`) in memory; it starts after the
   rows cached at launch. Changes made with Taskboard record no rows ([writes.md](writes.md)), so they never notify.
 
@@ -27,5 +27,5 @@ announced without a connected account (Test Connection).
 ## Buttons (`notify::show`)
 
 An issue's notification has **Open** (`issue:open:<KEY>`: shows the window with the issue in the full Issue
-view, `remote::open_issue`); the summary has **Show Unread** (`unread:show`). Both are bus commands
+view, `remote::open_issue`); the summary has **Show Unread** (`unread:show`: turns Unread only on and goes to Everything). Both are bus commands
 (`notify/commands.rs`). macOS asks once whether Taskboard may notify; the debug build asks for itself.

@@ -235,10 +235,10 @@ fn views_takes_an_optional_level() {
         ask(IpcMessage::Views { level: None }, false)
     );
     assert_eq!(
-        parse_args(&["views", "recent"]),
+        parse_args(&["views", "pinned"]),
         ask(
             IpcMessage::Views {
-                level: Some("recent".into())
+                level: Some("pinned".into())
             },
             false
         )
