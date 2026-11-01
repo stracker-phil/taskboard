@@ -195,3 +195,8 @@
 .team-matrix__check { accent-color: var(--accent); }
 /* Boxes of Spaces where the person has no activity are quieter until ticked. */
 .team-matrix__cell:not(.team-matrix__cell--involved) .team-matrix__check:not(:checked) { opacity: 0.45; }
+/* A token scope as Jira names it; selectable, so it can be copied into Atlassian's token form. */
+.settings-scope {
+  padding: 0 4px; border-radius: 4px; background: var(--fill-subtle); font-family: var(--font-mono); font-size: 10.5px;
+  white-space: nowrap; -webkit-user-select: text; user-select: text; cursor: text;
+}

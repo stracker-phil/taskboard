@@ -8,6 +8,7 @@ vi.mock("../../../api", async (orig) => ({ ...(await orig<object>()), api: (awai
 import { api, type Behaviour } from "../../../api";
 import { createQueryClient } from "../../../queries/queryClient";
 import { resetStore, useStore } from "../../../state/store";
+import { capabilityRows } from "../../../test/capabilities";
 import { behaviour, settings } from "../../../test/settings";
 import { ChangesGroup } from "./ChangesGroup";
 
@@ -72,7 +73,7 @@ describe("ChangesGroup", () => {
       expect(screen.getByRole("switch", { name: "Change the priority" })).toBeChecked();
       expect(screen.getByRole("switch", { name: "Add web links" })).toBeChecked();
       expect(screen.getByRole("switch", { name: "Add comments" })).not.toBeChecked();
-      expect(screen.getByText("Sets or clears the assignee of an issue.")).toBeInTheDocument();
+      expect(screen.getByText(/Sets or clears the assignee of an issue\./)).toBeInTheDocument();
     });
 
     it("sends the capability and false when a checked change is switched off", async () => {
@@ -120,7 +121,7 @@ describe("ChangesGroup", () => {
       await renderGroup(true);
 
       expect(await screen.findByText("Your account")).toBeInTheDocument();
-      expect(screen.getByText("Reads the issues of the projects you track.")).toBeInTheDocument();
+      expect(screen.getByText(/Reads the issues of the projects you track\./)).toBeInTheDocument();
       expect(screen.queryByRole("switch", { name: "Your account" })).not.toBeInTheDocument();
       expect(screen.queryByRole("switch", { name: "Issues" })).not.toBeInTheDocument();
     });
@@ -131,6 +132,47 @@ describe("ChangesGroup", () => {
       await screen.findByRole("switch", { name: "Assign issues" });
 
       expect(screen.getAllByRole("switch")).toHaveLength(6);
+    });
+  });
+
+  describe("token scopes", () => {
+    const rows = capabilityRows();
+
+    it.each(rows.map((row) => [row.label, row.detail, row.scope]))("shows the scope of “%s” after its detail", async (_label, detail, scope) => {
+      await renderGroup(true);
+
+      const description = await screen.findByText(new RegExp(`^${detail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
+
+      expect(description).toHaveTextContent(`${detail} · ${scope}`);
+    });
+
+    it("lists the optional scopes of the changes in the Changes description", async () => {
+      await renderGroup(true);
+
+      expect(await screen.findByText(/Optional for a scoped token:/)).toHaveTextContent(
+        "Each change is sent to Jira once. Optional for a scoped token: write:jira-work, only while changes are on.",
+      );
+    });
+
+    it("lists the required scopes of the reads once each, in row order, in the reads description", async () => {
+      await renderGroup(true);
+
+      expect(await screen.findByText(/Required for a scoped token:/)).toHaveTextContent(
+        "Always on: Taskboard reads only these from Jira. Required for a scoped token: read:jira-user, read:jira-work.",
+      );
+    });
+
+    it("derives both descriptions from the scopes of the rows", async () => {
+      mocked.jiraCapabilities.mockResolvedValue([
+        { ...rows[0], scope: "read:example-first" },
+        { ...rows[1], scope: "read:example-second" },
+        { ...rows[5], scope: "write:example-one" },
+        { ...rows[6], scope: "write:example-two" },
+      ]);
+      await renderGroup(true);
+
+      expect(await screen.findByText(/Optional for a scoped token:/)).toHaveTextContent("write:example-one, write:example-two, only while");
+      expect(screen.getByText(/Required for a scoped token:/)).toHaveTextContent("read:example-first, read:example-second.");
     });
   });
 });

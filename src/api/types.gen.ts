@@ -147,7 +147,11 @@ export type Capability = "account" | "projects" | "issues" | "issueDetails" | "c
 /**
  * A capability as Settings → Connection shows it.
  */
-export type CapabilityRow = { capability: Capability, label: string, detail: string, change: boolean, 
+export type CapabilityRow = { capability: Capability, label: string, detail: string, 
+/**
+ * The token scope it needs, as Jira names it.
+ */
+scope: string, change: boolean, 
 /**
  * A change: allowed now (changes to Jira on and this one not switched off). A read: always.
  */

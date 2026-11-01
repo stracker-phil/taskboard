@@ -13,7 +13,8 @@ the gateway's allowlist (`jira/gateway/guard.rs` `RULES`): every new endpoint na
 | `write:jira-work` | Assigning issues, changing their status or priority, adding comments and web links | Changes fail with "a scoped token lacks write:jira-work"; reading keeps working |
 
 Settings → Connection lists the same in plain words: what Taskboard reads, and each kind of change with its own
-switch (`jira::capability`, named by every request the gateway sends). `write:jira-work` is only needed with
+switch (`jira::capability`, named by every request the gateway sends), each with the scope it needs as Jira names
+it (`Capability::scope`); the reads' group names the required scopes, the changes' group the optional one. `write:jira-work` is only needed with
 **Allow changes to Jira** on
 ([writes.md](writes.md)). Leave it out for a token that can only read.
 

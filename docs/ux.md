@@ -725,8 +725,10 @@ no separate Settings design; owner, 2026-10-28). Its colors are the `--settings-
     field that never shows a saved token, Classic or Scoped token kind, the cloud ID for Scoped; Save and
     Test Connection, with "Connected as …" or the error below), *Token* (the expiry date and how soon it
     runs out), *Changes* (Allow changes to Jira, then a switch per kind of change, dimmed while changes are off)
-    and *What Taskboard reads* (the reads, label and detail, no control). Both lists come from Rust
-    (`jira_capabilities`), named by the requests the gateway sends.
+    and *What Taskboard reads* (the reads, label and detail, no control). Each row ends with the token scope it
+    needs as Jira names it (`read:jira-work`; monospaced, selectable); the reads' group says which scopes a scoped
+    token requires, the changes' group which one is optional. Both lists come from Rust (`jira_capabilities`),
+    named by the requests the gateway sends.
   - **Projects**: Refresh after a successful test, "N of M tracked", a filter field (every word in the name or
     key, ignoring case) and a Track switch per project.
   - **Spaces** (`SpacesPage`): the tracked Spaces in sidebar order, each a row with its tile, name, key and

@@ -47,6 +47,19 @@ impl Capability {
         )
     }
 
+    /// The scope a scoped API token needs for it, as Jira names it (`docs/scopes.md`).
+    pub fn scope(self) -> &'static str {
+        match self {
+            Self::Account => "read:jira-user",
+            Self::Projects | Self::Issues | Self::IssueDetails | Self::CheckQueries => "read:jira-work",
+            Self::Assign
+            | Self::ChangeStatus
+            | Self::ChangePriority
+            | Self::Comment
+            | Self::AddWebLink => "write:jira-work",
+        }
+    }
+
     pub fn label(self) -> &'static str {
         match self {
             Self::Account => "Your account",
@@ -88,6 +101,8 @@ pub struct CapabilityRow {
     pub capability: Capability,
     pub label: String,
     pub detail: String,
+    /// The token scope it needs, as Jira names it.
+    pub scope: String,
     pub change: bool,
     /// A change: allowed now (changes to Jira on and this one not switched off). A read: always.
     pub enabled: bool,
@@ -101,6 +116,7 @@ pub fn capability_rows(allow_changes: bool, disabled: &[Capability]) -> Vec<Capa
             capability,
             label: capability.label().into(),
             detail: capability.detail().into(),
+            scope: capability.scope().into(),
             change: capability.is_change(),
             enabled: !capability.is_change() || (allow_changes && !disabled.contains(&capability)),
         })
@@ -224,6 +240,42 @@ mod tests {
     }
 
     #[test]
+    fn every_change_needs_the_write_scope_and_no_read_does() {
+        for capability in Capability::ALL {
+            assert_eq!(
+                capability.scope() == "write:jira-work",
+                capability.is_change(),
+                "{capability:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn each_capability_names_the_scope_jira_requires() {
+        for (capability, scope) in [
+            (Capability::Account, "read:jira-user"),
+            (Capability::Projects, "read:jira-work"),
+            (Capability::Issues, "read:jira-work"),
+            (Capability::IssueDetails, "read:jira-work"),
+            (Capability::CheckQueries, "read:jira-work"),
+            (Capability::Assign, "write:jira-work"),
+            (Capability::ChangeStatus, "write:jira-work"),
+            (Capability::ChangePriority, "write:jira-work"),
+            (Capability::Comment, "write:jira-work"),
+            (Capability::AddWebLink, "write:jira-work"),
+        ] {
+            assert_eq!(capability.scope(), scope, "{capability:?}");
+        }
+    }
+
+    #[test]
+    fn rows_carry_the_scope_of_their_capability() {
+        for row in capability_rows(true, &[]) {
+            assert_eq!(row.scope, row.capability.scope(), "{:?}", row.capability);
+        }
+    }
+
+    #[test]
     fn a_row_serializes_with_camel_case_names() {
         let row = capability_rows(true, &[])
             .into_iter()
@@ -236,6 +288,7 @@ mod tests {
                 "capability": "addWebLink",
                 "label": "Add web links",
                 "detail": "Add links such as a pull request to issues",
+                "scope": "write:jira-work",
                 "change": true,
                 "enabled": true,
             })
