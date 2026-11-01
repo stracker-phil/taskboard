@@ -1,10 +1,14 @@
 /* The content header and the view tabs (docs/ux.md → Header, Tabs). */
+/* One height on every level, room for its tallest control (Open in Jira), so a button that comes or goes moves
+   nothing below it. */
 .content-header {
   display: flex;
   flex: none;
   align-items: center;
   gap: 10px;
+  height: 58px;
   padding: 14px 24px 12px;
+  box-sizing: border-box;
 }
 .content-header__title { margin: 0; font-size: 19px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .content-header__spacer { flex: 1; }
@@ -51,6 +55,7 @@
   height: 28px; padding: 0 10px; border: 1px solid var(--border); border-radius: 7px; background: var(--panel-bg);
   color: var(--text-secondary); font: inherit; font-size: 12px; font-weight: 600; cursor: default;
   transition: background-color var(--motion-fast) var(--ease-out), opacity var(--motion-fast) var(--ease-out);
+  animation: fade-in var(--motion-fast) var(--ease-out);
 }
 .content-header__action:hover:not(:disabled) { background: var(--fill-subtle); }
 .content-header__action:disabled { opacity: 0.45; }

@@ -123,8 +123,9 @@ The owner's rule (2026-10-30), for every control, list and popover:
 
 ## Content header
 
-`src/shell/Header.tsx` and `HeaderTitle.tsx`, styled in `styles/header.css`: 14px 24px 12px padding, a row
-with a 10px gap.
+`src/shell/Header.tsx` and `HeaderTitle.tsx`, styled in `styles/header.css`: 58px on every level (room for its
+tallest control, Open in Jira), 14px 24px 12px padding, a row with a 10px gap. A button that comes or goes there
+(Mark all as read) fades in and moves nothing below it.
 
 - A Space: the 28px tile (8px radius, 14/800) and the name (19/700).
 - A filter list: a breadcrumb button with the 20px tile (6px radius, 10/800) and the Space name (13px
