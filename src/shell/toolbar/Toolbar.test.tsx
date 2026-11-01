@@ -711,7 +711,7 @@ describe("Toolbar Me mode", () => {
 
   /** Renders with Me on in every view; waits until the chip shows it. */
   async function renderEverywhere() {
-    mocked.modesGet.mockResolvedValue({ meEverywhere: true, unreadOnly: false });
+    mocked.modesGet.mockResolvedValue({ meEverywhere: true, unreadOnly: false, bookmarksBar: false });
     renderToolbar(SPACE_LEVEL);
     await waitFor(() => expect(meChip()).toHaveAttribute("aria-pressed", "true"));
   }
@@ -719,7 +719,7 @@ describe("Toolbar Me mode", () => {
   beforeEach(() => {
     mocked.getSettings.mockResolvedValue(settings());
     mocked.meUserFields.mockResolvedValue([{ field: "reporter", name: "Reporter" }]);
-    mocked.modesGet.mockResolvedValue({ meEverywhere: false, unreadOnly: false });
+    mocked.modesGet.mockResolvedValue({ meEverywhere: false, unreadOnly: false, bookmarksBar: false });
     mocked.levelPeople.mockResolvedValue([ALEX, SAM]);
     mocked.listConditions.mockResolvedValue(listConditions({ kind: "space" }));
   });
@@ -982,8 +982,8 @@ describe("Toolbar Unread only", () => {
   const unreadButton = () => screen.getByRole("button", { name: "Unread only" });
 
   beforeEach(() => {
-    mocked.modesGet.mockResolvedValue({ meEverywhere: false, unreadOnly: false });
-    mocked.modeSet.mockResolvedValue({ meEverywhere: false, unreadOnly: true });
+    mocked.modesGet.mockResolvedValue({ meEverywhere: false, unreadOnly: false, bookmarksBar: false });
+    mocked.modeSet.mockResolvedValue({ meEverywhere: false, unreadOnly: true, bookmarksBar: false });
   });
 
   it("sits after the Filter button and before the Me chip", async () => {
@@ -1003,7 +1003,7 @@ describe("Toolbar Unread only", () => {
   });
 
   it("shows pressed while Unread only is on, and turns it off when clicked", async () => {
-    mocked.modesGet.mockResolvedValue({ meEverywhere: false, unreadOnly: true });
+    mocked.modesGet.mockResolvedValue({ meEverywhere: false, unreadOnly: true, bookmarksBar: false });
     renderToolbar(SPACE_LEVEL);
     await waitFor(() => expect(unreadButton()).toHaveAttribute("aria-pressed", "true"));
 
@@ -1082,7 +1082,7 @@ describe("Toolbar Unread only", () => {
     });
 
     it("shows the toggle checked when Unread only is on, and turns it off when chosen", async () => {
-      mocked.modesGet.mockResolvedValue({ meEverywhere: false, unreadOnly: true });
+      mocked.modesGet.mockResolvedValue({ meEverywhere: false, unreadOnly: true, bookmarksBar: false });
       const menu = await openMore();
       expect(menu.getByRole("menuitemcheckbox", { name: "Unread only" })).toHaveAttribute("aria-checked", "true");
 

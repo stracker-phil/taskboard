@@ -1,5 +1,5 @@
-//! Modes that hold in every view until switched off (`modes.json`): Me mode everywhere, Unread only. Rust applies
-//! them to every view query; the toolbar shows and switches them.
+//! Modes that hold in every view until switched off (`modes.json`): Me mode everywhere, Unread only, and where the
+//! bookmarks show. Rust applies them to every view query and the menus; the page shows and switches them.
 
 use std::path::Path;
 
@@ -17,6 +17,8 @@ pub struct Modes {
     pub me_everywhere: bool,
     /// Every view and every sidebar count shows only unread issues.
     pub unread_only: bool,
+    /// The bookmarks show in a bar above the content instead of in the sidebar.
+    pub bookmarks_bar: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, TS)]
@@ -25,6 +27,7 @@ pub struct Modes {
 pub enum Mode {
     MeEverywhere,
     UnreadOnly,
+    BookmarksBar,
 }
 
 pub struct ModesStore {
@@ -48,6 +51,7 @@ impl ModesStore {
                 match mode {
                     Mode::MeEverywhere => modes.me_everywhere = on,
                     Mode::UnreadOnly => modes.unread_only = on,
+                    Mode::BookmarksBar => modes.bookmarks_bar = on,
                 }
                 *modes
             })
@@ -65,7 +69,81 @@ mod tests {
         Modes {
             me_everywhere,
             unread_only,
+            ..Modes::default()
         }
+    }
+
+    fn bar_only() -> Modes {
+        Modes {
+            bookmarks_bar: true,
+            ..Modes::default()
+        }
+    }
+
+    #[tokio::test]
+    async fn the_bookmarks_bar_mode_is_independent_of_the_other_modes() {
+        let dir = temp_config_dir();
+        let store = ModesStore::open(dir.path());
+
+        assert_eq!(
+            store.set(Mode::BookmarksBar, true).await.unwrap(),
+            bar_only()
+        );
+        assert_eq!(
+            store.set(Mode::UnreadOnly, true).await.unwrap(),
+            Modes {
+                unread_only: true,
+                bookmarks_bar: true,
+                ..Modes::default()
+            }
+        );
+        assert_eq!(
+            store.set(Mode::UnreadOnly, false).await.unwrap(),
+            bar_only()
+        );
+        assert_eq!(
+            store.set(Mode::BookmarksBar, false).await.unwrap(),
+            Modes::default()
+        );
+    }
+
+    #[tokio::test]
+    async fn the_bookmarks_bar_mode_persists_across_reopen() {
+        let dir = temp_config_dir();
+        ModesStore::open(dir.path())
+            .set(Mode::BookmarksBar, true)
+            .await
+            .unwrap();
+
+        assert_eq!(ModesStore::open(dir.path()).get(), bar_only());
+    }
+
+    #[test]
+    fn a_file_from_before_the_bookmarks_bar_loads_with_the_bar_off() {
+        let dir = temp_config_dir();
+        fs::write(
+            dir.path().join("modes.json"),
+            r#"{"meEverywhere": true, "unreadOnly": true}"#,
+        )
+        .unwrap();
+
+        assert_eq!(ModesStore::open(dir.path()).get(), modes(true, true));
+    }
+
+    #[test]
+    fn the_bookmarks_bar_uses_camel_case_on_the_wire() {
+        assert_eq!(
+            serde_json::to_value(bar_only()).unwrap(),
+            serde_json::json!({
+                "meEverywhere": false,
+                "unreadOnly": false,
+                "bookmarksBar": true
+            })
+        );
+        assert_eq!(
+            serde_json::to_value(Mode::BookmarksBar).unwrap(),
+            serde_json::json!("bookmarksBar")
+        );
     }
 
     #[test]
@@ -141,7 +219,11 @@ mod tests {
     fn modes_and_mode_use_camel_case_on_the_wire() {
         assert_eq!(
             serde_json::to_value(modes(true, false)).unwrap(),
-            serde_json::json!({ "meEverywhere": true, "unreadOnly": false })
+            serde_json::json!({
+                "meEverywhere": true,
+                "unreadOnly": false,
+                "bookmarksBar": false
+            })
         );
         assert_eq!(
             serde_json::to_value(Mode::UnreadOnly).unwrap(),

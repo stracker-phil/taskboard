@@ -112,7 +112,7 @@ src-tauri/
                              names sidebar levels and views; remote/places lists and opens them)
   src/events.rs state.rs     every event name; AppState
   src/error.rs lock.rs       AppError (+ ErrorKind); poison-tolerant lock helpers
-  src/store/                 JsonFile, JsonStore, settings/, keybindings, ui_state, modes (app-wide Me and Unread),
+  src/store/                 JsonFile, JsonStore, settings/, keybindings, ui_state, modes (app-wide Me, Unread, bookmarks bar),
                              places (each view's place)
   src/bus/                   the command bus
   src/db/                    the two SQLite files: open, migrate, read, the one write path

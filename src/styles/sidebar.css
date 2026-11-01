@@ -46,7 +46,7 @@
 .sb-row:focus-visible, .sb-row button:focus-visible { outline-offset: -2px; }
 .sb-row[data-dragging], .sb-space-group[data-dragging] { opacity: 0.5; }
 
-.sb-home { display: flex; flex: none; flex-direction: column; gap: 1px; }
+.sb-home { display: flex; flex: none; flex-direction: column; gap: 1px; overflow: hidden; }
 .sb-home__row { gap: 10px; height: 34px; padding: 0 10px; color: var(--text-strong-body); }
 .sb-spaces {
   position: relative;

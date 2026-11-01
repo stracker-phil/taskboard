@@ -1,5 +1,8 @@
 import type { ListNode } from "../../api";
 import { Tile } from "../../components/look/Tile";
+import { openContextMenu } from "../../components/menu";
+import { attempt } from "../../state/requests";
+import { api } from "../../api";
 import { HOME_ICONS } from "../levels";
 import { ListCount } from "./ListCount";
 
@@ -23,6 +26,11 @@ export function HomeRows({ rows, activeId, open }: Props) {
             data-state={active ? "active" : undefined}
             aria-current={active ? "page" : undefined}
             onClick={() => open(node.id)}
+            onContextMenu={
+              node.kind === "pinned"
+                ? (e) => openContextMenu(e, [{ text: "Show in Bookmarks Bar", run: () => void attempt(api.modeSet("bookmarksBar", true), "Could not move the bookmarks") }], "Bookmarks")
+                : undefined
+            }
           >
             {node.kind === "list" ? (
               <Tile icon={node.icon} color={node.color} fallback={HOME_ICONS.list} size={node.color ? 18 : 17} />

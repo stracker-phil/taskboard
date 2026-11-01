@@ -48,7 +48,7 @@ beforeEach(() => {
   resetStore();
   mocked.connectionGet.mockResolvedValue(connectionView());
   mocked.pinsList.mockResolvedValue(pins());
-  mocked.modesGet.mockResolvedValue({ meEverywhere: false, unreadOnly: false });
+  mocked.modesGet.mockResolvedValue({ meEverywhere: false, unreadOnly: false, bookmarksBar: false });
   mocked.listMarkAllSeen.mockResolvedValue(undefined);
   mocked.openUrl.mockResolvedValue(undefined);
 });
@@ -233,7 +233,7 @@ describe("Header", () => {
       };
 
       beforeEach(() => {
-        mocked.modesGet.mockResolvedValue({ meEverywhere: false, unreadOnly: true });
+        mocked.modesGet.mockResolvedValue({ meEverywhere: false, unreadOnly: true, bookmarksBar: false });
       });
 
       it.each([

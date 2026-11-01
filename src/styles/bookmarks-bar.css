@@ -1,0 +1,20 @@
+/* The bookmarks bar (docs/ux.md → Bookmarks): flat items on the window background, like the sidebar's rows. */
+.bookmarks-bar { display: flex; align-items: center; gap: 4px; height: 36px; padding: 0 8px 0 0; box-sizing: border-box; }
+.shell__titlebar .bookmarks-bar { height: 42px; padding-left: 84px; }
+.bookmarks-bar__items { position: relative; display: flex; flex: 1; align-items: center; gap: 2px; min-width: 0; height: 100%; overflow: hidden; }
+.bookmarks-bar__item, .bookmarks-bar__more {
+  display: flex; flex: none; align-items: center; gap: 6px; height: 26px; padding: 0 9px; box-sizing: border-box;
+  border: 0; border-radius: 7px; background: transparent; color: var(--text-secondary);
+  font: inherit; font-size: 12.5px; white-space: nowrap; cursor: default;
+  transition: background-color var(--motion-fast) var(--ease-out);
+}
+.bookmarks-bar__item { max-width: 220px; }
+.bookmarks-bar__item[hidden] { display: none; }
+.bookmarks-bar__item:hover, .bookmarks-bar__more:hover { background: var(--fill-hover); color: var(--text); }
+.bookmarks-bar__item[data-dragging] { opacity: 0.5; }
+.bookmarks-bar__more { justify-content: center; width: 26px; padding: 0; }
+.bookmarks-bar__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.bookmarks-bar__icon { flex: none; color: var(--text-tertiary); }
+.bookmarks-bar__rename { width: 160px; }
+.bookmarks-bar__empty { padding-left: 9px; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+.bookmarks-bar__drop { position: absolute; top: 6px; bottom: 6px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--accent); pointer-events: none; }

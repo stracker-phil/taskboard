@@ -144,6 +144,7 @@ pub async fn mode_set(
 ) -> AppResult<Modes> {
     let modes = state.modes.set(mode, on).await?;
     crate::events::announce_modes(&app, modes);
+    crate::menu::place::refresh(&app);
     Ok(modes)
 }
 

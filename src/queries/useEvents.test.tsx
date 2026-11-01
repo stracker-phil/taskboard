@@ -226,7 +226,7 @@ describe("useEvents", () => {
     }
 
     async function renderModes() {
-      mocked.modesGet.mockResolvedValue({ meEverywhere: false, unreadOnly: false });
+      mocked.modesGet.mockResolvedValue({ meEverywhere: false, unreadOnly: false, bookmarksBar: false });
       mocked.viewRows.mockResolvedValue(viewData([], [row({ key: "NW-1" }), row({ id: "10043", key: "NW-2" })]));
       render(
         <QueryClientProvider client={createQueryClient()}>
@@ -239,10 +239,10 @@ describe("useEvents", () => {
 
     it("refetches the modes and the view rows when modes_changed arrives", async () => {
       await renderModes();
-      mocked.modesGet.mockResolvedValue({ meEverywhere: true, unreadOnly: false });
+      mocked.modesGet.mockResolvedValue({ meEverywhere: true, unreadOnly: false, bookmarksBar: false });
       mocked.viewRows.mockResolvedValue(viewData([], [row({ key: "NW-1" })]));
 
-      act(() => emitEvent(api, "modes_changed", { meEverywhere: true, unreadOnly: false }));
+      act(() => emitEvent(api, "modes_changed", { meEverywhere: true, unreadOnly: false, bookmarksBar: false }));
 
       expect(await screen.findByText("Me everywhere: true; rows: NW-1")).toBeInTheDocument();
     });

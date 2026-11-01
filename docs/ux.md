@@ -45,7 +45,19 @@ The owner's rule (2026-10-30), for every control, list and popover:
   `--window-bg`, beside the content panel: `--panel-bg`, inset 8px top, right and bottom (none toward the
   sidebar), 12px radius, `--shadow-panel`. Popovers anchor to the panel.
 - **Traffic lights** are the native ones, inside the sidebar's top 18px strip (`trafficLightPosition` 20, 24);
-  the strip and empty chrome drag the window. There is no top bar, icon rail or status bar.
+  the strip and empty chrome drag the window. There is no icon rail or status bar, and no top bar but the
+  bookmarks bar ([ADR 0047](adr/0047-the-bookmarks-bar-is-the-only-top-bar.md)).
+- **Bookmarks bar** (`src/pins/BookmarksBar.tsx`, `styles/bookmarks-bar.css`; View → Show Bookmarks Bar ⇧⌘B,
+  `view:toggleBookmarksBar`, checked while shown; `modes.json` `bookmarksBar`): the bookmarks in a 36px row on
+  `--window-bg` above the panel, beside the traffic-light strip; with the sidebar hidden it sits in the 42px strip
+  after the traffic lights. Turning it on grows its slot from 0, so the panel glides down (`--motion-slow`). Items
+  are flat like sidebar rows (26px, 7px radius, 12.5px `--text-secondary`, `--fill-hover`): the status square, a
+  folder or a layout tile, and the bookmark's name (`pinName`, at most 220px, ellipsis). A click opens it, a drag
+  moves it (`useDragReorder` across, the view tabs' drop line), right-click has Open, Rename Bookmark…, Use
+  Original Name, Remove Bookmark and Show Bookmarks in Sidebar. What doesn't fit folds into the » button's menu,
+  by the width only (`fitCount`), which ends with All Bookmarks. While the bar shows, the sidebar drops the
+  Bookmarks row and the bookmarked lists under Home (the Home rows glide, `useHeightGlide`); the Bookmarks row's
+  context menu has Show in Bookmarks Bar.
 - **Sidebar** ([below](#sidebar)): ⌘\ or the sidebar toggle hides it; the panel then takes the full width under
   a 42px strip that keeps the traffic lights off it. The state is kept in `ui_state.json`.
 - **Sidebar toggle** (`src/shell/SidebarToggle.tsx`): a 34px button (panel icon 17/1.8, styled like Settings)

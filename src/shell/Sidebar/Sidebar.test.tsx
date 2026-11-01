@@ -95,7 +95,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
   mocked.pinsList.mockResolvedValue(pins());
-  mocked.modesGet.mockResolvedValue({ meEverywhere: false, unreadOnly: false });
+  mocked.modesGet.mockResolvedValue({ meEverywhere: false, unreadOnly: false, bookmarksBar: false });
   mocked.listCreate.mockResolvedValue(30);
   mocked.listRename.mockResolvedValue(undefined);
   mocked.listDuplicate.mockResolvedValue(31);
@@ -132,7 +132,7 @@ describe("Sidebar", () => {
 
     describe("with Unread only on", () => {
       beforeEach(() => {
-        mocked.modesGet.mockResolvedValue({ meEverywhere: false, unreadOnly: true });
+        mocked.modesGet.mockResolvedValue({ meEverywhere: false, unreadOnly: true, bookmarksBar: false });
       });
 
       it("show each count as an unread count", async () => {
@@ -456,6 +456,50 @@ describe("Sidebar", () => {
       cleanup();
 
       expect(["go.everything", "go.pinned", "list.new"].map(run)).toEqual([false, false, false]);
+    });
+  });
+
+  describe("with the bookmarks bar on", () => {
+    const homeButtons = () => within(screen.getByRole("navigation", { name: "Home" })).getAllByRole("button");
+
+    beforeEach(() => {
+      mocked.modesGet.mockResolvedValue({ meEverywhere: false, unreadOnly: false, bookmarksBar: true });
+    });
+
+    it("drops the Bookmarks row and the pinned lists from Home", async () => {
+      const tree = treeWith();
+      tree.pinnedLists = [list(22, "Epics", { count: 3 })];
+      await renderSidebar(tree);
+
+      await waitFor(() => expect(homeButtons().map((r) => r.textContent)).toEqual(["Everything42"]));
+    });
+
+    it("keeps the Bookmarks row and the pinned lists while the bar is off", async () => {
+      mocked.modesGet.mockResolvedValue({ meEverywhere: false, unreadOnly: false, bookmarksBar: false });
+      const tree = treeWith();
+      tree.pinnedLists = [list(22, "Epics", { count: 3 })];
+      await renderSidebar(tree);
+
+      expect(homeButtons().map((r) => r.textContent)).toEqual(["Everything42", "Bookmarks", "Epics3"]);
+    });
+  });
+
+  describe("Bookmarks row", () => {
+    it("offers to show the bookmarks in the bar from its context menu", async () => {
+      await renderSidebar();
+
+      await userEvent.pointer({ keys: "[MouseRight]", target: screen.getByRole("button", { name: "Bookmarks" }) });
+      await chooseFromMenu("Show in Bookmarks Bar");
+
+      expect(mocked.modeSet).toHaveBeenCalledWith("bookmarksBar", true);
+    });
+
+    it("is the only Home row with that menu", async () => {
+      await renderSidebar();
+
+      await userEvent.pointer({ keys: "[MouseRight]", target: screen.getByRole("button", { name: named("Everything") }) });
+
+      expect(screen.queryByRole("menuitem", { name: "Show in Bookmarks Bar" })).not.toBeInTheDocument();
     });
   });
 

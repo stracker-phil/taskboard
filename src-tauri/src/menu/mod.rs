@@ -112,11 +112,18 @@ pub const ISSUE: &[Item] = &[
     plain("Assign To…", "page:issue.assignTo"),
 ];
 /// The window's appearance only; what the page shows lives in Go, List and Issue.
-pub const VIEW: &[Item] = &[item(
-    "Toggle Sidebar",
-    "view:toggleSidebar",
-    "CmdOrCtrl+Backslash",
-)];
+pub const VIEW: &[Item] = &[
+    item(
+        "Toggle Sidebar",
+        "view:toggleSidebar",
+        "CmdOrCtrl+Backslash",
+    ),
+    item(
+        "Show Bookmarks Bar",
+        "view:toggleBookmarksBar",
+        "CmdOrCtrl+Shift+B",
+    ),
+];
 pub const RELOAD: Item = item("Reload", "app:reload", "CmdOrCtrl+Alt+R");
 pub const HELP: &[Item] = &[
     plain("Open Log Folder", "app:logs"),
@@ -498,11 +505,18 @@ mod tests {
             .collect();
         assert_eq!(
             found,
-            [(
-                "Toggle Sidebar",
-                "view:toggleSidebar",
-                Some("CmdOrCtrl+Backslash")
-            )]
+            [
+                (
+                    "Toggle Sidebar",
+                    "view:toggleSidebar",
+                    Some("CmdOrCtrl+Backslash")
+                ),
+                (
+                    "Show Bookmarks Bar",
+                    "view:toggleBookmarksBar",
+                    Some("CmdOrCtrl+Shift+B")
+                )
+            ]
         );
         for item in VIEW {
             assert!(!item.command.starts_with("page:"), "{}", item.command);

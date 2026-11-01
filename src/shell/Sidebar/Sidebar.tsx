@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { useHeightGlide } from "../../lib/motion";
+import { useModes } from "../../queries/modes";
 import { Search } from "lucide-react";
 import { api, type SpaceNode } from "../../api";
 import { SpacePopover } from "../../components/SpaceEditor";
@@ -20,6 +22,10 @@ export function Sidebar() {
   const setExpanded = useSetExpanded();
   const setPaletteOpen = useStore((s) => s.setPaletteOpen);
   const [renamingId, setRenamingId] = useState<number | null>(null);
+  const { bookmarksBar } = useModes();
+  const asideRef = useRef<HTMLElement>(null);
+  // The Home rows shrink or grow when the bookmarks move to the bar or back.
+  useHeightGlide(asideRef, bookmarksBar);
   // The Space menu's "Client label…" popover opens from here.
   const [editingClient, setEditingClient] = useState<SpaceNode | null>(null);
 
@@ -43,14 +49,20 @@ export function Sidebar() {
   usePageAction("list.new", tree ? () => void newList() : null);
 
   return (
-    <aside className="sidebar" aria-label="Sidebar">
+    <aside ref={asideRef} className="sidebar" aria-label="Sidebar">
       <div className="sidebar__traffic-lights" data-tauri-drag-region />
       <button type="button" className="sb-search" title="Search (⌘K)" onClick={() => setPaletteOpen(true)}>
         <Search size={15} strokeWidth={2} aria-hidden="true" />
         <span className="sb-search__label">Search</span>
         <kbd className="sb-kbd">⌘K</kbd>
       </button>
-      {tree && <HomeRows rows={[tree.everything, ...tree.home, ...tree.pinnedLists]} activeId={currentId} open={(id) => void open(id)} />}
+      {tree && (
+        <HomeRows
+          rows={bookmarksBar ? [tree.everything, ...tree.home.filter((node) => node.kind !== "pinned")] : [tree.everything, ...tree.home, ...tree.pinnedLists]}
+          activeId={currentId}
+          open={(id) => void open(id)}
+        />
+      )}
       {tree && nav && (
         <SpacesSection
           spaces={tree.spaces}

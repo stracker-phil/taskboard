@@ -210,6 +210,41 @@ describe("Window", () => {
     });
   });
 
+  describe("bookmarks bar", () => {
+    const bar = () => screen.queryByRole("navigation", { name: "Bookmarks" });
+
+    function renderShell(sidebarHidden: boolean, bookmarksBar: boolean) {
+      mocked.modesGet.mockResolvedValue({ meEverywhere: false, unreadOnly: false, bookmarksBar });
+      render(
+        <QueryClientProvider client={client}>
+          <Window sidebarHidden={sidebarHidden}>
+            <p>View body</p>
+          </Window>
+        </QueryClientProvider>,
+      );
+    }
+
+    it.each([
+      ["hidden", true],
+      ["shown", false],
+    ])("shows the bar above the panel while it is on and the sidebar is %s", async (_state, sidebarHidden) => {
+      renderShell(sidebarHidden, true);
+
+      const found = await screen.findByRole("navigation", { name: "Bookmarks" });
+      expect(found.compareDocumentPosition(screen.getByRole("main")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it.each([
+      ["hidden", true],
+      ["shown", false],
+    ])("shows no bar while it is off and the sidebar is %s", async (_state, sidebarHidden) => {
+      renderShell(sidebarHidden, false);
+      await screen.findByText("View body");
+
+      expect(bar()).not.toBeInTheDocument();
+    });
+  });
+
   describe("without an Issue view", () => {
     it("shows the view body and stays that way when the place changes", async () => {
       await renderWindow(false);

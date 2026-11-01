@@ -505,7 +505,7 @@ accelerator: string | null,
  */
 checked: boolean, };
 
-export type Mode = "meEverywhere" | "unreadOnly";
+export type Mode = "meEverywhere" | "unreadOnly" | "bookmarksBar";
 
 export type Modes = { 
 /**
@@ -515,7 +515,11 @@ meEverywhere: boolean,
 /**
  * Every view and every sidebar count shows only unread issues.
  */
-unreadOnly: boolean, };
+unreadOnly: boolean, 
+/**
+ * The bookmarks show in a bar above the content instead of in the sidebar.
+ */
+bookmarksBar: boolean, };
 
 /**
  * The toolbar's narrowing on top of the level's filter, and the Filter popover's unsaved conditions (ADR 0038).

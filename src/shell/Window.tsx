@@ -1,5 +1,7 @@
 import { type ReactNode, useEffect } from "react";
 import { IssueView } from "../issue/IssueView";
+import { BookmarksBar } from "../pins/BookmarksBar";
+import { useModes } from "../queries/modes";
 import { useNav, useSidebar, useViews } from "../queries/sidebar";
 import { narrowingKey } from "../state/slices/narrowing";
 import { useStore } from "../state/store";
@@ -23,6 +25,7 @@ interface Props {
  *  lower-left corner over both. */
 export function Window({ sidebarHidden, children }: Props) {
   const issueView = useStore((s) => s.issueView);
+  const { bookmarksBar } = useModes();
   useCloseIssueOnNavigation();
   useDiscardDraftsOnLeave();
   return (
@@ -30,7 +33,17 @@ export function Window({ sidebarHidden, children }: Props) {
       {!sidebarHidden && <Sidebar />}
       <SidebarToggle sidebarHidden={sidebarHidden} />
       <div className="shell__content">
-        {sidebarHidden && <div className="shell__titlebar" data-tauri-drag-region />}
+        {sidebarHidden ? (
+          // The strip that keeps the traffic lights off the panel holds the bar after them.
+          <div className="shell__titlebar" data-tauri-drag-region>
+            {bookmarksBar && <BookmarksBar />}
+          </div>
+        ) : (
+          // Always there, so turning the bar on or off grows or shrinks it and the panel glides.
+          <div className={bookmarksBar ? "shell__bookmarks shell__bookmarks--open" : "shell__bookmarks"} inert={!bookmarksBar}>
+            {bookmarksBar && <BookmarksBar />}
+          </div>
+        )}
         <main className="content-panel">
           {issueView ? (
             <IssueView key={issueView.stack.length} id={issueView.stack[issueView.stack.length - 1]} origin={issueView.origin} />

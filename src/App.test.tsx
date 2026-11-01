@@ -65,4 +65,14 @@ describe("App", () => {
       expect(mocked.runCommand).toHaveBeenCalledWith("view:toggleSidebar");
     });
   });
+
+  describe("bookmarks bar", () => {
+    it("runs the view:toggleBookmarksBar bus command on ⌘⇧B", async () => {
+      await renderApp();
+
+      await userEvent.keyboard("{Meta>}{Shift>}b{/Shift}{/Meta}");
+
+      expect(mocked.runCommand).toHaveBeenCalledWith("view:toggleBookmarksBar");
+    });
+  });
 });

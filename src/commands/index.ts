@@ -28,6 +28,7 @@ const escapeIsFree = () => !isTextInput(document.activeElement) && !document.que
  *  sidebar key is the menu item's too; the page claims it so it can be rebound, and runs the same bus command. */
 const APP_COMMANDS: Command[] = [
   { id: "sidebar.toggle", title: "Toggle sidebar", scope: "main", defaultBinding: "Mod+\\", bus: "view:toggleSidebar", run: () => runBusCommand("view:toggleSidebar", "Could not toggle the sidebar") },
+  { id: "bookmarksBar.toggle", title: "Show Bookmarks Bar", scope: "main", defaultBinding: "Mod+Shift+B", bus: "view:toggleBookmarksBar", run: () => runBusCommand("view:toggleBookmarksBar", "Could not move the bookmarks") },
   { id: "space.previous", title: "Previous Space", scope: "main", defaultBinding: "Mod+Alt+ArrowUp", bus: "nav:previousSpace", run: () => runBusCommand("nav:previousSpace", "Could not open the Space") },
   { id: "palette.open", title: "Command palette", scope: "main", defaultBinding: "Mod+K", run: () => useStore.getState().setPaletteOpen(true) },
   { id: "space.next", title: "Next Space", scope: "main", defaultBinding: "Mod+Alt+ArrowDown", bus: "nav:nextSpace", run: () => runBusCommand("nav:nextSpace", "Could not open the Space") },

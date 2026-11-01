@@ -18,6 +18,7 @@ import "./look.css";
 import "./issue-view.css";
 import "./changes.css";
 import "./pins.css";
+import "./bookmarks-bar.css";
 import "./palette.css";
 import "./board.css";
 import "./states.css";

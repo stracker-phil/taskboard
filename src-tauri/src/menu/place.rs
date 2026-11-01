@@ -18,6 +18,9 @@ pub const LAYOUTS: [(&str, Layout); 3] = [
     ("page:view.layout.table", Layout::Table),
 ];
 
+/// The View menu's item that shows the bookmarks in the bar.
+pub const BOOKMARKS_BAR: &str = "view:toggleBookmarksBar";
+
 /// ⌘1–⌘9 open the first nine views; the page's `view.select.<n>` commands run them.
 pub const VIEW_KEYS: usize = 9;
 
@@ -28,11 +31,17 @@ pub struct Place {
     /// The level's views (id, name) in tab order.
     pub views: Vec<(i64, String)>,
     pub view_id: Option<i64>,
+    /// The bookmarks show in the bar (`modes.json`).
+    pub bookmarks_bar: bool,
 }
 
 impl Place {
-    /// A layout item is checked when it is the shown view's layout; other items have no check.
+    /// A layout item is checked when it is the shown view's layout, Show Bookmarks Bar while the bar shows; other
+    /// items have no check.
     pub fn checked(&self, command: &str) -> Option<bool> {
+        if command == BOOKMARKS_BAR {
+            return Some(self.bookmarks_bar);
+        }
         LAYOUTS
             .iter()
             .find(|(id, _)| *id == command)
@@ -53,6 +62,13 @@ static BUILT_VIEWS: Mutex<Option<Vec<(i64, String)>>> = Mutex::new(None);
 
 /// The current place; empty when there is none or it can't be read.
 pub async fn read(app: &AppHandle) -> Place {
+    Place {
+        bookmarks_bar: app.state::<AppState>().modes.get().bookmarks_bar,
+        ..read_location(app).await
+    }
+}
+
+async fn read_location(app: &AppHandle) -> Place {
     let state = app.state::<AppState>();
     let Ok(nav) = state.nav.current(&state.db).await else {
         return Place::default();
@@ -72,6 +88,7 @@ pub async fn read(app: &AppHandle) -> Place {
                 layout: views.iter().find(|v| v.id == at.view_id).map(|v| v.layout),
                 views: views.into_iter().map(|v| (v.id, v.name)).collect(),
                 view_id: Some(at.view_id),
+                ..Place::default()
             })
         })
         .await;
@@ -158,6 +175,37 @@ mod tests {
             let found = LAYOUTS.map(|(command, _)| place.checked(command));
             assert_eq!(found, expected, "{shown:?}");
         }
+    }
+
+    #[test]
+    fn show_bookmarks_bar_is_checked_exactly_while_the_bar_shows() {
+        for bookmarks_bar in [true, false] {
+            for layout in [None, Some(Layout::Board)] {
+                let place = Place {
+                    layout,
+                    bookmarks_bar,
+                    ..Place::default()
+                };
+                assert_eq!(
+                    place.checked("view:toggleBookmarksBar"),
+                    Some(bookmarks_bar),
+                    "{bookmarks_bar} {layout:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn the_bar_does_not_change_the_layout_checks() {
+        let place = Place {
+            layout: Some(Layout::Table),
+            bookmarks_bar: true,
+            ..Place::default()
+        };
+
+        let found = LAYOUTS.map(|(command, _)| place.checked(command));
+        assert_eq!(found, [Some(false), Some(false), Some(true)]);
+        assert_eq!(place.checked("view:toggleSidebar"), None);
     }
 
     #[test]

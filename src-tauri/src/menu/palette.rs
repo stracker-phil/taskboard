@@ -222,7 +222,10 @@ mod tests {
         assert!(!commands.contains(&"app:reload"));
         assert!(!commands.contains(&"sync:full"));
         assert!(commands.contains(&"sync:refresh"));
-        assert_eq!(in_menu(&items, "View"), ["view:toggleSidebar"]);
+        assert_eq!(
+            in_menu(&items, "View"),
+            ["view:toggleSidebar", "view:toggleBookmarksBar"]
+        );
     }
 
     #[test]

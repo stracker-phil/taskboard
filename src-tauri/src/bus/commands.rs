@@ -65,6 +65,21 @@ pub fn register(bus: &mut Bus) {
             .run_now(window::toggle_sidebar),
     );
     bus.add(
+        Command::new("view:toggleBookmarksBar", "Show Bookmarks Bar")
+            .help("Show the bookmarks in a bar above the content, or in the sidebar")
+            .run(|app: AppHandle| async move {
+                let state = app.state::<crate::state::AppState>();
+                let on = !state.modes.get().bookmarks_bar;
+                let modes = state
+                    .modes
+                    .set(crate::store::modes::Mode::BookmarksBar, on)
+                    .await?;
+                crate::events::announce_modes(&app, modes);
+                crate::menu::place::refresh(&app);
+                Ok(())
+            }),
+    );
+    bus.add(
         Command::new("sync:refresh", "Refresh")
             .help("Fetch what changed in Jira")
             .run_now(|app: &AppHandle| app.state::<SyncEngine>().queue(Job::Delta)),
@@ -107,6 +122,15 @@ mod tests {
             assert_eq!(info.help, "Open Settings at a page or section", "{id}");
             assert!(info.hidden, "{id}");
         }
+    }
+
+    #[test]
+    fn the_bookmarks_bar_toggle_is_a_registered_command() {
+        let bus = registered();
+
+        let info = bus.info("view:toggleBookmarksBar").unwrap();
+        assert_eq!(info.title, "Show Bookmarks Bar");
+        assert!(!info.hidden);
     }
 
     #[test]
