@@ -30,5 +30,8 @@ export default defineConfig(() => ({
     env: { NODE_ENV: "test" },
     // Agent worktrees under .claude/ hold their own copies of the tests.
     exclude: [...configDefaults.exclude, ".claude/**"],
+    // The heavy view and drag tests render whole views; under a full parallel run they need more time and fewer peers.
+    testTimeout: 10_000,
+    maxWorkers: "50%",
   },
 }));

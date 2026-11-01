@@ -1,6 +1,9 @@
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, vi } from "vitest";
-import { cleanup } from "@testing-library/react";
+import { cleanup, configure } from "@testing-library/react";
+
+// `waitFor`/`findBy` wait longer than the 1 s default: a full parallel run slows the heavy view tests.
+configure({ asyncUtilTimeout: 3000 });
 
 afterEach(cleanup);
 

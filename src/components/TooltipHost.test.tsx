@@ -21,7 +21,7 @@ const second = () => screen.getByRole("button", { name: "Open the settings" });
 const wait = (ms: number) => act(() => vi.advanceTimersByTimeAsync(ms));
 
 beforeEach(() => {
-  vi.useFakeTimers({ shouldAdvanceTime: true });
+  vi.useFakeTimers();
 });
 
 afterEach(() => {
