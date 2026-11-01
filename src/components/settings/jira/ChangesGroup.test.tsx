@@ -106,7 +106,7 @@ describe("ChangesGroup", () => {
     it("disables every change switch while changes to Jira are off", async () => {
       await renderGroup(false);
 
-      for (const name of ["Assign issues", "Change the status", "Change the priority", "Add comments", "Add web links"]) {
+      for (const name of ["Assign issues", "Change the status", "Change the priority", "Rename issues", "Add comments", "Add web links"]) {
         expect(await screen.findByRole("switch", { name })).toBeDisabled();
       }
     });
@@ -172,7 +172,7 @@ describe("ChangesGroup", () => {
 
       await screen.findByRole("switch", { name: "Assign issues" });
 
-      expect(screen.getAllByRole("switch")).toHaveLength(6);
+      expect(screen.getAllByRole("switch")).toHaveLength(7);
     });
   });
 

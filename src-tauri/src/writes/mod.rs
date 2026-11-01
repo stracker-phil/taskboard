@@ -7,6 +7,7 @@ mod drop;
 mod pending;
 mod priority;
 pub mod sent;
+mod title;
 mod transition;
 mod web_link;
 
@@ -45,6 +46,8 @@ pub enum Change {
     Transition { transition_id: String },
     /// Sets the issue's priority to one its edit screen offers.
     Priority { name: String },
+    /// Renames the issue.
+    Title { text: String },
 }
 
 /// What a write did, for the page's toast.
@@ -74,6 +77,7 @@ pub enum Field {
     Assignee,
     Status,
     Priority,
+    Title,
 }
 
 impl Field {
@@ -82,6 +86,7 @@ impl Field {
             Self::Assignee => "assignee",
             Self::Status => "status",
             Self::Priority => "priority",
+            Self::Title => "title",
         }
     }
 
@@ -90,6 +95,7 @@ impl Field {
             "assignee" => Some(Self::Assignee),
             "status" => Some(Self::Status),
             "priority" => Some(Self::Priority),
+            "title" => Some(Self::Title),
             _ => None,
         }
     }
@@ -121,6 +127,7 @@ pub async fn apply(
             transition::transition(db, source, issue_id, transition_id).await
         }
         Change::Priority { name } => priority::set_priority(db, source, issue_id, name).await,
+        Change::Title { text } => title::set_title(db, source, issue_id, text).await,
     }
 }
 
@@ -146,6 +153,7 @@ impl Change {
             Self::Assign { .. } => Capability::Assign,
             Self::Transition { .. } => Capability::ChangeStatus,
             Self::Priority { .. } => Capability::ChangePriority,
+            Self::Title { .. } => Capability::ChangeTitle,
         }
     }
 }

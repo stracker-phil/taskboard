@@ -28,6 +28,8 @@ export interface IssueKeyHandlers {
   assignTo: () => void;
   /** ⇧P: the selected issue's priority menu. */
   changePriority: () => void;
+  /** F2: edits the selected issue's title where it shows (the Preview or the Issue view). */
+  rename: () => void;
   /** Space: opens or closes the selected issue's preview; absent where there is none, so Space scrolls. */
   togglePeek?: () => void;
   hasSelection: () => boolean;
@@ -55,7 +57,8 @@ export const ISSUE_KEY_COMMANDS: Command[] = [
   { id: "issue.previous.arrow", title: "Previous issue (arrow)", scope: "main", defaultBinding: "ArrowUp", when: () => handlers !== null, run: () => handlers?.move(-1) },
   { id: "group.collapse", title: "Collapse the issue's group", scope: "main", defaultBinding: "ArrowLeft", when: selected, run: () => handlers?.setGroupOpen(false) },
   { id: "group.expand", title: "Expand the issue's group", scope: "main", defaultBinding: "ArrowRight", when: selected, run: () => handlers?.setGroupOpen(true) },
-  { id: "peek.close", title: "Close the preview", scope: "main", defaultBinding: "Escape", when: () => (handlers?.peekOpen() ?? false) && !document.querySelector("[role=dialog]"), run: () => handlers?.closePeek() },
+  // Escape in a text field (the title being renamed) leaves the field first.
+  { id: "peek.close", title: "Close the preview", scope: "main", defaultBinding: "Escape", when: () => (handlers?.peekOpen() ?? false) && !document.querySelector("[role=dialog]") && !isTextInput(document.activeElement), run: () => handlers?.closePeek() },
   { id: "issue.copyKey", title: "Copy issue key", scope: "main", defaultBinding: "Mod+C", when: () => selected() && nothingElseToCopy(), run: () => handlers?.copyKey() },
   { id: "issue.copyUrl", title: "Copy issue URL", scope: "main", defaultBinding: "Mod+Shift+C", when: selected, run: () => handlers?.copyUrl() },
   { id: "issue.copyAppLink", title: "Copy Taskboard link", scope: "main", defaultBinding: "Mod+Alt+Shift+C", when: selected, run: () => handlers?.copyAppLink() },
@@ -66,6 +69,7 @@ export const ISSUE_KEY_COMMANDS: Command[] = [
   { id: "issue.changeStatus", title: "Change the issue's status", scope: "main", defaultBinding: "D", when: selected, run: () => handlers?.changeStatus() },
   { id: "issue.assignTo", title: "Assign the issue to someone", scope: "main", defaultBinding: "A", when: selected, run: () => handlers?.assignTo() },
   { id: "issue.changePriority", title: "Change the issue's priority", scope: "main", defaultBinding: "Shift+P", when: selected, run: () => handlers?.changePriority() },
+  { id: "issue.rename", title: "Rename the issue", scope: "main", defaultBinding: "F2", when: selected, run: () => handlers?.rename() },
   { id: "issue.markSeen", title: "Mark the issue as read or unread", scope: "main", defaultBinding: "M", when: selected, run: () => handlers?.toggleRead() },
   { id: "issue.togglePeek", title: "Open or close the preview", scope: "main", defaultBinding: "Space", when: () => selected() && handlers?.togglePeek !== undefined, run: () => handlers?.togglePeek?.() },
   {

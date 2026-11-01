@@ -135,6 +135,31 @@ impl PriorityName {
     }
 }
 
+/// An issue's new title: one line of at most `TITLE_MAX` characters, as Jira's summary field allows; it goes into a
+/// request body, never a URL.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IssueTitle(String);
+
+/// Jira's limit for an issue's summary.
+pub const TITLE_MAX: usize = 255;
+
+impl IssueTitle {
+    pub fn parse(text: &str) -> AppResult<Self> {
+        let fits = !text.trim().is_empty()
+            && text.chars().count() <= TITLE_MAX
+            && !text.chars().any(char::is_control);
+        if fits {
+            Ok(Self(text.into()))
+        } else {
+            Err(refused("title", text))
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
 /// A web address for a web link: http or https, at most `WEB_URL_MAX` long. It goes into a request body, never a URL.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WebUrl(String);

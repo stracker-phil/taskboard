@@ -7,6 +7,7 @@ import { Avatar } from "../components/issue/Avatar";
 import { EpicChip } from "../components/issue/EpicChip";
 import { PriorityFlag } from "../components/issue/PriorityFlag";
 import { PriorityMenuButton } from "../writes/PriorityMenuButton";
+import { EditableTitle } from "../writes/EditableTitle";
 import { useIssue, useIssueActivity } from "../queries/issues";
 import { ActivityEntry } from "./Activity";
 import { hasContent } from "../lib/jiraHtml";
@@ -86,7 +87,7 @@ function Body({ issue, onExpand, onClose }: { issue: IssueDetail; onExpand: () =
   const latest = activity.slice(0, LATEST);
   return (
     <>
-      <h2 className={issue.gone ? "peek__title issue-title--gone" : "peek__title"}>{issue.summary}</h2>
+      <EditableTitle key={issue.id} issue={issue} as="h2" className="peek__title" />
       {issue.gone && <GoneNotice issue={issue} onRemoved={onClose} />}
       <div className="peek__chips">
         <StatusMenuButton issue={issue} variant="peek" />

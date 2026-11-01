@@ -85,6 +85,8 @@ pub trait Source: Send + Sync {
     ) -> Answer<'a, String>;
     /// Write: sets the issue's (by id) priority by name.
     fn set_priority<'a>(&'a self, issue_id: &'a str, name: &'a str) -> Answer<'a, ()>;
+    /// Write: renames the issue (by id).
+    fn set_title<'a>(&'a self, issue_id: &'a str, title: &'a str) -> Answer<'a, ()>;
     /// Write: assigns the issue (by id) to the account, or unassigns it.
     fn assign<'a>(&'a self, issue_id: &'a str, account_id: Option<&'a str>) -> Answer<'a, ()>;
 }

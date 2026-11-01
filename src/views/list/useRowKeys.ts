@@ -6,6 +6,7 @@ import type { RowActionHandlers } from "./RowActions";
 import { explainWritesOff } from "../../writes/runWrite";
 import { assignMenuAnchor } from "../../writes/assignMenu";
 import { priorityMenuAnchor } from "../../writes/priorityMenu";
+import { requestRename } from "../../writes/EditableTitle";
 import { statusMenuAnchor } from "../../writes/statusMenu";
 
 /** What the List's and Table's issue keys act on: this render's rows, selection and changes. */
@@ -19,7 +20,7 @@ export interface RowKeyState {
   toggle: (group: Group) => void;
   setSubtasksOpen: (id: string, open: boolean) => void;
   subtasksOpen: (id: string) => boolean;
-  actions: RowActionHandlers & { copyUrl: (key: string) => void; copyAppLink: (key: string) => void };
+  actions: RowActionHandlers & { copyUrl: (key: string) => void; copyAppLink: (key: string) => void; canChangeTitle: boolean };
   scrollToIndex: (index: number) => void;
   setPlace: (patch: Partial<ViewPlace>) => void;
   open: (id: string) => void;
@@ -100,6 +101,14 @@ export function useRowKeys(current: RowKeyState): RefObject<RowKeyState> {
         if (!row) return;
         if (actions.assignTo) actions.assignTo(row, assignMenuAnchor(row.id));
         else explainWritesOff();
+      },
+      // The title is edited in the Preview, which opens for it.
+      rename: () => {
+        const { selected, actions, select } = state.current;
+        if (!selected) return;
+        if (!actions.canChangeTitle) return explainWritesOff();
+        select(selected, true);
+        requestRename(selected);
       },
       changePriority: () => {
         const { selected, actions, data } = state.current;

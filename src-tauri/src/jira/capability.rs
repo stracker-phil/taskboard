@@ -17,12 +17,13 @@ pub enum Capability {
     Assign,
     ChangeStatus,
     ChangePriority,
+    ChangeTitle,
     Comment,
     AddWebLink,
 }
 
 impl Capability {
-    pub const ALL: [Self; 10] = [
+    pub const ALL: [Self; 11] = [
         Self::Account,
         Self::Projects,
         Self::Issues,
@@ -31,6 +32,7 @@ impl Capability {
         Self::Assign,
         Self::ChangeStatus,
         Self::ChangePriority,
+        Self::ChangeTitle,
         Self::Comment,
         Self::AddWebLink,
     ];
@@ -42,6 +44,7 @@ impl Capability {
             Self::Assign
                 | Self::ChangeStatus
                 | Self::ChangePriority
+                | Self::ChangeTitle
                 | Self::Comment
                 | Self::AddWebLink
         )
@@ -57,6 +60,7 @@ impl Capability {
             Self::Assign
             | Self::ChangeStatus
             | Self::ChangePriority
+            | Self::ChangeTitle
             | Self::Comment
             | Self::AddWebLink => "write:jira-work",
         }
@@ -67,7 +71,7 @@ impl Capability {
         match self {
             Self::Assign => Some("ASSIGN_ISSUES"),
             Self::ChangeStatus => Some("TRANSITION_ISSUES"),
-            Self::ChangePriority => Some("EDIT_ISSUES"),
+            Self::ChangePriority | Self::ChangeTitle => Some("EDIT_ISSUES"),
             Self::Comment => Some("ADD_COMMENTS"),
             Self::AddWebLink => Some("LINK_ISSUES"),
             Self::Account
@@ -88,6 +92,7 @@ impl Capability {
             Self::Assign => "Change the assignee",
             Self::ChangeStatus => "Change the status",
             Self::ChangePriority => "Change the priority",
+            Self::ChangeTitle => "Change the title",
             Self::Comment => "Add comments",
             Self::AddWebLink => "Add web links",
         }
@@ -105,6 +110,7 @@ impl Capability {
             Self::Assign => "Assign issues to you or a teammate, or unassign them",
             Self::ChangeStatus => "Move issues along their workflow",
             Self::ChangePriority => "Set an issue's priority from its menu, or by dragging it",
+            Self::ChangeTitle => "Rename an issue in the Issue view or the Preview",
             Self::Comment => "Comment on issues from the Issue view",
             Self::AddWebLink => "Add links such as a pull request to issues",
         }
@@ -146,10 +152,11 @@ mod tests {
     use super::*;
     use std::collections::HashSet;
 
-    const CHANGES: [Capability; 5] = [
+    const CHANGES: [Capability; 6] = [
         Capability::Assign,
         Capability::ChangeStatus,
         Capability::ChangePriority,
+        Capability::ChangeTitle,
         Capability::Comment,
         Capability::AddWebLink,
     ];
@@ -159,7 +166,7 @@ mod tests {
         let unique: HashSet<Capability> = Capability::ALL.into_iter().collect();
 
         assert_eq!(unique.len(), Capability::ALL.len());
-        assert_eq!(unique.len(), 10);
+        assert_eq!(unique.len(), 11);
     }
 
     #[test]
@@ -169,13 +176,13 @@ mod tests {
         assert_eq!(
             flags,
             [
-                false, false, false, false, false, true, true, true, true, true
+                false, false, false, false, false, true, true, true, true, true, true
             ]
         );
     }
 
     #[test]
-    fn exactly_the_five_kinds_of_write_are_changes() {
+    fn exactly_the_six_kinds_of_write_are_changes() {
         let changes: Vec<Capability> = Capability::ALL
             .into_iter()
             .filter(|c| c.is_change())
@@ -238,6 +245,7 @@ mod tests {
                 (Capability::Assign, true),
                 (Capability::ChangeStatus, true),
                 (Capability::ChangePriority, false),
+                (Capability::ChangeTitle, true),
                 (Capability::Comment, false),
                 (Capability::AddWebLink, true),
             ]
@@ -279,6 +287,7 @@ mod tests {
             (Capability::Assign, "write:jira-work"),
             (Capability::ChangeStatus, "write:jira-work"),
             (Capability::ChangePriority, "write:jira-work"),
+            (Capability::ChangeTitle, "write:jira-work"),
             (Capability::Comment, "write:jira-work"),
             (Capability::AddWebLink, "write:jira-work"),
         ] {
@@ -292,6 +301,7 @@ mod tests {
             (Capability::Assign, "ASSIGN_ISSUES"),
             (Capability::ChangeStatus, "TRANSITION_ISSUES"),
             (Capability::ChangePriority, "EDIT_ISSUES"),
+            (Capability::ChangeTitle, "EDIT_ISSUES"),
             (Capability::Comment, "ADD_COMMENTS"),
             (Capability::AddWebLink, "LINK_ISSUES"),
         ] {
@@ -319,6 +329,22 @@ mod tests {
         for row in capability_rows(true, &[]) {
             assert_eq!(row.scope, row.capability.scope(), "{:?}", row.capability);
         }
+    }
+
+    #[test]
+    fn changing_the_title_is_a_labeled_change_after_the_priority() {
+        let position = |c: Capability| Capability::ALL.iter().position(|&x| x == c).unwrap();
+
+        assert_eq!(Capability::ChangeTitle.label(), "Change the title");
+        assert!(Capability::ChangeTitle.is_change());
+        assert_eq!(
+            position(Capability::ChangeTitle),
+            position(Capability::ChangePriority) + 1
+        );
+        assert_eq!(
+            serde_json::to_value(Capability::ChangeTitle).unwrap(),
+            serde_json::json!("changeTitle")
+        );
     }
 
     #[test]

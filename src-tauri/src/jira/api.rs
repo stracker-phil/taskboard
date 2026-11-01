@@ -7,8 +7,8 @@ use super::dto::{
     SearchPage, Status, TenantInfo, Transition, Transitions, Version,
 };
 use super::gateway::{
-    AccountId, AttachmentId, Endpoint, FieldIds, IssueRef, IssueRefs, Jql, LinkTitle, PriorityName,
-    ProjectKey, TransitionId, WebUrl,
+    AccountId, AttachmentId, Endpoint, FieldIds, IssueRef, IssueRefs, IssueTitle, Jql, LinkTitle,
+    PriorityName, ProjectKey, TransitionId, WebUrl,
 };
 use super::paging::{SearchPages, SearchRequest};
 use crate::error::AppResult;
@@ -204,6 +204,15 @@ impl JiraClient {
         let endpoint = Endpoint::SetPriority {
             issue: IssueRef::parse(issue_id)?,
             priority: PriorityName::parse(name)?,
+        };
+        self.gateway().send(endpoint).await
+    }
+
+    /// Renames the issue. A write: sent once, never retried.
+    pub async fn set_title(&self, issue_id: &str, title: &str) -> AppResult<()> {
+        let endpoint = Endpoint::SetTitle {
+            issue: IssueRef::parse(issue_id)?,
+            title: IssueTitle::parse(title)?,
         };
         self.gateway().send(endpoint).await
     }

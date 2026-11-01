@@ -7,7 +7,8 @@ use url::Url;
 
 use super::{
     Access, AccountId, AttachmentId, BadRequest, Endpoint, Expand, FieldIds, IssueRef, IssueRefs,
-    Jql, LinkTitle, PageToken, Planned, PriorityName, ProjectKey, TransitionId, WebUrl, check,
+    IssueTitle, Jql, LinkTitle, PageToken, Planned, PriorityName, ProjectKey, TITLE_MAX,
+    TransitionId, WebUrl, check,
 };
 use crate::error::AppError;
 use crate::jira::capability::Capability;
@@ -1252,6 +1253,117 @@ fn setting_a_priority_plans_a_put_on_the_issue_with_the_name_in_the_fields() {
     }
 }
 
+fn set_title(issue_text: &str, title: &str) -> Endpoint {
+    Endpoint::SetTitle {
+        issue: issue(issue_text),
+        title: IssueTitle::parse(title).unwrap(),
+    }
+}
+
+#[test]
+fn renaming_plans_a_put_on_the_issue_with_only_the_summary_in_the_fields() {
+    for (prefix, site) in sites() {
+        for (target, title) in [
+            ("NW-1042", "Checkout: new copy"),
+            ("10001", "Größe \"x\" & y"),
+        ] {
+            let endpoint = set_title(target, title);
+            let plan = endpoint.plan(&site).unwrap();
+
+            assert_eq!(endpoint.capability(), Capability::ChangeTitle);
+            assert_eq!(
+                plan.url.as_str(),
+                format!("{prefix}issue/{target}"),
+                "{target} {title}"
+            );
+            assert_eq!(plan.method, Method::PUT, "{target} {title}");
+            assert_eq!(
+                plan.body,
+                Some(json!({ "fields": { "summary": title } })),
+                "{target} {title}"
+            );
+            assert!(plan.authenticated, "{target} {title}");
+            assert_eq!(plan.access, Access::Write, "{target} {title}");
+            assert_eq!(plan.bad_request, BadRequest::Plain, "{target} {title}");
+            assert!(check(&plan, &site).is_ok(), "{prefix} {target} {title}");
+        }
+    }
+}
+
+#[test]
+fn the_title_request_is_refused_once_it_is_planned_as_a_read_or_changed_in_shape() {
+    for (label, site) in sites() {
+        let plan = set_title("NW-1", "Spec").plan(&site).unwrap();
+
+        let mut as_read = plan.clone();
+        as_read.access = Access::Read;
+        assert_refused(&as_read, &site, &format!("{label} planned as a read"));
+
+        let mut with_query = plan.clone();
+        with_query
+            .url
+            .query_pairs_mut()
+            .append_pair("notifyUsers", "false");
+        assert_refused(&with_query, &site, &format!("{label} with a query"));
+
+        for method in [Method::POST, Method::DELETE, Method::PATCH, Method::GET] {
+            let mut other = plan.clone();
+            other.method = method.clone();
+            assert_refused(&other, &site, &format!("{label} as {method}"));
+        }
+    }
+}
+
+#[test]
+fn the_permissions_check_lists_each_permission_once_in_the_order_of_first_use() {
+    assert_eq!(
+        super::endpoint::change_permissions(),
+        [
+            "ASSIGN_ISSUES",
+            "TRANSITION_ISSUES",
+            "EDIT_ISSUES",
+            "ADD_COMMENTS",
+            "LINK_ISSUES"
+        ]
+    );
+}
+
+#[test]
+fn a_title_is_one_to_255_characters_counted_as_characters() {
+    let longest = "a".repeat(TITLE_MAX);
+    let wide = "ä".repeat(TITLE_MAX);
+    for title in [
+        "Checkout: address validation",
+        "x",
+        longest.as_str(),
+        wide.as_str(),
+    ] {
+        assert_eq!(IssueTitle::parse(title).unwrap().as_str(), title);
+    }
+    assert_eq!(TITLE_MAX, 255);
+}
+
+#[test]
+fn a_blank_oversized_or_multiline_title_is_refused() {
+    let too_long = "a".repeat(TITLE_MAX + 1);
+    let too_long_wide = "ä".repeat(TITLE_MAX + 1);
+    for title in [
+        "",
+        " ",
+        "\t \n",
+        "Two\nlines",
+        "Tab\tbed",
+        "Nul\0l",
+        too_long.as_str(),
+        too_long_wide.as_str(),
+    ] {
+        assert!(
+            matches!(IssueTitle::parse(title), Err(AppError::InvalidInput(_))),
+            "{title:?}"
+        );
+    }
+}
+
 #[test]
 fn the_priority_request_is_refused_once_it_is_planned_as_a_read_or_changed_in_shape() {
     for (label, site) in sites() {
@@ -1532,6 +1644,7 @@ fn every_endpoint_kind() -> Vec<Endpoint> {
         add_comment("NW-1042"),
         add_remote_link("NW-1042", "https://example.com/spec", "Spec"),
         set_priority("NW-1042", "High"),
+        set_title("NW-1042", "Checkout: address validation"),
     ]);
     endpoints
 }

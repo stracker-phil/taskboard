@@ -1821,6 +1821,456 @@ mod the_priority_menu {
     }
 }
 
+mod renaming {
+    use super::*;
+
+    const OLD_TITLE: &str = "Checkout: address validation for DACH postcodes";
+    const NEW_TITLE: &str = "Checkout: postcode validation for DACH addresses";
+    const REFUSAL: &str = "A title is one line of 1 to 255 characters";
+
+    impl Rig {
+        async fn cached_title(&self, issue_id: &str) -> String {
+            let id = issue_id.to_string();
+            self.ctx
+                .db
+                .read(move |conn| {
+                    Ok(conn.query_row(
+                        "SELECT summary FROM cache.issue WHERE id = ?1",
+                        [id],
+                        |row| row.get(0),
+                    )?)
+                })
+                .await
+                .unwrap()
+        }
+
+        async fn jira_title(&self, issue_id: &str) -> String {
+            let source = self.ctx.source().unwrap();
+            let found = source
+                .fetch(&[issue_id.to_string()], &["summary".to_string()])
+                .await
+                .unwrap();
+            found.issues[0].fields["summary"]
+                .as_str()
+                .unwrap()
+                .to_string()
+        }
+
+        async fn try_rename(&self, issue_id: &str, text: &str) -> AppResult<WriteOutcome> {
+            let source = self.ctx.source().unwrap();
+            apply(
+                &self.ctx.db,
+                &*source,
+                &self.settings(),
+                issue_id.into(),
+                Change::Title { text: text.into() },
+            )
+            .await
+        }
+
+        async fn rename(&self, issue_id: &str, text: &str) -> WriteOutcome {
+            self.try_rename(issue_id, text).await.unwrap()
+        }
+
+        fn edits_sent(&self) -> usize {
+            self.fake
+                .requests()
+                .iter()
+                .filter(|r| {
+                    r.method == "PUT"
+                        && r.path.contains("/issue/")
+                        && !r.path.ends_with("/assignee")
+                })
+                .count()
+        }
+
+        /// A rename on its way: the row already shows `value`, as `writes::apply` leaves it.
+        async fn start_pending_title(&self, issue_id: &'static str, value: &'static str) {
+            self.ctx
+                .db
+                .write(move |tx, _| {
+                    let base: String = tx.query_row(
+                        "SELECT summary FROM cache.issue WHERE id = ?1",
+                        [issue_id],
+                        |row| row.get(0),
+                    )?;
+                    tx.execute(
+                        "INSERT INTO cache.pending_write (issue_id, field, value, base, created_at)
+                         VALUES (?1, 'title', ?2, ?3, '2026-10-28T11:00:00.000Z')",
+                        rusqlite::params![issue_id, value, base],
+                    )?;
+                    tx.execute(
+                        "UPDATE cache.issue SET summary = ?2 WHERE id = ?1",
+                        rusqlite::params![issue_id, value],
+                    )?;
+                    Ok(())
+                })
+                .await
+                .unwrap();
+        }
+    }
+
+    fn title_outcome(done: &str, back_to: Option<&str>) -> WriteOutcome {
+        WriteOutcome {
+            done: done.into(),
+            reverse: back_to.map(|old| Reverse {
+                label: format!("Change back to “{old}”"),
+                change: Change::Title { text: old.into() },
+            }),
+        }
+    }
+
+    fn invalid_input(result: AppResult<WriteOutcome>) -> String {
+        match result {
+            Err(AppError::InvalidInput(message)) => message,
+            other => panic!("expected InvalidInput, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn shows_the_new_title_in_the_cache_and_in_jira_and_offers_the_old_one_back() {
+        let rig = Rig::synced().await;
+        assert_eq!(rig.cached_title(NW_1042).await, OLD_TITLE);
+
+        let done = rig.rename(NW_1042, NEW_TITLE).await;
+
+        assert_eq!(done, title_outcome("Renamed NW-1042", Some(OLD_TITLE)));
+        assert_eq!(rig.cached_title(NW_1042).await, NEW_TITLE);
+        assert_eq!(rig.jira_title(NW_1042).await, NEW_TITLE);
+        assert_eq!(rig.pending_writes().await, 0);
+        assert_eq!(rig.recorded_changes().await, 0);
+        assert_eq!(rig.edits_sent(), 1);
+    }
+
+    #[tokio::test]
+    async fn sends_only_the_summary_trimmed() {
+        let rig = Rig::synced().await;
+
+        rig.rename(NW_1042, &format!("  {NEW_TITLE}\n")).await;
+
+        let edit = rig
+            .fake
+            .requests()
+            .into_iter()
+            .find(|r| r.method == "PUT" && r.path.ends_with("/issue/101042"))
+            .unwrap();
+        assert_eq!(edit.body, json!({ "fields": { "summary": NEW_TITLE } }));
+        assert_eq!(rig.cached_title(NW_1042).await, NEW_TITLE);
+    }
+
+    #[tokio::test]
+    async fn shows_the_new_title_at_once_while_it_is_on_its_way() {
+        let rig = Rig::synced().await;
+        rig.fake.set_latency(std::time::Duration::from_millis(100));
+
+        let (result, seen) = tokio::join!(rig.try_rename(NW_1042, NEW_TITLE), async {
+            tokio::time::timeout(std::time::Duration::from_secs(30), async {
+                loop {
+                    if rig.pending_writes().await == 1 {
+                        return rig.cached_title(NW_1042).await;
+                    }
+                    tokio::time::sleep(std::time::Duration::from_millis(2)).await;
+                }
+            })
+            .await
+            .expect("the pending title never showed")
+        });
+
+        result.unwrap();
+        assert_eq!(seen, NEW_TITLE);
+        assert_eq!(rig.pending_writes().await, 0);
+    }
+
+    #[tokio::test]
+    async fn is_still_shown_after_the_next_sync() {
+        let rig = Rig::synced().await;
+        rig.rename(NW_1042, NEW_TITLE).await;
+
+        rig.sync().await;
+
+        assert_eq!(rig.cached_title(NW_1042).await, NEW_TITLE);
+    }
+
+    #[tokio::test]
+    async fn the_reverse_sets_the_old_title_back() {
+        let rig = Rig::synced().await;
+        let done = rig.rename(NW_1042, NEW_TITLE).await;
+
+        let back = done.reverse.unwrap().change;
+        let Change::Title { text } = back else {
+            panic!("expected a title change, got {back:?}");
+        };
+        let undone = rig.rename(NW_1042, &text).await;
+
+        assert_eq!(undone, title_outcome("Renamed NW-1042", Some(NEW_TITLE)));
+        assert_eq!(rig.cached_title(NW_1042).await, OLD_TITLE);
+        assert_eq!(rig.jira_title(NW_1042).await, OLD_TITLE);
+    }
+
+    #[tokio::test]
+    async fn the_outcome_serializes_for_the_page_in_camel_case() {
+        let rig = Rig::synced().await;
+
+        let done = rig.rename(NW_1042, NEW_TITLE).await;
+
+        assert_eq!(
+            serde_json::to_value(&done).unwrap(),
+            json!({
+                "done": "Renamed NW-1042",
+                "reverse": {
+                    "label": format!("Change back to “{OLD_TITLE}”"),
+                    "change": { "kind": "title", "text": OLD_TITLE },
+                },
+            })
+        );
+    }
+
+    #[tokio::test]
+    async fn the_current_title_sends_nothing_and_offers_no_reverse() {
+        let rig = Rig::synced().await;
+        for text in [OLD_TITLE, &format!("  {OLD_TITLE} ")] {
+            let done = rig.rename(NW_1042, text).await;
+
+            assert_eq!(
+                done,
+                title_outcome("NW-1042 already has this title", None),
+                "{text:?}"
+            );
+        }
+        assert_eq!(rig.edits_sent(), 0);
+        assert_eq!(rig.pending_writes().await, 0);
+    }
+
+    #[tokio::test]
+    async fn a_blank_or_oversized_title_is_refused_and_nothing_is_sent() {
+        let rig = Rig::synced().await;
+        let requests_before = rig.fake.requests().len();
+        for text in [
+            String::new(),
+            "   ".into(),
+            "\n\t".into(),
+            "Two\nlines".into(),
+            "a".repeat(256),
+        ] {
+            let message = invalid_input(rig.try_rename(NW_1042, &text).await);
+
+            assert_eq!(message, REFUSAL, "{text:?}");
+        }
+        assert_eq!(rig.fake.requests().len(), requests_before);
+        assert_eq!(rig.cached_title(NW_1042).await, OLD_TITLE);
+        assert_eq!(rig.pending_writes().await, 0);
+    }
+
+    #[tokio::test]
+    async fn a_title_of_255_characters_is_sent() {
+        let rig = Rig::synced().await;
+        let longest = "ä".repeat(255);
+
+        rig.rename(NW_1042, &longest).await;
+
+        assert_eq!(rig.cached_title(NW_1042).await, longest);
+        assert_eq!(rig.jira_title(NW_1042).await, longest);
+    }
+
+    #[tokio::test]
+    async fn with_changes_off_nothing_is_sent_or_changed() {
+        let rig = Rig::synced().await;
+        rig.ctx
+            .settings
+            .edit(|s| s.behaviour.allow_jira_changes = false)
+            .await
+            .unwrap();
+
+        let err = rig.try_rename(NW_1042, NEW_TITLE).await.unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::InvalidInput);
+        assert_eq!(rig.edits_sent(), 0);
+        assert_eq!(rig.cached_title(NW_1042).await, OLD_TITLE);
+    }
+
+    #[tokio::test]
+    async fn with_the_change_switched_off_it_is_refused_naming_the_label_and_changes_nothing() {
+        let rig = Rig::synced().await;
+        rig.ctx
+            .settings
+            .edit(|s| s.behaviour.disabled_changes = vec![Capability::ChangeTitle])
+            .await
+            .unwrap();
+
+        let message = invalid_input(rig.try_rename(NW_1042, NEW_TITLE).await);
+
+        assert_eq!(
+            message,
+            "“Change the title” is switched off in Settings → Connection."
+        );
+        assert_eq!(rig.edits_sent(), 0);
+        assert_eq!(rig.cached_title(NW_1042).await, OLD_TITLE);
+        assert_eq!(rig.pending_writes().await, 0);
+    }
+
+    #[tokio::test]
+    async fn an_issue_missing_from_the_cache_is_not_found() {
+        let rig = Rig::synced().await;
+
+        let err = rig.try_rename("999999", NEW_TITLE).await.unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::NotFound);
+        assert_eq!(rig.edits_sent(), 0);
+    }
+
+    #[tokio::test]
+    async fn a_write_jira_refuses_puts_the_old_title_back_and_returns_the_error() {
+        let rig = Rig::synced().await;
+        rig.fake
+            .answer_next_write(400, json!({ "errorMessages": ["Not allowed"] }));
+
+        let err = rig.try_rename(NW_1042, NEW_TITLE).await.unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::InvalidInput);
+        assert_eq!(rig.cached_title(NW_1042).await, OLD_TITLE);
+        assert_eq!(rig.jira_title(NW_1042).await, OLD_TITLE);
+        assert_eq!(rig.pending_writes().await, 0);
+        assert_eq!(rig.edits_sent(), 1);
+    }
+
+    #[tokio::test]
+    async fn a_second_rename_while_one_is_on_its_way_is_refused_and_sends_nothing() {
+        let rig = Rig::synced().await;
+        rig.start_pending_title(NW_1042, "Checkout: another name")
+            .await;
+
+        let err = rig.try_rename(NW_1042, NEW_TITLE).await.unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::InvalidInput);
+        assert_eq!(rig.edits_sent(), 0);
+        assert_eq!(rig.cached_title(NW_1042).await, "Checkout: another name");
+    }
+
+    #[tokio::test]
+    async fn the_sync_keeps_the_pending_title_over_what_jira_sent_and_remembers_jiras_as_the_base()
+    {
+        let rig = Rig::synced().await;
+        rig.start_pending_title(NW_1049, "Checkout: the name I chose")
+            .await;
+        rig.fake.set_now(demo_now() + chrono::Duration::hours(2));
+        rig.fake.edit_issue("NW-1049", |fields| {
+            fields["summary"] = json!("Checkout: the name someone else chose")
+        });
+
+        rig.sync().await;
+
+        assert_eq!(
+            rig.cached_title(NW_1049).await,
+            "Checkout: the name I chose"
+        );
+        let base: Option<String> = rig
+            .ctx
+            .db
+            .read(|conn| {
+                Ok(conn.query_row(
+                    "SELECT base FROM cache.pending_write WHERE issue_id = ?1 AND field = 'title'",
+                    [NW_1049],
+                    |row| row.get(0),
+                )?)
+            })
+            .await
+            .unwrap();
+        assert_eq!(
+            base.as_deref(),
+            Some("Checkout: the name someone else chose")
+        );
+    }
+
+    #[tokio::test]
+    async fn the_sync_takes_what_jira_sent_once_the_write_is_forgotten() {
+        let rig = Rig::synced().await;
+        rig.start_pending_title(NW_1049, "Checkout: the name I chose")
+            .await;
+        rig.ctx.db.write(|tx, _| forget_all(tx)).await.unwrap();
+        rig.fake.set_now(demo_now() + chrono::Duration::hours(2));
+        rig.fake.edit_issue("NW-1049", |fields| {
+            fields["summary"] = json!("Checkout: the name someone else chose")
+        });
+
+        rig.sync().await;
+
+        assert_eq!(
+            rig.cached_title(NW_1049).await,
+            "Checkout: the name someone else chose"
+        );
+    }
+}
+
+mod the_fake_jiras_edits {
+    use super::*;
+
+    async fn put(rig: &Rig, body: Value) -> u16 {
+        reqwest::Client::new()
+            .put(format!("{}rest/api/3/issue/{NW_1042}", rig.fake.url()))
+            .header("authorization", "Basic ZGVtbzpkZW1v")
+            .header("content-type", "application/json")
+            .body(body.to_string())
+            .send()
+            .await
+            .unwrap()
+            .status()
+            .as_u16()
+    }
+
+    async fn jira_fields(rig: &Rig) -> (String, Option<String>) {
+        let source = rig.ctx.source().unwrap();
+        let found = source
+            .fetch(
+                &[NW_1042.to_string()],
+                &["summary".to_string(), "priority".to_string()],
+            )
+            .await
+            .unwrap();
+        let fields = &found.issues[0].fields;
+        (
+            fields["summary"].as_str().unwrap().to_string(),
+            fields["priority"]["name"].as_str().map(String::from),
+        )
+    }
+
+    #[tokio::test]
+    async fn a_summary_edit_is_stored() {
+        let rig = Rig::synced().await;
+
+        let status = put(
+            &rig,
+            json!({ "fields": { "summary": "Checkout: new copy" } }),
+        )
+        .await;
+
+        assert_eq!(status, 204);
+        assert_eq!(
+            jira_fields(&rig).await,
+            ("Checkout: new copy".to_string(), Some("High".to_string()))
+        );
+    }
+
+    #[tokio::test]
+    async fn two_fields_in_one_request_or_a_bad_summary_are_a_400_that_changes_nothing() {
+        let rig = Rig::synced().await;
+        let before = jira_fields(&rig).await;
+        for (label, body) in [
+            (
+                "two fields",
+                json!({ "fields": { "summary": "Checkout: new copy", "priority": { "name": "Low" } } }),
+            ),
+            ("a number", json!({ "fields": { "summary": 5 } })),
+            ("null", json!({ "fields": { "summary": null } })),
+            ("blank", json!({ "fields": { "summary": "  " } })),
+            ("no fields", json!({ "fields": {} })),
+            ("another field", json!({ "fields": { "labels": ["x"] } })),
+        ] {
+            assert_eq!(put(&rig, body).await, 400, "{label}");
+        }
+        assert_eq!(jira_fields(&rig).await, before);
+    }
+}
+
 mod adding_a_web_link {
     use super::*;
 

@@ -93,23 +93,37 @@ pub fn edit_meta(site: &Content, id_or_key: &str) -> Response {
     )
 }
 
-/// `PUT /issue/{id}` with `{ "fields": { "priority": { "name": "…" } } }`; other fields are refused like a field
-/// missing from the edit screen.
+/// `PUT /issue/{id}` with one field: `{ "priority": { "name": "…" } }` or `{ "summary": "…" }`; other fields, or
+/// more than one, are refused like a field missing from the edit screen.
 pub fn edit(site: &mut Content, id_or_key: &str, body: &Value) -> Response {
     let fields = body["fields"].as_object().cloned().unwrap_or_default();
-    let asked = fields.get("priority").and_then(|p| p["name"].as_str());
-    let priority = asked.and_then(|name| PRIORITIES.iter().find(|(_, n)| *n == name));
-    let (Some((id, name)), 1) = (priority, fields.len()) else {
-        return Response::json(
+    let refuse = |field: &str| {
+        Response::json(
             400,
-            json!({ "errorMessages": [], "errors": { "priority": "Field cannot be set. It is not on the appropriate screen, or unknown." } }),
-        );
+            json!({ "errorMessages": [], "errors": { field: "Field cannot be set. It is not on the appropriate screen, or unknown." } }),
+        )
+    };
+    let value = match (fields.len(), fields.iter().next()) {
+        (1, Some((field, value))) if field == "priority" => {
+            let asked = value["name"].as_str();
+            match asked.and_then(|name| PRIORITIES.iter().find(|(_, n)| *n == name)) {
+                Some((id, name)) => ("priority", json!({ "id": id, "name": name })),
+                None => return refuse("priority"),
+            }
+        }
+        (1, Some((field, Value::String(title))))
+            if field == "summary" && !title.trim().is_empty() =>
+        {
+            ("summary", json!(title))
+        }
+        (_, Some((field, _))) => return refuse(field),
+        (_, None) => return refuse("fields"),
     };
     let now = site.now;
     let Some(issue) = visible_issue_mut(site, id_or_key) else {
         return not_found();
     };
-    issue["fields"]["priority"] = json!({ "id": id, "name": name });
+    issue["fields"][value.0] = value.1;
     stamp_after(issue, now);
     Response::raw(204, "text/plain", "")
 }

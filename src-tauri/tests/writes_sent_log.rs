@@ -248,6 +248,75 @@ async fn setting_the_priority_records_its_name() {
 }
 
 #[tokio::test]
+async fn renaming_records_the_length_of_the_title_and_never_the_title() {
+    let rig = Rig::synced().await;
+
+    rig.change(
+        NW_1042,
+        Change::Title {
+            text: "  Grüße aus Köln  ".into(),
+        },
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        rig.record().await,
+        [entry("NW-1042", "Title (14 characters)", false)]
+    );
+}
+
+#[tokio::test]
+async fn a_rename_jira_refuses_is_recorded_as_refused() {
+    let rig = Rig::synced().await;
+    rig.fake
+        .answer_next_write(400, json!({ "errorMessages": ["Not allowed"] }));
+
+    rig.change(
+        NW_1042,
+        Change::Title {
+            text: "Checkout copy".into(),
+        },
+    )
+    .await
+    .unwrap_err();
+
+    assert_eq!(
+        rig.record().await,
+        [entry("NW-1042", "Title (13 characters)", true)]
+    );
+}
+
+#[tokio::test]
+async fn a_rename_that_is_not_sent_leaves_no_record() {
+    let rig = Rig::synced().await;
+    rig.change(
+        NW_1042,
+        Change::Title {
+            text: "Checkout: address validation for DACH postcodes".into(),
+        },
+    )
+    .await
+    .unwrap();
+    for text in ["", "   ", &"a".repeat(256)] {
+        rig.change(NW_1042, Change::Title { text: text.into() })
+            .await
+            .unwrap_err();
+    }
+    rig.switch_off(Capability::ChangeTitle).await;
+    rig.change(
+        NW_1042,
+        Change::Title {
+            text: "Checkout copy".into(),
+        },
+    )
+    .await
+    .unwrap_err();
+
+    assert_eq!(rig.record().await, []);
+}
+
+#[tokio::test]
 async fn a_comment_records_its_length_and_never_its_text() {
     let rig = Rig::synced().await;
 

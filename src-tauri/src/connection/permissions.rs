@@ -91,10 +91,16 @@ mod tests {
 
         assert_eq!(
             not_allowed(&granted),
-            [ChangeNotAllowed {
-                capability: Capability::ChangePriority,
-                projects: vec!["OPS".into(), "LUM".into()],
-            }]
+            [
+                ChangeNotAllowed {
+                    capability: Capability::ChangePriority,
+                    projects: vec!["OPS".into(), "LUM".into()],
+                },
+                ChangeNotAllowed {
+                    capability: Capability::ChangeTitle,
+                    projects: vec!["OPS".into(), "LUM".into()],
+                },
+            ]
         );
     }
 
@@ -139,6 +145,7 @@ mod tests {
                 (Capability::Assign, ops()),
                 (Capability::ChangeStatus, ops()),
                 (Capability::ChangePriority, ops()),
+                (Capability::ChangeTitle, ops()),
                 (Capability::Comment, ops()),
                 (Capability::AddWebLink, ops()),
             ]

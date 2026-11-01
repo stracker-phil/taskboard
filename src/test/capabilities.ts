@@ -10,6 +10,7 @@ export const capabilityRows = (): CapabilityRow[] => [
   { capability: "assign", label: "Assign issues", detail: "Sets or clears the assignee of an issue.", scope: "write:jira-work", change: true, enabled: true },
   { capability: "changeStatus", label: "Change the status", detail: "Moves an issue through its workflow.", scope: "write:jira-work", change: true, enabled: true },
   { capability: "changePriority", label: "Change the priority", detail: "Sets the priority of an issue.", scope: "write:jira-work", change: true, enabled: true },
+  { capability: "changeTitle", label: "Rename issues", detail: "Changes the title of an issue.", scope: "write:jira-work", change: true, enabled: true },
   { capability: "comment", label: "Add comments", detail: "Posts a comment on an issue.", scope: "write:jira-work", change: true, enabled: true },
   { capability: "addWebLink", label: "Add web links", detail: "Attaches a link, such as a pull request, to an issue.", scope: "write:jira-work", change: true, enabled: true },
 ];

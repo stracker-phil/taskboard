@@ -35,6 +35,7 @@ import { WebLinks } from "./WebLinks";
 import { explainWritesOff } from "../writes/runWrite";
 import { assignMenuAnchor } from "../writes/assignMenu";
 import { priorityMenuAnchor } from "../writes/priorityMenu";
+import { EditableTitle, requestRename } from "../writes/EditableTitle";
 import { statusMenuAnchor } from "../writes/statusMenu";
 
 /** The issue's neighbors among the rows the origin view shows (open groups, expanded subtrees), for the
@@ -189,7 +190,7 @@ function IssueMain({ issue, origin }: { issue: IssueDetail; origin: IssueOrigin 
           </>
         )}
       </div>
-      <h1 className={issue.gone ? "issue-main__title issue-title--gone" : "issue-main__title"}>{issue.summary}</h1>
+      <EditableTitle key={issue.id} issue={issue} as="h1" className="issue-main__title" />
       {issue.gone && <GoneNotice issue={issue} onRemoved={closeIssue} />}
       {issue.since && <SinceBanner since={issue.since} onMarkSeen={() => void attempt(api.issuesMarkSeen([issue.id]), "Could not mark it read")} />}
       <FieldGrid issue={issue} onOpenEpic={openRelated} />
@@ -279,6 +280,12 @@ function IssueKeys({ issue, neighbors }: { issue: IssueDetail | undefined; neigh
         const { issue, actions } = state.current;
         if (!issue) return;
         if (actions.assignTo) actions.assignTo(issue, assignMenuAnchor(issue.id));
+        else explainWritesOff();
+      },
+      rename: () => {
+        const { issue, actions } = state.current;
+        if (!issue) return;
+        if (actions.canChangeTitle) requestRename(issue.id);
         else explainWritesOff();
       },
       changePriority: () => {

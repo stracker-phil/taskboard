@@ -207,3 +207,6 @@ body.is-dragging-issue, body.is-dragging-issue * { cursor: grabbing !important; 
   border-style: solid; background: color-mix(in srgb, var(--drop-color) 24%, transparent);
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--drop-color) 22%, transparent);
 }
+
+/* A title being renamed keeps its place and size; the ring is an outline, so it takes no room. */
+.issue-title--editing { outline: 2px solid var(--focus-ring); outline-offset: 4px; border-radius: 4px; }

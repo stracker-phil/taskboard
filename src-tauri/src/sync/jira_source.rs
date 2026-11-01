@@ -121,6 +121,10 @@ impl Source for JiraSource {
         Box::pin(self.client.set_priority(issue_id, name))
     }
 
+    fn set_title<'a>(&'a self, issue_id: &'a str, title: &'a str) -> Answer<'a, ()> {
+        Box::pin(self.client.set_title(issue_id, title))
+    }
+
     fn assign<'a>(&'a self, issue_id: &'a str, account_id: Option<&'a str>) -> Answer<'a, ()> {
         Box::pin(self.client.assign(issue_id, account_id))
     }

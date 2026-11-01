@@ -167,6 +167,27 @@ describe("useIssueActions", () => {
     });
   });
 
+  describe("canChangeTitle", () => {
+    it("is true while changes to Jira are on", async () => {
+      mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ allowJiraChanges: true }) }));
+      const actions = await renderActions("");
+
+      await waitFor(() => expect(actions.current.canChangeTitle).toBe(true));
+    });
+
+    it.each([
+      ["changes to Jira are off", { allowJiraChanges: false }],
+      ["renaming is switched off", { allowJiraChanges: true, disabledChanges: ["changeTitle" as const] }],
+    ])("is false while %s", async (_label, patch) => {
+      mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour(patch) }));
+      const actions = await renderActions("");
+      await waitFor(() => expect(mocked.getSettings).toHaveBeenCalled());
+      await act(async () => {});
+
+      expect(actions.current.canChangeTitle).toBe(false);
+    });
+  });
+
   describe("openInJira", () => {
     it("opens the issue's page on the Jira site", async () => {
       const actions = await renderActions("https://example.atlassian.net/");

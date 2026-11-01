@@ -10,7 +10,7 @@ the gateway's allowlist (`jira/gateway/guard.rs` `RULES`): every new endpoint na
 |---|---|---|
 | `read:jira-work` | Syncing issues, projects, fields, statuses, releases, comments, history, web links, attachments; checking JQL | Nothing syncs; Test Connection may pass, the sync fails |
 | `read:jira-user` | Who you are (Test Connection, the Me chip, "Assigned to you") | Test Connection fails; the app doesn't know which issues are yours |
-| `write:jira-work` | Assigning issues, changing their status or priority, adding comments and web links | Changes fail with "a scoped token lacks write:jira-work"; reading keeps working |
+| `write:jira-work` | Assigning issues, changing their status, priority or title, adding comments and web links | Changes fail with "a scoped token lacks write:jira-work"; reading keeps working |
 
 Settings → Connection lists the same in plain words: what Taskboard reads, and each kind of change with its own
 switch (`jira::capability`, named by every request the gateway sends), each with the scope it needs as Jira names
@@ -52,7 +52,7 @@ Changes, sent once and only while changes to Jira are allowed ([writes.md](write
 
 - `PUT issue/{id}/assignee`: Assign to me, Unassign, and "Change back to …".
 - `POST issue/{id}/transitions`: a move from the status menu or a drag, and its "Change back to …".
-- `PUT issue/{id}`: a priority from the priority menu or a drag, and its "Change back to …"; only the priority field
-  is ever sent.
+- `PUT issue/{id}`: a priority from the priority menu or a drag, or a new title, and its "Change back to …"; each
+  request sends that one field only (`priority` or `summary`).
 - `POST issue/{id}/comment`: a comment from the Issue view's comment box.
 - `POST issue/{id}/remotelink`: a web link (a pull request) from the Issue view's "Add link".

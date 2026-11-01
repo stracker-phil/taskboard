@@ -10,8 +10,8 @@ sent once and never retried.
 - The build: `jira/gateway/guard.rs` `WRITES_ENABLED`.
 - The user: Settings → Connection → Changes → **Allow changes to Jira** (`behaviour.allowJiraChanges`, off by
   default; the debug build turns it on when it first connects to the fake Jira), then each kind of change on its own
-  (`behaviour.disabledChanges`: Change the assignee, Change the status, Change the priority, Add comments, Add web
-  links). Off, a write fails as `invalid_input` ("Changes to Jira are off…" or "“Add comments” is switched off…"),
+  (`behaviour.disabledChanges`: Change the assignee, Change the status, Change the priority, Change the title, Add
+  comments, Add web links). Off, a write fails as `invalid_input` ("Changes to Jira are off…" or "“Add comments” is switched off…"),
   the page hides that change's buttons, menu items and keys, and a drag onto groups it would change says why.
 - The list is `jira::capability`: every gateway endpoint names its `Capability` (`Endpoint::capability`, an
   exhaustive match), so a new request can't exist without one, and `writes::ensure_allowed` checks the change's
@@ -21,7 +21,8 @@ sent once and never retried.
   pauses the sync. A `400` shows Jira's reason.
 - Jira's own permissions: while changes are on, Settings → Connection asks `GET mypermissions` once per tracked
   project (`connection_change_permissions`, `connection::permissions`) for the project permission each change needs
-  (`Capability::jira_permission`: Assign issues, Transition issues, Edit issues, Add comments, Link issues) and
+  (`Capability::jira_permission`: Assign issues, Transition issues, Edit issues (priority and title), Add comments,
+  Link issues; each asked once) and
   names, under a change, the projects where Jira doesn't allow it. Jira answers for the user, not the token, so a
   scoped token without `write:jira-work` still shows only when a change is refused.
 
@@ -122,6 +123,20 @@ and `issue_sync_comments`) keep `pending:` rows. Jira accepts: its answer replac
 and the box keeps the text. There is no reverse; editing and deleting comments aren't built. The box sits above
 the Issue view's activity (`CommentBox`): ⌘↩ sends, esc leaves it.
 
+## Titles
+
+`issue_write(id, Title { text })` (`writes::title`) renames the issue with `PUT issue/{id}` and the `summary` field
+only. The text is trimmed and must be one line of 1 to 255 characters (`IssueTitle`); the pending row holds it
+(field `title`, column `summary`), so the row, the Preview and search show it at once. The reverse sets the old title
+("Change back to “…”"). The record of changes keeps its length, not the text ("Title (42 characters)"), like a
+comment's.
+
+In the page the Preview's and the Issue view's title is the editor (`EditableTitle`): a double-click, **F2**
+(`issue.rename`) or Issue → Rename… makes the heading itself editable (`contentEditable="plaintext-only"`), so it
+keeps its place and size; ↩ or clicking elsewhere saves, esc cancels without closing the Preview or the Issue view,
+and leaving the app keeps the edit open. F2 on a List or Table row opens its Preview to edit there, on a Board card
+the Issue view. The sent title shows until Jira's answer replaces it; a refusal puts the old one back.
+
 ## Web links
 
 `issue_add_web_link(id, url, title)` (`writes::add_web_link`) adds a web link (Jira's remote link: a pull request,
@@ -150,6 +165,7 @@ A change refused before it is sent (changes off, a switched-off kind) records no
 | `issue_assignees(id)` | who the issue may be assigned to, and who has it |
 | `issue_write(id, Transition { transitionId })` | moves the issue along a transition from `issue_transitions` |
 | `issue_write(id, Priority { name })` | sets the priority to one the edit screen offers |
+| `issue_write(id, Title { text })` | renames the issue |
 | `issue_transitions(id)` | the moves Jira offers from the issue's status |
 | `issue_priorities(id)` | the priorities the issue's edit screen offers, and the one it has |
 | `issue_comment(id, text)` | adds a plain-text comment |

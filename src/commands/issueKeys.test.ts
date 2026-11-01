@@ -27,6 +27,7 @@ function handlers(patch: Partial<IssueKeyHandlers> = {}) {
     changeStatus: vi.fn(),
     assignTo: vi.fn(),
     changePriority: vi.fn(),
+    rename: vi.fn(),
     togglePeek: vi.fn(),
     hasSelection: () => true,
     peekOpen: () => true,
@@ -71,6 +72,7 @@ describe("issue keys", () => {
       ["D", "d", {}],
       ["A", "a", {}],
       ["⇧P", "P", { shift: true }],
+      ["F2", "F2", {}],
     ])("leaves %s to nobody", (_label, key, mods) => {
       expect(press(key, mods)).toBeNull();
     });
@@ -133,6 +135,42 @@ describe("issue keys", () => {
       document.body.innerHTML = '<div role="dialog">Confirm</div>';
 
       expect(press("Escape")).toBeNull();
+    });
+
+    it("leaves Escape to a focused text field, such as the title being renamed", () => {
+      register(handlers());
+      const input = document.createElement("input");
+      document.body.append(input);
+      input.focus();
+
+      expect(press("Escape")).toBeNull();
+    });
+
+    it("closes the peek again once the text field has lost focus", () => {
+      register(handlers());
+      const input = document.createElement("input");
+      document.body.append(input);
+      input.focus();
+      input.blur();
+
+      expect(press("Escape")?.id).toBe("peek.close");
+    });
+  });
+
+  describe("renaming", () => {
+    it("F2 renames the selected issue", () => {
+      const h = handlers();
+      register(h);
+
+      void press("F2")?.run();
+
+      expect(h.rename).toHaveBeenCalled();
+    });
+
+    it("ignores F2 without a selected row", () => {
+      register(handlers({ hasSelection: () => false }));
+
+      expect(press("F2")).toBeNull();
     });
   });
 

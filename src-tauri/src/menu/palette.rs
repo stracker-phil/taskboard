@@ -248,6 +248,7 @@ mod tests {
                 "page:issue.changeStatus",
                 "page:issue.assignTo",
                 "page:issue.changePriority",
+                "page:issue.rename",
             ]
         );
     }

@@ -5,6 +5,7 @@ import type { RowActionHandlers } from "../list/RowActions";
 import { explainWritesOff } from "../../writes/runWrite";
 import { assignMenuAnchor } from "../../writes/assignMenu";
 import { priorityMenuAnchor } from "../../writes/priorityMenu";
+import { requestRename } from "../../writes/EditableTitle";
 import { statusMenuAnchor } from "../../writes/statusMenu";
 
 /** The Board's issue keys: J/K (↓/↑) move through a column's cards, ←/→ to the neighboring open column, ↩
@@ -14,7 +15,7 @@ export function useBoardKeys(
   selected: string | null,
   select: (id: string) => void,
   open: (id: string) => void,
-  actions: RowActionHandlers & { copyUrl: (key: string) => void; copyAppLink: (key: string) => void },
+  actions: RowActionHandlers & { copyUrl: (key: string) => void; copyAppLink: (key: string) => void; canChangeTitle: boolean },
 ) {
   const state = useRef({ data, selected, select, open, actions });
   useEffect(() => {
@@ -77,6 +78,14 @@ export function useBoardKeys(
         if (!row) return;
         if (actions.assignTo) actions.assignTo(row, assignMenuAnchor(row.id));
         else explainWritesOff();
+      },
+      // A card has no Preview; the title is edited in the Issue view, which opens for it.
+      rename: () => {
+        const { selected, actions, open } = state.current;
+        if (!selected) return;
+        if (!actions.canChangeTitle) return explainWritesOff();
+        open(selected);
+        requestRename(selected);
       },
       changePriority: () => {
         const { selected, actions, data } = state.current;

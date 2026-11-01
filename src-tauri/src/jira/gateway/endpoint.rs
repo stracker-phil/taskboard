@@ -5,8 +5,8 @@ use serde_json::{Value, json};
 use url::Url;
 
 use super::params::{
-    AccountId, AttachmentId, Expand, FieldIds, IssueRef, IssueRefs, Jql, LinkTitle, PageToken,
-    PriorityName, ProjectKey, TransitionId, WebUrl,
+    AccountId, AttachmentId, Expand, FieldIds, IssueRef, IssueRefs, IssueTitle, Jql, LinkTitle,
+    PageToken, PriorityName, ProjectKey, TransitionId, WebUrl,
 };
 use crate::error::{AppError, AppResult};
 use crate::jira::capability::Capability;
@@ -126,6 +126,11 @@ pub enum Endpoint {
         issue: IssueRef,
         priority: PriorityName,
     },
+    /// Write: renames the issue.
+    SetTitle {
+        issue: IssueRef,
+        title: IssueTitle,
+    },
     /// Write: assigns the issue to the account, or unassigns it (`None`).
     AssignIssue {
         issue: IssueRef,
@@ -135,10 +140,13 @@ pub enum Endpoint {
 
 /// The project permissions Taskboard's changes need, in `Capability::ALL`'s order.
 pub fn change_permissions() -> Vec<&'static str> {
-    Capability::ALL
-        .iter()
-        .filter_map(|c| c.jira_permission())
-        .collect()
+    let mut permissions: Vec<&'static str> = Vec::new();
+    for permission in Capability::ALL.iter().filter_map(|c| c.jira_permission()) {
+        if !permissions.contains(&permission) {
+            permissions.push(permission);
+        }
+    }
+    permissions
 }
 
 /// A request ready for the guard and the wire.
@@ -177,6 +185,7 @@ impl Endpoint {
             Self::AssignIssue { .. } => Capability::Assign,
             Self::TransitionIssue { .. } => Capability::ChangeStatus,
             Self::SetPriority { .. } => Capability::ChangePriority,
+            Self::SetTitle { .. } => Capability::ChangeTitle,
             Self::AddComment { .. } => Capability::Comment,
             Self::AddRemoteLink { .. } => Capability::AddWebLink,
         }
@@ -289,6 +298,12 @@ impl Endpoint {
                 Method::PUT,
                 &["issue", issue.as_str()],
                 json!({ "fields": { "priority": { "name": priority.as_str() } } }),
+            )
+            .plan(site),
+            Self::SetTitle { issue, title } => Rest::write(
+                Method::PUT,
+                &["issue", issue.as_str()],
+                json!({ "fields": { "summary": title.as_str() } }),
             )
             .plan(site),
             Self::AssignIssue { issue, account } => Rest::write(

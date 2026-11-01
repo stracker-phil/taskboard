@@ -20,8 +20,8 @@ pub use endpoint::{Access, BadRequest, Endpoint, PAGE_SIZE, Planned};
 pub use guard::check;
 pub use http::{MAX_ANSWER_BYTES, MAX_ATTACHMENT_BYTES};
 pub use params::{
-    AccountId, AttachmentId, BULK_FETCH_MAX, Expand, FieldIds, IssueRef, IssueRefs, Jql, LinkTitle,
-    PageToken, PriorityName, ProjectKey, TransitionId, WebUrl,
+    AccountId, AttachmentId, BULK_FETCH_MAX, Expand, FieldIds, IssueRef, IssueRefs, IssueTitle,
+    Jql, LinkTitle, PageToken, PriorityName, ProjectKey, TITLE_MAX, TransitionId, WebUrl,
 };
 
 use super::limiter::Limiter;

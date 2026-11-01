@@ -148,7 +148,7 @@ export type CacheSize = { bytes: number,
  */
 free: number, };
 
-export type Capability = "account" | "projects" | "issues" | "issueDetails" | "checkQueries" | "assign" | "changeStatus" | "changePriority" | "comment" | "addWebLink";
+export type Capability = "account" | "projects" | "issues" | "issueDetails" | "checkQueries" | "assign" | "changeStatus" | "changePriority" | "changeTitle" | "comment" | "addWebLink";
 
 /**
  * A capability as Settings → Connection shows it.
@@ -168,7 +168,7 @@ export type Cell = { "kind": "text", "value": string } | { "kind": "person", "va
 /**
  * A change to one issue, as the page asks for it.
  */
-export type Change = { "kind": "assign", accountId: string | null, } | { "kind": "transition", transitionId: string, } | { "kind": "priority", name: string, };
+export type Change = { "kind": "assign", accountId: string | null, } | { "kind": "transition", transitionId: string, } | { "kind": "priority", name: string, } | { "kind": "title", text: string, };
 
 /**
  * A change Jira doesn't allow in some tracked projects.

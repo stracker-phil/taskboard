@@ -33,6 +33,7 @@ export function useIssueActions() {
   const canAssign = useJiraChange("assign");
   const canChangeStatus = useJiraChange("changeStatus");
   const canChangePriority = useJiraChange("changePriority");
+  const canChangeTitle = useJiraChange("changeTitle");
   // Stable, so memoized cards don't re-render with their parent.
   return useMemo(() => {
     const urlOf = (key: string) => browseUrl(site, key);
@@ -55,6 +56,8 @@ export function useIssueActions() {
       assignTo: canAssign ? (issue: { id: string; key: string }, at: MenuAt) => openAssignMenu(issue, at) : null,
       /** Opens the priority menu under `at`. */
       changePriority: canChangePriority ? (issue: { id: string; key: string }, at: MenuAt) => openPriorityMenu(issue, at) : null,
+      /** Titles can be edited (F2, a double-click on the title). */
+      canChangeTitle,
     };
-  }, [site, canAssign, canChangeStatus, canChangePriority]);
+  }, [site, canAssign, canChangeStatus, canChangePriority, canChangeTitle]);
 }

@@ -1,4 +1,4 @@
-import { act, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -7,7 +7,9 @@ vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await impo
 
 import { api, type IssueDetail } from "../api";
 import { installCommands } from "../commands";
-import { clearCommands, setOverrides } from "../commands/registry";
+import { onIssueKeys } from "../commands/issueKeys";
+import { clearCommands, resolveKeydown, setOverrides } from "../commands/registry";
+import { emulateContentEditable } from "../test/contentEditable";
 import { createQueryClient } from "../queries/queryClient";
 import { resetStore, useStore } from "../state/store";
 import { connectionView } from "../test/jira";
@@ -460,6 +462,44 @@ describe("Peek", () => {
       await screen.findByRole("heading", { name: "Redesign the pricing page" });
       expect(screen.queryByText(/Deleted in Jira/)).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Remove from cache" })).not.toBeInTheDocument();
+    });
+  });
+
+  describe("Escape while renaming the title", () => {
+    const noop = () => {};
+    let release: () => void;
+    const escape = () => resolveKeydown({ key: "Escape", metaKey: false, ctrlKey: false, altKey: false, shiftKey: false }, ["global", "main"]);
+
+    beforeEach(() => {
+      emulateContentEditable();
+      installCommands("main");
+      mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ allowJiraChanges: true }) }));
+      release = onIssueKeys({
+        move: noop, setGroupOpen: noop, closePeek: noop, copyKey: noop, copyUrl: noop, copyAppLink: noop, openInJira: noop, openEpic: noop,
+        togglePin: noop, toggleRead: noop, toggleMine: noop, changeStatus: noop, assignTo: noop, changePriority: noop, rename: noop,
+        hasSelection: () => true,
+        peekOpen: () => true,
+      });
+    });
+    afterEach(() => {
+      release();
+      clearCommands();
+    });
+
+    it("does not close the Preview while the title is being edited, and does once the edit has ended", async () => {
+      renderPeek();
+      await screen.findByRole("heading", { name: "Redesign the pricing page" });
+      await waitFor(() => {
+        fireEvent.doubleClick(screen.getByRole("heading", { name: "Redesign the pricing page" }));
+        expect(screen.getByRole("textbox", { name: "Title of NW-1042" })).toBeInTheDocument();
+      });
+
+      expect(escape()).toBeNull();
+
+      fireEvent.keyDown(screen.getByRole("textbox", { name: "Title of NW-1042" }), { key: "Escape" });
+
+      expect(screen.getByRole("heading", { name: "Redesign the pricing page" })).toBeInTheDocument();
+      expect(escape()?.id).toBe("peek.close");
     });
   });
 
