@@ -53,12 +53,17 @@ mod tests {
     fn project(key: &str, have: &[&str]) -> (String, BTreeSet<String>) {
         (
             key.to_string(),
-            have.iter().map(|permission| permission.to_string()).collect(),
+            have.iter()
+                .map(|permission| permission.to_string())
+                .collect(),
         )
     }
 
     fn without(denied: &[&str]) -> Vec<&'static str> {
-        JIRA_PERMISSIONS.into_iter().filter(|p| !denied.contains(p)).collect()
+        JIRA_PERMISSIONS
+            .into_iter()
+            .filter(|p| !denied.contains(p))
+            .collect()
     }
 
     #[test]

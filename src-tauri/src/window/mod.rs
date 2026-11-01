@@ -1,6 +1,7 @@
 //! The app's windows: the main window here, Settings in `settings`. Closing either hides it; the app keeps
 //! running until it quits (ADR 0016).
 
+pub mod navigation;
 pub mod settings;
 
 use tauri::{AppHandle, Emitter, Manager, WebviewWindow};

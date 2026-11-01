@@ -58,5 +58,6 @@ stands in Taskboard. The numbers in this table are Taskboard's.
 | [0046](0046-unread-is-a-mode-of-every-view.md) | Unread is a mode of every view | Accepted (2026-11-01) |
 | [0047](0047-the-bookmarks-bar-is-the-only-top-bar.md) | The bookmarks bar is the only top bar | Accepted (2026-11-01) |
 | [0048](0048-every-change-sent-to-jira-is-recorded-locally.md) | Every change sent to Jira is recorded locally | Accepted (2026-11-01) |
+| [0049](0049-hardened-runtime-strict-csp-and-no-navigation.md) | Hardened runtime, strict CSP and no navigation | Accepted (2026-11-01) |
 
 Open: integrations with Daybook and TimeTracker.

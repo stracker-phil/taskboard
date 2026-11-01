@@ -173,6 +173,17 @@ scripts/*.sh scripts/dev/    install, stop, signing; the dev loop
 .claude/                     rules, agents, skills, settings
 ```
 
+## Webview hardening
+
+The webviews show company content (Jira's HTML), so they are locked down
+([ADR 0049](adr/0049-hardened-runtime-strict-csp-and-no-navigation.md)):
+- The CSP in `tauri.conf.json` allows only the bundled scripts and style sheets (`style-src-elem 'self'`; React's
+  `style` attributes stay allowed), images from the app, `data:` and `inline-image:`, no frames, objects, forms or
+  `<base>`.
+- `window/navigation.rs` (a plugin on every webview) blocks any navigation away from the app's own pages; web links
+  open in the browser through `open_url`.
+- Jira's HTML is sanitized before it is shown (`src/lib/jiraHtml.ts`).
+
 ## Platform
 
 The code base targets **macOS on Apple Silicon** only. The platform-specific parts are listed in

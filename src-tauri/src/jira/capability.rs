@@ -295,7 +295,11 @@ mod tests {
             (Capability::Comment, "ADD_COMMENTS"),
             (Capability::AddWebLink, "LINK_ISSUES"),
         ] {
-            assert_eq!(capability.jira_permission(), Some(permission), "{capability:?}");
+            assert_eq!(
+                capability.jira_permission(),
+                Some(permission),
+                "{capability:?}"
+            );
         }
     }
 

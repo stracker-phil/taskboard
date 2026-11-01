@@ -88,4 +88,5 @@ Never use `bun run app`, `open` or AppleScript clicks and keystrokes to drive th
 
 macOS keys privacy grants and Keychain trust to identifier + certificate
 ([ADR 0015](adr/0015-signed-with-a-local-certificate.md)). Run `scripts/create-signing-cert.sh` once per Mac;
-`scripts/sign-app.sh` signs with `TASKBOARD_SIGN_IDENTITY`, else that certificate, else ad hoc.
+`scripts/sign-app.sh` signs with `TASKBOARD_SIGN_IDENTITY`, else that certificate, else ad hoc. Every build is
+signed with the hardened runtime ([ADR 0049](adr/0049-hardened-runtime-strict-csp-and-no-navigation.md)).
