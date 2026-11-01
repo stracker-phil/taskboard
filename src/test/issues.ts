@@ -14,6 +14,7 @@ export function row(patch: Partial<Row> = {}): Row {
     commentCount: 0,
     changed: false,
     changeNote: null,
+    updatedAt: "2026-10-28T10:00:00.000Z",
     assignees: [],
     epic: null,
     release: null,

@@ -285,6 +285,10 @@ unread (`src-tauri/src/changes/`). The UI says read and unread; the code says se
 - Changed rows: `--changed-bg`, a 600 summary and the change chip with the most important change ("New",
   "2 new comments", "Moved to Review", "Priority raised", "Assigned to you", "Due date changed"; "+N" for
   more kinds). Changed epic children in the Issue view get the same background.
+- A row or card whose issue changes while it is on screen (a sync brought a change, or your own change settled:
+  `Row.updatedAt` moved) flashes once: `useFlash` (`lib/motion.ts`) adds `.flash`, an accent wash
+  (`--flash-bg`) that fades over 1.2 s without moving anything; none under reduced motion. Rows scrolled in later
+  don't flash.
 - The Since-yesterday banner (`SinceBanner`, `--banner-info-*`) in the preview and the Issue view: "Since
   yesterday:" (or "Since you last looked:" when that was over a day ago) and every change in words; the Issue
   view adds Mark as read.

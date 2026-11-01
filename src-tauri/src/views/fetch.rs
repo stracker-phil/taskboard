@@ -99,6 +99,7 @@ fn row_from(r: &rusqlite::Row, source: &Source) -> AppResult<(Row, Facts)> {
         status_name,
         comment_count: r.get(6)?,
         changed: false,
+        updated_at: r.get(17)?,
         change_note: None,
         assignees: assignee_id
             .as_deref()

@@ -288,6 +288,7 @@ mod tests {
             labels: Vec::new(),
             sprint: None,
             due: None,
+            updated_at: String::new(),
             custom: BTreeMap::new(),
             child_count: 0,
             is_subtask: false,

@@ -72,3 +72,8 @@
   from { opacity: 0; transform: translateX(-50%) translateY(2px); }
   to { opacity: 1; transform: translateX(-50%); }
 }
+
+/* A row or card whose issue just changed (useFlash): an accent wash that fades out; no size or position change. */
+.flash { animation: flash 1200ms var(--ease-out); }
+@keyframes flash { from { box-shadow: inset 0 0 0 100vmax var(--flash-bg); } }
+@media (prefers-reduced-motion: reduce) { .flash { animation: none; } }

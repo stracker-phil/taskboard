@@ -9,6 +9,7 @@ import { ChildCount, SubtaskIcon } from "../../components/issue/SubtaskIcon";
 import type { Nesting } from "../list/flatten";
 import { SubtaskCaret } from "../list/SubtaskCaret";
 import { widthVar } from "./widths";
+import { useFlash } from "../../lib/motion";
 
 const cellWidth = (id: string): CSSProperties => ({ width: `var(${widthVar(id)})` });
 
@@ -35,7 +36,8 @@ interface Props {
 export const TableRow = memo(function TableRow(props: Props) {
   const { row, columns, inlineLabels = false, selected, onSelect, onOpen } = props;
   const { tree = false, nesting = null, subtasksOpen = true, onToggleSubtasks, childChip = false } = props;
-  const className = ["table-row", tree && "table-row--tree", nesting?.parent && "table-row--parent", nesting && nesting.depth > 0 && "table-row--child", row.changed && "table-row--changed", selected && "table-row--selected"].filter(Boolean).join(" ");
+  const flashing = useFlash(row.updatedAt);
+  const className = ["table-row", tree && "table-row--tree", nesting?.parent && "table-row--parent", nesting && nesting.depth > 0 && "table-row--child", row.changed && "table-row--changed", flashing && "flash", selected && "table-row--selected"].filter(Boolean).join(" ");
   return (
     <div className={className} style={{ "--depth": nesting?.depth ?? 0 } as CSSProperties} role="row" aria-selected={selected} data-issue-id={row.id} onClick={() => onSelect(row.id)} onDoubleClick={(e) => opensIssue(e) && onOpen(row.id)}>
       <span className="table-row__cell table-row__key" role="gridcell" style={cellWidth("key")}>

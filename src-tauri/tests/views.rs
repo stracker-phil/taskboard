@@ -459,6 +459,28 @@ mod rows {
 
     #[tokio::test]
     #[ignore = "syncs the demo site into a temp database"]
+    async fn a_row_carries_the_updated_at_of_its_issue() {
+        let site = Site::new().await;
+
+        let data = site.nw_data(Narrowing::default()).await;
+
+        let stored = query(
+            site.db(),
+            format!("SELECT key, updated_at FROM cache.issue WHERE project_id = '{NW}' AND gone = 0"),
+            |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+        )
+        .await;
+        assert!(!stored.is_empty());
+        for (key, updated_at) in stored {
+            if let Some(row) = data.rows.values().find(|row| row.key == key) {
+                assert_eq!(row.updated_at, updated_at, "{key}");
+                assert!(!row.updated_at.is_empty(), "{key}");
+            }
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
     async fn nobody_is_marked_changed_after_the_first_sync() {
         let site = Site::new().await;
 

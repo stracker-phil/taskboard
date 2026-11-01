@@ -7,6 +7,7 @@ import { EpicChip } from "../../components/issue/EpicChip";
 import { LabelChips } from "../../components/issue/LabelChips";
 import { PriorityFlag } from "../../components/issue/PriorityFlag";
 import { RowActions, type RowActionHandlers } from "../list/RowActions";
+import { useFlash } from "../../lib/motion";
 
 interface Props {
   row: Row;
@@ -24,11 +25,12 @@ interface Props {
 /** A Board card: the summary first, always wrapped, the key in the bottom-right corner; changed cards are tinted. */
 export const BoardCard = memo(function BoardCard({ row, fields, inlineLabels = false, selected = false, onOpen, actions, pinned = false }: Props) {
   const shows = (field: string) => fields.includes(field);
+  const flashing = useFlash(row.updatedAt);
   const epic = shows("epic") && row.epic;
   const labels = shows("labels") && row.labels.length > 0;
   return (
     <article
-      className={["board-card", row.changed && "board-card--changed", selected && "board-card--selected"].filter(Boolean).join(" ")}
+      className={["board-card", row.changed && "board-card--changed", flashing && "flash", selected && "board-card--selected"].filter(Boolean).join(" ")}
       aria-current={selected || undefined}
       tabIndex={0}
       aria-label={`${row.key} ${row.summary}`}

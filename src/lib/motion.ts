@@ -103,3 +103,21 @@ function instantly(element: HTMLElement) {
   element.classList.add("motion-off");
   requestAnimationFrame(() => requestAnimationFrame(() => element.classList.remove("motion-off")));
 }
+
+/** How long a flashed row keeps its highlight; `.flash` in motion.css fades over the same time. */
+const FLASH_MS = 1200;
+
+/** True for a moment after `value` changes while mounted, never on mount: a row flashes when what it shows moved
+ *  (a sync brought a change, or a change of the owner's settled). */
+export function useFlash(value: string): boolean {
+  const previous = useRef(value);
+  const [flashing, setFlashing] = useState(false);
+  useEffect(() => {
+    if (previous.current === value) return;
+    previous.current = value;
+    setFlashing(true);
+    const timer = setTimeout(() => setFlashing(false), FLASH_MS);
+    return () => clearTimeout(timer);
+  }, [value]);
+  return flashing;
+}

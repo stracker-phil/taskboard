@@ -2,7 +2,7 @@ import { act, renderHook } from "@testing-library/react";
 import { useLayoutEffect } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { startMotionTimers, stubMotion } from "../test/motion";
-import { motionMs, useGlide, useHeightGlide, usePresence } from "./motion";
+import { motionMs, useFlash, useGlide, useHeightGlide, usePresence } from "./motion";
 
 let spy: { mockRestore(): void } | undefined;
 
@@ -194,6 +194,56 @@ describe("useHeightGlide", () => {
     expect(() => rerender({ state: "dragging", tall: true })).not.toThrow();
 
     expect(animate).not.toHaveBeenCalled();
+  });
+});
+
+describe("useFlash", () => {
+  const render = (value: string) => renderHook(({ value }) => useFlash(value), { initialProps: { value } });
+
+  const advance = (ms: number) => act(() => void vi.advanceTimersByTime(ms));
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  it("does not flash on mount", () => {
+    const { result } = render("2026-10-28T10:00:00.000Z");
+    advance(2000);
+
+    expect(result.current).toBe(false);
+  });
+
+  it("does not flash when it re-renders with the same value", () => {
+    const { result, rerender } = render("2026-10-28T10:00:00.000Z");
+
+    rerender({ value: "2026-10-28T10:00:00.000Z" });
+
+    expect(result.current).toBe(false);
+  });
+
+  it("flashes when the value changes and stops after 1200 ms", () => {
+    const { result, rerender } = render("2026-10-28T10:00:00.000Z");
+
+    rerender({ value: "2026-10-28T11:00:00.000Z" });
+
+    expect(result.current).toBe(true);
+    advance(1199);
+    expect(result.current).toBe(true);
+    advance(1);
+    expect(result.current).toBe(false);
+  });
+
+  it("keeps flashing when the value changes again and ends 1200 ms after the latest change", () => {
+    const { result, rerender } = render("2026-10-28T10:00:00.000Z");
+    rerender({ value: "2026-10-28T11:00:00.000Z" });
+    advance(800);
+
+    rerender({ value: "2026-10-28T12:00:00.000Z" });
+
+    advance(1199);
+    expect(result.current).toBe(true);
+    advance(1);
+    expect(result.current).toBe(false);
   });
 });
 

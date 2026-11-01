@@ -11,6 +11,7 @@ import { LabelChips } from "../../components/issue/LabelChips";
 import { opensIssue } from "./opensIssue";
 import { ChildCount, SubtaskIcon } from "../../components/issue/SubtaskIcon";
 import { SubtaskCaret } from "./SubtaskCaret";
+import { useFlash } from "../../lib/motion";
 
 interface Props {
   row: Row;
@@ -41,7 +42,8 @@ export const IssueRow = memo(function IssueRow(props: Props) {
   const { row, columns, position, wrap = false, inlineLabels = false, selected, onSelect, onOpen, actions } = props;
   const { nesting = null, subtasksOpen = true, onToggleSubtasks, childChip = false, pinned = false } = props;
   const nested = (nesting?.depth ?? 0) > 0;
-  const className = ["list-row", `list-row--${position}`, wrap && "list-row--wrap", nested && "list-row--child", row.changed && "list-row--changed", selected && "list-row--selected"]
+  const flashing = useFlash(row.updatedAt);
+  const className = ["list-row", `list-row--${position}`, wrap && "list-row--wrap", nested && "list-row--child", row.changed && "list-row--changed", flashing && "flash", selected && "list-row--selected"]
     .filter(Boolean)
     .join(" ");
   // A wrapping title takes the chips into its flow, each after a space that vanishes at a line start; on one

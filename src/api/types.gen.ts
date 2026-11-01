@@ -688,6 +688,10 @@ export type Row = { id: string, key: string, summary: string, style: Style, stat
  */
 changed: boolean, 
 /**
+ * When Jira last changed the issue (UTC); a row whose time moves while shown flashes once.
+ */
+updatedAt: string, 
+/**
  * The change chip's text ("2 new comments").
  */
 changeNote: string | null, assignees: Array<Person>, epic: EpicChip | null, release: string | null, priority: Priority | null, labels: Array<Label>, sprint: string | null, 

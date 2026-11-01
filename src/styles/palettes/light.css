@@ -44,6 +44,8 @@
   --palette-active-bg: #eff4fe;
   --selection-text: #1d4ed8;
   --accent-soft-bg: #eff6ff;
+  /* useFlash: a row whose issue just changed. */
+  --flash-bg: rgb(37 99 235 / 0.12);
   --accent-soft-border: #bfdbfe;
   --accent-soft-text: #1e3a8a;
   --button-primary-bg: #18181b;
