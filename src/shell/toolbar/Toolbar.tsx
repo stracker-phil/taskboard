@@ -1,6 +1,7 @@
 import { Columns3, Ellipsis, Layers, ListFilter } from "lucide-react";
 import { type ReactNode, type RefObject, useCallback, useEffect, useRef, useState } from "react";
 import { usePageAction } from "../../commands/pageActions";
+import { useShortcuts } from "../../commands/useShortcuts";
 import { usePaletteMenu } from "../../palette/menus";
 import { type Presence, useGlide, usePresence } from "../../lib/motion";
 import { api, type View } from "../../api";
@@ -101,6 +102,7 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
   const { data: people = [] } = useViewPeople(view.listId, view.id, useRequestNarrowing(view.listId, view.id));
   const save = () => void draft.save();
   const columnsLabel = view.layout === "board" ? "Card fields" : "Columns";
+  const { title } = useShortcuts();
   const shows = (item: Collapsible) => !hidden.includes(item) && (item !== "subtasks" || hasSubtasks);
 
   usePageAction("toolbar.me", me.toggle);
@@ -181,7 +183,7 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
   return (
     <div ref={barRef} className="toolbar">
       {shows("group") && (
-        <button ref={groupButton} type="button" className="toolbar-btn" aria-haspopup="menu" onClick={openGroupMenu}>
+        <button ref={groupButton} type="button" className="toolbar-btn" aria-haspopup="menu" title={title("Group and sort", "toolbar.group")} onClick={openGroupMenu}>
           <Layers size={14} strokeWidth={2} aria-hidden="true" />
           Group: {GROUP_NAMES[view.groupBy]}
         </button>
@@ -193,6 +195,7 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
             type="button"
             className={open === "columns" ? "toolbar-btn toolbar-btn--open" : "toolbar-btn"}
             aria-expanded={open === "columns"}
+            title={title(columnsLabel, "toolbar.columns")}
             onClick={() => toggle("columns")}
           >
             <Columns3 size={14} strokeWidth={2} aria-hidden="true" />
@@ -211,6 +214,7 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
             type="button"
             className={open === "filter" ? "toolbar-btn toolbar-btn--filter toolbar-btn--active" : "toolbar-btn toolbar-btn--filter"}
             aria-expanded={open === "filter"}
+            title={title("Filter", "toolbar.filter")}
             onClick={() => toggle("filter")}
           >
             <ListFilter size={14} strokeWidth={2} aria-hidden="true" />

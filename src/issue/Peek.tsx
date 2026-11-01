@@ -1,6 +1,7 @@
 import { ExternalLink, Maximize2, X } from "lucide-react";
 import { CopyKey } from "../components/issue/CopyKey";
 import { useEffect, useRef } from "react";
+import { useShortcuts } from "../commands/useShortcuts";
 import type { IssueDetail } from "../api";
 import { Avatar } from "../components/issue/Avatar";
 import { EpicChip } from "../components/issue/EpicChip";
@@ -19,11 +20,18 @@ import { PinButton } from "../pins/PinButton";
 import { useIssueActions } from "../views/list/useIssueActions";
 import { StatusMenuButton } from "../writes/StatusMenuButton";
 
+/** A footer hint ("J / K next"); none while its keys are unbound. */
+function KeyHint({ keys, text }: { keys: string[]; text: string }) {
+  const bound = keys.filter(Boolean);
+  return bound.length > 0 ? <span>{`${bound.join(" / ")} ${text}`}</span> : null;
+}
+
 /** The 540px panel beside the list (artboard 4): the selected issue at a glance. */
 export function Peek({ id, onClose, onExpand }: { id: string; onClose: () => void; onExpand: () => void }) {
   const { data: issue, error } = useIssue(id);
   const actions = useIssueActions();
   const bodyRef = useRef<HTMLDivElement>(null);
+  const { key, title } = useShortcuts();
   useSeenAfter(id, issue?.unread ?? false);
 
   useEffect(() => {
@@ -43,16 +51,16 @@ export function Peek({ id, onClose, onExpand }: { id: string; onClose: () => voi
           </>
         )}
         <span className="peek__spacer" />
-        {issue && <PinButton kind="issue" target={issue.id} label="Bookmark this issue" meta={issue.key} className="peek__btn" />}
+        {issue && <PinButton kind="issue" target={issue.id} label="Bookmark this issue" meta={issue.key} command="issue.togglePin" className="peek__btn" />}
         {issue && actions.openInJira && (
-          <button type="button" className="peek__btn" aria-label="Open in Jira" title="Open in Jira (⌘↩)" onClick={() => actions.openInJira?.(issue.key)}>
+          <button type="button" className="peek__btn" aria-label="Open in Jira" title={title("Open in Jira", "issue.openInJira")} onClick={() => actions.openInJira?.(issue.key)}>
             <ExternalLink size={14} strokeWidth={1.9} aria-hidden="true" />
           </button>
         )}
-        <button type="button" className="peek__btn" aria-label="Full view" title="Full view (↩)" onClick={onExpand}>
+        <button type="button" className="peek__btn" aria-label="Full view" title={title("Full view", "issue.open")} onClick={onExpand}>
           <Maximize2 size={14} strokeWidth={1.9} aria-hidden="true" />
         </button>
-        <button type="button" className="peek__btn" aria-label="Close (esc)" onClick={onClose}>
+        <button type="button" className="peek__btn" aria-label="Close" title={title("Close", "peek.close")} onClick={onClose}>
           <X size={18} strokeWidth={1.9} aria-hidden="true" />
         </button>
       </header>
@@ -60,11 +68,11 @@ export function Peek({ id, onClose, onExpand }: { id: string; onClose: () => voi
         {issue ? <Body issue={issue} onExpand={onExpand} onClose={onClose} /> : error ? <IssueMissing error={error} className="peek__missing" /> : null}
       </div>
       <footer className="peek__footer">
-        <span>J / K next</span>
-        <span>↩ full view</span>
-        <span>⌘↩ Jira</span>
+        <KeyHint keys={[key("issue.next"), key("issue.previous")]} text="next" />
+        <KeyHint keys={[key("issue.open")]} text="full view" />
+        <KeyHint keys={[key("issue.openInJira")]} text="Jira" />
         <span className="peek__spacer" />
-        <span>esc close</span>
+        <KeyHint keys={[key("peek.close")]} text="close" />
       </footer>
     </aside>
   );

@@ -137,7 +137,7 @@ describe("CurrentPeek", () => {
     resetStore({ places: { "11:101": PLACE } });
     renderPeek();
 
-    await userEvent.click(await screen.findByRole("button", { name: "Close (esc)" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Close" }));
 
     expect(useStore.getState().places["11:101"]).toMatchObject({ selectedId: "10042", peekOpen: false });
     expect(screen.queryByRole("complementary", { name: "Issue preview" })).not.toBeInTheDocument();

@@ -2,6 +2,7 @@ import { DisclosureChevron } from "../../components/DisclosureChevron";
 import { Plus } from "lucide-react";
 import { useState, type HTMLAttributes, type MouseEvent } from "react";
 import { api, type SpaceNode } from "../../api";
+import { useShortcuts } from "../../commands/useShortcuts";
 import { InlineRename } from "../../components/InlineRename";
 import { openContextMenu } from "../../components/menu";
 import { SpaceLookButton } from "../../components/SpaceLookButton";
@@ -46,6 +47,7 @@ export function SpaceRow({ space, active, holdsActive, expanded, renaming, onOpe
       space.name,
     );
   const state = active ? "active" : holdsActive ? "holds-active" : undefined;
+  const { title } = useShortcuts();
   return (
     <div className="sb-row sb-space" data-state={state} onContextMenu={openMenu} {...dragHandle}>
       <button
@@ -82,7 +84,7 @@ export function SpaceRow({ space, active, holdsActive, expanded, renaming, onOpe
         </button>
       )}
       {!renaming && space.lists.length > 0 && (
-        <button type="button" className="sb-space__add" aria-label={`New filter list in ${space.name}`} title="New filter list" onClick={onAddList}>
+        <button type="button" className="sb-space__add" aria-label={`New filter list in ${space.name}`} title={active || holdsActive ? title("New filter list", "list.new") : "New filter list"} onClick={onAddList}>
           <Plus size={14} strokeWidth={2} aria-hidden="true" />
         </button>
       )}

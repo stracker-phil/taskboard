@@ -109,11 +109,11 @@ describe("Toolbar page actions", () => {
       renderToolbar();
 
       await userEvent.click(meChip());
-      expect(meChip()).toHaveAttribute("title", "Only my issues; click to show all");
+      expect(meChip()).toHaveAttribute("title", "Only my issues (⌘⇧M)");
 
       await userEvent.click(meChip());
       expect(meChip()).toHaveAttribute("aria-pressed", "false");
-      expect(meChip()).toHaveAttribute("title", "Show only my issues");
+      expect(meChip()).toHaveAttribute("title", "Only my issues (⌘⇧M)");
     });
   });
 
@@ -930,7 +930,7 @@ describe("Toolbar Me mode", () => {
     it("shows the chip pressed with the every-view tooltip", async () => {
       await renderEverywhere();
 
-      expect(meChip()).toHaveAttribute("title", "My issues in every view; click to show all");
+      expect(meChip()).toHaveAttribute("title", "Only my issues, in every view (⌘⇧M)");
     });
 
     it("turns Me mode off everywhere when the chip is clicked", async () => {

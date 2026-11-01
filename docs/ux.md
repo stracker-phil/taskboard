@@ -500,6 +500,11 @@ and on keyboard focus. A press, a key, the wheel or leaving hides it. Text cut o
 clamped to fewer lines) shows its whole text the same way, before any `title` around it; so every label that
 can be cut (titles, names, epic chips, breadcrumbs) uses `text-overflow: ellipsis`, never a bare clip.
 
+A control whose action has a key ends its tooltip with that key as it is bound now, "Only my issues (⌘⇧M)":
+`commands/useShortcuts.ts` reads the binding and follows Settings → Shortcuts, so no tooltip spells a key
+itself. A control that acts on something else than the key does (a Space's "+" while another Space is open)
+leaves the key out.
+
 ## Motion
 
 Nothing jumps from one state to another (`styles/motion.css`). Tokens: `--motion-fast` 120ms (hover, press),

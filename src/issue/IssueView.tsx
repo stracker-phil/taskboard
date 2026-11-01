@@ -1,4 +1,5 @@
 import { ArrowDown, ArrowLeft, ArrowUp, CheckCheck, CircleDot, Link2 } from "lucide-react";
+import { useShortcuts } from "../commands/useShortcuts";
 import { CopyKey } from "../components/issue/CopyKey";
 import { useQueryClient } from "@tanstack/react-query";
 import { type RefObject, useEffect, useMemo, useRef } from "react";
@@ -108,9 +109,10 @@ function IssueHeader({
   const showIssue = useStore((s) => s.showIssue);
   const actions = useIssueActions();
   const go = useNavGo();
+  const { title } = useShortcuts();
   return (
     <header className="issue-header">
-      <button type="button" className="issue-header__icon" aria-label={`Back to ${originName ?? "the list"}`} title="Back (esc)" onClick={onBack}>
+      <button type="button" className="issue-header__icon" aria-label={`Back to ${originName ?? "the list"}`} title={title("Back", "issue.back")} onClick={onBack}>
         <ArrowLeft size={16} strokeWidth={2} aria-hidden="true" />
       </button>
       <nav className="issue-header__crumbs" aria-label="Breadcrumb">
@@ -133,7 +135,7 @@ function IssueHeader({
         )}
         {issue && <CopyKey className="issue-header__key" issueKey={issue.key} />}
         {issue && actions.openInJira && (
-          <button type="button" className="issue-header__copy" aria-label={`Copy the link to ${issue.key}`} title="Copy link (⇧⌘C)" onClick={() => actions.copyUrl(issue.key)}>
+          <button type="button" className="issue-header__copy" aria-label={`Copy the link to ${issue.key}`} title={title("Copy link", "issue.copyUrl")} onClick={() => actions.copyUrl(issue.key)}>
             <Link2 size={13} strokeWidth={2} aria-hidden="true" />
           </button>
         )}
@@ -141,16 +143,16 @@ function IssueHeader({
       <span className="issue-header__spacer" />
       <IssueFind rootRef={findIn} />
       {issue && <span className="issue-header__updated">Updated {formatLocalTime(issue.updatedAt)}</span>}
-      <button type="button" className="issue-header__nav" aria-label="Previous issue" title="Previous (K)" disabled={!neighbors.previous} onClick={() => neighbors.previous && showIssue(neighbors.previous)}>
+      <button type="button" className="issue-header__nav" aria-label="Previous issue" title={title("Previous", "issue.previous")} disabled={!neighbors.previous} onClick={() => neighbors.previous && showIssue(neighbors.previous)}>
         <ArrowUp size={14} strokeWidth={2} aria-hidden="true" />
       </button>
-      <button type="button" className="issue-header__nav" aria-label="Next issue" title="Next (J)" disabled={!neighbors.next} onClick={() => neighbors.next && showIssue(neighbors.next)}>
+      <button type="button" className="issue-header__nav" aria-label="Next issue" title={title("Next", "issue.next")} disabled={!neighbors.next} onClick={() => neighbors.next && showIssue(neighbors.next)}>
         <ArrowDown size={14} strokeWidth={2} aria-hidden="true" />
       </button>
       {issue && <ReadToggle issue={issue} />}
-      {issue && <PinButton kind="issue" target={issue.id} label="Bookmark this issue" meta={issue.key} className="issue-header__nav" />}
+      {issue && <PinButton kind="issue" target={issue.id} label="Bookmark this issue" meta={issue.key} command="issue.togglePin" className="issue-header__nav" />}
       {issue && actions.openInJira && (
-        <OpenInJiraButton onClick={() => actions.openInJira?.(issue.key)} />
+        <OpenInJiraButton onClick={() => actions.openInJira?.(issue.key)} command="issue.openInJira" />
       )}
     </header>
   );
@@ -220,8 +222,9 @@ function toggleRead(issue: IssueDetail) {
 function ReadToggle({ issue }: { issue: IssueDetail }) {
   const label = issue.unread ? "Mark as read" : "Mark as unread";
   const Icon = issue.unread ? CheckCheck : CircleDot;
+  const { title } = useShortcuts();
   return (
-    <button type="button" className="issue-header__nav" aria-label={label} title={`${label} (M)`} onClick={() => toggleRead(issue)}>
+    <button type="button" className="issue-header__nav" aria-label={label} title={title(label, "issue.markSeen")} onClick={() => toggleRead(issue)}>
       <Icon size={14} strokeWidth={2} aria-hidden="true" />
     </button>
   );

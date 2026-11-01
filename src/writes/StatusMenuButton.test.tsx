@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
 
 import { api, type TransitionOption } from "../api";
+import { installCommands } from "../commands";
 import { MenuHost } from "../components/menu";
 import { createQueryClient } from "../queries/queryClient";
 import { resetStore, useStore } from "../state/store";
@@ -41,6 +42,7 @@ async function openMenu() {
 beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
+  installCommands("main");
   allowChanges();
   mocked.connectionGet.mockResolvedValue(connectionView());
   mocked.issueTransitions.mockResolvedValue([REVIEW, DONE]);

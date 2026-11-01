@@ -1,5 +1,6 @@
 import { Search } from "lucide-react";
 import { type KeyboardEvent, type Ref, useEffect, useId, useState } from "react";
+import { useShortcuts } from "../../commands/useShortcuts";
 
 const DEBOUNCE_MS = 80;
 
@@ -19,6 +20,7 @@ interface Props {
 export function TextFilter({ value, onChange, inputRef, label = "Filter this view", onEnter, status }: Props) {
   const id = useId();
   const [draft, setDraft] = useState(value);
+  const { title } = useShortcuts();
   useEffect(() => {
     if (draft === value) return;
     const timer = setTimeout(() => onChange(draft), DEBOUNCE_MS);
@@ -41,7 +43,7 @@ export function TextFilter({ value, onChange, inputRef, label = "Filter this vie
   return (
     <label className="text-filter" htmlFor={id}>
       <Search size={14} strokeWidth={2} aria-hidden="true" />
-      <input ref={inputRef} id={id} type="text" aria-label={label} placeholder={label} value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={onKeyDown} />
+      <input ref={inputRef} id={id} type="text" aria-label={label} placeholder={label} title={title(label, "toolbar.search")} value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={onKeyDown} />
       {status !== undefined && (
         <span className="text-filter__status" aria-live="polite">
           {status}

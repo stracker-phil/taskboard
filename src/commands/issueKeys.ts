@@ -21,7 +21,7 @@ export interface IssueKeyHandlers {
   toggleRead: () => void;
   /** I: the selected issue is assigned to me, or unassigned when it is mine. */
   toggleMine: () => void;
-  /** S: the selected issue's status menu. */
+  /** D: the selected issue's status menu. */
   changeStatus: () => void;
   /** A: the selected issue's assignee menu. */
   assignTo: () => void;

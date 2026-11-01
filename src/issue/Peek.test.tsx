@@ -6,6 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
 
 import { api, type IssueDetail } from "../api";
+import { installCommands } from "../commands";
+import { clearCommands, setOverrides } from "../commands/registry";
 import { createQueryClient } from "../queries/queryClient";
 import { resetStore, useStore } from "../state/store";
 import { connectionView } from "../test/jira";
@@ -163,9 +165,35 @@ describe("Peek", () => {
   it("calls onClose when the close button is clicked", async () => {
     const onClose = renderPeek();
 
-    await userEvent.click(await screen.findByRole("button", { name: "Close (esc)" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Close" }));
 
     expect(onClose).toHaveBeenCalled();
+  });
+
+  describe("key hints", () => {
+    beforeEach(() => {
+      installCommands("main");
+    });
+    afterEach(() => {
+      clearCommands();
+    });
+
+    it("shows the close button's key in its tooltip and the footer hints from the bindings", async () => {
+      renderPeek();
+
+      expect(await screen.findByRole("button", { name: "Close" })).toHaveAttribute("title", "Close (⎋)");
+      expect(screen.getByText("J / K next")).toBeInTheDocument();
+      expect(screen.getByText("⎋ close")).toBeInTheDocument();
+    });
+
+    it("drops the close hint when its key is unbound and follows a rebound key", async () => {
+      setOverrides({ "peek.close": null, "issue.next": "N" });
+      renderPeek();
+
+      expect(await screen.findByRole("button", { name: "Close" })).toHaveAttribute("title", "Close");
+      expect(screen.queryByText(/close$/)).not.toBeInTheDocument();
+      expect(screen.getByText("N / K next")).toBeInTheDocument();
+    });
   });
 
   it("opens the bookmark dialog from the Bookmark this issue button and bookmarks the issue", async () => {

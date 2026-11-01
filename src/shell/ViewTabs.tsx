@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { api, type Layout, type View } from "../api";
 import { usePageAction } from "../commands/pageActions";
+import { useShortcuts } from "../commands/useShortcuts";
 import { useGlide } from "../lib/motion";
 import { usePaletteMenu } from "../palette/menus";
 import { usePinDefault } from "../pins/PinPopover";
@@ -20,6 +21,7 @@ export function ViewTabs({ listId, viewId }: { listId: number; viewId: number })
   const { data: views = [] } = useViews(listId);
   const open = useNavGo();
   const [renamingId, setRenamingId] = useState<number | null>(null);
+  const { title } = useShortcuts();
   const [lookingId, setLookingId] = useState<number | null>(null);
   const lookAnchor = useRef<HTMLElement | null>(null);
   const looking = views.find((view) => view.id === lookingId);
@@ -139,6 +141,7 @@ export function ViewTabs({ listId, viewId }: { listId: number; viewId: number })
         <ViewTab
           key={view.id}
           view={view}
+          index={index}
           active={view.id === viewId}
           renaming={view.id === renamingId}
           onOpen={() => void open(listId, view.id)}
@@ -151,7 +154,7 @@ export function ViewTabs({ listId, viewId }: { listId: number; viewId: number })
       ))}
       {dropLineY !== null && <span className="view-tabs__drop" style={{ left: dropLineY }} aria-hidden="true" />}
       <span className="view-tabs__separator" aria-hidden="true" />
-      <button ref={addRef} type="button" className="view-tabs__add" aria-haspopup="menu" onClick={addMenu}>
+      <button ref={addRef} type="button" className="view-tabs__add" aria-haspopup="menu" title={title("New view", "view.new")} onClick={addMenu}>
         + View
       </button>
       {looking && (

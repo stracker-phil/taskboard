@@ -1,5 +1,6 @@
 import type { HTMLAttributes, MouseEvent } from "react";
 import { api, type View } from "../api";
+import { useShortcuts } from "../commands/useShortcuts";
 import { InlineRename } from "../components/InlineRename";
 import { Tile } from "../components/look/Tile";
 import { attempt } from "../state/requests";
@@ -7,6 +8,8 @@ import { LAYOUTS, LayoutTile } from "./viewLayouts";
 
 interface Props {
   view: View;
+  /** Its place among the tabs, for its ⌘1–⌘9 key. */
+  index: number;
   /** The open view: a click on its name renames it, one on its tile edits the look. */
   active: boolean;
   renaming: boolean;
@@ -20,7 +23,8 @@ interface Props {
 }
 
 /** One view tab: its tile (an own look, else the layout's) and name. */
-export function ViewTab({ view, active, renaming, onOpen, onRename, onRenameDone, onEditLook, onMenu, dragProps }: Props) {
+export function ViewTab({ view, index, active, renaming, onOpen, onRename, onRenameDone, onEditLook, onMenu, dragProps }: Props) {
+  const opens = useShortcuts().key(`view.select.${index + 1}`);
   const tile = (
     <span
       className="view-tab__look"
@@ -58,7 +62,7 @@ export function ViewTab({ view, active, renaming, onOpen, onRename, onRenameDone
       className="view-tab"
       aria-selected={active}
       data-active={active || undefined}
-      title={active ? "Click to rename, drag to move" : "Drag to move"}
+      title={active ? "Click to rename, drag to move" : opens ? `Open (${opens}), drag to move` : "Drag to move"}
       onClick={active ? onRename : onOpen}
       onDoubleClick={onRename}
       onContextMenu={onMenu}

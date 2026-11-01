@@ -1,5 +1,6 @@
 import { CheckCheck, CircleDot, Copy, ExternalLink, Bookmark } from "lucide-react";
 import type { MouseEvent } from "react";
+import { useShortcuts } from "../../commands/useShortcuts";
 import type { MenuAt } from "../../components/menu";
 
 export interface RowActionHandlers {
@@ -35,24 +36,25 @@ export function RowActions({ issueId, issueKey, changed, actions, pinned }: Prop
     e.stopPropagation();
     action();
   };
+  const { title } = useShortcuts();
   return (
     <span className="row-actions">
       {changed ? (
-        <button type="button" className="row-actions__btn" title="Mark as read (M)" aria-label={`Mark ${issueKey} as read`} onClick={run(() => actions.markSeen(issueId))}>
+        <button type="button" className="row-actions__btn" title={title("Mark as read", "issue.markSeen")} aria-label={`Mark ${issueKey} as read`} onClick={run(() => actions.markSeen(issueId))}>
           <CheckCheck size={13} strokeWidth={2} aria-hidden="true" />
         </button>
       ) : (
-        <button type="button" className="row-actions__btn" title="Mark as unread (M)" aria-label={`Mark ${issueKey} as unread`} onClick={run(() => actions.markUnread(issueId))}>
+        <button type="button" className="row-actions__btn" title={title("Mark as unread", "issue.markSeen")} aria-label={`Mark ${issueKey} as unread`} onClick={run(() => actions.markUnread(issueId))}>
           <CircleDot size={13} strokeWidth={2} aria-hidden="true" />
         </button>
       )}
-      <button type="button" className="row-actions__btn" title="Copy key (⌘C)" aria-label={`Copy ${issueKey}`} onClick={run(() => actions.copyKey(issueKey))}>
+      <button type="button" className="row-actions__btn" title={title("Copy key", "issue.copyKey")} aria-label={`Copy ${issueKey}`} onClick={run(() => actions.copyKey(issueKey))}>
         <Copy size={13} strokeWidth={2} aria-hidden="true" />
       </button>
       <button
         type="button"
         className="row-actions__btn"
-        title={pinned ? "Remove bookmark (P)" : "Bookmark (P)"}
+        title={title(pinned ? "Remove bookmark" : "Bookmark", "issue.togglePin")}
         aria-label={pinned ? `Remove the bookmark of ${issueKey}` : `Bookmark ${issueKey}`}
         aria-pressed={pinned}
         onClick={run(() => actions.togglePin(issueId))}
@@ -63,7 +65,7 @@ export function RowActions({ issueId, issueKey, changed, actions, pinned }: Prop
         <button
           type="button"
           className="row-actions__btn"
-          title="Open in Jira (⌘↩)"
+          title={title("Open in Jira", "issue.openInJira")}
           aria-label={`Open ${issueKey} in Jira`}
           onClick={run(() => actions.openInJira?.(issueKey))}
         >

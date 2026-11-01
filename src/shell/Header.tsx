@@ -1,4 +1,5 @@
 import { usePageAction } from "../commands/pageActions";
+import { useShortcuts } from "../commands/useShortcuts";
 import { OpenInJiraButton } from "../components/OpenInJiraButton";
 import { browseUrl } from "../lib/jiraLinks";
 import { api, type SpaceNode } from "../api";
@@ -45,8 +46,9 @@ function MarkAllSeen({ listId, unseen }: { listId: number; unseen: number }) {
   const narrowing = useRequestNarrowing(listId, viewId ?? -1) ?? null;
   const markAll = () => void attempt(api.listMarkAllSeen(listId, viewId, viewId === null ? null : narrowing), "Could not mark them read");
   usePageAction("view.markAllSeen", unseen > 0 ? markAll : null);
+  const { title } = useShortcuts();
   return (
-    <button type="button" className="content-header__action" disabled={unseen === 0} onClick={markAll}>
+    <button type="button" className="content-header__action" disabled={unseen === 0} title={title("Mark what this view shows as read", "view.markAllSeen")} onClick={markAll}>
       Mark all as read
     </button>
   );

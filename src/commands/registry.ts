@@ -33,6 +33,21 @@ const MOD_LABELS: Record<(typeof MODIFIERS)[number], string> = { Mod: "⌘", Ctr
 
 const commands = new Map<string, Command>();
 let overrides: Overrides = {};
+/** Bumped whenever a binding may have changed, for `useShortcuts`. */
+let bindingsVersion = 0;
+const bindingListeners = new Set<() => void>();
+
+function bindingsChanged() {
+  bindingsVersion += 1;
+  for (const listener of bindingListeners) listener();
+}
+
+export function subscribeBindings(listener: () => void): () => void {
+  bindingListeners.add(listener);
+  return () => bindingListeners.delete(listener);
+}
+
+export const getBindingsVersion = () => bindingsVersion;
 
 /** Throws on a command whose scope is not registered, which catches scope typos at install time. */
 export function registerCommands(list: Command[]) {
@@ -40,11 +55,13 @@ export function registerCommands(list: Command[]) {
     if (!scopeDef(c.scope)) throw new Error(`Command "${c.id}" has unknown scope "${c.scope}"`);
   }
   for (const c of list) commands.set(c.id, c);
+  bindingsChanged();
 }
 
 export function clearCommands() {
   commands.clear();
   overrides = {};
+  bindingsChanged();
 }
 
 export function allCommands(): Command[] {
@@ -57,6 +74,7 @@ export function getCommand(id: string): Command | undefined {
 
 export function setOverrides(next: Overrides) {
   overrides = { ...next };
+  bindingsChanged();
 }
 
 /** The effective binding: user override, else the default, else none. */
