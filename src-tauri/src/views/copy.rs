@@ -7,11 +7,10 @@ use rusqlite::types::Value as SqlValue;
 use super::display::{
     write_inline_labels, write_look, write_open_with, write_subtasks, write_wrap,
 };
-use super::edit::{
-    insert_view, list_views, read_view, siblings, write_collapsed, write_sort, write_widths,
-};
+use super::edit::{insert_view, siblings, write_collapsed, write_sort, write_widths};
 use super::filter::{write_filter, write_only_mine, write_person};
 use super::model::View;
+use super::read::{list_views, read_view};
 use crate::db::{Db, LocalPart};
 use crate::error::AppResult;
 

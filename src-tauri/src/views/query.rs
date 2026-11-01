@@ -10,12 +10,12 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 use super::columns::custom_columns;
-use super::edit::read_view;
 use super::fetch::{Source, fetch};
 use super::filter::view_conditions;
 use super::groups::{Facts, Group, Lookup, group};
 use super::lookup::{spaces, versions};
 use super::model::{GroupBy, Layout, SubtaskMode, View};
+use super::read::read_view;
 use super::rows::{Person, Row};
 use super::sorting::{fold, sort};
 use super::subtasks::{Nested, as_items, descendants, expand, nest};

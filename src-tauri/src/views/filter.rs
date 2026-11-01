@@ -3,8 +3,9 @@
 
 use rusqlite::{Connection, params};
 
-use super::edit::{edit, read_view};
+use super::edit::edit;
 use super::model::View;
+use super::read::read_view;
 use crate::db::{Db, LocalPart};
 use crate::error::{AppError, AppResult};
 use crate::filter::{Condition, Filter, compile};
