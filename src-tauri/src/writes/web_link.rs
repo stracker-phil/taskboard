@@ -32,7 +32,10 @@ pub async fn add_web_link(
     };
     let id = issue_id.clone();
     let key = db.read(move |conn| issue_key(conn, &id)).await?;
-    let link_id = source.add_remote_link(&issue_id, &url, &title).await?;
+    let answer = source.add_remote_link(&issue_id, &url, &title).await;
+    let change = format!("Web link: {url}");
+    super::sent::record(db, &issue_id, change, answer.as_ref().err()).await;
+    let link_id = answer?;
     let source_name = source.kind().as_str();
     db.write(move |tx, changes| {
         tx.execute(

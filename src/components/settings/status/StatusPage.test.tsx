@@ -57,6 +57,41 @@ describe("StatusPage", () => {
     expect(within(mac).queryByText("Token")).not.toBeInTheDocument();
   });
 
+  describe("Changes Sent to Jira group", () => {
+    const sent = (patch: Partial<DiagnosticRow> = {}) => row({ label: "1 Nov, 14:02 · NW-12", tone: "info", ...patch });
+
+    it("shows every row when two rows share a label", async () => {
+      renderPage({
+        groups: [
+          {
+            title: "Changes Sent to Jira",
+            rows: [sent({ value: "Status: Done" }), sent({ value: "Assignee: Jamie Doe" })],
+          },
+        ],
+      });
+
+      const group = await screen.findByRole("region", { name: "Changes Sent to Jira" });
+      expect(within(group).getAllByText("1 Nov, 14:02 · NW-12")).toHaveLength(2);
+      expect(within(group).getByText("Status: Done")).toBeInTheDocument();
+      expect(within(group).getByText("Assignee: Jamie Doe")).toBeInTheDocument();
+    });
+
+    it("runs the export command from the row's button", async () => {
+      renderPage({
+        groups: [
+          {
+            title: "Changes Sent to Jira",
+            rows: [row({ label: "Export", value: "2 changes", tone: "info", command: "app:exportChanges", commandLabel: "Export…" })],
+          },
+        ],
+      });
+
+      await userEvent.click(await screen.findByRole("button", { name: "Export…" }));
+
+      expect(mocked.runCommand).toHaveBeenCalledWith("app:exportChanges");
+    });
+  });
+
   it("shows nothing when there are no groups", async () => {
     renderPage({ groups: [] });
 

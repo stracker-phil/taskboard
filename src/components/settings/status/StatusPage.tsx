@@ -45,8 +45,8 @@ export function StatusPage() {
   if (error && !data) return <p className="settings-empty" role="alert">{String((error as { message?: string }).message ?? error)}</p>;
   return data?.groups.map((group) => (
     <Group key={group.title} title={group.title} anchor={group.title === "Jira" ? "status" : undefined}>
-      {group.rows.map((row) => (
-        <Row key={row.label} label={row.label}>
+      {group.rows.map((row, index) => (
+        <Row key={`${index}:${row.label}`} label={row.label}>
           <DiagnosticValue row={row} onRan={reload} />
         </Row>
       ))}

@@ -42,7 +42,8 @@ pub(super) async fn set_priority(
         Begun::Sent(change) => change,
     };
     let write = source.set_priority(&issue_id, &name);
-    send(db, source, &issue_id, Field::Priority, write).await?;
+    let sent = format!("Priority: {name}");
+    send(db, source, &issue_id, Field::Priority, sent, write).await?;
     Ok(change.outcome(&name))
 }
 

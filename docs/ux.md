@@ -771,7 +771,8 @@ no separate Settings design; owner, 2026-10-28). Its colors are the `--settings-
   - **Status** (`components/settings/status/`, Daybook's Status page): `diagnostics_get` reports groups of
     rows, each a value with a tone icon (ok, warning, error, info) and maybe a bus command as a button: *Jira*
     (site, account, API token and its expiry), *Sync* (state, tracked projects, last full sync, cached
-    issues, cache size with Compact) and *This Mac* (version, data and log folders with Show, the command-line tool's path). It reads
+    issues, cache size with Compact), *Changes Sent to Jira* (the newest 50, refused ones in red, with
+    Export…) and *This Mac* (version, data and log folders with Show, the command-line tool's path). It reads
     again when the window comes to the front and after a sync.
 
 ## Keys

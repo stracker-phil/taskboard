@@ -81,7 +81,8 @@ pub(super) async fn transition(
         Begun::Sent(moved) => moved,
     };
     let write = source.transition(&issue_id, &transition_id);
-    send(db, source, &issue_id, Field::Status, write).await?;
+    let change = format!("Status: {}", chosen.to.name);
+    send(db, source, &issue_id, Field::Status, change, write).await?;
     let back = reverse_of(source, &issue_id, &moved).await;
     Ok(WriteOutcome {
         done: format!("Moved {} to {}", moved.key, chosen.to.name),

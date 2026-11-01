@@ -1,6 +1,7 @@
 //! Settings → Status: what the Jira connection, the sync and this Mac report now (`groups` builds the texts).
 
 pub mod groups;
+mod sent;
 
 use std::path::{Path, PathBuf};
 
@@ -70,16 +71,43 @@ pub async fn diagnostics_get(
         cli_path: shown(std::env::current_exe().map_err(|e| e.to_string())),
         version: app.package_info().version.to_string(),
     };
+    let sent_changes = state
+        .db
+        .read(|conn| crate::writes::sent::sent_changes(conn, Some(sent::SHOWN)))
+        .await?;
     Ok(Diagnostics {
         groups: vec![
             jira_group(&jira),
             sync_group(&sync_facts),
+            sent::sent_group(&sent_changes, local),
             local_group(&local_facts),
         ],
     })
 }
 
 /// Shows the folder with the settings, the cache and the socket in Finder.
+/// Writes every recorded change to Jira as a CSV into Downloads and shows it in Finder.
+pub async fn export_sent_changes(app: AppHandle) -> AppResult<()> {
+    use tauri_plugin_opener::OpenerExt;
+    let changes = app
+        .state::<AppState>()
+        .db
+        .read(|conn| crate::writes::sent::sent_changes(conn, None))
+        .await?;
+    let dir = app
+        .path()
+        .download_dir()
+        .map_err(|e| AppError::Io(e.to_string()))?;
+    let file = dir.join(format!(
+        "Taskboard changes {}.csv",
+        Local::now().format("%Y-%m-%d %H.%M")
+    ));
+    std::fs::write(&file, sent::to_csv(&changes))?;
+    app.opener()
+        .reveal_item_in_dir(&file)
+        .map_err(|e| AppError::Io(e.to_string()))
+}
+
 pub fn open_data_folder(app: AppHandle) -> AppResult<()> {
     use tauri_plugin_opener::OpenerExt;
     let dir = app

@@ -26,6 +26,7 @@ pub const LOCAL: &[&str] = &[
     include_str!("../../migrations/local/0018_drop_unread_list.sql"),
     include_str!("../../migrations/local/0019_pin_title_position.sql"),
     include_str!("../../migrations/local/0020_view_person.sql"),
+    include_str!("../../migrations/local/0021_write_log.sql"),
 ];
 pub const CACHE: &[&str] = &[
     include_str!("../../migrations/cache/0001_init.sql"),
@@ -304,6 +305,39 @@ mod tests {
                 "issue:NW-1".to_string(),
             ]
         );
+    }
+
+    #[test]
+    fn the_write_log_migration_adds_an_empty_log_and_keeps_the_rest() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        migrate(&mut conn, "local", &LOCAL[..20]).unwrap();
+        conn.execute(
+            "INSERT INTO pin (target_kind, target_id, created_at) \
+             VALUES ('issue', 'NW-1', '2026-01-05T09:00:00Z')",
+            [],
+        )
+        .unwrap();
+        assert!(!tables(&conn).contains(&"write_log".to_string()));
+
+        migrate(&mut conn, "local", LOCAL).unwrap();
+
+        assert!(tables(&conn).contains(&"write_log".to_string()));
+        let count = |table: &str| -> i64 {
+            conn.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |r| r.get(0))
+                .unwrap()
+        };
+        assert_eq!(count("write_log"), 0);
+        assert_eq!(count("pin"), 1);
+        conn.execute(
+            "INSERT INTO write_log (at, issue_id, change) \
+             VALUES ('2026-10-28T12:00:00.000Z', '20001', 'Status: Done')",
+            [],
+        )
+        .unwrap();
+        let error: Option<String> = conn
+            .query_row("SELECT error FROM write_log", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(error, None);
     }
 
     #[test]

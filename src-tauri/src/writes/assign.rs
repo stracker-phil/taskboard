@@ -45,6 +45,9 @@ pub(super) async fn assign(
     let id = issue_id.clone();
     let target = account_id.clone();
     let now = format_utc(Utc::now());
+    // The toast says "you"; the record of changes names the person.
+    let to_me = account_id.as_deref() == Some(me.account_id.as_str());
+    let my_name = me.name.clone();
     let begun = db
         .write(move |tx, changes| {
             let begun = begin(tx, &me, &id, target.as_deref(), &now)?;
@@ -63,8 +66,13 @@ pub(super) async fn assign(
         }
         Begun::Sent(assignment) => assignment,
     };
+    let assignee = match to_me {
+        true => Some(my_name.as_str()),
+        false => assignment.after.as_deref(),
+    };
+    let change = format!("Assignee: {}", assignee.unwrap_or("Unassigned"));
     let write = source.assign(&issue_id, account_id.as_deref());
-    send(db, source, &issue_id, Field::Assignee, write).await?;
+    send(db, source, &issue_id, Field::Assignee, change, write).await?;
     Ok(assignment.outcome())
 }
 

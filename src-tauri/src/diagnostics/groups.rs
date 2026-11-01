@@ -43,7 +43,7 @@ pub struct DiagnosticRow {
     pub command_label: Option<String>,
 }
 
-fn row(label: &str, value: impl Into<String>, tone: DiagnosticTone) -> DiagnosticRow {
+pub(super) fn row(label: &str, value: impl Into<String>, tone: DiagnosticTone) -> DiagnosticRow {
     DiagnosticRow {
         label: label.into(),
         value: value.into(),
@@ -54,14 +54,14 @@ fn row(label: &str, value: impl Into<String>, tone: DiagnosticTone) -> Diagnosti
 }
 
 impl DiagnosticRow {
-    fn offering(mut self, command: &str, label: &str) -> Self {
+    pub(super) fn offering(mut self, command: &str, label: &str) -> Self {
         self.command = Some(command.into());
         self.command_label = Some(label.into());
         self
     }
 }
 
-fn group(title: &str, rows: Vec<DiagnosticRow>) -> DiagnosticGroup {
+pub(super) fn group(title: &str, rows: Vec<DiagnosticRow>) -> DiagnosticGroup {
     DiagnosticGroup {
         title: title.into(),
         rows,

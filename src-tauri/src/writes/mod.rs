@@ -6,6 +6,7 @@ mod comment;
 mod drop;
 mod pending;
 mod priority;
+pub mod sent;
 mod transition;
 mod web_link;
 
@@ -148,19 +149,23 @@ impl Change {
     }
 }
 
-/// Sends the write once; a failure puts the old value back, a success fetches the issue again and settles.
+/// Sends the write once and records it as `change`; a failure puts the old value back, a success fetches the
+/// issue again and settles.
 async fn send<Fut>(
     db: &Db,
     source: &dyn Source,
     issue_id: &str,
     field: Field,
+    change: String,
     write: Fut,
 ) -> AppResult<()>
 where
     Fut: std::future::Future<Output = AppResult<()>>,
 {
     let id = issue_id.to_string();
-    if let Err(e) = write.await {
+    let answer = write.await;
+    sent::record(db, issue_id, change, answer.as_ref().err()).await;
+    if let Err(e) = answer {
         return Err(refused(db, id, field, e).await);
     }
     let settle_id = id.clone();

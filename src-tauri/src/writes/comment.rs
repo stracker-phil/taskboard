@@ -30,6 +30,7 @@ pub async fn add_comment(
     let me = me_of(settings)?;
     let text = checked_text(&text)?;
     let body = adf::from_plain_text(&text);
+    let change = format!("Comment ({} characters)", text.chars().count());
     let shown = Shown {
         issue_id: issue_id.clone(),
         pending_id: format!("pending:{}", fastrand::u64(..)),
@@ -48,7 +49,9 @@ pub async fn add_comment(
             Ok(key)
         })
         .await?;
-    match source.add_comment(&issue_id, body).await {
+    let answer = source.add_comment(&issue_id, body).await;
+    super::sent::record(db, &issue_id, change, answer.as_ref().err()).await;
+    match answer {
         Ok(stored) => settle(db, source, issue_id, pending_id, stored).await?,
         Err(e) => {
             log::info!("Jira refused a comment on issue {issue_id}: {e}");

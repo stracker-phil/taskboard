@@ -57,5 +57,6 @@ stands in Taskboard. The numbers in this table are Taskboard's.
 | [0045](0045-me-mode-is-a-set-of-rules-in-a-scope.md) | Me mode is a set of rules in a scope | Accepted (2026-11-01) |
 | [0046](0046-unread-is-a-mode-of-every-view.md) | Unread is a mode of every view | Accepted (2026-11-01) |
 | [0047](0047-the-bookmarks-bar-is-the-only-top-bar.md) | The bookmarks bar is the only top bar | Accepted (2026-11-01) |
+| [0048](0048-every-change-sent-to-jira-is-recorded-locally.md) | Every change sent to Jira is recorded locally | Accepted (2026-11-01) |
 
 Open: integrations with Daybook and TimeTracker.

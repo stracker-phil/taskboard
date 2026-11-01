@@ -49,6 +49,11 @@ pub fn register(bus: &mut Bus) {
             .run(|app| async move { crate::diagnostics::open_data_folder(app) }),
     );
     bus.add(
+        Command::new("app:exportChanges", "Export Changes Sent to Jira")
+            .help("Save the record of every change sent to Jira as a CSV in Downloads")
+            .run(|app| async move { crate::diagnostics::export_sent_changes(app).await }),
+    );
+    bus.add(
         Command::new("window:close", "Close Window")
             .help("Hide the focused window")
             .hidden()
@@ -215,6 +220,16 @@ mod tests {
         assert!(bus.knows("app:compactCache"));
         let info = bus.info("app:compactCache").unwrap();
         assert_eq!(info.title, "Compact Cache");
+        assert!(!info.hidden);
+    }
+
+    #[test]
+    fn export_changes_is_registered_and_visible() {
+        let bus = registered();
+
+        assert!(bus.knows("app:exportChanges"));
+        let info = bus.info("app:exportChanges").unwrap();
+        assert_eq!(info.title, "Export Changes Sent to Jira");
         assert!(!info.hidden);
     }
 

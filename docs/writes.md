@@ -127,6 +127,15 @@ fetch of the issue's links replaces them as usual. There is no reverse and no re
 links section shows while changes to Jira are on, even without links, with an "Add link" button that grows a form
 open (`AddWebLink.tsx`): the address, focused, and an optional title; ↩ adds, esc closes.
 
+## Record of changes
+
+Every change Jira is asked for is recorded with Jira's answer in `local.write_log` (`writes::sent`): when, the issue
+key, what in plain words ("Status: Done", "Assignee: Jamie Doe", "Comment (42 characters)", "Web link: …") and the
+refusal, if any; a comment's text is not kept. Field changes record in `send`, comments and web links after their
+request. Records are kept for 180 days. Settings → Status lists the newest 50 ("Changes Sent to Jira",
+`diagnostics::sent`); Export… (`app:exportChanges`) saves all of them as a CSV in Downloads and shows it in Finder.
+A change refused before it is sent (changes off, a switched-off kind) records nothing.
+
 ## Commands
 
 | Command | Does |
