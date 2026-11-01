@@ -27,6 +27,8 @@ async function renderGroup(allowJiraChanges: boolean, patch: Partial<Behaviour> 
 beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
+  mocked.connectionChangePermissions.mockReset();
+  mocked.connectionChangePermissions.mockResolvedValue([]);
   mocked.behaviourSet.mockImplementation(async (b) => settings({ behaviour: b }));
 });
 
@@ -113,6 +115,45 @@ describe("ChangesGroup", () => {
       await renderGroup(true);
 
       expect(await screen.findByRole("switch", { name: "Assign issues" })).toBeEnabled();
+    });
+  });
+
+  describe("projects where Jira doesn't allow a change", () => {
+    const note = /Jira doesn't allow it in/;
+
+    it("names the projects under the matching change and under no other", async () => {
+      mocked.connectionChangePermissions.mockResolvedValue([{ capability: "comment", projects: ["NW", "OPS"] }]);
+      await renderGroup(true);
+
+      const shown = await screen.findByText("Jira doesn't allow it in NW, OPS");
+
+      expect(screen.getAllByText(note)).toHaveLength(1);
+      expect(shown.parentElement).toHaveTextContent(capabilityRows().find((row) => row.capability === "comment")!.detail);
+    });
+
+    it("neither asks Jira nor shows a note while changes are off", async () => {
+      mocked.connectionChangePermissions.mockResolvedValue([{ capability: "comment", projects: ["NW"] }]);
+      await renderGroup(false);
+      await screen.findByRole("switch", { name: "Add comments" });
+
+      expect(mocked.connectionChangePermissions).not.toHaveBeenCalled();
+      expect(screen.queryByText(note)).not.toBeInTheDocument();
+    });
+
+    it("shows no note when Jira allows every change", async () => {
+      await renderGroup(true);
+      await screen.findByRole("switch", { name: "Add comments" });
+
+      expect(screen.queryByText(note)).not.toBeInTheDocument();
+    });
+
+    it("shows no note and keeps the rows when the answer fails", async () => {
+      mocked.connectionChangePermissions.mockRejectedValue({ kind: "network", message: "Offline", code: null });
+      await renderGroup(true);
+
+      expect(await screen.findByRole("switch", { name: "Add comments" })).toBeEnabled();
+      await vi.waitFor(() => expect(mocked.connectionChangePermissions).toHaveBeenCalled());
+      expect(screen.queryByText(note)).not.toBeInTheDocument();
     });
   });
 

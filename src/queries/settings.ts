@@ -9,6 +9,7 @@ export const SETTINGS_KEYS = {
   scope: ["scope"],
   keybindings: ["keybindings"],
   capabilities: ["capabilities"],
+  changePermissions: ["changePermissions"],
 } as const;
 
 export const useSettings = () => useQuery({ queryKey: SETTINGS_KEYS.settings, queryFn: api.getSettings });
@@ -17,3 +18,6 @@ export const useProjects = () => useQuery({ queryKey: SETTINGS_KEYS.projects, qu
 export const useScope = () => useQuery({ queryKey: SETTINGS_KEYS.scope, queryFn: api.scopeGet });
 export const useKeybindings = () => useQuery({ queryKey: SETTINGS_KEYS.keybindings, queryFn: api.getKeybindings });
 export const useCapabilities = () => useQuery({ queryKey: SETTINGS_KEYS.capabilities, queryFn: api.jiraCapabilities });
+/** The changes Jira doesn't allow in some tracked projects; asked only while changes are on. */
+export const useChangePermissions = (enabled: boolean) =>
+  useQuery({ queryKey: SETTINGS_KEYS.changePermissions, queryFn: api.connectionChangePermissions, enabled, retry: false });

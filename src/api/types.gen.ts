@@ -170,6 +170,15 @@ export type Cell = { "kind": "text", "value": string } | { "kind": "person", "va
  */
 export type Change = { "kind": "assign", accountId: string | null, } | { "kind": "transition", transitionId: string, } | { "kind": "priority", name: string, };
 
+/**
+ * A change Jira doesn't allow in some tracked projects.
+ */
+export type ChangeNotAllowed = { capability: Capability, 
+/**
+ * The projects' keys, in the sidebar's order.
+ */
+projects: Array<string>, };
+
 export type ChangeValue = { "kind": "status", "value": { name: string, style: Style, } } | { "kind": "person", "value": Person } | { "kind": "text", "value": string };
 
 export type Children = { 

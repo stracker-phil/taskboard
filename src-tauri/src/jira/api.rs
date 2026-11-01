@@ -3,8 +3,8 @@
 use super::client::JiraClient;
 use super::dto::{
     ApproximateCount, BulkFetch, Changelog, ChangelogPage, Comment, CommentPage, CreatedRemoteLink,
-    EditMeta, Field, Issue, Myself, ParsedQueries, Project, ProjectPage, RemoteLink, SearchPage,
-    Status, TenantInfo, Transition, Transitions, Version,
+    EditMeta, Field, Issue, MyPermissions, Myself, ParsedQueries, Project, ProjectPage, RemoteLink,
+    SearchPage, Status, TenantInfo, Transition, Transitions, Version,
 };
 use super::gateway::{
     AccountId, AttachmentId, Endpoint, FieldIds, IssueRef, IssueRefs, Jql, LinkTitle, PriorityName,
@@ -38,6 +38,22 @@ impl JiraClient {
         self.gateway()
             .send(Endpoint::ProjectVersions { project })
             .await
+    }
+
+    /// Which project permissions behind Taskboard's changes (`Capability::jira_permission`) the user has in the
+    /// project.
+    pub async fn my_permissions(&self, project_key: &str) -> AppResult<BTreeSet<String>> {
+        let project = ProjectKey::parse(project_key)?;
+        let answer: MyPermissions = self
+            .gateway()
+            .send(Endpoint::MyPermissions { project })
+            .await?;
+        Ok(answer
+            .permissions
+            .into_iter()
+            .filter(|(_, permission)| permission.have_permission)
+            .map(|(key, _)| key)
+            .collect())
     }
 
     /// Every project the user can browse, all pages.

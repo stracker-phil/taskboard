@@ -22,6 +22,8 @@ pub struct Content {
     pub page_size: Option<usize>,
     /// Status ids whose transitions ask for a screen.
     pub screens: HashSet<String>,
+    /// (project key, permission) pairs the user lacks; every other permission is granted.
+    pub denied: HashSet<(String, String)>,
     pub max_results_cap: usize,
 }
 
@@ -38,6 +40,7 @@ pub fn route(site: &mut Content, request: &Recorded) -> Response {
     let parts: Vec<&str> = path.split('/').collect();
     match (request.method.as_str(), parts.as_slice()) {
         ("GET", ["myself"]) => Response::json(200, site.data.myself.clone()),
+        ("GET", ["mypermissions"]) => my_permissions(site, request),
         ("GET", ["field"]) => Response::json(200, json!(site.data.fields)),
         ("GET", ["status"]) => Response::json(200, json!(site.data.statuses)),
         ("GET", ["project", "search"]) => projects(site, request),
@@ -112,6 +115,25 @@ fn offset_query(request: &Recorded, default_size: usize) -> (usize, usize) {
         number("startAt", 0),
         number("maxResults", default_size).max(1),
     )
+}
+
+fn my_permissions(site: &Content, request: &Recorded) -> Response {
+    let project = request.query_value("projectKey").unwrap_or_default();
+    let asked = request.query_value("permissions").unwrap_or_default();
+    let permissions: serde_json::Map<String, Value> = asked
+        .split(',')
+        .filter(|key| !key.is_empty())
+        .map(|key| {
+            let denied = site
+                .denied
+                .contains(&(project.to_string(), key.to_string()));
+            (
+                key.to_string(),
+                json!({ "key": key, "havePermission": !denied }),
+            )
+        })
+        .collect();
+    Response::json(200, json!({ "permissions": permissions }))
 }
 
 fn projects(site: &Content, request: &Recorded) -> Response {

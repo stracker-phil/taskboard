@@ -62,6 +62,22 @@ impl Capability {
         }
     }
 
+    /// The Jira project permission a change needs in the issue's project; `None` for a read.
+    pub fn jira_permission(self) -> Option<&'static str> {
+        match self {
+            Self::Assign => Some("ASSIGN_ISSUES"),
+            Self::ChangeStatus => Some("TRANSITION_ISSUES"),
+            Self::ChangePriority => Some("EDIT_ISSUES"),
+            Self::Comment => Some("ADD_COMMENTS"),
+            Self::AddWebLink => Some("LINK_ISSUES"),
+            Self::Account
+            | Self::Projects
+            | Self::Issues
+            | Self::IssueDetails
+            | Self::CheckQueries => None,
+        }
+    }
+
     pub fn label(self) -> &'static str {
         match self {
             Self::Account => "Your account",
@@ -267,6 +283,30 @@ mod tests {
             (Capability::AddWebLink, "write:jira-work"),
         ] {
             assert_eq!(capability.scope(), scope, "{capability:?}");
+        }
+    }
+
+    #[test]
+    fn each_change_names_the_jira_permission_it_needs() {
+        for (capability, permission) in [
+            (Capability::Assign, "ASSIGN_ISSUES"),
+            (Capability::ChangeStatus, "TRANSITION_ISSUES"),
+            (Capability::ChangePriority, "EDIT_ISSUES"),
+            (Capability::Comment, "ADD_COMMENTS"),
+            (Capability::AddWebLink, "LINK_ISSUES"),
+        ] {
+            assert_eq!(capability.jira_permission(), Some(permission), "{capability:?}");
+        }
+    }
+
+    #[test]
+    fn every_change_needs_a_jira_permission_and_no_read_does() {
+        for capability in Capability::ALL {
+            assert_eq!(
+                capability.jira_permission().is_some(),
+                capability.is_change(),
+                "{capability:?}"
+            );
         }
     }
 

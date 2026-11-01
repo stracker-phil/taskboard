@@ -19,6 +19,11 @@ sent once and never retried.
   changes as switches); `jira_capability_set` switches a change.
 - A scoped token needs `write:jira-work`. A `403` on a write is `invalid_input` naming that scope; it never
   pauses the sync. A `400` shows Jira's reason.
+- Jira's own permissions: while changes are on, Settings → Connection asks `GET mypermissions` once per tracked
+  project (`connection_change_permissions`, `connection::permissions`) for the project permission each change needs
+  (`Capability::jira_permission`: Assign issues, Transition issues, Edit issues, Add comments, Link issues) and
+  names, under a change, the projects where Jira doesn't allow it. Jira answers for the user, not the token, so a
+  scoped token without `write:jira-work` still shows only when a change is refused.
 
 ## Flow (`writes::apply`)
 

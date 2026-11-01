@@ -14,6 +14,20 @@ fn today() -> NaiveDate {
     Local::now().date_naive()
 }
 
+/// The changes Jira doesn't allow in some tracked projects, asked once per project.
+#[tauri::command]
+pub async fn connection_change_permissions(
+    state: State<'_, AppState>,
+) -> AppResult<Vec<super::permissions::ChangeNotAllowed>> {
+    let client = state.jira.client(&state.settings.get().connection)?;
+    let mut granted = Vec::new();
+    for key in super::projects::tracked_keys(&state.db).await? {
+        let have = client.my_permissions(&key).await?;
+        granted.push((key, have));
+    }
+    Ok(super::permissions::not_allowed(&granted))
+}
+
 #[tauri::command]
 pub fn connection_get(state: State<'_, AppState>) -> ConnectionView {
     super::view(&state.settings, &state.jira, today())

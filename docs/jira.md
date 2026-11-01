@@ -96,6 +96,7 @@ One method on `JiraClient` each (`jira/api.rs`), one `Endpoint` each; the answer
 | `projects` | `GET project/search`, every page by `startAt` | `Project` |
 | `statuses` | `GET status` | `Status` with its category key |
 | `versions` | `GET project/{key}/versions` | `Version` |
+| `my_permissions` | `GET mypermissions?projectKey=&permissions=` (the changes' project permissions) | `MyPermissions` |
 | `search_jql` | `POST search/jql`, `maxResults=100`, explicit fields | `SearchPages`, a cursor of `SearchPage` |
 | `bulk_fetch` | `POST issue/bulkfetch`, up to `BULK_FETCH_MAX` ids | `BulkFetch`: issues and the ids Jira refused |
 | `approximate_count` | `POST search/approximate-count` | a count |

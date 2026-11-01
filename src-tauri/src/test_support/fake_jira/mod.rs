@@ -61,6 +61,7 @@ impl FakeJira {
                 now,
                 hidden: HashSet::new(),
                 screens: HashSet::new(),
+                denied: HashSet::new(),
                 page_size: None,
                 max_results_cap: 100,
             }),
@@ -118,6 +119,13 @@ impl FakeJira {
     /// Moving an issue into this status asks for a screen (`hasScreen`).
     pub fn require_screen(&self, status_id: &str) {
         self.content().screens.insert(status_id.to_string());
+    }
+
+    /// The user lacks the project permission (`ASSIGN_ISSUES`…) in the project (`mypermissions`).
+    pub fn deny_permission(&self, project_key: &str, permission: &str) {
+        self.content()
+            .denied
+            .insert((project_key.to_string(), permission.to_string()));
     }
 
     /// The most issues a search page holds when `maxResults` asks for more.

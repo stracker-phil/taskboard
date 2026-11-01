@@ -55,6 +55,10 @@ pub enum Endpoint {
     ProjectVersions {
         project: ProjectKey,
     },
+    /// Which of the project permissions behind Taskboard's changes the user has in the project.
+    MyPermissions {
+        project: ProjectKey,
+    },
     SearchJql {
         jql: Jql,
         fields: FieldIds,
@@ -129,6 +133,14 @@ pub enum Endpoint {
     },
 }
 
+/// The project permissions Taskboard's changes need, in `Capability::ALL`'s order.
+pub fn change_permissions() -> Vec<&'static str> {
+    Capability::ALL
+        .iter()
+        .filter_map(|c| c.jira_permission())
+        .collect()
+}
+
 /// A request ready for the guard and the wire.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Planned {
@@ -150,6 +162,7 @@ impl Endpoint {
             | Self::Statuses
             | Self::ProjectSearch { .. }
             | Self::ProjectVersions { .. }
+            | Self::MyPermissions { .. }
             | Self::FieldUsage { .. } => Capability::Projects,
             Self::SearchJql { .. } | Self::BulkFetch { .. } | Self::ApproximateCount { .. } => {
                 Capability::Issues
@@ -189,6 +202,10 @@ impl Endpoint {
             Self::ProjectVersions { project } => {
                 Rest::get(&["project", project.as_str(), "versions"]).plan(site)
             }
+            Self::MyPermissions { project } => Rest::get(&["mypermissions"])
+                .query("projectKey", project.as_str())
+                .query("permissions", change_permissions().join(","))
+                .plan(site),
             Self::SearchJql {
                 jql,
                 fields,

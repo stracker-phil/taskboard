@@ -1,5 +1,5 @@
 import { api, type CapabilityRow } from "../../../api";
-import { useCapabilities, useSettings } from "../../../queries/settings";
+import { useCapabilities, useChangePermissions, useSettings } from "../../../queries/settings";
 import { attempt } from "../../../state/requests";
 import { Group, Row, Switch, SwitchInput } from "../controls";
 
@@ -8,6 +8,7 @@ import { Group, Row, Switch, SwitchInput } from "../controls";
 export function ChangesGroup() {
   const { data: settings } = useSettings();
   const { data: capabilities = [] } = useCapabilities();
+  const { data: notAllowed = [] } = useChangePermissions(settings?.behaviour.allowJiraChanges ?? false);
   if (!settings) return null;
   const { behaviour } = settings;
   const setAllowJiraChanges = (allowJiraChanges: boolean) =>
@@ -16,6 +17,8 @@ export function ChangesGroup() {
     void attempt(api.jiraCapabilitySet(row.capability, enabled), `Could not change “${row.label}”`);
   const changes = capabilities.filter((row) => row.change);
   const reads = capabilities.filter((row) => !row.change);
+  const notAllowedIn = (row: CapabilityRow) =>
+    behaviour.allowJiraChanges ? (notAllowed.find((n) => n.capability === row.capability)?.projects ?? []) : [];
   const scopes = (rows: CapabilityRow[]) => [...new Set(rows.map((row) => row.scope))];
   return (
     <>
@@ -30,7 +33,12 @@ export function ChangesGroup() {
       >
         <Switch label="Allow changes to Jira" checked={behaviour.allowJiraChanges} onChange={setAllowJiraChanges} />
         {changes.map((row) => (
-          <Row key={row.capability} label={row.label} description={<Described row={row} />} disabled={!behaviour.allowJiraChanges}>
+          <Row
+            key={row.capability}
+            label={row.label}
+            description={<Described row={row} notAllowedIn={notAllowedIn(row)} />}
+            disabled={!behaviour.allowJiraChanges}
+          >
             <SwitchInput
               aria-label={row.label}
               checked={!behaviour.disabledChanges.includes(row.capability)}
@@ -57,11 +65,14 @@ export function ChangesGroup() {
   );
 }
 
-/** The detail, then the scope it needs as Jira names it. */
-function Described({ row }: { row: CapabilityRow }) {
+/** The detail and its token scope; for a change, the projects where Jira doesn't allow it. */
+function Described({ row, notAllowedIn = [] }: { row: CapabilityRow; notAllowedIn?: string[] }) {
   return (
     <>
       {row.detail} · <code className="settings-scope">{row.scope}</code>
+      {notAllowedIn.length > 0 && (
+        <span className="settings-not-allowed">Jira doesn't allow it in {notAllowedIn.join(", ")}</span>
+      )}
     </>
   );
 }

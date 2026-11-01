@@ -4,6 +4,7 @@
 mod account;
 pub mod commands;
 mod expiry;
+pub mod permissions;
 mod projects;
 mod scope;
 

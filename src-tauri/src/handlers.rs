@@ -45,6 +45,7 @@ pub fn handlers() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
         pins::pin_toggle_issue,
         changes::list_mark_all_seen,
         connection::connection_get,
+        connection::connection_change_permissions,
         connection::connection_save,
         connection::connection_test,
         connection::projects_list,

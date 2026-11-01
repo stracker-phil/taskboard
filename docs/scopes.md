@@ -36,6 +36,8 @@ Reads the issues and everything around them. Every request of the sync and of an
 - **The status menu and drags:** `GET issue/{id}/transitions`, the moves the workflow offers;
   `GET issue/{id}/editmeta`, the priorities an issue may get.
 - **Settings → Sync:** `POST jql/parse` validates the sync scope's JQL.
+- **Settings → Connection:** `GET mypermissions` (per tracked project) checks which changes Jira allows the user
+  there.
 
 ## read:jira-user
 

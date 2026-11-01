@@ -8,6 +8,7 @@ import {
   type Behaviour,
   type BoardData,
   type CapabilityRow,
+  type ChangeNotAllowed,
   type Connection,
   type ConnectionInput,
   type ConnectionView,
@@ -94,6 +95,7 @@ export function createApiMock(): Api {
     takeLaunchEvents: vi.fn().mockResolvedValue([]),
     runCommand: vi.fn().mockResolvedValue(undefined),
     connectionGet: vi.fn(async (): Promise<ConnectionView> => ({ connection: emptyConnection(), hasToken: false, expiry: { state: "fine" } })),
+    connectionChangePermissions: vi.fn(async (): Promise<ChangeNotAllowed[]> => []),
     connectionSave: vi.fn(async (input: ConnectionInput, token: string | null): Promise<ConnectionView> => ({
       connection: { ...emptyConnection(), ...input },
       hasToken: token !== null,

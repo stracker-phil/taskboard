@@ -10,6 +10,7 @@ import type {
   Behaviour,
   Capability,
   CapabilityRow,
+  ChangeNotAllowed,
   BoardData,
   Change,
   ConnectionInput,
@@ -235,6 +236,7 @@ export const api = {
   /** Adds a plain-text comment in Jira; it shows in the activity at once. */
   /** What Taskboard does with Jira; the changes allowed or not. */
   jiraCapabilities: () => invoke<CapabilityRow[]>("jira_capabilities"),
+  connectionChangePermissions: () => invoke<ChangeNotAllowed[]>("connection_change_permissions"),
   jiraCapabilitySet: (capability: Capability, enabled: boolean) => invoke<Settings>("jira_capability_set", { capability, enabled }),
   issueComment: (id: string, text: string) => invoke<WriteOutcome>("issue_comment", { id, text }),
   /** `title` null: named after its pull request or address. */

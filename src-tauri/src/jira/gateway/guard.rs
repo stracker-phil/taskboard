@@ -72,6 +72,11 @@ const RULES: &[Rule] = &[
     ),
     read(
         Get,
+        &[Literal("mypermissions")],
+        &["projectKey", "permissions"],
+    ),
+    read(
+        Get,
         &[Literal("issue"), IssueIdOrKey, Literal("comment")],
         &["startAt", "maxResults", "orderBy", "expand"],
     ),

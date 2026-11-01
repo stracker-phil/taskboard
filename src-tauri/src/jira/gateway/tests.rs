@@ -96,6 +96,14 @@ fn allowlist() -> Vec<(Endpoint, Method, &'static str, Option<Value>)> {
             None,
         ),
         (
+            Endpoint::MyPermissions {
+                project: project("NW"),
+            },
+            Method::GET,
+            "mypermissions?projectKey=NW&permissions=ASSIGN_ISSUES%2CTRANSITION_ISSUES%2CEDIT_ISSUES%2CADD_COMMENTS%2CLINK_ISSUES",
+            None,
+        ),
+        (
             search(jql(QUERY)),
             Method::POST,
             "search/jql",
@@ -748,6 +756,60 @@ fn a_tenant_info_request_with_credentials_or_another_shape_is_refused() {
             let mut plan = planned(method, url);
             plan.authenticated = false;
             assert_refused(&plan, &site, what);
+        }
+    }
+}
+
+#[test]
+fn checking_permissions_is_a_projects_read() {
+    let endpoint = Endpoint::MyPermissions {
+        project: project("OPS"),
+    };
+
+    assert_eq!(endpoint.capability(), Capability::Projects);
+    assert_eq!(endpoint.plan(&classic()).unwrap().access, Access::Read);
+}
+
+#[test]
+fn the_permissions_check_takes_only_the_project_key_and_the_permissions() {
+    let permissions = "ASSIGN_ISSUES,EDIT_ISSUES";
+    for (_, site) in sites() {
+        let accepted = format!("rest/api/3/mypermissions?projectKey=NW&permissions={permissions}");
+        assert!(
+            check(&planned(Method::GET, &url_for(&site, &accepted)), &site).is_ok(),
+            "{accepted}"
+        );
+
+        for (method, relative) in [
+            (
+                Method::GET,
+                format!("rest/api/3/mypermissions?projectKey=NW&permissions={permissions}&x=1"),
+            ),
+            (
+                Method::GET,
+                format!(
+                    "rest/api/3/mypermissions?projectKey=NW&projectKey=OPS&permissions={permissions}"
+                ),
+            ),
+            (
+                Method::POST,
+                format!("rest/api/3/mypermissions?projectKey=NW&permissions={permissions}"),
+            ),
+            (
+                Method::PUT,
+                format!("rest/api/3/mypermissions?projectKey=NW&permissions={permissions}"),
+            ),
+            (
+                Method::DELETE,
+                format!("rest/api/3/mypermissions?projectKey=NW&permissions={permissions}"),
+            ),
+            (Method::GET, "rest/api/3/mypermissions/NW".to_string()),
+        ] {
+            assert_refused(
+                &planned(method.clone(), &url_for(&site, &relative)),
+                &site,
+                &format!("{method} {relative}"),
+            );
         }
     }
 }

@@ -6,6 +6,7 @@ mod comment;
 mod edit_meta;
 mod issue;
 mod meta;
+mod permissions;
 mod remote_link;
 mod transition;
 
@@ -19,6 +20,7 @@ pub use issue::{ApproximateCount, BulkFetch, Issue, SearchPage, parse_jira_time}
 pub use meta::{
     Field, FieldSchema, Myself, Project, Status, StatusCategory, TenantInfo, User, Version,
 };
+pub(crate) use permissions::MyPermissions;
 pub use remote_link::{CreatedRemoteLink, RemoteApplication, RemoteIcon, RemoteLink, RemoteObject};
 pub use transition::Transition;
 pub(crate) use transition::Transitions;

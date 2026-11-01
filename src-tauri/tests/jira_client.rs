@@ -410,6 +410,74 @@ mod retries {
     }
 }
 
+mod permissions {
+    use super::*;
+    use std::collections::BTreeSet;
+
+    fn set(items: &[&str]) -> BTreeSet<String> {
+        items.iter().map(|item| item.to_string()).collect()
+    }
+
+    const ALL_CHANGES: [&str; 5] = [
+        "ADD_COMMENTS",
+        "ASSIGN_ISSUES",
+        "EDIT_ISSUES",
+        "LINK_ISSUES",
+        "TRANSITION_ISSUES",
+    ];
+
+    #[tokio::test]
+    async fn every_permission_is_granted_unless_denied() {
+        let fake = FakeJira::start_demo().await;
+
+        let granted = fake
+            .client(TokenKind::Classic)
+            .my_permissions("NW")
+            .await
+            .unwrap();
+
+        assert_eq!(granted, set(&ALL_CHANGES));
+        let asked = fake.requests();
+        assert_eq!(asked.len(), 1);
+        assert_eq!(asked[0].query_value("projectKey"), Some("NW"));
+        assert_eq!(
+            asked[0].query_value("permissions"),
+            Some("ASSIGN_ISSUES,TRANSITION_ISSUES,EDIT_ISSUES,ADD_COMMENTS,LINK_ISSUES")
+        );
+    }
+
+    #[tokio::test]
+    async fn a_denied_permission_is_left_out_for_that_project_only() {
+        let fake = FakeJira::start_demo().await;
+        fake.deny_permission("OPS", "TRANSITION_ISSUES");
+        fake.deny_permission("OPS", "LINK_ISSUES");
+        let client = fake.client(TokenKind::Classic);
+
+        assert_eq!(
+            client.my_permissions("OPS").await.unwrap(),
+            set(&["ADD_COMMENTS", "ASSIGN_ISSUES", "EDIT_ISSUES"])
+        );
+        assert_eq!(
+            client.my_permissions("NW").await.unwrap(),
+            set(&ALL_CHANGES)
+        );
+    }
+
+    #[tokio::test]
+    async fn an_invalid_project_key_is_refused_before_anything_is_sent() {
+        let fake = FakeJira::start_demo().await;
+
+        let err = fake
+            .client(TokenKind::Classic)
+            .my_permissions("nw/../x")
+            .await
+            .unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::InvalidInput);
+        assert!(fake.requests().is_empty());
+    }
+}
+
 mod demo_answers {
     use super::*;
 
