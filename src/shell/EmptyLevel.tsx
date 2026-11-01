@@ -1,15 +1,22 @@
 import { Funnel } from "lucide-react";
+import { api } from "../api";
+import { useModes } from "../queries/modes";
 import { useSidebar } from "../queries/sidebar";
 import { NO_NARROWING, useRequestNarrowing } from "../queries/views";
+import { attempt } from "../state/requests";
 import { narrowingKey } from "../state/slices/narrowing";
 import { useStore } from "../state/store";
 import { findLevel } from "./levels";
+import { useMeMode } from "./toolbar/useMeMode";
 
-/** A view with no issues (artboard 8, card 2): what the level asks for, and how to widen it. */
+/** A view with no issues (artboard 8, card 2): what the level asks for, what narrows it, and one button per way
+ *  to widen it. */
 export function EmptyLevel({ listId, viewId }: { listId: number; viewId: number }) {
   const { data: tree } = useSidebar();
   const key = narrowingKey(listId, viewId);
   const narrowing = useRequestNarrowing(listId, viewId) ?? NO_NARROWING;
+  const { unreadOnly } = useModes();
+  const me = useMeMode(key, narrowing.me, narrowing.person);
   const setNarrowing = useStore((s) => s.setNarrowing);
   const requestFilter = useStore((s) => s.requestFilter);
   const level = tree ? findLevel(tree, listId) : null;
@@ -17,8 +24,21 @@ export function EmptyLevel({ listId, viewId }: { listId: number; viewId: number 
   const name = level.kind === "space" ? level.space.name : level.node.name;
   const ownFilter = level.kind === "list" || (level.kind === "home" && level.node.kind === "list");
   const description = level.kind === "space" ? "" : level.node.description;
-  const parts = [description, narrowing.me && "Assignee = me", narrowing.text.trim() && `the text “${narrowing.text.trim()}”`].filter(Boolean);
+  const text = narrowing.text.trim();
+  const parts = [
+    description,
+    me.on && "Me mode",
+    me.person && "the person filter",
+    text && `the text “${text}”`,
+    unreadOnly && "Unread only",
+  ].filter(Boolean);
   const sentence = parts.length > 0 ? `No issues match ${parts.join(" and ")}.` : "No issues here yet.";
+  const widen = [
+    text && { label: "Clear search", run: () => setNarrowing(key, { text: "" }) },
+    me.on && { label: "Clear Me filter", run: () => me.setMe(false) },
+    me.person && { label: "Show anyone", run: () => me.setPerson(null) },
+    unreadOnly && { label: "Turn off Unread only", run: () => void attempt(api.modeSet("unreadOnly", false), "Could not change Unread only") },
+  ].filter((action): action is { label: string; run: () => void } => Boolean(action));
   return (
     <div className="empty-level">
       <span className="empty-level__icon" aria-hidden="true">
@@ -26,18 +46,18 @@ export function EmptyLevel({ listId, viewId }: { listId: number; viewId: number 
       </span>
       <h2 className="empty-level__title">Nothing in {name}</h2>
       <p className="empty-level__text">{sentence}</p>
-      {(ownFilter || narrowing.me) && (
+      {(ownFilter || widen.length > 0) && (
         <div className="empty-level__actions">
           {ownFilter && (
             <button type="button" className="btn-secondary" onClick={requestFilter}>
               Edit filter
             </button>
           )}
-          {narrowing.me && (
-            <button type="button" className="empty-level__ghost" onClick={() => setNarrowing(key, { me: false })}>
-              Clear Me filter
+          {widen.map((action) => (
+            <button key={action.label} type="button" className="empty-level__ghost" onClick={action.run}>
+              {action.label}
             </button>
-          )}
+          ))}
         </div>
       )}
     </div>

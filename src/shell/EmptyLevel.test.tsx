@@ -35,6 +35,7 @@ async function renderEmpty(listId: number, tree: SidebarTree) {
 beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
+  mocked.modesGet.mockResolvedValue({ meEverywhere: false, unreadOnly: false, bookmarksBar: false });
   mocked.viewsOf.mockImplementation(async (listId) => [view({ id: VIEW_ID, listId })]);
 });
 
@@ -62,11 +63,11 @@ describe("EmptyLevel", () => {
     });
 
     it.each<[string, string, boolean, string, string]>([
-      ["Me on", "Priority = High", true, "", "No issues match Priority = High and Assignee = me."],
+      ["Me on", "Priority = High", true, "", "No issues match Priority = High and Me mode."],
       ["a text", "Priority = High", false, "pricing", "No issues match Priority = High and the text “pricing”."],
-      ["Me and a text", "Priority = High", true, "  pricing ", "No issues match Priority = High and Assignee = me and the text “pricing”."],
+      ["Me and a text", "Priority = High", true, "  pricing ", "No issues match Priority = High and Me mode and the text “pricing”."],
       ["a blank text", "Priority = High", false, "   ", "No issues match Priority = High."],
-      ["no description and Me on", "", true, "", "No issues match Assignee = me."],
+      ["no description and Me on", "", true, "", "No issues match Me mode."],
       ["no description and a text", "", false, "pricing", "No issues match the text “pricing”."],
       ["no description, no Me and no text", "", false, "", "No issues here yet."],
     ])("words the narrowing with %s", async (_name, description, me, text, sentence) => {
@@ -127,7 +128,7 @@ describe("EmptyLevel", () => {
       mocked.viewsOf.mockResolvedValue([view({ id: VIEW_ID, listId: FILTER_ID, onlyMine: true })]);
       await renderEmpty(FILTER_ID, treeWithFilter());
 
-      expect(await screen.findByText("No issues match Priority = High and Assignee = me.")).toBeInTheDocument();
+      expect(await screen.findByText("No issues match Priority = High and Me mode.")).toBeInTheDocument();
     });
 
     it("turns off the Me chip the view saved as a draft, without saving the view", async () => {
@@ -145,7 +146,113 @@ describe("EmptyLevel", () => {
       await renderEmpty(SPACE_ID, sidebarTree([space()]));
 
       expect(await screen.findByRole("button", { name: "Clear Me filter" })).toBeInTheDocument();
-      expect(screen.getByText("No issues match Assignee = me.")).toBeInTheDocument();
+      expect(screen.getByText("No issues match Me mode.")).toBeInTheDocument();
+    });
+
+    it("also switches Me off in every view when it applies everywhere", async () => {
+      mocked.modesGet.mockResolvedValue({ meEverywhere: true, unreadOnly: false, bookmarksBar: false });
+      await renderEmpty(FILTER_ID, treeWithFilter());
+
+      await userEvent.click(await screen.findByRole("button", { name: "Clear Me filter" }));
+
+      expect(mocked.modeSet).toHaveBeenCalledWith("meEverywhere", false);
+    });
+
+    it("leaves the everywhere mode alone when Me is only on in this view", async () => {
+      useStore.getState().setNarrowing(KEY, { me: true });
+      await renderEmpty(FILTER_ID, treeWithFilter());
+
+      await userEvent.click(await screen.findByRole("button", { name: "Clear Me filter" }));
+
+      expect(mocked.modeSet).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Clear search", () => {
+    it("is not offered without a text", async () => {
+      useStore.getState().setNarrowing(KEY, { text: "   " });
+      await renderEmpty(FILTER_ID, treeWithFilter());
+
+      await screen.findByRole("heading", { name: /^Nothing in / });
+      expect(screen.queryByRole("button", { name: "Clear search" })).not.toBeInTheDocument();
+    });
+
+    it("empties the text and drops it from the sentence", async () => {
+      useStore.getState().setNarrowing(KEY, { text: "pricing" });
+      await renderEmpty(FILTER_ID, treeWithFilter());
+
+      await userEvent.click(await screen.findByRole("button", { name: "Clear search" }));
+
+      expect(useStore.getState().narrowings[KEY]).toMatchObject({ text: "" });
+      expect(screen.getByText("No issues match Priority = High.")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Clear search" })).not.toBeInTheDocument();
+    });
+  });
+
+  describe("Show anyone", () => {
+    it("is not offered without a person chip", async () => {
+      await renderEmpty(FILTER_ID, treeWithFilter());
+
+      await screen.findByRole("heading", { name: /^Nothing in / });
+      expect(screen.queryByRole("button", { name: "Show anyone" })).not.toBeInTheDocument();
+    });
+
+    it("names the person filter and clears the chip", async () => {
+      useStore.getState().setNarrowing(KEY, { person: "user-7" });
+      await renderEmpty(FILTER_ID, treeWithFilter());
+      expect(await screen.findByText("No issues match Priority = High and the person filter.")).toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole("button", { name: "Show anyone" }));
+
+      expect(useStore.getState().narrowings[KEY]?.person).toBeNull();
+      expect(screen.getByText("No issues match Priority = High.")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Show anyone" })).not.toBeInTheDocument();
+    });
+  });
+
+  describe("Turn off Unread only", () => {
+    it("is not offered while Unread only is off", async () => {
+      await renderEmpty(FILTER_ID, treeWithFilter());
+
+      await screen.findByRole("heading", { name: /^Nothing in / });
+      expect(screen.queryByRole("button", { name: "Turn off Unread only" })).not.toBeInTheDocument();
+    });
+
+    it("names Unread only in the sentence and turns the mode off", async () => {
+      mocked.modesGet.mockResolvedValue({ meEverywhere: false, unreadOnly: true, bookmarksBar: false });
+      await renderEmpty(FILTER_ID, treeWithFilter());
+      expect(await screen.findByText("No issues match Priority = High and Unread only.")).toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole("button", { name: "Turn off Unread only" }));
+
+      expect(mocked.modeSet).toHaveBeenCalledWith("unreadOnly", false);
+    });
+  });
+
+  describe("with several narrowings", () => {
+    it("joins them all with and and offers one button for each", async () => {
+      mocked.modesGet.mockResolvedValue({ meEverywhere: false, unreadOnly: true, bookmarksBar: false });
+      useStore.getState().setNarrowing(KEY, { me: true, text: "pricing" });
+      await renderEmpty(FILTER_ID, treeWithFilter());
+
+      expect(
+        await screen.findByText("No issues match Priority = High and Me mode and the text “pricing” and Unread only."),
+      ).toBeInTheDocument();
+      expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual([
+        "Edit filter",
+        "Clear search",
+        "Clear Me filter",
+        "Turn off Unread only",
+      ]);
+    });
+  });
+
+  describe("without narrowing", () => {
+    it("offers no action buttons on a Space", async () => {
+      await renderEmpty(SPACE_ID, sidebarTree([space()]));
+
+      await screen.findByRole("heading", { name: /^Nothing in / });
+      expect(screen.queryAllByRole("button")).toHaveLength(0);
     });
   });
 });

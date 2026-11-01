@@ -27,7 +27,7 @@
 .empty-level__icon { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 14px; background: var(--fill-subtle); color: var(--text-muted); }
 .empty-level__title { margin: 0; font-size: 16px; font-weight: 700; color: var(--text); }
 .empty-level__text { max-width: 300px; margin: 0; font-size: 13px; line-height: 1.5; color: var(--text-tertiary); }
-.empty-level__actions { display: flex; gap: 8px; }
+.empty-level__actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; max-width: 420px; }
 .empty-level__ghost {
   height: 30px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: var(--text-tertiary);
   font: inherit; font-size: 13px; cursor: default; transition: background-color var(--motion-fast) var(--ease-out);
@@ -42,3 +42,23 @@
 }
 .gone-notice__actions { display: flex; gap: 8px; }
 .btn-secondary--small { height: 28px; padding: 0 10px; font-size: 12px; }
+
+/* Placeholder rows while a view's first issues load: the List's and Table's row heights, the Board's columns. The
+   delay keeps a quick load from flashing them. */
+.body-skeleton {
+  height: 100%; box-sizing: border-box; overflow: hidden; border-top: 1px solid var(--hairline); background: var(--list-bg);
+  animation: fade-in var(--motion-slow) var(--ease-out) 250ms backwards;
+}
+.body-skeleton--list { padding: 52px 40px 0 68px; }
+.body-skeleton--table { padding: 34px 24px 0; }
+.body-skeleton__row { display: flex; align-items: center; height: 44px; }
+.body-skeleton--table .body-skeleton__row { height: 30px; border-bottom: 1px solid var(--row-hairline); }
+.body-skeleton--board { display: flex; gap: 16px; padding: 16px 24px; }
+.body-skeleton__column { display: flex; flex-direction: column; gap: 8px; width: 300px; padding: 10px; border-radius: 12px; background: var(--fill-subtle); }
+.body-skeleton__card { display: flex; align-items: center; height: 110px; padding: 0 14px; border-radius: 10px; background: var(--panel-bg); }
+.body-skeleton__bar {
+  height: 10px; border-radius: 5px; background: var(--fill-subtle);
+  animation: skeleton-pulse 1.4s var(--ease-in-out) infinite;
+}
+@keyframes skeleton-pulse { 50% { opacity: 0.5; } }
+@media (prefers-reduced-motion: reduce) { .body-skeleton__bar { animation: none; } }

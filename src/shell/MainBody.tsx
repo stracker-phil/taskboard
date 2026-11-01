@@ -10,6 +10,7 @@ import { useStore } from "../state/store";
 import { BoardView } from "../views/board/BoardView";
 import { ListView } from "../views/list/ListView";
 import { TableView } from "../views/table/TableView";
+import { BodySkeleton } from "./BodySkeleton";
 import { SyncStatusView } from "./SyncStatusView";
 
 /** What the body shows: the sync's progress, the Bookmarks page, or a view's layout. */
@@ -21,7 +22,8 @@ const bodyKey = (body: Body) => (body.kind === "view" ? `view:${body.view.id}:${
 
 /** The current view's issues, narrowed by the toolbar, once the cache holds any; before that, what the sync is
  *  doing. A view shows once its data is loaded: until then the one before stays, so switching views, layouts or
- *  the narrowing changes the content in place rather than blanking it. */
+ *  the narrowing changes the content in place rather than blanking it. With nothing before it (at launch) the
+ *  layout's placeholder rows stand in. */
 export function MainBody() {
   const next = useNextBody();
   const viewData = next?.kind === "view" ? viewDataQuery(next.view, next.narrowing) : null;
@@ -35,7 +37,7 @@ export function MainBody() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nextKey]);
   const body = ready ? next : previous;
-  if (!body) return null;
+  if (!body) return next?.kind === "view" ? <BodySkeleton layout={next.view.layout} /> : null;
   switch (body.kind) {
     case "status":
       return <SyncStatusView />;

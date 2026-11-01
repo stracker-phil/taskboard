@@ -429,18 +429,33 @@ describe("MainBody", () => {
       expect(screen.queryByText("Old rows")).not.toBeInTheDocument();
     });
 
-    it("draws nothing while the first view's rows are still loading", async () => {
+    it("shows the loading skeleton while the first view's rows are loading, then the rows in its place", async () => {
+      const first = deferred<ReturnType<typeof dataOf>>();
       mocked.viewsOf.mockResolvedValue([view()]);
-      mocked.viewRows.mockReturnValue(new Promise(() => {}));
+      mocked.viewRows.mockReturnValue(first.promise);
 
-      const { container } = render(
-        <QueryClientProvider client={createQueryClient()}>
-          <MainBody />
-        </QueryClientProvider>,
-      );
+      renderBody();
 
-      await waitFor(() => expect(mocked.viewRows).toHaveBeenCalled());
-      expect(container).toBeEmptyDOMElement();
+      expect(await screen.findByLabelText("Loading issues")).toHaveAttribute("aria-busy", "true");
+      expect(screen.queryByText("Old rows")).not.toBeInTheDocument();
+
+      await act(async () => first.resolve(dataOf(OLD)));
+
+      expect(await screen.findByText("Old rows")).toBeInTheDocument();
+      expect(screen.queryByLabelText("Loading issues")).not.toBeInTheDocument();
+    });
+
+    it("shows no skeleton when switching to a view that is still loading", async () => {
+      const next = deferred<ReturnType<typeof dataOf>>();
+      mocked.viewsOf.mockResolvedValue([view({ id: 101 }), view({ id: 102, name: "Other" })]);
+      mocked.viewRows.mockImplementation((_list, viewId) => (viewId === 101 ? Promise.resolve(dataOf(OLD)) : next.promise));
+      const client = renderBody();
+      await screen.findByText("Old rows");
+
+      await goTo(client, 102);
+      await waitFor(() => expect(mocked.viewRows).toHaveBeenCalledWith(11, 102, expect.anything()));
+
+      expect(screen.queryByLabelText("Loading issues")).not.toBeInTheDocument();
     });
   });
 
