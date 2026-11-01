@@ -15,8 +15,9 @@ description: Finish a development step in Taskboard - clean up and review the co
    other screen). The debug app is never installed: call its CLI by path
    (`src-tauri/target/debug/bundle/macos/Taskboard (Debug).app/Contents/MacOS/taskboard`), not `taskboard`.
    Drive the UI with `scripts/dev/js.sh '<js>'` (fire-and-forget; wrap code in an IIFE, the store is
-   `window.taskboard`) and check it with `scripts/dev/screenshot.sh <png>`. Never use AppleScript clicks or
-   keystrokes; they need focus.
+   `window.taskboard`) and check it with `scripts/dev/screenshot.sh <png>`. For UI changes, run
+   `scripts/dev/e2e.sh`: it fails when the panel, toolbar, first row or a clicked control moved. Never use
+   AppleScript clicks or keystrokes; they need focus.
 5. Update the affected `docs/` page if behavior, commands, files or extension points changed; add an ADR for
    a new decision. Check that no real data slipped into code, docs or screenshots (`.claude/rules/demo-data.md`).
 6. Stage the step's files by path (check `git status` for stray files), then commit following

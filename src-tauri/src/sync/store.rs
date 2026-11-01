@@ -497,13 +497,28 @@ mod tests {
         db.write(|tx, _| forget_project(tx, NW)).await.unwrap();
 
         for (sql, expected) in [
-            ("SELECT COUNT(*) FROM issue_seen WHERE issue_id IN ('1', '2')", 2),
-            ("SELECT COUNT(*) FROM cache.issue WHERE project_id = '10002'", 1),
+            (
+                "SELECT COUNT(*) FROM issue_seen WHERE issue_id IN ('1', '2')",
+                2,
+            ),
+            (
+                "SELECT COUNT(*) FROM cache.issue WHERE project_id = '10002'",
+                1,
+            ),
             ("SELECT COUNT(*) FROM cache.issue_fts WHERE rowid = 3", 1),
             ("SELECT COUNT(*) FROM cache.comment WHERE issue_id = '3'", 1),
-            ("SELECT COUNT(*) FROM cache.issue_change WHERE issue_id = '3'", 1),
-            ("SELECT COUNT(*) FROM cache.sync_state WHERE scope_id = 'full:10002'", 1),
-            ("SELECT COUNT(*) FROM cache.sync_state WHERE scope_id = 'scope'", 1),
+            (
+                "SELECT COUNT(*) FROM cache.issue_change WHERE issue_id = '3'",
+                1,
+            ),
+            (
+                "SELECT COUNT(*) FROM cache.sync_state WHERE scope_id = 'full:10002'",
+                1,
+            ),
+            (
+                "SELECT COUNT(*) FROM cache.sync_state WHERE scope_id = 'scope'",
+                1,
+            ),
         ] {
             assert_eq!(count(&db, sql).await, expected, "{sql}");
         }

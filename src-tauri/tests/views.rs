@@ -466,7 +466,9 @@ mod rows {
 
         let stored = query(
             site.db(),
-            format!("SELECT key, updated_at FROM cache.issue WHERE project_id = '{NW}' AND gone = 0"),
+            format!(
+                "SELECT key, updated_at FROM cache.issue WHERE project_id = '{NW}' AND gone = 0"
+            ),
             |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
         )
         .await;

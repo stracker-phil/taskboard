@@ -1933,7 +1933,8 @@ mod reconciliation {
             .unwrap();
         let db = &rig.ctx.db;
         let now = Utc::now();
-        let days_ago = |days: i64| taskboard_lib::time::format_utc(now - chrono::Duration::days(days));
+        let days_ago =
+            |days: i64| taskboard_lib::time::format_utc(now - chrono::Duration::days(days));
         let (seen, old, recent) = (days_ago(0), days_ago(40), days_ago(20));
         db.write(move |tx, _| {
             tx.execute(

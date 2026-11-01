@@ -278,6 +278,41 @@ impl FakeJira {
         content.data.comments.entry(id).or_default().push(comment);
     }
 
+    /// Gives every issue `per_issue` more comments by `author` (a user object) in one pass, stamped with the
+    /// fake's clock; `updated` stays. For big data sets, where `add_comment` per comment is too slow.
+    pub fn seed_comments(&self, per_issue: usize, author: &Value) {
+        let mut content = self.content();
+        let stamp = jira_time(content.now);
+        let mut next_id = content.data.comments.values().flatten().count() + 900_000;
+        let data = &mut content.data;
+        for issue in data.issues.iter_mut() {
+            let mut added = Vec::with_capacity(per_issue);
+            for number in 1..=per_issue {
+                let text = format!("Checked build {number} on staging, the totals look right.");
+                let body = json!({ "type": "doc", "version": 1, "content": [
+                    { "type": "paragraph", "content": [{ "type": "text", "text": text }] }
+                ] });
+                let rendered_body = format!("<p>{text}</p>");
+                let comment = json!({
+                    "id": next_id.to_string(),
+                    "author": author,
+                    "body": body,
+                    "renderedBody": rendered_body,
+                    "created": stamp,
+                    "updated": stamp,
+                });
+                next_id += 1;
+                let mut rendered = comment.clone();
+                rendered["body"] = json!(rendered_body);
+                push_comment(&mut issue["fields"]["comment"], comment.clone());
+                push_comment(&mut issue["renderedFields"]["comment"], rendered);
+                added.push(comment);
+            }
+            let id = issue["id"].as_str().unwrap_or_default().to_string();
+            data.comments.entry(id).or_default().extend(added);
+        }
+    }
+
     /// Adds an issue to `project_key`, shaped like `template`, with a new id, key and summary.
     pub fn add_issue(&self, template: &str, project_key: &str, summary: &str) -> String {
         let mut content = self.content();
