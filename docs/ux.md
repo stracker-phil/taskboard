@@ -380,8 +380,8 @@ and views can be bookmarked; a filter list's bookmark puts it under Home.
 ## Sync chip and token banners
 
 The sidebar footer's chip (artboard 8, panel 5) says "Synced 2 min ago" (counting on), "Syncing… 3 changes"
-with a turning icon, "Offline · cache from 14:02" on white, or "Sync paused · token" / "Sync failed" in red; its
-tooltip explains, a click syncs now (⌘R). Under the content header (panel 4) a red banner says Jira rejected
+with a turning icon, "Offline · synced 14:02" (the last sync that worked) on white, or "Sync paused · token" / "Sync failed" in
+red; its tooltip names the reason and the time of the next try, a click syncs now (⌘R). Under the content header (panel 4) a red banner says Jira rejected
 the token (sync paused) with Update token, and an amber one warns 14 days before the token expires, with
 Replace and × (dismissed for the rest of the day). Nothing blocks: the app keeps working from the cache.
 
@@ -771,7 +771,7 @@ no separate Settings design; owner, 2026-10-28). Its colors are the `--settings-
   - **Status** (`components/settings/status/`, Daybook's Status page): `diagnostics_get` reports groups of
     rows, each a value with a tone icon (ok, warning, error, info) and maybe a bus command as a button: *Jira*
     (site, account, API token and its expiry), *Sync* (state, tracked projects, last full sync, cached
-    issues) and *This Mac* (version, data and log folders with Show, the command-line tool's path). It reads
+    issues, cache size with Compact) and *This Mac* (version, data and log folders with Show, the command-line tool's path). It reads
     again when the window comes to the front and after a sync.
 
 ## Keys

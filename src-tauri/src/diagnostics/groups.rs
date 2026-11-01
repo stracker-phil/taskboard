@@ -130,6 +130,7 @@ pub struct SyncFacts {
     pub last_full: Option<String>,
     pub tracked: usize,
     pub cached: u32,
+    pub cache_bytes: u64,
 }
 
 pub fn sync_group(facts: &SyncFacts) -> DiagnosticGroup {
@@ -162,7 +163,14 @@ pub fn sync_group(facts: &SyncFacts) -> DiagnosticGroup {
     )
     .offering("sync:full", "Full Sync");
     let cached = row("Cached issues", facts.cached.to_string(), Info);
-    group("Sync", vec![state, projects, last_full, cached])
+    let size = row("Cache size", megabytes(facts.cache_bytes), Info)
+        .offering("app:compactCache", "Compact");
+    group("Sync", vec![state, projects, last_full, cached, size])
+}
+
+/// "0.4 MB", "12.5 MB".
+fn megabytes(bytes: u64) -> String {
+    format!("{:.1} MB", bytes as f64 / 1_000_000.0)
 }
 
 fn running(job: Job) -> &'static str {
@@ -220,6 +228,7 @@ mod tests {
             last_full: Some("Mon 09:00".into()),
             tracked: 2,
             cached: 120,
+            cache_bytes: 12_500_000,
         };
         overrides(&mut facts);
         facts
@@ -418,6 +427,9 @@ mod tests {
             SyncState::Error {
                 kind: ErrorKind::Internal,
                 message: "Jira answered with an unexpected page".into(),
+                since: "2026-03-02T09:00:00.000Z".into(),
+                retry_at: "2026-03-02T09:01:00.000Z".into(),
+                last_ok: None,
             },
             None,
         );
@@ -438,6 +450,8 @@ mod tests {
         let row = state_row(
             SyncState::Offline {
                 since: "2026-03-02T09:00:00Z".into(),
+                retry_at: "2026-03-02T09:01:00Z".into(),
+                last_ok: Some("2026-03-02T08:00:00Z".into()),
             },
             None,
         );
@@ -518,11 +532,33 @@ mod tests {
         let group = sync_group(&sync(|f| f.cached = 1234));
 
         assert_eq!(group.title, "Sync");
-        assert_eq!(group.rows.len(), 4);
+        assert_eq!(group.rows.len(), 5);
         assert_eq!(
             group.rows[3],
             expected("Cached issues", "1234", DiagnosticTone::Info, None)
         );
+    }
+
+    #[test]
+    fn the_cache_size_is_the_last_row_in_decimal_megabytes_offering_compaction() {
+        for (bytes, shown) in [
+            (0, "0.0 MB"),
+            (400_000, "0.4 MB"),
+            (12_500_000, "12.5 MB"),
+            (1_234_000_000, "1234.0 MB"),
+        ] {
+            let group = sync_group(&sync(|f| f.cache_bytes = bytes));
+            assert_eq!(
+                group.rows.last().unwrap(),
+                &expected(
+                    "Cache size",
+                    shown,
+                    DiagnosticTone::Info,
+                    Some(("app:compactCache", "Compact"))
+                ),
+                "{bytes}"
+            );
+        }
     }
 
     #[test]

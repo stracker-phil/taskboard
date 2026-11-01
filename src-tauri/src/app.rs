@@ -100,7 +100,11 @@ pub fn start(
             RunEvent::Reopen { .. } => window::show_main(app),
             RunEvent::Exit => {
                 clear_attachments(app);
-                clear_cache_if_asked(&app.state::<AppState>());
+                let state = app.state::<AppState>();
+                clear_cache_if_asked(&state);
+                if let Err(e) = tauri::async_runtime::block_on(state.db.optimize()) {
+                    log::warn!("The database wasn't optimized at quit: {e}");
+                }
             }
             _ => {}
         });

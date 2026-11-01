@@ -964,14 +964,27 @@ mod running_a_job {
         let emit = rig.emit();
 
         let (state, ()) = tokio::join!(
-            run_job(&rig.ctx, Job::Full, &*emit, None),
+            run_job(
+                &rig.ctx,
+                Job::Full,
+                &*emit,
+                Some("2026-10-27T09:00:00.000Z".into())
+            ),
             after_the_first_page_request(&rig, || rig.fake.fail_next(1, 500, None))
         );
 
         match state {
-            SyncState::Error { kind, message } => {
+            SyncState::Error {
+                kind,
+                message,
+                retry_at,
+                last_ok,
+                ..
+            } => {
                 assert_eq!(kind, ErrorKind::Internal);
                 assert_eq!(message, format!("Jira answered HTTP 500 to {SEARCH_PATH}"));
+                assert!(retry_at.ends_with('Z'), "{retry_at}");
+                assert_eq!(last_ok.as_deref(), Some("2026-10-27T09:00:00.000Z"));
             }
             other => panic!("expected an error, got {other:?}"),
         }
@@ -1020,10 +1033,18 @@ mod running_a_job {
         rig.fake.go_offline().await;
         let before = rig.requests();
 
-        let state = rig.run(None).await;
+        let state = rig.run(Some("2026-10-27T09:00:00.000Z".into())).await;
 
         match state {
-            SyncState::Offline { since } => assert!(since.ends_with('Z'), "{since}"),
+            SyncState::Offline {
+                since,
+                retry_at,
+                last_ok,
+            } => {
+                assert!(since.ends_with('Z'), "{since}");
+                assert!(retry_at.ends_with('Z'), "{retry_at}");
+                assert_eq!(last_ok.as_deref(), Some("2026-10-27T09:00:00.000Z"));
+            }
             other => panic!("expected offline, got {other:?}"),
         }
         assert_eq!(rig.requests(), before);
@@ -1213,6 +1234,8 @@ mod the_overview {
             &rig.ctx.db,
             SyncState::Offline {
                 since: LATER_UTC.into(),
+                retry_at: LATER_UTC.into(),
+                last_ok: None,
             },
         )
         .await
@@ -1221,7 +1244,12 @@ mod the_overview {
         let value = serde_json::to_value(&report).unwrap();
         assert_eq!(
             value["state"],
-            json!({ "state": "offline", "since": LATER_UTC })
+            json!({
+                "state": "offline",
+                "since": LATER_UTC,
+                "retryAt": LATER_UTC,
+                "lastOk": null
+            })
         );
         assert_eq!(value["lastFullAt"], Value::Null);
         assert_eq!(
@@ -1519,14 +1547,27 @@ mod the_delta_sync {
         let emit = rig.emit();
 
         let (state, ()) = tokio::join!(
-            run_job(&rig.ctx, Job::Delta, &*emit, None),
+            run_job(
+                &rig.ctx,
+                Job::Delta,
+                &*emit,
+                Some("2026-10-27T09:00:00.000Z".into())
+            ),
             after_the_next_search_request(&rig, || rig.fake.fail_next(1, 500, None))
         );
 
         match state {
-            SyncState::Error { kind, message } => {
+            SyncState::Error {
+                kind,
+                message,
+                retry_at,
+                last_ok,
+                ..
+            } => {
                 assert_eq!(kind, ErrorKind::Internal);
                 assert_eq!(message, format!("Jira answered HTTP 500 to {SEARCH_PATH}"));
+                assert!(retry_at.ends_with('Z'), "{retry_at}");
+                assert_eq!(last_ok.as_deref(), Some("2026-10-27T09:00:00.000Z"));
             }
             other => panic!("expected an error, got {other:?}"),
         }
@@ -1563,10 +1604,20 @@ mod the_delta_sync {
         rig.fake.go_offline().await;
         let before = rig.requests();
 
-        let state = rig.job(Job::Delta, None).await;
+        let state = rig
+            .job(Job::Delta, Some("2026-10-27T09:00:00.000Z".into()))
+            .await;
 
         match state {
-            SyncState::Offline { since } => assert!(since.ends_with('Z'), "{since}"),
+            SyncState::Offline {
+                since,
+                retry_at,
+                last_ok,
+            } => {
+                assert!(since.ends_with('Z'), "{since}");
+                assert!(retry_at.ends_with('Z'), "{retry_at}");
+                assert_eq!(last_ok.as_deref(), Some("2026-10-27T09:00:00.000Z"));
+            }
             other => panic!("expected offline, got {other:?}"),
         }
         assert_eq!(rig.requests(), before);

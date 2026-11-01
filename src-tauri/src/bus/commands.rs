@@ -89,6 +89,16 @@ pub fn register(bus: &mut Bus) {
             .help("Fetch every issue of the sync scope again")
             .run_now(|app: &AppHandle| app.state::<SyncEngine>().queue(Job::Full)),
     );
+    bus.add(
+        Command::new("app:compactCache", "Compact Cache")
+            .help("Rewrite the Jira cache without the space that deleted issues left")
+            .run(|app: AppHandle| async move {
+                let db = &app.state::<crate::state::AppState>().db;
+                let size = db.compact_cache().await?;
+                log::info!("Compacted the cache to {} bytes", size.bytes);
+                Ok(())
+            }),
+    );
     #[cfg(debug_assertions)]
     bus.add(
         Command::new("app:reload", "Reload")
@@ -195,6 +205,16 @@ mod tests {
         assert!(bus.knows("app:data"));
         let info = bus.info("app:data").unwrap();
         assert_eq!(info.title, "Show Data Folder");
+        assert!(!info.hidden);
+    }
+
+    #[test]
+    fn compact_cache_is_registered_and_visible() {
+        let bus = registered();
+
+        assert!(bus.knows("app:compactCache"));
+        let info = bus.info("app:compactCache").unwrap();
+        assert_eq!(info.title, "Compact Cache");
         assert!(!info.hidden);
     }
 

@@ -7,7 +7,18 @@ describe("describeSyncState", () => {
   it.each<[string, SyncState, string]>([
     ["an idle state that never synced", { state: "idle", lastOk: null }, "Not synced yet"],
     ["a running sync", { state: "running", job: "full" }, "Syncing…"],
-    ["an error", { state: "error", kind: "auth", message: "Jira rejected the token." }, "Jira rejected the token."],
+    [
+      "an error",
+      {
+        state: "error",
+        kind: "auth",
+        message: "Jira rejected the token.",
+        since: "2026-10-28T10:00:00.000Z",
+        retryAt: "2026-10-28T10:05:00.000Z",
+        lastOk: null,
+      },
+      "Jira rejected the token.",
+    ],
     ["a paused sync", { state: "paused", message: "Reconnect Jira to continue." }, "Reconnect Jira to continue."],
   ])("describes %s", (_name, state, expected) => {
     expect(describeSyncState(state)).toBe(expected);
@@ -22,6 +33,6 @@ describe("describeSyncState", () => {
   it("names the time the connection was lost when offline", () => {
     const since = "2026-03-04T09:30:00Z";
 
-    expect(describeSyncState({ state: "offline", since })).toBe(`Offline since ${formatLocalTime(since)}`);
+    expect(describeSyncState({ state: "offline", since, retryAt: "2026-03-04T09:35:00Z", lastOk: null })).toBe(`Offline since ${formatLocalTime(since)}`);
   });
 });

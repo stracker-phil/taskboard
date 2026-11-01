@@ -6,6 +6,7 @@ mod changes;
 mod coalesce;
 mod connection;
 mod migrate;
+mod upkeep;
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -16,6 +17,7 @@ use rusqlite::{Connection, Transaction};
 pub use changes::{Changes, IssuesChanged, LocalChanged, LocalPart};
 pub use coalesce::{ANNOUNCE_EVERY, coalesce};
 pub use connection::{CACHE_FILE, LOCAL_FILE};
+pub use upkeep::CacheSize;
 
 use crate::error::{AppError, AppResult};
 use crate::lock::MutexExt;

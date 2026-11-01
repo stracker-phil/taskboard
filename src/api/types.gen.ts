@@ -142,6 +142,12 @@ export type BoardData = { columns: Array<BoardColumn>, rows: { [key in string]: 
  */
 cardFields: Array<string>, };
 
+export type CacheSize = { bytes: number, 
+/**
+ * The share of the file that deletions left empty, 0 to 1.
+ */
+free: number, };
+
 export type Capability = "account" | "projects" | "issues" | "issueDetails" | "checkQueries" | "assign" | "changeStatus" | "changePriority" | "comment" | "addWebLink";
 
 /**
@@ -854,7 +860,7 @@ keepDoneDays: number,
  */
 clearCacheOnQuit: boolean, };
 
-export type SyncState = { "state": "idle", lastOk: string | null, } | { "state": "running", job: Job, } | { "state": "error", kind: ErrorKind, message: string, } | { "state": "offline", since: string, } | { "state": "paused", message: string, };
+export type SyncState = { "state": "idle", lastOk: string | null, } | { "state": "running", job: Job, } | { "state": "error", kind: ErrorKind, message: string, since: string, retryAt: string, lastOk: string | null, } | { "state": "offline", since: string, retryAt: string, lastOk: string | null, } | { "state": "paused", message: string, };
 
 export type TeamCell = { active: boolean, 
 /**

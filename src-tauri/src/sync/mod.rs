@@ -1,5 +1,6 @@
 //! The sync engine (`docs/sync.md`): one task owns all network work and mirrors the sync scope into the cache.
 
+mod backoff;
 pub mod commands;
 mod delta;
 pub mod diff;
@@ -18,6 +19,7 @@ pub mod schedule;
 pub mod source;
 pub mod store;
 
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
@@ -77,18 +79,39 @@ pub enum SyncState {
     Running {
         job: Job,
     },
+    /// `since`: the first failure in a row; `retry_at`: when the schedule tries again; `last_ok`: the last job that
+    /// worked.
     Error {
         kind: ErrorKind,
         message: String,
+        since: String,
+        retry_at: String,
+        last_ok: Option<String>,
     },
-    /// Jira couldn't be reached; the next run tries again.
+    /// Jira couldn't be reached; the cache keeps serving. Fields as for `Error`.
     Offline {
         since: String,
+        retry_at: String,
+        last_ok: Option<String>,
     },
     /// Jira refused the credentials; nothing runs until the connection is saved again.
     Paused {
         message: String,
     },
+}
+
+impl SyncState {
+    /// When a failing sync tries again; `None` while nothing is failing.
+    pub fn retry_at(&self) -> Option<DateTime<Utc>> {
+        match self {
+            SyncState::Error { retry_at, .. } | SyncState::Offline { retry_at, .. } => {
+                DateTime::parse_from_rfc3339(retry_at)
+                    .ok()
+                    .map(|at| at.with_timezone(&Utc))
+            }
+            _ => None,
+        }
+    }
 }
 
 /// After every page of a full or delta sync; a delta counts changed issues in `fetched` and has no project.

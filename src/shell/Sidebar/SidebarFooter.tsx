@@ -1,6 +1,6 @@
 import { RotateCw, Settings } from "lucide-react";
 import { useEffect, useState } from "react";
-import type { SyncOverview, SyncProgress, SyncState } from "../../api";
+import type { SyncProgress, SyncState } from "../../api";
 import { clockTime, timeAgo } from "../../lib/relativeTime";
 import { useSyncOverview, useSyncProgress } from "../../queries/sync";
 import { runBusCommand } from "../../state/requests";
@@ -16,7 +16,7 @@ function useTicker(ms = 30_000): Date {
 }
 
 /** The chip's line for each state (artboard 8, panel 5). */
-export function chipText(state: SyncState, lastOk: string | null, progress: SyncProgress[], now: Date): string {
+export function chipText(state: SyncState, progress: SyncProgress[], now: Date): string {
   switch (state.state) {
     case "idle":
       return state.lastOk ? `Synced ${timeAgo(state.lastOk, now)}` : "Not synced yet";
@@ -25,7 +25,7 @@ export function chipText(state: SyncState, lastOk: string | null, progress: Sync
       return changes > 0 ? `Syncing… ${changes} ${changes === 1 ? "change" : "changes"}` : "Syncing…";
     }
     case "offline":
-      return lastOk ? `Offline · cache from ${clockTime(lastOk)}` : "Offline";
+      return state.lastOk ? `Offline · synced ${clockTime(state.lastOk)}` : "Offline";
     case "paused":
       return "Sync paused · token";
     case "error":
@@ -33,22 +33,18 @@ export function chipText(state: SyncState, lastOk: string | null, progress: Sync
   }
 }
 
-/** The detail behind the chip, as its tooltip. */
-function chipDetail(state: SyncState): string {
+/** The detail behind the chip, as its tooltip: why it failed and when it tries again. */
+export function chipDetail(state: SyncState): string {
   switch (state.state) {
     case "error":
+      return `${state.message} Next try at ${clockTime(state.retryAt)}; click to try now.`;
     case "paused":
       return `${state.message} Click to try again.`;
     case "offline":
-      return "Jira can't be reached; the app works from the cache and retries every minute. Click to try now.";
+      return `Jira can't be reached since ${clockTime(state.since)}; the app works from the cache. Next try at ${clockTime(state.retryAt)}; click to try now.`;
     default:
       return "Click to sync now (⌘R)";
   }
-}
-
-/** When the cache was last filled, which the offline line names. */
-function lastSynced(overview: SyncOverview | undefined): string | null {
-  return overview?.lastFullAt ?? null;
 }
 
 /** The sync chip (its state; a click syncs now or retries) and the Settings button. */
@@ -67,7 +63,7 @@ export function SidebarFooter() {
         onClick={() => runBusCommand("sync:refresh", "Could not sync")}
       >
         <span className="sb-sync__dot" data-state={state?.state} aria-hidden="true" />
-        <span className="sb-sync__text">{state ? chipText(state, lastSynced(overview), Object.values(progress), now) : ""}</span>
+        <span className="sb-sync__text">{state ? chipText(state, Object.values(progress), now) : ""}</span>
         <RotateCw size={14} strokeWidth={2} aria-hidden="true" className={state?.state === "running" ? "sb-sync__spin" : undefined} />
       </button>
       <button type="button" className="sb-settings" aria-label="Settings" title="Settings (⌘,)" onClick={() => runBusCommand("app:settings", "Could not open Settings")}>

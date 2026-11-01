@@ -1,6 +1,6 @@
 //! When the sync runs by itself: deltas every few minutes (shorter while the window has focus), a
-//! reconciliation every hour, a full sync every week, and a delta right after the Mac wakes or the network
-//! returns. `due` decides (pure); `start_schedule` ticks.
+//! reconciliation every hour, a full sync every week, and a delta right after the Mac wakes. While a sync is
+//! failing, only a delta runs, at the failure's `retry_at`. `due` decides (pure); `start_schedule` ticks.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -8,7 +8,7 @@ use std::time::Duration as StdDuration;
 
 use chrono::{DateTime, Duration, Utc};
 
-use super::{Job, SyncContext, SyncEngine, SyncState};
+use super::{Job, SyncContext, SyncEngine};
 use crate::store::settings::SyncSettings;
 
 const TICK: StdDuration = StdDuration::from_secs(30);
@@ -16,8 +16,6 @@ const TICK: StdDuration = StdDuration::from_secs(30);
 const WAKE_GAP: Duration = Duration::minutes(2);
 const RECONCILE_EVERY: Duration = Duration::hours(1);
 const FULL_EVERY: Duration = Duration::days(7);
-/// While offline, a delta is tried this often, so the cache catches up soon after the network returns.
-const OFFLINE_RETRY: Duration = Duration::minutes(1);
 
 /// When each job was last queued.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -28,24 +26,24 @@ pub struct Last {
     pub tick: DateTime<Utc>,
 }
 
-/// The jobs to queue at `now`, at most one: a full sync covers a reconciliation and a delta.
+/// The jobs to queue at `now`, at most one: a full sync covers a reconciliation and a delta. `retry_at` is set
+/// while the last job failed.
 pub fn due(
     now: DateTime<Utc>,
     last: &Last,
     focused: bool,
-    offline: bool,
+    retry_at: Option<DateTime<Utc>>,
     sync: &SyncSettings,
 ) -> Option<Job> {
     let woke = now - last.tick > WAKE_GAP;
-    let every = if offline {
-        OFFLINE_RETRY
+    if let Some(retry_at) = retry_at {
+        return (woke || now >= retry_at).then_some(Job::Delta);
+    }
+    let every = Duration::minutes(i64::from(if focused {
+        sync.focused_minutes
     } else {
-        Duration::minutes(i64::from(if focused {
-            sync.focused_minutes
-        } else {
-            sync.background_minutes
-        }))
-    };
+        sync.background_minutes
+    }));
     if now - last.full >= FULL_EVERY {
         Some(Job::Full)
     } else if now - last.reconcile >= RECONCILE_EVERY {
@@ -106,8 +104,8 @@ pub fn start_schedule(ctx: SyncContext, engine: SyncEngine, focus: Focus) {
         loop {
             tokio::time::sleep(TICK).await;
             let now = Utc::now();
-            let offline = matches!(engine.state(), SyncState::Offline { .. });
-            if let Some(job) = due(now, &last, focus.get(), offline, &ctx.settings.get().sync) {
+            let retry_at = engine.state().retry_at();
+            if let Some(job) = due(now, &last, focus.get(), retry_at, &ctx.settings.get().sync) {
                 engine.queue(job);
                 queued(&mut last, job, now);
             }
@@ -136,14 +134,18 @@ mod tests {
         }
     }
 
-    fn due_now(last: &Last, focused: bool, offline: bool) -> Option<Job> {
-        due(now(), last, focused, offline, &SyncSettings::default())
+    fn due_now(last: &Last, focused: bool) -> Option<Job> {
+        due(now(), last, focused, None, &SyncSettings::default())
+    }
+
+    fn due_failing(last: &Last, retry_at: DateTime<Utc>) -> Option<Job> {
+        due(now(), last, true, Some(retry_at), &SyncSettings::default())
     }
 
     #[test]
     fn nothing_is_due_right_after_a_sync() {
-        assert_eq!(due_now(&fresh(), true, false), None);
-        assert_eq!(due_now(&fresh(), false, false), None);
+        assert_eq!(due_now(&fresh(), true), None);
+        assert_eq!(due_now(&fresh(), false), None);
     }
 
     #[test]
@@ -157,7 +159,7 @@ mod tests {
                 full: now() - age,
                 ..fresh()
             };
-            assert_eq!(due_now(&last, true, false), expected, "{age:?}");
+            assert_eq!(due_now(&last, true), expected, "{age:?}");
         }
     }
 
@@ -170,7 +172,7 @@ mod tests {
             tick: now() - Duration::minutes(10),
         };
 
-        assert_eq!(due_now(&last, true, false), Some(Job::Full));
+        assert_eq!(due_now(&last, true), Some(Job::Full));
     }
 
     #[test]
@@ -184,7 +186,7 @@ mod tests {
                 reconcile: now() - age,
                 ..fresh()
             };
-            assert_eq!(due_now(&last, true, false), expected, "{age:?}");
+            assert_eq!(due_now(&last, true), expected, "{age:?}");
         }
     }
 
@@ -196,7 +198,7 @@ mod tests {
             ..fresh()
         };
 
-        assert_eq!(due_now(&last, false, false), Some(Job::Reconcile));
+        assert_eq!(due_now(&last, false), Some(Job::Reconcile));
     }
 
     #[test]
@@ -214,7 +216,7 @@ mod tests {
                 ..fresh()
             };
             assert_eq!(
-                due_now(&last, focused, false),
+                due_now(&last, focused),
                 expected,
                 "focused {focused}, {minutes} min"
             );
@@ -233,8 +235,8 @@ mod tests {
             ..fresh()
         };
 
-        assert_eq!(due(now(), &last, true, false, &sync), Some(Job::Delta));
-        assert_eq!(due(now(), &last, false, false, &sync), None);
+        assert_eq!(due(now(), &last, true, None, &sync), Some(Job::Delta));
+        assert_eq!(due(now(), &last, false, None, &sync), None);
     }
 
     #[test]
@@ -251,27 +253,73 @@ mod tests {
                 tick: now() - gap,
                 ..fresh()
             };
-            assert_eq!(due_now(&last, false, false), expected, "{gap:?}");
+            assert_eq!(due_now(&last, false), expected, "{gap:?}");
         }
     }
 
     #[test]
-    fn while_offline_a_delta_is_retried_every_minute() {
-        for (age, offline, expected) in [
-            (Duration::seconds(59), true, None),
-            (Duration::minutes(1), true, Some(Job::Delta)),
-            (Duration::minutes(1), false, None),
+    fn while_failing_a_delta_is_due_once_the_retry_time_has_come() {
+        for (retry_in, expected) in [
+            (Duration::seconds(1), None),
+            (Duration::minutes(14), None),
+            (Duration::zero(), Some(Job::Delta)),
+            (-Duration::seconds(1), Some(Job::Delta)),
+            (-Duration::hours(1), Some(Job::Delta)),
         ] {
-            let last = Last {
-                delta: now() - age,
-                ..fresh()
-            };
             assert_eq!(
-                due_now(&last, false, offline),
+                due_failing(&fresh(), now() + retry_in),
                 expected,
-                "{age:?}, offline {offline}"
+                "{retry_in:?}"
             );
         }
+    }
+
+    #[test]
+    fn while_failing_the_mac_waking_up_retries_before_the_retry_time() {
+        let last = Last {
+            tick: now() - Duration::minutes(3),
+            ..fresh()
+        };
+
+        assert_eq!(
+            due_failing(&last, now() + Duration::minutes(15)),
+            Some(Job::Delta)
+        );
+    }
+
+    #[test]
+    fn while_failing_only_a_delta_ever_runs() {
+        let overdue = Last {
+            delta: now() - Duration::days(1),
+            reconcile: now() - Duration::days(1),
+            full: now() - Duration::days(30),
+            tick: now() - Duration::hours(8),
+        };
+
+        assert_eq!(
+            due_failing(&overdue, now() - Duration::minutes(5)),
+            Some(Job::Delta)
+        );
+        let not_woken = Last {
+            tick: now() - Duration::seconds(30),
+            ..overdue
+        };
+        assert_eq!(due_failing(&not_woken, now() + Duration::minutes(5)), None);
+        assert_eq!(
+            due_failing(&not_woken, now() - Duration::minutes(5)),
+            Some(Job::Delta)
+        );
+    }
+
+    #[test]
+    fn the_regular_intervals_do_not_apply_while_failing() {
+        let last = Last {
+            delta: now() - Duration::minutes(30),
+            ..fresh()
+        };
+
+        assert_eq!(due_now(&last, true), Some(Job::Delta));
+        assert_eq!(due_failing(&last, now() + Duration::minutes(5)), None);
     }
 
     #[test]
@@ -334,11 +382,11 @@ mod tests {
             full: now() - Duration::days(8),
             ..fresh()
         };
-        assert_eq!(due_now(&last, true, false), Some(Job::Full));
+        assert_eq!(due_now(&last, true), Some(Job::Full));
 
         queued(&mut last, Job::Full, now());
 
-        assert_eq!(due_now(&last, true, false), None);
+        assert_eq!(due_now(&last, true), None);
     }
 
     #[test]

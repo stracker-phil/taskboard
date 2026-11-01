@@ -50,6 +50,10 @@ commands, which validate them. Tracking a project writes `local.space`, not the 
 - Every connection keeps a 16 MB page cache and memory-maps up to 256 MB per file (`connection::tune`).
 - `Db::reset_cache` detaches the cache everywhere, deletes it, creates an empty one and emits
   `issues_changed { all: true }`.
+- Upkeep (`db/upkeep.rs`): `Db::optimize` (`PRAGMA optimize`) runs at quit; after every full sync
+  `Db::tidy_cache` compacts the cache (`VACUUM cache`) when more than a quarter of it is free pages, else only
+  trims its write-ahead log, then optimizes. Settings → Status shows the cache size (`Db::cache_size`) with
+  Compact (`app:compactCache`, `Db::compact_cache`).
 
 ## Tables
 

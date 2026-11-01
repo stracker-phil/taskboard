@@ -203,9 +203,20 @@ describe("SyncStatusView", () => {
 
   describe("when the sync cannot run", () => {
     it.each<[string, SyncState, string]>([
-      ["an error", { state: "error", kind: "internal", message: "Jira answered with an unexpected response." }, "Jira answered with an unexpected response."],
+      [
+        "an error",
+        {
+          state: "error",
+          kind: "internal",
+          message: "Jira answered with an unexpected response.",
+          since: "2026-10-28T10:00:00.000Z",
+          retryAt: "2026-10-28T10:05:00.000Z",
+          lastOk: null,
+        },
+        "Jira answered with an unexpected response.",
+      ],
       ["a pause", { state: "paused", message: "Reconnect Jira to continue." }, "Reconnect Jira to continue."],
-      ["an offline state", { state: "offline", since: "2026-03-04T09:30:00Z" }, `Offline since ${formatLocalTime("2026-03-04T09:30:00Z")}`],
+      ["an offline state", { state: "offline", since: "2026-03-04T09:30:00Z", retryAt: "2026-03-04T09:35:00Z", lastOk: null }, `Offline since ${formatLocalTime("2026-03-04T09:30:00Z")}`],
     ])("shows the message for %s", async (_name, state, text) => {
       mocked.syncOverview.mockResolvedValue(syncOverview({ state, projects: [NW] }));
 

@@ -58,6 +58,7 @@ pub async fn diagnostics_get(
         last_full: counts.last_full_at.as_deref().map(local),
         tracked: counts.projects.len(),
         cached: counts.projects.iter().map(|p| p.cached).sum(),
+        cache_bytes: state.db.cache_size().await?.bytes,
     };
     let paths = app.path();
     let home = paths.home_dir().ok();

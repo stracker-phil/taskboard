@@ -51,7 +51,9 @@ impl Capability {
     pub fn scope(self) -> &'static str {
         match self {
             Self::Account => "read:jira-user",
-            Self::Projects | Self::Issues | Self::IssueDetails | Self::CheckQueries => "read:jira-work",
+            Self::Projects | Self::Issues | Self::IssueDetails | Self::CheckQueries => {
+                "read:jira-work"
+            }
             Self::Assign
             | Self::ChangeStatus
             | Self::ChangePriority

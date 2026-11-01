@@ -15,12 +15,14 @@ queued twice. Every start syncs right away: a full sync for a cache that was nev
 |---|---|---|
 | `idle { lastOk }` | after a successful job, or without a connection or token | the next job |
 | `running { job }` | while a job runs | – |
-| `error { kind, message }` | the job failed (a page, the database) | the next job |
-| `offline { since }` | Jira couldn't be reached | the next job |
+| `error { kind, message, since, retryAt, lastOk }` | the job failed (a page, the database) | a delta at `retryAt` |
+| `offline { since, retryAt, lastOk }` | Jira couldn't be reached | a delta at `retryAt` |
 | `paused { message }` | Jira answered 401/403 | nothing until `connection_changed` (Save on the Connection page) |
 
 `run_job` is the pure part: it checks the connection, runs the job and returns the state after it. Tests call it
-directly.
+directly. The engine passes each result through `backoff.rs` `Failures`: `since` is the first failure in a row,
+`retryAt` is a minute later while offline and 1, 2, 4, 8, then 15 minutes later after each failed job in a row;
+`lastOk` is the last job that worked. A job that works ends the streak.
 
 ## Jobs
 
@@ -69,8 +71,8 @@ its newest entry, which the history already has.
 
 `schedule.rs` ticks every 30 s and queues at most one job (`due`, pure): a full sync weekly, a reconciliation
 hourly, a delta every `focused_minutes` while the main window has focus (5 by default) and every
-`background_minutes` otherwise (15), right away after the Mac woke (a tick more than 2 minutes late), and every
-minute while offline, so the cache catches up soon after the network returns. ⌘R (`sync:refresh`, also the
+`background_minutes` otherwise (15), and right away after the Mac woke (a tick more than 2 minutes late). While
+a sync is failing, only a delta runs, at the failure's `retryAt` or after a wake. ⌘R (`sync:refresh`, also the
 sync chip and `taskboard sync`) queues a delta, ⌘⇧R (`sync:full`, `taskboard sync --full`) a full sync.
 
 ## Storing a page

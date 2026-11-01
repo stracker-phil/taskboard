@@ -6,6 +6,7 @@ use std::sync::{Arc, Mutex};
 use chrono::Utc;
 use tokio::sync::mpsc;
 
+use super::backoff::Failures;
 use super::delta::delta_sync;
 use super::full::full_sync;
 use super::map::format_utc;
@@ -80,6 +81,7 @@ async fn run(
     set(SyncState::Idle {
         last_ok: last_ok.clone(),
     });
+    let mut failures = Failures::default();
     loop {
         if pending.is_empty() {
             let Some(command) = receiver.recv().await else {
@@ -97,7 +99,10 @@ async fn run(
             log::info!("Skipped a {job:?} sync: Jira refused the credentials");
             continue;
         }
-        let next = run_job(&ctx, job, &announce, last_ok.clone()).await;
+        let next = failures.follow(
+            run_job(&ctx, job, &announce, last_ok.clone()).await,
+            Utc::now(),
+        );
         if let SyncState::Idle { last_ok: ok } = &next {
             last_ok = ok.clone();
         }
@@ -142,7 +147,13 @@ pub async fn run_job(
     let result = match job {
         // A full sync ends with a reconciliation: it catches what the full sync can't see (deletions).
         Job::Full => match full_sync(ctx, emit).await {
-            Ok(()) => reconcile(ctx, emit).await,
+            Ok(()) => {
+                let reconciled = reconcile(ctx, emit).await;
+                if reconciled.is_ok() {
+                    tidy_after_full(ctx).await;
+                }
+                reconciled
+            }
             failed => failed,
         },
         Job::Delta => delta_sync(ctx, emit).await,
@@ -155,17 +166,32 @@ pub async fn run_job(
             log::warn!("Sync paused: {message}");
             SyncState::Paused { message }
         }
+        // The engine's `Failures` fills in the streak's `since` and the next try.
         Err(AppError::Offline(message)) => {
             log::info!("Sync skipped, offline: {message}");
-            SyncState::Offline { since: now }
+            SyncState::Offline {
+                since: now.clone(),
+                retry_at: now,
+                last_ok,
+            }
         }
         Err(e) => {
             log::error!("Sync failed: {e}");
             SyncState::Error {
                 kind: e.kind(),
                 message: e.to_string(),
+                since: now.clone(),
+                retry_at: now,
+                last_ok,
             }
         }
+    }
+}
+
+/// A full sync replaced much of the cache; a failed tidy leaves it as it is and doesn't fail the sync.
+async fn tidy_after_full(ctx: &SyncContext) {
+    if let Err(e) = ctx.db.tidy_cache().await {
+        log::warn!("The cache wasn't tidied after the full sync: {e}");
     }
 }
 

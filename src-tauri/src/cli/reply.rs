@@ -80,7 +80,7 @@ fn sync_text(state: &SyncState) -> String {
         SyncState::Idle { .. } => "idle".into(),
         SyncState::Running { .. } => "running".into(),
         SyncState::Error { message, .. } => format!("error: {message}"),
-        SyncState::Offline { since } => format!("offline since {since}"),
+        SyncState::Offline { since, .. } => format!("offline since {since}"),
         SyncState::Paused { message } => format!("paused: {message}"),
     }
 }
@@ -225,12 +225,17 @@ mod tests {
                 SyncState::Error {
                     kind: ErrorKind::Internal,
                     message: "Jira answered 500".into(),
+                    since: SYNCED_AT.into(),
+                    retry_at: SYNCED_AT.into(),
+                    last_ok: None,
                 },
                 "sync: error: Jira answered 500",
             ),
             (
                 SyncState::Offline {
                     since: SYNCED_AT.into(),
+                    retry_at: SYNCED_AT.into(),
+                    last_ok: Some(SYNCED_AT.into()),
                 },
                 "sync: offline since 2026-10-28T10:00:00.000Z",
             ),
