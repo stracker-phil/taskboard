@@ -96,6 +96,7 @@ fn view(id: i64, name: &str, layout: Layout, is_default: bool) -> View {
         is_default,
         filter: None,
         only_mine: false,
+        person: None,
         own_conditions: 0,
     }
 }

@@ -28,6 +28,13 @@ describe("setNarrowing", () => {
     useStore.getState().setNarrowing(KEY, { text: "login" });
 
     expect(narrowings()[KEY]).toMatchObject({ me: null, list: null, view: null, epic: null });
+    expect(narrowings()[KEY]?.person).toBeUndefined();
+  });
+
+  it("tells a drafted Anyone (null) from the view's saved person (undefined)", () => {
+    useStore.getState().setNarrowing(KEY, { person: null });
+
+    expect(narrowings()[KEY]?.person).toBeNull();
   });
 
   it("keeps the narrowings of different views apart", () => {
@@ -44,6 +51,17 @@ describe("clearDrafts", () => {
     useStore.getState().clearDrafts(KEY);
 
     expect(narrowings()[KEY]).toMatchObject({ me: null, list: null, view: null });
+  });
+
+  it("drops a drafted person back to the view's saved one, even a drafted Anyone", () => {
+    useStore.getState().setNarrowing(KEY, { person: null });
+    useStore.getState().setNarrowing(OTHER, { person: "demo-account-2" });
+
+    useStore.getState().clearDrafts(KEY);
+    useStore.getState().clearDrafts(OTHER);
+
+    expect(narrowings()[KEY]?.person).toBeUndefined();
+    expect(narrowings()[OTHER]?.person).toBeUndefined();
   });
 
   it("keeps the text filter and the epic", () => {

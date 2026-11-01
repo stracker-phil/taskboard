@@ -19,7 +19,7 @@ import { MeChip } from "./MeChip";
 import { MePopover } from "./MePopover";
 import { openPeopleMenu, PersonChip } from "./PersonChip";
 import { useModes } from "../../queries/modes";
-import { useLevelPeople } from "../../queries/views";
+import { useRequestNarrowing, useViewPeople } from "../../queries/views";
 import { TextFilter } from "./TextFilter";
 import { DraftActions } from "./DraftActions";
 import { UnreadButton } from "./UnreadButton";
@@ -95,10 +95,10 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
   const space = spaceOf(level);
   // Both layers count, as drafted or saved: the filter list's own conditions and the view's.
   const own = draft.conditions;
-  const me = useMeMode(key, draft.me);
+  const me = useMeMode(key, draft.me, draft.person);
   const { unreadOnly } = useModes();
   const setUnread = (on: boolean) => void attempt(api.modeSet("unreadOnly", on), "Could not change Unread only");
-  const { data: people = [] } = useLevelPeople(view.listId);
+  const { data: people = [] } = useViewPeople(view.listId, view.id, useRequestNarrowing(view.listId, view.id));
   const save = () => void draft.save();
   const columnsLabel = view.layout === "board" ? "Card fields" : "Columns";
   const shows = (item: Collapsible) => !hidden.includes(item) && (item !== "subtasks" || hasSubtasks);
@@ -143,8 +143,8 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
             { text: "Me Mode Options…", run: () => setOpen("me") },
             {
               text: "Assigned to…",
-              hint: people.find((p) => p.accountId === narrowing.person)?.name,
-              run: () => moreRef.current && openPeopleMenu(people, narrowing.person, me.setPerson, moreRef.current),
+              hint: people.find((p) => p.accountId === me.person)?.name,
+              run: () => moreRef.current && openPeopleMenu(people, me.person, me.setPerson, moreRef.current),
             },
           ];
       }
@@ -231,7 +231,7 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
             <MeChip on={me.on} everywhere={me.everywhere} onChange={me.setMe} optionsRef={meOptionsRef} optionsOpen={open === "me"} onOptions={() => toggle("me")} />
             {mePopover(meOptionsRef)}
           </span>
-          <PersonChip listId={view.listId} person={narrowing.person} onChange={me.setPerson} />
+          <PersonChip listId={view.listId} viewId={view.id} person={me.person} onChange={me.setPerson} />
         </span>
       )}
       {narrowing.epic && <EpicNarrowingChip epicId={narrowing.epic} onClear={() => setNarrowing(key, { epic: null })} />}

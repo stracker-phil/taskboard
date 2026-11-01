@@ -1,8 +1,8 @@
 import type { Condition } from "../../api";
 import type { Slice } from "../store";
 
-/** What the toolbar narrows a view to, and its unsaved filter changes (ADR 0038). None of it is saved: Save
- *  View writes the drafts to the view, and leaving the view drops all of it. */
+/** What the toolbar narrows a view to, and its unsaved changes (ADR 0038). None of it is saved: Save View writes
+ *  the drafts (Me, person, conditions) to the view, and leaving the view drops all of it. */
 export interface ViewNarrowing {
   /** "Filter this view". */
   text: string;
@@ -10,8 +10,8 @@ export interface ViewNarrowing {
   epic: string | null;
   /** The Me chip's draft; null shows the view's saved one. */
   me: boolean | null;
-  /** Only issues assigned to this account (the person chip); never saved. */
-  person: string | null;
+  /** The person chip's draft: an account, null for anyone; undefined shows the view's saved one. */
+  person?: string | null;
   /** Draft conditions in place of the filter list's own ones, as edited (incomplete ones too); null keeps the
    *  saved ones. */
   list: Condition[] | null;
@@ -23,7 +23,7 @@ export interface NarrowingSlice {
   /** By `narrowingKey`. */
   narrowings: Record<string, ViewNarrowing>;
   setNarrowing: (key: string, patch: Partial<ViewNarrowing>) => void;
-  /** Back to what the view saved: after Save View, or Revert View. The text, the epic and the person stay. */
+  /** Back to what the view saved: after Save View, or Revert View. The text and the epic stay. */
   clearDrafts: (key: string) => void;
   /** Drops every other view's narrowing and drafts: the window left them. */
   keepOnlyNarrowing: (key: string) => void;
@@ -32,7 +32,7 @@ export interface NarrowingSlice {
   requestFilter: () => void;
 }
 
-export const NO_VIEW_NARROWING: ViewNarrowing = { text: "", epic: null, me: null, person: null, list: null, view: null };
+export const NO_VIEW_NARROWING: ViewNarrowing = { text: "", epic: null, me: null, person: undefined, list: null, view: null };
 
 export const narrowingKey = (listId: number, viewId: number) => `${listId}:${viewId}`;
 
@@ -45,7 +45,7 @@ export const narrowingSlice: Slice<NarrowingSlice> = {
       set((s) => {
         const current = s.narrowings[key];
         if (!current) return s;
-        return { narrowings: { ...s.narrowings, [key]: { ...current, me: null, list: null, view: null } } };
+        return { narrowings: { ...s.narrowings, [key]: { ...current, me: null, person: undefined, list: null, view: null } } };
       }),
     keepOnlyNarrowing: (key) =>
       set((s) => {

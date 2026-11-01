@@ -53,7 +53,7 @@ describe("StatusMenuButton", () => {
 
       const button = await screen.findByRole("button", { name: "Change the status of NW-1042" });
 
-      expect(button).toHaveAttribute("title", "Change status (S)");
+      expect(button).toHaveAttribute("title", "Change status (D)");
       expect(button).toHaveAttribute("aria-haspopup", "menu");
       expect(button).toHaveTextContent("In Progress");
     });

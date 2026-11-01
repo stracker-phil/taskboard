@@ -13,7 +13,7 @@ export function StatusMenuButton({ issue, variant }: { issue: IssueDetail; varia
       className="status-menu-button"
       data-status-menu={issue.id}
       aria-label={`Change the status of ${issue.key}`}
-      title="Change status (S)"
+      title="Change status (D)"
       aria-haspopup="menu"
       onClick={(e) => changeStatus(issue, e.currentTarget)}
     >

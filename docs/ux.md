@@ -273,8 +273,8 @@ open preview follows the click at once. A Board always opens the Issue view.
   assignee), the sanitized description, web links, the latest three activity items with "All activity".
 - Footer 36: the keys.
 - Hovering a row shows its toolbar at the end of the title: Mark as read (unread rows) or Mark as unread, Copy
-  key, Bookmark, Assign to me or unassign (only while changes to Jira are on, [writes.md](writes.md)), Open in
-  Jira (`RowActions`).
+  key, Bookmark, Open in Jira (`RowActions`). Assigning to me or unassigning has no button: I does it
+  (only while changes to Jira are on, [writes.md](writes.md)).
 
 ## Change tracking
 
@@ -391,9 +391,8 @@ Full view button or E (the selected issue's epic); esc goes back one step (an op
 view with its place intact).
 
 - Header 50: back, breadcrumb (Space tile and name / list or view / key and a copy-link button), **Find in this
-  issue**, "Updated …", previous and next in the view's order (also J/K), Mark as read or unread, Assign to me
-  (`AssignMeButton`, pressed while it is mine; only while changes to Jira are on; also I; the field grid's status
-  pill opens the status menu, also S), Bookmark (with
+  issue**, "Updated …", previous and next in the view's order (also J/K), Mark as read or unread (I assigns to me or
+  unassigns, without a button; the field grid's status pill opens the status menu, also D, Jira's own key), Bookmark (with
   bookmarks), **Open in Jira** (`OpenInJiraButton`, the content header's too).
   Previous and next step through the rows the view shows (not those in collapsed groups or subtrees), move the
   view's selection along, and keep the current issue on screen until the next one loads (the neighbors load
@@ -566,10 +565,12 @@ button, Escape and a press outside close it, focus goes back to the button).
   every view, a ring around the avatar, until Me is turned off). Its "Fields…" opens Settings → General → Me
   Mode. The text is never saved.
 - **Person** chip (`PersonChip.tsx`, beside Me, the same pill; a people icon and "Person", or the picked person's
-  avatar and first name in the active style): a [menu](#menus) "Issues assigned to" with Anyone, me, and the active
-  teammates of the level's Space (every tracked Space outside one; `level_people`). It narrows like
-  Me (`Narrowing.person`), is never saved and goes with the text when the view is left. Picking a person turns Me
-  off; turning Me on clears the person. Folded into "…" it reads "Assigned to…".
+  avatar and first name in the active style): a [menu](#menus) "Issues assigned to" with Anyone, me, and whoever
+  has one of the issues the view shows before the chip narrows them (`view_people`: its list's and its own
+  conditions, Me mode, Unread only), by name. So it narrows on top of the filter: filter for five assignees and
+  pick one, or filter out one and pick among the rest. It is a draft like Me: a pick shows Revert and Save View,
+  and Save View keeps it with the view (`view.person`, `view_set_person`). Picking a person turns Me off; turning
+  Me on clears the person. Folded into "…" it reads "Assigned to…".
 - **Save View** (left of the Filter button, `SaveViewButton.tsx`, on `--accent` with `--text-on-accent`; pops in
   with a short fade and scale, instant under reduced motion) shows while the Me chip or any condition of either
   popover section differs from what the view and its list saved (`useViewDraft`). It saves the list's
@@ -749,8 +750,8 @@ no separate Settings design; owner, 2026-10-28). Its colors are the `--settings-
     checkbox per cell puts the person on that Space's team (`space_set_member`). By default everyone ever assigned
     one of the Space's issues is on its team and nobody else; a box where the person has no activity is quieter
     until ticked, and its tooltip says why a box is on. The header row and the name column stay while the grid
-    scrolls; rows keep their order while boxes are ticked. The team is who Assign to…, the person chip and assignee
-    drops offer, always after me: I can be picked in every Space, on its team or not.
+    scrolls; rows keep their order while boxes are ticked. The team is who Assign to… and assignee drops offer, always
+    after me: I can be picked in every Space, on its team or not.
   - **Sync**: *Scope* (the effective JQL in a monospaced field; Validate, Save, Reset to Default), *Intervals*
     (minutes in front and in the background, days to keep done issues) and *Cache* (the sync state line with
     Sync Now, one row per tracked project with its key, last full sync and "N issues · M open", then Reset

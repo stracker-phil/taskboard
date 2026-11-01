@@ -119,6 +119,8 @@ pub struct View {
     pub subtasks: SubtaskMode,
     /// The saved Me chip (ADR 0038): only the connected account's issues.
     pub only_mine: bool,
+    /// The saved person chip: only the issues assigned to this account, on top of the filter.
+    pub person: Option<String>,
     /// The tab's icon (`look`); none shows the layout's.
     pub icon: Option<String>,
     /// The icon's tile color; none shows the icon plain.

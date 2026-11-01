@@ -131,6 +131,15 @@ pub async fn view_set_only_mine(state: State<'_, AppState>, id: i64, on: bool) -
 }
 
 #[tauri::command]
+pub async fn view_set_person(
+    state: State<'_, AppState>,
+    id: i64,
+    person: Option<String>,
+) -> AppResult<View> {
+    super::view_set_person(&state.db, id, person).await
+}
+
+#[tauri::command]
 pub async fn view_set_column_collapsed(
     state: State<'_, AppState>,
     id: i64,
@@ -169,21 +178,42 @@ pub async fn space_default_columns(
     super::space_default_columns(&state.db, project_id, columns).await
 }
 
+/// The page's narrowing with what Rust adds: the issues read here, Me mode's rules and the app-wide modes.
+fn with_modes(state: &AppState, narrowing: Narrowing) -> (Narrowing, Viewer) {
+    let settings = state.settings.get();
+    let modes = state.modes.get();
+    let narrowing = Narrowing {
+        read_here: state.nav.read_here_ids(),
+        me_rules: settings.behaviour.me_rules,
+        me: narrowing.me || modes.me_everywhere,
+        unread: modes.unread_only,
+        ..narrowing
+    };
+    (narrowing, Viewer::of(&settings.connection, Utc::now()))
+}
+
 #[tauri::command]
 pub async fn view_rows(
     state: State<'_, AppState>,
     list_id: i64,
     view_id: i64,
-    mut narrowing: Narrowing,
+    narrowing: Narrowing,
 ) -> AppResult<ViewData> {
-    let settings = state.settings.get();
-    narrowing.read_here = state.nav.read_here_ids();
-    narrowing.me_rules = settings.behaviour.me_rules;
-    let modes = state.modes.get();
-    narrowing.me |= modes.me_everywhere;
-    narrowing.unread = modes.unread_only;
-    let viewer = Viewer::of(&settings.connection, Utc::now());
+    let (narrowing, viewer) = with_modes(&state, narrowing);
     super::view_rows(&state.db, viewer, list_id, view_id, narrowing).await
+}
+
+/// The person chip's choices for the view as it shows now.
+#[tauri::command]
+pub async fn view_people(
+    state: State<'_, AppState>,
+    list_id: i64,
+    view_id: i64,
+    narrowing: Narrowing,
+) -> AppResult<Vec<crate::views::rows::Person>> {
+    let me = crate::team::Me::of(&state.settings.get().connection);
+    let (narrowing, viewer) = with_modes(&state, narrowing);
+    super::view_people(&state.db, viewer, me, list_id, view_id, narrowing).await
 }
 
 /// The Board layout's columns and cards.
@@ -192,15 +222,9 @@ pub async fn view_board(
     state: State<'_, AppState>,
     list_id: i64,
     view_id: i64,
-    mut narrowing: Narrowing,
+    narrowing: Narrowing,
 ) -> AppResult<BoardData> {
-    let settings = state.settings.get();
-    narrowing.read_here = state.nav.read_here_ids();
-    narrowing.me_rules = settings.behaviour.me_rules;
-    let modes = state.modes.get();
-    narrowing.me |= modes.me_everywhere;
-    narrowing.unread = modes.unread_only;
-    let viewer = Viewer::of(&settings.connection, Utc::now());
+    let (narrowing, viewer) = with_modes(&state, narrowing);
     super::view_board(&state.db, viewer, list_id, view_id, narrowing).await
 }
 

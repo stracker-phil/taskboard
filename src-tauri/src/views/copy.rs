@@ -10,7 +10,7 @@ use super::display::{
 use super::edit::{
     insert_view, list_views, read_view, siblings, write_collapsed, write_sort, write_widths,
 };
-use super::filter::{write_filter, write_only_mine};
+use super::filter::{write_filter, write_only_mine, write_person};
 use super::model::View;
 use crate::db::{Db, LocalPart};
 use crate::error::AppResult;
@@ -41,6 +41,7 @@ fn copy_view(conn: &Connection, view: &View, list_id: i64, name: &str) -> AppRes
     write_look(conn, id, view.icon.as_deref(), view.color.as_deref())?;
     write_filter(conn, id, view.filter.as_deref())?;
     write_only_mine(conn, id, view.only_mine)?;
+    write_person(conn, id, view.person.as_deref())?;
     Ok(id)
 }
 

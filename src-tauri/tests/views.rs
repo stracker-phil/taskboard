@@ -12,13 +12,14 @@ use taskboard_lib::connection::{
 };
 use taskboard_lib::db::Db;
 use taskboard_lib::error::ErrorKind;
-use taskboard_lib::filter::{Condition, Field, Filter};
+use taskboard_lib::filter::{Condition, Field, Filter, Op, Value};
 use taskboard_lib::jira::{Limiter, TokenKind};
 use taskboard_lib::lists::{SidebarTree, Viewer, list_conditions, list_create, sidebar_tree};
 use taskboard_lib::me_mode::{MeMatch, MeRule};
 use taskboard_lib::status_style::{Style, status_style_set, status_styles_list};
 use taskboard_lib::store::settings::SettingsStore;
 use taskboard_lib::sync::{Emit, SyncContext, full_sync};
+use taskboard_lib::team::Me;
 use taskboard_lib::test_support::demo::{DEMO_NOW, ME_EMAIL};
 use taskboard_lib::test_support::fake_jira::{DEMO_TOKEN, FakeJira};
 use taskboard_lib::test_support::{FakeSecrets, temp_config_dir};
@@ -26,8 +27,8 @@ use taskboard_lib::views::groups::{Group, GroupMark};
 use taskboard_lib::views::rows::{Cell, Row};
 use taskboard_lib::views::{
     BoardColumn, BoardData, GroupBy, Narrowing, Sort, SortBy, SubtaskMode, ViewData,
-    columns_catalogue, view_board, view_rows, view_set_column_collapsed, view_set_columns,
-    view_set_filter, view_set_group, view_set_sort, view_set_subtasks, views_of,
+    columns_catalogue, view_board, view_people, view_rows, view_set_column_collapsed,
+    view_set_columns, view_set_filter, view_set_group, view_set_sort, view_set_subtasks, views_of,
 };
 
 const ME_ACCOUNT_ID: &str = "712020:5a1e0c3f-8d2b-4f61-9c7e-1b2a3c4d5e01";
@@ -2936,5 +2937,218 @@ mod catalog {
         ] {
             assert!(columns.iter().all(|c| c.id != id), "{id}");
         }
+    }
+}
+
+mod people {
+    use super::*;
+
+    const MARTA_ACCOUNT_ID: &str = "712020:5a1e0c3f-8d2b-4f61-9c7e-1b2a3c4d5e03";
+
+    fn me() -> Me {
+        Me {
+            account_id: ME_ACCOUNT_ID.into(),
+            name: "Alex Morgan".into(),
+        }
+    }
+
+    fn assignee_in(accounts: &[&str]) -> Filter {
+        Filter {
+            conditions: vec![Condition::new(
+                Field::Assignee,
+                Op::In,
+                Some(Value::Many(
+                    accounts.iter().map(|a| a.to_string()).collect(),
+                )),
+            )],
+        }
+    }
+
+    impl Site {
+        /// The Website relaunch Space's default view without subtasks, so only its results count.
+        async fn nw_listed(&self) -> (i64, i64) {
+            let (space, view) = self.nw().await;
+            view_set_subtasks(self.db(), view, SubtaskMode::Hidden)
+                .await
+                .unwrap();
+            (space, view)
+        }
+
+        /// A list in the Website relaunch Space with these assignees, shown without subtasks.
+        async fn list_of_assignees(&self, accounts: &[&str]) -> (i64, i64) {
+            let list = list_create(
+                self.db(),
+                viewer(),
+                self.nw_space().await,
+                "Assigned".into(),
+                Some(assignee_in(accounts)),
+            )
+            .await
+            .unwrap();
+            let view = self.first_view(list).await;
+            view_set_subtasks(self.db(), view, SubtaskMode::Hidden)
+                .await
+                .unwrap();
+            (list, view)
+        }
+
+        async fn people(&self, list: i64, view: i64, narrowing: Narrowing) -> Vec<String> {
+            view_people(self.db(), viewer(), Some(me()), list, view, narrowing)
+                .await
+                .unwrap()
+                .into_iter()
+                .map(|p| p.account_id)
+                .collect()
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn a_list_condition_leaves_me_and_the_assignees_it_keeps_by_name() {
+        let site = Site::new().await;
+        let (list, view) = site
+            .list_of_assignees(&[MARTA_ACCOUNT_ID, JONAS_ACCOUNT_ID])
+            .await;
+
+        let people = site.people(list, view, Narrowing::default()).await;
+
+        assert_eq!(people, [ME_ACCOUNT_ID, JONAS_ACCOUNT_ID, MARTA_ACCOUNT_ID]);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn me_comes_first_with_my_name_even_when_the_view_shows_none_of_my_issues() {
+        let site = Site::new().await;
+        let (list, view) = site.list_of_assignees(&[JONAS_ACCOUNT_ID]).await;
+
+        let people = view_people(
+            site.db(),
+            viewer(),
+            Some(me()),
+            list,
+            view,
+            Narrowing::default(),
+        )
+        .await
+        .unwrap();
+
+        let named: Vec<(&str, &str)> = people
+            .iter()
+            .map(|p| (p.account_id.as_str(), p.name.as_str()))
+            .collect();
+        assert_eq!(
+            named,
+            [
+                (ME_ACCOUNT_ID, "Alex Morgan"),
+                (JONAS_ACCOUNT_ID, "Jonas Reiter")
+            ]
+        );
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn a_view_condition_leaves_out_the_assignee_it_excludes() {
+        let site = Site::new().await;
+        let (space, view) = site.nw_listed().await;
+        let before = site.people(space, view, Narrowing::default()).await;
+        view_set_filter(
+            site.db(),
+            viewer(),
+            view,
+            Filter {
+                conditions: vec![Condition::new(
+                    Field::Assignee,
+                    Op::IsNot,
+                    Some(Value::One(JONAS_ACCOUNT_ID.into())),
+                )],
+            },
+        )
+        .await
+        .unwrap();
+
+        let after = site.people(space, view, Narrowing::default()).await;
+
+        assert!(before.contains(&JONAS_ACCOUNT_ID.to_string()));
+        let expected: Vec<String> = before
+            .into_iter()
+            .filter(|id| id != JONAS_ACCOUNT_ID)
+            .collect();
+        assert_eq!(after, expected);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn a_view_draft_decides_who_is_offered() {
+        let site = Site::new().await;
+        let (space, view) = site.nw_listed().await;
+
+        let people = site
+            .people(
+                space,
+                view,
+                Narrowing {
+                    view_draft: Some(assignee_in(&[MARTA_ACCOUNT_ID]).conditions),
+                    ..Narrowing::default()
+                },
+            )
+            .await;
+
+        assert_eq!(people, [ME_ACCOUNT_ID, MARTA_ACCOUNT_ID]);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn a_picked_person_does_not_shrink_the_choices() {
+        let site = Site::new().await;
+        let (space, view) = site.nw_listed().await;
+
+        let everyone = site.people(space, view, Narrowing::default()).await;
+        let picked = site
+            .people(space, view, narrowing_person(JONAS_ACCOUNT_ID))
+            .await;
+
+        assert!(everyone.len() > 2);
+        assert_eq!(picked, everyone);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn me_mode_leaves_only_me() {
+        let site = Site::new().await;
+        let (space, view) = site.nw_listed().await;
+
+        let people = site
+            .people(
+                space,
+                view,
+                Narrowing {
+                    me: true,
+                    ..Narrowing::default()
+                },
+            )
+            .await;
+
+        assert_eq!(people, [ME_ACCOUNT_ID]);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn the_choices_of_a_view_of_another_list_are_not_found() {
+        let site = Site::new().await;
+        let (_, view) = site.nw().await;
+        let everything = site.everything().await;
+
+        let err = view_people(
+            site.db(),
+            viewer(),
+            Some(me()),
+            everything,
+            view,
+            Narrowing::default(),
+        )
+        .await
+        .unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::NotFound);
     }
 }

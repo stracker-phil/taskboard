@@ -51,6 +51,22 @@ pub async fn view_set_only_mine(db: &Db, id: i64, on: bool) -> AppResult<View> {
     edit(db, id, move |conn| write_only_mine(conn, id, on)).await
 }
 
+pub(super) fn write_person(conn: &Connection, id: i64, person: Option<&str>) -> AppResult<()> {
+    conn.execute(
+        "UPDATE view SET person = ?2 WHERE id = ?1",
+        params![id, person],
+    )?;
+    Ok(())
+}
+
+/// Saves the person chip; none shows anyone's issues.
+pub async fn view_set_person(db: &Db, id: i64, person: Option<String>) -> AppResult<View> {
+    edit(db, id, move |conn| {
+        write_person(conn, id, person.as_deref())
+    })
+    .await
+}
+
 /// Turns the Me chip on for these views, as `places.json` kept it before views saved it; unknown ids are
 /// skipped.
 pub async fn seed_only_mine(db: &Db, ids: Vec<i64>) -> AppResult<()> {

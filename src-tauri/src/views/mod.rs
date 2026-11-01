@@ -28,7 +28,9 @@ pub use edit::{
     view_create, view_delete, view_move, view_rename, view_set_column_collapsed, view_set_columns,
     view_set_group, view_set_layout, view_set_sort, view_set_widths, views_of,
 };
-pub use filter::{seed_only_mine, view_conditions, view_set_filter, view_set_only_mine};
+pub use filter::{
+    seed_only_mine, view_conditions, view_set_filter, view_set_only_mine, view_set_person,
+};
 pub use model::{DEFAULT_COLUMNS, GroupBy, IssueOpening, Layout, Sort, SortBy, SubtaskMode, View};
-pub use query::{Narrowing, ViewAt, ViewData, unseen_ids, view_rows};
+pub use query::{Narrowing, ViewAt, ViewData, unseen_ids, view_people, view_rows};
 pub use sorting::fold;

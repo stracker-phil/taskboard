@@ -66,7 +66,7 @@ describe("issue keys", () => {
       ["⌘↵", "Enter", { meta: true }],
       ["P", "p", {}],
       ["I", "i", {}],
-      ["S", "s", {}],
+      ["D", "d", {}],
       ["A", "a", {}],
     ])("leaves %s to nobody", (_label, key, mods) => {
       expect(press(key, mods)).toBeNull();
@@ -197,17 +197,23 @@ describe("issue keys", () => {
   });
 
   describe("changing the status", () => {
-    it("S changes the selected issue's status", () => {
+    it("D changes the selected issue's status", () => {
       const h = handlers();
       register(h);
 
-      void press("s")?.run();
+      void press("d")?.run();
 
       expect(h.changeStatus).toHaveBeenCalled();
     });
 
-    it("ignores S without a selected row", () => {
+    it("ignores D without a selected row", () => {
       register(handlers({ hasSelection: () => false }));
+
+      expect(press("d")).toBeNull();
+    });
+
+    it("no longer answers to S", () => {
+      register(handlers());
 
       expect(press("s")).toBeNull();
     });

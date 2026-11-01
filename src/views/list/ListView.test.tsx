@@ -26,6 +26,14 @@ let spies: Restorable[] = [];
 
 const place = () => useStore.getState().places["11:101"];
 
+/** Waits until the settings, and with them the permission to change Jira, have reached the view. */
+const settingsLoaded = async () => {
+  await waitFor(() => expect(mocked.getSettings).toHaveBeenCalled());
+  await act(async () => {
+    await mocked.getSettings.mock.results[0]?.value;
+  });
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
@@ -847,19 +855,11 @@ describe("ListView", () => {
       expect(screen.queryByRole("button", { name: "Bookmark NW-1042" })).not.toBeInTheDocument();
     });
 
-    it("assigns the issue to me or unassigns it without selecting the row while changes to Jira are on", async () => {
-      mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ allowJiraChanges: true }) }));
-      await renderList(viewData([groupOf([OPEN])], [OPEN]));
-
-      await userEvent.click(await action("Assign NW-1042 to me or unassign it"));
-
-      expect(mocked.issueToggleMine).toHaveBeenCalledWith("1");
-      expect(screen.getByRole("row", { name: /NW-1042/ })).toHaveAttribute("aria-selected", "false");
-    });
-
-    it("offers no Assign to me while changes to Jira are off", async () => {
+    it.each([true, false])("offers no Assign to me button in the row toolbar, with changes to Jira on: %s", async (allowJiraChanges) => {
+      mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ allowJiraChanges }) }));
       await renderList(viewData([groupOf([OPEN])], [OPEN]));
       await screen.findByRole("button", { name: "Bookmark NW-1042" });
+      await settingsLoaded();
 
       expect(screen.queryByRole("button", { name: /to me or unassign it$/ })).not.toBeInTheDocument();
     });
@@ -951,7 +951,7 @@ describe("ListView", () => {
       mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ allowJiraChanges: true }) }));
       await renderList(viewData([groupOf(rows)], rows));
       await userEvent.click(await screen.findByText("Fix the footer links"));
-      await screen.findByRole("button", { name: "Assign NW-1003 to me or unassign it" });
+      await settingsLoaded();
 
       await press("issue.toggleMine");
 
@@ -968,18 +968,18 @@ describe("ListView", () => {
       expect(mocked.issueToggleMine).not.toHaveBeenCalled();
     });
 
-    it("S asks Jira for the selected issue's moves while changes to Jira are on", async () => {
+    it("D asks Jira for the selected issue's moves while changes to Jira are on", async () => {
       mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ allowJiraChanges: true }) }));
       await renderList(viewData([groupOf(rows)], rows));
       await userEvent.click(await screen.findByText("Fix the footer links"));
-      await screen.findByRole("button", { name: "Assign NW-1003 to me or unassign it" });
+      await settingsLoaded();
 
       await press("issue.changeStatus");
 
       expect(mocked.issueTransitions).toHaveBeenCalledWith("3");
     });
 
-    it("S explains that changes to Jira are off instead of opening the status menu", async () => {
+    it("D explains that changes to Jira are off instead of opening the status menu", async () => {
       await renderList(viewData([groupOf(rows)], rows));
       await userEvent.click(await screen.findByText("Fix the footer links"));
 
@@ -993,7 +993,7 @@ describe("ListView", () => {
       mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ allowJiraChanges: true }) }));
       await renderList(viewData([groupOf(rows)], rows));
       await userEvent.click(await screen.findByText("Fix the footer links"));
-      await screen.findByRole("button", { name: "Assign NW-1003 to me or unassign it" });
+      await settingsLoaded();
 
       await press("issue.assignTo");
 

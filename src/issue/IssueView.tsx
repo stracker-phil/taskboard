@@ -32,7 +32,6 @@ import { RichFields } from "./RichFields";
 import { Children, Links } from "./Related";
 import { WebLinks } from "./WebLinks";
 import { explainWritesOff } from "../writes/runWrite";
-import { AssignMeButton } from "../writes/AssignMeButton";
 import { assignMenuAnchor } from "../writes/assignMenu";
 import { statusMenuAnchor } from "../writes/statusMenu";
 
@@ -149,7 +148,6 @@ function IssueHeader({
         <ArrowDown size={14} strokeWidth={2} aria-hidden="true" />
       </button>
       {issue && <ReadToggle issue={issue} />}
-      {issue && <AssignMeButton issue={issue} className="issue-header__nav" />}
       {issue && <PinButton kind="issue" target={issue.id} label="Bookmark this issue" meta={issue.key} className="issue-header__nav" />}
       {issue && actions.openInJira && (
         <OpenInJiraButton onClick={() => actions.openInJira?.(issue.key)} />

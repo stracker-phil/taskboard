@@ -74,5 +74,5 @@ function useNextBody(): Body | null {
   if (tree?.home.some((node) => node.id === location.listId && node.kind === "pinned")) return { kind: "pinned", listId: location.listId, viewId: location.viewId };
   const view = views?.find((v) => v.id === location.viewId);
   if (!view) return null;
-  return { kind: "view", view, narrowing: requestNarrowing(stored ?? NO_VIEW_NARROWING, view.onlyMine) };
+  return { kind: "view", view, narrowing: requestNarrowing(stored ?? NO_VIEW_NARROWING, view) };
 }

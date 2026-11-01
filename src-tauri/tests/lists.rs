@@ -33,7 +33,8 @@ use taskboard_lib::views::{
     seed_only_mine, space_default_columns, view_create, view_delete, view_duplicate, view_move,
     view_rename, view_rows, view_set_column_collapsed, view_set_columns, view_set_filter,
     view_set_group, view_set_inline_labels, view_set_layout, view_set_look, view_set_only_mine,
-    view_set_open_with, view_set_sort, view_set_subtasks, view_set_widths, view_set_wrap, views_of,
+    view_set_open_with, view_set_person, view_set_sort, view_set_subtasks, view_set_widths,
+    view_set_wrap, views_of,
 };
 
 const ME_ACCOUNT_ID: &str = "712020:5a1e0c3f-8d2b-4f61-9c7e-1b2a3c4d5e01";
@@ -2310,6 +2311,7 @@ mod editing_views {
                 "openWith": null,
                 "subtasks": "hidden",
                 "onlyMine": false,
+                "person": null,
                 "icon": null,
                 "color": null,
                 "position": 0,
@@ -2781,6 +2783,87 @@ mod editing_views {
 
         assert!(copy.only_mine);
         assert!(views_of(&db, copied_list).await.unwrap()[0].only_mine);
+    }
+
+    #[tokio::test]
+    async fn a_view_starts_with_no_person_chip() {
+        let (_dir, db) = tracked_lab().await;
+
+        let people: Vec<Option<String>> = space_views(&db)
+            .await
+            .into_iter()
+            .map(|v| v.person)
+            .collect();
+
+        assert_eq!(people, [None, None, None]);
+    }
+
+    #[tokio::test]
+    async fn setting_the_person_chip_is_stored_returned_and_limited_to_that_view() {
+        let (_dir, db) = tracked_lab().await;
+        let views = space_views(&db).await;
+
+        let set = view_set_person(&db, views[1].id, Some("acc-bea".into()))
+            .await
+            .unwrap();
+
+        assert_eq!(set.person.as_deref(), Some("acc-bea"));
+        let people: Vec<Option<String>> = space_views(&db)
+            .await
+            .into_iter()
+            .map(|v| v.person)
+            .collect();
+        assert_eq!(people, [None, Some("acc-bea".to_string()), None]);
+    }
+
+    #[tokio::test]
+    async fn clearing_the_person_chip_shows_everyone_again() {
+        let (_dir, db) = tracked_lab().await;
+        let view = space_views(&db).await[1].id;
+        view_set_person(&db, view, Some("acc-bea".into()))
+            .await
+            .unwrap();
+
+        let cleared = view_set_person(&db, view, None).await.unwrap();
+
+        assert_eq!(cleared.person, None);
+        assert_eq!(space_views(&db).await[1].person, None);
+    }
+
+    #[tokio::test]
+    async fn the_person_chip_of_an_unknown_view_is_not_found() {
+        let (_dir, db) = tracked_lab().await;
+
+        let err = view_set_person(&db, 9999, Some("acc-bea".into()))
+            .await
+            .unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::NotFound);
+    }
+
+    #[tokio::test]
+    async fn a_duplicate_view_and_a_duplicate_list_keep_the_person_chip() {
+        let (_dir, db) = tracked_lab().await;
+        let table = space_views(&db).await[2].id;
+        view_set_person(&db, table, Some("acc-bea".into()))
+            .await
+            .unwrap();
+        let epics = list_id(&db, "Epics").await;
+        let epics_view = views_of(&db, epics).await.unwrap()[0].id;
+        view_set_person(&db, epics_view, Some("acc-dan".into()))
+            .await
+            .unwrap();
+
+        let copy = view_duplicate(&db, table).await.unwrap();
+        let copied_list = list_duplicate(&db, epics).await.unwrap();
+
+        assert_eq!(copy.person.as_deref(), Some("acc-bea"));
+        assert_eq!(
+            views_of(&db, copied_list).await.unwrap()[0]
+                .person
+                .as_deref(),
+            Some("acc-dan")
+        );
     }
 
     #[tokio::test]

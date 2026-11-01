@@ -1,4 +1,4 @@
-import { CheckCheck, CircleDot, Copy, ExternalLink, Bookmark, UserRound } from "lucide-react";
+import { CheckCheck, CircleDot, Copy, ExternalLink, Bookmark } from "lucide-react";
 import type { MouseEvent } from "react";
 import type { MenuAt } from "../../components/menu";
 
@@ -28,8 +28,7 @@ interface Props {
   pinned: boolean;
 }
 
-/** The hover toolbar at the end of a row's title: Mark as read or unread, Copy key, Bookmark, Assign to me (while
- *  changes to Jira are on), Open in Jira. */
+/** The hover toolbar at the end of a row's title: Mark as read or unread, Copy key, Bookmark, Open in Jira. */
 export function RowActions({ issueId, issueKey, changed, actions, pinned }: Props) {
   // The row's own click selects it; an action must not.
   const run = (action: () => void) => (e: MouseEvent) => {
@@ -60,17 +59,6 @@ export function RowActions({ issueId, issueKey, changed, actions, pinned }: Prop
       >
         <Bookmark size={13} strokeWidth={2} aria-hidden="true" />
       </button>
-      {actions.toggleMine && (
-        <button
-          type="button"
-          className="row-actions__btn"
-          title="Assign to me or unassign (I)"
-          aria-label={`Assign ${issueKey} to me or unassign it`}
-          onClick={run(() => actions.toggleMine?.(issueId))}
-        >
-          <UserRound size={13} strokeWidth={2} aria-hidden="true" />
-        </button>
-      )}
       {actions.openInJira && (
         <button
           type="button"

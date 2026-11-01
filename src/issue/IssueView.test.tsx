@@ -92,6 +92,7 @@ describe("IssueView", () => {
   describe("header", () => {
     it("bookmarks the issue from the Bookmark this issue button", async () => {
       renderIssue();
+      await title("Checkout: address validation for DACH postcodes");
 
       await userEvent.click(await screen.findByRole("button", { name: "Bookmark this issue" }));
       await userEvent.click(screen.getByRole("button", { name: "Until removed" }));
@@ -103,6 +104,7 @@ describe("IssueView", () => {
     it("removes the bookmark of a bookmarked issue from the same button", async () => {
       mocked.pinsList.mockResolvedValue(pins([pinItem({ id: 6 })]));
       renderIssue();
+      await title("Checkout: address validation for DACH postcodes");
 
       await userEvent.click(await screen.findByRole("button", { name: "Remove bookmark" }));
 
@@ -268,6 +270,14 @@ describe("IssueView", () => {
       act(() => useStore.getState().setNarrowing(narrowingKey(11, 101), { me: true, view: [draft] }));
 
       await waitFor(() => expect(mocked.viewRows).toHaveBeenCalledWith(11, 101, { me: true, text: "", epic: null, person: null, listDraft: null, viewDraft: [draft] }));
+    });
+
+    it("follows the person the origin view saved", async () => {
+      mocked.viewsOf.mockResolvedValue([view({ person: "demo-account-2" })]);
+
+      renderIssue("10042");
+
+      await waitFor(() => expect(mocked.viewRows).toHaveBeenCalledWith(11, 101, expect.objectContaining({ person: "demo-account-2" })));
     });
 
     it("follows the Me chip the origin view saved", async () => {
@@ -1013,24 +1023,33 @@ describe("IssueView", () => {
     it("I assigns the open issue to me or unassigns it while changes to Jira are on", async () => {
       mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ allowJiraChanges: true }) }));
       renderIssue("10042");
-      await screen.findByRole("button", { name: "Assign NW-1042 to me" });
+      await screen.findByRole("button", { name: "Change the status of NW-1042" });
 
       await press("issue.toggleMine");
 
       expect(mocked.issueToggleMine).toHaveBeenCalledWith("10042");
     });
 
-    it("S asks Jira for the open issue's moves while changes to Jira are on", async () => {
+    it.each([true, false])("offers no Assign to me or Unassign button, with changes to Jira on: %s", async (allowJiraChanges) => {
+      mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ allowJiraChanges }) }));
+      renderIssue("10042");
+      await title("Checkout: address validation for DACH postcodes");
+      if (allowJiraChanges) await screen.findByRole("button", { name: "Change the status of NW-1042" });
+
+      expect(screen.queryByRole("button", { name: /Assign NW-1042|Unassign NW-1042/ })).not.toBeInTheDocument();
+    });
+
+    it("D asks Jira for the open issue's moves while changes to Jira are on", async () => {
       mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ allowJiraChanges: true }) }));
       renderIssue("10042");
-      await screen.findByRole("button", { name: "Assign NW-1042 to me" });
+      await screen.findByRole("button", { name: "Change the status of NW-1042" });
 
       await press("issue.changeStatus");
 
       expect(mocked.issueTransitions).toHaveBeenCalledWith("10042");
     });
 
-    it("S explains that changes to Jira are off instead of opening the status menu", async () => {
+    it("D explains that changes to Jira are off instead of opening the status menu", async () => {
       renderIssue("10042");
       await title("Checkout: address validation for DACH postcodes");
 
@@ -1043,7 +1062,7 @@ describe("IssueView", () => {
     it("A asks Rust for the open issue's team while changes to Jira are on", async () => {
       mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ allowJiraChanges: true }) }));
       renderIssue("10042");
-      await screen.findByRole("button", { name: "Assign NW-1042 to me" });
+      await screen.findByRole("button", { name: "Change the status of NW-1042" });
 
       await press("issue.assignTo");
 
@@ -1131,6 +1150,18 @@ describe("IssueView", () => {
       const command = resolveKeydown({ key: "m", metaKey: false, ctrlKey: false, altKey: false, shiftKey: false }, ["global", "main"]);
 
       expect(command?.id).toBe("issue.markSeen");
+    });
+
+    it.each([
+      ["d", "issue.changeStatus"],
+      ["i", "issue.toggleMine"],
+    ])("resolves %s to %s", async (key, id) => {
+      renderIssue("10042");
+      await title("Checkout: address validation for DACH postcodes");
+
+      const command = resolveKeydown({ key, metaKey: false, ctrlKey: false, altKey: false, shiftKey: false }, ["global", "main"]);
+
+      expect(command?.id).toBe(id);
     });
   });
 });

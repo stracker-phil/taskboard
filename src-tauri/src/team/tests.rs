@@ -569,144 +569,82 @@ async fn a_person_off_in_every_given_project_is_left_out() {
     );
 }
 
-async fn level_where(db: &Db, clause: impl Into<String>) -> i64 {
-    let clause = clause.into();
-    db.read(move |conn| {
-        Ok(conn.query_row(
-            &format!("SELECT id FROM filter_list WHERE {clause} ORDER BY id LIMIT 1"),
-            [],
-            |r| r.get(0),
-        )?)
-    })
-    .await
-    .unwrap()
-}
-
-async fn space_level(db: &Db, project: &'static str) -> i64 {
-    level_where(db, format!("kind = 'space' AND project_id = '{project}'")).await
-}
-
-async fn people_at(db: &Db, level: i64, me: Option<&str>) -> Vec<String> {
-    level_people(db, level, me.map(me_of))
+async fn named(db: &Db, accounts: &[&str], me: Option<&str>) -> Vec<(String, String)> {
+    let accounts: HashSet<String> = accounts.iter().map(|a| a.to_string()).collect();
+    let me = me.map(me_of);
+    db.read(move |conn| with_me_first(conn, &accounts, me.as_ref()))
         .await
         .unwrap()
         .into_iter()
-        .map(|p| p.account_id)
+        .map(|p| (p.account_id, p.name))
         .collect()
 }
 
-#[tokio::test]
-async fn a_space_level_gives_that_spaces_team() {
-    let (_dir, db) = lab().await;
-    track(&db, &[WEB, SUPPORT]).await;
-
-    let web = space_level(&db, WEB).await;
-    let support = space_level(&db, SUPPORT).await;
-
-    assert_eq!(people_at(&db, web, None).await, [ALEX, BEA, HAL, IVY]);
-    assert_eq!(people_at(&db, support, None).await, [DAN]);
+fn pair(account: &str, name: &str) -> (String, String) {
+    (account.to_string(), name.to_string())
 }
 
 #[tokio::test]
-async fn a_filter_list_inside_a_space_gives_that_spaces_team() {
+async fn accounts_are_listed_by_name_ignoring_case() {
     let (_dir, db) = lab().await;
-    track(&db, &[WEB, SUPPORT]).await;
-    let in_support = level_where(
-        &db,
-        "kind = 'list' AND parent_id IN (SELECT id FROM filter_list WHERE kind = 'space' AND project_id = '10002')",
-    )
-    .await;
-
-    assert_eq!(people_at(&db, in_support, None).await, [DAN]);
-}
-
-#[tokio::test]
-async fn everything_gives_the_people_of_every_tracked_space_once() {
-    let (_dir, db) = lab().await;
-    track(&db, &[WEB, SUPPORT]).await;
-    let everything = level_where(&db, "kind = 'everything'").await;
 
     assert_eq!(
-        people_at(&db, everything, None).await,
-        [ALEX, BEA, DAN, HAL, IVY]
+        named(&db, &[IVY, BEA, ALEX, DAN], None).await,
+        [
+            pair(ALEX, "alex Stone"),
+            pair(BEA, "Bea Carter"),
+            pair(DAN, "Dan Evers"),
+            pair(IVY, "ivy Quill"),
+        ]
     );
 }
 
 #[tokio::test]
-async fn everything_leaves_out_the_people_of_untracked_spaces() {
+async fn an_account_the_cache_does_not_know_is_left_out() {
     let (_dir, db) = lab().await;
-    track(&db, &[SUPPORT]).await;
-    let everything = level_where(&db, "kind = 'everything'").await;
 
-    assert_eq!(people_at(&db, everything, None).await, [DAN]);
-}
-
-#[tokio::test]
-async fn level_people_list_me_first_once() {
-    let (_dir, db) = lab().await;
-    track(&db, &[WEB, SUPPORT]).await;
-    let web = space_level(&db, WEB).await;
-    let everything = level_where(&db, "kind = 'everything'").await;
-
-    assert_eq!(people_at(&db, web, Some(BEA)).await, [BEA, ALEX, HAL, IVY]);
     assert_eq!(
-        people_at(&db, everything, Some(BEA)).await,
-        [BEA, ALEX, DAN, HAL, IVY]
+        named(&db, &[BEA, "acc-nobody"], None).await,
+        [pair(BEA, "Bea Carter")]
     );
 }
 
 #[tokio::test]
-async fn level_people_list_me_first_even_when_never_assigned_in_that_space() {
+async fn me_comes_first_and_only_once_when_among_the_accounts() {
     let (_dir, db) = lab().await;
-    track(&db, &[WEB, SUPPORT]).await;
-    let support = space_level(&db, SUPPORT).await;
 
-    assert_eq!(people_at(&db, support, Some(ALEX)).await, [ALEX, DAN]);
-    assert_eq!(people_at(&db, support, Some(ZOE)).await, [ZOE, DAN]);
-}
-
-#[tokio::test]
-async fn people_switched_off_in_a_space_are_left_out_of_its_level_and_those_switched_on_join_it() {
-    let (_dir, db) = lab().await;
-    track(&db, &[WEB, SUPPORT]).await;
-    set(&db, WEB, BEA, false).await.unwrap();
-    set(&db, WEB, CLEO, true).await.unwrap();
-    let web = space_level(&db, WEB).await;
-    let support = space_level(&db, SUPPORT).await;
-
-    assert_eq!(people_at(&db, web, None).await, [ALEX, CLEO, HAL, IVY]);
-    assert_eq!(people_at(&db, support, None).await, [DAN]);
-}
-
-#[tokio::test]
-async fn everything_keeps_a_person_who_is_on_in_only_some_spaces() {
-    let (_dir, db) = lab().await;
-    track(&db, &[WEB, SUPPORT]).await;
-    let everything = level_where(&db, "kind = 'everything'").await;
-    set(&db, WEB, DAN, true).await.unwrap();
-
-    set(&db, SUPPORT, DAN, false).await.unwrap();
-    assert!(
-        people_at(&db, everything, None)
-            .await
-            .contains(&DAN.to_string())
-    );
-
-    set(&db, WEB, DAN, false).await.unwrap();
-    assert!(
-        !people_at(&db, everything, None)
-            .await
-            .contains(&DAN.to_string())
+    assert_eq!(
+        named(&db, &[ALEX, BEA, IVY], Some(BEA)).await,
+        [
+            pair(BEA, "Bea Carter"),
+            pair(ALEX, "alex Stone"),
+            pair(IVY, "ivy Quill"),
+        ]
     );
 }
 
 #[tokio::test]
-async fn an_unknown_level_is_not_found() {
+async fn me_comes_first_even_with_no_accounts() {
     let (_dir, db) = lab().await;
 
-    let err = level_people(&db, 9999, None).await.unwrap_err();
+    assert_eq!(
+        named(&db, &[], Some(ALEX)).await,
+        [pair(ALEX, "alex Stone")]
+    );
+    assert_eq!(
+        named(&db, &[DAN], Some(ALEX)).await,
+        [pair(ALEX, "alex Stone"), pair(DAN, "Dan Evers")]
+    );
+}
 
-    assert_eq!(err.kind(), ErrorKind::NotFound);
+#[tokio::test]
+async fn me_unknown_to_the_cache_is_listed_under_the_connections_name() {
+    let (_dir, db) = lab().await;
+
+    assert_eq!(
+        named(&db, &[DAN], Some(ZOE)).await,
+        [pair(ZOE, "Zoe Park"), pair(DAN, "Dan Evers")]
+    );
 }
 
 #[tokio::test]

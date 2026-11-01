@@ -16,7 +16,7 @@ use super::filter::view_conditions;
 use super::groups::{Facts, Group, Lookup, group};
 use super::lookup::{spaces, versions};
 use super::model::{GroupBy, Layout, SubtaskMode, View};
-use super::rows::Row;
+use super::rows::{Person, Row};
 use super::sorting::{fold, sort};
 use super::subtasks::{Nested, as_items, descendants, expand, nest};
 use crate::changes::{Names, UNSEEN, chip, facts, unseen_changes};
@@ -29,6 +29,7 @@ use crate::me_mode::{self, MeRule};
 use crate::pins::active;
 use crate::status_style::Styles;
 use crate::sync::map::format_utc;
+use crate::team::{Me, with_me_first};
 
 /// The toolbar's narrowing on top of the level's filter, and the Filter popover's unsaved conditions (ADR 0038).
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, TS)]
@@ -212,6 +213,32 @@ impl<'a> RowNarrowing<'a> {
         let theirs = self.person.is_none() || assignee == self.person;
         mine && theirs && self.text_matches(item)
     }
+}
+
+/// Whom the person chip offers: me, then whoever has one of the view's issues as its filter and Me mode leave
+/// them, before the person chip narrows them.
+pub async fn view_people(
+    db: &Db,
+    viewer: Viewer,
+    me: Option<Me>,
+    list_id: i64,
+    view_id: i64,
+    narrowing: Narrowing,
+) -> AppResult<Vec<Person>> {
+    db.read(move |conn| {
+        let unpicked = Narrowing {
+            person: None,
+            ..narrowing
+        };
+        let fetched = fetch_view(conn, &viewer, list_id, view_id, &unpicked, None)?;
+        let assignees: HashSet<String> = fetched
+            .items
+            .iter()
+            .filter_map(|(_, facts)| facts.assignee_id.clone())
+            .collect();
+        with_me_first(conn, &assignees, me.as_ref())
+    })
+    .await
 }
 
 /// Every issue Me mode keeps, for narrowing rows one by one.

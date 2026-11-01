@@ -10,12 +10,13 @@ export const NO_NARROWING: Narrowing = { me: false, text: "", epic: null, person
 
 /** What a view's rows are asked with (ADR 0038): the toolbar's narrowing, the Me chip as drafted or else as the
  *  view saved it, and the drafts' complete conditions in place of the saved ones. */
-export function requestNarrowing(narrowing: ViewNarrowing, savedOnlyMine: boolean): Narrowing {
+/** The drafts over what the view saved. */
+export function requestNarrowing(narrowing: ViewNarrowing, saved: Pick<View, "onlyMine" | "person">): Narrowing {
   return {
-    me: narrowing.me ?? savedOnlyMine,
+    me: narrowing.me ?? saved.onlyMine,
     text: narrowing.text,
     epic: narrowing.epic,
-    person: narrowing.person,
+    person: narrowing.person === undefined ? saved.person : narrowing.person,
     listDraft: narrowing.list?.filter(isComplete) ?? null,
     viewDraft: narrowing.view?.filter(isComplete) ?? null,
   };
@@ -26,7 +27,7 @@ export function useRequestNarrowing(listId: number, viewId: number): Narrowing |
   const narrowing = useStore((s) => s.narrowings[narrowingKey(listId, viewId)]) ?? NO_VIEW_NARROWING;
   const { data: views } = useViews(listId);
   const view = views?.find((v) => v.id === viewId);
-  return view ? requestNarrowing(narrowing, view.onlyMine) : undefined;
+  return view ? requestNarrowing(narrowing, view) : undefined;
 }
 
 /** Every view's rows; `viewRowsKey` is one view's with one narrowing. */
@@ -80,8 +81,15 @@ export const useSpaceConfig = (projectId: string) =>
 export const TEAM_KEY = ["team"] as const;
 export const TEAM_MATRIX_KEY = [...TEAM_KEY, "matrix"] as const;
 export const useTeamMatrix = () => useQuery({ queryKey: TEAM_MATRIX_KEY, queryFn: () => api.teamMatrix() });
-export const levelPeopleKey = (listId: number) => [...TEAM_KEY, "level", listId] as const;
-export const useLevelPeople = (listId: number) => useQuery({ queryKey: levelPeopleKey(listId), queryFn: () => api.levelPeople(listId) });
+/** Whom the person chip offers for the view as it shows: me, then the assignees its filter leaves. Under
+ *  `VIEW_ROWS_KEY`, so it refreshes with the rows. */
+export const useViewPeople = (listId: number, viewId: number, narrowing: Narrowing | undefined) =>
+  useQuery({
+    queryKey: [...VIEW_ROWS_KEY, "people", listId, viewId, narrowing],
+    queryFn: () => api.viewPeople(listId, viewId, narrowing as Narrowing),
+    enabled: narrowing !== undefined,
+    gcTime: VIEW_GC_MS,
+  });
 export const useMeUserFields = () => useQuery({ queryKey: [...TEAM_KEY, "meFields"], queryFn: api.meUserFields });
 
 /** A level's locked and own conditions and the view's own ones, for the Filter popover. */

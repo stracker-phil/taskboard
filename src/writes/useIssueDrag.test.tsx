@@ -89,9 +89,10 @@ describe("dragging in the List", () => {
       </QueryClientProvider>,
     );
     await screen.findByRole("grid");
-    if (withChanges) await screen.findByRole("button", { name: "Assign NW-1042 to me or unassign it" });
-    else await waitFor(() => expect(mocked.getSettings).toHaveBeenCalled());
-    await act(async () => {});
+    await waitFor(() => expect(mocked.getSettings).toHaveBeenCalled());
+    await act(async () => {
+      await mocked.getSettings.mock.results[0]?.value;
+    });
   }
 
   const rowOf = (key: string) => screen.getByRole("row", { name: new RegExp(key) });

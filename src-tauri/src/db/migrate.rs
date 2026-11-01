@@ -25,6 +25,7 @@ pub const LOCAL: &[&str] = &[
     include_str!("../../migrations/local/0017_space_member.sql"),
     include_str!("../../migrations/local/0018_drop_unread_list.sql"),
     include_str!("../../migrations/local/0019_pin_title_position.sql"),
+    include_str!("../../migrations/local/0020_view_person.sql"),
 ];
 pub const CACHE: &[&str] = &[
     include_str!("../../migrations/cache/0001_init.sql"),
@@ -184,6 +185,33 @@ mod tests {
             assert!(rows.contains(&(name.to_string(), false)), "{name}");
         }
         assert!(rows.iter().all(|(_, only_mine)| !only_mine), "{rows:?}");
+    }
+
+    #[test]
+    fn views_from_before_the_saved_person_chip_start_without_one() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        migrate(&mut conn, "local", &LOCAL[..19]).unwrap();
+        conn.execute_batch(
+            "INSERT INTO view (list_id, name, layout, group_by, sort_by, sort_order)
+             VALUES (1, 'Board', 'board', 'status', 'updated', 0),
+                    (1, 'List', 'list', 'status', 'updated', 0)",
+        )
+        .unwrap();
+
+        migrate(&mut conn, "local", LOCAL).unwrap();
+
+        let mut query = conn
+            .prepare("SELECT name, person FROM view ORDER BY id")
+            .unwrap();
+        let rows: Vec<(String, Option<String>)> = query
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect();
+        for name in ["Board", "List"] {
+            assert!(rows.contains(&(name.to_string(), None)), "{name}");
+        }
+        assert!(rows.iter().all(|(_, person)| person.is_none()), "{rows:?}");
     }
 
     #[test]

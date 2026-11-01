@@ -80,7 +80,7 @@ unique across sources (Jira's numeric ids; another source prefixes its own):
 |---|---|
 | `space` | a tracked project as the sidebar shows it: name, icon, color (`1`–`12`), client, position, `default_columns` for new views; its Space settings (`local/0007`): `layouts` (JSON array of the layouts its views offer; null = all), `default_layout` and `default_group` for new views |
 | `filter_list` | WHICH issues: the sidebar tree (`kind` everything, space, list, recent, pinned); a JSON filter ANDed with its ancestors |
-| `view` | HOW to show a list: one tab; layout, columns, grouping, sort; `filter` (`local/0012`): its own conditions, ANDed with its list's ([ADR 0033](adr/0033-views-can-hold-their-own-filter.md)); `subtasks` (`local/0013`): how subtasks show ([ADR 0037](adr/0037-views-choose-how-subtasks-show.md)); `only_mine` (`local/0014`): the saved Me chip ([ADR 0038](adr/0038-filter-changes-are-drafts-until-the-view-is-saved.md)) |
+| `view` | HOW to show a list: one tab; layout, columns, grouping, sort; `filter` (`local/0012`): its own conditions, ANDed with its list's ([ADR 0033](adr/0033-views-can-hold-their-own-filter.md)); `subtasks` (`local/0013`): how subtasks show ([ADR 0037](adr/0037-views-choose-how-subtasks-show.md)); `only_mine` (`local/0014`): the saved Me chip ([ADR 0038](adr/0038-filter-changes-are-drafts-until-the-view-is-saved.md)); `person` (`local/0020`): the saved person chip |
 | `pin` | bookmarked issues, comments, filter lists and views (Bookmarks in the UI; `target_kind` `issue`, `comment`, `filter_list`, `view`), with an optional reason and expiry, an own `title` and the owner's order (`position`, `local/0019`; a new one goes last); active while not removed and not expired (`pins::active`); ended bookmarks stay in Recently removed for 7 days |
 | `space_status_style` | overrides the detected style of a status in one Space (`local/0007`; the old app-wide `status_style` rows were copied to every Space) |
 | `space_field` | how a custom field shows in one Space: `hiddenInList`, `hiddenInDetail` or `hidden`; no row = visible (`space_config`) |
@@ -118,7 +118,8 @@ that view); the sidebar counts stay with the level. A view filter that can't be 
 `view_set_filter(id, filter)` compiles it under the level first and marks its custom fields `shown`;
 `list_conditions(id, viewId)` returns the view's conditions next to the level's (`ListConditions.view`,
 `viewError`), and `View.ownConditions` counts them for the Filter badge. Duplicating a view or a filter list
-copies the view filters and `view.only_mine` (`View.onlyMine`, set by `view_set_only_mine`).
+copies the view filters, `view.only_mine` (`View.onlyMine`, set by `view_set_only_mine`) and `view.person`
+(`View.person`, set by `view_set_person`).
 
 The page edits both layers and the Me chip as drafts ([ADR 0038](adr/0038-filter-changes-are-drafts-until-the-view-is-saved.md)):
 `Narrowing.listDraft` and `Narrowing.viewDraft` stand in for the filter list's own and the view's stored conditions in

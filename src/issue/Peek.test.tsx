@@ -83,6 +83,17 @@ describe("Peek", () => {
     expect(screen.getByText("Alex Morgan")).toBeInTheDocument();
   });
 
+  it.each([true, false])("offers no Assign to me or Unassign button, with changes to Jira on: %s", async (allowJiraChanges) => {
+    mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ allowJiraChanges }) }));
+    mocked.issueGet.mockResolvedValue(detail({ assignedToMe: allowJiraChanges }));
+    renderPeek();
+
+    await screen.findByRole("heading", { name: "Redesign the pricing page" });
+    if (allowJiraChanges) await screen.findByRole("button", { name: "Change the status of NW-1042" });
+
+    expect(screen.queryByRole("button", { name: /Assign NW-1042|Unassign NW-1042/ })).not.toBeInTheDocument();
+  });
+
   it("asks Rust for the issue by its id", async () => {
     renderPeek();
 

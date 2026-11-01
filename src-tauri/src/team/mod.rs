@@ -4,7 +4,7 @@
 
 pub mod commands;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::Serialize;
@@ -12,7 +12,6 @@ use ts_rs::TS;
 
 use crate::db::{Db, LocalPart};
 use crate::error::{AppError, AppResult};
-use crate::space_config::project_of_level;
 use crate::store::settings::Connection as JiraConnection;
 use crate::views::rows::{Person, person};
 
@@ -182,6 +181,32 @@ pub fn active(
     Ok(people)
 }
 
+/// These accounts by name (`cache.user`; an unknown one is left out), and me first whether among them or not.
+pub fn with_me_first(
+    conn: &Connection,
+    accounts: &HashSet<String>,
+    me: Option<&Me>,
+) -> AppResult<Vec<Person>> {
+    let me_id = me.map(|m| m.account_id.as_str());
+    let mut query = conn.prepare_cached("SELECT name FROM cache.user WHERE account_id = ?1")?;
+    let mut people = Vec::new();
+    for account in accounts.iter().filter(|a| Some(a.as_str()) != me_id) {
+        if let Some(name) = query
+            .query_row([account], |row| row.get::<_, String>(0))
+            .optional()?
+        {
+            people.push(person(account, &name, me_id));
+        }
+    }
+    people.sort_by(|a, b| {
+        (a.name.to_lowercase(), &a.account_id).cmp(&(b.name.to_lowercase(), &b.account_id))
+    });
+    if let Some(me) = me {
+        people.insert(0, person(&me.account_id, &my_name(conn, me)?, me_id));
+    }
+    Ok(people)
+}
+
 /// The name the cache knows me by, as other rows show it; the connection's name before the first sync.
 fn my_name(conn: &Connection, me: &Me) -> AppResult<String> {
     let cached: Option<String> = conn
@@ -192,19 +217,6 @@ fn my_name(conn: &Connection, me: &Me) -> AppResult<String> {
         )
         .optional()?;
     Ok(cached.unwrap_or_else(|| me.name.clone()))
-}
-
-/// The person chip's choices: me, then the active teammates of the level's Space, or of every tracked Space for a
-/// level outside one.
-pub async fn level_people(db: &Db, list_id: i64, me: Option<Me>) -> AppResult<Vec<Person>> {
-    db.read(move |conn| {
-        let projects = match project_of_level(conn, list_id)? {
-            Some(project) => vec![project],
-            None => tracked_projects(conn)?,
-        };
-        active(conn, &projects, me.as_ref())
-    })
-    .await
 }
 
 pub async fn team_matrix_of(db: &Db, me: Option<String>) -> AppResult<TeamMatrix> {

@@ -2,18 +2,19 @@ import { Users } from "lucide-react";
 import type { Person } from "../../api";
 import { Avatar } from "../../components/issue/Avatar";
 import { openMenu, type MenuAt, type MenuEntry } from "../../components/menu";
-import { useLevelPeople } from "../../queries/views";
+import { useRequestNarrowing, useViewPeople } from "../../queries/views";
 
 interface Props {
   listId: number;
+  viewId: number;
   /** The account the view is narrowed to; null for anyone. */
   person: string | null;
   onChange: (person: string | null) => void;
 }
 
-/** Narrows the view to one teammate's issues, like the Me chip does to mine. Never saved. */
-export function PersonChip({ listId, person, onChange }: Props) {
-  const { data: people = [] } = useLevelPeople(listId);
+/** Narrows the view to one person's issues, on top of its filter: a draft until Save View, like the Me chip. */
+export function PersonChip({ listId, viewId, person, onChange }: Props) {
+  const { data: people = [] } = useViewPeople(listId, viewId, useRequestNarrowing(listId, viewId));
   const picked = people.find((p) => p.accountId === person) ?? null;
   return (
     <button

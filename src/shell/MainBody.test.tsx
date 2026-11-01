@@ -220,6 +220,24 @@ describe("MainBody", () => {
       await waitFor(() => expect(mocked.viewRows).toHaveBeenCalledWith(11, 101, expect.objectContaining({ me: false, person: "demo-account-2" })));
     });
 
+    it("opens a view that saved a person narrowed to that person", async () => {
+      mocked.viewsOf.mockResolvedValue([view({ person: "demo-account-2" })]);
+
+      renderBody();
+
+      await waitFor(() => expect(mocked.viewRows).toHaveBeenCalledWith(11, 101, expect.objectContaining({ person: "demo-account-2" })));
+    });
+
+    it("lets a drafted Anyone win over the person the view saved", async () => {
+      mocked.viewsOf.mockResolvedValue([view({ person: "demo-account-2" })]);
+      useStore.getState().setNarrowing(narrowingKey(11, 101), { person: null });
+
+      renderBody();
+
+      await waitFor(() => expect(mocked.viewRows).toHaveBeenCalledWith(11, 101, expect.objectContaining({ person: null })));
+      expect(mocked.viewRows).not.toHaveBeenCalledWith(11, 101, expect.objectContaining({ person: "demo-account-2" }));
+    });
+
     it("asks for the rows narrowed by the text of this view only", async () => {
       mocked.viewsOf.mockResolvedValue([view()]);
       useStore.getState().setNarrowing(narrowingKey(11, 101), { text: "pricing" });

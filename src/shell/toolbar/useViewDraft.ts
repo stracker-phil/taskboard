@@ -16,6 +16,8 @@ const sameConditions = (a: Condition[], b: Condition[]) =>
 export interface ViewDraft {
   /** The Me chip as it shows: the draft, else what the view saved. */
   me: boolean;
+  /** The person chip as it shows: the draft, else what the view saved; null for anyone. */
+  person: string | null;
   /** The Filter badge: the drafted or saved conditions of the filter list and of the view. */
   conditions: number;
   /** Something differs from what the view and its list saved. */
@@ -26,7 +28,7 @@ export interface ViewDraft {
   revert: () => void;
 }
 
-/** The current view's unsaved Me chip and filter conditions (ADR 0038). */
+/** The current view's unsaved Me chip, person chip and filter conditions (ADR 0038). */
 export function useViewDraft(level: Level, view: View): ViewDraft {
   const client = useQueryClient();
   const key = narrowingKey(view.listId, view.id);
@@ -38,6 +40,8 @@ export function useViewDraft(level: Level, view: View): ViewDraft {
   const listDraft = narrowing.list?.filter(isComplete) ?? null;
   const viewDraft = narrowing.view?.filter(isComplete) ?? null;
   const meDirty = me !== view.onlyMine;
+  const person = narrowing.person === undefined ? view.person : narrowing.person;
+  const personDirty = person !== view.person;
   const listDirty = listDraft !== null && saved !== undefined && !sameConditions(listDraft, saved.own);
   const viewDirty = viewDraft !== null && saved !== undefined && !sameConditions(viewDraft, saved.view);
   const listSaved = level.kind === "space" ? 0 : level.node.ownConditions;
@@ -48,6 +52,7 @@ export function useViewDraft(level: Level, view: View): ViewDraft {
       if (listDirty && listDraft) await api.listSetFilter(view.listId, { conditions: listDraft });
       if (viewDirty && viewDraft) latest = await api.viewSetFilter(view.id, { conditions: viewDraft });
       if (meDirty) latest = await api.viewSetOnlyMine(view.id, me);
+      if (personDirty) latest = await api.viewSetPerson(view.id, person);
     } catch (e) {
       // The drafts stay, so nothing is lost; what did save shows as saved.
       fail(e, "Could not save the view");
@@ -58,12 +63,13 @@ export function useViewDraft(level: Level, view: View): ViewDraft {
     // The saved state is in place before the drafts go, so the rows and the badge don't flicker back.
     await Promise.all([client.invalidateQueries({ queryKey: listConditionsKey(view.listId, view.id) }), client.invalidateQueries({ queryKey: SIDEBAR_KEY })]);
     clearDrafts(key);
-  }, [client, clearDrafts, key, view.listId, view.id, listDirty, listDraft, viewDirty, viewDraft, meDirty, me]);
+  }, [client, clearDrafts, key, view.listId, view.id, listDirty, listDraft, viewDirty, viewDraft, meDirty, me, personDirty, person]);
 
   return {
     me,
+    person,
     conditions: (listDraft?.length ?? listSaved) + (viewDraft?.length ?? view.ownConditions),
-    dirty: meDirty || listDirty || viewDirty,
+    dirty: meDirty || personDirty || listDirty || viewDirty,
     save,
     revert: useCallback(() => clearDrafts(key), [clearDrafts, key]),
   };

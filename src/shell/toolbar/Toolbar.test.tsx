@@ -51,9 +51,9 @@ const run = (id: string) => {
 
 /** Waits until the level's people have been asked for and delivered to the toolbar. */
 async function peopleLoaded() {
-  await vi.waitFor(() => expect(mocked.levelPeople).toHaveBeenCalled());
+  await vi.waitFor(() => expect(mocked.viewPeople).toHaveBeenCalled());
   await act(async () => {
-    await mocked.levelPeople.mock.results[0]?.value;
+    await mocked.viewPeople.mock.results[0]?.value;
   });
 }
 
@@ -64,6 +64,7 @@ beforeEach(() => {
   resetStore();
   installCommands("main");
   mocked.listMatchCount.mockResolvedValue({ open: 5, total: 9 });
+  mocked.viewsOf.mockResolvedValue([view()]);
 });
 
 const IN_PROGRESS = { field: "status", op: "is", value: "3" } as const;
@@ -595,8 +596,9 @@ describe("Toolbar person chip", () => {
   }
 
   beforeEach(() => {
-    mocked.levelPeople.mockResolvedValue([ALEX, SAM]);
+    mocked.viewPeople.mockResolvedValue([ALEX, SAM]);
     mocked.listConditions.mockResolvedValue(listConditions({ kind: "space" }));
+    mocked.viewSetPerson.mockImplementation(async (id, person) => view({ id, person }));
   });
 
   it("shows an unpressed Person chip next to Me while nobody is picked", () => {
@@ -607,7 +609,7 @@ describe("Toolbar person chip", () => {
     expect(meChip().compareDocumentPosition(personChip()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("lists Anyone and the level's people under a caption, with Anyone checked", async () => {
+  it("lists Anyone and the view's people under a caption, with Anyone checked", async () => {
     renderToolbar(SPACE_LEVEL);
     await peopleLoaded();
 
@@ -618,11 +620,20 @@ describe("Toolbar person chip", () => {
     expect(menu.getByRole("menuitemradio", { name: "Anyone" })).toHaveAttribute("aria-checked", "true");
     expect(menu.getByRole("menuitemradio", { name: /Alex Morgan/ })).toHaveAttribute("aria-checked", "false");
     expect(menu.getByRole("menuitemradio", { name: /Sam Lee/ })).toHaveAttribute("aria-checked", "false");
-    expect(mocked.levelPeople).toHaveBeenCalledWith(11);
+    expect(mocked.viewPeople).toHaveBeenCalledWith(11, 101, expect.objectContaining({ text: "", epic: null }));
   });
 
-  it("says there are no teammates yet, in a disabled row, when the level has none", async () => {
-    mocked.levelPeople.mockResolvedValue([]);
+  it("asks for the people again with the view's text filter, so the list follows what the view shows", async () => {
+    renderToolbar(SPACE_LEVEL);
+    await peopleLoaded();
+
+    await userEvent.type(filterField(), "pricing");
+
+    await vi.waitFor(() => expect(mocked.viewPeople).toHaveBeenCalledWith(11, 101, expect.objectContaining({ text: "pricing" })));
+  });
+
+  it("says there are no teammates yet, in a disabled row, when the view has none", async () => {
+    mocked.viewPeople.mockResolvedValue([]);
     renderToolbar(SPACE_LEVEL);
 
     await userEvent.click(personChip());
@@ -683,24 +694,99 @@ describe("Toolbar person chip", () => {
     expect(personChip()).toHaveAttribute("aria-pressed", "false");
   });
 
-  it("offers no Save View for a picked person, since it is never saved", async () => {
+  it("offers Save View and Revert View for a picked person, without saving anything yet", async () => {
     renderToolbar(SPACE_LEVEL);
 
     await pick(/Sam Lee/);
 
-    expect(saveViewButton()).not.toBeInTheDocument();
-    expect(revertViewButton()).not.toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Save View" })).toBeInTheDocument();
+    expect(revertViewButton()).toBeInTheDocument();
+    expect(mocked.viewSetPerson).not.toHaveBeenCalled();
     expect(mocked.viewSetOnlyMine).not.toHaveBeenCalled();
   });
 
-  it("keeps the picked person after Revert View drops a drafted condition", async () => {
+  it("saves the picked person on the view and drops the Save View button", async () => {
     renderToolbar(SPACE_LEVEL);
     await pick(/Sam Lee/);
-    await addCondition("This view");
+
+    await userEvent.click(await screen.findByRole("button", { name: "Save View" }));
+
+    await waitFor(() => expect(mocked.viewSetPerson).toHaveBeenCalledWith(101, "demo-account-2"));
+    await waitFor(() => expect(saveViewButton()).not.toBeInTheDocument());
+    expect(mocked.viewSetOnlyMine).not.toHaveBeenCalled();
+  });
+
+  it("drops the picked person with Revert View", async () => {
+    renderToolbar(SPACE_LEVEL);
+    await pick(/Sam Lee/);
 
     await userEvent.click(await screen.findByRole("button", { name: "Revert View" }));
 
-    expect(personChip()).toHaveAttribute("aria-pressed", "true");
+    expect(personChip()).toHaveTextContent("Person");
+    expect(personChip()).toHaveAttribute("aria-pressed", "false");
+    expect(saveViewButton()).not.toBeInTheDocument();
+    expect(mocked.viewSetPerson).not.toHaveBeenCalled();
+  });
+
+  it("hides Save View again when the person is changed back to what the view saved", async () => {
+    renderToolbar(SPACE_LEVEL);
+    await pick(/Sam Lee/);
+    await screen.findByRole("button", { name: "Save View" });
+
+    await pick("Anyone");
+
+    expect(saveViewButton()).not.toBeInTheDocument();
+  });
+
+  it("keeps the draft and the Save View button when saving the person fails", async () => {
+    mocked.viewSetPerson.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
+    renderToolbar(SPACE_LEVEL);
+    await pick(/Sam Lee/);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Save View" }));
+
+    await waitFor(() => expect(useStore.getState().toasts.map((t) => t.kind)).toContain("error"));
+    expect(screen.getByRole("button", { name: "Save View" })).toBeInTheDocument();
+    expect(personChip()).toHaveTextContent("Sam");
+  });
+
+  describe("on a view that saved a person", () => {
+    beforeEach(() => {
+      mocked.viewsOf.mockResolvedValue([view({ person: "demo-account-2" })]);
+    });
+
+    it("shows the saved person on a pressed chip with nothing to save", async () => {
+      renderToolbar(SPACE_LEVEL, 0, { person: "demo-account-2" });
+
+      await waitFor(() => expect(personChip()).toHaveTextContent("Sam"));
+      expect(personChip()).toHaveAttribute("aria-pressed", "true");
+      expect(saveViewButton()).not.toBeInTheDocument();
+    });
+
+    it("saves Anyone, as a null account, when Anyone is chosen", async () => {
+      renderToolbar(SPACE_LEVEL, 0, { person: "demo-account-2" });
+      await waitFor(() => expect(personChip()).toHaveTextContent("Sam"));
+
+      await pick("Anyone");
+      await userEvent.click(await screen.findByRole("button", { name: "Save View" }));
+
+      await waitFor(() => expect(mocked.viewSetPerson).toHaveBeenCalledWith(101, null));
+    });
+
+    it("turns the saved person off when Me is turned on, and saves Me", async () => {
+      renderToolbar(SPACE_LEVEL, 0, { person: "demo-account-2" });
+      await waitFor(() => expect(personChip()).toHaveTextContent("Sam"));
+
+      await userEvent.click(meChip());
+
+      expect(meChip()).toHaveAttribute("aria-pressed", "true");
+      expect(personChip()).toHaveAttribute("aria-pressed", "false");
+
+      await userEvent.click(await screen.findByRole("button", { name: "Save View" }));
+
+      await waitFor(() => expect(mocked.viewSetOnlyMine).toHaveBeenCalledWith(101, true));
+      await waitFor(() => expect(mocked.viewSetPerson).toHaveBeenCalledWith(101, null));
+    });
   });
 });
 
@@ -720,7 +806,7 @@ describe("Toolbar Me mode", () => {
     mocked.getSettings.mockResolvedValue(settings());
     mocked.meUserFields.mockResolvedValue([{ field: "reporter", name: "Reporter" }]);
     mocked.modesGet.mockResolvedValue({ meEverywhere: false, unreadOnly: false, bookmarksBar: false });
-    mocked.levelPeople.mockResolvedValue([ALEX, SAM]);
+    mocked.viewPeople.mockResolvedValue([ALEX, SAM]);
     mocked.listConditions.mockResolvedValue(listConditions({ kind: "space" }));
   });
 
@@ -921,7 +1007,7 @@ describe("Toolbar folding", () => {
   describe("with the Me chip folded away", () => {
     const openMore = async () => {
       narrowBar(310);
-      mocked.levelPeople.mockResolvedValue([ALEX, SAM]);
+      mocked.viewPeople.mockResolvedValue([ALEX, SAM]);
       renderToolbar(SPACE_LEVEL);
       await peopleLoaded();
       await userEvent.click(await screen.findByRole("button", { name: "More toolbar items" }));

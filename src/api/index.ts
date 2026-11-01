@@ -182,6 +182,10 @@ export const api = {
   /** The view's own conditions, ANDed with its level's; rejects with `invalid_input` when they don't compile. */
   viewSetFilter: (id: number, filter: Filter) => invoke<View>("view_set_filter", { id, filter }),
   viewSetOnlyMine: (id: number, on: boolean) => invoke<View>("view_set_only_mine", { id, on }),
+  /** Saves the person chip; null for anyone. */
+  viewSetPerson: (id: number, person: string | null) => invoke<View>("view_set_person", { id, person }),
+  /** Whom the person chip offers: me, then the assignees of the view's issues before the chip narrows them. */
+  viewPeople: (listId: number, viewId: number, narrowing: Narrowing) => invoke<Person[]>("view_people", { listId, viewId, narrowing }),
   viewSetColumnCollapsed: (id: number, statusId: string, collapsed: boolean) => invoke<View>("view_set_column_collapsed", { id, statusId, collapsed }),
   /** How long an open issue takes to count as seen, and the default pin duration. */
   behaviourSet: (behaviour: Behaviour) => invoke<Settings>("behaviour_set", { behaviour }),
@@ -259,8 +263,6 @@ export const api = {
   spaceSetLayouts: (projectId: string, layouts: SpaceLayouts) => invoke<SpaceConfig>("space_set_layouts", { projectId, layouts }),
   spaceSetField: (projectId: string, fieldId: string, visibility: FieldVisibility) =>
     invoke<SpaceConfig>("space_set_field", { projectId, fieldId, visibility }),
-  /** The active teammates of the level's Spaces, without me; for the person chip. */
-  levelPeople: (listId: number) => invoke<Person[]>("level_people", { listId }),
   /** Reporter and the custom user fields Me mode may count (Settings → General → Me Mode). */
   meUserFields: () => invoke<UserField[]>("me_user_fields"),
   meRuleEdit: (edit: MeRuleEdit) => invoke<Settings>("me_rule_edit", { edit }),

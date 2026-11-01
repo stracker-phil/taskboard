@@ -145,7 +145,7 @@ open (`AddWebLink.tsx`): the address, focused, and an optional title; ↩ adds, 
 In the page: the row hover toolbar's person button, the Issue view's and the Preview's header button (pressed
 while it is mine), the key **I** (`issue.toggleMine`) and Issue → Assign to Me or Unassign (also in the palette).
 The status pill in the Preview and the Issue view's field grid is the status menu's button (`StatusMenuButton`);
-**S** (`issue.changeStatus`) and Issue → Change Status… open the same menu under the pill, or under the selected
+**D** (`issue.changeStatus`, Jira's own key) and Issue → Change Status… open the same menu under the pill, or under the selected
 row or card. Rows and cards drag onto tiles of their groups (above).
 The Issue view's assignee is the assignee menu's button (`AssigneeMenuButton`); **A** (`issue.assignTo`) and
 Issue → Assign To… open it under the assignee, or under the selected row or card. `issue_assignees(id)`
