@@ -143,6 +143,7 @@ src-tauri/
   src/quicklook.rs           macOS only: the Quick Look panel on one file (ADR 0035)
   src/status_style/          the six status styles (status types): detection and the owner's overrides per Space
   src/space_config/          a Space's own settings: offered layouts, new views' layout and grouping, field visibility
+                             (types.rs the settings, read.rs what views and the Issue view read, edit.rs the changes)
   src/me_mode/               which issues are mine in Me mode: the assignee plus the owner's rules (ADR 0045)
   src/team/                  who is on which Space's team: its assignees by default, the owner's choices on top
   src/avatars/               people's profile pictures: freshness, the `cache.avatar` rows, `user_avatar` (data URLs)
