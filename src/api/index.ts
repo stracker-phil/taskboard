@@ -206,6 +206,10 @@ export const api = {
     invoke<void>("pin_create", { kind, target, duration, reason }),
   /** Ends the pin now; it moves to Recently unpinned. */
   pinRemove: (id: number) => invoke<void>("pin_remove", { id }),
+  /** The bookmark's own name; null or blank shows the item's name. */
+  pinRename: (id: number, title: string | null) => invoke<void>("pin_rename", { id, title }),
+  /** Moves the bookmark before another one, or last for null. */
+  pinMove: (id: number, before: number | null) => invoke<void>("pin_move", { id, before }),
   /** P: unpins the issue, or pins it until unpinned. */
   pinToggleIssue: (id: string) => invoke<void>("pin_toggle_issue", { id }),
   /** Marks the unseen issues the view shows, narrowed as asked, seen; without a view every unseen issue of the

@@ -344,6 +344,11 @@ and views can be bookmarked; a filter list's bookmark puts it under Home.
   summary), comment (author, excerpt, issue key) or list (Space / name), Reason and Time left; hover shows ×
   to remove the bookmark. "Recently removed" lists what ended in the last 7 days. The Home row counts the active
   bookmarks. Time left refreshes every minute while the page is open.
+- **Own names and order.** Bookmarks keep the owner's order (`pin.position`; a new one goes last, bookmarking
+  it again keeps its place): drag a row on the Bookmarks page to move it (`useDragReorder`, the drop line of the
+  sidebar and the view tabs; `pin_move`). A row's context menu has Open, Rename Bookmark… (edited in place,
+  `InlineRename`; `pin_rename`), Use Original Name when it has its own, and Remove Bookmark. The own name shows
+  wherever the bookmark does (`pinName`), a bookmarked list's Home row too; the item's own name is the tooltip.
 
 ## States
 

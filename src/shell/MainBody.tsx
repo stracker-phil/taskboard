@@ -40,7 +40,7 @@ export function MainBody() {
     case "status":
       return <SyncStatusView />;
     case "pinned":
-      return <PinnedView listId={body.listId} viewId={body.viewId} />;
+      return <PinnedView />;
     case "view": {
       const { view, narrowing } = body;
       if (view.layout === "table") return <TableView view={view} narrowing={narrowing} />;

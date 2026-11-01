@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
 
 import { api } from "../api";
+import { MenuHost } from "../components/menu";
 import { createQueryClient } from "../queries/queryClient";
 import { resetStore, useStore } from "../state/store";
 import { commentTarget, issueTarget, listTarget, pinItem, pins, viewTarget } from "../test/pins";
@@ -20,7 +21,8 @@ const LIST = pinItem({ id: 3, target: listTarget(), reason: null, timeLeft: "" }
 function renderPinned() {
   render(
     <QueryClientProvider client={createQueryClient()}>
-      <PinnedView listId={3} viewId={0} />
+      <PinnedView />
+      <MenuHost />
     </QueryClientProvider>,
   );
 }
@@ -32,6 +34,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
   mocked.pinsList.mockResolvedValue(pins());
+  mocked.navCurrent.mockResolvedValue({ location: { listId: 3, viewId: 0 }, expanded: [] });
 });
 
 describe("PinnedView", () => {
@@ -205,7 +208,7 @@ describe("PinnedView", () => {
         const client = createQueryClient();
         render(
           <QueryClientProvider client={client}>
-            <PinnedView listId={3} viewId={0} />
+            <PinnedView />
           </QueryClientProvider>,
         );
         await userEvent.click(within(await rowOf(/Sam Lee/)).getByRole("button", { name: "Remove bookmark" }));
@@ -250,6 +253,167 @@ describe("PinnedView", () => {
         const table = within(await pinnedTable());
         expect(table.getAllByRole("button", { name: "Remove bookmark" })).toHaveLength(2);
       });
+    });
+  });
+
+  describe("a bookmark with its own name", () => {
+    const TITLED = pinItem({ id: 1, title: "Pricing decision" });
+
+    it("shows the own name instead of the issue summary", async () => {
+      mocked.pinsList.mockResolvedValue(pins([TITLED]));
+      renderPinned();
+
+      const row = within(await rowOf(/Pricing decision/));
+      expect(row.getByText("NW-1042")).toBeInTheDocument();
+      expect(row.queryByText("Redesign the pricing page")).not.toBeInTheDocument();
+    });
+
+    it("shows the own name instead of the name of a list", async () => {
+      mocked.pinsList.mockResolvedValue(pins([pinItem({ target: listTarget(), title: "Mine" })]));
+      renderPinned();
+
+      const row = within(await rowOf(/Mine/));
+      expect(row.queryByText("My open issues")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("the row's context menu", () => {
+    const openMenu = async (text: RegExp) => {
+      fireEvent.contextMenu(await rowOf(text));
+      return within(screen.getByRole("menu"));
+    };
+
+    it("offers Open, Rename Bookmark and Remove Bookmark for an untitled bookmark", async () => {
+      mocked.pinsList.mockResolvedValue(pins([ISSUE]));
+      renderPinned();
+
+      const menu = await openMenu(/Redesign the pricing page/);
+
+      expect(menu.getAllByRole("menuitem").map((item) => item.textContent)).toEqual(["Open", "Rename Bookmark…", "Remove Bookmark"]);
+    });
+
+    it("opens the bookmark from Open", async () => {
+      mocked.pinsList.mockResolvedValue(pins([ISSUE]));
+      renderPinned();
+
+      await userEvent.click((await openMenu(/Redesign the pricing page/)).getByRole("menuitem", { name: "Open" }));
+
+      expect(useStore.getState().issueView?.stack).toEqual(["10042"]);
+    });
+
+    it("saves the typed name from Rename Bookmark", async () => {
+      mocked.pinsList.mockResolvedValue(pins([ISSUE]));
+      renderPinned();
+
+      await userEvent.click((await openMenu(/Redesign the pricing page/)).getByRole("menuitem", { name: "Rename Bookmark…" }));
+      const field = await screen.findByRole("textbox", { name: "Bookmark name" });
+      await userEvent.clear(field);
+      await userEvent.type(field, "Pricing decision{Enter}");
+
+      expect(mocked.pinRename).toHaveBeenCalledWith(1, "Pricing decision");
+      expect(screen.queryByRole("textbox", { name: "Bookmark name" })).not.toBeInTheDocument();
+    });
+
+    it("saves nothing when the rename is cancelled with Escape", async () => {
+      mocked.pinsList.mockResolvedValue(pins([ISSUE]));
+      renderPinned();
+
+      await userEvent.click((await openMenu(/Redesign the pricing page/)).getByRole("menuitem", { name: "Rename Bookmark…" }));
+      await userEvent.type(await screen.findByRole("textbox", { name: "Bookmark name" }), "Other{Escape}");
+
+      expect(mocked.pinRename).not.toHaveBeenCalled();
+      expect(screen.getByText("Redesign the pricing page")).toBeInTheDocument();
+    });
+
+    it("offers Use Original Name only for a titled bookmark, and clears the title with it", async () => {
+      mocked.pinsList.mockResolvedValue(pins([pinItem({ id: 1, title: "Pricing decision" })]));
+      renderPinned();
+
+      await userEvent.click((await openMenu(/Pricing decision/)).getByRole("menuitem", { name: /^Use Original Name/ }));
+
+      expect(mocked.pinRename).toHaveBeenCalledWith(1, null);
+    });
+
+    it("leaves out Use Original Name for an untitled bookmark", async () => {
+      mocked.pinsList.mockResolvedValue(pins([ISSUE]));
+      renderPinned();
+
+      const menu = await openMenu(/Redesign the pricing page/);
+
+      expect(menu.queryByRole("menuitem", { name: /Use Original Name/ })).not.toBeInTheDocument();
+    });
+
+    it("ends the bookmark from Remove Bookmark and keeps its row", async () => {
+      mocked.pinsList.mockResolvedValue(pins([ISSUE, COMMENT]));
+      renderPinned();
+
+      await userEvent.click((await openMenu(/Sam Lee/)).getByRole("menuitem", { name: "Remove Bookmark" }));
+
+      expect(mocked.pinRemove).toHaveBeenCalledWith(2);
+      expect(within(await rowOf(/Sam Lee/)).getByText("Removed")).toBeInTheDocument();
+    });
+  });
+
+  describe("drag to reorder", () => {
+    let rects: { mockRestore: () => void };
+
+    // Rows are 40px tall, stacked from the top by their drag index.
+    beforeEach(() => {
+      rects = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+        const index = this.getAttribute("data-drag-index");
+        const top = index === null ? 0 : Number(index) * 40;
+        const height = index === null ? 0 : 40;
+        return { top, bottom: top + height, height, left: 0, right: 0, width: 0, x: 0, y: top, toJSON: () => ({}) };
+      });
+      mocked.pinsList.mockResolvedValue(pins([ISSUE, COMMENT, LIST]));
+    });
+
+    afterEach(() => rects.mockRestore());
+
+    function drag(row: HTMLElement, from: number, to: number) {
+      fireEvent.pointerDown(row, { button: 0, clientY: from });
+      fireEvent.pointerMove(row, { buttons: 1, clientY: to });
+      fireEvent.pointerUp(row);
+    }
+
+    it.each([
+      ["the first bookmark between the second and third", /Redesign the pricing page/, 10, 70, 1, 3],
+      ["the first bookmark to the end", /Redesign the pricing page/, 10, 115, 1, null],
+      ["the last bookmark to the top", /My open issues/, 90, 5, 3, 1],
+    ])("moves %s, passing the bookmark it lands above", async (_name, row, from, to, movedId, before) => {
+      renderPinned();
+
+      drag(await rowOf(row), from, to);
+
+      expect(mocked.pinMove).toHaveBeenCalledWith(movedId, before);
+    });
+
+    it("does not move a bookmark dropped where it was", async () => {
+      renderPinned();
+
+      drag(await rowOf(/Sam Lee/), 50, 30);
+
+      expect(mocked.pinMove).not.toHaveBeenCalled();
+    });
+
+    it("does not open the row that ends a drag", async () => {
+      renderPinned();
+      const row = await rowOf(/Redesign the pricing page/);
+
+      drag(row, 10, 70);
+      fireEvent.click(row);
+
+      expect(useStore.getState().issueView).toBeNull();
+    });
+
+    it("does not drag a bookmark removed on this page", async () => {
+      renderPinned();
+      const row = await rowOf(/Sam Lee/);
+      await userEvent.click(within(row).getByRole("button", { name: "Remove bookmark" }));
+
+      drag(row, 50, 100);
+
+      expect(mocked.pinMove).not.toHaveBeenCalled();
     });
   });
 

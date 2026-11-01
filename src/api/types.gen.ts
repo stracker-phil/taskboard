@@ -432,8 +432,8 @@ export type ListKind = "everything" | "space" | "list" | "pinned";
 
 export type ListNode = { id: number, kind: ListKind, name: string, 
 /**
- * Open issues; for Unread its unseen issues (the badge), for Bookmarks its active pins; none for a
- * filter that can't be compiled.
+ * Open issues, or unread ones under Unread only; for Bookmarks its active pins; none for a filter that can't
+ * be compiled.
  */
 count: number | null, 
 /**
@@ -585,7 +585,11 @@ color: number, };
 
 export type PinDuration = "today" | "twoDays" | "week" | "untilUnpinned";
 
-export type PinItem = { id: number, target: Pinned, reason: string | null, 
+export type PinItem = { id: number, target: Pinned, 
+/**
+ * The owner's name for it; none shows the item's own.
+ */
+title: string | null, reason: string | null, 
 /**
  * "today", "2d left"; empty until unpinned and for ended pins.
  */

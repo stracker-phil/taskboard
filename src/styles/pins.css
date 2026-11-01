@@ -59,7 +59,11 @@
   display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 260px) 96px; overflow: hidden;
   border-radius: 10px; background: var(--panel-bg); box-shadow: var(--shadow-group-card);
 }
-.pin-table__head, .pin-table__row { display: contents; }
+/* Rows span the table's columns as subgrids, so each has a box to drag and measure. */
+.pin-table { position: relative; }
+.pin-table__head, .pin-table__row { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; }
+.pin-table__row[data-dragging] { opacity: 0.5; }
+.pin-table__rename { flex: 1; min-width: 0; }
 .pin-table__head > span {
   padding: 10px 16px 8px; font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase;
   color: var(--text-muted); white-space: nowrap;

@@ -1,5 +1,5 @@
-//! Creating and ending pins. A target has at most one active pin; pinning it again replaces its duration and
-//! reason.
+//! Creating, naming, ordering and ending pins. A target has at most one active pin; pinning it again replaces its
+//! duration and reason and keeps its name and place.
 
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
@@ -18,6 +18,8 @@ pub fn active(now_param: &str) -> String {
 
 /// The longest reason kept; the rest is cut.
 const REASON_MAX: usize = 200;
+/// The longest own name kept.
+const TITLE_MAX: usize = 120;
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, TS)]
 #[ts(export, export_to = "src/api/types.gen.ts")]
@@ -97,9 +99,17 @@ fn pin(
             "UPDATE pin SET reason = ?2, expires_at = ?3 WHERE id = ?1",
             params![id, normalize_reason(reason), expires],
         )?,
+        // A new bookmark goes last.
         None => conn.execute(
-            "INSERT INTO pin (target_kind, target_id, reason, expires_at, created_at) VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![kind.as_str(), target, normalize_reason(reason), expires, now],
+            "INSERT INTO pin (target_kind, target_id, reason, expires_at, created_at, position)
+             VALUES (?1, ?2, ?3, ?4, ?5, (SELECT COALESCE(MAX(position), -1) + 1 FROM pin))",
+            params![
+                kind.as_str(),
+                target,
+                normalize_reason(reason),
+                expires,
+                now
+            ],
         )?,
     };
     changes.local_changed(LocalPart::Pins);
@@ -130,6 +140,61 @@ pub async fn pin_create(
 ) -> AppResult<()> {
     db.write(move |tx, changes| pin(tx, changes, &viewer, kind, &target, duration, reason))
         .await
+}
+
+/// Names the bookmark; a blank name goes back to the item's own.
+pub async fn pin_rename(db: &Db, id: i64, title: Option<String>) -> AppResult<()> {
+    let title = title
+        .map(|t| t.split_whitespace().collect::<Vec<_>>().join(" "))
+        .filter(|t| !t.is_empty())
+        .map(|t| t.chars().take(TITLE_MAX).collect::<String>());
+    db.write(move |tx, changes| {
+        if tx.execute(
+            "UPDATE pin SET title = ?2 WHERE id = ?1",
+            params![id, title],
+        )? == 0
+        {
+            return Err(AppError::NotFound(format!("Bookmark {id} doesn't exist")));
+        }
+        changes.local_changed(LocalPart::Pins);
+        Ok(())
+    })
+    .await
+}
+
+/// Puts the active bookmark before another one, or last without one; the active bookmarks are numbered again.
+pub async fn pin_move(db: &Db, viewer: Viewer, id: i64, before: Option<i64>) -> AppResult<()> {
+    db.write(move |tx, changes| {
+        let now = format_utc(viewer.now);
+        let mut query = tx.prepare(&format!(
+            "SELECT p.id FROM pin p WHERE {} ORDER BY p.position, p.id",
+            active("?1")
+        ))?;
+        let mut order: Vec<i64> = query
+            .query_map([&now], |r| r.get(0))?
+            .collect::<Result<_, _>>()?;
+        let Some(from) = order.iter().position(|&p| p == id) else {
+            return Err(AppError::NotFound(format!("Bookmark {id} isn't active")));
+        };
+        order.remove(from);
+        let to = match before {
+            Some(other) => order
+                .iter()
+                .position(|&p| p == other)
+                .ok_or_else(|| AppError::NotFound(format!("Bookmark {other} isn't active")))?,
+            None => order.len(),
+        };
+        order.insert(to, id);
+        for (position, pin) in order.iter().enumerate() {
+            tx.execute(
+                "UPDATE pin SET position = ?2 WHERE id = ?1",
+                params![pin, position as i64],
+            )?;
+        }
+        changes.local_changed(LocalPart::Pins);
+        Ok(())
+    })
+    .await
 }
 
 /// Ends the pin now; it moves to Recently unpinned.

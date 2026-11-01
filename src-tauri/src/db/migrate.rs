@@ -24,6 +24,7 @@ pub const LOCAL: &[&str] = &[
     include_str!("../../migrations/local/0016_space_member_off.sql"),
     include_str!("../../migrations/local/0017_space_member.sql"),
     include_str!("../../migrations/local/0018_drop_unread_list.sql"),
+    include_str!("../../migrations/local/0019_pin_title_position.sql"),
 ];
 pub const CACHE: &[&str] = &[
     include_str!("../../migrations/cache/0001_init.sql"),
@@ -273,6 +274,40 @@ mod tests {
                 format!("filter_list:{pinned}"),
                 format!("view:{pinned_view}"),
                 "issue:NW-1".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn existing_bookmarks_are_numbered_newest_first_and_start_without_a_title() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        migrate(&mut conn, "local", &LOCAL[..18]).unwrap();
+        conn.execute_batch(
+            "INSERT INTO pin (target_kind, target_id, created_at) VALUES
+               ('issue', 'NW-1', '2026-01-05T09:00:00Z'),
+               ('issue', 'NW-2', '2026-01-05T09:00:00Z'),
+               ('issue', 'NW-3', '2026-01-04T09:00:00Z'),
+               ('issue', 'NW-4', '2026-01-06T09:00:00Z')",
+        )
+        .unwrap();
+
+        migrate(&mut conn, "local", LOCAL).unwrap();
+
+        let mut query = conn
+            .prepare("SELECT target_id, position, title FROM pin ORDER BY position")
+            .unwrap();
+        let rows: Vec<(String, i64, Option<String>)> = query
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect();
+        assert_eq!(
+            rows,
+            [
+                ("NW-4".to_string(), 0, None),
+                ("NW-2".to_string(), 1, None),
+                ("NW-1".to_string(), 2, None),
+                ("NW-3".to_string(), 3, None),
             ]
         );
     }

@@ -40,6 +40,8 @@ pub fn handlers() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
         crate::menu::palette::menu_commands,
         pins::pin_create,
         pins::pin_remove,
+        pins::pin_rename,
+        pins::pin_move,
         pins::pin_toggle_issue,
         changes::list_mark_all_seen,
         connection::connection_get,

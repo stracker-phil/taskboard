@@ -10,8 +10,8 @@ use taskboard_lib::db::Db;
 use taskboard_lib::error::ErrorKind;
 use taskboard_lib::lists::{Kind, SidebarTree, Viewer, list_create, list_delete, sidebar_tree};
 use taskboard_lib::pins::{
-    PinDuration, PinItem, PinKind, Pinned, Pins, pin_create, pin_remove, pin_toggle_issue,
-    pins_list,
+    PinDuration, PinItem, PinKind, Pinned, Pins, pin_create, pin_move, pin_remove, pin_rename,
+    pin_toggle_issue, pins_list,
 };
 use taskboard_lib::space_config::{SpaceLayouts, space_set_layouts};
 use taskboard_lib::status_style::Style;
@@ -194,7 +194,7 @@ mod what_a_pin_shows {
     use super::*;
 
     #[tokio::test]
-    async fn an_issue_a_comment_and_two_lists_are_listed_newest_first_with_their_details() {
+    async fn an_issue_a_comment_and_two_lists_are_listed_in_the_order_they_were_pinned() {
         let (_dir, db) = lab().await;
         let open_bugs = list_id(&db, "Open bugs").await;
         let everything = node_id(&db, "everything").await;
@@ -238,16 +238,7 @@ mod what_a_pin_shows {
         assert_eq!(
             targets(&pins.active),
             [
-                Pinned::List {
-                    id: my_bugs,
-                    name: "My bugs".into(),
-                    space: None,
-                },
-                Pinned::List {
-                    id: open_bugs,
-                    name: "Open bugs".into(),
-                    space: Some("Website relaunch".into()),
-                },
+                issue_target("1001", "NW-1", "Fix the checkout total", Style::Todo, false),
                 Pinned::Comment {
                     id: "c1".into(),
                     issue_id: "1001".into(),
@@ -255,7 +246,16 @@ mod what_a_pin_shows {
                     author: Some(person(ME, "Alex Morgan", Some(ME))),
                     excerpt: COMMENT_TEXT.into(),
                 },
-                issue_target("1001", "NW-1", "Fix the checkout total", Style::Todo, false),
+                Pinned::List {
+                    id: open_bugs,
+                    name: "Open bugs".into(),
+                    space: Some("Website relaunch".into()),
+                },
+                Pinned::List {
+                    id: my_bugs,
+                    name: "My bugs".into(),
+                    space: None,
+                },
             ]
         );
         assert!(pins.recently_unpinned.is_empty());
@@ -277,7 +277,7 @@ mod what_a_pin_shows {
 
             let pins = pins_at(&db, NOW).await;
 
-            let Pinned::Comment { excerpt, .. } = &pins.active[0].target else {
+            let Pinned::Comment { excerpt, .. } = &pins.active.last().unwrap().target else {
                 panic!("{comment} is not a comment pin");
             };
             assert_eq!(excerpt, &expected, "{comment}");
@@ -324,16 +324,16 @@ mod what_a_pin_shows {
             summary(&today),
             [
                 (
-                    "7d left".to_string(),
-                    Some("2026-11-03T23:00:00.000Z".to_string())
+                    "today".to_string(),
+                    Some("2026-10-28T23:00:00.000Z".to_string())
                 ),
                 (
                     "2d left".to_string(),
                     Some("2026-10-29T23:00:00.000Z".to_string())
                 ),
                 (
-                    "today".to_string(),
-                    Some("2026-10-28T23:00:00.000Z".to_string())
+                    "7d left".to_string(),
+                    Some("2026-11-03T23:00:00.000Z".to_string())
                 ),
             ]
         );
@@ -343,7 +343,7 @@ mod what_a_pin_shows {
                 .iter()
                 .map(|item| item.time_left.as_str())
                 .collect::<Vec<_>>(),
-            ["6d left", "today"]
+            ["today", "6d left"]
         );
     }
 }
@@ -537,7 +537,7 @@ mod ending_pins {
         let (_dir, db) = lab().await;
         pin_issue(&db, NOW, "1001", PinDuration::UntilUnpinned).await;
         pin_issue(&db, NOW, "1002", PinDuration::Today).await;
-        let removed = pins_at(&db, NOW).await.active[1].id;
+        let removed = pins_at(&db, NOW).await.active[0].id;
         pin_remove(&db, viewer(NOW), removed).await.unwrap();
 
         for (viewed, remembered) in [
@@ -644,7 +644,7 @@ mod bookmarked_views {
     }
 
     #[tokio::test]
-    async fn views_of_a_space_a_filter_list_and_a_global_list_show_their_level_newest_first() {
+    async fn views_of_a_space_a_filter_list_and_a_global_list_show_their_level_in_pin_order() {
         let (_dir, db) = lab().await;
         let space = node_id(&db, "space").await;
         let open_bugs = list_id(&db, "Open bugs").await;
@@ -668,11 +668,11 @@ mod bookmarked_views {
             targets(&pins.active),
             [
                 view_target(
-                    global_board,
-                    my_bugs,
+                    space_board,
+                    space,
                     "Board",
                     Layout::Board,
-                    "My bugs",
+                    "Website relaunch",
                     None
                 ),
                 view_target(
@@ -684,11 +684,11 @@ mod bookmarked_views {
                     Some("Website relaunch")
                 ),
                 view_target(
-                    space_board,
-                    space,
+                    global_board,
+                    my_bugs,
                     "Board",
                     Layout::Board,
-                    "Website relaunch",
+                    "My bugs",
                     None
                 ),
             ]
@@ -726,18 +726,18 @@ mod bookmarked_views {
             targets(&pins.active),
             [
                 view_target(
-                    space_table,
-                    space,
-                    "Table",
-                    Layout::Table,
-                    "Website relaunch",
-                    None
-                ),
-                view_target(
                     space_board,
                     space,
                     "Board",
                     Layout::List,
+                    "Website relaunch",
+                    None
+                ),
+                view_target(
+                    space_table,
+                    space,
+                    "Table",
+                    Layout::Table,
                     "Website relaunch",
                     None
                 ),
@@ -833,7 +833,7 @@ mod in_the_sidebar {
     use super::*;
 
     #[tokio::test]
-    async fn pinned_filter_lists_appear_newest_first_with_their_counts() {
+    async fn pinned_filter_lists_appear_in_pin_order_with_their_counts() {
         let (_dir, db) = lab().await;
         let sprint = list_id(&db, "Current sprint").await;
         let open_bugs = list_id(&db, "Open bugs").await;
@@ -862,8 +862,8 @@ mod in_the_sidebar {
         assert_eq!(
             pinned,
             [
-                (open_bugs, Kind::List, "Open bugs", Some(1)),
                 (sprint, Kind::List, "Current sprint", Some(0)),
+                (open_bugs, Kind::List, "Open bugs", Some(1)),
             ]
         );
         let space = tree.spaces.iter().find(|s| s.key == "NW").unwrap();
@@ -903,7 +903,7 @@ mod in_the_sidebar {
         let tomorrow = "2026-10-29T08:00:00Z";
 
         let expired = tree_at(&db, tomorrow).await;
-        let issue_pin = pins_at(&db, tomorrow).await.active[1].id;
+        let issue_pin = pins_at(&db, tomorrow).await.active[0].id;
         pin_remove(&db, viewer(tomorrow), issue_pin).await.unwrap();
         let removed = tree_at(&db, tomorrow).await;
 
@@ -976,9 +976,217 @@ mod in_the_pinned_view {
         assert_eq!(shown_ids(&db, next_day).await, ["1001", "1003"]);
 
         let pins = pins_at(&db, next_day).await;
-        pin_remove(&db, viewer(next_day), pins.active[0].id)
+        pin_remove(&db, viewer(next_day), pins.active[1].id)
             .await
             .unwrap();
         assert_eq!(shown_ids(&db, next_day).await, ["1001"]);
+    }
+}
+
+mod naming_and_ordering {
+    use super::*;
+
+    /// Pins the three issues in order and returns their pin ids.
+    async fn three_pins(db: &Db) -> Vec<i64> {
+        for id in ["1001", "1002", "1003"] {
+            pin_issue(db, NOW, id, PinDuration::UntilUnpinned).await;
+        }
+        active_ids(db).await
+    }
+
+    async fn active_ids(db: &Db) -> Vec<i64> {
+        pins_at(db, NOW).await.active.iter().map(|p| p.id).collect()
+    }
+
+    async fn position_of(db: &Db, pin: i64) -> i64 {
+        number(db, format!("SELECT position FROM pin WHERE id = {pin}")).await
+    }
+
+    async fn titles(db: &Db) -> Vec<Option<String>> {
+        pins_at(db, NOW)
+            .await
+            .active
+            .into_iter()
+            .map(|p| p.title)
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn a_new_pin_goes_last_even_after_an_earlier_one_ended() {
+        let (_dir, db) = lab().await;
+        let ids = three_pins(&db).await;
+        pin_remove(&db, viewer(NOW), ids[0]).await.unwrap();
+        pin_issue(&db, NOW, "1001", PinDuration::UntilUnpinned).await;
+
+        let order = active_ids(&db).await;
+
+        assert_eq!(order[..2], ids[1..]);
+        assert_eq!(order.len(), 3);
+        assert_ne!(order[2], ids[0]);
+    }
+
+    #[tokio::test]
+    async fn pinning_again_keeps_the_title_and_the_place() {
+        let (_dir, db) = lab().await;
+        let ids = three_pins(&db).await;
+        pin_rename(&db, ids[0], Some("Checkout".into()))
+            .await
+            .unwrap();
+
+        pin_issue(&db, NOW, "1001", PinDuration::Week).await;
+
+        assert_eq!(active_ids(&db).await, ids);
+        assert_eq!(
+            titles(&db).await,
+            [Some("Checkout".to_string()), None, None]
+        );
+        assert_eq!(number(&db, "SELECT COUNT(*) FROM pin").await, 3);
+    }
+
+    #[tokio::test]
+    async fn a_new_title_is_flattened_capped_and_cleared_when_blank() {
+        let (_dir, db) = lab().await;
+        pin_issue(&db, NOW, "1001", PinDuration::UntilUnpinned).await;
+        let id = active_ids(&db).await[0];
+        let cases = [
+            (
+                Some("  Release \n  checklist ".to_string()),
+                Some("Release checklist".to_string()),
+            ),
+            (Some("   ".to_string()), None),
+            (None, None),
+            (Some("x".repeat(200)), Some("x".repeat(120))),
+        ];
+        for (input, expected) in cases {
+            pin_rename(&db, id, Some("Old".into())).await.unwrap();
+
+            pin_rename(&db, id, input.clone()).await.unwrap();
+
+            assert_eq!(titles(&db).await, [expected], "{input:?}");
+        }
+    }
+
+    #[tokio::test]
+    async fn renaming_an_unknown_bookmark_is_not_found() {
+        let (_dir, db) = lab().await;
+
+        let err = pin_rename(&db, 999, Some("Checkout".into()))
+            .await
+            .unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::NotFound);
+    }
+
+    #[tokio::test]
+    async fn the_title_reaches_the_page_as_title() {
+        let (_dir, db) = lab().await;
+        pin_issue(&db, NOW, "1001", PinDuration::UntilUnpinned).await;
+        let id = active_ids(&db).await[0];
+        pin_rename(&db, id, Some("Checkout".into())).await.unwrap();
+
+        let item = pins_at(&db, NOW).await.active.remove(0);
+
+        assert_eq!(
+            serde_json::to_value(&item).unwrap(),
+            serde_json::json!({
+                "id": id,
+                "target": {
+                    "kind": "issue",
+                    "id": "1001",
+                    "key": "NW-1",
+                    "summary": "Fix the checkout total",
+                    "style": serde_json::to_value(Style::Todo).unwrap(),
+                    "gone": false,
+                },
+                "title": "Checkout",
+                "reason": null,
+                "timeLeft": "",
+                "expiresAt": null,
+            })
+        );
+    }
+
+    #[tokio::test]
+    async fn moving_a_bookmark_puts_it_before_another_or_last() {
+        // (moved, before, expected order as indices of the three pins)
+        let cases: [(usize, Option<usize>, [usize; 3]); 4] = [
+            (2, Some(0), [2, 0, 1]),
+            (0, None, [1, 2, 0]),
+            (0, Some(2), [1, 0, 2]),
+            (0, Some(1), [0, 1, 2]),
+        ];
+        for (moved, before, expected) in cases {
+            let (_dir, db) = lab().await;
+            let ids = three_pins(&db).await;
+
+            pin_move(&db, viewer(NOW), ids[moved], before.map(|b| ids[b]))
+                .await
+                .unwrap();
+
+            let want: Vec<i64> = expected.iter().map(|&i| ids[i]).collect();
+            assert_eq!(active_ids(&db).await, want, "{moved} before {before:?}");
+        }
+    }
+
+    #[tokio::test]
+    async fn moving_numbers_the_active_bookmarks_from_zero_and_leaves_ended_ones_out() {
+        let (_dir, db) = lab().await;
+        let ids = three_pins(&db).await;
+        pin_remove(&db, viewer(NOW), ids[1]).await.unwrap();
+
+        pin_move(&db, viewer(NOW), ids[2], Some(ids[0]))
+            .await
+            .unwrap();
+
+        assert_eq!(position_of(&db, ids[2]).await, 0);
+        assert_eq!(position_of(&db, ids[0]).await, 1);
+        assert_eq!(active_ids(&db).await, [ids[2], ids[0]]);
+    }
+
+    #[tokio::test]
+    async fn moving_to_or_from_a_bookmark_that_isnt_active_is_not_found() {
+        let (_dir, db) = lab().await;
+        let ids = three_pins(&db).await;
+        pin_remove(&db, viewer(NOW), ids[1]).await.unwrap();
+        let cases = [
+            (999, Some(ids[0])),
+            (ids[1], Some(ids[0])),
+            (ids[0], Some(ids[1])),
+            (ids[0], Some(999)),
+            (ids[0], Some(ids[0])),
+        ];
+        for (moved, before) in cases {
+            let err = pin_move(&db, viewer(NOW), moved, before).await.unwrap_err();
+
+            assert_eq!(err.kind(), ErrorKind::NotFound, "{moved} before {before:?}");
+        }
+
+        assert_eq!(active_ids(&db).await, [ids[0], ids[2]]);
+    }
+
+    #[tokio::test]
+    async fn the_sidebar_lists_bookmarked_lists_in_the_bookmarks_order_under_their_titles() {
+        let (_dir, db) = lab().await;
+        let sprint = list_id(&db, "Current sprint").await;
+        let open_bugs = list_id(&db, "Open bugs").await;
+        pin_list(&db, NOW, sprint, PinDuration::UntilUnpinned).await;
+        pin_list(&db, NOW, open_bugs, PinDuration::UntilUnpinned).await;
+        let ids = active_ids(&db).await;
+        pin_rename(&db, ids[1], Some("Triage".into()))
+            .await
+            .unwrap();
+        assert_eq!(
+            pinned_list_names(&tree_at(&db, NOW).await),
+            ["Current sprint", "Triage"]
+        );
+
+        pin_move(&db, viewer(NOW), ids[1], Some(ids[0]))
+            .await
+            .unwrap();
+
+        let tree = tree_at(&db, NOW).await;
+        assert_eq!(pinned_list_names(&tree), ["Triage", "Current sprint"]);
+        assert_eq!(tree.pinned_lists[0].id, open_bugs);
+        assert_eq!(tree.pinned_lists[1].id, sprint);
     }
 }

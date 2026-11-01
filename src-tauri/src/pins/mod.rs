@@ -7,4 +7,4 @@ mod store;
 
 pub use duration::{PinDuration, expires_at, time_left};
 pub use list::{PinItem, Pinned, Pins, pins_list};
-pub use store::{PinKind, active, pin_create, pin_remove, pin_toggle_issue};
+pub use store::{PinKind, active, pin_create, pin_move, pin_remove, pin_rename, pin_toggle_issue};

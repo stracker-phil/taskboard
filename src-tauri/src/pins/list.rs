@@ -1,4 +1,4 @@
-//! The Pinned view: active pins, newest first, and the ones that ended in the last 7 days.
+//! The Bookmarks page: active pins in the owner's order, and the ones that ended in the last 7 days.
 
 use chrono::{DateTime, Duration, Utc};
 use rusqlite::{Connection, OptionalExtension};
@@ -34,6 +34,8 @@ pub struct Pins {
 pub struct PinItem {
     pub id: i64,
     pub target: Pinned,
+    /// The owner's name for it; none shows the item's own.
+    pub title: Option<String>,
     pub reason: Option<String>,
     /// "today", "2d left"; empty until unpinned and for ended pins.
     pub time_left: String,
@@ -87,6 +89,7 @@ struct Row {
     id: i64,
     kind: String,
     target: String,
+    title: Option<String>,
     reason: Option<String>,
     expires_at: Option<String>,
 }
@@ -98,7 +101,7 @@ pub async fn pins_list(db: &Db, viewer: Viewer) -> AppResult<Pins> {
         let style_map = Styles::load(conn)?;
         let active_rows = read(
             conn,
-            &format!("{} ORDER BY p.created_at DESC, p.id DESC", active("?1")),
+            &format!("{} ORDER BY p.position, p.id", active("?1")),
             &[&now],
         )?;
         let ended_rows = read(
@@ -140,6 +143,7 @@ fn resolve(
             items.push(PinItem {
                 id: row.id,
                 target,
+                title: row.title,
                 reason: row.reason,
                 time_left: String::new(),
                 expires_at: row.expires_at,
@@ -155,15 +159,16 @@ fn read(
     params: &[&dyn rusqlite::ToSql],
 ) -> AppResult<Vec<Row>> {
     let mut query = conn.prepare(&format!(
-        "SELECT p.id, p.target_kind, p.target_id, p.reason, p.expires_at FROM pin p WHERE {condition}"
+        "SELECT p.id, p.target_kind, p.target_id, p.title, p.reason, p.expires_at FROM pin p WHERE {condition}"
     ))?;
     let rows = query.query_map(params, |r| {
         Ok(Row {
             id: r.get(0)?,
             kind: r.get(1)?,
             target: r.get(2)?,
-            reason: r.get(3)?,
-            expires_at: r.get(4)?,
+            title: r.get(3)?,
+            reason: r.get(4)?,
+            expires_at: r.get(5)?,
         })
     })?;
     Ok(rows.collect::<Result<_, _>>()?)

@@ -46,7 +46,7 @@ export const viewTarget = (patch: Partial<Extract<Pinned, { kind: "view" }>> = {
 
 /** An active pin on an issue unless overridden; pass `target: commentTarget()` or `listTarget()` for the others. */
 export function pinItem(patch: Partial<PinItem> = {}): PinItem {
-  return { id: 1, target: issueTarget(), reason: null, timeLeft: "2d left", expiresAt: null, ...patch };
+  return { id: 1, target: issueTarget(), title: null, reason: null, timeLeft: "2d left", expiresAt: null, ...patch };
 }
 
 export const pins = (active: PinItem[] = [], recentlyUnpinned: PinItem[] = []): Pins => ({ active, recentlyUnpinned });

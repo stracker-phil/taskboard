@@ -167,6 +167,8 @@ export function createApiMock(): Api {
     issueAssignees: vi.fn(async (): Promise<Assignees> => ({ people: [], current: null })),
     levelPeople: vi.fn().mockResolvedValue([]),
     meUserFields: vi.fn().mockResolvedValue([]),
+    pinRename: vi.fn().mockResolvedValue(undefined),
+    pinMove: vi.fn().mockResolvedValue(undefined),
     meRuleEdit: vi.fn().mockResolvedValue(settings()),
     modesGet: vi.fn().mockResolvedValue({ meEverywhere: false, unreadOnly: false }),
     modeSet: vi.fn(async (mode: string, on: boolean) => ({ meEverywhere: mode === "meEverywhere" && on, unreadOnly: mode === "unreadOnly" && on })),

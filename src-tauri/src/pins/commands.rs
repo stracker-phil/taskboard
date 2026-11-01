@@ -29,6 +29,22 @@ pub async fn pin_create(
     super::pin_create(&state.db, viewer(&state), kind, target, duration, reason).await
 }
 
+/// Names the bookmark; none or a blank name shows the item's own.
+#[tauri::command]
+pub async fn pin_rename(
+    state: State<'_, AppState>,
+    id: i64,
+    title: Option<String>,
+) -> AppResult<()> {
+    super::pin_rename(&state.db, id, title).await
+}
+
+/// Moves the bookmark before `before`, or last.
+#[tauri::command]
+pub async fn pin_move(state: State<'_, AppState>, id: i64, before: Option<i64>) -> AppResult<()> {
+    super::pin_move(&state.db, viewer(&state), id, before).await
+}
+
 #[tauri::command]
 pub async fn pin_remove(state: State<'_, AppState>, id: i64) -> AppResult<()> {
     super::pin_remove(&state.db, viewer(&state), id).await

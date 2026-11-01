@@ -33,8 +33,8 @@ pub struct ListNode {
     pub id: i64,
     pub kind: Kind,
     pub name: String,
-    /// Open issues; for Unread its unseen issues (the badge), for Bookmarks its active pins; none for a
-    /// filter that can't be compiled.
+    /// Open issues, or unread ones under Unread only; for Bookmarks its active pins; none for a filter that can't
+    /// be compiled.
     pub count: Option<i64>,
     /// Conditions of its own, for the Filter button's badge.
     pub own_conditions: usize,
@@ -129,12 +129,15 @@ fn build(conn: &Connection, viewer: &Viewer, unread: bool) -> AppResult<SidebarT
         .map(|n| list_node(n, &nodes, &ctx, &names, &mut counter))
         .collect();
 
-    let pinned_lists = pinned_list_ids(conn, viewer)?
-        .iter()
-        .filter_map(|id| nodes.iter().find(|n| n.id == *id))
+    let pinned_lists = pinned_lists(conn, viewer)?
+        .into_iter()
+        .filter_map(|(id, title)| Some((nodes.iter().find(|n| n.id == id)?, title)))
         // A global list already sits under Home.
-        .filter(|n| n.parent_id.is_some())
-        .map(|n| list_node(n, &nodes, &ctx, &names, &mut counter))
+        .filter(|(n, _)| n.parent_id.is_some())
+        .map(|(n, title)| ListNode {
+            name: title.unwrap_or_else(|| n.name.clone()),
+            ..list_node(n, &nodes, &ctx, &names, &mut counter)
+        })
         .collect();
 
     let mut spaces = Vec::new();
@@ -179,13 +182,14 @@ fn build(conn: &Connection, viewer: &Viewer, unread: bool) -> AppResult<SidebarT
     Ok(tree)
 }
 
-fn pinned_list_ids(conn: &Connection, viewer: &Viewer) -> AppResult<Vec<i64>> {
+/// The bookmarked lists in the bookmarks' order, with the bookmark's own name.
+fn pinned_lists(conn: &Connection, viewer: &Viewer) -> AppResult<Vec<(i64, Option<String>)>> {
     let mut query = conn.prepare(&format!(
-        "SELECT CAST(p.target_id AS INTEGER) FROM pin p WHERE p.target_kind = 'filter_list' AND {}
-         ORDER BY p.created_at DESC, p.id DESC",
+        "SELECT CAST(p.target_id AS INTEGER), p.title FROM pin p WHERE p.target_kind = 'filter_list' AND {}
+         ORDER BY p.position, p.id",
         active("?1")
     ))?;
-    let ids = query.query_map([format_utc(viewer.now)], |r| r.get(0))?;
+    let ids = query.query_map([format_utc(viewer.now)], |r| Ok((r.get(0)?, r.get(1)?)))?;
     Ok(ids.collect::<Result<_, _>>()?)
 }
 
