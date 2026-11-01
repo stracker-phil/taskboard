@@ -19,8 +19,6 @@ use crate::time::format_utc;
 const KEEP_GONE: Duration = Duration::days(7);
 /// An issue found outside the scope is asked for again after this long, so one deleted since is noticed.
 const RECHECK_LEFT_SCOPE: Duration = Duration::days(7);
-/// Recorded changes the owner has seen are kept this long.
-const KEEP_SEEN_CHANGES: Duration = Duration::days(90);
 
 pub async fn reconcile(
     ctx: &SyncContext,
@@ -85,7 +83,8 @@ pub async fn reconcile(
     }
     let now = Utc::now();
     let gone_before = format_utc(now - KEEP_GONE);
-    let changes_before = format_utc(now - KEEP_SEEN_CHANGES);
+    let keep_history = Duration::days(i64::from(ctx.settings.get().sync.keep_history_days));
+    let changes_before = format_utc(now - keep_history);
     let stamp = format_utc(now);
     let (purged, pruned) = ctx
         .db
@@ -102,7 +101,7 @@ pub async fn reconcile(
         log::info!("Removed {purged} issues gone for more than a week");
     }
     if pruned > 0 {
-        log::info!("Removed {pruned} seen changes older than 90 days");
+        log::info!("Removed {pruned} seen changes past the kept history");
     }
     Ok(())
 }

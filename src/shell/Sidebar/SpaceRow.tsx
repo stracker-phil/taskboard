@@ -96,7 +96,7 @@ export function SpaceRow({ space, active, holdsActive, expanded, renaming, onOpe
 async function stopTracking(space: SpaceNode) {
   const confirmed = await useStore.getState().confirm({
     title: `Stop tracking “${space.name}”?`,
-    text: "Its issues leave the sidebar and the next sync skips the project. Its filter lists and views are kept for when you track it again.",
+    text: "Its issues leave the sidebar and are removed from this Mac; the sync skips the project. Its filter lists, views and what you've read are kept for when you track it again.",
     action: "Stop Tracking",
   });
   if (confirmed) await attempt(api.projectTrack(space.projectId, false), "Could not stop tracking the Space");

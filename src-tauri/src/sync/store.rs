@@ -104,6 +104,31 @@ pub fn forget_issue(conn: &Connection, id: &str) -> AppResult<bool> {
     Ok(conn.execute("DELETE FROM cache.issue WHERE id = ?1", [id])? > 0)
 }
 
+/// Deletes a project's cached issues (their comments, changes and links go with them) and its sync record, so
+/// tracking it again fetches it anew; what the owner has read stays. Returns the deleted issues' ids.
+pub fn forget_project(conn: &Connection, project_id: &str) -> AppResult<Vec<String>> {
+    let ids: Vec<String> = {
+        let mut query = conn.prepare("SELECT id FROM cache.issue WHERE project_id = ?1")?;
+        query
+            .query_map([project_id], |row| row.get(0))?
+            .collect::<Result<_, _>>()?
+    };
+    conn.execute(
+        "DELETE FROM cache.issue_fts WHERE rowid IN
+           (SELECT CAST(id AS INTEGER) FROM cache.issue WHERE project_id = ?1)",
+        [project_id],
+    )?;
+    conn.execute(
+        "DELETE FROM cache.issue WHERE project_id = ?1",
+        [project_id],
+    )?;
+    conn.execute(
+        "DELETE FROM cache.sync_state WHERE scope_id = ?1 || ?2",
+        params![PROJECT_ROW_PREFIX, project_id],
+    )?;
+    Ok(ids)
+}
+
 /// The most recently updated live issues, for the comment prefetch after a delta.
 pub fn recently_updated(conn: &Connection, limit: usize) -> AppResult<Vec<String>> {
     let mut query = conn
@@ -391,4 +416,106 @@ fn record_changes(conn: &Connection, cached: Option<&Snapshot>, row: &IssueRow) 
         )?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::Db;
+
+    const NW: &str = "10001";
+    const OPS: &str = "10002";
+
+    fn issue_sql(id: u32, project: &str) -> String {
+        format!(
+            "INSERT INTO cache.issue (id, key, project_id, summary, issue_type, status_id, status_category,
+                                     created_at, updated_at, synced_at, gone)
+             VALUES ('{id}', 'K-{id}', '{project}', 'Issue {id}', 'Task', 's1', 'new',
+                     '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z', 0);
+             INSERT INTO cache.issue_fts (rowid, key, summary, description, comments)
+             VALUES ({id}, 'K-{id}', 'Issue {id}', '', '');
+             INSERT INTO cache.comment (id, issue_id, created_at, updated_at)
+             VALUES ('c{id}', '{id}', '2026-01-02T00:00:00Z', '2026-01-02T00:00:00Z');
+             INSERT INTO cache.issue_change (issue_id, field, old_value, new_value, changed_at)
+             VALUES ('{id}', 'priority', 'High', 'Low', '2026-01-02T00:00:00Z');
+             INSERT INTO issue_seen (issue_id, seen_at) VALUES ('{id}', '2026-01-03T00:00:00Z');"
+        )
+    }
+
+    async fn lab() -> (tempfile::TempDir, Db) {
+        let dir = crate::test_support::temp_config_dir();
+        let db = Db::open(dir.path()).unwrap();
+        let sql = [
+            "INSERT INTO cache.space (id, key, name, raw) VALUES
+               ('10001', 'NW', 'Website relaunch', '{}'), ('10002', 'OPS', 'Operations', '{}');"
+                .to_string(),
+            issue_sql(1, NW),
+            issue_sql(2, NW),
+            issue_sql(3, OPS),
+        ]
+        .concat();
+        db.write(move |tx, _| {
+            tx.execute_batch(&sql)?;
+            record_project_sync(tx, NW, "project = NW", "2026-01-04T00:00:00Z", 2)?;
+            record_project_sync(tx, OPS, "project = OPS", "2026-01-04T00:00:00Z", 1)?;
+            record_scope_sync(tx, "project in (NW, OPS)", "2026-01-04T00:00:00Z", None)
+        })
+        .await
+        .unwrap();
+        (dir, db)
+    }
+
+    async fn count(db: &Db, sql: &'static str) -> i64 {
+        db.read(move |conn| Ok(conn.query_row(sql, [], |row| row.get(0))?))
+            .await
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn forgetting_a_project_returns_and_deletes_its_issues_with_everything_attached() {
+        let (_dir, db) = lab().await;
+
+        let mut ids = db.write(|tx, _| forget_project(tx, NW)).await.unwrap();
+        ids.sort();
+
+        assert_eq!(ids, vec!["1".to_string(), "2".to_string()]);
+        for sql in [
+            "SELECT COUNT(*) FROM cache.issue WHERE project_id = '10001'",
+            "SELECT COUNT(*) FROM cache.issue_fts WHERE rowid IN (1, 2)",
+            "SELECT COUNT(*) FROM cache.comment WHERE issue_id IN ('1', '2')",
+            "SELECT COUNT(*) FROM cache.issue_change WHERE issue_id IN ('1', '2')",
+            "SELECT COUNT(*) FROM cache.sync_state WHERE scope_id = 'full:10001'",
+        ] {
+            assert_eq!(count(&db, sql).await, 0, "{sql}");
+        }
+    }
+
+    #[tokio::test]
+    async fn forgetting_a_project_keeps_read_marks_other_projects_and_the_scope_record() {
+        let (_dir, db) = lab().await;
+
+        db.write(|tx, _| forget_project(tx, NW)).await.unwrap();
+
+        for (sql, expected) in [
+            ("SELECT COUNT(*) FROM issue_seen WHERE issue_id IN ('1', '2')", 2),
+            ("SELECT COUNT(*) FROM cache.issue WHERE project_id = '10002'", 1),
+            ("SELECT COUNT(*) FROM cache.issue_fts WHERE rowid = 3", 1),
+            ("SELECT COUNT(*) FROM cache.comment WHERE issue_id = '3'", 1),
+            ("SELECT COUNT(*) FROM cache.issue_change WHERE issue_id = '3'", 1),
+            ("SELECT COUNT(*) FROM cache.sync_state WHERE scope_id = 'full:10002'", 1),
+            ("SELECT COUNT(*) FROM cache.sync_state WHERE scope_id = 'scope'", 1),
+        ] {
+            assert_eq!(count(&db, sql).await, expected, "{sql}");
+        }
+    }
+
+    #[tokio::test]
+    async fn forgetting_a_project_without_issues_returns_nothing() {
+        let (_dir, db) = lab().await;
+
+        let ids = db.write(|tx, _| forget_project(tx, "99999")).await.unwrap();
+
+        assert_eq!(ids, Vec::<String>::new());
+        assert_eq!(count(&db, "SELECT COUNT(*) FROM cache.issue").await, 3);
+    }
 }

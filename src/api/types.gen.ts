@@ -865,6 +865,10 @@ focusedMinutes: number, backgroundMinutes: number,
  */
 keepDoneDays: number, 
 /**
+ * How long the changes recorded for an issue stay cached once the owner has seen them.
+ */
+keepHistoryDays: number, 
+/**
  * Empties the cache when Taskboard quits, and at launch in case it didn't quit cleanly.
  */
 clearCacheOnQuit: boolean, };

@@ -1923,6 +1923,46 @@ mod reconciliation {
     }
 
     #[tokio::test]
+    async fn the_kept_history_setting_decides_how_old_a_seen_change_must_be_to_be_pruned() {
+        let rig = Rig::connected().await;
+        rig.full_sync().await;
+        rig.ctx
+            .settings
+            .edit(|settings| settings.sync.keep_history_days = 30)
+            .await
+            .unwrap();
+        let db = &rig.ctx.db;
+        let now = Utc::now();
+        let days_ago = |days: i64| taskboard_lib::time::format_utc(now - chrono::Duration::days(days));
+        let (seen, old, recent) = (days_ago(0), days_ago(40), days_ago(20));
+        db.write(move |tx, _| {
+            tx.execute(
+                "UPDATE issue_seen SET seen_at = ?1 WHERE issue_id = '101042'",
+                [&seen],
+            )?;
+            tx.execute(
+                "INSERT INTO cache.issue_change (issue_id, field, old_value, new_value, changed_at) VALUES
+                   ('101042', 'priority', 'High', 'Low', ?1),
+                   ('101042', 'status', '1', '2', ?2)",
+                [&old, &recent],
+            )?;
+            Ok(())
+        })
+        .await
+        .unwrap();
+
+        rig.job(Job::Reconcile, None).await;
+
+        let kept = rows(
+            db,
+            "SELECT field FROM cache.issue_change WHERE issue_id = '101042' AND field IN ('priority', 'status')",
+            |row| row.get::<_, String>(0),
+        )
+        .await;
+        assert_eq!(kept, vec!["status".to_string()]);
+    }
+
+    #[tokio::test]
     async fn purges_issues_gone_for_more_than_a_week_with_their_comments_and_changes() {
         let rig = Rig::connected().await;
         rig.full_sync().await;

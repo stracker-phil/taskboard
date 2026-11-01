@@ -17,7 +17,8 @@ Settings → Connection (`connection/`):
    needs the site's cloud id (`/_edge/tenant_info`); when the site doesn't answer it (`not_found`), the page
    asks for it.
 3. **Settings → Projects → Refresh** loads every project into `cache.space`; **Track** creates the project's Space
-   (`local.space`). Untracking keeps the Space's settings.
+   (`local.space`) and queues a full sync, which fetches its issues. Untracking keeps the Space's settings and
+   what the owner read, and removes the project's cached issues (`sync::store::forget_project`).
 
 Scopes a scoped token needs, and why: [scopes.md](scopes.md).
 The expiry date warns 14 days ahead (`connection::token_expiry`).

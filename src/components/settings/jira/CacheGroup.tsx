@@ -6,7 +6,7 @@ import { SETTINGS_KEYS, useSettings } from "../../../queries/settings";
 import { describeSyncState, useSyncOverview } from "../../../queries/sync";
 import { fail, useStore } from "../../../state/store";
 import { ConfirmSheet } from "../../ConfirmSheet";
-import { Group, Row, Switch } from "../controls";
+import { Group, Row, Segmented, Switch } from "../controls";
 import { useBusyAction } from "../useBusyAction";
 
 const WHAT_STAYS = "Taskboard deletes its copy of your Jira issues and fetches them again. Spaces, filter lists, views, bookmarks and what you've read stay.";
@@ -45,8 +45,33 @@ function ClearOnQuit() {
   );
 }
 
+const HISTORY_DAYS = ["30", "90", "180"] as const;
+
+/** How long the changes you've seen stay cached; a value set elsewhere (a hand-edited file) presses none. */
+function KeepHistory() {
+  const client = useQueryClient();
+  const { data: settings } = useSettings();
+  if (!settings) return null;
+  const save = (days: (typeof HISTORY_DAYS)[number]) =>
+    void api.syncSave({ ...settings.sync, keepHistoryDays: Number(days) }).then(
+      (saved) => client.setQueryData<Settings>(SETTINGS_KEYS.settings, (current) => current && { ...current, sync: saved }),
+      (e: unknown) => fail(e, "Could not save the setting"),
+    );
+  const current = String(settings.sync.keepHistoryDays);
+  return (
+    <Segmented
+      label="Keep history you've read"
+      description="How long the changes on issues stay cached once you've seen them."
+      options={HISTORY_DAYS}
+      labels={{ "30": "30 days", "90": "90 days", "180": "180 days" }}
+      value={HISTORY_DAYS.find((days) => days === current) ?? null}
+      onChange={save}
+    />
+  );
+}
+
 /** Sync → Cache: the sync state with Sync Now, what the cache holds per tracked project, Reset Cache (after a
- *  confirmation) and clearing it on quit. */
+ *  confirmation), how long read history stays and clearing the cache on quit. */
 export function CacheGroup() {
   const [confirming, setConfirming] = useState(false);
   const [busy, run] = useBusyAction();
@@ -85,6 +110,7 @@ export function CacheGroup() {
           Reset Cache
         </button>
       </Row>
+      <KeepHistory />
       <ClearOnQuit />
       {confirming && <ConfirmSheet title="Reset the cache?" text={WHAT_STAYS} action="Reset Cache" onCancel={() => setConfirming(false)} onConfirm={reset} />}
     </Group>

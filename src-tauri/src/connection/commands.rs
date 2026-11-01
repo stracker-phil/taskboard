@@ -74,6 +74,7 @@ pub async fn projects_refresh(state: State<'_, AppState>) -> AppResult<Vec<Proje
 #[tauri::command]
 pub async fn project_track(
     state: State<'_, AppState>,
+    sync: State<'_, SyncEngine>,
     project_id: String,
     tracked: bool,
 ) -> AppResult<()> {
@@ -83,7 +84,12 @@ pub async fn project_track(
             log::warn!("Couldn't fetch the project's versions: {e}");
         }
     }
-    super::track_project(&state.db, project_id, tracked).await
+    super::track_project(&state.db, project_id, tracked).await?;
+    // A change sync only fetches what changed; a project tracked (again) needs all its issues.
+    if tracked {
+        sync.queue(crate::sync::Job::Full);
+    }
+    Ok(())
 }
 
 #[tauri::command]

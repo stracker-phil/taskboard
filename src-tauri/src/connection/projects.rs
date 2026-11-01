@@ -9,7 +9,7 @@ use crate::error::AppResult;
 use crate::jira::JiraClient;
 use crate::jira::dto::Project;
 use crate::lists::ensure_space;
-use crate::sync::store::store_versions;
+use crate::sync::store::{forget_project, store_versions};
 
 /// How many Space tile colors the palette has (`--space-tile-*`).
 const SPACE_COLORS: i64 = 12;
@@ -111,7 +111,8 @@ pub async fn tracked_projects(db: &Db) -> AppResult<Vec<ProjectRow>> {
 
 /// Tracking a project for the first time makes its Space: next position, the name's first letter as
 /// icon, a tile color by position, and its default views and filter lists. Untracking keeps all of it, so
-/// the settings survive re-tracking.
+/// the settings survive re-tracking, but removes the project's cached issues: no copy of a project the owner
+/// stopped following stays on the Mac.
 pub async fn track_project(db: &Db, project_id: String, tracked: bool) -> AppResult<()> {
     db.write(move |tx, changes| {
         let updated = tx.execute(
@@ -122,6 +123,11 @@ pub async fn track_project(db: &Db, project_id: String, tracked: bool) -> AppRes
             insert_space(tx, &project_id, tracked)?;
         }
         changes.local_changed(LocalPart::Spaces);
+        if !tracked {
+            for id in forget_project(tx, &project_id)? {
+                changes.issue_changed(id);
+            }
+        }
         if tracked && ensure_space(tx, &project_id)? {
             changes.local_changed(LocalPart::Lists);
             changes.local_changed(LocalPart::Views);
@@ -186,4 +192,106 @@ pub async fn tracked_keys(db: &Db) -> AppResult<Vec<String>> {
         Ok(keys.collect::<Result<_, _>>()?)
     })
     .await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const NW: &str = "10001";
+    const OPS: &str = "10002";
+
+    fn issue_sql(id: u32, project: &str) -> String {
+        format!(
+            "INSERT INTO cache.issue (id, key, project_id, summary, issue_type, status_id, status_category,
+                                     created_at, updated_at, synced_at, gone)
+             VALUES ('{id}', 'K-{id}', '{project}', 'Issue {id}', 'Task', 's1', 'new',
+                     '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z', 0);
+             INSERT INTO issue_seen (issue_id, seen_at) VALUES ('{id}', '2026-01-03T00:00:00Z');"
+        )
+    }
+
+    async fn tracked_lab() -> (tempfile::TempDir, Db) {
+        let dir = crate::test_support::temp_config_dir();
+        let db = Db::open(dir.path()).unwrap();
+        let sql = [
+            "INSERT INTO cache.space (id, key, name, raw) VALUES
+               ('10001', 'NW', 'Website relaunch', '{}'), ('10002', 'OPS', 'Operations', '{}');"
+                .to_string(),
+            issue_sql(1, NW),
+            issue_sql(2, NW),
+            issue_sql(3, OPS),
+        ]
+        .concat();
+        db.write(move |tx, _| {
+            tx.execute_batch(&sql)?;
+            Ok(())
+        })
+        .await
+        .unwrap();
+        track_project(&db, NW.into(), true).await.unwrap();
+        track_project(&db, OPS.into(), true).await.unwrap();
+        (dir, db)
+    }
+
+    async fn issue_ids(db: &Db) -> Vec<String> {
+        db.read(|conn| {
+            let mut query = conn.prepare("SELECT id FROM cache.issue ORDER BY id")?;
+            let ids = query.query_map([], |row| row.get(0))?;
+            Ok(ids.collect::<Result<_, _>>()?)
+        })
+        .await
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn untracking_a_project_removes_its_issues_and_keeps_the_others() {
+        let (_dir, db) = tracked_lab().await;
+
+        track_project(&db, NW.into(), false).await.unwrap();
+
+        assert_eq!(issue_ids(&db).await, vec!["3".to_string()]);
+        assert_eq!(tracked_keys(&db).await.unwrap(), vec!["OPS".to_string()]);
+    }
+
+    #[tokio::test]
+    async fn untracking_a_project_keeps_the_read_marks_of_its_issues() {
+        let (_dir, db) = tracked_lab().await;
+
+        track_project(&db, NW.into(), false).await.unwrap();
+
+        let marked: i64 = db
+            .read(|conn| {
+                Ok(conn.query_row(
+                    "SELECT COUNT(*) FROM issue_seen WHERE issue_id = '1'",
+                    [],
+                    |row| row.get(0),
+                )?)
+            })
+            .await
+            .unwrap();
+        assert_eq!(marked, 1);
+    }
+
+    #[tokio::test]
+    async fn tracking_a_project_again_keeps_its_space_and_adds_no_second_one() {
+        let (_dir, db) = tracked_lab().await;
+        let spaces = |db: Db| async move {
+            db.read(|conn| {
+                Ok(conn.query_row("SELECT COUNT(*) FROM space", [], |row| row.get::<_, i64>(0))?)
+            })
+            .await
+            .unwrap()
+        };
+        let before = spaces(db.clone()).await;
+
+        track_project(&db, NW.into(), false).await.unwrap();
+        track_project(&db, NW.into(), true).await.unwrap();
+
+        assert_eq!(spaces(db.clone()).await, before);
+        assert_eq!(
+            tracked_keys(&db).await.unwrap(),
+            vec!["NW".to_string(), "OPS".to_string()]
+        );
+    }
 }

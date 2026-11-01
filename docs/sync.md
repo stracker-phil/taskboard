@@ -54,7 +54,7 @@ row `gone`), which takes it out of every list at once. Issues gone for more than
 comments, changes and seen rows. An issue Jira returns that is outside the scope (done for longer than the scope
 keeps, moved to an untracked project) stays cached with `issue.left_scope_at` and is asked for again only after 7
 days (`RECHECK_LEFT_SCOPE`), so one deleted since is still noticed; the mark goes when the scope lists it again.
-Seen changes older than 90 days are pruned ([data.md](data.md#tables)). Runs after every full sync and hourly.
+Seen changes older than `sync.keepHistoryDays` (Settings → Sync, 90 days by default) are pruned ([data.md](data.md#tables)). Runs after every full sync and hourly.
 
 **Detail**: opening an issue fetches its comments when the cached ones are older than the issue
 (`issues::issue_sync_comments`), and its web links unless fetched in the last 5 minutes (`issues::issue_sync_web_links`,
