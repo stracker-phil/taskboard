@@ -159,10 +159,19 @@ async fn set(db: &Db, project: &str, account: &str, on: bool) -> AppResult<TeamM
     space_set_member(db, project.into(), account.into(), on, None).await
 }
 
+const ZOE: &str = "acc-zoe";
+
+fn me_of(account_id: &str) -> Me {
+    Me {
+        account_id: account_id.to_string(),
+        name: "Zoe Park".to_string(),
+    }
+}
+
 async fn active_people(db: &Db, projects: &[&str], me: Option<&str>) -> Vec<String> {
     let projects: Vec<String> = projects.iter().map(|p| p.to_string()).collect();
-    let me = me.map(str::to_string);
-    db.read(move |conn| active(conn, &projects, me.as_deref()))
+    let me = me.map(me_of);
+    db.read(move |conn| active(conn, &projects, me.as_ref()))
         .await
         .unwrap()
         .into_iter()
@@ -457,15 +466,75 @@ async fn active_lists_the_default_and_chosen_team_of_the_projects_sorted_by_name
 }
 
 #[tokio::test]
-async fn active_puts_me_first_when_among_the_people() {
+async fn active_puts_me_first_and_once_when_among_the_people() {
     let (_dir, db) = lab().await;
     assert_eq!(
         active_people(&db, &[WEB, SUPPORT], Some(IVY)).await,
         [IVY, ALEX, BEA, DAN, HAL]
     );
+}
+
+#[tokio::test]
+async fn active_lists_me_first_even_when_not_on_the_team() {
+    let (_dir, db) = lab().await;
     assert_eq!(
         active_people(&db, &[WEB, SUPPORT], Some(GUS)).await,
-        [ALEX, BEA, DAN, HAL, IVY]
+        [GUS, ALEX, BEA, DAN, HAL, IVY]
+    );
+    assert_eq!(
+        active_people(&db, &[SUPPORT], Some(CLEO)).await,
+        [CLEO, DAN]
+    );
+}
+
+#[tokio::test]
+async fn active_names_me_from_the_cache_or_else_from_the_connection() {
+    let (_dir, db) = lab().await;
+    let names = |me: Me| db.read(move |conn| active(conn, &[WEB.to_string()], Some(&me)));
+
+    let cached = names(me_of(GUS)).await.unwrap();
+    let unsynced = names(me_of(ZOE)).await.unwrap();
+
+    assert_eq!(
+        (cached[0].account_id.as_str(), cached[0].name.as_str()),
+        (GUS, "Gus Hart")
+    );
+    assert_eq!(
+        (unsynced[0].account_id.as_str(), unsynced[0].name.as_str()),
+        (ZOE, "Zoe Park")
+    );
+}
+
+#[tokio::test]
+async fn active_without_me_lists_only_the_teammates() {
+    let (_dir, db) = lab().await;
+    assert_eq!(
+        active_people(&db, &[WEB], None).await,
+        [ALEX, BEA, HAL, IVY]
+    );
+}
+
+#[test]
+fn me_is_known_only_with_an_account_id() {
+    let mut connection = JiraConnection::default();
+    assert_eq!(Me::of(&connection), None);
+
+    connection.account_id = Some(ALEX.to_string());
+    assert_eq!(
+        Me::of(&connection),
+        Some(Me {
+            account_id: ALEX.to_string(),
+            name: String::new()
+        })
+    );
+
+    connection.display_name = Some("Alex Morgan".to_string());
+    assert_eq!(
+        Me::of(&connection),
+        Some(Me {
+            account_id: ALEX.to_string(),
+            name: "Alex Morgan".to_string()
+        })
     );
 }
 
@@ -518,7 +587,7 @@ async fn space_level(db: &Db, project: &'static str) -> i64 {
 }
 
 async fn people_at(db: &Db, level: i64, me: Option<&str>) -> Vec<String> {
-    level_people(db, level, me.map(str::to_string))
+    level_people(db, level, me.map(me_of))
         .await
         .unwrap()
         .into_iter()
@@ -573,17 +642,27 @@ async fn everything_leaves_out_the_people_of_untracked_spaces() {
 }
 
 #[tokio::test]
-async fn level_people_never_include_me() {
+async fn level_people_list_me_first_once() {
     let (_dir, db) = lab().await;
     track(&db, &[WEB, SUPPORT]).await;
     let web = space_level(&db, WEB).await;
     let everything = level_where(&db, "kind = 'everything'").await;
 
-    assert_eq!(people_at(&db, web, Some(BEA)).await, [ALEX, HAL, IVY]);
+    assert_eq!(people_at(&db, web, Some(BEA)).await, [BEA, ALEX, HAL, IVY]);
     assert_eq!(
         people_at(&db, everything, Some(BEA)).await,
-        [ALEX, DAN, HAL, IVY]
+        [BEA, ALEX, DAN, HAL, IVY]
     );
+}
+
+#[tokio::test]
+async fn level_people_list_me_first_even_when_never_assigned_in_that_space() {
+    let (_dir, db) = lab().await;
+    track(&db, &[WEB, SUPPORT]).await;
+    let support = space_level(&db, SUPPORT).await;
+
+    assert_eq!(people_at(&db, support, Some(ALEX)).await, [ALEX, DAN]);
+    assert_eq!(people_at(&db, support, Some(ZOE)).await, [ZOE, DAN]);
 }
 
 #[tokio::test]

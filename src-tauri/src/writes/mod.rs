@@ -26,6 +26,7 @@ use crate::jira::capability::Capability;
 use crate::store::settings::Settings;
 use crate::sync::refetch_issue;
 use crate::sync::source::Source;
+use crate::team::Me;
 
 /// A change to one issue, as the page asks for it.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, TS)]
@@ -92,26 +93,13 @@ impl Field {
     }
 }
 
-/// Who the connected account is, from the last Test Connection.
-#[derive(Debug)]
-struct Me {
-    account_id: String,
-    name: String,
-}
-
-impl Me {
-    fn of(settings: &Settings) -> AppResult<Self> {
-        let connection = &settings.connection;
-        let account_id = connection.account_id.clone().ok_or_else(|| {
-            AppError::NotConnected(
-                "Test the connection in Settings first, so Taskboard knows who you are".into(),
-            )
-        })?;
-        Ok(Self {
-            name: connection.display_name.clone().unwrap_or_default(),
-            account_id,
-        })
-    }
+/// Who the connected account is; writes need it.
+fn me_of(settings: &Settings) -> AppResult<Me> {
+    Me::of(&settings.connection).ok_or_else(|| {
+        AppError::NotConnected(
+            "Test the connection in Settings first, so Taskboard knows who you are".into(),
+        )
+    })
 }
 
 /// Sends the change while changes to Jira are allowed.
@@ -125,7 +113,7 @@ pub async fn apply(
     ensure_allowed(settings, change.capability())?;
     match change {
         Change::Assign { account_id } => {
-            assign::assign(db, source, Me::of(settings)?, issue_id, account_id).await
+            assign::assign(db, source, me_of(settings)?, issue_id, account_id).await
         }
         Change::Transition { transition_id } => {
             transition::transition(db, source, issue_id, transition_id).await

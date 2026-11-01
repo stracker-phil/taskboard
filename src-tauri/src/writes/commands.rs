@@ -95,6 +95,6 @@ pub async fn issue_drop(
 /// Who the issue may be assigned to.
 #[tauri::command]
 pub async fn issue_assignees(state: State<'_, AppState>, id: String) -> AppResult<Assignees> {
-    let me = state.settings.get().connection.account_id;
+    let me = crate::team::Me::of(&state.settings.get().connection);
     super::assignees(&state.db, id, me).await
 }

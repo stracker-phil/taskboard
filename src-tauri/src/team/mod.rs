@@ -6,14 +6,31 @@ pub mod commands;
 
 use std::collections::HashMap;
 
-use rusqlite::{Connection, params};
+use rusqlite::{Connection, OptionalExtension, params};
 use serde::Serialize;
 use ts_rs::TS;
 
 use crate::db::{Db, LocalPart};
 use crate::error::{AppError, AppResult};
 use crate::space_config::project_of_level;
+use crate::store::settings::Connection as JiraConnection;
 use crate::views::rows::{Person, person};
+
+/// Who the connected account is, from the last Test Connection.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Me {
+    pub account_id: String,
+    pub name: String,
+}
+
+impl Me {
+    pub fn of(connection: &JiraConnection) -> Option<Self> {
+        Some(Self {
+            account_id: connection.account_id.clone()?,
+            name: connection.display_name.clone().unwrap_or_default(),
+        })
+    }
+}
 
 /// Everyone with activity in a tracked Space, and on which Spaces' teams they are.
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
@@ -139,45 +156,53 @@ pub fn team_matrix(conn: &Connection, me: Option<&str>) -> AppResult<TeamMatrix>
     Ok(TeamMatrix { spaces, people })
 }
 
-/// Who is on the team of any of the projects, sorted by name; `me` comes first whenever it is among them.
+/// Who is on the team of any of the projects, sorted by name, and me first: I may always be picked, on a team or not.
 pub fn active(
     conn: &Connection,
     project_ids: &[String],
-    me: Option<&str>,
+    me: Option<&Me>,
 ) -> AppResult<Vec<Person>> {
+    let me_id = me.map(|m| m.account_id.as_str());
     let mut named: HashMap<String, String> = HashMap::new();
     for m in memberships(conn, project_ids)? {
-        if m.cell.active {
+        if m.cell.active && Some(m.account_id.as_str()) != me_id {
             named.insert(m.account_id, m.name);
         }
     }
     let mut people: Vec<Person> = named
         .iter()
-        .map(|(id, name)| person(id, name, me))
+        .map(|(id, name)| person(id, name, me_id))
         .collect();
     people.sort_by(|a, b| {
         (a.name.to_lowercase(), &a.account_id).cmp(&(b.name.to_lowercase(), &b.account_id))
     });
-    if let Some(at) = people
-        .iter()
-        .position(|p| Some(p.account_id.as_str()) == me)
-    {
-        let mine = people.remove(at);
-        people.insert(0, mine);
+    if let Some(me) = me {
+        people.insert(0, person(&me.account_id, &my_name(conn, me)?, me_id));
     }
     Ok(people)
 }
 
-/// The active teammates of the level's Space, or of every tracked Space for a level outside one; without me.
-pub async fn level_people(db: &Db, list_id: i64, me: Option<String>) -> AppResult<Vec<Person>> {
+/// The name the cache knows me by, as other rows show it; the connection's name before the first sync.
+fn my_name(conn: &Connection, me: &Me) -> AppResult<String> {
+    let cached: Option<String> = conn
+        .query_row(
+            "SELECT name FROM cache.user WHERE account_id = ?1",
+            [&me.account_id],
+            |row| row.get(0),
+        )
+        .optional()?;
+    Ok(cached.unwrap_or_else(|| me.name.clone()))
+}
+
+/// The person chip's choices: me, then the active teammates of the level's Space, or of every tracked Space for a
+/// level outside one.
+pub async fn level_people(db: &Db, list_id: i64, me: Option<Me>) -> AppResult<Vec<Person>> {
     db.read(move |conn| {
         let projects = match project_of_level(conn, list_id)? {
             Some(project) => vec![project],
             None => tracked_projects(conn)?,
         };
-        let mut people = active(conn, &projects, me.as_deref())?;
-        people.retain(|p| Some(p.account_id.as_str()) != me.as_deref());
-        Ok(people)
+        active(conn, &projects, me.as_ref())
     })
     .await
 }

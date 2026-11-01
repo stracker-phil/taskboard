@@ -4,7 +4,7 @@
 use chrono::Utc;
 use rusqlite::{Connection, params};
 
-use super::{Me, WriteOutcome, ensure_allowed, issue_key, remember_me};
+use super::{Me, WriteOutcome, ensure_allowed, issue_key, me_of, remember_me};
 use crate::adf::{self, Media};
 use crate::db::Db;
 use crate::error::{AppError, AppResult};
@@ -27,7 +27,7 @@ pub async fn add_comment(
     text: String,
 ) -> AppResult<WriteOutcome> {
     ensure_allowed(settings, Capability::Comment)?;
-    let me = Me::of(settings)?;
+    let me = me_of(settings)?;
     let text = checked_text(&text)?;
     let body = adf::from_plain_text(&text);
     let shown = Shown {

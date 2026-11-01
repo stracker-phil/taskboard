@@ -27,6 +27,6 @@ pub async fn space_set_member(
 /// The person chip's choices.
 #[tauri::command]
 pub async fn level_people(state: State<'_, AppState>, list_id: i64) -> AppResult<Vec<Person>> {
-    let me = state.settings.get().connection.account_id;
+    let me = super::Me::of(&state.settings.get().connection);
     super::level_people(&state.db, list_id, me).await
 }

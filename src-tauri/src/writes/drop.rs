@@ -12,6 +12,7 @@ use crate::jira::capability::Capability;
 use crate::status_style::Style;
 use crate::store::settings::Settings;
 use crate::sync::source::Source;
+use crate::team::Me;
 use crate::views::GroupBy;
 use crate::views::groups::GroupMark;
 use crate::views::model::to_text;
@@ -78,7 +79,7 @@ pub async fn drop_targets(
         GroupBy::Status => status_targets(&free_moves(db, source, issue_id).await?),
         GroupBy::StatusType => status_type_targets(&free_moves(db, source, issue_id).await?),
         GroupBy::Assignee => {
-            assignee_targets(db, issue_id, settings.connection.account_id.clone()).await?
+            assignee_targets(db, issue_id, crate::team::Me::of(&settings.connection)).await?
         }
         GroupBy::Priority => source
             .priorities(&issue_id)
@@ -178,20 +179,16 @@ fn either(names: &[&str]) -> String {
     }
 }
 
-async fn assignee_targets(
-    db: &Db,
-    issue_id: String,
-    me: Option<String>,
-) -> AppResult<Vec<DropTarget>> {
+async fn assignee_targets(db: &Db, issue_id: String, me: Option<Me>) -> AppResult<Vec<DropTarget>> {
     db.read(move |conn| {
         let project = issue_project(conn, &issue_id)?;
-        let people = crate::team::active(conn, &[project], me.as_deref())?;
+        let people = crate::team::active(conn, &[project], me.as_ref())?;
         let mut targets: Vec<DropTarget> = people
             .into_iter()
             .map(|person| DropTarget {
                 key: person.account_id.clone(),
                 label: person.name.clone(),
-                action: if Some(person.account_id.as_str()) == me.as_deref() {
+                action: if Some(&person.account_id) == me.as_ref().map(|m| &m.account_id) {
                     "Assign to me".into()
                 } else {
                     format!("Assign to {}", person.name)

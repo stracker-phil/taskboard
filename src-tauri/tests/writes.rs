@@ -20,7 +20,7 @@ use taskboard_lib::jira::{Limiter, TokenKind};
 use taskboard_lib::status_style::{Style, status_style_set};
 use taskboard_lib::store::settings::{Settings, SettingsStore};
 use taskboard_lib::sync::{Emit, SyncContext, SyncEvent, full_sync};
-use taskboard_lib::team::space_set_member;
+use taskboard_lib::team::{Me, space_set_member};
 use taskboard_lib::test_support::demo::{self, DEMO_NOW, ME_EMAIL};
 use taskboard_lib::test_support::fake_jira::{DEMO_TOKEN, FakeJira};
 use taskboard_lib::test_support::{FakeSecrets, temp_config_dir};
@@ -568,7 +568,11 @@ mod assignee_menu {
     use super::*;
 
     async fn menu(rig: &Rig, issue_id: &str, me: Option<&str>) -> AppResult<Assignees> {
-        assignees(&rig.ctx.db, issue_id.into(), me.map(String::from)).await
+        let me = me.map(|account_id| Me {
+            account_id: account_id.into(),
+            name: "Alex Morgan".into(),
+        });
+        assignees(&rig.ctx.db, issue_id.into(), me).await
     }
 
     fn names(menu: &Assignees) -> Vec<&str> {
@@ -634,6 +638,22 @@ mod assignee_menu {
         let menu = menu(&rig, NW_1044, Some(ALEX)).await.unwrap();
 
         assert_eq!(names(&menu), ["Alex Morgan", "Anna Lutz", "Marta Klein"]);
+    }
+
+    #[tokio::test]
+    async fn i_am_offered_first_even_when_switched_off_the_team() {
+        let rig = Rig::synced().await;
+        space_set_member(&rig.ctx.db, NW_PROJECT.into(), ALEX.into(), false, None)
+            .await
+            .unwrap();
+
+        let menu = menu(&rig, NW_1044, Some(ALEX)).await.unwrap();
+
+        assert_eq!(
+            names(&menu),
+            ["Alex Morgan", "Anna Lutz", "Jonas Reiter", "Marta Klein"]
+        );
+        assert_eq!(menu.people[0].account_id, ALEX);
     }
 
     #[tokio::test]

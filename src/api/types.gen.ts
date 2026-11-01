@@ -51,7 +51,7 @@ export type Appearance = "light" | "dark" | "system";
  */
 export type Assignees = { 
 /**
- * The issue's Space's active team, me first.
+ * Me, then the issue's Space's active team.
  */
 people: Array<Person>, 
 /**

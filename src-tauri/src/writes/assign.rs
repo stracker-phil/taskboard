@@ -7,7 +7,7 @@ use ts_rs::TS;
 
 use super::{
     Begun, Change, Field, Me, Reverse, WriteOutcome, apply, ensure_allowed, issue_key,
-    issue_project, pending, remember_me, send,
+    issue_project, me_of, pending, remember_me, send,
 };
 use crate::db::Db;
 use crate::error::{AppError, AppResult};
@@ -26,7 +26,7 @@ pub async fn toggle_mine(
 ) -> AppResult<WriteOutcome> {
     // Says "changes are off" before asking who I am.
     ensure_allowed(settings, Capability::Assign)?;
-    let me = Me::of(settings)?;
+    let me = me_of(settings)?;
     let id = issue_id.clone();
     let current = db.read(move |conn| assignee_of(conn, &id)).await?;
     let already_mine = current.as_deref() == Some(me.account_id.as_str());
@@ -154,17 +154,17 @@ fn person(conn: &Connection, me: &Me, account_id: Option<&str>) -> AppResult<Opt
 #[ts(export, export_to = "src/api/types.gen.ts")]
 #[serde(rename_all = "camelCase")]
 pub struct Assignees {
-    /// The issue's Space's active team, me first.
+    /// Me, then the issue's Space's active team.
     pub people: Vec<Person>,
     /// Who has the issue now.
     pub current: Option<String>,
 }
 
-pub async fn assignees(db: &Db, issue_id: String, me: Option<String>) -> AppResult<Assignees> {
+pub async fn assignees(db: &Db, issue_id: String, me: Option<Me>) -> AppResult<Assignees> {
     db.read(move |conn| {
         let project = issue_project(conn, &issue_id)?;
         Ok(Assignees {
-            people: crate::team::active(conn, &[project], me.as_deref())?,
+            people: crate::team::active(conn, &[project], me.as_ref())?,
             current: assignee_of(conn, &issue_id)?,
         })
     })

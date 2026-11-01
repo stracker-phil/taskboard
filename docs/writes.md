@@ -63,7 +63,7 @@ A List row or a Board card dragged onto a group changes the field the view group
 |---|---|---|
 | Status (a Board grouped by nothing shows status columns) | the statuses Jira's moves lead to, without moves that need a screen | the move into that status |
 | Status type | the types of those statuses | the one move into a status of that type; several → a menu of those moves at the drop point |
-| Assignee | the Space's active team (`team::active`, me first) and Unassigned | assigns to that person, or unassigns |
+| Assignee | me, the Space's active team (`team::active`) and Unassigned | assigns to that person, or unassigns |
 | Priority | the priorities the issue's edit screen offers | sets that priority |
 | anything else | none, with a note why | refused |
 
@@ -149,5 +149,5 @@ The status pill in the Preview and the Issue view's field grid is the status men
 row or card. Rows and cards drag onto tiles of their groups (above).
 The Issue view's assignee is the assignee menu's button (`AssigneeMenuButton`); **A** (`issue.assignTo`) and
 Issue → Assign To… open it under the assignee, or under the selected row or card. `issue_assignees(id)`
-(`writes::assignees`) lists the issue's Space's active team, me first (`team::active`), and who has it now; the
+(`writes::assignees`) lists me and the issue's Space's active team (`team::active`, me always first), and who has it now; the
 menu checks the current one and ends with Unassigned.

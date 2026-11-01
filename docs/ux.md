@@ -539,8 +539,8 @@ button, Escape and a press outside close it, focus goes back to the button).
   (190 wide, filters by key or summary as you type; esc clears it). Both narrow only the current view. A view opens with the Me
   chip it saved (`view.only_mine`); a click changes it as a draft. The text is never saved.
 - **Person** chip (`PersonChip.tsx`, beside Me, the same pill; a people icon and "Person", or the picked person's
-  avatar and first name in the active style): a [menu](#menus) "Issues assigned to" with Anyone and the active
-  teammates of the level's Space (every tracked Space outside one; `level_people`, without me). It narrows like
+  avatar and first name in the active style): a [menu](#menus) "Issues assigned to" with Anyone, me, and the active
+  teammates of the level's Space (every tracked Space outside one; `level_people`). It narrows like
   Me (`Narrowing.person`), is never saved and goes with the text when the view is left. Picking a person turns Me
   off; turning Me on clears the person. Folded into "…" it reads "Assigned to…".
 - **Save View** (left of the Filter button, `SaveViewButton.tsx`, on `--accent` with `--text-on-accent`; pops in
@@ -723,7 +723,7 @@ no separate Settings design; owner, 2026-10-28). Its colors are the `--settings-
     one of the Space's issues is on its team and nobody else; a box where the person has no activity is quieter
     until ticked, and its tooltip says why a box is on. The header row and the name column stay while the grid
     scrolls; rows keep their order while boxes are ticked. The team is who Assign to…, the person chip and assignee
-    drops offer.
+    drops offer, always after me: I can be picked in every Space, on its team or not.
   - **Sync**: *Scope* (the effective JQL in a monospaced field; Validate, Save, Reset to Default), *Intervals*
     (minutes in front and in the background, days to keep done issues) and *Cache* (the sync state line with
     Sync Now, one row per tracked project with its key, last full sync and "N issues · M open", then Reset
