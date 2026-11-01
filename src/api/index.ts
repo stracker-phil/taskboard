@@ -58,6 +58,10 @@ import type {
   SyncSettings,
   TeamMatrix,
   UiState,
+  Mode,
+  Modes,
+  UserField,
+  MeRuleEdit,
   View,
   ViewData,
   ViewGroup,
@@ -78,6 +82,9 @@ export const api = {
   setKeybindings: (bindings: Keybindings) => invoke<Keybindings>("set_keybindings", { bindings }),
   getUiState: () => invoke<UiState>("get_ui_state"),
   setUiState: (ui: UiState) => invoke<UiState>("set_ui_state", { ui }),
+  /** Me mode in every view and Unread only (`modes.json`). */
+  modesGet: () => invoke<Modes>("modes_get"),
+  modeSet: (mode: Mode, on: boolean) => invoke<Modes>("mode_set", { mode, on }),
   openLogFolder: () => invoke<void>("open_log_folder"),
   /** Settings → Status: the connection, the sync and this Mac, each row with a tone and maybe a command. */
   diagnosticsGet: () => invoke<Diagnostics>("diagnostics_get"),
@@ -250,6 +257,9 @@ export const api = {
     invoke<SpaceConfig>("space_set_field", { projectId, fieldId, visibility }),
   /** The active teammates of the level's Spaces, without me; for the person chip. */
   levelPeople: (listId: number) => invoke<Person[]>("level_people", { listId }),
+  /** Reporter and the custom user fields Me mode may count (Settings → General → Me Mode). */
+  meUserFields: () => invoke<UserField[]>("me_user_fields"),
+  meRuleEdit: (edit: MeRuleEdit) => invoke<Settings>("me_rule_edit", { edit }),
   /** Who the issue may be assigned to: its Space's active team, me first, and who has it now. */
   issueAssignees: (id: string) => invoke<Assignees>("issue_assignees", { id }),
   /** Every person with activity in a tracked Space against every Space (Settings → Team). */

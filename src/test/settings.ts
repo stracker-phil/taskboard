@@ -21,6 +21,11 @@ export const behaviour = (patch: Partial<Behaviour> = {}): Behaviour => ({
   allowJiraChanges: false,
   disabledChanges: [],
   notifyAbout: "mentionsAndAssignments",
+  meRules: [
+    { rule: { kind: "field", field: "reporter" }, on: false },
+    { rule: { kind: "mentioned" }, on: false },
+    { rule: { kind: "subtasks" }, on: false },
+  ],
   ...patch,
 });
 

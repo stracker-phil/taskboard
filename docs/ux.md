@@ -535,9 +535,15 @@ button, Escape and a press outside close it, focus goes back to the button).
   conditions into a new list and opens it. A picked field's value opens a
   list with a search box and a checkbox per value (`ValuePicker`); every tick applies at once, and several values
   are stored as `in` / `not in` (shown as "is" / "is not").
-- **Me** chip (on: `--accent-soft-*` pill with the `--avatar-1` avatar and "Me ×") and **Filter this view**
-  (190 wide, filters by key or summary as you type; esc clears it). Both narrow only the current view. A view opens with the Me
-  chip it saved (`view.only_mine`); a click changes it as a draft. The text is never saved.
+- **Me** chip (`MeChip.tsx`, one pill in two halves; on: `--accent-soft-*` with the `--avatar-1` avatar) and
+  **Filter this view** (190 wide, filters by key or summary as you type; esc clears it). A click on "Me" toggles
+  Me mode ([ADR 0045](adr/0045-me-mode-is-a-set-of-rules-in-a-scope.md)): the issues assigned to me, plus what
+  the rules switched on add (a user field such as Reporter holds me, a comment mentions me, a subtask of one of my
+  issues). The chevron (**Me Mode Options…**, `toolbar.meOptions`) opens the **Me popover** (`MePopover.tsx`):
+  a switch per rule (global, saved at once in `behaviour.meRules`) and *Applies to*: "Only this view" (the
+  saved `view.only_mine`; a click changes it as a draft) or "All views" (`modes.json` `meEverywhere`: on in
+  every view, a ring around the avatar, until Me is turned off). Its "Fields…" opens Settings → General → Me
+  Mode. The text is never saved.
 - **Person** chip (`PersonChip.tsx`, beside Me, the same pill; a people icon and "Person", or the picked person's
   avatar and first name in the active style): a [menu](#menus) "Issues assigned to" with Anyone, me, and the active
   teammates of the level's Space (every tracked Space outside one; `level_people`). It narrows like
@@ -728,7 +734,9 @@ no separate Settings design; owner, 2026-10-28). Its colors are the `--settings-
     (minutes in front and in the background, days to keep done issues) and *Cache* (the sync state line with
     Sync Now, one row per tracked project with its key, last full sync and "N issues · M open", then Reset
     Cache, confirmed in a sheet). It stays as the diagnostics view of the cache.
-  - **General** (System): *Behavior* (read delay, where a click opens issues, default bookmark duration) and *About* (version, log folder).
+  - **General** (System): *Behavior* (read delay, where a click opens issues, default bookmark duration), *Me
+    Mode* (the Me popover's switches, plus "Add Field…" for a user field from `cache.field`, `me_user_fields`;
+    a field rule can be removed) and *About* (version, log folder).
   - **Appearance**: Automatic, Light or Dark. **Shortcuts**: every command and its key, rebindable.
   - **Status** (`components/settings/status/`, Daybook's Status page): `diagnostics_get` reports groups of
     rows, each a value with a tone icon (ok, warning, error, info) and maybe a bus command as a button: *Jira*
@@ -753,7 +761,7 @@ global shortcuts.
   Everything ⇧⌘E, Unread ⇧⌘U, Bookmarks ⇧⌘P, Previous/Next Space ⌥⌘↑/↓, Previous/Next List ⌥⌘[/] (within the
   Space, or among the levels outside the Spaces, wrapping), Previous/Next View ⌃⇧⇥/⌃⇥, then the level's views by
   name with ⌘1–⌘9, the shown one checked). List acts on the shown issues (Group and Sort… ⌥⌘G, Columns… ⌥⌘C, Edit
-  Filter… ⌥⌘F, Only My Issues ⇧⌘M, Filter This View ⌘F, Save View ⌘S, Revert View; Mark All as Read ⇧⌘A; last, as
+  Filter… ⌥⌘F, Only My Issues ⇧⌘M, Me Mode Options…, Filter This View ⌘F, Save View ⌘S, Revert View; Mark All as Read ⇧⌘A; last, as
   it is rare: Show as List / Board / Table ⌃⌘1–3, the shown layout checked). The menus follow the place:
   `menu/place.rs` builds them again whenever the place moves (`NavStore::on_move`) or views, lists or Spaces change. Issue acts on the selected one
   (Open, Open or Close Preview, Open Epic, Open in Jira ⌘↩, Copy Key, Copy Link ⇧⌘C, Add or Remove Bookmark, Mark as Read or Unread).

@@ -13,6 +13,8 @@ pub fn announce_settings(app: &tauri::AppHandle, settings: &crate::store::settin
         log::warn!("Couldn't announce the saved settings: {e}");
     }
 }
+/// Payload: the `Modes` after one was switched.
+pub const MODES_CHANGED_EVENT: &str = "modes_changed";
 /// Payload: the saved `Keybindings`.
 pub const KEYBINDINGS_CHANGED_EVENT: &str = "keybindings_changed";
 /// To the Settings window. Payload: the id of the page to show.

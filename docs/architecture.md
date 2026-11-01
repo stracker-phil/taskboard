@@ -112,7 +112,8 @@ src-tauri/
                              names sidebar levels and views; remote/places lists and opens them)
   src/events.rs state.rs     every event name; AppState
   src/error.rs lock.rs       AppError (+ ErrorKind); poison-tolerant lock helpers
-  src/store/                 JsonFile, JsonStore, settings/, keybindings, ui_state, places (each view's place)
+  src/store/                 JsonFile, JsonStore, settings/, keybindings, ui_state, modes (app-wide Me and Unread),
+                             places (each view's place)
   src/bus/                   the command bus
   src/db/                    the two SQLite files: open, migrate, read, the one write path
   migrations/local/ cache/   numbered SQL migrations per file
@@ -140,6 +141,7 @@ src-tauri/
   src/quicklook.rs           macOS only: the Quick Look panel on one file (ADR 0035)
   src/status_style/          the six status styles (status types): detection and the owner's overrides per Space
   src/space_config/          a Space's own settings: offered layouts, new views' layout and grouping, field visibility
+  src/me_mode/               which issues are mine in Me mode: the assignee plus the owner's rules (ADR 0045)
   src/team/                  who is on which Space's team: its assignees by default, the owner's choices on top
   src/avatars/               people's profile pictures: freshness, the `cache.avatar` rows, `user_avatar` (data URLs)
   src/nav/                   where the main window is (level and view, nav.json); previous/next Space
@@ -156,7 +158,8 @@ src/
   queries/                   TanStack Query hooks and the event → query-key map (ADR 0018)
   state/store.ts slices/     UI-only state (zustand); slices/narrowing.ts the views' drafts and text filters
   shell/                     the main window frame: sidebar and content panel
-  shell/toolbar/             the view toolbar: Group menu, Columns popover, Subtasks menu, Filter popover, Me chip,
+  shell/toolbar/             the view toolbar: Group menu, Columns popover, Subtasks menu, Filter popover, Me chip
+                             and Me popover (useMeMode.ts),
                              text filter, Save View (useViewDraft.ts)
   views/list/ views/table/   the List and Table layouts over the view query's rows (views/board/ the Board)
   issue/                     the Issue view, the preview (Peek.tsx), activity, rich text (JiraHtml.tsx, InlineImage.tsx);

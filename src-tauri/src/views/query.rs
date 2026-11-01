@@ -2,7 +2,7 @@
 //! narrowing, sorted, grouped and shaped as rows. One query per call; grouping and sorting happen here, not in
 //! the page.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use rusqlite::types::Value as SqlValue;
 use rusqlite::{Connection, params_from_iter};
@@ -25,6 +25,7 @@ use crate::error::{AppError, AppResult};
 use crate::filter::{Condition, Ctx, compile};
 use crate::issues::status_names;
 use crate::lists::{Kind, Viewer, all_nodes, scope_of};
+use crate::me_mode::{self, MeRule};
 use crate::pins::active;
 use crate::status_style::Styles;
 use crate::sync::map::format_utc;
@@ -34,7 +35,7 @@ use crate::sync::map::format_utc;
 #[ts(export, export_to = "src/api/types.gen.ts")]
 #[serde(default, rename_all = "camelCase")]
 pub struct Narrowing {
-    /// Only issues assigned to the connected account.
+    /// Only my issues (Me mode).
     pub me: bool,
     /// Key or summary contains it, ignoring case and accents.
     pub text: String,
@@ -50,6 +51,10 @@ pub struct Narrowing {
     #[serde(skip)]
     #[ts(skip)]
     pub read_here: Vec<String>,
+    /// What Me mode counts as mine besides my assigned issues (`behaviour.meRules`).
+    #[serde(skip)]
+    #[ts(skip)]
+    pub me_rules: Vec<MeRule>,
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
@@ -120,7 +125,11 @@ pub(super) fn fetch_view(
     };
     let mode = mode.unwrap_or(view.subtasks);
     // In List the Me chip and the text narrow every row on its own, descendants too; elsewhere the results.
-    let narrowed = RowNarrowing::new(narrowing, ctx.me.as_deref());
+    let mine = match narrowing.me && mode == SubtaskMode::List {
+        true => Some(my_issue_ids(conn, &narrowing.me_rules, &ctx)?),
+        false => None,
+    };
+    let narrowed = RowNarrowing::new(narrowing, mine);
     let base = Narrowing {
         me: narrowing.me && mode != SubtaskMode::List,
         person: narrowing
@@ -169,17 +178,16 @@ pub(super) fn fetch_view(
 
 /// The Me chip, the person chip and the text field as a test on one row.
 struct RowNarrowing<'a> {
-    only_mine: bool,
-    me: Option<&'a str>,
+    /// My issues while Me mode is on.
+    mine: Option<HashSet<String>>,
     person: Option<&'a str>,
     needle: String,
 }
 
 impl<'a> RowNarrowing<'a> {
-    fn new(narrowing: &'a Narrowing, me: Option<&'a str>) -> Self {
+    fn new(narrowing: &'a Narrowing, mine: Option<HashSet<String>>) -> Self {
         Self {
-            only_mine: narrowing.me,
-            me,
+            mine,
             person: narrowing.person.as_deref(),
             needle: fold(narrowing.text.trim()),
         }
@@ -191,13 +199,23 @@ impl<'a> RowNarrowing<'a> {
             || fold(&row.summary).contains(&self.needle)
     }
 
-    /// Without a connected account the Me chip matches nobody.
     fn matches(&self, item: &(Row, Facts)) -> bool {
         let assignee = item.1.assignee_id.as_deref();
-        let mine = !self.only_mine || (self.me.is_some() && assignee == self.me);
+        let mine = self
+            .mine
+            .as_ref()
+            .is_none_or(|ids| ids.contains(&item.0.id));
         let theirs = self.person.is_none() || assignee == self.person;
         mine && theirs && self.text_matches(item)
     }
+}
+
+/// Every issue Me mode keeps, for narrowing rows one by one.
+fn my_issue_ids(conn: &Connection, rules: &[MeRule], ctx: &Ctx) -> AppResult<HashSet<String>> {
+    let (condition, params) = me_mode::condition(rules, ctx)?;
+    let mut query = conn.prepare(&format!("SELECT i.id FROM cache.issue i WHERE {condition}"))?;
+    let ids = query.query_map(params_from_iter(params), |r| r.get(0))?;
+    Ok(ids.collect::<Result<_, _>>()?)
 }
 
 fn build(
@@ -357,8 +375,9 @@ fn conditions(
         _ => {}
     }
     if narrowing.me {
-        condition.push_str(" AND i.assignee_id = ?");
-        params.push(ctx.me.clone().unwrap_or_default().into());
+        let (mine, mine_params) = me_mode::condition(&narrowing.me_rules, ctx)?;
+        condition.push_str(&format!(" AND {mine}"));
+        params.extend(mine_params);
     }
     if let Some(person) = &narrowing.person {
         condition.push_str(" AND i.assignee_id = ?");

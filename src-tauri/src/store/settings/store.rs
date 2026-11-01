@@ -308,8 +308,24 @@ mod tests {
                 allow_jira_changes: false,
                 disabled_changes: Vec::new(),
                 notify_about: crate::store::settings::NotifyAbout::default(),
+                me_rules: crate::me_mode::default_rules(),
             }
         );
+    }
+
+    #[test]
+    fn a_file_without_me_rules_reads_as_the_default_rules_all_off() {
+        let dir = temp_config_dir();
+        fs::write(
+            dir.path().join(FILE_NAME),
+            r#"{"behaviour":{"allowJiraChanges":true}}"#,
+        )
+        .unwrap();
+
+        let behaviour = SettingsStore::open(dir.path()).get().behaviour;
+
+        assert_eq!(behaviour.me_rules, crate::me_mode::default_rules());
+        assert!(behaviour.me_rules.iter().all(|rule| !rule.on));
     }
 
     #[test]
@@ -356,6 +372,7 @@ mod tests {
                 allow_jira_changes: false,
                 disabled_changes: Vec::new(),
                 notify_about: crate::store::settings::NotifyAbout::default(),
+                me_rules: crate::me_mode::default_rules(),
             }
         );
     }
@@ -391,6 +408,18 @@ mod tests {
             allow_jira_changes: true,
             disabled_changes: vec![Capability::Comment, Capability::AddWebLink],
             notify_about: crate::store::settings::NotifyAbout::MyIssues,
+            me_rules: vec![
+                crate::me_mode::MeRule {
+                    rule: crate::me_mode::MeMatch::Mentioned,
+                    on: true,
+                },
+                crate::me_mode::MeRule {
+                    rule: crate::me_mode::MeMatch::Field {
+                        field: "customfield_10071".into(),
+                    },
+                    on: false,
+                },
+            ],
         };
         let stored = behaviour.clone();
 
@@ -403,7 +432,7 @@ mod tests {
             serde_json::from_str(&fs::read_to_string(dir.path().join(FILE_NAME)).unwrap()).unwrap();
         assert_eq!(
             file["behaviour"],
-            serde_json::json!({"seenAfterSeconds": 5, "pinDefault": "twoDays", "openIssuesIn": "full", "allowJiraChanges": true, "disabledChanges": ["comment", "addWebLink"], "notifyAbout": "myIssues"})
+            serde_json::json!({"seenAfterSeconds": 5, "pinDefault": "twoDays", "openIssuesIn": "full", "allowJiraChanges": true, "disabledChanges": ["comment", "addWebLink"], "notifyAbout": "myIssues", "meRules": [{"rule": {"kind": "mentioned"}, "on": true}, {"rule": {"kind": "field", "field": "customfield_10071"}, "on": false}]})
         );
     }
 
@@ -442,6 +471,7 @@ mod tests {
                 allow_jira_changes: false,
                 disabled_changes: Vec::new(),
                 notify_about: crate::store::settings::NotifyAbout::default(),
+                me_rules: crate::me_mode::default_rules(),
             }
         );
         assert_eq!(MAX_SEEN_AFTER_SECONDS, 10);
@@ -468,6 +498,7 @@ mod tests {
                     allow_jira_changes: false,
                     disabled_changes: Vec::new(),
                     notify_about: crate::store::settings::NotifyAbout::default(),
+                    me_rules: crate::me_mode::default_rules(),
                 },
                 sync: SyncSettings {
                     focused_minutes: 10,

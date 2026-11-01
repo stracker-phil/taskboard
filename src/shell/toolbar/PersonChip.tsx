@@ -18,7 +18,7 @@ export function PersonChip({ listId, person, onChange }: Props) {
   return (
     <button
       type="button"
-      className="me-chip person-chip"
+      className={picked ? "me-chip person-chip" : "me-chip person-chip me-chip--plain"}
       aria-pressed={picked !== null}
       aria-haspopup="menu"
       title={picked ? `Only issues assigned to ${picked.name}` : "Show one person's issues"}

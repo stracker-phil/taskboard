@@ -34,12 +34,20 @@ pub async fn list_mark_all_seen(
     view_id: Option<i64>,
     narrowing: Option<Narrowing>,
 ) -> AppResult<()> {
-    let viewer = Viewer::of(&state.settings.get().connection, Utc::now());
+    let settings = state.settings.get();
+    let viewer = Viewer::of(&settings.connection, Utc::now());
     let now = format_utc(viewer.now);
     let nav = state.nav.clone();
     let view = view_id.map(|view_id| ViewAt {
         view_id,
-        narrowing: narrowing.unwrap_or_default(),
+        narrowing: {
+            let narrowing = narrowing.unwrap_or_default();
+            Narrowing {
+                me: narrowing.me || state.modes.get().me_everywhere,
+                me_rules: settings.behaviour.me_rules,
+                ..narrowing
+            }
+        },
     });
     let unseen = move |conn: &_| {
         let ids = crate::views::unseen_ids(conn, &viewer, list_id, view.as_ref())?;

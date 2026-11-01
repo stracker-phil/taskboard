@@ -47,6 +47,7 @@ export const PAGE_ACTION_COMMANDS: Command[] = [
   action("view.layout.board", "Show as Board", "Mod+Ctrl+2"),
   action("view.layout.table", "Show as Table", "Mod+Ctrl+3"),
   action("toolbar.me", "Only My Issues", "Mod+Shift+M"),
+  action("toolbar.meOptions", "Me Mode Options…"),
   action("toolbar.search", "Filter This View", "Mod+F"),
   action("toolbar.filter", "Edit Filter…", "Mod+Alt+F"),
   action("toolbar.columns", "Columns…", "Mod+Alt+C"),

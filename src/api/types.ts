@@ -1,5 +1,5 @@
 // Re-exports the IPC types generated from Rust (`bun run types`); everything defined below is frontend-only.
-import type { IssuesChanged, LocalChanged, Nav, Settings, SyncProgress, SyncState, UiState } from "./types.gen";
+import type { IssuesChanged, LocalChanged, Modes, Nav, Settings, SyncProgress, SyncState, UiState } from "./types.gen";
 
 export type * from "./types.gen";
 
@@ -23,6 +23,8 @@ export interface EventPayloads {
   window_opened: null;
   /** Settings were saved, from any window. */
   settings_changed: Settings;
+  /** Me mode in every view or Unread only was switched. */
+  modes_changed: Modes;
   /** Shortcut overrides were saved, from any window. */
   keybindings_changed: Keybindings;
   /** To the Settings window: show this page (or section). */

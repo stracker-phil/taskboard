@@ -5,6 +5,7 @@ import { useAppInfo } from "../../queries/useAppInfo";
 import { fail } from "../../state/store";
 import { Group, Row, Segmented } from "./controls";
 import { NumberField } from "./fields";
+import { MeModeGroup } from "./MeModeGroup";
 
 function About() {
   const { data } = useAppInfo();
@@ -74,10 +75,16 @@ function Behaviour() {
   );
 }
 
+function MeModes() {
+  const { data: settings } = useSettings();
+  return settings ? <MeModeGroup settings={settings} /> : null;
+}
+
 export function GeneralPage() {
   return (
     <>
       <Behaviour />
+      <MeModes />
       <About />
     </>
   );

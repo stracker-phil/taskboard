@@ -5,6 +5,7 @@ mod connection;
 mod store;
 mod sync;
 
+use crate::me_mode::{MeRule, default_rules};
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
@@ -48,6 +49,8 @@ pub struct Behaviour {
     pub disabled_changes: Vec<Capability>,
     /// Which changes a macOS notification announces.
     pub notify_about: NotifyAbout,
+    /// What else Me mode counts as mine, besides issues assigned to me; in the Me popup's order.
+    pub me_rules: Vec<MeRule>,
 }
 
 /// What macOS notifications announce after a change sync (`notify/`).
@@ -72,6 +75,7 @@ impl Default for Behaviour {
             allow_jira_changes: false,
             disabled_changes: Vec::new(),
             notify_about: NotifyAbout::default(),
+            me_rules: default_rules(),
         }
     }
 }

@@ -108,7 +108,11 @@ disabledChanges: Array<Capability>,
 /**
  * Which changes a macOS notification announces.
  */
-notifyAbout: NotifyAbout, };
+notifyAbout: NotifyAbout, 
+/**
+ * What else Me mode counts as mine, besides issues assigned to me; in the Me popup's order.
+ */
+meRules: Array<MeRule>, };
 
 export type BoardColumn = { 
 /**
@@ -478,6 +482,15 @@ export type MatchCount = { open: number, total: number, };
 
 export type MatchedIn = "key" | "summary" | "description" | "comment";
 
+export type MeMatch = { "kind": "field", field: string, } | { "kind": "mentioned" } | { "kind": "subtasks" };
+
+export type MeRule = { rule: MeMatch, on: boolean, };
+
+/**
+ * One edit of the Me rules, from the Me popover or Settings.
+ */
+export type MeRuleEdit = { "kind": "switch", rule: MeMatch, on: boolean, } | { "kind": "addField", field: string, } | { "kind": "removeField", field: string, };
+
 export type MenuCommand = { 
 /**
  * The menu's title, the palette's section.
@@ -492,12 +505,24 @@ accelerator: string | null,
  */
 checked: boolean, };
 
+export type Mode = "meEverywhere" | "unreadOnly";
+
+export type Modes = { 
+/**
+ * Me mode is on in every view (the Me popup's "All views").
+ */
+meEverywhere: boolean, 
+/**
+ * Every view and every sidebar count shows only unread issues.
+ */
+unreadOnly: boolean, };
+
 /**
  * The toolbar's narrowing on top of the level's filter, and the Filter popover's unsaved conditions (ADR 0038).
  */
 export type Narrowing = { 
 /**
- * Only issues assigned to the connected account.
+ * Only my issues (Me mode).
  */
 me: boolean, 
 /**
@@ -874,6 +899,15 @@ export type UiState = { sidebarHidden: boolean,
  * The Issue view's activity column in points; none is the default width.
  */
 activityWidth: number | null, };
+
+/**
+ * A user field the Me popup may offer, for Settings' "Add Field…".
+ */
+export type UserField = { 
+/**
+ * The filter name: `reporter` or a custom field's id.
+ */
+field: string, name: string, };
 
 export type Value = number | string | Array<string>;
 

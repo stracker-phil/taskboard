@@ -15,6 +15,7 @@ use taskboard_lib::error::ErrorKind;
 use taskboard_lib::filter::{Condition, Field, Filter};
 use taskboard_lib::jira::{Limiter, TokenKind};
 use taskboard_lib::lists::{SidebarTree, Viewer, list_conditions, list_create, sidebar_tree};
+use taskboard_lib::me_mode::{MeMatch, MeRule};
 use taskboard_lib::status_style::{Style, status_style_set, status_styles_list};
 use taskboard_lib::store::settings::SettingsStore;
 use taskboard_lib::sync::{Emit, SyncContext, full_sync};
@@ -1982,6 +1983,26 @@ mod subtasks {
         }
     }
 
+    fn mine_with(rules: &[MeMatch]) -> Narrowing {
+        Narrowing {
+            me: true,
+            me_rules: rules
+                .iter()
+                .map(|rule| MeRule {
+                    rule: rule.clone(),
+                    on: true,
+                })
+                .collect(),
+            ..Narrowing::default()
+        }
+    }
+
+    fn reporter_rule() -> MeMatch {
+        MeMatch::Field {
+            field: "reporter".into(),
+        }
+    }
+
     async fn sort_by_key(site: &Site, view: i64, descending: bool) {
         view_set_sort(
             site.db(),
@@ -2011,6 +2032,46 @@ mod subtasks {
                 data.rows
                     .values()
                     .all(|row| !row.is_subtask && row.depth == 0)
+            );
+            assert_consistent(&data);
+        }
+
+        #[tokio::test]
+        #[ignore = "syncs the demo site into a temp database"]
+        async fn me_with_the_reporter_rule_keeps_the_rows_assigned_to_or_reported_by_me() {
+            let site = Site::new().await;
+            let everyone = site.nw_data(Narrowing::default()).await;
+            let mine: Vec<String> = strings(
+                site.db(),
+                format!(
+                    "SELECT key FROM cache.issue
+                     WHERE assignee_id = '{ME_ACCOUNT_ID}' OR reporter_id = '{ME_ACCOUNT_ID}'"
+                ),
+            )
+            .await;
+            let mut expected: Vec<String> = sorted_keys(&everyone)
+                .into_iter()
+                .filter(|key| mine.contains(key))
+                .collect();
+            expected.sort();
+
+            let data = site.nw_data(mine_with(&[reporter_rule()])).await;
+
+            assert_eq!(sorted_keys(&data), expected);
+            assert_consistent(&data);
+        }
+
+        #[tokio::test]
+        #[ignore = "syncs the demo site into a temp database"]
+        async fn me_without_rules_keeps_only_the_rows_assigned_to_me() {
+            let site = Site::new().await;
+
+            let data = site.nw_data(mine_with(&[])).await;
+
+            assert!(
+                data.rows
+                    .values()
+                    .all(|row| is_assigned_to(row, ME_ACCOUNT_ID))
             );
             assert_consistent(&data);
         }
@@ -2253,6 +2314,36 @@ mod subtasks {
             let counted: usize = data.groups.iter().map(|group| group.count).sum();
             assert_eq!(counted, data.rows.len());
             assert!(!subtask_keys(&data).is_empty());
+        }
+
+        #[tokio::test]
+        #[ignore = "syncs the demo site into a temp database"]
+        async fn me_with_the_reporter_rule_applies_it_to_every_row() {
+            let site = Site::new().await;
+            let (list, view) = epics_view(&site, SubtaskMode::List).await;
+
+            let data = site.data(list, view, mine_with(&[reporter_rule()])).await;
+
+            let extra =
+                format!("AND (assignee_id = '{ME_ACCOUNT_ID}' OR reporter_id = '{ME_ACCOUNT_ID}')");
+            assert_eq!(sorted_keys(&data), epic_family(&site, &extra).await);
+            assert_consistent(&data);
+        }
+
+        #[tokio::test]
+        #[ignore = "syncs the demo site into a temp database"]
+        async fn me_with_the_subtasks_rule_also_keeps_the_subtasks_of_my_issues() {
+            let site = Site::new().await;
+            let (list, view) = epics_view(&site, SubtaskMode::List).await;
+
+            let data = site.data(list, view, mine_with(&[MeMatch::Subtasks])).await;
+
+            let extra = format!(
+                "AND (assignee_id = '{ME_ACCOUNT_ID}' OR (type_is_subtask = 1 AND parent_id IN
+                   (SELECT id FROM cache.issue WHERE assignee_id = '{ME_ACCOUNT_ID}')))"
+            );
+            assert_eq!(sorted_keys(&data), epic_family(&site, &extra).await);
+            assert_consistent(&data);
         }
 
         #[tokio::test]

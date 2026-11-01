@@ -82,6 +82,7 @@ export const TEAM_MATRIX_KEY = [...TEAM_KEY, "matrix"] as const;
 export const useTeamMatrix = () => useQuery({ queryKey: TEAM_MATRIX_KEY, queryFn: () => api.teamMatrix() });
 export const levelPeopleKey = (listId: number) => [...TEAM_KEY, "level", listId] as const;
 export const useLevelPeople = (listId: number) => useQuery({ queryKey: levelPeopleKey(listId), queryFn: () => api.levelPeople(listId) });
+export const useMeUserFields = () => useQuery({ queryKey: [...TEAM_KEY, "meFields"], queryFn: api.meUserFields });
 
 /** A level's locked and own conditions and the view's own ones, for the Filter popover. */
 export const LIST_CONDITIONS_KEY = ["listConditions"] as const;

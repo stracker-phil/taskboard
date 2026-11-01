@@ -176,8 +176,11 @@ pub async fn view_rows(
     view_id: i64,
     mut narrowing: Narrowing,
 ) -> AppResult<ViewData> {
+    let settings = state.settings.get();
     narrowing.read_here = state.nav.read_here_ids();
-    let viewer = Viewer::of(&state.settings.get().connection, Utc::now());
+    narrowing.me_rules = settings.behaviour.me_rules;
+    narrowing.me |= state.modes.get().me_everywhere;
+    let viewer = Viewer::of(&settings.connection, Utc::now());
     super::view_rows(&state.db, viewer, list_id, view_id, narrowing).await
 }
 
@@ -189,8 +192,11 @@ pub async fn view_board(
     view_id: i64,
     mut narrowing: Narrowing,
 ) -> AppResult<BoardData> {
+    let settings = state.settings.get();
     narrowing.read_here = state.nav.read_here_ids();
-    let viewer = Viewer::of(&state.settings.get().connection, Utc::now());
+    narrowing.me_rules = settings.behaviour.me_rules;
+    narrowing.me |= state.modes.get().me_everywhere;
+    let viewer = Viewer::of(&settings.connection, Utc::now());
     super::view_board(&state.db, viewer, list_id, view_id, narrowing).await
 }
 

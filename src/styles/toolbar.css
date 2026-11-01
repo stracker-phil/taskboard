@@ -181,3 +181,39 @@
 .value-picker__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .value-picker__empty { margin: 6px 8px; font-size: 12px; color: var(--text-muted); }
 .person-chip .avatar { width: 22px; height: 22px; }
+
+/* Me and Person sit apart like the other toolbar items. */
+.toolbar__item--chips { gap: 8px; }
+
+/* The Me chip: one pill holding the toggle and the options chevron; both halves keep their size on and off. */
+.me-split {
+  display: flex; flex: none; align-items: stretch; height: 30px; box-sizing: border-box;
+  border: 1px solid var(--border); border-radius: 15px; background: var(--panel-bg); color: var(--text-secondary);
+  transition: background-color var(--motion-fast) var(--ease-out), border-color var(--motion-fast) var(--ease-out), color var(--motion-fast) var(--ease-out);
+}
+.me-split:hover { border-color: var(--border-strong); }
+.me-split--on { border-color: var(--accent-soft-border); background: var(--accent-soft-bg); color: var(--accent-text); }
+.me-split__toggle, .me-split__options {
+  display: flex; align-items: center; border: 0; background: transparent; color: inherit; font: inherit; font-size: 13px; white-space: nowrap; cursor: default;
+}
+.me-split__toggle { gap: 6px; padding: 0 6px 0 3px; border-radius: 15px 0 0 15px; }
+.me-split__options { padding: 0 9px 0 5px; border-left: 1px solid var(--hairline); border-radius: 0 15px 15px 0; }
+.me-split__toggle:hover, .me-split__options:hover, .me-split__options[aria-expanded="true"] { background: var(--hover-bg); }
+.me-split--on .me-split__options { border-left-color: var(--accent-soft-border); }
+.me-split__toggle[aria-pressed="false"] .me-chip__avatar { opacity: 0.55; filter: grayscale(1); }
+/* "All views": a ring around the avatar, so the chip keeps its size. */
+.me-chip__avatar--everywhere { box-shadow: 0 0 0 1.5px var(--panel-bg), 0 0 0 3px var(--accent); }
+
+/* The person chip without a pick shows an icon, which needs the button's own inset. */
+.me-chip--plain { padding: 0 11px 0 10px; }
+
+.me-popover { right: 0; width: 300px; }
+.me-popover__body { display: flex; flex-direction: column; padding: 4px 8px 8px; }
+.me-popover__scope {
+  display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 0; border-radius: 6px; background: transparent;
+  color: var(--text); font: inherit; font-size: 13px; text-align: left; cursor: default;
+}
+.me-popover__scope:hover { background: var(--fill-hover); }
+.me-popover__scope-text { display: flex; flex: 1; flex-direction: column; gap: 1px; }
+.me-popover__check { flex: none; color: var(--accent-text); }
+.me-popover__check--off { visibility: hidden; }

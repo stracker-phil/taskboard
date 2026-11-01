@@ -10,6 +10,7 @@ use crate::jira::capability::{Capability, CapabilityRow, capability_rows};
 use crate::launch::LaunchEvent;
 use crate::state::AppState;
 use crate::store::keybindings::Keybindings;
+use crate::store::modes::{Mode, Modes};
 use crate::store::places::ViewPlace;
 use crate::store::settings::{Appearance, Behaviour, MAX_SEEN_AFTER_SECONDS, Settings};
 use crate::store::ui_state::UiState;
@@ -126,6 +127,27 @@ pub fn get_ui_state(state: State<'_, AppState>) -> UiState {
 #[tauri::command]
 pub async fn set_ui_state(state: State<'_, AppState>, ui: UiState) -> AppResult<UiState> {
     state.ui_state.set(ui).await
+}
+
+#[tauri::command]
+pub fn modes_get(state: State<'_, AppState>) -> Modes {
+    state.modes.get()
+}
+
+/// Switches an app-wide mode; every window refreshes its views and counts.
+#[tauri::command]
+pub async fn mode_set(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    mode: Mode,
+    on: bool,
+) -> AppResult<Modes> {
+    use tauri::Emitter;
+    let modes = state.modes.set(mode, on).await?;
+    if let Err(e) = app.emit(crate::events::MODES_CHANGED_EVENT, modes) {
+        log::warn!("Couldn't announce the modes: {e}");
+    }
+    Ok(modes)
 }
 
 #[tauri::command]

@@ -21,6 +21,8 @@ pub fn handlers() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
         commands::get_keybindings,
         commands::set_keybindings,
         commands::get_ui_state,
+        commands::modes_get,
+        commands::mode_set,
         commands::set_ui_state,
         commands::place_get,
         commands::place_set,
@@ -117,6 +119,8 @@ pub fn handlers() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
         crate::team::commands::team_matrix,
         crate::team::commands::space_set_member,
         crate::team::commands::level_people,
+        crate::me_mode::commands::me_user_fields,
+        crate::me_mode::commands::me_rule_edit,
         bus::app::run_command,
     ]
 }

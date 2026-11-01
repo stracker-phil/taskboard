@@ -16,6 +16,7 @@ import type { View } from "../../api";
 import { narrowingKey } from "../../state/slices/narrowing";
 import { filterOptions, listConditions } from "../../test/filters";
 import { ALEX, SAM } from "../../test/issues";
+import { behaviour, settings } from "../../test/settings";
 import { space } from "../../test/spaces";
 import { listNode, view } from "../../test/views";
 import type { Level } from "../levels";
@@ -603,7 +604,7 @@ describe("Toolbar person chip", () => {
 
     expect(personChip()).toHaveTextContent("Person");
     expect(personChip()).toHaveAttribute("aria-pressed", "false");
-    expect(meChip().nextElementSibling).toBe(personChip());
+    expect(meChip().compareDocumentPosition(personChip()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("lists Anyone and the level's people under a caption, with Anyone checked", async () => {
@@ -703,6 +704,181 @@ describe("Toolbar person chip", () => {
   });
 });
 
+describe("Toolbar Me mode", () => {
+  const optionsButton = () => screen.getByRole("button", { name: "Me mode options" });
+  const popover = async () => within(await screen.findByRole("dialog", { name: "Me mode" }));
+  const narrowedMe = () => useStore.getState().narrowings[narrowingKey(11, 101)]?.me;
+
+  /** Renders with Me on in every view; waits until the chip shows it. */
+  async function renderEverywhere() {
+    mocked.modesGet.mockResolvedValue({ meEverywhere: true, unreadOnly: false });
+    renderToolbar(SPACE_LEVEL);
+    await waitFor(() => expect(meChip()).toHaveAttribute("aria-pressed", "true"));
+  }
+
+  beforeEach(() => {
+    mocked.getSettings.mockResolvedValue(settings());
+    mocked.meUserFields.mockResolvedValue([{ field: "reporter", name: "Reporter" }]);
+    mocked.modesGet.mockResolvedValue({ meEverywhere: false, unreadOnly: false });
+    mocked.levelPeople.mockResolvedValue([ALEX, SAM]);
+    mocked.listConditions.mockResolvedValue(listConditions({ kind: "space" }));
+  });
+
+  describe("options button", () => {
+    it("opens the Me mode popover and reports it as expanded", async () => {
+      renderToolbar(SPACE_LEVEL);
+      expect(optionsButton()).toHaveAttribute("aria-expanded", "false");
+
+      await userEvent.click(optionsButton());
+
+      expect(await screen.findByRole("dialog", { name: "Me mode" })).toBeInTheDocument();
+      expect(optionsButton()).toHaveAttribute("aria-expanded", "true");
+    });
+
+    it("opens the popover from the toolbar.meOptions page action", async () => {
+      renderToolbar(SPACE_LEVEL);
+
+      run("toolbar.meOptions");
+
+      expect(await screen.findByRole("dialog", { name: "Me mode" })).toBeInTheDocument();
+    });
+
+    it("does not turn Me on", async () => {
+      renderToolbar(SPACE_LEVEL);
+
+      await userEvent.click(optionsButton());
+      await screen.findByRole("dialog", { name: "Me mode" });
+
+      expect(meChip()).toHaveAttribute("aria-pressed", "false");
+    });
+  });
+
+  describe("rules", () => {
+    it("lists the saved rules with their switch positions", async () => {
+      mocked.getSettings.mockResolvedValue(
+        settings({
+          behaviour: behaviour({
+            meRules: [
+              { rule: { kind: "field", field: "reporter" }, on: true },
+              { rule: { kind: "mentioned" }, on: false },
+            ],
+          }),
+        }),
+      );
+      renderToolbar(SPACE_LEVEL);
+      await userEvent.click(optionsButton());
+
+      const dialog = await popover();
+
+      expect(await dialog.findByRole("button", { name: "Reporter" })).toHaveAttribute("aria-pressed", "true");
+      expect(dialog.getByRole("button", { name: "Mentioned in a comment" })).toHaveAttribute("aria-pressed", "false");
+    });
+
+    it("sends a switch edit for the clicked rule with the opposite position", async () => {
+      renderToolbar(SPACE_LEVEL);
+      await userEvent.click(optionsButton());
+
+      await userEvent.click(await (await popover()).findByRole("button", { name: "Subtasks of my issues" }));
+
+      await waitFor(() => expect(mocked.meRuleEdit).toHaveBeenCalledWith({ kind: "switch", rule: { kind: "subtasks" }, on: true }));
+    });
+
+    it("shows an error toast when a rule cannot be saved", async () => {
+      mocked.meRuleEdit.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
+      renderToolbar(SPACE_LEVEL);
+      await userEvent.click(optionsButton());
+
+      await userEvent.click(await (await popover()).findByRole("button", { name: "Mentioned in a comment" }));
+
+      await waitFor(() => expect(useStore.getState().toasts.map((t) => t.kind)).toContain("error"));
+    });
+
+    it("opens the Me Mode settings from Fields…", async () => {
+      mocked.runCommand.mockResolvedValue(undefined);
+      renderToolbar(SPACE_LEVEL);
+      await userEvent.click(optionsButton());
+
+      await userEvent.click((await popover()).getByRole("button", { name: "Fields…" }));
+
+      expect(mocked.runCommand).toHaveBeenCalledWith("app:settings:general:meMode");
+    });
+  });
+
+  describe("applies to", () => {
+    it("starts with Only this view pressed", async () => {
+      renderToolbar(SPACE_LEVEL);
+      await userEvent.click(optionsButton());
+
+      expect((await popover()).getByRole("button", { name: /^Only this view/ })).toHaveAttribute("aria-pressed", "true");
+    });
+
+    it("turns Me mode on in every view when All views is chosen", async () => {
+      renderToolbar(SPACE_LEVEL);
+      await userEvent.click(optionsButton());
+
+      await userEvent.click((await popover()).getByRole("button", { name: /^All views/ }));
+
+      expect(mocked.modeSet).toHaveBeenCalledWith("meEverywhere", true);
+    });
+
+    it("marks All views as pressed while Me mode holds everywhere", async () => {
+      await renderEverywhere();
+
+      await userEvent.click(optionsButton());
+
+      expect((await popover()).getByRole("button", { name: /^All views/ })).toHaveAttribute("aria-pressed", "true");
+    });
+
+    it("keeps Me on in this view only when Only this view is chosen while everywhere", async () => {
+      await renderEverywhere();
+      await userEvent.click(optionsButton());
+
+      await userEvent.click((await popover()).getByRole("button", { name: /^Only this view/ }));
+
+      expect(mocked.modeSet).toHaveBeenCalledWith("meEverywhere", false);
+      expect(narrowedMe()).toBe(true);
+    });
+  });
+
+  describe("while Me mode holds in every view", () => {
+    it("shows the chip pressed with the every-view tooltip", async () => {
+      await renderEverywhere();
+
+      expect(meChip()).toHaveAttribute("title", "My issues in every view; click to show all");
+    });
+
+    it("turns Me mode off everywhere when the chip is clicked", async () => {
+      await renderEverywhere();
+
+      await userEvent.click(meChip());
+
+      expect(mocked.modeSet).toHaveBeenCalledWith("meEverywhere", false);
+      expect(narrowedMe()).toBe(false);
+    });
+
+    it("turns Me mode off everywhere when a person is picked", async () => {
+      await renderEverywhere();
+      await peopleLoaded();
+
+      await userEvent.click(screen.getByRole("button", { name: /^Person/ }));
+      await userEvent.click(within(await screen.findByRole("menu", { name: "Person" })).getByRole("menuitemradio", { name: /Sam Lee/ }));
+
+      expect(mocked.modeSet).toHaveBeenCalledWith("meEverywhere", false);
+    });
+  });
+
+  describe("when Me mode is only this view's", () => {
+    it("leaves where Me applies alone when the chip is toggled", async () => {
+      renderToolbar(SPACE_LEVEL);
+
+      await userEvent.click(meChip());
+      await userEvent.click(meChip());
+
+      expect(mocked.modeSet).not.toHaveBeenCalled();
+    });
+  });
+});
+
 describe("Toolbar folding", () => {
   const rects: { mockRestore: () => void }[] = [];
 
@@ -758,6 +934,14 @@ describe("Toolbar folding", () => {
       expect(menu.getByRole("menuitemcheckbox", { name: "Only my issues" })).toHaveAttribute("aria-checked", "false");
       expect(menu.getByRole("menuitem", { name: "Assigned to…" })).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Me" })).not.toBeInTheDocument();
+    });
+
+    it("opens the Me mode popover from Me Mode Options…", async () => {
+      const menu = await openMore();
+
+      await userEvent.click(menu.getByRole("menuitem", { name: "Me Mode Options…" }));
+
+      expect(await screen.findByRole("dialog", { name: "Me mode" })).toBeInTheDocument();
     });
 
     it("opens the people menu from Assigned to… and narrows the view to the chosen person", async () => {

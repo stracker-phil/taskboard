@@ -13,6 +13,7 @@ import { connectionView, PROJECTS, projectCounts, syncOverview } from "../test/j
 import { row, statusStyle, viewData } from "../test/issues";
 import { settings } from "../test/settings";
 import { lumenSpace, sidebarTree, space } from "../test/spaces";
+import { useModes } from "./modes";
 import { createQueryClient } from "./queryClient";
 import { useIssue } from "./issues";
 import { useNav, useSpaces } from "./sidebar";
@@ -209,6 +210,50 @@ describe("useEvents", () => {
 
       await waitFor(() => expect(mocked.filterOptions).toHaveBeenCalled());
       expect(await screen.findByText("Loaded: NW-1, NW-2")).toBeInTheDocument();
+    });
+  });
+
+  describe("modes", () => {
+    function ModesHarness() {
+      useEvents();
+      const modes = useModes();
+      const { data: view } = useViewRows(11, 101);
+      return (
+        <p>
+          Me everywhere: {String(modes.meEverywhere)}; rows: {view ? Object.values(view.rows).map((r) => r.key).join(", ") : "loading"}
+        </p>
+      );
+    }
+
+    async function renderModes() {
+      mocked.modesGet.mockResolvedValue({ meEverywhere: false, unreadOnly: false });
+      mocked.viewRows.mockResolvedValue(viewData([], [row({ key: "NW-1" }), row({ id: "10043", key: "NW-2" })]));
+      render(
+        <QueryClientProvider client={createQueryClient()}>
+          <ModesHarness />
+        </QueryClientProvider>,
+      );
+      await screen.findByText("Me everywhere: false; rows: NW-1, NW-2");
+      await waitFor(() => expect(mocked.listen).toHaveBeenCalledWith("modes_changed", expect.any(Function)));
+    }
+
+    it("refetches the modes and the view rows when modes_changed arrives", async () => {
+      await renderModes();
+      mocked.modesGet.mockResolvedValue({ meEverywhere: true, unreadOnly: false });
+      mocked.viewRows.mockResolvedValue(viewData([], [row({ key: "NW-1" })]));
+
+      act(() => emitEvent(api, "modes_changed", { meEverywhere: true, unreadOnly: false }));
+
+      expect(await screen.findByText("Me everywhere: true; rows: NW-1")).toBeInTheDocument();
+    });
+
+    it("refetches the view rows when settings_changed arrives", async () => {
+      await renderModes();
+      mocked.viewRows.mockResolvedValue(viewData([], [row({ key: "NW-2" })]));
+
+      act(() => emitEvent(api, "settings_changed", settings()));
+
+      expect(await screen.findByText("Me everywhere: false; rows: NW-2")).toBeInTheDocument();
     });
   });
 

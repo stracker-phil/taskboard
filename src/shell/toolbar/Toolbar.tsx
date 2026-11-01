@@ -6,6 +6,7 @@ import { type Presence, useGlide, usePresence } from "../../lib/motion";
 import { api, type View } from "../../api";
 import { openMenu, type MenuEntry } from "../../components/menu";
 import { narrowingKey, NO_VIEW_NARROWING } from "../../state/slices/narrowing";
+import { attempt } from "../../state/requests";
 import { useStore } from "../../state/store";
 import { spaceOf, type Level } from "../levels";
 import { ColumnsPopover } from "./ColumnsPopover";
@@ -15,15 +16,17 @@ import type { Collapsible } from "./fit";
 import { GROUP_NAMES, groupMenu } from "./groupMenu";
 import { MODE_NAMES, SubtasksButton, subtasksMenu } from "./SubtasksButton";
 import { MeChip } from "./MeChip";
+import { MePopover } from "./MePopover";
 import { openPeopleMenu, PersonChip } from "./PersonChip";
 import { useLevelPeople } from "../../queries/views";
 import { TextFilter } from "./TextFilter";
 import { DraftActions } from "./DraftActions";
+import { useMeMode } from "./useMeMode";
 import { useToolbarFit } from "./useToolbarFit";
 import { useViewDraft } from "./useViewDraft";
 import { useViewEdit } from "./useViewEdit";
 
-type Open = "columns" | "filter" | null;
+type Open = "columns" | "filter" | "me" | null;
 
 /** The palette's section for the current view's options. */
 const THIS_VIEW = "This view";
@@ -35,6 +38,7 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
   const barRef = useRef<HTMLDivElement>(null);
   const columnsRef = useRef<HTMLButtonElement>(null);
   const filterRef = useRef<HTMLButtonElement>(null);
+  const meOptionsRef = useRef<HTMLButtonElement>(null);
   const moreRef = useRef<HTMLButtonElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   // The Board always hides subtasks, so its bar has no Subtasks button.
@@ -59,6 +63,7 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
 
   const columnsShown = usePresence(open === "columns");
   const filterShown = usePresence(open === "filter");
+  const meShown = usePresence(open === "me");
   const toggle = (which: Exclude<Open, null>) => setOpen((current) => (current === which ? null : which));
   const close = () => setOpen(null);
   const groupEntries = () =>
@@ -88,16 +93,14 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
   const space = spaceOf(level);
   // Both layers count, as drafted or saved: the filter list's own conditions and the view's.
   const own = draft.conditions;
-  // Me and one person exclude each other.
-  const setMe = (me: boolean) => setNarrowing(key, { me, person: me ? null : narrowing.person });
-  const toggleMe = () => setMe(!draft.me);
+  const me = useMeMode(key, draft.me);
   const { data: people = [] } = useLevelPeople(view.listId);
-  const setPerson = (person: string | null) => setNarrowing(key, { person, me: person ? false : draft.me });
   const save = () => void draft.save();
   const columnsLabel = view.layout === "board" ? "Card fields" : "Columns";
   const shows = (item: Collapsible) => !hidden.includes(item) && (item !== "subtasks" || hasSubtasks);
 
-  usePageAction("toolbar.me", toggleMe);
+  usePageAction("toolbar.me", me.toggle);
+  usePageAction("toolbar.meOptions", () => setOpen("me"));
   usePageAction("view.save", draft.dirty ? save : null);
   usePageAction("view.revert", draft.dirty ? draft.revert : null);
   usePageAction("toolbar.search", () => {
@@ -129,11 +132,12 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
           return { text: `Group: ${GROUP_NAMES[view.groupBy]}`, items: groupEntries() };
         case "me":
           return [
-            { text: "Only my issues", checked: draft.me, toggle: true, run: toggleMe },
+            { text: "Only my issues", checked: me.on, toggle: true, run: me.toggle },
+            { text: "Me Mode Options…", run: () => setOpen("me") },
             {
               text: "Assigned to…",
               hint: people.find((p) => p.accountId === narrowing.person)?.name,
-              run: () => moreRef.current && openPeopleMenu(people, narrowing.person, setPerson, moreRef.current),
+              run: () => moreRef.current && openPeopleMenu(people, narrowing.person, me.setPerson, moreRef.current),
             },
           ];
       }
@@ -143,6 +147,21 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
     columnsShown.mounted && (
       <Fading state={columnsShown.state}>
         <ColumnsPopover view={view} spaceProjectId={space?.projectId ?? null} anchor={anchor} onClose={close} />
+      </Fading>
+    );
+  const mePopover = (anchor: RefObject<HTMLButtonElement | null>) =>
+    meShown.mounted && (
+      <Fading state={meShown.state}>
+        <MePopover
+          rules={me.rules}
+          fields={me.fields}
+          onRule={me.setRule}
+          everywhere={me.everywhere}
+          onScope={me.setScope}
+          onAddFields={() => void attempt(api.runCommand("app:settings:general:meMode"), "Could not open the Me Mode settings")}
+          anchor={anchor}
+          onClose={close}
+        />
       </Fading>
     );
   const filterPopover = (anchor: RefObject<HTMLButtonElement | null>) =>
@@ -199,9 +218,12 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
         </span>
       )}
       {shows("me") && (
-        <span ref={measure("me")} className="toolbar__item">
-          <MeChip on={draft.me} onChange={setMe} />
-          <PersonChip listId={view.listId} person={narrowing.person} onChange={setPerson} />
+        <span ref={measure("me")} className="toolbar__item toolbar__item--chips">
+          <span className="toolbar__anchor">
+            <MeChip on={me.on} everywhere={me.everywhere} onChange={me.setMe} optionsRef={meOptionsRef} optionsOpen={open === "me"} onOptions={() => toggle("me")} />
+            {mePopover(meOptionsRef)}
+          </span>
+          <PersonChip listId={view.listId} person={narrowing.person} onChange={me.setPerson} />
         </span>
       )}
       {narrowing.epic && <EpicNarrowingChip epicId={narrowing.epic} onClear={() => setNarrowing(key, { epic: null })} />}
@@ -213,6 +235,7 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
           </button>
           {!shows("columns") && columnsPopover(moreRef)}
           {!shows("filter") && filterPopover(moreRef)}
+          {!shows("me") && mePopover(moreRef)}
         </span>
       )}
     </div>
