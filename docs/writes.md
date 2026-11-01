@@ -151,6 +151,7 @@ A change refused before it is sent (changes off, a switched-off kind) records no
 | `issue_write(id, Transition { transitionId })` | moves the issue along a transition from `issue_transitions` |
 | `issue_write(id, Priority { name })` | sets the priority to one the edit screen offers |
 | `issue_transitions(id)` | the moves Jira offers from the issue's status |
+| `issue_priorities(id)` | the priorities the issue's edit screen offers, and the one it has |
 | `issue_comment(id, text)` | adds a plain-text comment |
 | `issue_add_web_link(id, url, title)` | adds a web link; `title` null names it after its pull request or address |
 | `issue_drop_targets(id, groupBy, fromKey, groups)` | the places a dragged issue may go, each with its action, in the view's order |
@@ -165,3 +166,8 @@ The Issue view's assignee is the assignee menu's button (`AssigneeMenuButton`); 
 Issue → Assign To… open it under the assignee, or under the selected row or card. `issue_assignees(id)`
 (`writes::assignees`) lists me and the issue's Space's active team (`team::active`, me always first), and who has it now; the
 menu checks the current one and ends with Unassigned.
+The priority in the Issue view's field grid and the Preview is the priority menu's button (`PriorityMenuButton`);
+**⇧P** (`issue.changePriority`) and Issue → Change Priority… open it under the priority, or under the selected row or
+card. `issue_priorities(id)` (`writes::priorities`) asks the edit screen each time; the menu checks the current one.
+In the List and the Table the Status, Assignee and Priority cells open the same three menus under the cell, and
+select the row without opening it (`views/list/cellEdits.tsx`); they shade the value on hover. Each opens only while its kind of change is on.

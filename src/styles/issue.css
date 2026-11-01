@@ -99,6 +99,18 @@
 }
 .assignee-menu-button:hover { background: var(--hover-bg); }
 .assignee-menu-button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+/* A value as its menu's button (the priority): its shading reaches past the value and takes no room, so the value
+   sits where it sat as plain text. */
+.field-menu-button {
+  position: relative; isolation: isolate; display: inline-flex; align-items: center; gap: 8px; padding: 0; border: 0;
+  background: none; color: inherit; font: inherit; cursor: pointer;
+}
+.field-menu-button::before {
+  content: ""; position: absolute; inset: -3px -6px; z-index: -1; border-radius: 7px;
+  transition: background-color var(--motion-fast) var(--ease-out);
+}
+.field-menu-button:hover::before { background: var(--hover-bg); }
+.field-menu-button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 4px; border-radius: 4px; }
 
 /* Dragging an issue onto another group (writes on, docs/writes.md). */
 body.is-dragging-issue, body.is-dragging-issue * { cursor: grabbing !important; user-select: none; }

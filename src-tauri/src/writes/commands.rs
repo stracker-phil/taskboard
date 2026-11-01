@@ -3,7 +3,8 @@
 use tauri::State;
 
 use super::{
-    Assignees, Change, DropOutcome, DropTargets, TransitionOption, ViewGroup, WriteOutcome,
+    Assignees, Change, DropOutcome, DropTargets, Priorities, TransitionOption, ViewGroup,
+    WriteOutcome,
 };
 use crate::error::AppResult;
 use crate::state::AppState;
@@ -37,6 +38,14 @@ pub async fn issue_transitions(
     let settings = state.settings.get();
     let source = crate::sync::source_for(&state.jira, &settings.connection)?;
     super::transitions(&state.db, source.as_ref(), id).await
+}
+
+/// The priorities Jira offers for the issue.
+#[tauri::command]
+pub async fn issue_priorities(state: State<'_, AppState>, id: String) -> AppResult<Priorities> {
+    let settings = state.settings.get();
+    let source = crate::sync::source_for(&state.jira, &settings.connection)?;
+    super::priorities(&state.db, source.as_ref(), id).await
 }
 
 /// Adds a comment, typed as plain text.

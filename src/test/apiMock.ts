@@ -26,6 +26,7 @@ import {
   type Nav,
   type PaletteResults,
   type Pins,
+  type Priorities,
   type Related,
   type ScopeView,
   type Settings,
@@ -168,6 +169,18 @@ export function createApiMock(): Api {
     issueDrop: vi.fn(async (): Promise<DropOutcome> => ({ kind: "done", outcome: { done: "Done", reverse: null } })),
     issueTransitions: vi.fn().mockResolvedValue([]),
     issueAssignees: vi.fn(async (): Promise<Assignees> => ({ people: [], current: null })),
+    issuePriorities: vi.fn(
+      async (): Promise<Priorities> => ({
+        options: [
+          { name: "Highest", level: 1 },
+          { name: "High", level: 2 },
+          { name: "Medium", level: 3 },
+          { name: "Low", level: 4 },
+          { name: "Lowest", level: 5 },
+        ],
+        current: "Medium",
+      }),
+    ),
     meUserFields: vi.fn().mockResolvedValue([]),
     viewSetPerson: vi.fn(async (id: number, person: string | null) => ({ ...view(), id, person })),
     viewPeople: vi.fn().mockResolvedValue([]),

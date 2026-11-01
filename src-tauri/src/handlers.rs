@@ -86,6 +86,7 @@ pub fn handlers() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
         crate::writes::commands::issue_write,
         crate::writes::commands::issue_toggle_mine,
         crate::writes::commands::issue_transitions,
+        crate::writes::commands::issue_priorities,
         crate::writes::commands::issue_comment,
         crate::writes::commands::issue_drop_targets,
         crate::writes::commands::issue_drop,

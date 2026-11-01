@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import type { Cell, IssueDetail } from "../api";
 import { Avatar } from "../components/issue/Avatar";
 import { PriorityFlag } from "../components/issue/PriorityFlag";
+import { PriorityMenuButton } from "../writes/PriorityMenuButton";
 import { AssigneeMenuButton } from "../writes/AssigneeMenuButton";
 import { StatusMenuButton } from "../writes/StatusMenuButton";
 
@@ -68,14 +69,16 @@ export function FieldGrid({ issue, onOpenEpic }: { issue: IssueDetail; onOpenEpi
         {issue.releases.length > 0 ? issue.releases.map((release) => <span key={release} className="release-chip">{release}</span>) : NONE}
       </Field>
       <Field icon={Flag} label="Priority">
-        {issue.priority ? (
-          <>
-            <PriorityFlag level={issue.priority.level} />
-            {issue.priority.name}
-          </>
-        ) : (
-          NONE
-        )}
+        <PriorityMenuButton issue={issue}>
+          {issue.priority ? (
+            <>
+              <PriorityFlag level={issue.priority.level} />
+              {issue.priority.name}
+            </>
+          ) : (
+            NONE
+          )}
+        </PriorityMenuButton>
       </Field>
       {!issue.isEpic && (
         <Field icon={RotateCw} label="Sprint">

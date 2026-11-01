@@ -649,6 +649,11 @@ space: string | null, };
 
 export type Pins = { active: Array<PinItem>, recentlyUnpinned: Array<PinItem>, };
 
+/**
+ * What the priority menu offers: the priorities Jira allows on the issue's edit screen, and the one it has.
+ */
+export type Priorities = { options: Array<Priority>, current: string | null, };
+
 export type Priority = { name: string, 
 /**
  * 1 Highest … 5 Lowest; an unknown name counts as Medium.

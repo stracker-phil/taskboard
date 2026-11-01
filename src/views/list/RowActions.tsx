@@ -17,6 +17,8 @@ export interface RowActionHandlers {
   changeStatus: ((issue: { id: string; key: string }, at: MenuAt) => void) | null;
   /** Opens the assignee menu under `at`; null while changes to Jira are off. */
   assignTo: ((issue: { id: string; key: string }, at: MenuAt) => void) | null;
+  /** Opens the priority menu under `at`; null while changes to Jira, or to priorities, are off. */
+  changePriority: ((issue: { id: string; key: string }, at: MenuAt) => void) | null;
 }
 
 interface Props {

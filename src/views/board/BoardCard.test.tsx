@@ -13,6 +13,7 @@ const actions: ComponentProps<typeof BoardCard>["actions"] = {
   toggleMine: null,
   changeStatus: null,
   assignTo: null,
+  changePriority: null,
 };
 
 const card = (updatedAt: string) => <BoardCard row={row({ updatedAt })} fields={[]} onOpen={vi.fn()} actions={actions} />;

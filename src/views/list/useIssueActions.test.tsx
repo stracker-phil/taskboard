@@ -1,5 +1,5 @@
 import { QueryClientProvider } from "@tanstack/react-query";
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -10,6 +10,7 @@ import { createQueryClient } from "../../queries/queryClient";
 import { SETTINGS_KEYS } from "../../queries/settings";
 import { resetStore, useStore } from "../../state/store";
 import { connectionView } from "../../test/jira";
+import { behaviour, settings } from "../../test/settings";
 import { useIssueActions } from "./useIssueActions";
 
 const mocked = vi.mocked(api, true);
@@ -139,6 +140,30 @@ describe("useIssueActions", () => {
       actions.current.markSeen("10042");
 
       await waitFor(() => expect(toasts()).toEqual([["error", "Could not mark it read: Disk full"]]));
+    });
+  });
+
+  describe("changePriority", () => {
+    it("opens the priority menu of the issue while changes to Jira are on", async () => {
+      mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ allowJiraChanges: true }) }));
+      const actions = await renderActions("");
+      await waitFor(() => expect(actions.current.changePriority).not.toBeNull());
+
+      actions.current.changePriority?.({ id: "10042", key: "NW-1042" }, { x: 10, y: 10 });
+
+      await waitFor(() => expect(mocked.issuePriorities).toHaveBeenCalledWith("10042"));
+    });
+
+    it.each([
+      ["changes to Jira are off", { allowJiraChanges: false }],
+      ["priority changes are switched off", { allowJiraChanges: true, disabledChanges: ["changePriority" as const] }],
+    ])("is not offered while %s", async (_label, patch) => {
+      mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour(patch) }));
+      const actions = await renderActions("");
+      await waitFor(() => expect(mocked.getSettings).toHaveBeenCalled());
+      await act(async () => {});
+
+      expect(actions.current.changePriority).toBeNull();
     });
   });
 

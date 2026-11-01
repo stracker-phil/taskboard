@@ -2,6 +2,7 @@ import { api, type TransitionOption } from "../api";
 import { StatusSquare } from "../components/issue/StatusSquare";
 import { openMenu, type MenuAt, type MenuEntry, type MenuItem } from "../components/menu";
 import { attempt } from "../state/requests";
+import { menuAnchor } from "./menuAnchor";
 import { runWrite } from "./runWrite";
 
 interface Issue {
@@ -36,12 +37,4 @@ function moveRow(issue: Issue, move: TransitionOption, openInJira: ((key: string
   return { ...row, run: () => runWrite(issue.id, api.issueWrite(issue.id, change), "Could not change the status") };
 }
 
-/** Where S opens the status menu: under the issue's status pill when one is on screen, else under its row or card,
- *  else near the top of the window. */
-export function statusMenuAnchor(issueId: string): MenuAt {
-  const id = CSS.escape(issueId);
-  return (
-    document.querySelector<HTMLElement>(`[data-status-menu="${id}"]`) ??
-    document.querySelector<HTMLElement>(`[data-issue-id="${id}"]`) ?? { x: window.innerWidth / 2, y: 120 }
-  );
-}
+export const statusMenuAnchor = (issueId: string): MenuAt => menuAnchor("data-status-menu", issueId);

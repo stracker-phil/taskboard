@@ -6,6 +6,7 @@ import type { IssueDetail } from "../api";
 import { Avatar } from "../components/issue/Avatar";
 import { EpicChip } from "../components/issue/EpicChip";
 import { PriorityFlag } from "../components/issue/PriorityFlag";
+import { PriorityMenuButton } from "../writes/PriorityMenuButton";
 import { useIssue, useIssueActivity } from "../queries/issues";
 import { ActivityEntry } from "./Activity";
 import { hasContent } from "../lib/jiraHtml";
@@ -96,10 +97,12 @@ function Body({ issue, onExpand, onClose }: { issue: IssueDetail; onExpand: () =
           </span>
         ))}
         {issue.priority && (
-          <span className="peek__meta">
-            <PriorityFlag level={issue.priority.level} size={13} />
-            {issue.priority.name}
-          </span>
+          <PriorityMenuButton issue={issue}>
+            <span className="peek__meta">
+              <PriorityFlag level={issue.priority.level} size={13} />
+              {issue.priority.name}
+            </span>
+          </PriorityMenuButton>
         )}
         {issue.assignees.map((person) => (
           <span key={person.accountId} className="peek__meta">

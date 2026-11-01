@@ -104,7 +104,7 @@ impl Capability {
             Self::CheckQueries => "Whether the sync scope's query is valid",
             Self::Assign => "Assign issues to you or a teammate, or unassign them",
             Self::ChangeStatus => "Move issues along their workflow",
-            Self::ChangePriority => "Set an issue's priority, by dragging it",
+            Self::ChangePriority => "Set an issue's priority from its menu, or by dragging it",
             Self::Comment => "Comment on issues from the Issue view",
             Self::AddWebLink => "Add links such as a pull request to issues",
         }

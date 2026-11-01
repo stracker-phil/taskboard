@@ -59,6 +59,19 @@
 /* On one line the change chip gives way first, down to a few letters, before the title shortens. */
 .list-row:not(.list-row--wrap) .change-chip { display: block; flex: 0 1000 auto; min-width: 44px; overflow: hidden; line-height: 18px; text-overflow: ellipsis; }
 .list-row__cell { display: flex; align-items: center; min-width: 0; white-space: nowrap; }
+/* A cell that opens its menu (status, assignee, priority) shades its value on hover, in the List and the Table: a
+   box reaching 5px past the value (a shadow, so it takes no room), translucent so a selected or unread row keeps its
+   color under it. The value's parts size as a cell's own children do. */
+.cell-edit__value {
+  display: inline-flex; align-items: center; gap: inherit; min-width: 0; max-width: 100%; border-radius: 4px;
+  transition: background-color var(--motion-fast) var(--ease-out), box-shadow var(--motion-fast) var(--ease-out);
+}
+.cell-edit__value > * { min-width: 0; max-width: 100%; }
+.cell-edit:hover .cell-edit__value { background-color: var(--cell-hover-bg); box-shadow: 0 0 0 5px var(--cell-hover-bg); }
+/* A stack's last avatar reaches past the stack by its overlap; the box covers it without taking room. */
+.cell-edit__value:has(> .avatar-stack) { padding-right: 6px; margin-right: -6px; }
+/* A Table cell still cuts what runs past its right edge, but lets the box out on the other sides. */
+.table-row__cell.cell-edit { overflow: visible; clip-path: inset(-6px 0 -6px -6px); }
 
 /* A cell's content never widens its column past the cap; long text ends in an ellipsis. */
 .list-row__cell > * { min-width: 0; max-width: 100%; }

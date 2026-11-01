@@ -2,6 +2,7 @@ import { api, type Assignees } from "../api";
 import { Avatar } from "../components/issue/Avatar";
 import { openMenu, type MenuAt, type MenuEntry } from "../components/menu";
 import { attempt } from "../state/requests";
+import { menuAnchor } from "./menuAnchor";
 import { runWrite } from "./runWrite";
 
 interface Issue {
@@ -32,12 +33,4 @@ function assignEntries(issue: Issue, { people, current }: Assignees): MenuEntry[
   ];
 }
 
-/** Where A opens the assignee menu: under the issue's assignee when one is on screen, else under its row or card,
- *  else near the top of the window. */
-export function assignMenuAnchor(issueId: string): MenuAt {
-  const id = CSS.escape(issueId);
-  return (
-    document.querySelector<HTMLElement>(`[data-assign-menu="${id}"]`) ??
-    document.querySelector<HTMLElement>(`[data-issue-id="${id}"]`) ?? { x: window.innerWidth / 2, y: 120 }
-  );
-}
+export const assignMenuAnchor = (issueId: string): MenuAt => menuAnchor("data-assign-menu", issueId);

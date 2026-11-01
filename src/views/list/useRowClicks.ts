@@ -38,5 +38,13 @@ export function useRowClicks(keys: RefObject<RowKeyState>, opening: IssueOpening
     },
     [keys],
   );
-  return { onSelect, onOpen };
+  /** Selects the row and nothing else: a cell that opens a menu acts on it without opening it. */
+  const onPick = useCallback(
+    (id: string) => {
+      clearTimeout(pendingPreview.current);
+      keys.current.select(id, keys.current.peekOpen);
+    },
+    [keys],
+  );
+  return { onSelect, onOpen, onPick };
 }

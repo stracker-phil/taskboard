@@ -28,7 +28,7 @@ use taskboard_lib::views::GroupBy;
 use taskboard_lib::writes::{
     Assignees, Change, DropOutcome, DropTargets, MAX_COMMENT_CHARS, Reverse, TransitionOption,
     WriteOutcome, add_comment, add_web_link, apply, assignees, drop_on, drop_targets, forget_all,
-    toggle_mine, transitions,
+    priorities, toggle_mine, transitions,
 };
 
 const PROJECT_IDS: [&str; 5] = ["10001", "10002", "10003", "10004", "10005"];
@@ -1747,6 +1747,77 @@ mod setting_the_priority {
             rig.cached_priority(NW_1049).await.as_deref(),
             Some("Medium")
         );
+    }
+}
+
+mod the_priority_menu {
+    use super::*;
+
+    async fn menu(rig: &Rig) -> AppResult<Value> {
+        let source = rig.ctx.source().unwrap();
+        priorities(&rig.ctx.db, &*source, NW_1042.into())
+            .await
+            .map(|menu| serde_json::to_value(menu).unwrap())
+    }
+
+    #[tokio::test]
+    async fn offers_the_priorities_of_the_edit_screen_in_order_with_their_levels_and_marks_the_current()
+     {
+        let rig = Rig::synced().await;
+
+        assert_eq!(
+            menu(&rig).await.unwrap(),
+            json!({
+                "options": [
+                    { "name": "Highest", "level": 1 },
+                    { "name": "High", "level": 2 },
+                    { "name": "Medium", "level": 3 },
+                    { "name": "Low", "level": 4 },
+                    { "name": "Lowest", "level": 5 },
+                ],
+                "current": "High",
+            })
+        );
+    }
+
+    #[tokio::test]
+    async fn shows_the_new_priority_as_current_after_a_priority_write() {
+        let rig = Rig::synced().await;
+        rig.set_priority(NW_1042, "Lowest").await;
+
+        let menu = menu(&rig).await.unwrap();
+
+        assert_eq!(menu["current"], "Lowest");
+    }
+
+    #[tokio::test]
+    async fn has_no_current_for_an_issue_without_a_priority() {
+        let rig = Rig::synced().await;
+        rig.ctx
+            .db
+            .write(|tx, _| {
+                tx.execute(
+                    "UPDATE cache.issue SET priority = NULL WHERE id = ?1",
+                    [NW_1042],
+                )?;
+                Ok(())
+            })
+            .await
+            .unwrap();
+
+        let menu = menu(&rig).await.unwrap();
+
+        assert_eq!(menu["current"], Value::Null);
+        assert_eq!(menu["options"].as_array().unwrap().len(), 5);
+    }
+
+    #[tokio::test]
+    async fn is_an_error_when_jira_refuses_the_edit_screen() {
+        let rig = Rig::synced().await;
+        rig.fake
+            .answer_next(400, json!({ "errorMessages": ["Not allowed"] }));
+
+        menu(&rig).await.unwrap_err();
     }
 }
 

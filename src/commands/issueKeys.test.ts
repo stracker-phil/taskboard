@@ -26,6 +26,7 @@ function handlers(patch: Partial<IssueKeyHandlers> = {}) {
     toggleMine: vi.fn(),
     changeStatus: vi.fn(),
     assignTo: vi.fn(),
+    changePriority: vi.fn(),
     togglePeek: vi.fn(),
     hasSelection: () => true,
     peekOpen: () => true,
@@ -69,6 +70,7 @@ describe("issue keys", () => {
       ["I", "i", {}],
       ["D", "d", {}],
       ["A", "a", {}],
+      ["⇧P", "P", { shift: true }],
     ])("leaves %s to nobody", (_label, key, mods) => {
       expect(press(key, mods)).toBeNull();
     });
@@ -234,6 +236,33 @@ describe("issue keys", () => {
       register(handlers({ hasSelection: () => false }));
 
       expect(press("a")).toBeNull();
+    });
+  });
+
+  describe("changing the priority", () => {
+    it("⇧P opens the selected issue's priority menu", () => {
+      const h = handlers();
+      register(h);
+
+      void press("P", { shift: true })?.run();
+
+      expect(h.changePriority).toHaveBeenCalled();
+    });
+
+    it("ignores ⇧P without a selected row", () => {
+      register(handlers({ hasSelection: () => false }));
+
+      expect(press("P", { shift: true })).toBeNull();
+    });
+
+    it("leaves a plain P to bookmarking", () => {
+      const h = handlers();
+      register(h);
+
+      void press("p")?.run();
+
+      expect(h.togglePin).toHaveBeenCalled();
+      expect(h.changePriority).not.toHaveBeenCalled();
     });
   });
 

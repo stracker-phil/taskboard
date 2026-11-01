@@ -28,6 +28,7 @@ import type {
   Keybindings,
   LaunchEvent,
   LinkTarget,
+  Priorities,
   Layout,
   MenuCommand,
   FilterOptions,
@@ -250,6 +251,7 @@ export const api = {
   issueDrop: (id: string, groupBy: GroupBy, key: string) => invoke<DropOutcome>("issue_drop", { id, groupBy, key }),
   /** The moves Jira offers from the issue's status. */
   issueTransitions: (id: string) => invoke<TransitionOption[]>("issue_transitions", { id }),
+  issuePriorities: (id: string) => invoke<Priorities>("issue_priorities", { id }),
   /** The person's profile picture as a `data:` URL, fetched and cached by Rust; null shows initials. */
   userAvatar: (accountId: string) => invoke<string | null>("user_avatar", { accountId }),
   placeGet: (listId: number, viewId: number) => invoke<ViewPlace | null>("place_get", { listId, viewId }),

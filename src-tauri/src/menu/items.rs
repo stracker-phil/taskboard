@@ -100,6 +100,7 @@ pub const ISSUE: &[Item] = &[
     plain("Assign to Me or Unassign", "page:issue.toggleMine"),
     plain("Change Status…", "page:issue.changeStatus"),
     plain("Assign To…", "page:issue.assignTo"),
+    plain("Change Priority…", "page:issue.changePriority"),
 ];
 /// The window's appearance only; what the page shows lives in Go, List and Issue.
 pub const VIEW: &[Item] = &[
@@ -246,6 +247,7 @@ mod tests {
                 "issue.toggleMine",
                 "issue.changeStatus",
                 "issue.assignTo",
+                "issue.changePriority",
             ]
         );
     }

@@ -13,6 +13,7 @@
   --list-bg: #1e1e21;
   --hover-bg: #2e2e33;
   --row-hover-bg: #29292d;
+  --cell-hover-bg: rgba(255, 255, 255, 0.07);
   --scrim: rgba(0, 0, 0, 0.55);
   --tooltip-bg: #3a3a3f;
   --tooltip-text: #f4f4f5;

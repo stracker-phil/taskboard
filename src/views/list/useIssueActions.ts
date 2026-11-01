@@ -9,6 +9,7 @@ import { runWrite } from "../../writes/runWrite";
 import { useJiraChange } from "../../writes/useJiraChanges";
 import { openStatusMenu } from "../../writes/statusMenu";
 import { openAssignMenu } from "../../writes/assignMenu";
+import { openPriorityMenu } from "../../writes/priorityMenu";
 
 /** Copies the text and confirms with a toast; subscribes to nothing, so every row can use it. */
 export function copyWithToast(text: string, done: string) {
@@ -25,12 +26,13 @@ export function copyAppLink(target: LinkTarget, done: string) {
 }
 
 /** Per-issue actions; null when they can't run: the URL actions without a Jira site, the writes (`toggleMine`,
- *  `changeStatus`, `assignTo`) while changes to Jira, or that kind of change, are off. */
+ *  `changeStatus`, `assignTo`, `changePriority`) while changes to Jira, or that kind of change, are off. */
 export function useIssueActions() {
   const { data: connection } = useConnection();
   const site = connection?.connection.siteUrl;
   const canAssign = useJiraChange("assign");
   const canChangeStatus = useJiraChange("changeStatus");
+  const canChangePriority = useJiraChange("changePriority");
   // Stable, so memoized cards don't re-render with their parent.
   return useMemo(() => {
     const urlOf = (key: string) => browseUrl(site, key);
@@ -51,6 +53,8 @@ export function useIssueActions() {
       changeStatus: canChangeStatus ? (issue: { id: string; key: string }, at: MenuAt) => openStatusMenu(issue, at, openInJira) : null,
       /** Opens the assignee menu under `at`. */
       assignTo: canAssign ? (issue: { id: string; key: string }, at: MenuAt) => openAssignMenu(issue, at) : null,
+      /** Opens the priority menu under `at`. */
+      changePriority: canChangePriority ? (issue: { id: string; key: string }, at: MenuAt) => openPriorityMenu(issue, at) : null,
     };
-  }, [site, canAssign, canChangeStatus]);
+  }, [site, canAssign, canChangeStatus, canChangePriority]);
 }

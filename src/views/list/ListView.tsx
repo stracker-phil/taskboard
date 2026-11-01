@@ -128,7 +128,7 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
   const keys = useRowKeys({ ...place, items, rowIds, data, select, toggle, actions, scrollToIndex, open });
 
   // Stable, so rows that didn't change skip re-rendering.
-  const { onSelect, onOpen } = useRowClicks(keys, opening);
+  const { onSelect, onOpen, onPick } = useRowClicks(keys, opening);
   const onToggleSubtasks = useCallback((id: string) => keys.current.setSubtasksOpen(id, !keys.current.subtasksOpen(id)), [keys]);
 
   return (
@@ -178,6 +178,7 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
                   inlineLabels={inlineLabels}
                   selected={selected === item.row.id}
                   onSelect={onSelect}
+                  onPick={onPick}
                   onOpen={onOpen}
                   actions={actions}
                   nesting={item.nesting}

@@ -1,7 +1,8 @@
-import { type CSSProperties, memo } from "react";
+import { type CSSProperties, memo, type ReactNode } from "react";
 import type { Row } from "../../api";
 import { CopyKey } from "../../components/issue/CopyKey";
 import { StatusSquare } from "../../components/issue/StatusSquare";
+import { CellValue, cellEditProps, type CellEditHandlers } from "../list/cellEdits";
 import { columnDef } from "../list/columns";
 import { LabelChips } from "../../components/issue/LabelChips";
 import { opensIssue } from "../list/opensIssue";
@@ -13,11 +14,33 @@ import { useFlash } from "../../lib/motion";
 
 const cellWidth = (id: string): CSSProperties => ({ width: `var(${widthVar(id)})` });
 
+interface CellProps {
+  id: string;
+  className: string;
+  row: Row;
+  edits: CellEditHandlers;
+  onPick: (id: string) => void;
+  children: ReactNode;
+}
+
+/** A column's cell at the table's width for it; the status, assignee and priority cells open their menus. */
+function Cell({ id, className, row, edits, onPick, children }: CellProps) {
+  const editing = cellEditProps(id, row, edits, onPick);
+  const editable = "onClick" in editing;
+  return (
+    <span className={editable ? `${className} cell-edit` : className} role="gridcell" style={cellWidth(id)} {...editing}>
+      <CellValue editable={editable}>{children}</CellValue>
+    </span>
+  );
+}
+
 interface Props {
   row: Row;
   columns: string[];
   selected: boolean;
   onSelect: (id: string) => void;
+  /** Selects without opening: a cell that opens a menu. */
+  onPick: (id: string) => void;
   /** A double-click: always the full Issue view. */
   onOpen: (id: string) => void;
   /** The labels as tags after the summary. */
@@ -30,11 +53,13 @@ interface Props {
   onToggleSubtasks?: (id: string) => void;
   /** Its child count after the summary. */
   childChip?: boolean;
+  /** The status, assignee and priority cells open their menus. */
+  edits: CellEditHandlers;
 }
 
 /** One issue: key, summary, status, then the view's cells; the widths come from the table's variables. */
 export const TableRow = memo(function TableRow(props: Props) {
-  const { row, columns, inlineLabels = false, selected, onSelect, onOpen } = props;
+  const { row, columns, inlineLabels = false, selected, onSelect, onPick, onOpen, edits } = props;
   const { tree = false, nesting = null, subtasksOpen = true, onToggleSubtasks, childChip = false } = props;
   const flashing = useFlash(row.updatedAt);
   const className = ["table-row", tree && "table-row--tree", nesting?.parent && "table-row--parent", nesting && nesting.depth > 0 && "table-row--child", row.changed && "table-row--changed", flashing && "flash", selected && "table-row--selected"].filter(Boolean).join(" ");
@@ -50,14 +75,14 @@ export const TableRow = memo(function TableRow(props: Props) {
         {childChip && <ChildCount count={row.childCount} />}
         {inlineLabels && <LabelChips labels={row.labels} className="row-labels" />}
       </span>
-      <span className="table-row__cell table-row__status" role="gridcell" style={cellWidth("status")}>
+      <Cell id="status" className="table-row__cell table-row__status" row={row} edits={edits} onPick={onPick}>
         <StatusSquare style={row.style} />
         <span className="status-name">{row.statusName}</span>
-      </span>
+      </Cell>
       {columns.map((id) => (
-        <span key={id} className="table-row__cell" role="gridcell" style={cellWidth(id)}>
+        <Cell key={id} id={id} className="table-row__cell" row={row} edits={edits} onPick={onPick}>
           {columnDef(id).cell(row)}
-        </span>
+        </Cell>
       ))}
     </div>
   );

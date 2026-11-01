@@ -127,7 +127,7 @@ function Table({ view, data }: { view: View; data: ViewData }) {
   const keys = useRowKeys({ ...place, items, rowIds, data, select, toggle, actions, scrollToIndex, open });
 
   // Stable, so rows that didn't change skip re-rendering.
-  const { onSelect, onOpen } = useRowClicks(keys, opening);
+  const { onSelect, onOpen, onPick } = useRowClicks(keys, opening);
   const onToggleSubtasks = useCallback((id: string) => keys.current.setSubtasksOpen(id, !keys.current.subtasksOpen(id)), [keys]);
 
   return (
@@ -180,6 +180,7 @@ function Table({ view, data }: { view: View; data: ViewData }) {
                     columns={columns}
                     selected={selected === item.row.id}
                     onSelect={onSelect}
+                    onPick={onPick}
                     onOpen={onOpen}
                     inlineLabels={inlineLabels}
                     tree={tree}
@@ -187,6 +188,7 @@ function Table({ view, data }: { view: View; data: ViewData }) {
                     subtasksOpen={subtasksOpen(item.row.id)}
                     onToggleSubtasks={onToggleSubtasks}
                     childChip={data.subtasks === "hidden" || (item.nesting?.parent === true && !subtasksOpen(item.row.id))}
+                    edits={actions}
                   />
                 )}
               </div>

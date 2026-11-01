@@ -18,6 +18,7 @@ pub use assign::{Assignees, assignees, toggle_mine};
 pub use comment::{MAX_COMMENT_CHARS, add_comment};
 pub use drop::{DropOutcome, DropTarget, DropTargets, ViewGroup, arrange, drop_on, drop_targets};
 pub use pending::{forget_all, overlay};
+pub use priority::{Priorities, priorities};
 pub use transition::{TransitionOption, transitions};
 pub use web_link::add_web_link;
 

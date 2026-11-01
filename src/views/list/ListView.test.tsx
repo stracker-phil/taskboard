@@ -8,6 +8,7 @@ vi.mock("../../api", async (orig) => ({ ...(await orig<object>()), api: (await i
 import { api, type IssueOpening, type Narrowing, type Row, type ViewData, type ViewPlace } from "../../api";
 import { installCommands } from "../../commands";
 import { getCommand } from "../../commands/registry";
+import { MenuHost } from "../../components/menu";
 import { createQueryClient } from "../../queries/queryClient";
 import { NO_NARROWING } from "../../queries/views";
 import { resetStore, useStore } from "../../state/store";
@@ -61,6 +62,7 @@ async function renderList(data: ViewData, openWith: IssueOpening | null = null) 
   const tree = (narrowing: Narrowing) => (
     <QueryClientProvider client={client}>
       <ListView listId={11} viewId={101} openWith={openWith} narrowing={narrowing} />
+      <MenuHost />
     </QueryClientProvider>
   );
   const { rerender } = render(tree(NO_NARROWING));
@@ -1440,6 +1442,142 @@ describe("ListView", () => {
       expect(screen.getByRole("button", { name: "Collapse Done" })).toHaveAttribute("aria-expanded", "true");
       await act(() => vi.advanceTimersByTimeAsync(400));
       expect(screen.getByText("Publish the launch notes")).toBeInTheDocument();
+    });
+  });
+
+  describe("editable cells", () => {
+    const EDITABLE = row({
+      id: "1",
+      key: "NW-1042",
+      summary: "Redesign the pricing page",
+      assignees: [ALEX],
+      epic: { id: "9", name: "Launch Q4", color: 2 },
+      priority: { name: "High", level: 2 },
+    });
+    const REVIEW = { id: "31", statusId: "3", statusName: "In Review", style: "review", opensJira: false } as const;
+    const cell = (text: string) => within(screen.getByRole("row", { name: /NW-1042/ })).getByText(text).closest<HTMLElement>('[role="gridcell"]')!;
+    const assigneeCell = () => within(screen.getByRole("row", { name: /NW-1042/ })).getByRole("img", { name: "Alex Morgan" }).closest<HTMLElement>('[role="gridcell"]')!;
+
+    const OTHER = row({ id: "2", key: "NW-1001", summary: "Publish the launch notes", priority: { name: "Low", level: 4 } });
+
+    async function renderEditable(patch: Partial<ReturnType<typeof behaviour>> = {}, openWith: IssueOpening | null = null) {
+      mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ allowJiraChanges: true, ...patch }) }));
+      await renderList(viewData([groupOf([EDITABLE, OTHER])], [EDITABLE, OTHER], { columns: ["status", "assignee", "priority", "epic"], groupBy: "none" }), openWith);
+      await settingsLoaded();
+    }
+
+    beforeEach(() => {
+      mocked.issueTransitions.mockResolvedValue([REVIEW]);
+    });
+
+    it("opens the priority menu from the Priority cell, and choosing an entry writes it", async () => {
+      await renderEditable();
+
+      await userEvent.click(cell("High"));
+      const menu = await screen.findByRole("menu", { name: "Priority of NW-1042" });
+      await userEvent.click(within(menu).getByRole("menuitemradio", { name: /Highest/ }));
+
+      expect(mocked.issueWrite).toHaveBeenCalledWith("1", { kind: "priority", name: "Highest" });
+    });
+
+    it("opens the status menu from the Status cell", async () => {
+      await renderEditable();
+
+      await userEvent.click(cell("In Progress"));
+
+      const menu = await screen.findByRole("menu", { name: "Status of NW-1042" });
+      expect(within(menu).getByRole("menuitem", { name: /In Review/ })).toBeInTheDocument();
+    });
+
+    it("opens the assignee menu from the Assignee cell", async () => {
+      mocked.issueAssignees.mockResolvedValue({ people: [ALEX, SAM], current: ALEX.accountId });
+      await renderEditable();
+
+      await userEvent.click(assigneeCell());
+
+      expect(await screen.findByRole("menu", { name: "Assignee of NW-1042" })).toBeInTheDocument();
+    });
+
+    it("selects the row when an editable cell is clicked", async () => {
+      await renderEditable();
+
+      await userEvent.click(cell("High"));
+
+      expect(screen.getByRole("row", { name: /NW-1042/ })).toHaveAttribute("aria-selected", "true");
+    });
+
+    it("selects the row without opening the preview, even after the double-click interval", async () => {
+      await renderEditable({}, "preview");
+
+      await userEvent.click(cell("High"));
+      await pastDoubleClickInterval();
+
+      expect(place()).toMatchObject({ selectedId: "1", peekOpen: false });
+      expect(screen.getByRole("menu", { name: "Priority of NW-1042" })).toBeInTheDocument();
+    });
+
+    it("opens no Issue view when an editable cell is double-clicked", async () => {
+      await renderEditable({}, "preview");
+
+      await userEvent.dblClick(cell("High"));
+      await pastDoubleClickInterval();
+
+      expect(useStore.getState().issueView).toBeNull();
+    });
+
+    it("keeps an open preview open on the row whose cell is clicked", async () => {
+      await renderEditable({}, "preview");
+      await userEvent.click(screen.getByText("Publish the launch notes"));
+      await waitFor(() => expect(place()).toMatchObject({ selectedId: "2", peekOpen: true }), PREVIEW_WAIT);
+
+      await userEvent.click(cell("High"));
+
+      expect(place()).toMatchObject({ selectedId: "1", peekOpen: true });
+    });
+
+    it("still opens the preview after the double-click interval when the row itself is clicked", async () => {
+      await renderEditable({}, "preview");
+
+      await userEvent.click(screen.getByText("Redesign the pricing page"));
+
+      await waitFor(() => expect(place()).toMatchObject({ selectedId: "1", peekOpen: true }), PREVIEW_WAIT);
+    });
+
+    it("marks the editable cells as opening a menu and leaves the other cells alone", async () => {
+      await renderEditable();
+
+      expect([cell("High"), cell("In Progress"), assigneeCell()].map((c) => c.getAttribute("aria-haspopup"))).toEqual(["menu", "menu", "menu"]);
+      expect(cell("Launch Q4")).not.toHaveAttribute("aria-haspopup");
+    });
+
+    it("opens nothing from the Epic cell", async () => {
+      await renderEditable();
+
+      await userEvent.click(cell("Launch Q4"));
+
+      expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    });
+
+    it("opens nothing from the Priority cell while priority changes are switched off", async () => {
+      await renderEditable({ disabledChanges: ["changePriority"] });
+
+      await userEvent.click(cell("High"));
+
+      expect(cell("High")).not.toHaveAttribute("aria-haspopup");
+      expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+      expect(mocked.issuePriorities).not.toHaveBeenCalled();
+      expect(cell("In Progress")).toHaveAttribute("aria-haspopup", "menu");
+    });
+
+    it("opens no menu from any cell while changes to Jira are off", async () => {
+      await renderEditable({ allowJiraChanges: false });
+
+      await userEvent.click(cell("High"));
+      await userEvent.click(cell("In Progress"));
+
+      expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+      expect(cell("High")).not.toHaveAttribute("aria-haspopup");
+      expect(cell("In Progress")).not.toHaveAttribute("aria-haspopup");
     });
   });
 

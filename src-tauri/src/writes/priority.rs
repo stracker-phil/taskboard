@@ -2,12 +2,35 @@
 
 use chrono::Utc;
 use rusqlite::{Connection, OptionalExtension};
+use serde::Serialize;
+use ts_rs::TS;
 
 use super::{Begun, Change, Field, Reverse, WriteOutcome, issue_key, pending, send};
 use crate::db::Db;
 use crate::error::{AppError, AppResult};
 use crate::sync::source::Source;
 use crate::time::format_utc;
+use crate::views::rows::{Priority, priority};
+
+/// What the priority menu offers: the priorities Jira allows on the issue's edit screen, and the one it has.
+#[derive(Serialize, Clone, Debug, PartialEq, TS)]
+#[ts(export, export_to = "src/api/types.gen.ts")]
+#[serde(rename_all = "camelCase")]
+pub struct Priorities {
+    pub options: Vec<Priority>,
+    pub current: Option<String>,
+}
+
+pub async fn priorities(db: &Db, source: &dyn Source, issue_id: String) -> AppResult<Priorities> {
+    let names = source.priorities(&issue_id).await?;
+    let current = db
+        .read(move |conn| current_priority(conn, &issue_id))
+        .await?;
+    Ok(Priorities {
+        options: names.iter().map(|name| priority(name)).collect(),
+        current,
+    })
+}
 
 pub(super) async fn set_priority(
     db: &Db,
@@ -85,4 +108,41 @@ fn current_priority(conn: &Connection, id: &str) -> AppResult<Option<String>> {
         )
         .optional()?
         .flatten())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_menu_serializes_options_with_levels_and_the_current_name() {
+        let menu = Priorities {
+            options: vec![priority("Highest"), priority("Low")],
+            current: Some("Low".into()),
+        };
+
+        assert_eq!(
+            serde_json::to_value(&menu).unwrap(),
+            serde_json::json!({
+                "options": [
+                    { "name": "Highest", "level": 1 },
+                    { "name": "Low", "level": 4 },
+                ],
+                "current": "Low",
+            })
+        );
+    }
+
+    #[test]
+    fn a_menu_without_a_current_priority_serializes_null() {
+        let menu = Priorities {
+            options: Vec::new(),
+            current: None,
+        };
+
+        assert_eq!(
+            serde_json::to_value(&menu).unwrap(),
+            serde_json::json!({ "options": [], "current": null })
+        );
+    }
 }

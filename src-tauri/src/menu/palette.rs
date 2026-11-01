@@ -247,6 +247,7 @@ mod tests {
                 "page:issue.toggleMine",
                 "page:issue.changeStatus",
                 "page:issue.assignTo",
+                "page:issue.changePriority",
             ]
         );
     }

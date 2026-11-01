@@ -4,6 +4,7 @@ import { CopyKey } from "../../components/issue/CopyKey";
 import { ChangeChip } from "../../components/issue/ChangeChip";
 import { CommentCount } from "../../components/issue/CommentCount";
 import { StatusSquare } from "../../components/issue/StatusSquare";
+import { CellValue, cellEditProps } from "./cellEdits";
 import { columnDef } from "./columns";
 import type { CardPosition, Nesting } from "./flatten";
 import { RowActions, type RowActionHandlers } from "./RowActions";
@@ -24,6 +25,8 @@ interface Props {
   inlineLabels?: boolean;
   selected: boolean;
   onSelect: (id: string) => void;
+  /** Selects without opening: a cell that opens a menu. */
+  onPick: (id: string) => void;
   /** A double-click: always the full Issue view. */
   onOpen: (id: string) => void;
   actions: RowActionHandlers;
@@ -39,7 +42,7 @@ interface Props {
 }
 
 export const IssueRow = memo(function IssueRow(props: Props) {
-  const { row, columns, position, wrap = false, inlineLabels = false, selected, onSelect, onOpen, actions } = props;
+  const { row, columns, position, wrap = false, inlineLabels = false, selected, onSelect, onPick, onOpen, actions } = props;
   const { nesting = null, subtasksOpen = true, onToggleSubtasks, childChip = false, pinned = false } = props;
   const nested = (nesting?.depth ?? 0) > 0;
   const flashing = useFlash(row.updatedAt);
@@ -72,11 +75,15 @@ export const IssueRow = memo(function IssueRow(props: Props) {
           {!wrap && chips}
           <RowActions issueId={row.id} issueKey={row.key} changed={row.changed} actions={actions} pinned={pinned} />
         </span>
-        {columns.map((id) => (
-          <span key={id} className="list-row__cell" role="gridcell">
-            {columnDef(id).cell(row)}
-          </span>
-        ))}
+        {columns.map((id) => {
+          const editing = cellEditProps(id, row, actions, onPick);
+          const editable = "onClick" in editing;
+          return (
+            <span key={id} className={editable ? "list-row__cell cell-edit" : "list-row__cell"} role="gridcell" {...editing}>
+              <CellValue editable={editable}>{columnDef(id).cell(row)}</CellValue>
+            </span>
+          );
+        })}
       </div>
     </>
   );

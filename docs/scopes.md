@@ -52,6 +52,7 @@ Changes, sent once and only while changes to Jira are allowed ([writes.md](write
 
 - `PUT issue/{id}/assignee`: Assign to me, Unassign, and "Change back to …".
 - `POST issue/{id}/transitions`: a move from the status menu or a drag, and its "Change back to …".
-- `PUT issue/{id}`: a priority from a drag, and its "Change back to …"; only the priority field is ever sent.
+- `PUT issue/{id}`: a priority from the priority menu or a drag, and its "Change back to …"; only the priority field
+  is ever sent.
 - `POST issue/{id}/comment`: a comment from the Issue view's comment box.
 - `POST issue/{id}/remotelink`: a web link (a pull request) from the Issue view's "Add link".

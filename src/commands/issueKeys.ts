@@ -26,6 +26,8 @@ export interface IssueKeyHandlers {
   changeStatus: () => void;
   /** A: the selected issue's assignee menu. */
   assignTo: () => void;
+  /** ⇧P: the selected issue's priority menu. */
+  changePriority: () => void;
   /** Space: opens or closes the selected issue's preview; absent where there is none, so Space scrolls. */
   togglePeek?: () => void;
   hasSelection: () => boolean;
@@ -63,6 +65,7 @@ export const ISSUE_KEY_COMMANDS: Command[] = [
   { id: "issue.toggleMine", title: "Assign the issue to me or unassign it", scope: "main", defaultBinding: "I", when: selected, run: () => handlers?.toggleMine() },
   { id: "issue.changeStatus", title: "Change the issue's status", scope: "main", defaultBinding: "D", when: selected, run: () => handlers?.changeStatus() },
   { id: "issue.assignTo", title: "Assign the issue to someone", scope: "main", defaultBinding: "A", when: selected, run: () => handlers?.assignTo() },
+  { id: "issue.changePriority", title: "Change the issue's priority", scope: "main", defaultBinding: "Shift+P", when: selected, run: () => handlers?.changePriority() },
   { id: "issue.markSeen", title: "Mark the issue as read or unread", scope: "main", defaultBinding: "M", when: selected, run: () => handlers?.toggleRead() },
   { id: "issue.togglePeek", title: "Open or close the preview", scope: "main", defaultBinding: "Space", when: () => selected() && handlers?.togglePeek !== undefined, run: () => handlers?.togglePeek?.() },
   {
