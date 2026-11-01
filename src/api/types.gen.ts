@@ -959,6 +959,10 @@ openWith: IssueOpening | null, subtasks: SubtaskMode,
  */
 onlyMine: boolean, 
 /**
+ * The saved person chip: only the issues assigned to this account, on top of the filter.
+ */
+person: string | null, 
+/**
  * The tab's icon (`look`); none shows the layout's.
  */
 icon: string | null, 
