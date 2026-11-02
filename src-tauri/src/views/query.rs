@@ -6,15 +6,17 @@ use std::collections::{HashMap, HashSet};
 
 use rusqlite::types::Value as SqlValue;
 use rusqlite::{Connection, params_from_iter};
-use serde::{Deserialize, Serialize};
-use ts_rs::TS;
 
 use super::columns::custom_columns;
+use serde::Serialize;
+use ts_rs::TS;
+
 use super::fetch::{Source, fetch};
 use super::filter::view_conditions;
 use super::groups::{Facts, Group, Lookup, group};
 use super::lookup::{spaces, versions};
 use super::model::{GroupBy, Layout, SubtaskMode, View};
+use super::narrowing::Narrowing;
 use super::read::read_view;
 use super::rows::{Person, Row};
 use super::sorting::{fold, sort};
@@ -22,7 +24,7 @@ use super::subtasks::{Nested, as_items, descendants, expand, nest};
 use crate::changes::{Names, UNSEEN, chip, facts, unseen_changes};
 use crate::db::Db;
 use crate::error::{AppError, AppResult};
-use crate::filter::{Condition, Ctx, compile};
+use crate::filter::{Ctx, compile};
 use crate::issues::status_names;
 use crate::lists::{Kind, Viewer, all_nodes, scope_of};
 use crate::me_mode::{self, MeRule};
@@ -30,37 +32,6 @@ use crate::pins::active;
 use crate::status_style::Styles;
 use crate::team::{Me, with_me_first};
 use crate::time::format_utc;
-
-/// The toolbar's narrowing on top of the level's filter, and the Filter popover's unsaved conditions (ADR 0038).
-#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, TS)]
-#[ts(export, export_to = "src/api/types.gen.ts")]
-#[serde(default, rename_all = "camelCase")]
-pub struct Narrowing {
-    /// Only my issues (Me mode).
-    pub me: bool,
-    /// Key or summary contains it, ignoring case and accents.
-    pub text: String,
-    /// Only children of this epic.
-    pub epic: Option<String>,
-    /// Only issues assigned to this account (the person chip).
-    pub person: Option<String>,
-    /// Unsaved conditions in place of the filter list's own ones; only a filter list has its own.
-    pub list_draft: Option<Vec<Condition>>,
-    /// Unsaved conditions in place of the view's own ones.
-    pub view_draft: Option<Vec<Condition>>,
-    /// Only unread issues, and the ones read since the owner came here (`read_here`): Unread only is on.
-    #[serde(skip)]
-    #[ts(skip)]
-    pub unread: bool,
-    /// Unread only keeps these read issues (read since the owner came here); set by Rust, never by the page.
-    #[serde(skip)]
-    #[ts(skip)]
-    pub read_here: Vec<String>,
-    /// What Me mode counts as mine besides my assigned issues (`behaviour.meRules`).
-    #[serde(skip)]
-    #[ts(skip)]
-    pub me_rules: Vec<MeRule>,
-}
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
 #[ts(export, export_to = "src/api/types.gen.ts")]

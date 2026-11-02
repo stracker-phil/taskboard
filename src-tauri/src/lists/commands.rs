@@ -6,6 +6,7 @@ use tauri::State;
 use super::{FilterOptions, ListConditions, MatchCount, SidebarTree, SpaceUpdate, Viewer};
 use crate::error::AppResult;
 use crate::filter::Filter;
+use crate::look::Accent;
 use crate::state::AppState;
 
 fn viewer(state: &AppState) -> Viewer {
@@ -91,6 +92,16 @@ pub async fn space_update(
     update: SpaceUpdate,
 ) -> AppResult<()> {
     super::space_update(&state.db, project_id, update).await
+}
+
+/// A Space's own accent color; none follows the app's.
+#[tauri::command]
+pub async fn space_set_accent(
+    state: State<'_, AppState>,
+    project_id: String,
+    accent: Option<Accent>,
+) -> AppResult<()> {
+    super::space_set_accent(&state.db, project_id, accent).await
 }
 
 /// A level's locked and own conditions, and a view's own ones, for the Filter popover.

@@ -72,10 +72,9 @@ function Table({ view, data }: { view: View; data: ViewData }) {
   const onScroll = useRememberedScroll(view.listId, view.id, scrollRef);
 
   const widthOf = (id: string) => resize.liveWidth(id) ?? columnWidth(id, view.widths);
-  // The Table always has its own Status column; a view's Status column would repeat it.
-  const columns = useMemo(() => data.columns.filter((id) => id !== "status"), [data.columns]);
+  const columns = data.columns;
   const inlineLabels = view.inlineLabels && !data.columns.includes("labels");
-  const headerColumns = ["key", "summary", "status", ...columns];
+  const headerColumns = ["key", "summary", ...columns];
   const minWidth = headerColumns.reduce((sum, id) => sum + (id === "summary" ? SUMMARY_MIN_WIDTH : widthOf(id)), 2 * SIDE_PADDING);
   const widthVars = Object.fromEntries(headerColumns.filter((id) => id !== "summary").map((id) => [widthVar(id), `${widthOf(id)}px`]));
 
@@ -184,9 +183,9 @@ function Table({ view, data }: { view: View; data: ViewData }) {
                   <TableRow
                     row={item.row}
                     columns={columns}
-                    selected={picking ? pickedIds.has(item.row.id) : selected === item.row.id}
+                    selected={!picking && selected === item.row.id}
                     picked={pickedIds.has(item.row.id)}
-                    picking={picking}
+                    showBox={picking && selected === item.row.id}
                     onToggleBox={onToggleBox}
                     onSelect={onSelect}
                     onPick={onPick}

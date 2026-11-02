@@ -25,12 +25,12 @@ interface Props {
   wrap?: boolean;
   /** The labels as tags after the title. */
   inlineLabels?: boolean;
-  /** Highlighted: the selected row, or a picked one while rows are picked. */
+  /** Highlighted: the selected row, while no rows are picked. */
   selected: boolean;
   /** Its checkbox is ticked. */
   picked: boolean;
-  /** Rows are picked: every checkbox shows. */
-  picking: boolean;
+  /** Its checkbox shows without the pointer: the current row while rows are picked. */
+  showBox: boolean;
   onSelect: (id: string, mods?: PickKeys) => void;
   onToggleBox: (id: string) => void;
   /** Selects without opening: a cell that opens a menu. */
@@ -50,11 +50,11 @@ interface Props {
 }
 
 export const IssueRow = memo(function IssueRow(props: Props) {
-  const { row, columns, position, wrap = false, inlineLabels = false, selected, picked, picking, onSelect, onToggleBox, onPick, onOpen, actions } = props;
+  const { row, columns, position, wrap = false, inlineLabels = false, selected, picked, showBox, onSelect, onToggleBox, onPick, onOpen, actions } = props;
   const { nesting = null, subtasksOpen = true, onToggleSubtasks, childChip = false, pinned = false } = props;
   const nested = (nesting?.depth ?? 0) > 0;
   const flashing = useFlash(row.updatedAt);
-  const className = ["list-row", `list-row--${position}`, wrap && "list-row--wrap", nested && "list-row--child", row.changed && "list-row--changed", flashing && "flash", selected && "list-row--selected"]
+  const className = ["list-row", `list-row--${position}`, wrap && "list-row--wrap", nested && "list-row--child", row.changed && "list-row--changed", flashing && "flash", selected && "list-row--selected", picked && "list-row--picked"]
     .filter(Boolean)
     .join(" ");
   // A wrapping title takes the chips into its flow, each after a space that vanishes at a line start; on one
@@ -69,13 +69,13 @@ export const IssueRow = memo(function IssueRow(props: Props) {
   const caretClass = ["list-row-caret", nested && "list-row-caret--nested", wrap && "list-row-caret--wrap"].filter(Boolean).join(" ");
   return (
     <>
-      <PickBox issueKey={row.key} picked={picked} onToggle={() => onToggleBox(row.id)} className={["list-pick", wrap && "list-pick--wrap", picking && "pick-box--shown"].filter(Boolean).join(" ")} />
+      <PickBox issueKey={row.key} picked={picked} onToggle={() => onToggleBox(row.id)} className={["list-pick", wrap && "list-pick--wrap", showBox && "pick-box--shown"].filter(Boolean).join(" ")} />
       {nesting?.parent && <SubtaskCaret className={caretClass} style={indentStyle} open={subtasksOpen} onToggle={() => onToggleSubtasks?.(row.id)} />}
       <div
         className={className}
         style={indentStyle}
         role="row"
-        aria-selected={selected}
+        aria-selected={selected || picked}
         data-issue-id={row.id}
         onMouseDown={keepTextUnselected}
         onClick={(e) => onSelect(row.id, e)}

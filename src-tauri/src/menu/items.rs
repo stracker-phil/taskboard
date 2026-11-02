@@ -450,7 +450,12 @@ mod tests {
             .collect();
         assert_eq!(
             window_groups,
-            [["nav:newTab", "nav:previousTab", "nav:nextTab", "nav:reopenTab"]]
+            [[
+                "nav:newTab",
+                "nav:previousTab",
+                "nav:nextTab",
+                "nav:reopenTab"
+            ]]
         );
         let go_groups: Vec<&str> = GO_MENU.1.iter().map(|g| g[0].command).collect();
         assert_eq!(go_groups, [GO_LEVELS[0].command, GO_MOVES[0].command]);
@@ -459,7 +464,12 @@ mod tests {
             .iter()
             .flat_map(|g| g.iter().map(|item| item.command))
             .collect();
-        for tab in ["nav:newTab", "nav:previousTab", "nav:nextTab", "nav:reopenTab"] {
+        for tab in [
+            "nav:newTab",
+            "nav:previousTab",
+            "nav:nextTab",
+            "nav:reopenTab",
+        ] {
             assert!(!go_commands.contains(&tab), "{tab}");
         }
     }

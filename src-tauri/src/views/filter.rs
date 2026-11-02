@@ -10,6 +10,7 @@ use crate::db::{Db, LocalPart};
 use crate::error::{AppError, AppResult};
 use crate::filter::{Condition, Filter, compile};
 use crate::lists::{Viewer, all_nodes, mark_fields_shown, node, scope_of};
+use crate::me_mode::MeMatch;
 
 pub(super) fn write_filter(conn: &Connection, id: i64, filter: Option<&str>) -> AppResult<()> {
     conn.execute(
@@ -64,6 +65,27 @@ pub(super) fn write_person(conn: &Connection, id: i64, person: Option<&str>) -> 
 pub async fn view_set_person(db: &Db, id: i64, person: Option<String>) -> AppResult<View> {
     edit(db, id, move |conn| {
         write_person(conn, id, person.as_deref())
+    })
+    .await
+}
+
+pub(super) fn write_me_rules(
+    conn: &Connection,
+    id: i64,
+    rules: Option<&[MeMatch]>,
+) -> AppResult<()> {
+    let json = rules.map(serde_json::to_string).transpose()?;
+    conn.execute(
+        "UPDATE view SET me_rules = ?2 WHERE id = ?1",
+        params![id, json],
+    )?;
+    Ok(())
+}
+
+/// Saves the Me rules the view has on; none follows the app's.
+pub async fn view_set_me_rules(db: &Db, id: i64, rules: Option<Vec<MeMatch>>) -> AppResult<View> {
+    edit(db, id, move |conn| {
+        write_me_rules(conn, id, rules.as_deref())
     })
     .await
 }

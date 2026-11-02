@@ -43,8 +43,8 @@ interface Props {
   selected: boolean;
   /** Its checkbox is ticked. */
   picked: boolean;
-  /** Rows are picked: every checkbox shows. */
-  picking: boolean;
+  /** Its checkbox shows without the pointer: the current row while rows are picked. */
+  showBox: boolean;
   onSelect: (id: string, mods?: PickKeys) => void;
   onToggleBox: (id: string) => void;
   /** Selects without opening: a cell that opens a menu. */
@@ -65,18 +65,20 @@ interface Props {
   edits: CellEditHandlers;
 }
 
-/** One issue: key, summary, status, then the view's cells; the widths come from the table's variables. */
+/** One issue: its status square and key, the summary, then the view's cells; the widths come from the table's
+ *  variables. */
 export const TableRow = memo(function TableRow(props: Props) {
-  const { row, columns, inlineLabels = false, selected, picked, picking, onSelect, onToggleBox, onPick, onOpen, edits } = props;
+  const { row, columns, inlineLabels = false, selected, picked, showBox, onSelect, onToggleBox, onPick, onOpen, edits } = props;
   const { tree = false, nesting = null, subtasksOpen = true, onToggleSubtasks, childChip = false } = props;
   const flashing = useFlash(row.updatedAt);
-  const className = ["table-row", tree && "table-row--tree", nesting?.parent && "table-row--parent", nesting && nesting.depth > 0 && "table-row--child", row.changed && "table-row--changed", flashing && "flash", selected && "table-row--selected"].filter(Boolean).join(" ");
+  const className = ["table-row", tree && "table-row--tree", nesting?.parent && "table-row--parent", nesting && nesting.depth > 0 && "table-row--child", row.changed && "table-row--changed", flashing && "flash", selected && "table-row--selected", picked && "table-row--picked"].filter(Boolean).join(" ");
   return (
-    <div className={className} style={{ "--depth": nesting?.depth ?? 0 } as CSSProperties} role="row" aria-selected={selected} data-issue-id={row.id} onMouseDown={keepTextUnselected} onClick={(e) => onSelect(row.id, e)} onDoubleClick={(e) => opensIssue(e) && onOpen(row.id, e)}>
+    <div className={className} style={{ "--depth": nesting?.depth ?? 0 } as CSSProperties} role="row" aria-selected={selected || picked} data-issue-id={row.id} onMouseDown={keepTextUnselected} onClick={(e) => onSelect(row.id, e)} onDoubleClick={(e) => opensIssue(e) && onOpen(row.id, e)}>
       <span className="table-row__pick">
-        <PickBox issueKey={row.key} picked={picked} onToggle={() => onToggleBox(row.id)} className={picking ? "pick-box--shown" : ""} />
+        <PickBox issueKey={row.key} picked={picked} onToggle={() => onToggleBox(row.id)} className={showBox ? "pick-box--shown" : ""} />
       </span>
       <span className="table-row__cell table-row__key" role="gridcell" style={cellWidth("key")}>
+        <StatusSquare style={row.style} />
         <CopyKey issueKey={row.key} />
       </span>
       <span className="table-row__cell table-row__summary" role="gridcell">
@@ -86,15 +88,18 @@ export const TableRow = memo(function TableRow(props: Props) {
         {childChip && <ChildCount count={row.childCount} />}
         {inlineLabels && <LabelChips labels={row.labels} className="row-labels" />}
       </span>
-      <Cell id="status" className="table-row__cell table-row__status" row={row} edits={edits} onPick={onPick}>
-        <StatusSquare style={row.style} />
-        <span className="status-name">{row.statusName}</span>
-      </Cell>
-      {columns.map((id) => (
-        <Cell key={id} id={id} className="table-row__cell" row={row} edits={edits} onPick={onPick}>
-          {columnDef(id).cell(row)}
-        </Cell>
-      ))}
+      {columns.map((id) =>
+        id === "status" ? (
+          // The square before the key already shows the status's color.
+          <Cell key={id} id={id} className="table-row__cell table-row__status" row={row} edits={edits} onPick={onPick}>
+            <span className="status-name">{row.statusName}</span>
+          </Cell>
+        ) : (
+          <Cell key={id} id={id} className="table-row__cell" row={row} edits={edits} onPick={onPick}>
+            {columnDef(id).cell(row)}
+          </Cell>
+        ),
+      )}
     </div>
   );
 });

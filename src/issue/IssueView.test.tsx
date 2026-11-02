@@ -267,7 +267,7 @@ describe("IssueView", () => {
       renderIssue("10042");
       act(() => useStore.getState().setNarrowing(narrowingKey(11, 101), { me: true, view: [draft] }));
 
-      await waitFor(() => expect(mocked.viewRows).toHaveBeenCalledWith(11, 101, { me: true, text: "", epic: null, person: null, listDraft: null, viewDraft: [draft] }));
+      await waitFor(() => expect(mocked.viewRows).toHaveBeenCalledWith(11, 101, { me: true, text: "", epic: null, person: null, listDraft: null, viewDraft: [draft], meOn: null }));
     });
 
     it("follows the person the origin view saved", async () => {

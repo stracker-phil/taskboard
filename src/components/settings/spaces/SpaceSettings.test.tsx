@@ -5,9 +5,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../../../test/apiMock")).createApiMock() }));
 
-import { api, type SpaceConfig, type SpaceLayouts } from "../../../api";
+import { api, type Accent, type SpaceConfig, type SpaceLayouts } from "../../../api";
 import { createQueryClient } from "../../../queries/queryClient";
 import { resetStore } from "../../../state/store";
+import { settings } from "../../../test/settings";
 import { space, spaceConfig } from "../../../test/spaces";
 import { teamCell, teamMatrix } from "../../../test/team";
 import { MenuHost } from "../../menu";
@@ -81,6 +82,49 @@ describe("SpaceSettings", () => {
     await screen.findByRole("region", { name: "Layouts" });
 
     expect(screen.queryByRole("button", { name: "Spaces" })).not.toBeInTheDocument();
+  });
+
+  describe("accent color", () => {
+    async function renderWith(spaceAccent: Accent | null, appAccent: Accent = "blue") {
+      mocked.getSettings.mockResolvedValue(settings({ accent: appAccent }));
+      mocked.spaceConfig.mockResolvedValue(spaceConfig());
+      render(
+        <QueryClientProvider client={createQueryClient()}>
+          <SpaceSettings space={space({ accent: spaceAccent })} />
+        </QueryClientProvider>,
+      );
+      await screen.findByRole("region", { name: "Layouts" });
+      return screen.getByRole("radiogroup", { name: "Accent color" });
+    }
+
+    it("checks the Space's own accent", async () => {
+      const group = await renderWith("purple");
+
+      expect(within(group).getByRole("radio", { name: "Purple" })).toHaveAttribute("aria-checked", "true");
+      expect(within(group).getAllByRole("radio", { checked: true })).toHaveLength(1);
+    });
+
+    it("checks the swatch that follows the app when the Space has none", async () => {
+      const group = await renderWith(null, "orange");
+
+      expect(await within(group).findByRole("radio", { name: "Same as the app (Orange)", checked: true })).toBeInTheDocument();
+    });
+
+    it("sends the clicked accent for the Space to Rust", async () => {
+      const group = await renderWith(null);
+
+      await userEvent.click(within(group).getByRole("radio", { name: "Teal" }));
+
+      expect(mocked.spaceSetAccent).toHaveBeenCalledWith("10001", "teal");
+    });
+
+    it("sends null when the swatch that follows the app is clicked", async () => {
+      const group = await renderWith("teal");
+
+      await userEvent.click(within(group).getByRole("radio", { name: "Same as the app (Blue)" }));
+
+      expect(mocked.spaceSetAccent).toHaveBeenCalledWith("10001", null);
+    });
   });
 
   describe("layouts", () => {

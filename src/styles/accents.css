@@ -1,0 +1,10 @@
+/* The picked accent (`data-accent` on <html>, `lib/theme.ts`): the app's, or the shown Space's own. Each palette
+   defines the colors; the tints mixed from `--accent` follow. */
+:root[data-scheme][data-accent="purple"] { --accent: var(--accent-purple); --accent-text: var(--accent-purple-text); }
+:root[data-scheme][data-accent="pink"] { --accent: var(--accent-pink); --accent-text: var(--accent-pink-text); }
+:root[data-scheme][data-accent="red"] { --accent: var(--accent-red); --accent-text: var(--accent-red-text); }
+:root[data-scheme][data-accent="orange"] { --accent: var(--accent-orange); --accent-text: var(--accent-orange-text); }
+:root[data-scheme][data-accent="yellow"] { --accent: var(--accent-yellow); --accent-text: var(--accent-yellow-text); }
+:root[data-scheme][data-accent="green"] { --accent: var(--accent-green); --accent-text: var(--accent-green-text); }
+:root[data-scheme][data-accent="teal"] { --accent: var(--accent-teal); --accent-text: var(--accent-teal-text); }
+:root[data-scheme][data-accent="graphite"] { --accent: var(--accent-graphite); --accent-text: var(--accent-graphite-text); }

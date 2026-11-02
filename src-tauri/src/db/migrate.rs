@@ -27,6 +27,8 @@ pub const LOCAL: &[&str] = &[
     include_str!("../../migrations/local/0019_pin_title_position.sql"),
     include_str!("../../migrations/local/0020_view_person.sql"),
     include_str!("../../migrations/local/0021_write_log.sql"),
+    include_str!("../../migrations/local/0022_space_accent.sql"),
+    include_str!("../../migrations/local/0023_view_me_rules.sql"),
 ];
 pub const CACHE: &[&str] = &[
     include_str!("../../migrations/cache/0001_init.sql"),
@@ -162,6 +164,32 @@ mod tests {
     }
 
     #[test]
+    fn spaces_from_before_the_accent_start_without_one() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        migrate(&mut conn, "local", &LOCAL[..21]).unwrap();
+        conn.execute(
+            "INSERT INTO space (project_id) VALUES ('10001'), ('10002')",
+            [],
+        )
+        .unwrap();
+
+        migrate(&mut conn, "local", LOCAL).unwrap();
+
+        let mut query = conn
+            .prepare("SELECT project_id, accent FROM space ORDER BY 1")
+            .unwrap();
+        let rows: Vec<(String, Option<String>)> = query
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect();
+        assert_eq!(
+            rows,
+            [("10001".to_string(), None), ("10002".to_string(), None)]
+        );
+    }
+
+    #[test]
     fn views_from_before_the_saved_me_chip_start_with_it_off() {
         let mut conn = Connection::open_in_memory().unwrap();
         migrate(&mut conn, "local", &LOCAL[..13]).unwrap();
@@ -213,6 +241,33 @@ mod tests {
             assert!(rows.contains(&(name.to_string(), None)), "{name}");
         }
         assert!(rows.iter().all(|(_, person)| person.is_none()), "{rows:?}");
+    }
+
+    #[test]
+    fn views_from_before_their_own_me_rules_start_without_any() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        migrate(&mut conn, "local", &LOCAL[..22]).unwrap();
+        conn.execute_batch(
+            "INSERT INTO view (list_id, name, layout, group_by, sort_by, sort_order)
+             VALUES (1, 'Board', 'board', 'status', 'updated', 0),
+                    (1, 'List', 'list', 'status', 'updated', 0)",
+        )
+        .unwrap();
+
+        migrate(&mut conn, "local", LOCAL).unwrap();
+
+        let mut query = conn
+            .prepare("SELECT name, me_rules FROM view ORDER BY id")
+            .unwrap();
+        let rows: Vec<(String, Option<String>)> = query
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect();
+        for name in ["Board", "List"] {
+            assert!(rows.contains(&(name.to_string(), None)), "{name}");
+        }
+        assert!(rows.iter().all(|(_, rules)| rules.is_none()), "{rows:?}");
     }
 
     #[test]

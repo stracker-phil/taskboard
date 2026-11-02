@@ -17,12 +17,12 @@ interface Props {
   fields: string[];
   /** The labels as tags after the title, while they aren't a card field. */
   inlineLabels?: boolean;
-  /** Highlighted: the keyboard's current card, or a picked one while cards are picked. */
+  /** Highlighted: the keyboard's current card, while no cards are picked. */
   selected?: boolean;
   /** Its checkbox is ticked. */
   picked?: boolean;
-  /** Cards are picked: every checkbox shows. */
-  picking?: boolean;
+  /** Its checkbox shows without the pointer: the current card while cards are picked. */
+  showBox?: boolean;
   onOpen: (id: string, mods?: PickKeys) => void;
   onToggleBox?: (id: string) => void;
   /** A ⌘ double-click: the issue in a new tab, shown with ⇧. */
@@ -33,15 +33,15 @@ interface Props {
 }
 
 /** A Board card: the summary first, always wrapped, the key in the bottom-right corner; changed cards are tinted. */
-export const BoardCard = memo(function BoardCard({ row, fields, inlineLabels = false, selected = false, picked = false, picking = false, onOpen, onToggleBox, onOpenInTab, actions, pinned = false }: Props) {
+export const BoardCard = memo(function BoardCard({ row, fields, inlineLabels = false, selected = false, picked = false, showBox = false, onOpen, onToggleBox, onOpenInTab, actions, pinned = false }: Props) {
   const shows = (field: string) => fields.includes(field);
   const flashing = useFlash(row.updatedAt);
   const epic = shows("epic") && row.epic;
   const labels = shows("labels") && row.labels.length > 0;
   return (
     <article
-      className={["board-card", row.changed && "board-card--changed", flashing && "flash", selected && "board-card--selected"].filter(Boolean).join(" ")}
-      aria-current={selected || undefined}
+      className={["board-card", row.changed && "board-card--changed", flashing && "flash", selected && "board-card--selected", picked && "board-card--picked"].filter(Boolean).join(" ")}
+      aria-current={selected || picked || undefined}
       tabIndex={0}
       aria-label={`${row.key} ${row.summary}`}
       data-issue-id={row.id}
@@ -76,7 +76,7 @@ export const BoardCard = memo(function BoardCard({ row, fields, inlineLabels = f
         <CopyKey className="board-card__key" issueKey={row.key} />
       </div>
       {onToggleBox && (
-        <PickBox issueKey={row.key} picked={picked} onToggle={() => onToggleBox(row.id)} className={picking ? "board-card__pick pick-box--shown" : "board-card__pick"} />
+        <PickBox issueKey={row.key} picked={picked} onToggle={() => onToggleBox(row.id)} className={showBox ? "board-card__pick pick-box--shown" : "board-card__pick"} />
       )}
       <span className="board-card__actions">
         <RowActions issueId={row.id} issueKey={row.key} changed={row.changed} actions={actions} pinned={pinned} />

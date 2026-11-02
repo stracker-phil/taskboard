@@ -96,7 +96,7 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
   const space = spaceOf(level);
   // Both layers count, as drafted or saved: the filter list's own conditions and the view's.
   const own = draft.conditions;
-  const me = useMeMode(key, draft.me, draft.person);
+  const me = useMeMode(key, draft.me, draft.person, draft.meRules);
   const { unreadOnly } = useModes();
   const setUnread = (on: boolean) => void attempt(api.modeSet("unreadOnly", on), "Could not change Unread only");
   const { data: people = [] } = useViewPeople(view.listId, view.id, useRequestNarrowing(view.listId, view.id));

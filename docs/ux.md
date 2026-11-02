@@ -266,11 +266,15 @@ Board's `views/board/useBoardPicks.ts`):
   picks the rows from the selected one to the clicked one (the press selects no text). **⌘A** picks every row the
   view shows (in a text field or the Issue view it stays Select All); **⇧J / ⇧K** (⇧↓ / ⇧↑) add the row past the
   picks' bottom or top edge. **Esc**, a plain click, J/K and opening the preview drop the picks.
-- **The checkbox** (`PickBox`, a native checkbox in the accent color) toggles its row alone. It shows while its row
-  or card has the pointer, once ticked, and on every row while any is picked: in the List in the gutter 48 left of
-  the row (left of the subtask caret, vertically on the first line), in the Table in the row's 24px left inset (the
-  spacer it replaces), on a Board card at the end of the title's first line, in room the title always keeps free.
-- Picked rows and cards look selected; while any is picked, the selected row alone doesn't. Picking closes the
+- **The checkbox** (`PickBox`) toggles its row alone. It is drawn, not native: 14px, radius 4, a 1.5px
+  `--pick-line` outline (`--pick-line-hover` under the pointer), ticked a `--pick-fill` square with a `--pick-check`
+  tick. It fades in (`--motion-base`) while its row or card has the pointer, once ticked, and on the current row
+  while any is picked; the other unticked boxes stay hidden. In the List it sits in the gutter 42 left of the row,
+  centered on the subtask caret's line, and the whole gutter counts as the row's, so the pointer keeps the box on
+  its way there; in the Table in the row's 24px left inset (the spacer it replaces); on a Board card at the end of
+  the title's first line, in room the title always keeps free.
+- Picked rows and cards get the neutral `--picked-bg` (a picked card also `--border-strong`), apart from the
+  accent's selection and unread tints; while any is picked, the selected row isn't highlighted. Picking closes the
   preview, which shows one issue. A ⌘ or ⇧ click or double-click opens nothing, and a narrowing that hides a picked
   row leaves it out. Leaving the view drops the picks.
 - **The bulk bar** (`writes/BulkBar.tsx`) fades in centered 16 over the view's bottom while anything is picked: the
@@ -618,7 +622,9 @@ button, Escape and a press outside close it, focus goes back to the button).
   Me mode ([ADR 0045](adr/0045-me-mode-is-a-set-of-rules-in-a-scope.md)): the issues assigned to me, plus what
   the rules switched on add (a user field such as Reporter holds me, a comment mentions me, a subtask of one of my
   issues). The chevron (**Me Mode Options…**, `toolbar.meOptions`) opens the **Me popover** (`MePopover.tsx`):
-  a switch per rule (global, saved at once in `behaviour.meRules`) and *Applies to*: "Only this view" (the
+  a switch per rule and *Applies to*. In a view's own Me mode the switches are a draft of that view, saved with
+  it (`view.me_rules`, [ADR 0051](adr/0051-each-views-me-mode-has-its-own-rules.md)); while Me holds only through
+  "All views" they change the app's set (`behaviour.meRules`, which a view starts from). *Applies to*: "Only this view" (the
   saved `view.only_mine`; a click changes it as a draft) or "All views" (`modes.json` `meEverywhere`: on in
   every view, a ring around the avatar, until Me is turned off). Its "Fields…" opens Settings → General → Me
   Mode. The text is never saved.
@@ -671,8 +677,8 @@ the same way ([writes.md](writes.md#drag-and-drop)).
 ## Table view
 
 `src/views/table/`: the same rows as the list, every row 30 high (a group heading too: its 22px tab sits at
-the row's bottom), with a sticky 34px header: Key, Summary (flexible),
-Status, then the view's columns. A sortable header (Key, Summary, Status, Priority, Due) sorts on click and
+the row's bottom), with a sticky 34px header: Key (with the status square before it), Summary (flexible), then the view's columns,
+Status among them like any other. A sortable header (Key, Summary, Status, Priority, Due) sorts on click and
 again flips the direction (`aria-sort`, ↑/↓); a 6px handle at each header's right edge resizes the column
 (48–800), saved on the view. Grouped tables keep the list's group headers; the table scrolls sideways when the
 columns are wider than the window. Groups open and close with the List's animation (`useGroupMotion`). Rows

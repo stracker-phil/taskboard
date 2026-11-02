@@ -28,8 +28,8 @@
   --text-faint: #6b6b74;
   --danger-text: #f87171;
   --text-on-accent: #ffffff;
-  --link: #8ab4ff;
-  --link-hover: #b3cdff;
+  --link: var(--accent-text);
+  --link-hover: var(--accent-soft-text);
 
   /* Lines */
   --border: #3a3a40;
@@ -38,28 +38,56 @@
   --row-hairline: #2c2c31;
   --card-border: #36363c;
 
-  /* Accent and selection */
-  --accent: #2563eb;
-  --accent-text: #8ab4ff;
-  --selection-bg: #233554;
-  --palette-active-bg: #2a3a57;
-  --selection-text: #b3cdff;
-  --accent-soft-bg: #1f2c44;
+  /* Accent colors to pick from (Settings → Appearance, a Space's own; styles/accents.css): the fill, then the shade
+     for text */
+  --accent-blue: #2563eb;
+  --accent-blue-text: #8ab4ff;
+  --accent-purple: #7c3aed;
+  --accent-purple-text: #c4b5fd;
+  --accent-pink: #be185d;
+  --accent-pink-text: #f9a8d4;
+  --accent-red: #dc2626;
+  --accent-red-text: #fca5a5;
+  --accent-orange: #c2410c;
+  --accent-orange-text: #fdba74;
+  --accent-yellow: #a16207;
+  --accent-yellow-text: #fde047;
+  --accent-green: #15803d;
+  --accent-green-text: #86efac;
+  --accent-teal: #0f766e;
+  --accent-teal-text: #5eead4;
+  --accent-graphite: #71717a;
+  --accent-graphite-text: #d4d4d8;
+
+  /* Accent and selection: the picked accent, and tints mixed from it */
+  --accent: var(--accent-blue);
+  --accent-text: var(--accent-blue-text);
+  --selection-bg: color-mix(in srgb, var(--accent) 26%, var(--panel-bg));
+  --palette-active-bg: color-mix(in srgb, var(--accent) 30%, var(--panel-bg));
+  --selection-text: color-mix(in srgb, var(--accent-text) 70%, var(--text));
+  --accent-soft-bg: color-mix(in srgb, var(--accent) 16%, var(--panel-bg));
   /* useFlash: a row whose issue just changed. */
-  --flash-bg: rgb(37 99 235 / 0.22);
-  --accent-soft-border: #2f4a7a;
-  --accent-soft-text: #b3cdff;
+  --flash-bg: color-mix(in srgb, var(--accent) 22%, transparent);
+  --accent-soft-border: color-mix(in srgb, var(--accent) 42%, var(--panel-bg));
+  --accent-soft-text: color-mix(in srgb, var(--accent-text) 70%, var(--text));
   --button-primary-bg: #f4f4f5;
   --button-primary-text: #18181b;
-  --spinner-track: #2f4a7a;
-  --focus-ring: #60a5fa;
+  --spinner-track: var(--accent-soft-border);
+  --focus-ring: color-mix(in srgb, var(--accent) 50%, var(--accent-text));
+
+  /* Picking rows for a bulk change: the checkbox's outline and tick, and a picked row's neutral fill */
+  --pick-line: #5c5c64;
+  --pick-line-hover: #9a9aa3;
+  --pick-fill: #d4d4d8;
+  --pick-check: #232326;
+  --picked-bg: #313136;
 
   /* Changed since the owner last looked */
-  --changed-bg: #1c2840;
-  --changed-border: #2f4a7a;
-  --changed-chip-bg: #24365a;
-  --changed-chip-text: #a8c6ff;
-  --changed-dot: #60a5fa;
+  --changed-bg: color-mix(in srgb, var(--accent) 15%, var(--list-bg));
+  --changed-border: var(--accent-soft-border);
+  --changed-chip-bg: color-mix(in srgb, var(--accent) 28%, var(--panel-bg));
+  --changed-chip-text: color-mix(in srgb, var(--accent-text) 85%, var(--text));
+  --changed-dot: color-mix(in srgb, var(--accent) 50%, var(--accent-text));
 
   /* Status styles: pill fill, pill text, pill border, row square, board tint, board count; To do has its own List tab, Backlog a dashed border */
   --status-backlog-bg: #26262a;
@@ -180,7 +208,7 @@
 
   /* Sync chip */
   --sync-ok: #22c55e;
-  --sync-busy: #8ab4ff;
+  --sync-busy: var(--accent-text);
   --sync-offline: #6b6b74;
   --sync-error-bg: #3a1d1f;
   --sync-error-text: #fca5a5;
@@ -223,7 +251,7 @@
   --settings-field-line: rgba(255, 255, 255, 0.14);
   --settings-knob: #e5e5e5;
   --settings-knob-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.3), 0 0.5px 2px rgba(0, 0, 0, 0.4);
-  --settings-focus-ring: rgba(96, 165, 250, 0.55);
+  --settings-focus-ring: color-mix(in srgb, var(--accent-text) 55%, transparent);
   /* accent fills of an inactive window turn gray */
   --settings-blurred-fill: rgba(229, 229, 229, 0.25);
 }

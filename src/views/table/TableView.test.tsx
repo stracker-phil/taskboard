@@ -99,16 +99,40 @@ describe("TableView", () => {
   });
 
   describe("headers", () => {
-    it("starts with Key, Summary and Status, then the view's columns by their names", async () => {
+    const headerNames = () => screen.getAllByRole("columnheader").map((h) => h.textContent?.replace(/[↑↓]/, ""));
+
+    it("starts with Key and Summary, then the view's columns by their names", async () => {
       await renderTable();
 
-      await waitFor(() => expect(screen.getAllByRole("columnheader").map((h) => h.textContent?.replace(/[↑↓]/, ""))).toEqual(["Key", "Summary", "Status", "Assignee", "Priority"]));
+      await waitFor(() => expect(headerNames()).toEqual(["Key", "Summary", "Assignee", "Priority"]));
     });
 
-    it("shows one Status header when the view also has the status column", async () => {
-      await renderTable(viewData([groupOf([OPEN, DONE])], [OPEN, DONE], { columns: ["status", "assignee"], groupBy: "none" }));
+    it("shows a Status header at the status column's position when the view has it", async () => {
+      await renderTable(viewData([groupOf([OPEN, DONE])], [OPEN, DONE], { columns: ["assignee", "status", "priority"], groupBy: "none" }));
 
-      await waitFor(() => expect(screen.getAllByRole("columnheader").map((h) => h.textContent?.replace(/[↑↓]/, ""))).toEqual(["Key", "Summary", "Status", "Assignee"]));
+      await waitFor(() => expect(headerNames()).toEqual(["Key", "Summary", "Assignee", "Status", "Priority"]));
+    });
+
+    it("shows no Status header or status name when the view lacks the status column", async () => {
+      await renderTable();
+      await screen.findByText("Assignee");
+
+      expect(screen.queryByRole("columnheader", { name: /Status/ })).not.toBeInTheDocument();
+      expect(screen.queryByText("In Progress")).not.toBeInTheDocument();
+    });
+
+    it("shows each row's status name in the Status column", async () => {
+      await renderTable(viewData([groupOf([OPEN, DONE])], [OPEN, DONE], { columns: ["status"], groupBy: "none" }));
+
+      expect(await within(screen.getByRole("row", { name: /NW-1042/ })).findByText("In Progress")).toBeInTheDocument();
+      expect(within(screen.getByRole("row", { name: /NW-1001/ })).getByText("Done")).toBeInTheDocument();
+    });
+
+    it("shows the status square before the key", async () => {
+      await renderTable();
+
+      const keyCell = (await screen.findByText("NW-1001")).closest<HTMLElement>('[role="gridcell"]')!;
+      expect(keyCell.querySelector(".status-square--done")).toBeInTheDocument();
     });
 
     it("marks only the sorted column with aria-sort", async () => {
@@ -116,7 +140,7 @@ describe("TableView", () => {
 
       expect(header("Key")).toHaveAttribute("aria-sort", "ascending");
       expect(header("Summary")).not.toHaveAttribute("aria-sort");
-      expect(header("Status")).not.toHaveAttribute("aria-sort");
+      expect(header("Assignee")).not.toHaveAttribute("aria-sort");
     });
 
     it("marks a descending sort as descending", async () => {
@@ -145,7 +169,7 @@ describe("TableView", () => {
       ["Priority", { by: "priority", descending: true }],
       ["Due", { by: "due", descending: true }],
     ])("sorts by %s in its natural direction when another column is sorted", async (name, sort) => {
-      await renderTable(viewData([groupOf([OPEN])], [OPEN], { columns: ["priority", "due"] }));
+      await renderTable(viewData([groupOf([OPEN])], [OPEN], { columns: ["status", "priority", "due"] }));
       await screen.findByRole("button", { name });
 
       await userEvent.click(screen.getByRole("button", { name }));
@@ -180,7 +204,7 @@ describe("TableView", () => {
     it("uses the default width for a column without a stored one", async () => {
       await renderTable();
 
-      expect(header("Key")).toHaveStyle({ width: "102px" });
+      expect(header("Key")).toHaveStyle({ width: "120px" });
     });
 
     it("saves the widths with the dragged column's new width once the pointer is released", async () => {
@@ -192,7 +216,7 @@ describe("TableView", () => {
       fireEvent.pointerMove(window, { clientX: 140 });
       fireEvent.pointerUp(window);
 
-      await waitFor(() => expect(mocked.viewSetWidths).toHaveBeenCalledWith(101, { status: 160, key: 142 }));
+      await waitFor(() => expect(mocked.viewSetWidths).toHaveBeenCalledWith(101, { status: 160, key: 160 }));
       expect(mocked.viewSetWidths).toHaveBeenCalledTimes(1);
     });
 
@@ -202,7 +226,7 @@ describe("TableView", () => {
       fireEvent.pointerDown(screen.getByRole("separator", { name: "Resize Key" }), { button: 0, clientX: 100 });
       fireEvent.pointerMove(window, { clientX: 140 });
 
-      await waitFor(() => expect(header("Key")).toHaveStyle({ width: "142px" }));
+      await waitFor(() => expect(header("Key")).toHaveStyle({ width: "160px" }));
       expect(mocked.viewSetWidths).not.toHaveBeenCalled();
       fireEvent.pointerUp(window);
     });
@@ -235,7 +259,7 @@ describe("TableView", () => {
 
   describe("rows", () => {
     it("shows key, summary and status of each issue", async () => {
-      await renderTable();
+      await renderTable(viewData([groupOf([OPEN, DONE])], [OPEN, DONE], { columns: ["status"], groupBy: "none" }));
 
       const issue = await screen.findByRole("row", { name: /NW-1001/ });
       expect(issue).toHaveTextContent("Publish the launch notes");
@@ -262,7 +286,7 @@ describe("TableView", () => {
       });
 
       it("shows them only in the Labels column when the view has it", async () => {
-        const [, title, , labels] = await renderLabeled(true, ["labels"]);
+        const [, title, labels] = await renderLabeled(true, ["labels"]);
 
         expect(within(title).queryByText("launch")).not.toBeInTheDocument();
         expect(within(labels).getByText("launch")).toBeInTheDocument();
@@ -280,7 +304,7 @@ describe("TableView", () => {
       });
       const cellsOf = async (issue: Row) => {
         await renderTable(viewData([groupOf([issue])], [issue], { columns: ["assignee", "epic", "priority"], groupBy: "none" }));
-        return within(await screen.findByRole("row", { name: new RegExp(issue.key) })).getAllByRole("gridcell").slice(3);
+        return within(await screen.findByRole("row", { name: new RegExp(issue.key) })).getAllByRole("gridcell").slice(2);
       };
 
       it("shows a dash in the assignee, epic and priority cells of an issue without them", async () => {
@@ -462,12 +486,12 @@ describe("TableView", () => {
     async function renderEditable(patch: Partial<ReturnType<typeof behaviour>> = {}, current: View = TABLE) {
       mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ allowJiraChanges: true, ...patch }) }));
       mocked.issueTransitions.mockResolvedValue([REVIEW]);
-      await renderTable(viewData([groupOf([EDITABLE, OTHER])], [EDITABLE, OTHER], { columns: ["assignee", "priority"], groupBy: "none" }), current);
+      await renderTable(viewData([groupOf([EDITABLE, OTHER])], [EDITABLE, OTHER], { columns: ["status", "assignee", "priority"], groupBy: "none" }), current);
       await waitFor(() => expect(mocked.getSettings).toHaveBeenCalled());
       await act(async () => {});
     }
 
-    it("opens the status menu from the fixed Status cell", async () => {
+    it("opens the status menu from the Status cell", async () => {
       await renderEditable();
 
       await userEvent.click(cell("In Progress"));
@@ -726,6 +750,53 @@ describe("TableView", () => {
       fireEvent.click(screen.getByText("Fix the footer links"), { metaKey: true });
 
       expect(pickedKeys()).toEqual(["NW-1001"]);
+    });
+
+    it("highlights the selected row only while nothing is picked", async () => {
+      await renderTable(flat());
+
+      await userEvent.click(await screen.findByText("Redesign the pricing page"));
+
+      const selected = screen.getByRole("row", { name: /NW-1042/ });
+      expect(selected).toHaveClass("table-row--selected");
+      expect(selected).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByRole("row", { name: /NW-1001/ })).toHaveAttribute("aria-selected", "false");
+    });
+
+    it("highlights the picked rows as picked, not selected, and drops the selected highlight", async () => {
+      await renderTable(flat());
+      await userEvent.click(await screen.findByText("Redesign the pricing page"));
+
+      fireEvent.click(screen.getByText("Publish the launch notes"), { metaKey: true });
+
+      for (const key of [/NW-1042/, /NW-1001/]) {
+        const picked = screen.getByRole("row", { name: key });
+        expect(picked).toHaveClass("table-row--picked");
+        expect(picked).not.toHaveClass("table-row--selected");
+        expect(picked).toHaveAttribute("aria-selected", "true");
+      }
+      expect(screen.getByRole("row", { name: /NW-1003/ })).toHaveAttribute("aria-selected", "false");
+    });
+
+    it("shows the checkbox of the current row only, while rows are picked", async () => {
+      await renderTable(flat());
+      await userEvent.click(await screen.findByText("Redesign the pricing page"));
+
+      fireEvent.click(screen.getByText("Publish the launch notes"), { metaKey: true });
+
+      expect(screen.getByRole("checkbox", { name: "Pick NW-1001" })).toHaveClass("pick-box--shown");
+      expect(screen.getByRole("checkbox", { name: "Pick NW-1001" })).toBeChecked();
+      expect(screen.getByRole("checkbox", { name: "Pick NW-1042" })).not.toHaveClass("pick-box--shown");
+      expect(screen.getByRole("checkbox", { name: "Pick NW-1042" })).toBeChecked();
+      expect(screen.getByRole("checkbox", { name: "Pick NW-1003" })).not.toHaveClass("pick-box--shown");
+    });
+
+    it("shows no checkbox without the pointer while nothing is picked", async () => {
+      await renderTable(flat());
+
+      await userEvent.click(await screen.findByText("Redesign the pricing page"));
+
+      screen.getAllByRole("checkbox").forEach((box) => expect(box).not.toHaveClass("pick-box--shown"));
     });
 
     it("picks the rows from the selected one to the ⇧-clicked one", async () => {

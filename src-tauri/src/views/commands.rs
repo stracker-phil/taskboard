@@ -10,6 +10,7 @@ use super::{
 use crate::error::AppResult;
 use crate::filter::Filter;
 use crate::lists::Viewer;
+use crate::me_mode::MeMatch;
 use crate::state::AppState;
 
 #[tauri::command]
@@ -125,6 +126,16 @@ pub async fn view_set_filter(
     super::view_set_filter(&state.db, viewer, id, filter).await
 }
 
+/// The Me rules the view has on; none follows the app's.
+#[tauri::command]
+pub async fn view_set_me_rules(
+    state: State<'_, AppState>,
+    id: i64,
+    rules: Option<Vec<MeMatch>>,
+) -> AppResult<View> {
+    super::view_set_me_rules(&state.db, id, rules).await
+}
+
 #[tauri::command]
 pub async fn view_set_only_mine(state: State<'_, AppState>, id: i64, on: bool) -> AppResult<View> {
     super::view_set_only_mine(&state.db, id, on).await
@@ -184,7 +195,7 @@ fn with_modes(state: &AppState, narrowing: Narrowing) -> (Narrowing, Viewer) {
     let modes = state.modes.get();
     let narrowing = Narrowing {
         read_here: state.nav.read_here_ids(),
-        me_rules: settings.behaviour.me_rules,
+        me_rules: narrowing.resolve_me_rules(&settings.behaviour.me_rules),
         me: narrowing.me || modes.me_everywhere,
         unread: modes.unread_only,
         ..narrowing

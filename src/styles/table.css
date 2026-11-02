@@ -45,6 +45,7 @@
 .table-row:hover .pick-box { opacity: 1; }
 .table-row--changed, .table-row--changed:hover { background: var(--changed-bg); }
 .table-row--selected, .table-row--selected:hover { background: var(--selection-bg); }
+.table-row--picked, .table-row--picked:hover { background: var(--picked-bg); }
 .table-row__cell { display: flex; flex: none; align-items: center; gap: 7px; min-width: 0; box-sizing: border-box; padding-right: 12px; overflow: hidden; }
 /* The key keeps 12px from the inset, like every cell from the next. */
 .table-row__key, .table-header__cell:first-child { padding-left: 12px; }

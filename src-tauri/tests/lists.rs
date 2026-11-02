@@ -21,8 +21,9 @@ use taskboard_lib::lists::{
     Kind, LIST_VIEW, ListConditions, ListNode, LockedCondition, MatchCount, SidebarTree, SpaceNode,
     SpaceUpdate, ValueKind, Viewer, ensure_tracked_spaces, filter_options, list_conditions,
     list_create, list_delete, list_duplicate, list_match_count, list_move, list_rename,
-    list_set_filter, list_set_look, sidebar_tree, space_move, space_update,
+    list_set_filter, list_set_look, sidebar_tree, space_move, space_set_accent, space_update,
 };
+use taskboard_lib::look::Accent;
 use taskboard_lib::store::settings::SettingsStore;
 use taskboard_lib::sync::{Emit, SyncContext, full_sync};
 use taskboard_lib::test_support::demo::{DEMO_NOW, ME_EMAIL};
@@ -32,9 +33,9 @@ use taskboard_lib::views::{
     DEFAULT_COLUMNS, GroupBy, IssueOpening, Layout, Narrowing, Sort, SortBy, SubtaskMode, View,
     seed_only_mine, space_default_columns, view_create, view_delete, view_duplicate, view_move,
     view_rename, view_rows, view_set_column_collapsed, view_set_columns, view_set_filter,
-    view_set_group, view_set_inline_labels, view_set_layout, view_set_look, view_set_only_mine,
-    view_set_open_with, view_set_person, view_set_sort, view_set_subtasks, view_set_widths,
-    view_set_wrap, views_of,
+    view_set_group, view_set_inline_labels, view_set_layout, view_set_look, view_set_me_rules,
+    view_set_only_mine, view_set_open_with, view_set_person, view_set_sort, view_set_subtasks,
+    view_set_widths, view_set_wrap, views_of,
 };
 
 const ME_ACCOUNT_ID: &str = "712020:5a1e0c3f-8d2b-4f61-9c7e-1b2a3c4d5e01";
@@ -2867,6 +2868,105 @@ mod editing_views {
     }
 
     #[tokio::test]
+    async fn a_view_starts_with_no_me_rules_of_its_own() {
+        let (_dir, db) = tracked_lab().await;
+
+        let rules: Vec<_> = space_views(&db)
+            .await
+            .into_iter()
+            .map(|v| v.me_rules)
+            .collect();
+
+        assert_eq!(rules, [None, None, None]);
+    }
+
+    #[tokio::test]
+    async fn setting_the_me_rules_is_stored_returned_and_limited_to_that_view() {
+        use taskboard_lib::me_mode::MeMatch;
+        let (_dir, db) = tracked_lab().await;
+        let views = space_views(&db).await;
+        let own = vec![
+            MeMatch::Mentioned,
+            MeMatch::Field {
+                field: "reporter".into(),
+            },
+        ];
+
+        let set = view_set_me_rules(&db, views[1].id, Some(own.clone()))
+            .await
+            .unwrap();
+
+        assert_eq!(set.me_rules, Some(own.clone()));
+        let rules: Vec<_> = space_views(&db)
+            .await
+            .into_iter()
+            .map(|v| v.me_rules)
+            .collect();
+        assert_eq!(rules, [None, Some(own), None]);
+    }
+
+    #[tokio::test]
+    async fn an_empty_list_of_me_rules_is_kept_apart_from_none() {
+        let (_dir, db) = tracked_lab().await;
+        let view = space_views(&db).await[1].id;
+
+        let set = view_set_me_rules(&db, view, Some(vec![])).await.unwrap();
+
+        assert_eq!(set.me_rules, Some(vec![]));
+        assert_eq!(space_views(&db).await[1].me_rules, Some(vec![]));
+    }
+
+    #[tokio::test]
+    async fn clearing_the_me_rules_follows_the_apps_again() {
+        use taskboard_lib::me_mode::MeMatch;
+        let (_dir, db) = tracked_lab().await;
+        let view = space_views(&db).await[1].id;
+        view_set_me_rules(&db, view, Some(vec![MeMatch::Subtasks]))
+            .await
+            .unwrap();
+
+        let cleared = view_set_me_rules(&db, view, None).await.unwrap();
+
+        assert_eq!(cleared.me_rules, None);
+        assert_eq!(space_views(&db).await[1].me_rules, None);
+    }
+
+    #[tokio::test]
+    async fn the_me_rules_of_an_unknown_view_are_not_found() {
+        let (_dir, db) = tracked_lab().await;
+
+        let err = view_set_me_rules(&db, 9999, Some(vec![]))
+            .await
+            .unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::NotFound);
+    }
+
+    #[tokio::test]
+    async fn a_duplicate_view_and_a_duplicate_list_keep_the_me_rules() {
+        use taskboard_lib::me_mode::MeMatch;
+        let (_dir, db) = tracked_lab().await;
+        let table = space_views(&db).await[2].id;
+        view_set_me_rules(&db, table, Some(vec![MeMatch::Mentioned]))
+            .await
+            .unwrap();
+        let epics = list_id(&db, "Epics").await;
+        let epics_view = views_of(&db, epics).await.unwrap()[0].id;
+        view_set_me_rules(&db, epics_view, Some(vec![]))
+            .await
+            .unwrap();
+
+        let copy = view_duplicate(&db, table).await.unwrap();
+        let copied_list = list_duplicate(&db, epics).await.unwrap();
+
+        assert_eq!(copy.me_rules, Some(vec![MeMatch::Mentioned]));
+        assert_eq!(
+            views_of(&db, copied_list).await.unwrap()[0].me_rules,
+            Some(vec![])
+        );
+    }
+
+    #[tokio::test]
     async fn seeding_the_me_chip_turns_it_on_for_the_given_views_and_skips_unknown_ids() {
         let (_dir, db) = tracked_lab().await;
         let views = space_views(&db).await;
@@ -3132,6 +3232,59 @@ mod editing_spaces {
 
         assert_eq!(update.kind(), ErrorKind::NotFound);
         assert_eq!(moved.kind(), ErrorKind::NotFound);
+    }
+
+    #[tokio::test]
+    async fn a_spaces_accent_is_stored_shown_in_the_tree_and_cleared_with_none() {
+        let (_dir, db) = two_spaces().await;
+        let accent_of = |key: &'static str| {
+            let db = db.clone();
+            async move {
+                let tree = sidebar_tree(&db, viewer(None), false).await.unwrap();
+                find_space(&tree, key).accent
+            }
+        };
+        assert_eq!(accent_of("NW").await, None);
+
+        space_set_accent(&db, NW.into(), Some(Accent::Teal))
+            .await
+            .unwrap();
+
+        assert_eq!(accent_of("NW").await, Some(Accent::Teal));
+        assert_eq!(
+            text(&db, "SELECT accent FROM space WHERE project_id = '10001'").await,
+            "teal"
+        );
+        assert_eq!(accent_of("NWS").await, None);
+
+        space_set_accent(&db, NW.into(), None).await.unwrap();
+
+        assert_eq!(accent_of("NW").await, None);
+    }
+
+    #[tokio::test]
+    async fn an_unknown_stored_accent_shows_as_blue_in_the_tree() {
+        let (_dir, db) = tracked_lab().await;
+        execute(
+            &db,
+            "UPDATE space SET accent = 'magenta' WHERE project_id = '10001'",
+        )
+        .await;
+
+        let tree = sidebar_tree(&db, viewer(None), false).await.unwrap();
+
+        assert_eq!(find_space(&tree, "NW").accent, Some(Accent::Blue));
+    }
+
+    #[tokio::test]
+    async fn setting_the_accent_of_a_project_without_a_space_is_not_found() {
+        let (_dir, db) = tracked_lab().await;
+
+        let err = space_set_accent(&db, "99999".into(), Some(Accent::Red))
+            .await
+            .unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::NotFound);
     }
 
     #[tokio::test]

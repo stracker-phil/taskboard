@@ -9,6 +9,9 @@ import { SpaceFields } from "../../SpaceEditor";
 import { openMenu } from "../../menu";
 import { SpaceLookButton } from "../../SpaceLookButton";
 import { Group, Row, Segmented, SwitchInput } from "../controls";
+import { useSettings } from "../../../queries/settings";
+import { attempt } from "../../../state/requests";
+import { AccentPicker } from "../AccentPicker";
 import { SpaceStatuses } from "./SpaceStatuses";
 import { SpaceTeam } from "./SpaceTeam";
 
@@ -49,12 +52,28 @@ export function SpaceSettings({ space, onBack }: { space: SpaceNode; onBack?: ()
       </div>
       <Group title="General">
         <SpaceFields space={space} />
+        <SpaceAccent space={space} />
       </Group>
       {config && <LayoutsGroup config={config} />}
       <SpaceStatuses projectId={space.projectId} />
       <SpaceTeam projectId={space.projectId} />
       {config && <FieldsGroup config={config} />}
     </>
+  );
+}
+
+/** The Space's own accent, shown in the main window while the Space is; the first swatch follows the app's. */
+function SpaceAccent({ space }: { space: SpaceNode }) {
+  const { data: settings } = useSettings();
+  return (
+    <Row label="Accent color" description="Used while this Space is shown">
+      <AccentPicker
+        label="Accent color"
+        value={space.accent}
+        appAccent={settings?.accent ?? "blue"}
+        onChange={(accent) => void attempt(api.spaceSetAccent(space.projectId, accent), "Could not change the accent color")}
+      />
+    </Row>
   );
 }
 

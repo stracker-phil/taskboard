@@ -182,9 +182,9 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
                   position={fold?.positions.get(virtual.index) ?? item.position}
                   wrap={wrapTitles}
                   inlineLabels={inlineLabels}
-                  selected={picking ? pickedIds.has(item.row.id) : selected === item.row.id}
+                  selected={!picking && selected === item.row.id}
                   picked={pickedIds.has(item.row.id)}
-                  picking={picking}
+                  showBox={picking && selected === item.row.id}
                   onSelect={onSelect}
                   onToggleBox={onToggleBox}
                   onPick={onPick}

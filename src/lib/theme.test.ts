@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
 
-import { api, type Appearance } from "../api";
+import { api, type Accent, type Appearance } from "../api";
 import { createQueryClient } from "../queries/queryClient";
 import { settings } from "../test/settings";
 import { applyInitialLook, schemeFor, useAppearance } from "./theme";
@@ -95,6 +95,49 @@ describe("useAppearance", () => {
 
     system.set(false);
     await waitFor(() => expect(scheme()).toBe("light"));
+  });
+
+  describe("accent", () => {
+    const accent = () => document.documentElement.dataset.accent;
+
+    function mountAccent(spaceAccent: Accent | null, appAccent?: Accent) {
+      if (appAccent) mocked.getSettings.mockResolvedValue(settings({ accent: appAccent }));
+      const wrapper = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: createQueryClient() }, children);
+      return renderHook(({ space }) => useAppearance(space), { wrapper, initialProps: { space: spaceAccent } });
+    }
+
+    beforeEach(() => {
+      delete document.documentElement.dataset.accent;
+    });
+
+    it("applies the accent of the settings", async () => {
+      mountAccent(null, "green");
+
+      await waitFor(() => expect(accent()).toBe("green"));
+    });
+
+    it("is blue before the settings have loaded", () => {
+      mocked.getSettings.mockReturnValueOnce(new Promise(() => {}));
+
+      mountAccent(null);
+
+      expect(accent()).toBe("blue");
+    });
+
+    it("applies the shown Space's accent over the app's", async () => {
+      mountAccent("teal", "green");
+
+      await waitFor(() => expect(accent()).toBe("teal"));
+    });
+
+    it("goes back to the app's accent when the Space has none", async () => {
+      const { rerender } = mountAccent("teal", "green");
+      await waitFor(() => expect(accent()).toBe("teal"));
+
+      rerender({ space: null });
+
+      await waitFor(() => expect(accent()).toBe("green"));
+    });
   });
 
   it.each<[Appearance, string]>([

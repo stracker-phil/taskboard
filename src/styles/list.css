@@ -136,9 +136,25 @@
 .list-row--wrap .row-actions { top: -4px; transform: none; }
 .list-row--child .list-row__name { padding-left: calc(var(--depth) * var(--indent-step)); }
 
-/* Picking rows for a bulk change: a checkbox that shows while its row has the pointer, once it is ticked, and on
-   every row while any is picked. It sits in the List's gutter left of the caret, where nothing else is drawn. */
-.pick-box { margin: 0; width: 14px; height: 14px; accent-color: var(--accent); opacity: 0; transition: opacity var(--motion-base) var(--ease-out); }
+/* Picking rows for a bulk change: a checkbox that fades in while its row has the pointer, once it is ticked, and
+   on the current row while any is picked. Drawn rather than native, so it can fade and stays quiet beside the
+   rows: an outline, then a neutral fill with a tick. */
+.pick-box {
+  appearance: none; position: relative; flex: none; width: 14px; height: 14px; margin: 0; box-sizing: border-box;
+  border: 1.5px solid var(--pick-line); border-radius: 4px; background: var(--panel-bg); outline: none; opacity: 0;
+  transition: opacity var(--motion-base) var(--ease-out), border-color var(--motion-fast) var(--ease-out), background-color var(--motion-fast) var(--ease-out);
+}
+.pick-box:hover { border-color: var(--pick-line-hover); }
+.pick-box:checked { border-color: var(--pick-fill); background: var(--pick-fill); }
+.pick-box:checked::after {
+  content: ""; position: absolute; left: 3.5px; top: 0.5px; width: 4px; height: 7.5px; box-sizing: border-box;
+  border: solid var(--pick-check); border-width: 0 1.5px 1.5px 0; transform: rotate(45deg);
+}
+.pick-box:focus-visible { box-shadow: 0 0 0 3px var(--settings-focus-ring); }
 .pick-box:checked, .pick-box--shown, .pick-box:focus-visible, .list-item:hover > .pick-box { opacity: 1; }
-.list-pick { position: absolute; left: -48px; top: 22px; transform: translateY(-50%); z-index: 1; }
-.list-pick--wrap { top: 15px; transform: none; }
+/* In the gutter just left of a top-level row's caret, centered on the caret. */
+.list-pick { position: absolute; left: -42px; top: 22px; transform: translateY(-50%); z-index: 1; }
+.list-pick--wrap { top: 12px; transform: none; }
+/* The gutter belongs to the row, so the pointer keeps the checkbox while it travels to it. */
+.list-item::before { content: ""; position: absolute; top: 0; bottom: 0; left: -52px; width: 52px; }
+.list-row--picked, .list-row--picked:hover { background: var(--picked-bg); }

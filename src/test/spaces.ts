@@ -23,6 +23,7 @@ export function space(patch: Partial<SpaceNode> = {}): SpaceNode {
     projectName: "Website relaunch",
     icon: null,
     color: "1",
+    accent: null,
     client: null,
     openCount: 21,
     lists: [],

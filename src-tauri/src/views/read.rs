@@ -11,7 +11,7 @@ use crate::filter::Filter;
 use crate::lists::{Kind, node};
 use crate::space_config::{ALL_LAYOUTS, SpaceLayouts, hidden_columns, level_layouts};
 
-const COLUMNS: &str = "id, list_id, name, layout, columns, group_by, sort_by, sort_order, position, is_default, widths, wrap_titles, collapsed, open_with, icon, color, inline_labels, filter, subtasks, only_mine, person";
+const COLUMNS: &str = "id, list_id, name, layout, columns, group_by, sort_by, sort_order, position, is_default, widths, wrap_titles, collapsed, open_with, icon, color, inline_labels, filter, subtasks, only_mine, person, me_rules";
 
 fn from_row(row: &Row) -> rusqlite::Result<View> {
     let columns: Option<String> = row.get(4)?;
@@ -53,6 +53,9 @@ fn from_row(row: &Row) -> rusqlite::Result<View> {
             .unwrap_or_default(),
         only_mine: row.get(19)?,
         person: row.get(20)?,
+        me_rules: row
+            .get::<_, Option<String>>(21)?
+            .and_then(|json| serde_json::from_str(&json).ok()),
         own_conditions: Filter::parse(filter.as_deref()).map_or(0, |f| f.conditions.len()),
         filter,
     })

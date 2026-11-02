@@ -33,6 +33,7 @@ fn space(
         project_name: name.into(),
         icon: None,
         color: None,
+        accent: None,
         client: client.map(String::from),
         open_count,
         lists,
@@ -97,6 +98,7 @@ fn view(id: i64, name: &str, layout: Layout, is_default: bool) -> View {
         filter: None,
         only_mine: false,
         person: None,
+        me_rules: None,
         own_conditions: 0,
     }
 }

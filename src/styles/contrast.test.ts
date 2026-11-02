@@ -17,30 +17,94 @@ describe("contrastRatio", () => {
   });
 });
 
-describe.each(SCHEMES)("%s palette contrast", (scheme) => {
-  const css = sheets[scheme];
+const ACCENTS = ["blue", "purple", "pink", "red", "orange", "yellow", "green", "teal", "graphite"] as const;
 
+/** Splits `a, b(c, d), e` at the commas outside parentheses. */
+function splitArgs(text: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === "(") depth++;
+    else if (text[i] === ")") depth--;
+    else if (text[i] === "," && depth === 0) {
+      parts.push(text.slice(start, i));
+      start = i + 1;
+    }
+  }
+  parts.push(text.slice(start));
+  return parts.map((p) => p.trim());
+}
+
+/**
+ * Resolves a palette's tokens to colors: hex, rgba(), var(--x) and color-mix(in srgb, A P%, B). Mixing with
+ * `transparent` composites A at P% over the background. `overrides` replace tokens, like a `data-accent` rule.
+ */
+function paletteColors(css: string, overrides: Record<string, string> = {}) {
   function token(name: string): string {
+    if (name in overrides) return overrides[name];
     const m = css.match(new RegExp(`^\\s*${name}:\\s*([^;]+);`, "m"));
     if (!m) throw new Error(`missing token ${name}`);
     return m[1].trim();
   }
 
-  /** A token's color; an rgba() value is composited over `bg`. */
-  function color(name: string, bg?: Rgb): Rgb {
-    const value = token(name);
+  function resolve(value: string, bg?: Rgb): Rgb {
     if (value.startsWith("#")) return hexToRgb(value);
-    const m = value.match(/^rgba\(\s*(\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)$/);
-    if (!m || !bg) throw new Error(`cannot resolve ${name}: ${value}`);
-    return over([+m[1] / 255, +m[2] / 255, +m[3] / 255], +m[4], bg);
+    const variable = value.match(/^var\((--[\w-]+)\)$/);
+    if (variable) return resolve(token(variable[1]), bg);
+    const rgba = value.match(/^rgba\(\s*(\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)$/);
+    if (rgba && bg) return over([+rgba[1] / 255, +rgba[2] / 255, +rgba[3] / 255], +rgba[4], bg);
+    const mix = value.match(/^color-mix\(in srgb,(.*)\)$/);
+    if (mix) {
+      const [first, second] = splitArgs(mix[1]);
+      const share = first.match(/^(.+?)\s+([\d.]+)%$/);
+      if (share && second) {
+        const alpha = +share[2] / 100;
+        if (second === "transparent") {
+          if (!bg) throw new Error(`cannot resolve ${value} without a background`);
+          return over(resolve(share[1], bg), alpha, bg);
+        }
+        return over(resolve(share[1], bg), alpha, resolve(second, bg));
+      }
+    }
+    throw new Error(`cannot resolve ${value}`);
   }
 
-  const ratio = (fg: string, bg: string) => {
+  const color = (name: string, bg?: Rgb): Rgb => resolve(token(name), bg);
+
+  return (fg: string, bg: string) => {
     const background = color(bg);
     return contrastRatio(color(fg, background), background);
   };
+}
 
-  it.each(["--text", "--text-strong-body", "--text-secondary", "--text-tertiary", "--text-muted", "--link", "--accent-text"])(
+describe.each(SCHEMES)("%s palette contrast", (scheme) => {
+  const css = sheets[scheme];
+  const ratio = paletteColors(css);
+
+  describe.each(ACCENTS)("with the %s accent", (accent) => {
+    const accentRatio = paletteColors(css, {
+      "--accent": `var(--accent-${accent})`,
+      "--accent-text": `var(--accent-${accent}-text)`,
+    });
+
+    it.each(["--link", "--accent-text"])("%s reads at 4.5:1 on the panel", (fg) => {
+      expect(accentRatio(fg, "--panel-bg")).toBeGreaterThanOrEqual(4.5);
+    });
+
+    it("selected text reads at 4.5:1 on the selection", () => {
+      expect(accentRatio("--selection-text", "--selection-bg")).toBeGreaterThanOrEqual(4.5);
+    });
+
+    it.each([
+      ["--changed-chip-text", "--changed-chip-bg"],
+      ["--text-on-accent", "--accent"],
+    ])("%s reads at 4.5:1 on %s", (fg, bg) => {
+      expect(accentRatio(fg, bg)).toBeGreaterThanOrEqual(4.5);
+    });
+  });
+
+  it.each(["--text", "--text-strong-body", "--text-secondary", "--text-tertiary", "--text-muted"])(
     "%s reads at 4.5:1 on the panel",
     (fg) => {
       expect(ratio(fg, "--panel-bg")).toBeGreaterThanOrEqual(4.5);
@@ -53,10 +117,6 @@ describe.each(SCHEMES)("%s palette contrast", (scheme) => {
 
   it("muted meta text reads at 3:1 on the sidebar", () => {
     expect(ratio("--text-muted", "--window-bg")).toBeGreaterThanOrEqual(3);
-  });
-
-  it("selected text reads at 4.5:1 on the selection", () => {
-    expect(ratio("--selection-text", "--selection-bg")).toBeGreaterThanOrEqual(4.5);
   });
 
   it.each(["todo", "progress", "review", "blocked", "done"])("the %s status pill reads at 4.5:1", (s) => {
@@ -72,11 +132,9 @@ describe.each(SCHEMES)("%s palette contrast", (scheme) => {
   });
 
   it.each([
-    ["--changed-chip-text", "--changed-chip-bg"],
     ["--banner-info-text", "--banner-info-bg"],
     ["--banner-warn-text", "--banner-warn-bg"],
     ["--banner-error-text", "--banner-error-bg"],
-    ["--text-on-accent", "--accent"],
     ["--button-primary-text", "--button-primary-bg"],
     ["--settings-text", "--settings-bg"],
     ["--settings-text-secondary", "--settings-bg"],

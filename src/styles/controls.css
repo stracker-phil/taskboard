@@ -82,3 +82,25 @@
 .switch:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--settings-focus-ring); }
 :root.window-blurred .switch:checked { background: var(--settings-blurred-fill); }
 :root.window-blurred .settings-pane .btn-primary:not(:disabled) { background: var(--settings-control); color: var(--settings-text); }
+
+/* Accent swatches (AccentPicker): 16px dots in the palette's accent colors; the picked one gets a ring in its color,
+   drawn as a shadow so nothing moves. "Same as the app" is a ring in the app's accent. */
+.accent-picker { display: flex; align-items: center; gap: 8px; }
+.accent-swatch {
+  flex: none; width: 16px; height: 16px; margin: 0; padding: 0; border: 0; border-radius: 50%;
+  background: var(--swatch); box-shadow: inset 0 0 0 1px var(--settings-hairline);
+  transition: box-shadow var(--motion-fast) var(--ease-out);
+}
+.accent-swatch[aria-checked="true"] { box-shadow: 0 0 0 2px var(--settings-bg), 0 0 0 3.5px var(--swatch); }
+.accent-swatch:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--settings-bg), 0 0 0 4px var(--settings-focus-ring); }
+.accent-swatch--app { background: transparent; box-shadow: inset 0 0 0 4px var(--swatch); }
+.accent-swatch--app[aria-checked="true"] { box-shadow: inset 0 0 0 4px var(--swatch), 0 0 0 2px var(--settings-bg), 0 0 0 3.5px var(--swatch); }
+.accent-swatch--blue { --swatch: var(--accent-blue); }
+.accent-swatch--purple { --swatch: var(--accent-purple); }
+.accent-swatch--pink { --swatch: var(--accent-pink); }
+.accent-swatch--red { --swatch: var(--accent-red); }
+.accent-swatch--orange { --swatch: var(--accent-orange); }
+.accent-swatch--yellow { --swatch: var(--accent-yellow); }
+.accent-swatch--green { --swatch: var(--accent-green); }
+.accent-swatch--teal { --swatch: var(--accent-teal); }
+.accent-swatch--graphite { --swatch: var(--accent-graphite); }

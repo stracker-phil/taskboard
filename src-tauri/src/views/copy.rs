@@ -8,7 +8,7 @@ use super::display::{
     write_inline_labels, write_look, write_open_with, write_subtasks, write_wrap,
 };
 use super::edit::{insert_view, siblings, write_collapsed, write_sort, write_widths};
-use super::filter::{write_filter, write_only_mine, write_person};
+use super::filter::{write_filter, write_me_rules, write_only_mine, write_person};
 use super::model::View;
 use super::read::{list_views, read_view};
 use crate::db::{Db, LocalPart};
@@ -41,6 +41,7 @@ fn copy_view(conn: &Connection, view: &View, list_id: i64, name: &str) -> AppRes
     write_filter(conn, id, view.filter.as_deref())?;
     write_only_mine(conn, id, view.only_mine)?;
     write_person(conn, id, view.person.as_deref())?;
+    write_me_rules(conn, id, view.me_rules.as_deref())?;
     Ok(id)
 }
 

@@ -111,6 +111,47 @@ describe("TooltipHost", () => {
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   });
 
+  describe("near the window's edges", () => {
+    const TIP_WIDTH = 100;
+    const original = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "offsetWidth");
+
+    beforeEach(() => {
+      Object.defineProperty(HTMLElement.prototype, "offsetWidth", { configurable: true, get: () => TIP_WIDTH });
+    });
+
+    afterEach(() => {
+      if (original) Object.defineProperty(HTMLElement.prototype, "offsetWidth", original);
+      else delete (HTMLElement.prototype as { offsetWidth?: number }).offsetWidth;
+    });
+
+    /** Hovers an icon button whose box starts at `left` and is 20px wide; returns the tooltip's left in px. */
+    async function tooltipLeftFor(left: number) {
+      render(
+        <>
+          <button type="button" title="Refresh the list" />
+          <TooltipHost />
+        </>,
+      );
+      const button = screen.getByRole("button", { name: "Refresh the list" });
+      button.getBoundingClientRect = () => ({ left, right: left + 20, top: 10, bottom: 30, width: 20, height: 20, x: left, y: 10, toJSON: () => ({}) });
+      fireEvent.pointerOver(button);
+      await wait(450);
+      return parseFloat(screen.getByRole("tooltip").style.left);
+    }
+
+    it("keeps a tooltip centered under a control in the middle", async () => {
+      expect(await tooltipLeftFor(490)).toBe(500);
+    });
+
+    it("moves a tooltip inward so it stays 8px inside the left edge", async () => {
+      expect(await tooltipLeftFor(0)).toBe(8 + TIP_WIDTH / 2);
+    });
+
+    it("moves a tooltip inward so it stays 8px inside the right edge", async () => {
+      expect(await tooltipLeftFor(window.innerWidth - 20)).toBe(window.innerWidth - 8 - TIP_WIDTH / 2);
+    });
+  });
+
   describe("text cut off with an ellipsis", () => {
     const TITLE = "A very long issue title that does not fit";
 

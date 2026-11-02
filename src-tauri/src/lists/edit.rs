@@ -11,8 +11,10 @@ use super::nodes::{Kind, Node, all_nodes, node, scope_of};
 use crate::db::{Changes, Db, LocalPart};
 use crate::error::{AppError, AppResult};
 use crate::filter::{Field, Filter, OPEN_ISSUES, compile};
+use crate::look::Accent;
 use crate::look::{clean_color, clean_icon};
 use crate::order::Siblings;
+use crate::views::model::to_text;
 use crate::views::{clean_name, copy_views};
 
 /// Only filter lists can be renamed, duplicated, moved, filtered or deleted here.
@@ -293,6 +295,24 @@ pub async fn space_update(db: &Db, project_id: String, update: SpaceUpdate) -> A
         tx.execute(
             "UPDATE space SET name = ?2, icon = ?3, color = ?4, client = ?5 WHERE project_id = ?1",
             params![project_id, name, icon, color, client],
+        )?;
+        changes.local_changed(LocalPart::Spaces);
+        Ok(())
+    })
+    .await
+}
+
+/// A Space's own accent color; none follows the app's.
+pub async fn space_set_accent(
+    db: &Db,
+    project_id: String,
+    accent: Option<Accent>,
+) -> AppResult<()> {
+    db.write(move |tx, changes| {
+        require_space(tx, &project_id)?;
+        tx.execute(
+            "UPDATE space SET accent = ?2 WHERE project_id = ?1",
+            params![project_id, accent.map(to_text)],
         )?;
         changes.local_changed(LocalPart::Spaces);
         Ok(())

@@ -8,6 +8,7 @@ use crate::error::{AppError, AppResult};
 use crate::events::{KEYBINDINGS_CHANGED_EVENT, announce_settings};
 use crate::jira::capability::{Capability, CapabilityRow, capability_rows};
 use crate::launch::LaunchEvent;
+use crate::look::Accent;
 use crate::state::AppState;
 use crate::store::keybindings::Keybindings;
 use crate::store::modes::{Mode, Modes};
@@ -43,6 +44,18 @@ pub async fn appearance_set(
         .settings
         .edit(move |s| s.appearance = appearance)
         .await?;
+    announce_settings(&app, &saved);
+    Ok(saved)
+}
+
+/// The app's accent color; a Space's own accent replaces it while that Space is shown.
+#[tauri::command]
+pub async fn accent_set(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    accent: Accent,
+) -> AppResult<Settings> {
+    let saved = state.settings.edit(move |s| s.accent = accent).await?;
     announce_settings(&app, &saved);
     Ok(saved)
 }

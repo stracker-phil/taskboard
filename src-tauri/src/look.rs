@@ -1,7 +1,29 @@
 //! The look of a sidebar or tab tile: an icon (a letter, digit or emoji, or the name of a line icon) on one of
 //! the palette's tile colors (`--space-tile-N`). Spaces, filter lists and views share it.
 
+use serde::{Deserialize, Serialize};
+use ts_rs::TS;
+
 use crate::error::{AppError, AppResult};
+
+/// The windows' accent color (`palettes/*.css`, `data-accent`): the app's, or a Space's own while it is shown.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq, TS)]
+#[ts(export, export_to = "src/api/types.gen.ts")]
+#[serde(rename_all = "camelCase")]
+pub enum Accent {
+    Purple,
+    Pink,
+    Red,
+    Orange,
+    Yellow,
+    Green,
+    Teal,
+    Graphite,
+    /// Also what an unknown value reads as.
+    #[default]
+    #[serde(other)]
+    Blue,
+}
 
 /// The tile colors the palette has.
 pub const TILE_COLORS: u8 = 12;
@@ -87,6 +109,43 @@ mod tests {
 
     fn is_invalid_field(result: AppResult<Option<String>>, expected: &str) -> bool {
         matches!(result, Err(AppError::InvalidField { field, .. }) if field == expected)
+    }
+
+    #[test]
+    fn each_accent_serializes_as_its_camel_case_name_and_reads_back() {
+        for (accent, name) in [
+            (Accent::Purple, "purple"),
+            (Accent::Pink, "pink"),
+            (Accent::Red, "red"),
+            (Accent::Orange, "orange"),
+            (Accent::Yellow, "yellow"),
+            (Accent::Green, "green"),
+            (Accent::Teal, "teal"),
+            (Accent::Graphite, "graphite"),
+            (Accent::Blue, "blue"),
+        ] {
+            assert_eq!(
+                serde_json::to_value(accent).unwrap(),
+                serde_json::json!(name)
+            );
+            assert_eq!(
+                serde_json::from_value::<Accent>(serde_json::json!(name)).unwrap(),
+                accent,
+                "{name}"
+            );
+        }
+    }
+
+    #[test]
+    fn an_unknown_accent_reads_as_blue_which_is_the_default() {
+        for input in ["magenta", "", "Purple"] {
+            assert_eq!(
+                serde_json::from_value::<Accent>(serde_json::json!(input)).unwrap(),
+                Accent::Blue,
+                "{input:?}"
+            );
+        }
+        assert_eq!(Accent::default(), Accent::Blue);
     }
 
     #[test]

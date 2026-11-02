@@ -6,12 +6,12 @@ import { useStore } from "../state/store";
 import { useViews } from "./sidebar";
 
 /** Rows asked for without any narrowing or draft. */
-export const NO_NARROWING: Narrowing = { me: false, text: "", epic: null, person: null, listDraft: null, viewDraft: null };
+export const NO_NARROWING: Narrowing = { me: false, text: "", epic: null, person: null, listDraft: null, viewDraft: null, meOn: null };
 
 /** What a view's rows are asked with (ADR 0038): the toolbar's narrowing, the Me chip as drafted or else as the
  *  view saved it, and the drafts' complete conditions in place of the saved ones. */
 /** The drafts over what the view saved. */
-export function requestNarrowing(narrowing: ViewNarrowing, saved: Pick<View, "onlyMine" | "person">): Narrowing {
+export function requestNarrowing(narrowing: ViewNarrowing, saved: Pick<View, "onlyMine" | "person" | "meRules">): Narrowing {
   return {
     me: narrowing.me ?? saved.onlyMine,
     text: narrowing.text,
@@ -19,6 +19,7 @@ export function requestNarrowing(narrowing: ViewNarrowing, saved: Pick<View, "on
     person: narrowing.person === undefined ? saved.person : narrowing.person,
     listDraft: narrowing.list?.filter(isComplete) ?? null,
     viewDraft: narrowing.view?.filter(isComplete) ?? null,
+    meOn: narrowing.meRules === undefined ? saved.meRules : narrowing.meRules,
   };
 }
 

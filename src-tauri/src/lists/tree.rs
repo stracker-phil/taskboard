@@ -10,8 +10,10 @@ use crate::changes::UNSEEN;
 use crate::db::Db;
 use crate::error::AppResult;
 use crate::filter::{Compiled, Ctx, Names, OPEN_ISSUES, TRACKED_ISSUES, compile, describe};
+use crate::look::Accent;
 use crate::pins::active;
 use crate::time::format_utc;
+use crate::views::model::from_text;
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
 #[ts(export, export_to = "src/api/types.gen.ts")]
@@ -63,6 +65,8 @@ pub struct SpaceNode {
     /// A Space tile color token number.
     pub color: Option<String>,
     pub client: Option<String>,
+    /// Its own accent color, in place of the app's while it is shown.
+    pub accent: Option<Accent>,
     pub open_count: i64,
     pub lists: Vec<ListNode>,
 }
@@ -80,11 +84,12 @@ struct SpaceRow {
     icon: Option<String>,
     color: Option<String>,
     client: Option<String>,
+    accent: Option<Accent>,
 }
 
 fn tracked_spaces(conn: &Connection) -> AppResult<Vec<SpaceRow>> {
     let mut query = conn.prepare(
-        "SELECT s.project_id, p.key, COALESCE(s.name, p.name), p.name, s.icon, s.color, s.client
+        "SELECT s.project_id, p.key, COALESCE(s.name, p.name), p.name, s.icon, s.color, s.client, s.accent
          FROM space s JOIN cache.space p ON p.id = s.project_id
          WHERE s.tracked = 1 ORDER BY s.position, p.key",
     )?;
@@ -97,6 +102,9 @@ fn tracked_spaces(conn: &Connection) -> AppResult<Vec<SpaceRow>> {
             icon: row.get(4)?,
             color: row.get(5)?,
             client: row.get(6)?,
+            accent: row
+                .get::<_, Option<String>>(7)?
+                .and_then(|text| from_text(&text)),
         })
     })?;
     Ok(rows.collect::<Result<_, _>>()?)
@@ -163,6 +171,7 @@ fn build(conn: &Connection, viewer: &Viewer, unread: bool) -> AppResult<SidebarT
             icon: space.icon,
             color: space.color,
             client: space.client,
+            accent: space.accent,
             open_count: own.count.unwrap_or(0),
             lists,
         });

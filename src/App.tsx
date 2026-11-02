@@ -8,6 +8,7 @@ import { useErrorToasts } from "./lib/useErrorToasts";
 import { trackWindowFocus } from "./lib/windowFocus";
 import { queryClient } from "./queries/queryClient";
 import { useAppearance } from "./lib/theme";
+import { useShownSpaceAccent } from "./shell/useShownSpaceAccent";
 import { CommandPalette } from "./palette/CommandPalette";
 import { SpaceSheet } from "./shell/SpaceSheet";
 import { TooltipHost } from "./components/TooltipHost";
@@ -31,7 +32,7 @@ function MainWindow() {
   useCommandKeys();
   useEvents();
   usePinExpiry();
-  useAppearance();
+  useAppearance(useShownSpaceAccent());
   useErrorToasts();
   useEffect(trackWindowFocus, []);
   const sidebarHidden = useStore((s) => s.sidebarHidden);

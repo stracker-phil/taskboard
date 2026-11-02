@@ -279,6 +279,55 @@ fn the_default_rules_are_reporter_mentioned_and_subtasks_all_off() {
     );
 }
 
+fn app_rules() -> Vec<MeRule> {
+    vec![
+        on(reporter()),
+        MeRule {
+            rule: MeMatch::Mentioned,
+            on: false,
+        },
+        on(MeMatch::Subtasks),
+    ]
+}
+
+#[test]
+fn rules_for_without_own_rules_keeps_the_apps_switches() {
+    assert_eq!(rules_for(&app_rules(), None), app_rules());
+}
+
+#[test]
+fn rules_for_switches_exactly_the_listed_rules_on_in_the_apps_order() {
+    let rules = rules_for(&app_rules(), Some(&[MeMatch::Mentioned, MeMatch::Subtasks]));
+
+    assert_eq!(
+        rules,
+        vec![
+            MeRule {
+                rule: reporter(),
+                on: false
+            },
+            on(MeMatch::Mentioned),
+            on(MeMatch::Subtasks),
+        ]
+    );
+}
+
+#[test]
+fn rules_for_an_empty_list_switches_every_rule_off() {
+    let rules = rules_for(&app_rules(), Some(&[]));
+
+    assert_eq!(rules.len(), 3);
+    assert!(rules.iter().all(|rule| !rule.on), "{rules:?}");
+}
+
+#[test]
+fn rules_for_ignores_listed_rules_the_app_does_not_offer() {
+    let rules = rules_for(&app_rules(), Some(&[reviewer()]));
+
+    assert_eq!(rules.len(), 3);
+    assert!(rules.iter().all(|rule| !rule.on), "{rules:?}");
+}
+
 #[test]
 fn rules_serialize_with_a_kind_tag_and_camel_case_names() {
     let rules = vec![on(reviewer()), on(MeMatch::Mentioned)];

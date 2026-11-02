@@ -23,7 +23,7 @@ export function MeModeGroup({ settings }: { settings: Settings }) {
     <Group
       title="Me Mode"
       anchor="meMode"
-      description="Me mode always shows the issues assigned to you. Switch on what else counts as yours; the Me popup in the toolbar has the same switches."
+      description="Me mode always shows the issues assigned to you. Switch on what else counts as yours: these are the rules For all views uses and a view starts from; each view saves its own in the Me popup."
     >
       {rules.map(({ rule, on }) => {
         const label = ruleLabel(rule, fields);

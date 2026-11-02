@@ -51,6 +51,21 @@ pub fn default_rules() -> Vec<MeRule> {
     .collect()
 }
 
+/// The app's rules (Settings → Me Mode) switched as one Me mode has them: `on` lists the rules it has on; none keeps
+/// the app's switches.
+pub fn rules_for(app: &[MeRule], on: Option<&[MeMatch]>) -> Vec<MeRule> {
+    match on {
+        None => app.to_vec(),
+        Some(on) => app
+            .iter()
+            .map(|rule| MeRule {
+                rule: rule.rule.clone(),
+                on: on.contains(&rule.rule),
+            })
+            .collect(),
+    }
+}
+
 /// The issues Me mode keeps, as SQL over `cache.issue i`; without a connected account, none. A field rule for a
 /// field the cache doesn't know matches nothing; one for the assignee adds nothing to the base clause.
 pub fn condition(rules: &[MeRule], ctx: &Ctx) -> AppResult<(String, Vec<SqlValue>)> {

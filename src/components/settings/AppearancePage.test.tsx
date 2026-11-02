@@ -59,4 +59,28 @@ describe("AppearancePage", () => {
 
     expect(mocked.appearanceSet).toHaveBeenCalledWith(value);
   });
+
+  describe("accent color", () => {
+    it("checks the accent of the settings", async () => {
+      mocked.getSettings.mockResolvedValue(settings({ accent: "green" }));
+      render(
+        <QueryClientProvider client={createQueryClient()}>
+          <AppearancePage />
+        </QueryClientProvider>,
+      );
+
+      const group = await screen.findByRole("radiogroup", { name: "Accent color" });
+
+      expect(await within(group).findByRole("radio", { name: "Green", checked: true })).toBeInTheDocument();
+    });
+
+    it("sends the clicked accent to Rust", async () => {
+      await renderPage();
+      const group = screen.getByRole("radiogroup", { name: "Accent color" });
+
+      await userEvent.click(within(group).getByRole("radio", { name: "Purple" }));
+
+      expect(mocked.accentSet).toHaveBeenCalledWith("purple");
+    });
+  });
 });

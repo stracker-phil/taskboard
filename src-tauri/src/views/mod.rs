@@ -12,6 +12,7 @@ mod filter;
 pub mod groups;
 mod lookup;
 pub mod model;
+mod narrowing;
 pub mod query;
 mod read;
 pub mod rows;
@@ -31,10 +32,12 @@ pub use edit::{
     view_set_widths,
 };
 pub use filter::{
-    seed_only_mine, view_conditions, view_set_filter, view_set_only_mine, view_set_person,
+    seed_only_mine, view_conditions, view_set_filter, view_set_me_rules, view_set_only_mine,
+    view_set_person,
 };
 pub use model::{DEFAULT_COLUMNS, GroupBy, IssueOpening, Layout, Sort, SortBy, SubtaskMode, View};
-pub use query::{Narrowing, ViewAt, ViewData, unseen_ids, view_people, view_rows};
+pub use narrowing::Narrowing;
+pub use query::{ViewAt, ViewData, unseen_ids, view_people, view_rows};
 pub use read::{columns_for_new_view, list_views, read_view, views_of};
 pub use sorting::fold;
 pub use validate::clean_name;

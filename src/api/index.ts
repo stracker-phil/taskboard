@@ -6,8 +6,10 @@ import type {
   AppError,
   AppInfo,
   Assignees,
+  Accent,
   Appearance,
   Behaviour,
+  MeMatch,
   Capability,
   CapabilityRow,
   ChangeNotAllowed,
@@ -150,6 +152,7 @@ export const api = {
   listMatchCount: (id: number, filter: Filter, me: boolean) => invoke<MatchCount>("list_match_count", { id, filter, me }),
   spaceMove: (projectId: string, position: number) => invoke<void>("space_move", { projectId, position }),
   spaceUpdate: (projectId: string, update: SpaceUpdate) => invoke<void>("space_update", { projectId, update }),
+  spaceSetAccent: (projectId: string, accent: Accent | null) => invoke<void>("space_set_accent", { projectId, accent }),
   /** "Use as Space default": the columns new views in this Space start with. */
   spaceDefaultColumns: (projectId: string, columns: string[]) => invoke<void>("space_default_columns", { projectId, columns }),
   /** Where the main window is; Everything when the saved place is gone. */
@@ -199,6 +202,7 @@ export const api = {
   viewSetOnlyMine: (id: number, on: boolean) => invoke<View>("view_set_only_mine", { id, on }),
   /** Saves the person chip; null for anyone. */
   viewSetPerson: (id: number, person: string | null) => invoke<View>("view_set_person", { id, person }),
+  viewSetMeRules: (id: number, rules: MeMatch[] | null) => invoke<View>("view_set_me_rules", { id, rules }),
   /** Whom the person chip offers: me, then the assignees of the view's issues before the chip narrows them. */
   viewPeople: (listId: number, viewId: number, narrowing: Narrowing) => invoke<Person[]>("view_people", { listId, viewId, narrowing }),
   viewSetColumnCollapsed: (id: number, statusId: string, collapsed: boolean) => invoke<View>("view_set_column_collapsed", { id, statusId, collapsed }),
@@ -206,6 +210,7 @@ export const api = {
   behaviourSet: (behaviour: Behaviour) => invoke<Settings>("behaviour_set", { behaviour }),
   /** Light, dark or following macOS; every window repaints. */
   appearanceSet: (appearance: Appearance) => invoke<Settings>("appearance_set", { appearance }),
+  accentSet: (accent: Accent) => invoke<Settings>("accent_set", { accent }),
   issueGet: (id: string) => invoke<IssueDetail>("issue_get", { id }),
   /** Remove from cache: only for an issue gone from Jira. */
   issueForget: (id: string) => invoke<void>("issue_forget", { id }),

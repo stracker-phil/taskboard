@@ -13,7 +13,8 @@ import { paletteMenus } from "../../palette/menus";
 import { createQueryClient } from "../../queries/queryClient";
 import { resetStore, useStore } from "../../state/store";
 import type { View } from "../../api";
-import { narrowingKey } from "../../state/slices/narrowing";
+import { requestNarrowing } from "../../queries/views";
+import { narrowingKey, NO_VIEW_NARROWING } from "../../state/slices/narrowing";
 import { filterOptions, listConditions } from "../../test/filters";
 import { ALEX, SAM } from "../../test/issues";
 import { behaviour, settings } from "../../test/settings";
@@ -860,8 +861,8 @@ describe("Toolbar Me mode", () => {
       expect(dialog.getByRole("button", { name: "Mentioned in a comment" })).toHaveAttribute("aria-pressed", "false");
     });
 
-    it("sends a switch edit for the clicked rule with the opposite position", async () => {
-      renderToolbar(SPACE_LEVEL);
+    it("sends an app-wide switch edit for the clicked rule while Me holds in every view", async () => {
+      await renderEverywhere();
       await userEvent.click(optionsButton());
 
       await userEvent.click(await (await popover()).findByRole("button", { name: "Subtasks of my issues" }));
@@ -869,9 +870,9 @@ describe("Toolbar Me mode", () => {
       await waitFor(() => expect(mocked.meRuleEdit).toHaveBeenCalledWith({ kind: "switch", rule: { kind: "subtasks" }, on: true }));
     });
 
-    it("shows an error toast when a rule cannot be saved", async () => {
+    it("shows an error toast when an app-wide rule cannot be saved", async () => {
       mocked.meRuleEdit.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
-      renderToolbar(SPACE_LEVEL);
+      await renderEverywhere();
       await userEvent.click(optionsButton());
 
       await userEvent.click(await (await popover()).findByRole("button", { name: "Mentioned in a comment" }));
@@ -886,6 +887,97 @@ describe("Toolbar Me mode", () => {
       await userEvent.click((await popover()).getByRole("button", { name: "Fields…" }));
 
       expect(mocked.runCommand).toHaveBeenCalledWith("app:settings:general:meMode");
+    });
+  });
+
+  describe("rules in the view's own Me mode", () => {
+    const MENTIONED = { kind: "mentioned" } as const;
+    const REPORTER = { kind: "field", field: "reporter" } as const;
+    const mentionedRow = async () => (await popover()).findByRole("button", { name: "Mentioned in a comment" });
+
+    /** Renders a view that saved Me on with the given rules (null follows the app's). */
+    async function renderSavedMe(meRules: (typeof MENTIONED | typeof REPORTER)[] | null) {
+      mocked.viewsOf.mockResolvedValue([view({ onlyMine: true, meRules })]);
+      renderToolbar(SPACE_LEVEL, 0, { onlyMine: true, meRules });
+      await waitFor(() => expect(meChip()).toHaveAttribute("aria-pressed", "true"));
+      await userEvent.click(optionsButton());
+    }
+
+    it("drafts a toggled rule on the view instead of editing the app's rules", async () => {
+      await renderSavedMe(null);
+
+      await userEvent.click(await mentionedRow());
+
+      expect(await mentionedRow()).toHaveAttribute("aria-pressed", "true");
+      expect(await screen.findByRole("button", { name: "Save View" })).toBeInTheDocument();
+      expect(revertViewButton()).toBeInTheDocument();
+      expect(mocked.meRuleEdit).not.toHaveBeenCalled();
+    });
+
+    it("asks for the rows with the rules that are on", async () => {
+      await renderSavedMe(null);
+
+      await userEvent.click(await mentionedRow());
+
+      await waitFor(() => expect(mocked.viewPeople).toHaveBeenLastCalledWith(11, 101, expect.objectContaining({ me: true, meOn: [MENTIONED] })));
+    });
+
+    it("saves the rules that are on on the view with Save View", async () => {
+      await renderSavedMe(null);
+      await userEvent.click(await mentionedRow());
+
+      await userEvent.click(await screen.findByRole("button", { name: "Save View" }));
+
+      await waitFor(() => expect(mocked.viewSetMeRules).toHaveBeenCalledWith(101, [MENTIONED]));
+      await waitFor(() => expect(saveViewButton()).not.toBeInTheDocument());
+      expect(mocked.meRuleEdit).not.toHaveBeenCalled();
+    });
+
+    it("drops the drafted rules with Revert View", async () => {
+      await renderSavedMe(null);
+      await userEvent.click(await mentionedRow());
+
+      await userEvent.click(await screen.findByRole("button", { name: "Revert View" }));
+
+      expect(saveViewButton()).not.toBeInTheDocument();
+      expect(mocked.viewSetMeRules).not.toHaveBeenCalled();
+      expect(useStore.getState().narrowings[narrowingKey(11, 101)]?.meRules).toBeUndefined();
+    });
+
+    it("shows the rules the view saved, whatever the app's switches are", async () => {
+      mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ meRules: [{ rule: REPORTER, on: true }, { rule: MENTIONED, on: false }] }) }));
+      await renderSavedMe([MENTIONED]);
+
+      expect(await mentionedRow()).toHaveAttribute("aria-pressed", "true");
+      expect((await popover()).getByRole("button", { name: "Reporter" })).toHaveAttribute("aria-pressed", "false");
+      expect(saveViewButton()).not.toBeInTheDocument();
+    });
+
+    it("saves the app's rules that are on when Me was just turned on with no rule drafted", async () => {
+      mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ meRules: [{ rule: REPORTER, on: true }, { rule: MENTIONED, on: false }] }) }));
+      renderToolbar(SPACE_LEVEL);
+      await userEvent.click(meChip());
+
+      await userEvent.click(await screen.findByRole("button", { name: "Save View" }));
+
+      await waitFor(() => expect(mocked.viewSetOnlyMine).toHaveBeenCalledWith(101, true));
+      await waitFor(() => expect(mocked.viewSetMeRules).toHaveBeenCalledWith(101, [REPORTER]));
+    });
+
+    it("keeps another view's saved rules and the app's rules when Me is turned on and a rule switched in this view", async () => {
+      const viewA = view({ id: 101, name: "Mine", onlyMine: true, meRules: [MENTIONED] });
+      mocked.viewsOf.mockResolvedValue([viewA, view({ id: 102, name: "Board" })]);
+      renderToolbar(SPACE_LEVEL, 0, { id: 102, name: "Board" });
+      await userEvent.click(meChip());
+      await userEvent.click(optionsButton());
+
+      await userEvent.click((await popover()).getByRole("button", { name: "Reporter" }));
+
+      expect(await screen.findByRole("button", { name: "Save View" })).toBeInTheDocument();
+      expect(mocked.meRuleEdit).not.toHaveBeenCalled();
+      const narrowings = useStore.getState().narrowings;
+      expect(requestNarrowing(narrowings[narrowingKey(11, 101)] ?? NO_VIEW_NARROWING, viewA).meOn).toEqual([MENTIONED]);
+      expect(requestNarrowing(narrowings[narrowingKey(11, 102)] ?? NO_VIEW_NARROWING, view({ id: 102 })).meOn).toEqual([REPORTER]);
     });
   });
 

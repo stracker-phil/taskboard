@@ -95,7 +95,7 @@ describe("ListView", () => {
   it("asks Rust for the rows of the list and view", async () => {
     await renderList(viewData([groupOf([OPEN])], [OPEN]));
 
-    expect(mocked.viewRows).toHaveBeenCalledWith(11, 101, { me: false, text: "", epic: null, person: null, listDraft: null, viewDraft: null });
+    expect(mocked.viewRows).toHaveBeenCalledWith(11, 101, { me: false, text: "", epic: null, person: null, listDraft: null, viewDraft: null, meOn: null });
   });
 
   it("shows what the level is missing instead of a grid when the view has no issues", async () => {
@@ -1171,6 +1171,53 @@ describe("ListView", () => {
 
       expect(screen.getByRole("row", { name: /NW-1001/ })).toHaveAttribute("aria-selected", "true");
       expect(screen.getByRole("row", { name: /NW-1042/ })).toHaveAttribute("aria-selected", "false");
+    });
+
+    it("highlights the selected row only while nothing is picked", async () => {
+      await renderList(data(), "preview");
+
+      await userEvent.click(await text("Redesign the pricing page"));
+
+      const selected = screen.getByRole("row", { name: /NW-1042/ });
+      expect(selected).toHaveClass("list-row--selected");
+      expect(selected).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByRole("row", { name: /NW-1001/ })).toHaveAttribute("aria-selected", "false");
+    });
+
+    it("highlights the picked rows as picked, not selected, and drops the selected highlight", async () => {
+      await renderList(data(), "preview");
+      await userEvent.click(await text("Redesign the pricing page"));
+
+      fireEvent.click(await text("Publish the launch notes"), { metaKey: true });
+
+      for (const key of [/NW-1042/, /NW-1001/]) {
+        const picked = screen.getByRole("row", { name: key });
+        expect(picked).toHaveClass("list-row--picked");
+        expect(picked).not.toHaveClass("list-row--selected");
+        expect(picked).toHaveAttribute("aria-selected", "true");
+      }
+      expect(screen.getByRole("row", { name: /NW-1003/ })).toHaveAttribute("aria-selected", "false");
+    });
+
+    it("shows the checkbox of the current row only, while rows are picked", async () => {
+      await renderList(data(), "preview");
+      await userEvent.click(await text("Redesign the pricing page"));
+
+      fireEvent.click(await text("Publish the launch notes"), { metaKey: true });
+
+      expect(box("NW-1001")).toHaveClass("pick-box--shown");
+      expect(box("NW-1001")).toBeChecked();
+      expect(box("NW-1042")).not.toHaveClass("pick-box--shown");
+      expect(box("NW-1042")).toBeChecked();
+      expect(box("NW-1003")).not.toHaveClass("pick-box--shown");
+    });
+
+    it("shows no checkbox without the pointer while nothing is picked", async () => {
+      await renderList(data(), "preview");
+
+      await userEvent.click(await text("Redesign the pricing page"));
+
+      screen.getAllByRole("checkbox").forEach((b) => expect(b).not.toHaveClass("pick-box--shown"));
     });
 
     it("picks the rows from the selected one to the ⇧-clicked one", async () => {

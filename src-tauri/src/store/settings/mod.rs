@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 use crate::jira::capability::Capability;
+use crate::look::Accent;
 use crate::pins::PinDuration;
 use crate::views::IssueOpening;
 
@@ -26,6 +27,7 @@ pub struct Settings {
     /// Changed only through the sync commands, which validate it.
     pub sync: SyncSettings,
     pub appearance: Appearance,
+    pub accent: Accent,
     pub behaviour: Behaviour,
 }
 

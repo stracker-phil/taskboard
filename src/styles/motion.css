@@ -77,3 +77,6 @@
 .flash { animation: flash 1200ms var(--ease-out); }
 @keyframes flash { from { box-shadow: inset 0 0 0 100vmax var(--flash-bg); } }
 @media (prefers-reduced-motion: reduce) { .flash { animation: none; } }
+
+/* The scheme or accent is switching (lib/theme.ts): nothing transitions, so every color takes the new value. */
+.restyling, .restyling *, .restyling *::before, .restyling *::after { transition: none !important; }

@@ -671,7 +671,7 @@ describe("dragging in the Table", () => {
 
   it("shows the target status in the copy's status cell while over a zone that takes the drop, and the own one again after leaving it", async () => {
     answer([target("b", "Set status to In Review", { kind: "status", style: "review" }, "In Review")]);
-    await renderTable();
+    await renderTable(viewData(GROUPS, [PRICING, FOOTER, MIGRATION], { columns: ["status"] }));
     dragPricing();
     await answered();
 

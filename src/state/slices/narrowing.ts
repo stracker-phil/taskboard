@@ -1,4 +1,4 @@
-import type { Condition } from "../../api";
+import type { Condition, MeMatch } from "../../api";
 import type { Slice } from "../store";
 
 /** What the toolbar narrows a view to, and its unsaved changes (ADR 0038). None of it is saved: Save View writes
@@ -12,6 +12,8 @@ export interface ViewNarrowing {
   me: boolean | null;
   /** The person chip's draft: an account, null for anyone; undefined shows the view's saved one. */
   person?: string | null;
+  /** The Me rules' draft: the ones on; undefined shows the view's saved ones (ADR 0051). */
+  meRules?: MeMatch[] | null;
   /** Draft conditions in place of the filter list's own ones, as edited (incomplete ones too); null keeps the
    *  saved ones. */
   list: Condition[] | null;
@@ -34,7 +36,7 @@ export interface NarrowingSlice {
   requestFilter: () => void;
 }
 
-export const NO_VIEW_NARROWING: ViewNarrowing = { text: "", epic: null, me: null, person: undefined, list: null, view: null };
+export const NO_VIEW_NARROWING: ViewNarrowing = { text: "", epic: null, me: null, person: undefined, meRules: undefined, list: null, view: null };
 
 export const narrowingKey = (listId: number, viewId: number) => `${listId}:${viewId}`;
 
@@ -47,7 +49,7 @@ export const narrowingSlice: Slice<NarrowingSlice> = {
       set((s) => {
         const current = s.narrowings[key];
         if (!current) return s;
-        return { narrowings: { ...s.narrowings, [key]: { ...current, me: null, person: undefined, list: null, view: null } } };
+        return { narrowings: { ...s.narrowings, [key]: { ...current, me: null, person: undefined, meRules: undefined, list: null, view: null } } };
       }),
     keepOnlyNarrowing: (key) => get().keepNarrowings([key]),
     keepNarrowings: (keys) =>

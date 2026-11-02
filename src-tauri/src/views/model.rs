@@ -6,6 +6,8 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
+use crate::me_mode::MeMatch;
+
 /// The columns a new view starts with (spec: Columns per view).
 pub const DEFAULT_COLUMNS: [&str; 4] = ["assignee", "epic", "release", "priority"];
 
@@ -121,6 +123,8 @@ pub struct View {
     pub only_mine: bool,
     /// The saved person chip: only the issues assigned to this account, on top of the filter.
     pub person: Option<String>,
+    /// The Me rules this view has on (ADR 0051); none follows the app's.
+    pub me_rules: Option<Vec<MeMatch>>,
     /// The tab's icon (`look`); none shows the layout's.
     pub icon: Option<String>,
     /// The icon's tile color; none shows the icon plain.

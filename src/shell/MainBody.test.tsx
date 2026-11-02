@@ -209,7 +209,7 @@ describe("MainBody", () => {
 
       renderBody();
 
-      await waitFor(() => expect(mocked.viewRows).toHaveBeenCalledWith(11, 101, { me: true, text: "", epic: null, person: null, listDraft: null, viewDraft: null }));
+      await waitFor(() => expect(mocked.viewRows).toHaveBeenCalledWith(11, 101, { me: true, text: "", epic: null, person: null, listDraft: null, viewDraft: null, meOn: null }));
     });
 
     it("asks for the rows narrowed to the picked person", async () => {
@@ -246,7 +246,7 @@ describe("MainBody", () => {
 
       renderBody();
 
-      await waitFor(() => expect(mocked.viewRows).toHaveBeenCalledWith(11, 101, { me: false, text: "pricing", epic: null, person: null, listDraft: null, viewDraft: null }));
+      await waitFor(() => expect(mocked.viewRows).toHaveBeenCalledWith(11, 101, { me: false, text: "pricing", epic: null, person: null, listDraft: null, viewDraft: null, meOn: null }));
       expect(mocked.viewRows).not.toHaveBeenCalledWith(11, 101, expect.objectContaining({ me: true }));
     });
 

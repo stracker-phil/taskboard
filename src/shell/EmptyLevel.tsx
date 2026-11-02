@@ -16,7 +16,7 @@ export function EmptyLevel({ listId, viewId }: { listId: number; viewId: number 
   const key = narrowingKey(listId, viewId);
   const narrowing = useRequestNarrowing(listId, viewId) ?? NO_NARROWING;
   const { unreadOnly } = useModes();
-  const me = useMeMode(key, narrowing.me, narrowing.person);
+  const me = useMeMode(key, narrowing.me, narrowing.person, narrowing.meOn);
   const setNarrowing = useStore((s) => s.setNarrowing);
   const requestFilter = useStore((s) => s.requestFilter);
   const level = tree ? findLevel(tree, listId) : null;

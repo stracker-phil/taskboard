@@ -2101,6 +2101,100 @@ mod subtasks {
             assert_consistent(&data);
         }
 
+        /// Resolved as the commands do, against the app's default rules (all off).
+        fn with_view_rules(me: bool, me_on: Option<Vec<MeMatch>>) -> Narrowing {
+            let mut narrowing = Narrowing {
+                me,
+                me_on,
+                ..Narrowing::default()
+            };
+            narrowing.me_rules =
+                narrowing.resolve_me_rules(&taskboard_lib::me_mode::default_rules());
+            narrowing
+        }
+
+        /// Adds a comment mentioning me to a top-level NW issue assigned to someone else; returns its key.
+        async fn mention_me_on_an_issue_of_someone_else(site: &Site) -> String {
+            let key = strings(
+                site.db(),
+                format!(
+                    "SELECT key FROM cache.issue
+                     WHERE project_id = '{NW}' AND gone = 0 AND type_is_subtask = 0
+                       AND parent_id IS NULL AND COALESCE(assignee_id, '') != '{ME_ACCOUNT_ID}'
+                       AND COALESCE(reporter_id, '') != '{ME_ACCOUNT_ID}'
+                     ORDER BY key LIMIT 1"
+                ),
+            )
+            .await
+            .remove(0);
+            let body = serde_json::json!({"type": "doc", "version": 1, "content": [
+                {"type": "paragraph", "content": [
+                    {"type": "mention", "attrs": {"id": ME_ACCOUNT_ID, "text": "@Alex"}}
+                ]}
+            ]})
+            .to_string();
+            let issue = key.clone();
+            site.db()
+                .write(move |tx, _| {
+                    tx.execute(
+                        "INSERT INTO cache.comment (id, issue_id, body_adf, created_at, updated_at)
+                         SELECT 'c-view-rules', id, ?2, '2026-10-02T09:00:00Z', '2026-10-02T09:00:00Z'
+                         FROM cache.issue WHERE key = ?1",
+                        rusqlite::params![issue, body],
+                    )?;
+                    Ok(())
+                })
+                .await
+                .unwrap();
+            key
+        }
+
+        #[tokio::test]
+        #[ignore = "syncs the demo site into a temp database"]
+        async fn a_view_in_me_mode_with_the_mentioned_rule_shows_issues_mentioning_me_though_the_app_has_it_off()
+         {
+            let site = Site::new().await;
+            let mentioned = mention_me_on_an_issue_of_someone_else(&site).await;
+
+            let own = site
+                .nw_data(with_view_rules(true, Some(vec![MeMatch::Mentioned])))
+                .await;
+            let apps = site.nw_data(with_view_rules(true, None)).await;
+
+            assert!(has(&own, &mentioned));
+            assert!(!has(&apps, &mentioned));
+        }
+
+        #[tokio::test]
+        #[ignore = "syncs the demo site into a temp database"]
+        async fn a_view_in_me_mode_with_an_empty_rule_list_shows_only_the_assigned_issues() {
+            let site = Site::new().await;
+            mention_me_on_an_issue_of_someone_else(&site).await;
+
+            let data = site.nw_data(with_view_rules(true, Some(vec![]))).await;
+
+            assert!(!data.rows.is_empty());
+            assert!(
+                data.rows
+                    .values()
+                    .all(|row| is_assigned_to(row, ME_ACCOUNT_ID))
+            );
+            assert_consistent(&data);
+        }
+
+        #[tokio::test]
+        #[ignore = "syncs the demo site into a temp database"]
+        async fn a_view_not_in_me_mode_is_not_narrowed_by_the_rules_it_saved() {
+            let site = Site::new().await;
+            let everyone = site.nw_data(Narrowing::default()).await;
+
+            let data = site
+                .nw_data(with_view_rules(false, Some(vec![MeMatch::Mentioned])))
+                .await;
+
+            assert_eq!(sorted_keys(&data), sorted_keys(&everyone));
+        }
+
         #[tokio::test]
         #[ignore = "syncs the demo site into a temp database"]
         async fn a_row_counts_its_direct_children_of_any_type_done_ones_included() {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 /** How long the pointer rests before a tooltip shows. */
 const SHOW_DELAY_MS = 450;
@@ -56,6 +56,12 @@ const owner = (target: EventTarget | null) =>
  *  keyboard focus. Any element with a `title` gets it, and any text cut off with an ellipsis shows in full. */
 export function TooltipHost() {
   const [tip, setTip] = useState<Tip | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+  // The shown tooltip's width, measured before it paints, so it can keep clear of the window's edges.
+  const [width, setWidth] = useState(0);
+  useLayoutEffect(() => {
+    if (ref.current) setWidth(ref.current.offsetWidth);
+  }, [tip]);
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -116,10 +122,12 @@ export function TooltipHost() {
   if (!tip) return null;
   // Below the control, centered; above it when there's no room underneath.
   const below = tip.rect.bottom + GAP + 28 < window.innerHeight;
-  const left = Math.min(Math.max(tip.rect.left + tip.rect.width / 2, EDGE), window.innerWidth - EDGE);
+  // Centered on the control, but all of it EDGE inside the window.
+  const half = width / 2;
+  const left = Math.min(Math.max(tip.rect.left + tip.rect.width / 2, EDGE + half), window.innerWidth - EDGE - half);
   const style = below ? { left, top: tip.rect.bottom + GAP } : { left, bottom: window.innerHeight - tip.rect.top + GAP };
   return (
-    <div className={below ? "tooltip" : "tooltip tooltip--above"} role="tooltip" style={style}>
+    <div ref={ref} className={below ? "tooltip" : "tooltip tooltip--above"} role="tooltip" style={style}>
       {tip.text}
     </div>
   );

@@ -63,9 +63,9 @@ export const BoardColumnCards = memo(function BoardColumnCards({ ids, rows, fiel
                 row={row}
                 fields={fields}
                 inlineLabels={inlineLabels}
-                selected={picking ? pickedIds.has(row.id) : row.id === selected}
+                selected={!picking && row.id === selected}
                 picked={pickedIds.has(row.id)}
-                picking={picking}
+                showBox={picking && row.id === selected}
                 onOpen={onOpen}
                 onToggleBox={onToggleBox}
                 onOpenInTab={onOpenInTab}

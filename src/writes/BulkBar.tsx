@@ -62,9 +62,9 @@ function Bar({ ids, leaving, onClear }: { ids: string[]; leaving: boolean; onCle
     <div className={leaving ? "bulk-bar bulk-bar--leaving" : "bulk-bar"} role="toolbar" aria-label="Picked issues" inert={leaving}>
       <span className="bulk-bar__count">{ids.length === 1 ? "1 picked" : `${ids.length} picked`}</span>
       <span className="bulk-bar__divider" aria-hidden="true" />
-      <BarButton menu="status" icon={<CircleDot size={15} />} label="Status" title={title("Change their status", "issue.changeStatus")} enabled={canStatus} busy={busy} run={(at) => openBulkStatusMenu(ids, at, (on) => marking(on, "status"))} />
-      <BarButton menu="assign" icon={<UserRound size={15} />} label="Assign" title={title("Assign them", "issue.assignTo")} enabled={canAssign} busy={busy} run={(at) => openBulkAssignMenu(ids, at, (on) => marking(on, "assign"))} />
-      <BarButton menu="priority" icon={<Flag size={15} />} label="Priority" title={title("Set their priority", "issue.changePriority")} enabled={canPriority} busy={busy} run={(at) => openBulkPriorityMenu(ids, at, (on) => marking(on, "priority"))} />
+      <BarButton menu="status" icon={<CircleDot size={15} aria-hidden="true" />} label="Status" title={title("Change their status", "issue.changeStatus")} enabled={canStatus} busy={busy} run={(at) => openBulkStatusMenu(ids, at, (on) => marking(on, "status"))} />
+      <BarButton menu="assign" icon={<UserRound size={15} aria-hidden="true" />} label="Assign" title={title("Assign them", "issue.assignTo")} enabled={canAssign} busy={busy} run={(at) => openBulkAssignMenu(ids, at, (on) => marking(on, "assign"))} />
+      <BarButton menu="priority" icon={<Flag size={15} aria-hidden="true" />} label="Priority" title={title("Set their priority", "issue.changePriority")} enabled={canPriority} busy={busy} run={(at) => openBulkPriorityMenu(ids, at, (on) => marking(on, "priority"))} />
       <span className="bulk-bar__divider" aria-hidden="true" />
       <button type="button" className="toolbar-btn" onClick={markRead}>
         <CheckCheck size={15} aria-hidden="true" />
@@ -105,7 +105,7 @@ function BarButton({ menu, icon, label, title, enabled, busy, run }: BarButtonPr
       disabled={!enabled || busy !== null}
       onClick={(e) => run(e.currentTarget)}
     >
-      <span aria-hidden="true">{icon}</span>
+      {icon}
       {label}
     </button>
   );

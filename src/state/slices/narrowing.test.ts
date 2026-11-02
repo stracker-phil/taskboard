@@ -64,6 +64,17 @@ describe("clearDrafts", () => {
     expect(narrowings()[OTHER]?.person).toBeUndefined();
   });
 
+  it("drops drafted Me rules back to the view's saved ones, even a drafted empty set", () => {
+    useStore.getState().setNarrowing(KEY, { meRules: [] });
+    useStore.getState().setNarrowing(OTHER, { meRules: [{ kind: "mentioned" }] });
+
+    useStore.getState().clearDrafts(KEY);
+    useStore.getState().clearDrafts(OTHER);
+
+    expect(narrowings()[KEY]?.meRules).toBeUndefined();
+    expect(narrowings()[OTHER]?.meRules).toBeUndefined();
+  });
+
   it("keeps the text filter and the epic", () => {
     useStore.getState().setNarrowing(KEY, { me: true, text: "login", epic: "10001" });
 

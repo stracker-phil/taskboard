@@ -276,6 +276,67 @@ mod tests {
     }
 
     #[test]
+    fn a_file_without_accent_reads_as_blue() {
+        let dir = temp_config_dir();
+        fs::write(
+            dir.path().join(FILE_NAME),
+            r#"{"sync":{"focusedMinutes":10}}"#,
+        )
+        .unwrap();
+
+        let settings = SettingsStore::open(dir.path()).get();
+
+        assert_eq!(settings.accent, crate::look::Accent::Blue);
+        assert_eq!(settings.sync.focused_minutes, 10);
+    }
+
+    #[tokio::test]
+    async fn the_accent_round_trips_through_the_store_and_the_file() {
+        use crate::look::Accent;
+        for (accent, name) in [(Accent::Teal, "teal"), (Accent::Graphite, "graphite")] {
+            let dir = temp_config_dir();
+            let store = SettingsStore::open(dir.path());
+
+            let saved = store.edit(move |s| s.accent = accent).await.unwrap();
+
+            assert_eq!(saved.accent, accent, "{name}");
+            assert_eq!(store.get().accent, accent, "{name}");
+            assert_eq!(
+                SettingsStore::open(dir.path()).get().accent,
+                accent,
+                "{name}"
+            );
+            let file: serde_json::Value =
+                serde_json::from_str(&fs::read_to_string(dir.path().join(FILE_NAME)).unwrap())
+                    .unwrap();
+            assert_eq!(file["accent"], serde_json::json!(name), "{name}");
+        }
+    }
+
+    #[test]
+    fn an_unknown_accent_in_the_file_reads_as_blue_and_keeps_the_rest() {
+        let dir = temp_config_dir();
+        fs::write(
+            dir.path().join(FILE_NAME),
+            r#"{"accent":"magenta","sync":{"focusedMinutes":10}}"#,
+        )
+        .unwrap();
+
+        let settings = SettingsStore::open(dir.path()).get();
+
+        assert_eq!(
+            settings,
+            Settings {
+                sync: SyncSettings {
+                    focused_minutes: 10,
+                    ..SyncSettings::default()
+                },
+                ..Settings::default()
+            }
+        );
+    }
+
+    #[test]
     fn settings_serialize_with_the_camel_case_appearance() {
         let settings = Settings {
             appearance: Appearance::Light,

@@ -34,6 +34,7 @@ export const settings = (patch: Partial<Settings> = {}): Settings => ({
   connection: emptyConnection(),
   sync: defaultSync(),
   appearance: "system",
+  accent: "blue",
   behaviour: behaviour(),
   ...patch,
 });

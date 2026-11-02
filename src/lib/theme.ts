@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { Appearance } from "../api";
+import type { Accent, Appearance } from "../api";
 import { useSettings } from "../queries/settings";
 
 /** The palette's scheme (`palettes/<scheme>.css`). */
@@ -15,8 +15,20 @@ export function schemeFor(appearance: Appearance, darkSystem: boolean): Scheme {
   return appearance;
 }
 
+/** Changes the look at once. WebKit leaves a color with a transition stale when only an inherited custom property
+ *  changes, so transitions pause while the window restyles. */
+function setLook(key: "scheme" | "accent", value: string) {
+  const root = document.documentElement;
+  if (root.dataset[key] === value) return;
+  root.classList.add("restyling");
+  root.dataset[key] = value;
+  // Restyles now, while nothing transitions.
+  void root.offsetHeight;
+  requestAnimationFrame(() => root.classList.remove("restyling"));
+}
+
 function applyScheme(scheme: Scheme) {
-  document.documentElement.dataset.scheme = scheme;
+  setLook("scheme", scheme);
 }
 
 /** Sets `data-scheme` on <html> before the first render (from macOS, until the settings load), so the first
@@ -25,8 +37,9 @@ export function applyInitialLook() {
   applyScheme(systemDark() ? "dark" : "light");
 }
 
-/** Keeps the window's scheme in step with the Appearance setting and, on Automatic, with macOS. */
-export function useAppearance() {
+/** Keeps the window's scheme in step with the Appearance setting (on Automatic, with macOS) and its accent with the
+ *  app's; `spaceAccent`, the shown Space's own, replaces the app's. */
+export function useAppearance(spaceAccent: Accent | null = null) {
   const { data: settings } = useSettings();
   const [dark, setDark] = useState(systemDark);
   useEffect(() => {
@@ -38,4 +51,6 @@ export function useAppearance() {
   }, []);
   const appearance = settings?.appearance ?? "system";
   useEffect(() => applyScheme(schemeFor(appearance, dark)), [appearance, dark]);
+  const accent = spaceAccent ?? settings?.accent ?? "blue";
+  useEffect(() => setLook("accent", accent), [accent]);
 }

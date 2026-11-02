@@ -431,6 +431,43 @@ describe("BoardView", () => {
       expect(useStore.getState().issueView).toBeNull();
     });
 
+    describe("highlighting", () => {
+      const box = (key: string) => screen.getByRole("checkbox", { name: `Pick ${key}` });
+
+      it("shows no checkbox without the pointer while nothing is picked", async () => {
+        await renderBoard(BOARD_DATA);
+
+        screen.getAllByRole("checkbox").forEach((b) => expect(b).not.toHaveClass("pick-box--shown"));
+      });
+
+      it("marks the picked cards as picked, not selected", async () => {
+        await renderBoard(BOARD_DATA);
+
+        fireEvent.click(card("Write the footer copy"), { metaKey: true });
+        fireEvent.click(card("Pick the typefaces"), { metaKey: true });
+
+        for (const summary of ["Write the footer copy", "Pick the typefaces"]) {
+          expect(card(summary)).toHaveClass("board-card--picked");
+          expect(card(summary)).not.toHaveClass("board-card--selected");
+          expect(card(summary)).toHaveAttribute("aria-current", "true");
+        }
+        expect(card("Draft the sitemap")).not.toHaveAttribute("aria-current");
+      });
+
+      it("shows the checkbox of the current card only, while cards are picked", async () => {
+        await renderBoard(BOARD_DATA);
+
+        fireEvent.click(card("Write the footer copy"), { metaKey: true });
+        fireEvent.click(card("Pick the typefaces"), { metaKey: true });
+
+        expect(box("NW-103")).toHaveClass("pick-box--shown");
+        expect(box("NW-103")).toBeChecked();
+        expect(box("NW-102")).not.toHaveClass("pick-box--shown");
+        expect(box("NW-102")).toBeChecked();
+        expect(box("NW-101")).not.toHaveClass("pick-box--shown");
+      });
+    });
+
     describe("a ⌘-double-click on a card", () => {
       const twoTabs = () => mocked.navTabNew.mockResolvedValue(tabbedNav([tab(1, { listId: 11, viewId: 101 }), tab(2, { listId: 11, viewId: 101 })], 1));
       const metaDoubleClick = (target: HTMLElement, shiftKey = false) => {

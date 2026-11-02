@@ -22,6 +22,7 @@ export function view(patch: Partial<View> = {}): View {
     ownConditions: 0,
     onlyMine: false,
     person: null,
+    meRules: null,
     icon: null,
     color: null,
     ...patch,
