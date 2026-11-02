@@ -15,6 +15,7 @@ import { useIssueOpening } from "../useIssueOpening";
 import { useRememberedScroll } from "../useRememberedScroll";
 import { useIssueActions } from "./useIssueActions";
 import { usePinnedIssues } from "./usePinnedIssues";
+import { useOpenIssueInTab } from "../../shell/openInTab";
 import { useRowClicks } from "./useRowClicks";
 import { useRowKeys } from "./useRowKeys";
 import { LIST_PADDING_TOP, useRowSizing } from "./useRowSizing";
@@ -127,8 +128,10 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
   };
   const select = (id: string, openPeek: boolean) => place.select(id, openPeek, rowIds);
   const open = (id: string) => openIssue(id, { listId, viewId });
+  const openIssueInTab = useOpenIssueInTab();
+  const openInTab = (id: string, show: boolean) => void openIssueInTab(id, { listId, viewId }, show);
   const scrollToIndex = (index: number) => virtualizer.scrollToIndex(index, { align: "auto" });
-  const keys = useRowKeys({ ...place, items, rowIds, data, select, toggle, actions, scrollToIndex, open });
+  const keys = useRowKeys({ ...place, items, rowIds, data, select, toggle, actions, scrollToIndex, open, openInTab });
 
   // Stable, so rows that didn't change skip re-rendering.
   const { onSelect, onOpen, onPick, onToggleBox } = useRowClicks(keys, opening);

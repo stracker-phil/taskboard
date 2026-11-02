@@ -158,6 +158,8 @@ function isNonLatinChar(key: string) {
 function eventKey(e: KeyLike): string | null {
   const physical = e.code ? keyFromCode(e.code) : null;
   if (physical && (e.altKey || e.key === "Dead" || e.key === "Unidentified" || isNonLatinChar(e.key))) return physical;
+  // ⇧ turns a digit into a symbol that differs by layout; with ⌘ or ⌃ it stays the digit, as ⌘⇧1 does in browsers.
+  if (physical && e.shiftKey && (e.metaKey || e.ctrlKey) && /^Digit/.test(e.code ?? "")) return physical;
   return canonicalKey(e.key);
 }
 

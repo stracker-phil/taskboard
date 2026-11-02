@@ -96,6 +96,11 @@ pub const LIST_SEEN: &[Item] = &[item(
 )];
 pub const ISSUE: &[Item] = &[
     plain("Open", "page:issue.open"),
+    item(
+        "Open in New Tab",
+        "page:issue.openInNewTab",
+        "CmdOrCtrl+Shift+Enter",
+    ),
     plain("Open or Close Preview", "page:issue.togglePeek"),
     plain("Open Epic", "page:issue.openEpic"),
     item("Open in Jira", "page:issue.openInJira", "CmdOrCtrl+Enter"),
@@ -249,6 +254,7 @@ mod tests {
                 "view.layout.board",
                 "view.layout.table",
                 "issue.open",
+                "issue.openInNewTab",
                 "issue.togglePeek",
                 "issue.openEpic",
                 "issue.openInJira",

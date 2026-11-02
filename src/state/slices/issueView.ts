@@ -19,6 +19,8 @@ export interface IssueViewSlice {
   parkedIssueViews: Record<number, IssueViewState>;
   /** Parks the shown Issue view with tab `from` and shows tab `to`'s; tabs no longer open (`open`) lose theirs. */
   switchTab: (from: number, to: number, open: number[]) => void;
+  /** Gives a tab that isn't shown an Issue view, shown when the tab is. */
+  parkIssueView: (tab: number, view: IssueViewState) => void;
   openIssue: (id: string, origin: IssueOrigin) => void;
   /** Opens a related issue (an epic, a child, a link) on top; back returns to the one before. */
   openRelated: (id: string) => void;
@@ -40,6 +42,7 @@ export const issueViewSlice: Slice<IssueViewSlice> = {
         if (s.issueView && open.includes(from)) parked[from] = s.issueView;
         return { issueView: s.parkedIssueViews[to] ?? null, parkedIssueViews: parked };
       }),
+    parkIssueView: (tab, view) => set((s) => ({ parkedIssueViews: { ...s.parkedIssueViews, [tab]: view } })),
     openIssue: (id, origin) => set({ issueView: { origin, stack: [id] } }),
     openRelated: (id) =>
       set((s) => (s.issueView && s.issueView.stack.at(-1) !== id ? { issueView: { ...s.issueView, stack: [...s.issueView.stack, id] } } : s)),

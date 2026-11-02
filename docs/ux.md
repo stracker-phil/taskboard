@@ -68,6 +68,9 @@ The owner's rule (2026-10-30), for every control, list and popover:
   of its view; switching swaps them before the frame paints. Go → New Tab ⌘⇧T, Previous / Next Tab ⌘⇧[ / ⌘⇧],
   Reopen Closed Tab ⌘⌥T; File → Close Tab or Window ⌘W. "Open in New Tab" sits in the menus of Spaces, filter
   lists, Home rows, view tabs and list or view bookmarks; ⌘-click on those opens a tab behind, ⌘⇧-click shows it.
+  An issue opens in its own tab, at its view with its Issue view shown, by a ⌘ double-click on its row or card
+  (behind; ⌘⇧ shows it) or Issue → Open in New Tab ⌘⇧↩ (shown); the double-click's ⌘-clicks leave the picks as
+  they were. Such a tab is named by the issue's key and title. ⌘⇧1–⌘⇧9 show the first to ninth tab.
 - **Sidebar** ([below](#sidebar)): ⌘\ or the sidebar toggle hides it; the panel then takes the full width under
   a 42px strip that keeps the traffic lights off it. The state is kept in `ui_state.json`.
 - **Sidebar toggle** (`src/shell/SidebarToggle.tsx`): a 34px button (panel icon 17/1.8, styled like Settings)

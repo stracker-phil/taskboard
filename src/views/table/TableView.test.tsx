@@ -14,6 +14,7 @@ import { NO_NARROWING } from "../../queries/views";
 import { resetStore, useStore } from "../../state/store";
 import { ALEX, COLUMNS, groupOf, row, viewData } from "../../test/issues";
 import { behaviour, settings } from "../../test/settings";
+import { tab, tabbedNav } from "../../test/nav";
 import { sidebarTree, space } from "../../test/spaces";
 import { view } from "../../test/views";
 import { TableView } from "./TableView";
@@ -766,6 +767,78 @@ describe("TableView", () => {
       await userEvent.dblClick(await screen.findByRole("checkbox", { name: "Pick NW-1003" }));
 
       expect(useStore.getState().issueView).toBeNull();
+    });
+
+    describe("a ⌘-double-click", () => {
+      const twoTabs = () => mocked.navTabNew.mockResolvedValue(tabbedNav([tab(1, { listId: 11, viewId: 101 }), tab(2, { listId: 11, viewId: 101 })], 1));
+      const metaDoubleClick = (target: HTMLElement, shiftKey = false) => {
+        fireEvent.click(target, { metaKey: true, shiftKey, detail: 1 });
+        fireEvent.click(target, { metaKey: true, shiftKey, detail: 2 });
+        fireEvent.dblClick(target, { metaKey: true, shiftKey });
+      };
+
+      it("opens the issue in a new tab behind the shown one, leaving the picks and selection as they were", async () => {
+        twoTabs();
+        await renderTable(flat());
+        await userEvent.click(await screen.findByText("Redesign the pricing page"));
+
+        metaDoubleClick(screen.getByText("Publish the launch notes"));
+
+        await waitFor(() => expect(mocked.navTabNew).toHaveBeenCalledWith(11, 101, false));
+        expect(useStore.getState().parkedIssueViews[2]).toEqual({ origin: { listId: 11, viewId: 101 }, stack: ["2"] });
+        expect(mocked.navTabActivate).not.toHaveBeenCalled();
+        expect(useStore.getState().issueView).toBeNull();
+        expect(pickedKeys()).toEqual([]);
+        expect(place().selectedId).toBe("1");
+        expect(screen.queryByRole("toolbar", { name: "Picked issues" })).not.toBeInTheDocument();
+      });
+
+      it("also shows the new tab with ⇧", async () => {
+        twoTabs();
+        await renderTable(flat());
+
+        metaDoubleClick(await screen.findByText("Publish the launch notes"), true);
+
+        await waitFor(() => expect(mocked.navTabActivate).toHaveBeenCalledWith(2));
+      });
+    });
+
+    it("opens the Issue view in place on a plain double-click", async () => {
+      await renderTable(flat());
+
+      await userEvent.dblClick(await screen.findByText("Publish the launch notes"));
+
+      expect(useStore.getState().issueView).toEqual({ origin: { listId: 11, viewId: 101 }, stack: ["2"] });
+      expect(mocked.navTabNew).not.toHaveBeenCalled();
+    });
+
+    it("opens nothing on a ⇧-double-click", async () => {
+      await renderTable(flat());
+
+      fireEvent.dblClick(await screen.findByText("Publish the launch notes"), { shiftKey: true });
+
+      expect(useStore.getState().issueView).toBeNull();
+      expect(mocked.navTabNew).not.toHaveBeenCalled();
+    });
+
+    describe("Open in a new tab (⌘⇧↵)", () => {
+      it("opens the selected issue in a new tab and shows it", async () => {
+        mocked.navTabNew.mockResolvedValue(tabbedNav([tab(1, { listId: 11, viewId: 101 }), tab(2, { listId: 11, viewId: 101 })], 1));
+        await renderTable(flat());
+        await userEvent.click(await screen.findByText("Publish the launch notes"));
+
+        await press("issue.openInNewTab");
+
+        expect(mocked.navTabNew).toHaveBeenCalledWith(11, 101, false);
+        await waitFor(() => expect(mocked.navTabActivate).toHaveBeenCalledWith(2));
+      });
+
+      it("is disabled while no row is selected", async () => {
+        await renderTable(flat());
+        await screen.findByText("Publish the launch notes");
+
+        expect(getCommand("issue.openInNewTab")?.when?.()).toBe(false);
+      });
     });
 
     it("drops the picks on Esc", async () => {

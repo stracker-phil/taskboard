@@ -6,6 +6,6 @@ export const keepTextUnselected = (e: MouseEvent) => {
 };
 
 /** A double-click on a row's own controls (pin, copy, mark read, its checkbox) stays with that control, and one with
- *  ⌘ or ⇧ picks rows rather than opening one. */
+ *  ⇧ alone picks rows rather than opening one; with ⌘ it opens the issue in a new tab. */
 export const opensIssue = (e: MouseEvent) =>
-  !e.metaKey && !e.shiftKey && !e.ctrlKey && !(e.target instanceof Element && e.target.closest("button, a, input"));
+  !(e.shiftKey && !e.metaKey) && !e.ctrlKey && !(e.target instanceof Element && e.target.closest("button, a, input"));

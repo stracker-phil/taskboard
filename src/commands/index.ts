@@ -6,6 +6,7 @@ import { isRecordingTarget, isTextInput, registerCommands, resolveKeydown, setOv
 import { activeScopes, registerScope } from "./scopes";
 import { ISSUE_KEY_COMMANDS } from "./issueKeys";
 import { VIEW_KEY_COMMANDS } from "./viewKeys";
+import { TAB_KEY_COMMANDS } from "./tabKeys";
 import { PAGE_ACTION_COMMANDS } from "./pageActions";
 
 /** The window this page runs in: the Taskboard window (`main`) or Settings. */
@@ -35,6 +36,7 @@ const APP_COMMANDS: Command[] = [
   { id: "list.previous", title: "Previous List", scope: "main", defaultBinding: "Mod+Alt+[", bus: "nav:previousList", run: () => runBusCommand("nav:previousList", "Could not open the list") },
   { id: "list.next", title: "Next List", scope: "main", defaultBinding: "Mod+Alt+]", bus: "nav:nextList", run: () => runBusCommand("nav:nextList", "Could not open the list") },
   ...VIEW_KEY_COMMANDS,
+  ...TAB_KEY_COMMANDS,
   ...PAGE_ACTION_COMMANDS,
   ...ISSUE_KEY_COMMANDS,
   { id: "settings.close", title: "Close Settings", scope: "settings", defaultBinding: "Escape", when: escapeIsFree, run: () => runBusCommand("window:close", "Could not close the window") },

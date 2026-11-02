@@ -321,6 +321,28 @@ describe("issue keys", () => {
 
       expect(press(key)).toBeNull();
     });
+
+    it("⌘⇧↵ opens the selected issue in a new tab", () => {
+      const h = handlers({ openInNewTab: vi.fn() });
+      register(h);
+
+      void press("Enter", { meta: true, shift: true })?.run();
+
+      expect(h.openInNewTab).toHaveBeenCalled();
+      expect(h.open).not.toHaveBeenCalled();
+    });
+
+    it("ignores ⌘⇧↵ without a selected row", () => {
+      register(handlers({ openInNewTab: vi.fn(), hasSelection: () => false }));
+
+      expect(press("Enter", { meta: true, shift: true })).toBeNull();
+    });
+
+    it("ignores ⌘⇧↵ where the view cannot open a tab", () => {
+      register(handlers());
+
+      expect(press("Enter", { meta: true, shift: true })).toBeNull();
+    });
   });
 
   describe("bookmarking", () => {

@@ -16,6 +16,7 @@ interface Props {
   pickedIds: ReadonlySet<string>;
   onOpen: (id: string, mods?: PickKeys) => void;
   onToggleBox: (id: string) => void;
+  onOpenInTab: (id: string, show: boolean) => void;
   actions: RowActionHandlers;
   /** The ids of the bookmarked issues. */
   pinned: ReadonlySet<string>;
@@ -25,7 +26,7 @@ const CARD_ESTIMATE = 110;
 const CARD_GAP = 8;
 
 /** A column's cards, virtualized: a Space with thousands of issues mounts only the cards on screen. */
-export const BoardColumnCards = memo(function BoardColumnCards({ ids, rows, fields, inlineLabels, selected, pickedIds, onOpen, onToggleBox, actions, pinned }: Props) {
+export const BoardColumnCards = memo(function BoardColumnCards({ ids, rows, fields, inlineLabels, selected, pickedIds, onOpen, onToggleBox, onOpenInTab, actions, pinned }: Props) {
   const picking = pickedIds.size > 0;
   const scrollRef = useRef<HTMLDivElement>(null);
   const virtualizer = useVirtualizer({
@@ -67,6 +68,7 @@ export const BoardColumnCards = memo(function BoardColumnCards({ ids, rows, fiel
                 picking={picking}
                 onOpen={onOpen}
                 onToggleBox={onToggleBox}
+                onOpenInTab={onOpenInTab}
                 actions={actions}
                 pinned={pinned.has(row.id)}
               />

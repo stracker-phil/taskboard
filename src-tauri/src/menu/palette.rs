@@ -240,6 +240,7 @@ mod tests {
             in_menu(&items, "Issue"),
             [
                 "page:issue.open",
+                "page:issue.openInNewTab",
                 "page:issue.togglePeek",
                 "page:issue.openEpic",
                 "page:issue.openInJira",

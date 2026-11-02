@@ -6,7 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
 
 import { api, type Nav } from "../api";
+import { installCommands, useCommandKeys } from "../commands";
 import { MenuHost } from "../components/menu";
+import { issueDetail } from "../test/issues";
 import { createQueryClient } from "../queries/queryClient";
 import { resetStore, useStore } from "../state/store";
 import { tab, tabbedNav } from "../test/nav";
@@ -102,6 +104,86 @@ describe("TabStrip", () => {
       await userEvent.click(tabNamed("Lumen iOS app"));
 
       await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not show the tab: Disk full"));
+    });
+  });
+
+  describe("tab keys", () => {
+    const pressTabKey = (n: number, key: string) =>
+      fireEvent.keyDown(window, { key, code: `Digit${n}`, metaKey: true, shiftKey: true });
+
+    function Keys() {
+      useCommandKeys();
+      return null;
+    }
+
+    beforeEach(() => installCommands("main"));
+
+    it("shows the second tab on ⌘⇧2", async () => {
+      render(<Keys />);
+      await renderStrip();
+
+      pressTabKey(2, "@");
+
+      await waitFor(() => expect(mocked.navTabActivate).toHaveBeenCalledWith(2));
+    });
+
+    it("shows the third tab on ⌘⇧3 with a layout that types another symbol", async () => {
+      render(<Keys />);
+      await renderStrip();
+
+      pressTabKey(3, "§");
+
+      await waitFor(() => expect(mocked.navTabActivate).toHaveBeenCalledWith(3));
+    });
+
+    it("does nothing on ⌘⇧1 when the first tab is shown, or for a tab that does not exist", async () => {
+      render(<Keys />);
+      await renderStrip();
+
+      pressTabKey(1, "!");
+      pressTabKey(9, "(");
+
+      expect(mocked.navTabActivate).not.toHaveBeenCalled();
+    });
+
+    it("names the key in each tab's tooltip", async () => {
+      await renderStrip();
+
+      expect(screen.getByText("Website relaunch · List")).toHaveAttribute("title", "Website relaunch · List (⌘⇧1)");
+      expect(screen.getByText("Lumen iOS app")).toHaveAttribute("title", "Lumen iOS app (⌘⇧3)");
+    });
+  });
+
+  describe("a tab showing an issue", () => {
+    const SUMMARY = "Redesign the pricing page";
+
+    beforeEach(() => {
+      mocked.issueGet.mockImplementation(async (id) => issueDetail({ id, key: "NW-1042", summary: SUMMARY }));
+    });
+
+    it("is named after the issue's key and summary when it is the shown tab", async () => {
+      resetStore({ issueView: { origin: { listId: 11, viewId: 101 }, stack: ["10042"] } });
+
+      await renderStrip(tabbedNav(THREE, 1), new RegExp(`^NW-1042 ${SUMMARY}`));
+
+      expect(screen.getAllByRole("tab")[0]).toHaveAccessibleName(new RegExp(`^NW-1042 ${SUMMARY}`));
+    });
+
+    it("is named after the issue parked with it when it is not the shown tab", async () => {
+      resetStore({ parkedIssueViews: { 3: { origin: { listId: 12, viewId: 301 }, stack: ["10042"] } } });
+
+      await renderStrip(tabbedNav(THREE, 1), new RegExp(`^NW-1042 ${SUMMARY}`));
+
+      expect(screen.getAllByRole("tab")[2]).toHaveAccessibleName(new RegExp(`^NW-1042 ${SUMMARY}`));
+      expect(tabNamed("Website relaunch · List")).toBeInTheDocument();
+    });
+
+    it("is named after the issue on top of its stack", async () => {
+      resetStore({ issueView: { origin: { listId: 11, viewId: 101 }, stack: ["10042", "10051"] } });
+
+      await renderStrip(tabbedNav(THREE, 1), new RegExp(`^NW-1042 ${SUMMARY}`));
+
+      expect(mocked.issueGet).toHaveBeenCalledWith("10051");
     });
   });
 

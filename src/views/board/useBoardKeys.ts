@@ -19,12 +19,13 @@ export function useBoardKeys(
   selected: string | null,
   select: (id: string) => void,
   open: (id: string) => void,
+  openInTab: (id: string, show: boolean) => void,
   actions: RowActionHandlers & { copyUrl: (key: string) => void; copyAppLink: (key: string) => void; canChangeTitle: boolean },
   picks: BoardPicks,
 ) {
-  const state = useRef({ data, selected, select, open, actions, picks });
+  const state = useRef({ data, selected, select, open, openInTab, actions, picks });
   useEffect(() => {
-    state.current = { data, selected, select, open, actions, picks };
+    state.current = { data, selected, select, open, openInTab, actions, picks };
   });
   useEffect(() => {
     const columns = () => state.current.data.columns.filter((c) => !c.collapsed && c.ids.length > 0);
@@ -62,6 +63,9 @@ export function useBoardKeys(
       openInJira: () => withKey((key) => state.current.actions.openInJira?.(key)),
       open: () => {
         if (state.current.selected) state.current.open(state.current.selected);
+      },
+      openInNewTab: () => {
+        if (state.current.selected) state.current.openInTab(state.current.selected, true);
       },
       openEpic: () => {
         const epic = state.current.selected ? state.current.data.rows[state.current.selected]?.epic : undefined;

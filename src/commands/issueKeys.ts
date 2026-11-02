@@ -21,6 +21,8 @@ export interface IssueKeyHandlers {
   openInJira: () => void;
   /** ↩: the selected issue in the full Issue view; absent where the issue is already open. */
   open?: () => void;
+  /** ⌘⇧↩: the selected issue's Issue view in a new tab, shown; absent where the issue is already open. */
+  openInNewTab?: () => void;
   /** E: the selected issue's epic in the Issue view. */
   openEpic: () => void;
   /** P: bookmarks the selected issue for the default duration, or removes its bookmark. */
@@ -84,6 +86,7 @@ export const ISSUE_KEY_COMMANDS: Command[] = [
   { id: "issue.copyUrl", title: "Copy issue URL", scope: "main", defaultBinding: "Mod+Shift+C", when: selected, run: () => handlers?.copyUrl() },
   { id: "issue.copyAppLink", title: "Copy Taskboard link", scope: "main", defaultBinding: "Mod+Alt+Shift+C", when: selected, run: () => handlers?.copyAppLink() },
   { id: "issue.open", title: "Open the issue", scope: "main", defaultBinding: "Enter", when: () => selected() && handlers?.open !== undefined, run: () => handlers?.open?.() },
+  { id: "issue.openInNewTab", title: "Open the issue in a new tab", scope: "main", defaultBinding: "Mod+Shift+Enter", when: () => selected() && handlers?.openInNewTab !== undefined, run: () => handlers?.openInNewTab?.() },
   { id: "issue.openEpic", title: "Open the issue's epic", scope: "main", defaultBinding: "E", when: selected, run: () => handlers?.openEpic() },
   { id: "issue.togglePin", title: "Bookmark the issue or remove its bookmark", scope: "main", defaultBinding: "P", when: selected, run: () => handlers?.togglePin() },
   { id: "issue.toggleMine", title: "Assign the issue to me or unassign it", scope: "main", defaultBinding: "I", when: selected, run: () => handlers?.toggleMine() },

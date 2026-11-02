@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { acceleratorLabel, clearCommands, conflicts, registerCommands, setOverrides, type Command } from "./registry";
+import { acceleratorLabel, bindingFromEvent, clearCommands, conflicts, registerCommands, setOverrides, type Command } from "./registry";
 import { registerCoreScopes } from "./index";
 import { registerScope } from "./scopes";
 
@@ -58,6 +58,26 @@ describe("conflicts", () => {
     setOverrides({ b: "Mod+K" });
 
     expect(conflicts()).toHaveLength(1);
+  });
+});
+
+describe("bindingFromEvent", () => {
+  const event = (patch: Partial<Parameters<typeof bindingFromEvent>[0]>) => ({ key: "", metaKey: false, shiftKey: false, ctrlKey: false, altKey: false, ...patch });
+
+  it.each([
+    ["⌘⇧1 on a US layout", { key: "!", code: "Digit1", metaKey: true, shiftKey: true }, "Mod+Shift+1"],
+    ["⌘⇧2 on a US layout", { key: "@", code: "Digit2", metaKey: true, shiftKey: true }, "Mod+Shift+2"],
+    ["⌘⇧9 on a German layout", { key: ")", code: "Digit9", metaKey: true, shiftKey: true }, "Mod+Shift+9"],
+  ])("names %s after the digit key", (_name, patch, binding) => {
+    expect(bindingFromEvent(event(patch))).toBe(binding);
+  });
+
+  it("names ⌃⇧1 after the digit key off the Mac", () => {
+    expect(bindingFromEvent(event({ key: "!", code: "Digit1", ctrlKey: true, shiftKey: true }), false)).toBe("Mod+Shift+1");
+  });
+
+  it("keeps the typed symbol for ⇧ and a digit without ⌘ or ⌃", () => {
+    expect(bindingFromEvent(event({ key: "!", code: "Digit1", shiftKey: true }))).toBe("Shift+!");
   });
 });
 

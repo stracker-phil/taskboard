@@ -14,6 +14,7 @@ import { narrowingKey } from "../../state/slices/narrowing";
 import { resetStore, useStore } from "../../state/store";
 import { boardColumn, boardData } from "../../test/board";
 import { ALEX, row, SAM } from "../../test/issues";
+import { tab, tabbedNav } from "../../test/nav";
 import { issueTarget, pinItem, pins } from "../../test/pins";
 import { behaviour, settings } from "../../test/settings";
 import { sidebarTree, space } from "../../test/spaces";
@@ -428,6 +429,71 @@ describe("BoardView", () => {
 
       expect(pickedKeys()).toEqual(["NW-102"]);
       expect(useStore.getState().issueView).toBeNull();
+    });
+
+    describe("a ⌘-double-click on a card", () => {
+      const twoTabs = () => mocked.navTabNew.mockResolvedValue(tabbedNav([tab(1, { listId: 11, viewId: 101 }), tab(2, { listId: 11, viewId: 101 })], 1));
+      const metaDoubleClick = (target: HTMLElement, shiftKey = false) => {
+        fireEvent.click(target, { metaKey: true, shiftKey, detail: 1 });
+        fireEvent.click(target, { metaKey: true, shiftKey, detail: 2 });
+        fireEvent.dblClick(target, { metaKey: true, shiftKey });
+      };
+
+      it("opens the card in a new tab behind the shown one, leaving the picks as they were", async () => {
+        twoTabs();
+        await renderBoard(BOARD_DATA);
+
+        metaDoubleClick(card("Write the footer copy"));
+
+        await waitFor(() => expect(mocked.navTabNew).toHaveBeenCalledWith(11, 101, false));
+        expect(useStore.getState().parkedIssueViews[2]).toEqual({ origin: { listId: 11, viewId: 101 }, stack: ["2"] });
+        expect(mocked.navTabActivate).not.toHaveBeenCalled();
+        expect(useStore.getState().issueView).toBeNull();
+        expect(pickedKeys()).toEqual([]);
+        expect(screen.queryByRole("toolbar", { name: "Picked issues" })).not.toBeInTheDocument();
+      });
+
+      it("keeps the cards that were picked before it", async () => {
+        twoTabs();
+        await renderBoard(BOARD_DATA);
+        fireEvent.click(card("Draft the sitemap"), { metaKey: true });
+        expect(pickedKeys()).toEqual(["NW-101"]);
+
+        metaDoubleClick(card("Write the footer copy"));
+
+        await waitFor(() => expect(mocked.navTabNew).toHaveBeenCalled());
+        expect(pickedKeys()).toEqual(["NW-101"]);
+      });
+
+      it("also shows the new tab with ⇧", async () => {
+        twoTabs();
+        await renderBoard(BOARD_DATA);
+
+        metaDoubleClick(card("Write the footer copy"), true);
+
+        await waitFor(() => expect(mocked.navTabActivate).toHaveBeenCalledWith(2));
+        expect(pickedKeys()).toEqual([]);
+      });
+    });
+
+    describe("Open in a new tab (⌘⇧↵)", () => {
+      it("opens the current card in a new tab and shows it", async () => {
+        mocked.navTabNew.mockResolvedValue(tabbedNav([tab(1, { listId: 11, viewId: 101 }), tab(2, { listId: 11, viewId: 101 })], 1));
+        await renderBoard(BOARD_DATA);
+        await press("issue.next");
+
+        await press("issue.openInNewTab");
+
+        await waitFor(() => expect(mocked.navTabActivate).toHaveBeenCalledWith(2));
+        expect(mocked.navTabNew).toHaveBeenCalledWith(11, 101, false);
+        expect(useStore.getState().parkedIssueViews[2]?.stack).toEqual(["1"]);
+      });
+
+      it("is disabled while no card is current", async () => {
+        await renderBoard(BOARD_DATA);
+
+        expect(getCommand("issue.openInNewTab")?.when?.()).toBe(false);
+      });
     });
 
     it("picks the current card too with the first ⌘-click, and unpicks on a second", async () => {

@@ -7,7 +7,7 @@ import { EpicChip } from "../../components/issue/EpicChip";
 import { LabelChips } from "../../components/issue/LabelChips";
 import { PriorityFlag } from "../../components/issue/PriorityFlag";
 import { RowActions, type RowActionHandlers } from "../list/RowActions";
-import { keepTextUnselected } from "../list/opensIssue";
+import { keepTextUnselected, opensIssue } from "../list/opensIssue";
 import { PickBox } from "../list/PickBox";
 import type { PickKeys } from "../list/useRowClicks";
 import { useFlash } from "../../lib/motion";
@@ -25,13 +25,15 @@ interface Props {
   picking?: boolean;
   onOpen: (id: string, mods?: PickKeys) => void;
   onToggleBox?: (id: string) => void;
+  /** A ⌘ double-click: the issue in a new tab, shown with ⇧. */
+  onOpenInTab?: (id: string, show: boolean) => void;
   actions: RowActionHandlers;
   /** Has an active bookmark. */
   pinned?: boolean;
 }
 
 /** A Board card: the summary first, always wrapped, the key in the bottom-right corner; changed cards are tinted. */
-export const BoardCard = memo(function BoardCard({ row, fields, inlineLabels = false, selected = false, picked = false, picking = false, onOpen, onToggleBox, actions, pinned = false }: Props) {
+export const BoardCard = memo(function BoardCard({ row, fields, inlineLabels = false, selected = false, picked = false, picking = false, onOpen, onToggleBox, onOpenInTab, actions, pinned = false }: Props) {
   const shows = (field: string) => fields.includes(field);
   const flashing = useFlash(row.updatedAt);
   const epic = shows("epic") && row.epic;
@@ -45,6 +47,7 @@ export const BoardCard = memo(function BoardCard({ row, fields, inlineLabels = f
       data-issue-id={row.id}
       onMouseDown={keepTextUnselected}
       onClick={(e) => onOpen(row.id, e)}
+      onDoubleClick={(e) => e.metaKey && opensIssue(e) && onOpenInTab?.(row.id, e.shiftKey)}
       onKeyDown={(e) => {
         if (e.key === "Enter" && e.target === e.currentTarget) onOpen(row.id);
       }}

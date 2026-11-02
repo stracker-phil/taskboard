@@ -36,7 +36,7 @@ interface Props {
   /** Selects without opening: a cell that opens a menu. */
   onPick: (id: string) => void;
   /** A double-click: always the full Issue view. */
-  onOpen: (id: string) => void;
+  onOpen: (id: string, mods?: PickKeys) => void;
   actions: RowActionHandlers;
   /** Its place in Hierarchy: its depth's indent, and a caret when it has children. */
   nesting?: Nesting;
@@ -79,7 +79,7 @@ export const IssueRow = memo(function IssueRow(props: Props) {
         data-issue-id={row.id}
         onMouseDown={keepTextUnselected}
         onClick={(e) => onSelect(row.id, e)}
-        onDoubleClick={(e) => opensIssue(e) && onOpen(row.id)}
+        onDoubleClick={(e) => opensIssue(e) && onOpen(row.id, e)}
       >
         <span className="list-row__name" role="gridcell">
           <StatusSquare style={row.style} />

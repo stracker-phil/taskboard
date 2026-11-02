@@ -50,7 +50,7 @@ interface Props {
   /** Selects without opening: a cell that opens a menu. */
   onPick: (id: string) => void;
   /** A double-click: always the full Issue view. */
-  onOpen: (id: string) => void;
+  onOpen: (id: string, mods?: PickKeys) => void;
   /** The labels as tags after the summary. */
   inlineLabels?: boolean;
   /** The view shows subtasks under their parents: every title leaves room for a caret. */
@@ -72,7 +72,7 @@ export const TableRow = memo(function TableRow(props: Props) {
   const flashing = useFlash(row.updatedAt);
   const className = ["table-row", tree && "table-row--tree", nesting?.parent && "table-row--parent", nesting && nesting.depth > 0 && "table-row--child", row.changed && "table-row--changed", flashing && "flash", selected && "table-row--selected"].filter(Boolean).join(" ");
   return (
-    <div className={className} style={{ "--depth": nesting?.depth ?? 0 } as CSSProperties} role="row" aria-selected={selected} data-issue-id={row.id} onMouseDown={keepTextUnselected} onClick={(e) => onSelect(row.id, e)} onDoubleClick={(e) => opensIssue(e) && onOpen(row.id)}>
+    <div className={className} style={{ "--depth": nesting?.depth ?? 0 } as CSSProperties} role="row" aria-selected={selected} data-issue-id={row.id} onMouseDown={keepTextUnselected} onClick={(e) => onSelect(row.id, e)} onDoubleClick={(e) => opensIssue(e) && onOpen(row.id, e)}>
       <span className="table-row__pick">
         <PickBox issueKey={row.key} picked={picked} onToggle={() => onToggleBox(row.id)} className={picking ? "pick-box--shown" : ""} />
       </span>

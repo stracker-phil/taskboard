@@ -8,6 +8,7 @@ import { flatten, itemKey, type Item } from "../list/flatten";
 import { GroupHeader } from "../list/GroupHeader";
 import { useGroupMotion } from "../list/useGroupMotion";
 import { useIssueActions } from "../list/useIssueActions";
+import { useOpenIssueInTab } from "../../shell/openInTab";
 import { useRowClicks } from "../list/useRowClicks";
 import { useRowKeys } from "../list/useRowKeys";
 import { useRowsPlace } from "../list/useRowsPlace";
@@ -126,8 +127,10 @@ function Table({ view, data }: { view: View; data: ViewData }) {
   };
   const select = (id: string, openPeek: boolean) => place.select(id, openPeek, rowIds);
   const open = (id: string) => openIssue(id, { listId: view.listId, viewId: view.id });
+  const openIssueInTab = useOpenIssueInTab();
+  const openInTab = (id: string, show: boolean) => void openIssueInTab(id, { listId: view.listId, viewId: view.id }, show);
   const scrollToIndex = (index: number) => virtualizer.scrollToIndex(index, { align: "auto" });
-  const keys = useRowKeys({ ...place, items, rowIds, data, select, toggle, actions, scrollToIndex, open });
+  const keys = useRowKeys({ ...place, items, rowIds, data, select, toggle, actions, scrollToIndex, open, openInTab });
 
   // Stable, so rows that didn't change skip re-rendering.
   const { onSelect, onOpen, onPick, onToggleBox } = useRowClicks(keys, opening);

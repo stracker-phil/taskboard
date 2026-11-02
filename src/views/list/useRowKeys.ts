@@ -29,6 +29,8 @@ export interface RowKeyState {
   scrollToIndex: (index: number) => void;
   setPlace: (patch: Partial<ViewPlace>) => void;
   open: (id: string) => void;
+  /** Opens the issue in a new tab; `show` switches to it. */
+  openInTab: (id: string, show: boolean) => void;
 }
 
 /** Takes the issue keys for a List or Table while it is mounted. The keys reach the latest render's state
@@ -91,6 +93,10 @@ export function useRowKeys(current: RowKeyState): RefObject<RowKeyState> {
       open: () => {
         const { selected, open } = state.current;
         if (selected) open(selected);
+      },
+      openInNewTab: () => {
+        const { selected, openInTab } = state.current;
+        if (selected) openInTab(selected, true);
       },
       openEpic: () => {
         const { data, selected, open } = state.current;

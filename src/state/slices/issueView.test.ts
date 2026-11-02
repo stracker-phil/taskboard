@@ -151,6 +151,27 @@ describe("issue view slice", () => {
     });
   });
 
+  describe("parkIssueView", () => {
+    const PARKED = { origin: ORIGIN, stack: ["10042"] };
+
+    it("shows the parked Issue view once its tab is switched to", () => {
+      useStore.getState().parkIssueView(2, PARKED);
+
+      useStore.getState().switchTab(1, 2, [1, 2]);
+
+      expect(useStore.getState().issueView).toEqual(PARKED);
+      expect(useStore.getState().parkedIssueViews).toEqual({});
+    });
+
+    it("leaves the shown Issue view alone", () => {
+      useStore.getState().openIssue("10060", { listId: 4, viewId: 9 });
+
+      useStore.getState().parkIssueView(2, PARKED);
+
+      expect(stack()).toEqual(["10060"]);
+    });
+  });
+
   it("closes the whole stack at once", () => {
     useStore.getState().openIssue("10042", ORIGIN);
     useStore.getState().openRelated("10051");

@@ -13,6 +13,7 @@ import { useIssueActions } from "../list/useIssueActions";
 import { usePinnedIssues } from "../list/usePinnedIssues";
 import { BoardColumnCards } from "./BoardColumnCards";
 import { useBoardKeys } from "./useBoardKeys";
+import { useOpenIssueInTab } from "../../shell/openInTab";
 import { useBoardPicks } from "./useBoardPicks";
 import { BulkBar } from "../../writes/BulkBar";
 import { colorClass, DropTray, DropZone, zoneOf } from "../../writes/DropZone";
@@ -55,8 +56,11 @@ function Board({ view, data }: { view: View; data: BoardData }) {
     },
     [select, open],
   );
-  const picks = useBoardPicks(placeKey, data, selected, select, openCard);
-  useBoardKeys(data, selected, select, open, actions, picks);
+  const openIssueInTab = useOpenIssueInTab();
+  const openInTab = useCallback((id: string, show: boolean) => void openIssueInTab(id, { listId, viewId }, show), [openIssueInTab, listId, viewId]);
+  const restorePlace = useCallback((id: string | null) => updatePlace(listId, viewId, { selectedId: id }), [updatePlace, listId, viewId]);
+  const picks = useBoardPicks(placeKey, data, selected, select, openCard, openInTab, restorePlace);
+  useBoardKeys(data, selected, select, open, openInTab, actions, picks);
   // A Board that groups by nothing shows status columns.
   const columnGroups = data.columns.map((column) => ({ key: column.key, label: column.name }));
   const boardRef = useRef<HTMLDivElement>(null);
@@ -115,6 +119,7 @@ function Board({ view, data }: { view: View; data: BoardData }) {
               pickedIds={picks.pickedIds}
               onOpen={picks.onCard}
               onToggleBox={picks.onToggleBox}
+              onOpenInTab={picks.onOpenInTab}
               actions={actions}
               pinned={pinned}
             />

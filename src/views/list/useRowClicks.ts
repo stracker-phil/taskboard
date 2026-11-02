@@ -8,14 +8,24 @@ import type { RowKeyState } from "./useRowKeys";
 export interface PickKeys {
   metaKey: boolean;
   shiftKey: boolean;
+  /** The click's count: 2 for the second click of a double-click. */
+  detail?: number;
+}
+
+interface PickState {
+  picked: string[];
+  selected: string | null;
+  peekOpen: boolean;
 }
 
 /** A row's click and double-click for the List and Table. A click selects at once; when it opens the preview,
  *  the preview waits out the double-click interval, so a double-click opens the Issue view alone. ⌘ and ⇧ clicks
- *  and the checkbox pick rows instead and open nothing; a plain click drops the picks. */
+ *  and the checkbox pick rows instead and open nothing; a plain click drops the picks. A ⌘ double-click opens the
+ *  issue in a new tab (⌘⇧ shows it) and leaves the picks as they were before it. */
 export function useRowClicks(keys: RefObject<RowKeyState>, opening: IssueOpening) {
   const interval = useDoubleClickMs();
   const pendingPreview = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const beforeMetaClick = useRef<PickState | null>(null);
   useEffect(() => {
     const pending = pendingPreview;
     return () => clearTimeout(pending.current);
@@ -26,6 +36,7 @@ export function useRowClicks(keys: RefObject<RowKeyState>, opening: IssueOpening
       clearTimeout(pendingPreview.current);
       const { select, open, peekOpen, rowIds, picked, selected, setPicked } = keys.current;
       if (mods?.metaKey) {
+        if ((mods.detail ?? 1) <= 1) beforeMetaClick.current = { picked, selected, peekOpen };
         setPicked(togglePick(rowIds, picked, id, selected));
         select(id, false);
         return;
@@ -51,9 +62,18 @@ export function useRowClicks(keys: RefObject<RowKeyState>, opening: IssueOpening
     [keys, opening, interval],
   );
   const onOpen = useCallback(
-    (id: string) => {
+    (id: string, mods?: PickKeys) => {
       clearTimeout(pendingPreview.current);
-      keys.current.open(id);
+      if (!mods?.metaKey) {
+        keys.current.open(id);
+        return;
+      }
+      const before = beforeMetaClick.current;
+      if (before) {
+        keys.current.setPicked(before.picked);
+        keys.current.setPlace({ selectedId: before.selected, peekOpen: before.peekOpen });
+      }
+      keys.current.openInTab(id, mods.shiftKey);
     },
     [keys],
   );

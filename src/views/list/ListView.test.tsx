@@ -14,6 +14,7 @@ import { NO_NARROWING } from "../../queries/views";
 import { resetStore, useStore } from "../../state/store";
 import { ALEX, COLUMNS, groupOf, row, SAM, viewData } from "../../test/issues";
 import { connectionView } from "../../test/jira";
+import { tab, tabbedNav } from "../../test/nav";
 import { startMotionTimers, stubMotion } from "../../test/motion";
 import { issueTarget, pinItem, pins } from "../../test/pins";
 import { behaviour, settings } from "../../test/settings";
@@ -1231,12 +1232,82 @@ describe("ListView", () => {
       expect(useStore.getState().issueView).toBeNull();
     });
 
-    it("opens no Issue view on a ⌘-double-click", async () => {
+    describe("a ⌘-double-click", () => {
+      const twoTabs = () => mocked.navTabNew.mockResolvedValue(tabbedNav([tab(1, { listId: 11, viewId: 101 }), tab(2, { listId: 11, viewId: 101 })], 1));
+      const metaDoubleClick = (target: HTMLElement, shiftKey = false) => {
+        fireEvent.click(target, { metaKey: true, shiftKey, detail: 1 });
+        fireEvent.click(target, { metaKey: true, shiftKey, detail: 2 });
+        fireEvent.dblClick(target, { metaKey: true, shiftKey });
+      };
+
+      it("opens the issue in a new tab behind the shown one, leaving the view as it was", async () => {
+        twoTabs();
+        await renderList(data(), "preview");
+        await userEvent.click(await text("Redesign the pricing page"));
+
+        metaDoubleClick(await text("Publish the launch notes"));
+
+        await waitFor(() => expect(mocked.navTabNew).toHaveBeenCalledWith(11, 101, false));
+        expect(useStore.getState().parkedIssueViews[2]).toEqual({ origin: { listId: 11, viewId: 101 }, stack: ["2"] });
+        expect(mocked.navTabActivate).not.toHaveBeenCalled();
+        expect(useStore.getState().issueView).toBeNull();
+        expect(pickedKeys()).toEqual([]);
+        expect(place().selectedId).toBe("1");
+        expect(screen.queryByRole("toolbar", { name: "Picked issues" })).not.toBeInTheDocument();
+      });
+
+      it("keeps the rows that were picked before it", async () => {
+        twoTabs();
+        await renderList(data(), "preview");
+        await userEvent.click(await text("Redesign the pricing page"));
+        fireEvent.click(await text("Fix the footer links"), { shiftKey: true });
+        expect(pickedKeys()).toEqual(["NW-1042", "NW-1001", "NW-1003"]);
+
+        metaDoubleClick(await text("Publish the launch notes"));
+
+        await waitFor(() => expect(mocked.navTabNew).toHaveBeenCalled());
+        expect(pickedKeys()).toEqual(["NW-1042", "NW-1001", "NW-1003"]);
+      });
+
+      it("also shows the new tab with ⇧", async () => {
+        twoTabs();
+        await renderList(data(), "preview");
+
+        metaDoubleClick(await text("Publish the launch notes"), true);
+
+        await waitFor(() => expect(mocked.navTabActivate).toHaveBeenCalledWith(2));
+        expect(pickedKeys()).toEqual([]);
+      });
+    });
+
+    describe("Open in a new tab (⌘⇧↵)", () => {
+      it("opens the selected issue in a new tab and shows it", async () => {
+        mocked.navTabNew.mockResolvedValue(tabbedNav([tab(1, { listId: 11, viewId: 101 }), tab(2, { listId: 11, viewId: 101 })], 1));
+        await renderList(data(), "preview");
+        await userEvent.click(await text("Publish the launch notes"));
+
+        await press("issue.openInNewTab");
+
+        expect(mocked.navTabNew).toHaveBeenCalledWith(11, 101, false);
+        await waitFor(() => expect(mocked.navTabActivate).toHaveBeenCalledWith(2));
+        expect(useStore.getState().parkedIssueViews[2]).toEqual({ origin: { listId: 11, viewId: 101 }, stack: ["2"] });
+      });
+
+      it("is disabled while no row is selected", async () => {
+        await renderList(data(), "preview");
+        await screen.findByRole("row", { name: /NW-1042/ });
+
+        expect(getCommand("issue.openInNewTab")?.when?.()).toBe(false);
+      });
+    });
+
+    it("opens nothing on a ⇧-double-click", async () => {
       await renderList(data(), "preview");
 
-      fireEvent.dblClick(await text("Publish the launch notes"), { metaKey: true });
+      fireEvent.dblClick(await text("Publish the launch notes"), { shiftKey: true });
 
       expect(useStore.getState().issueView).toBeNull();
+      expect(mocked.navTabNew).not.toHaveBeenCalled();
     });
 
     it("picks every shown row on ⌘A", async () => {
