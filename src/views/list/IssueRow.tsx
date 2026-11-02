@@ -80,10 +80,10 @@ export const IssueRow = memo(function IssueRow(props: Props) {
         onDoubleClick={(e) => opensIssue(e) && onOpen(row.id, e)}
       >
         <span className="list-row__name" role="gridcell">
-          <StatusSquare style={row.style} />
           <span className="list-row__title">
             <CopyKey className="list-row__key" issueKey={row.key} />
             {row.isSubtask && <SubtaskIcon />}
+            <StatusSquare style={row.style} />
             <span className="list-row__summary">{row.summary}</span>
             {inlineLabels && <LabelChips labels={row.labels} className={wrap ? "row-labels row-labels--flow" : "row-labels"} />}
             {wrap && flowingChips}

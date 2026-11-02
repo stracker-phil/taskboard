@@ -128,11 +128,30 @@ describe("TableView", () => {
       expect(within(screen.getByRole("row", { name: /NW-1001/ })).getByText("Done")).toBeInTheDocument();
     });
 
-    it("shows the status square before the key", async () => {
+    it("keeps the status square out of the Key cell and puts it right before the title in the Summary cell", async () => {
       await renderTable();
 
-      const keyCell = (await screen.findByText("NW-1001")).closest<HTMLElement>('[role="gridcell"]')!;
-      expect(keyCell.querySelector(".status-square--done")).toBeInTheDocument();
+      const issue = await screen.findByRole("row", { name: /NW-1001/ });
+      const [keyCell, summaryCell] = within(issue).getAllByRole("gridcell");
+      const square = summaryCell.querySelector(".status-square--done");
+      const title = within(summaryCell).getByText("Publish the launch notes");
+      expect(keyCell.querySelector(".status-square")).toBeNull();
+      expect(square).not.toBeNull();
+      expect(square!.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it("places the status square after the caret and subtask glyph of a Hierarchy row", async () => {
+      const parent = row({ id: "1", key: "NW-1042", summary: "Redesign the pricing page", childCount: 1 });
+      const step = row({ id: "11", key: "NW-1043", summary: "Draft the price table", isSubtask: true, parentId: "1", depth: 1 });
+      await renderTable(viewData([groupOf([parent, step])], [parent, step], { groupBy: "none", subtasks: "hierarchy" }));
+
+      const parentCell = within(await screen.findByRole("row", { name: /NW-1042/ })).getAllByRole("gridcell")[1];
+      const stepCell = within(screen.getByRole("row", { name: /NW-1043/ })).getAllByRole("gridcell")[1];
+      const caret = within(parentCell).getByRole("button", { name: "Collapse subtasks" });
+      const glyph = stepCell.querySelector(".subtask-icon")!;
+      const after = (first: Element, second: Element | null) => first.compareDocumentPosition(second!) & Node.DOCUMENT_POSITION_FOLLOWING;
+      expect(after(caret, parentCell.querySelector(".status-square"))).toBeTruthy();
+      expect(after(glyph, stepCell.querySelector(".status-square"))).toBeTruthy();
     });
 
     it("marks only the sorted column with aria-sort", async () => {
@@ -204,7 +223,7 @@ describe("TableView", () => {
     it("uses the default width for a column without a stored one", async () => {
       await renderTable();
 
-      expect(header("Key")).toHaveStyle({ width: "120px" });
+      expect(header("Key")).toHaveStyle({ width: "100px" });
     });
 
     it("saves the widths with the dragged column's new width once the pointer is released", async () => {
@@ -216,7 +235,7 @@ describe("TableView", () => {
       fireEvent.pointerMove(window, { clientX: 140 });
       fireEvent.pointerUp(window);
 
-      await waitFor(() => expect(mocked.viewSetWidths).toHaveBeenCalledWith(101, { status: 160, key: 160 }));
+      await waitFor(() => expect(mocked.viewSetWidths).toHaveBeenCalledWith(101, { status: 160, key: 140 }));
       expect(mocked.viewSetWidths).toHaveBeenCalledTimes(1);
     });
 
@@ -226,7 +245,7 @@ describe("TableView", () => {
       fireEvent.pointerDown(screen.getByRole("separator", { name: "Resize Key" }), { button: 0, clientX: 100 });
       fireEvent.pointerMove(window, { clientX: 140 });
 
-      await waitFor(() => expect(header("Key")).toHaveStyle({ width: "160px" }));
+      await waitFor(() => expect(header("Key")).toHaveStyle({ width: "140px" }));
       expect(mocked.viewSetWidths).not.toHaveBeenCalled();
       fireEvent.pointerUp(window);
     });

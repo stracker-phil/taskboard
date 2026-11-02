@@ -522,6 +522,29 @@ describe("ListView", () => {
       expect(summary.parentElement).toContainElement(step.querySelector<HTMLElement>(".subtask-icon"));
     });
 
+    it("puts the status square after the key and the subtask icon, right before the summary", async () => {
+      await renderList(modeData("list"));
+
+      const step = await screen.findByRole("row", { name: /NW-1043/ });
+      const key = within(step).getByText("NW-1043");
+      const icon = step.querySelector(".subtask-icon")!;
+      const square = step.querySelector(".status-square")!;
+      const summary = within(step).getByText("Draft the price table");
+      const follows = (first: Element, second: Element) => Boolean(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING);
+      expect(follows(key, icon)).toBe(true);
+      expect(follows(icon, square)).toBe(true);
+      expect(follows(square, summary)).toBe(true);
+    });
+
+    it("puts the status square after the key of a row without a subtask icon", async () => {
+      await renderList(viewData([groupOf([OPEN])], [OPEN]));
+
+      const issue = await screen.findByRole("row", { name: /NW-1042/ });
+      const square = issue.querySelector(".status-square")!;
+      expect(within(issue).getByText("NW-1042").compareDocumentPosition(square) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(square.compareDocumentPosition(within(issue).getByText("Redesign the pricing page")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
     it("copies a parent's key in Hierarchy without selecting the row or toggling its subtasks", async () => {
       await renderList(modeData("hierarchy"));
 

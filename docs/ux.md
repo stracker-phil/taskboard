@@ -231,11 +231,11 @@ one group, Board column or pill per style, whatever the status is called; the Bo
   its header or its widest cell across all loaded rows of the view (`measure.ts`, canvas text metrics,
   cached), so columns line up across groups, but no column is wider than 200 (`MAX_COLUMN_WIDTH`); a longer
   value, such as a long epic name, truncates and shows in full on hover. Gap 20, rows padded 16.
-- Rows 44: square, mono key, summary (600 when changed, on `--changed-bg`), change chip, comment count, then
+- Rows 44: mono key, the subtask glyph, the status square right before the summary (600 when changed, on `--changed-bg`), change chip, comment count, then
   the cells. Long titles wrap onto more lines by default and the row grows (each row is measured); "Wrap long
   titles" in the Columns popover turns that off per view, and titles truncate instead (`view.wrap_titles`). A
-  wrapped title is one flow: the key and the subtask glyph lead it, the change chip, comment count and child count
-  follow its last word, and its lines start under the key; only the square keeps its own column. The Table
+  wrapped title is one flow: the key, the subtask glyph and the square lead it, the change chip, comment count and child count
+  follow its last word, and its lines start under the key. The Table
   always truncates at a fixed row height; Board cards always wrap. A clicked row is selected (`--selection-bg`).
   A cell without a value shows a muted "—" (`EMPTY`, `views/list/columns.tsx`), in the List and the Table alike.
 - An issue's labels show as small tags (`row-labels`, 18px `label-chip`s) after its title in the List, the
@@ -257,7 +257,7 @@ one group, Board column or pill per style, whatever the status is called; the Bo
   "3 child issues" as its tooltip. List: a subtask is a row like any other, with the glyph before its title.
   Hierarchy: each result's subtree follows it, every level indented 24 more (`list-row--child`, the row's
   `--depth`); a 16px caret (`SubtaskCaret`) collapses or expands its subtree at any level: a top-level row's sits
-  in the gutter left of the card, under its group's chevron; a nested row's 6 before its square. Like the group's
+  in the gutter left of the card, under its group's chevron; a nested row's 6 before its key. Like the group's
   chevron it shows only while its row has the pointer (or it has focus). A collapsed row shows the count chip.
   Collapsed rows are kept per view (`places.json`); expanded is
   the default.
@@ -681,7 +681,7 @@ the same way ([writes.md](writes.md#drag-and-drop)).
 ## Table view
 
 `src/views/table/`: the same rows as the list, every row 30 high (a group heading too: its 22px tab sits at
-the row's bottom), with a sticky 34px header: Key (with the status square before it), Summary (flexible), then the view's columns,
+the row's bottom), with a sticky 34px header: Key, Summary (flexible, the status square right before the title, so it follows the indent), then the view's columns,
 Status among them like any other. A sortable header (Key, Summary, Status, Priority, Due) sorts on click and
 again flips the direction (`aria-sort`, ↑/↓); a 6px handle at each header's right edge resizes the column
 (48–800), saved on the view. Grouped tables keep the list's group headers; the table scrolls sideways when the

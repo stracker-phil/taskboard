@@ -63,8 +63,7 @@ interface Props {
   edits: CellEditHandlers;
 }
 
-/** One issue: its status square and key, the summary, then the view's cells; the widths come from the table's
- *  variables. */
+/** One issue row; its widths come from the table's CSS variables. */
 export const TableRow = memo(function TableRow(props: Props) {
   const { row, columns, inlineLabels = false, selected, picked, onSelect, onToggleBox, onPick, onOpen, edits } = props;
   const { tree = false, nesting = null, subtasksOpen = true, onToggleSubtasks, childChip = false } = props;
@@ -76,19 +75,19 @@ export const TableRow = memo(function TableRow(props: Props) {
         <PickBox issueKey={row.key} picked={picked} onToggle={() => onToggleBox(row.id)} />
       </span>
       <span className="table-row__cell table-row__key" role="gridcell" style={cellWidth("key")}>
-        <StatusSquare style={row.style} />
         <CopyKey issueKey={row.key} />
       </span>
       <span className="table-row__cell table-row__summary" role="gridcell">
         {nesting?.parent && <SubtaskCaret open={subtasksOpen} onToggle={() => onToggleSubtasks?.(row.id)} />}
         {row.isSubtask && <SubtaskIcon />}
+        <StatusSquare style={row.style} />
         <span className="table-row__title">{row.summary}</span>
         {childChip && <ChildCount count={row.childCount} />}
         {inlineLabels && <LabelChips labels={row.labels} className="row-labels" />}
       </span>
       {columns.map((id) =>
         id === "status" ? (
-          // The square before the key already shows the status's color.
+          // The row's status square already shows the status's color.
           <Cell key={id} id={id} className="table-row__cell table-row__status" row={row} edits={edits} onPick={onPick}>
             <span className="status-name">{row.statusName}</span>
           </Cell>

@@ -113,10 +113,10 @@
 .list-row--wrap .list-row__title { display: block; line-height: 22px; white-space: normal; overflow-wrap: anywhere; word-spacing: 4px; }
 .list-row--wrap .list-row__summary { white-space: normal; text-overflow: clip; word-spacing: normal; }
 .list-row--wrap .list-cell--labels { flex-wrap: wrap; }
-.list-row--wrap .list-row__title > .list-row__key, .list-row--wrap .list-row__title > .subtask-icon { margin-right: 8px; }
+.list-row--wrap .list-row__title > :is(.list-row__key, .subtask-icon, .status-square) { margin-right: 8px; }
 .list-row--wrap .list-row__title > :is(.list-row__key, .subtask-icon) { line-height: 22px; vertical-align: top; }
 .list-row--wrap .list-row__title > .subtask-icon { margin-top: 4px; }
-.list-row--wrap .status-square { margin-top: 6px; }
+.list-row--wrap .status-square { margin-top: 6px; vertical-align: top; }
 .list-row--wrap .list-row__title > :is(.change-chip, .comment-count, .subtask-count) { vertical-align: top; word-spacing: normal; }
 .list-row--wrap .list-row__title > .change-chip { margin-top: 2px; line-height: 18px; }
 
