@@ -282,11 +282,11 @@ fn tracked_space_nodes(conn: &Connection) -> AppResult<Vec<i64>> {
 }
 
 /// A section's levels in sidebar order (each before its children): the Space `space` and its lists, or without one
-/// every level outside the Spaces.
+/// every level outside the Spaces, Everything first.
 fn section_levels(nodes: &[Node], space: Option<i64>) -> Vec<i64> {
     fn walk(nodes: &[Node], parent: Option<i64>, out: &mut Vec<i64>) {
         for child in nodes.iter().filter(|n| n.parent_id == parent) {
-            if parent.is_none() && child.kind == Kind::Space {
+            if parent.is_none() && matches!(child.kind, Kind::Space | Kind::Everything) {
                 continue;
             }
             out.push(child.id);
@@ -294,6 +294,14 @@ fn section_levels(nodes: &[Node], space: Option<i64>) -> Vec<i64> {
         }
     }
     let mut levels = Vec::from_iter(space);
+    if space.is_none() {
+        levels.extend(
+            nodes
+                .iter()
+                .filter(|n| n.kind == Kind::Everything)
+                .map(|n| n.id),
+        );
+    }
     walk(nodes, space, &mut levels);
     levels
 }

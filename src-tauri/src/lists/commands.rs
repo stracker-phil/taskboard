@@ -5,7 +5,7 @@ use tauri::State;
 
 use super::{FilterOptions, ListConditions, MatchCount, SidebarTree, SpaceUpdate, Viewer};
 use crate::error::AppResult;
-use crate::filter::Filter;
+use crate::filter::{Filter, Op};
 use crate::look::Accent;
 use crate::state::AppState;
 
@@ -64,6 +64,16 @@ pub async fn list_move(state: State<'_, AppState>, id: i64, position: i64) -> Ap
 #[tauri::command]
 pub async fn list_set_filter(state: State<'_, AppState>, id: i64, filter: Filter) -> AppResult<()> {
     super::list_set_filter(&state.db, viewer(&state), id, filter).await
+}
+
+#[tauri::command]
+pub async fn list_set_window(
+    state: State<'_, AppState>,
+    id: i64,
+    op: Op,
+    count: u32,
+) -> AppResult<()> {
+    super::list_set_window(&state.db, id, op, count).await
 }
 
 #[tauri::command]

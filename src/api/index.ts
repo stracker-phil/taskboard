@@ -25,6 +25,7 @@ import type {
   EventName,
   EventPayloads,
   Filter,
+  Op,
   GroupBy,
   FieldVisibility,
   Keybindings,
@@ -143,6 +144,8 @@ export const api = {
   listDelete: (id: number) => invoke<void>("list_delete", { id }),
   listMove: (id: number, position: number) => invoke<void>("list_move", { id, position }),
   listSetFilter: (id: number, filter: Filter) => invoke<void>("list_set_filter", { id, filter }),
+  /** Recently viewed's time window: the last `count` hours or days. */
+  listSetWindow: (id: number, op: Op, count: number) => invoke<void>("list_set_window", { id, op, count }),
   /** What `id` inherits ANDed with `filter` in place of its own conditions. */
   /** A level's locked conditions (with display names), a filter list's own ones and the view's own ones. */
   listConditions: (id: number, viewId: number | null) => invoke<ListConditions>("list_conditions", { id, viewId }),

@@ -123,7 +123,7 @@ pub fn columns_for_new_view(conn: &Connection, list_id: i64) -> AppResult<Vec<St
 pub(super) fn group_for_new_view(conn: &Connection, list_id: i64) -> AppResult<GroupBy> {
     Ok(match node(conn, list_id)?.kind {
         Kind::Everything => GroupBy::Project,
-        Kind::Pinned => GroupBy::None,
+        Kind::Pinned | Kind::Viewed => GroupBy::None,
         Kind::Space | Kind::List => level_layouts(conn, list_id)?.default_group,
     })
 }

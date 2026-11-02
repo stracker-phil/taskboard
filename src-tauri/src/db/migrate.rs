@@ -30,6 +30,7 @@ pub const LOCAL: &[&str] = &[
     include_str!("../../migrations/local/0022_space_accent.sql"),
     include_str!("../../migrations/local/0023_view_me_rules.sql"),
     include_str!("../../migrations/local/0024_issue_activity.sql"),
+    include_str!("../../migrations/local/0025_recently_viewed.sql"),
 ];
 pub const CACHE: &[&str] = &[
     include_str!("../../migrations/cache/0001_init.sql"),
@@ -346,11 +347,11 @@ mod tests {
         };
         assert_eq!(
             strings("SELECT kind FROM filter_list ORDER BY id"),
-            ["everything", "pinned"]
+            ["everything", "pinned", "viewed"]
         );
         assert_eq!(
             strings("SELECT CAST(id AS TEXT) FROM view ORDER BY id").len(),
-            2
+            3
         );
         assert!(!strings("SELECT CAST(id AS TEXT) FROM view").contains(&unread_view.to_string()));
         assert_eq!(
@@ -394,6 +395,77 @@ mod tests {
             .query_row("SELECT error FROM write_log", [], |r| r.get(0))
             .unwrap();
         assert_eq!(error, None);
+    }
+
+    #[test]
+    fn the_recently_viewed_migration_adds_one_node_with_a_day_window_and_its_default_view() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        migrate(&mut conn, "local", &LOCAL[..24]).unwrap();
+        let before: i64 = conn
+            .query_row("SELECT COUNT(*) FROM filter_list", [], |r| r.get(0))
+            .unwrap();
+
+        migrate(&mut conn, "local", LOCAL).unwrap();
+
+        let nodes: Vec<(String, String, i64, Option<i64>, String)> = conn
+            .prepare(
+                "SELECT kind, name, position, parent_id, filter FROM filter_list WHERE kind = 'viewed'",
+            )
+            .unwrap()
+            .query_map([], |r| {
+                Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?))
+            })
+            .unwrap()
+            .map(Result::unwrap)
+            .collect();
+        assert_eq!(nodes.len(), 1);
+        let (kind, name, position, parent, filter) = nodes[0].clone();
+        assert_eq!(
+            (kind.as_str(), name.as_str(), position, parent),
+            ("viewed", "Recently viewed", -1, None)
+        );
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&filter).unwrap(),
+            serde_json::json!({
+                "conditions": [{ "field": "lastView", "op": "withinLastHours", "value": 24 }]
+            })
+        );
+        let after: i64 = conn
+            .query_row("SELECT COUNT(*) FROM filter_list", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(after, before + 1);
+        let view: (String, String, String, bool, String, String, i64, String) = conn
+            .query_row(
+                "SELECT name, layout, columns, is_default, group_by, sort_by, sort_order, subtasks
+                 FROM view WHERE list_id = (SELECT id FROM filter_list WHERE kind = 'viewed')",
+                [],
+                |r| {
+                    Ok((
+                        r.get(0)?,
+                        r.get(1)?,
+                        r.get(2)?,
+                        r.get(3)?,
+                        r.get(4)?,
+                        r.get(5)?,
+                        r.get(6)?,
+                        r.get(7)?,
+                    ))
+                },
+            )
+            .unwrap();
+        assert_eq!(
+            view,
+            (
+                "All issues".to_string(),
+                "list".to_string(),
+                r#"["lastView","assignee","status","priority"]"#.to_string(),
+                true,
+                "none".to_string(),
+                "lastView".to_string(),
+                -1,
+                "hidden".to_string(),
+            )
+        );
     }
 
     #[test]

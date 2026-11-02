@@ -558,6 +558,116 @@ describe("FilterPopover", () => {
     });
   });
 
+  describe("on Recently viewed", () => {
+    const WINDOW = { field: "lastView", op: "withinLastHours", value: 24 } as const;
+    const VIEWED = listConditions({ kind: "viewed", fixed: WINDOW });
+    const THIS_PAGE = "This page";
+
+    it("shows This page before This view, with the fixed condition", async () => {
+      const popover = await openFilter(VIEWED);
+
+      const page = section(popover, THIS_PAGE);
+      expect(page.compareDocumentPosition(section(popover, VIEW_SECTION)) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(within(page).getByLabelText("Value")).toHaveValue(24);
+    });
+
+    it("fixes the field and offers no way to remove the condition", async () => {
+      const popover = await openFilter(VIEWED);
+
+      const page = section(popover, THIS_PAGE);
+      expect(within(page).getByLabelText("Field")).toHaveDisplayValue("Last view");
+      expect(within(page).getByLabelText("Field")).toBeDisabled();
+      expect(within(page).queryByRole("button", { name: "Remove condition" })).not.toBeInTheDocument();
+      expect(within(page).queryByRole("button", { name: "+ Add condition" })).not.toBeInTheDocument();
+    });
+
+    it("offers only the hours and days operators", async () => {
+      const popover = await openFilter(VIEWED);
+
+      const operators = within(within(section(popover, THIS_PAGE)).getByLabelText("Operator")).getAllByRole("option");
+      expect(operators.map((o) => o.textContent)).toEqual(["in last (hours)", "in last"]);
+    });
+
+    it("keeps the other sections editable and shows no list section", async () => {
+      const popover = await openFilter(listConditions({ kind: "viewed", fixed: WINDOW, view: [NO_DUE_DATE] }));
+
+      expect(within(popover).queryByRole("group", { name: LIST_SECTION })).not.toBeInTheDocument();
+      expect(within(section(popover, VIEW_SECTION)).getByRole("button", { name: "Remove condition" })).toBeEnabled();
+      expect(within(section(popover, VIEW_SECTION)).getByLabelText("Field")).toBeEnabled();
+    });
+
+    it("saves the new window at once when the count changes", async () => {
+      const popover = await openFilter(VIEWED);
+      const value = within(section(popover, THIS_PAGE)).getByLabelText("Value");
+
+      await userEvent.clear(value);
+      await userEvent.type(value, "36");
+
+      expect(mocked.listSetWindow).toHaveBeenLastCalledWith(21, "withinLastHours", 36);
+      expect(draft()).toBeUndefined();
+    });
+
+    it("keeps the span when hours switch to days: 24 hours become 1 day", async () => {
+      const popover = await openFilter(VIEWED);
+
+      await userEvent.selectOptions(within(section(popover, THIS_PAGE)).getByLabelText("Operator"), "in last");
+
+      expect(mocked.listSetWindow).toHaveBeenCalledWith(21, "withinLastDays", 1);
+      expect(within(section(popover, THIS_PAGE)).getByLabelText("Operator")).toHaveDisplayValue("in last");
+    });
+
+    it("keeps the span when days switch to hours: 2 days become 48 hours", async () => {
+      const popover = await openFilter(listConditions({ kind: "viewed", fixed: { field: "lastView", op: "withinLastDays", value: 2 } }));
+
+      await userEvent.selectOptions(within(section(popover, THIS_PAGE)).getByLabelText("Operator"), "in last (hours)");
+
+      expect(mocked.listSetWindow).toHaveBeenCalledWith(21, "withinLastHours", 48);
+      expect(within(section(popover, THIS_PAGE)).getByLabelText("Value")).toHaveValue(48);
+    });
+
+    it("saves nothing while the count is empty", async () => {
+      const popover = await openFilter(VIEWED);
+      const value = within(section(popover, THIS_PAGE)).getByLabelText("Value");
+
+      await userEvent.clear(value);
+
+      expect(mocked.listSetWindow).not.toHaveBeenCalled();
+    });
+
+    it("saves nothing for a fractional count", async () => {
+      const popover = await openFilter(VIEWED);
+      const value = within(section(popover, THIS_PAGE)).getByLabelText("Value");
+
+      await userEvent.clear(value);
+      await userEvent.type(value, "1.5");
+
+      expect(mocked.listSetWindow).not.toHaveBeenLastCalledWith(21, "withinLastHours", 1.5);
+    });
+
+    it("keeps the popover open when the window cannot be saved", async () => {
+      mocked.listSetWindow.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
+      const popover = await openFilter(VIEWED);
+
+      await userEvent.type(within(section(popover, THIS_PAGE)).getByLabelText("Value"), "0");
+
+      await waitFor(() => expect(mocked.listSetWindow).toHaveBeenCalled());
+      expect(screen.getByRole("dialog", { name: "Filter" })).toBeInTheDocument();
+    });
+
+    it("counts the issues under the fixed condition and says they match", async () => {
+      const popover = await openFilter(VIEWED);
+
+      expect(await within(popover).findByText("5 issues match")).toBeInTheDocument();
+      await waitFor(() => expect(mocked.listMatchCount).toHaveBeenLastCalledWith(21, { conditions: [WINDOW] }, false));
+    });
+
+    it("counts the fixed condition together with the view's drafted ones", async () => {
+      await openFilter(listConditions({ kind: "viewed", fixed: WINDOW, view: [NO_DUE_DATE] }));
+
+      await waitFor(() => expect(mocked.listMatchCount).toHaveBeenLastCalledWith(21, { conditions: [WINDOW, NO_DUE_DATE] }, false));
+    });
+  });
+
   it("closes from Done", async () => {
     const popover = await openFilter(FILTER_LIST);
 

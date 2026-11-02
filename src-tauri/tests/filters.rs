@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 
-use chrono::{NaiveDate, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use rusqlite::params_from_iter;
 use serde_json::{Value as Json, json};
 use tempfile::TempDir;
@@ -235,6 +235,7 @@ impl Fixture {
         Ctx {
             me: me.map(str::to_string),
             today: NaiveDate::from_ymd_opt(2026, 10, 28).unwrap(),
+            now: now(),
             tz: chrono_tz::Europe::Berlin,
             custom: self.custom.clone(),
         }
@@ -733,8 +734,12 @@ fn at(text: &str) -> Option<String> {
     Some(text.to_string())
 }
 
+fn now() -> DateTime<Utc> {
+    "2026-10-28T11:00:00Z".parse().unwrap()
+}
+
 fn hours_ago(hours: i64) -> Option<String> {
-    Some(format_utc(Utc::now() - chrono::Duration::hours(hours)))
+    Some(format_utc(now() - chrono::Duration::hours(hours)))
 }
 
 #[tokio::test]

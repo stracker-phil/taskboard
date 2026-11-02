@@ -28,6 +28,7 @@ fn ctx(me: Option<&str>) -> Ctx {
     Ctx {
         me: me.map(Into::into),
         today: "2026-10-28".parse().unwrap(),
+        now: "2026-10-28T11:00:00Z".parse().unwrap(),
         tz: Tz::Europe__Berlin,
         custom: HashMap::from([(
             REVIEWER.to_string(),

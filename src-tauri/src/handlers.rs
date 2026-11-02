@@ -74,6 +74,7 @@ pub fn handlers() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
         lists::list_delete,
         lists::list_move,
         lists::list_set_filter,
+        lists::list_set_window,
         lists::list_match_count,
         lists::list_conditions,
         lists::filter_options,

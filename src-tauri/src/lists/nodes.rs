@@ -16,6 +16,8 @@ pub enum Kind {
     Space,
     List,
     Pinned,
+    /// Recently viewed: one fixed condition on the last view, whose time window the owner sets.
+    Viewed,
 }
 
 #[derive(Clone, Debug, PartialEq)]

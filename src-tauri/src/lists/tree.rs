@@ -20,7 +20,7 @@ use crate::views::model::from_text;
 #[serde(rename_all = "camelCase")]
 pub struct SidebarTree {
     pub everything: ListNode,
-    /// Unread, Bookmarks and global filter lists, in order.
+    /// Recently viewed, Bookmarks and global filter lists, in order.
     pub home: Vec<ListNode>,
     /// Space lists pinned to Home, newest pin first.
     pub pinned_lists: Vec<ListNode>,
@@ -133,7 +133,9 @@ fn build(conn: &Connection, viewer: &Viewer, unread: bool) -> AppResult<SidebarT
     };
     let home = nodes
         .iter()
-        .filter(|n| n.parent_id.is_none() && matches!(n.kind, Kind::Pinned | Kind::List))
+        .filter(|n| {
+            n.parent_id.is_none() && matches!(n.kind, Kind::Viewed | Kind::Pinned | Kind::List)
+        })
         .map(|n| list_node(n, &nodes, &ctx, &names, &mut counter))
         .collect();
 

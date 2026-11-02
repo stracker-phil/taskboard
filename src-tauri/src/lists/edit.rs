@@ -10,7 +10,7 @@ use super::defaults::{ensure_space, insert_list, list_siblings};
 use super::nodes::{Kind, Node, all_nodes, node, scope_of};
 use crate::db::{Changes, Db, LocalPart};
 use crate::error::{AppError, AppResult};
-use crate::filter::{Field, Filter, OPEN_ISSUES, compile};
+use crate::filter::{Condition, Field, Filter, OPEN_ISSUES, Op, Value, compile};
 use crate::look::Accent;
 use crate::look::{clean_color, clean_icon};
 use crate::order::Siblings;
@@ -186,6 +186,38 @@ pub async fn list_set_filter(db: &Db, viewer: Viewer, id: i64, filter: Filter) -
         let parent = list.parent_id.map(|p| node(tx, p)).transpose()?;
         check_filter(tx, &viewer, parent.as_ref(), &filter)?;
         mark_fields_shown(tx, &filter)?;
+        tx.execute(
+            "UPDATE filter_list SET filter = ?2 WHERE id = ?1",
+            params![id, filter.to_json()?],
+        )?;
+        changes.local_changed(LocalPart::Lists);
+        Ok(())
+    })
+    .await
+}
+
+/// Sets Recently viewed's time window: the last `count` hours (`WithinLastHours`) or days (`WithinLastDays`).
+pub async fn list_set_window(db: &Db, id: i64, op: Op, count: u32) -> AppResult<()> {
+    if !matches!(op, Op::WithinLastHours | Op::WithinLastDays) || count == 0 {
+        return Err(AppError::InvalidInput(
+            "Recently viewed looks back a number of hours or days".into(),
+        ));
+    }
+    db.write(move |tx, changes| {
+        let found = node(tx, id)?;
+        if found.kind != Kind::Viewed {
+            return Err(AppError::InvalidInput(format!(
+                "“{}” has no time window",
+                found.name
+            )));
+        }
+        let filter = Filter {
+            conditions: vec![Condition::new(
+                Field::LastView,
+                op,
+                Some(Value::Days(count)),
+            )],
+        };
         tx.execute(
             "UPDATE filter_list SET filter = ?2 WHERE id = ?1",
             params![id, filter.to_json()?],

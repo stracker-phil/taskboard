@@ -1,7 +1,7 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { ListFilter, Lock } from "lucide-react";
-import { useId, type RefObject } from "react";
-import { api, type Condition, type FilterOptions, type ListConditions, type LockedCondition } from "../../api";
+import { useId, useState, type RefObject } from "react";
+import { api, type Condition, type FilterOptions, type ListConditions, type LockedCondition, type Op } from "../../api";
 import { Popover } from "../../components/Popover";
 import { useNavGo, useSidebar } from "../../queries/sidebar";
 import { useFilterOptions, useListConditions, useRequestNarrowing } from "../../queries/views";
@@ -58,7 +58,8 @@ function Editor({ listId, viewId, conditions, options: allOptions, dirty, onSave
   const listComplete = listDraft.filter(isComplete);
   const viewComplete = viewDraft.filter(isComplete);
   const me = useRequestNarrowing(listId, viewId)?.me ?? false;
-  const count = useMatchCount(listId, [...listComplete, ...viewComplete], me);
+  const fixed = conditions.fixed ? [conditions.fixed] : [];
+  const count = useMatchCount(listId, [...fixed, ...listComplete, ...viewComplete], me);
 
   const { data: tree } = useSidebar();
   const go = useNavGo();
@@ -71,7 +72,7 @@ function Editor({ listId, viewId, conditions, options: allOptions, dirty, onSave
     onClose();
     await go(id);
   };
-  const narrowed = editsList || me || listDraft.length + viewDraft.length > 0;
+  const narrowed = editsList || fixed.length > 0 || me || listDraft.length + viewDraft.length > 0;
 
   return (
     <>
@@ -85,6 +86,7 @@ function Editor({ listId, viewId, conditions, options: allOptions, dirty, onSave
           <LockedRow key={i} condition={locked} />
         ))}
         {!editsList && conditions.error && <p className="filter-popover__error">{conditions.error}</p>}
+        {conditions.fixed && <WindowSection listId={listId} condition={conditions.fixed} options={options} />}
         {editsList && <ConditionSection title="All views of this list" draft={listDraft} setDraft={setListDraft} options={options} error={conditions.error} />}
         <ConditionSection title="This view" draft={viewDraft} setDraft={setViewDraft} options={options} error={conditions.viewError} />
       </div>
@@ -139,6 +141,29 @@ function ConditionSection({ title, draft, setDraft, options, error }: SectionPro
       <button type="button" className="filter-popover__add" onClick={add}>
         + Add condition
       </button>
+    </div>
+  );
+}
+
+const WINDOW_OPS: Op[] = ["withinLastHours", "withinLastDays"];
+
+/** Recently viewed's own condition: only how far back it looks changes, and it is saved at once. */
+function WindowSection({ listId, condition, options }: { listId: number; condition: Condition; options: FilterOptions }) {
+  const headingId = useId();
+  const [shown, setShown] = useState(condition);
+  const change = (next: Condition) => {
+    setShown(next);
+    const count = next.value;
+    if (typeof count === "number" && Number.isInteger(count) && count > 0) {
+      void attempt(api.listSetWindow(listId, next.op, count), "Could not change the time window");
+    }
+  };
+  return (
+    <div role="group" aria-labelledby={headingId} className="filter-popover__section">
+      <h3 id={headingId} className="popover__caps filter-popover__caps">
+        This page
+      </h3>
+      <ConditionRow condition={shown} options={options} onChange={change} ops={WINDOW_OPS} />
     </div>
   );
 }

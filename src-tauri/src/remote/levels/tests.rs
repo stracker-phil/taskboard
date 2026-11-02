@@ -131,6 +131,25 @@ fn a_level_is_found_by_its_keyword_name_or_key_in_any_case() {
 }
 
 #[test]
+fn recently_viewed_is_found_by_the_word_viewed_or_its_name() {
+    let mut with_viewed = tree();
+    with_viewed
+        .home
+        .insert(0, node(2, Kind::Viewed, "Recently viewed", Some(3)));
+
+    for word in [
+        "viewed",
+        "VIEWED",
+        "Recently viewed",
+        "recently",
+        " viewed ",
+    ] {
+        assert_eq!(find_level(&with_viewed, word), Ok(2), "{word:?}");
+    }
+    assert_eq!(find_level(&with_viewed, "pinned"), Ok(3));
+}
+
+#[test]
 fn a_filter_list_is_found_by_its_name_inside_its_space() {
     for (word, id) in [
         ("NW/Open bugs", 11),

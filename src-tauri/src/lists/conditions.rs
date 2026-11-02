@@ -21,6 +21,8 @@ pub struct ListConditions {
     pub locked: Vec<LockedCondition>,
     /// The filter list's own conditions; always empty on Everything, a Space or a Home level.
     pub own: Vec<Condition>,
+    /// Recently viewed's condition: only its time window can change (`list_set_window`).
+    pub fixed: Option<Condition>,
     /// Why the stored filter can't be read.
     pub error: Option<String>,
     /// A filter list in a Space: the Space gives the project, so a condition can't pick one.
@@ -74,12 +76,17 @@ fn conditions_of(conn: &Connection, id: i64) -> AppResult<ListConditions> {
             locked.extend(conditions.iter().map(|c| lock(c, &names, "from Space")));
         }
     }
+    let mut fixed = None;
     let (own, error) = match (target.kind, own_conditions(&target)) {
         (Kind::Space, Ok(conditions)) => {
             locked.extend(conditions.iter().map(|c| lock(c, &names, "this Space")));
             (Vec::new(), None)
         }
         (Kind::List, Ok(conditions)) => (conditions, None),
+        (Kind::Viewed, Ok(conditions)) => {
+            fixed = conditions.into_iter().next();
+            (Vec::new(), None)
+        }
         (_, Ok(_)) => (Vec::new(), None),
         (_, Err(message)) => (Vec::new(), Some(message)),
     };
@@ -90,6 +97,7 @@ fn conditions_of(conn: &Connection, id: i64) -> AppResult<ListConditions> {
         kind: target.kind,
         locked,
         own,
+        fixed,
         error,
         project_fixed,
         view: Vec::new(),

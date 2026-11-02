@@ -113,6 +113,10 @@ describe("page action commands", () => {
     expect(command.when?.()).toBe(false);
   });
 
+  it("binds Go to Recently Viewed to ⌘Y by default", () => {
+    expect(getCommand("go.viewed")?.defaultBinding).toBe("Mod+Y");
+  });
+
   it("runs the registered action when its default key is pressed", async () => {
     const run = vi.fn();
     renderHook(() => usePageAction("toolbar.me", run));
@@ -129,6 +133,7 @@ describe("page action commands", () => {
 describe("page action titles", () => {
   it.each([
     ["go.pinned", "Go to Bookmarks"],
+    ["go.viewed", "Go to Recently Viewed"],
     ["view.markAllSeen", "Mark All as Read"],
     ["toolbar.unread", "Unread Only"],
   ])("name %s %s", (id, title) => {

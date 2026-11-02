@@ -40,6 +40,7 @@ pub const PALETTE: Item = item("Command Palette…", "page:palette.open", "CmdOr
 pub const GO_LEVELS: &[Item] = &[
     PALETTE,
     item("Everything", "page:go.everything", "CmdOrCtrl+Shift+E"),
+    item("Recently Viewed", "page:go.viewed", "CmdOrCtrl+Y"),
     item("Bookmarks", "page:go.pinned", "CmdOrCtrl+Shift+P"),
 ];
 pub const GO_MOVES: &[Item] = &[
@@ -246,6 +247,7 @@ mod tests {
                 "view.new",
                 "palette.open",
                 "go.everything",
+                "go.viewed",
                 "go.pinned",
                 "view.previous",
                 "view.next",

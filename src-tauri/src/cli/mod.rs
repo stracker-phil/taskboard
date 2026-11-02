@@ -45,6 +45,7 @@ const EXAMPLES: &str = "Examples:
   taskboard go NW Board              open a Space at one of its views
   taskboard go \"NW/Open bugs\"        open a filter list
   taskboard go pinned                open Bookmarks
+  taskboard go viewed                open Recently viewed
   taskboard me on                    show only my issues in the current view
   taskboard layout table             show the current view as a table
   taskboard search \"login page\" --json

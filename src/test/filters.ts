@@ -36,5 +36,5 @@ export function filterOptions(patch: Partial<FilterOptions> = {}): FilterOptions
 
 /** A level's conditions: Everything's (none) unless overridden. */
 export function listConditions(patch: Partial<ListConditions> = {}): ListConditions {
-  return { kind: "everything", locked: [], own: [], error: null, view: [], viewError: null, projectFixed: false, ...patch };
+  return { kind: "everything", locked: [], own: [], error: null, view: [], viewError: null, projectFixed: false, fixed: null, ...patch };
 }

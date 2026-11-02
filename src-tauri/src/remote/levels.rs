@@ -37,6 +37,7 @@ fn home_words(node: &ListNode) -> Vec<String> {
     let keyword = match node.kind {
         Kind::Everything => Some("everything"),
         Kind::Pinned => Some("pinned"),
+        Kind::Viewed => Some("viewed"),
         Kind::Space | Kind::List => None,
     };
     std::iter::once(node.name.clone())

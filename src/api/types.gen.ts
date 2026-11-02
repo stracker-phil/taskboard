@@ -458,6 +458,10 @@ locked: Array<LockedCondition>,
  */
 own: Array<Condition>, 
 /**
+ * Recently viewed's condition: only its time window can change (`list_set_window`).
+ */
+fixed: Condition | null, 
+/**
  * Why the stored filter can't be read.
  */
 error: string | null, 
@@ -484,7 +488,7 @@ projectId: string | null,
  */
 isSpace: boolean, };
 
-export type ListKind = "everything" | "space" | "list" | "pinned";
+export type ListKind = "everything" | "space" | "list" | "pinned" | "viewed";
 
 export type ListNode = { id: number, kind: ListKind, name: string, 
 /**
@@ -810,7 +814,7 @@ sync: SyncSettings, appearance: Appearance, accent: Accent, behaviour: Behaviour
 
 export type SidebarTree = { everything: ListNode, 
 /**
- * Unread, Bookmarks and global filter lists, in order.
+ * Recently viewed, Bookmarks and global filter lists, in order.
  */
 home: Array<ListNode>, 
 /**

@@ -1,4 +1,4 @@
-import { Bookmark, Folder, Layers2, type LucideIcon } from "lucide-react";
+import { Bookmark, Folder, History, Layers2, type LucideIcon } from "lucide-react";
 import type { ListKind, ListNode, SidebarTree, SpaceNode } from "../api";
 
 /** A sidebar level as the page draws it: Everything or a Home list, a Space, or a filter list in a Space. */
@@ -22,10 +22,11 @@ export function findLevel(tree: SidebarTree, listId: number): Level | null {
 /** The Space a level belongs to, if any. */
 export const spaceOf = (level: Level | null): SpaceNode | null => (level && level.kind !== "home" ? level.space : null);
 
-/** The icon of a Home level: Everything, Bookmarks, or a folder for a filter list. */
+/** The icon of a Home level: Everything, Recently viewed, Bookmarks, or a folder for a filter list. */
 export const HOME_ICONS: Record<ListKind, LucideIcon> = {
   everything: Layers2,
   pinned: Bookmark,
+  viewed: History,
   list: Folder,
   space: Folder,
 };

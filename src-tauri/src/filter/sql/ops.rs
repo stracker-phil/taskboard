@@ -175,11 +175,13 @@ pub(super) fn date(c: &Condition, expr: &Sql, timestamp: bool, ctx: &Ctx) -> App
                 .ok_or_else(|| rejected(c, "is out of range"))?;
             between(from, days_after(c, ctx.today, 1)?)
         }
-        // Stored timestamps are UTC text with milliseconds (`time::format_utc`), as SQLite's `%f` writes them.
-        Op::WithinLastHours if timestamp => expr.fill(
-            "{} >= strftime('%Y-%m-%dT%H:%M:%fZ', 'now', ?)",
-            vec![SqlValue::Text(format!("-{} hours", hours(c)?))],
-        ),
+        Op::WithinLastHours if timestamp => {
+            let from = ctx
+                .now
+                .checked_sub_signed(chrono::Duration::hours(hours(c)?.into()))
+                .ok_or_else(|| rejected(c, "is out of range"))?;
+            expr.fill("{} >= ?", vec![SqlValue::Text(format_utc(from))])
+        }
         Op::WithinNextDays => {
             let until = days_after(c, ctx.today, u64::from(days(c)?) + 1)?;
             between(ctx.today, until)

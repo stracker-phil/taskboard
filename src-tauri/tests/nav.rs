@@ -567,15 +567,16 @@ mod stepping_through_lists {
         let everything = everything(&db).await;
         let bookmarks = bookmarks(&db).await;
         let weekly = home_list(&db, "Weekly review").await;
+        let viewed = id_where(&db, "kind = 'viewed'").await;
         nav.go(&db, everything, None).await.unwrap();
 
         let forward = walk(&nav, &db, 1, 5).await;
         let backward = walk(&nav, &db, -1, 5).await;
 
-        assert_eq!(forward, [bookmarks, weekly, everything, bookmarks, weekly]);
+        assert_eq!(forward, [viewed, bookmarks, weekly, everything, viewed]);
         assert_eq!(
             backward,
-            [bookmarks, everything, weekly, bookmarks, everything]
+            [everything, weekly, bookmarks, viewed, everything]
         );
     }
 
@@ -598,7 +599,7 @@ mod stepping_through_lists {
 
         let visited = walk(&nav, &db, 1, 1).await;
 
-        assert_eq!(visited, [bookmarks(&db).await]);
+        assert_eq!(visited, [id_where(&db, "kind = 'viewed'").await]);
     }
 }
 

@@ -28,7 +28,7 @@ pub fn project_of_level(conn: &Connection, list_id: i64) -> AppResult<Option<Str
             }
             None => Ok(None),
         },
-        Kind::Everything | Kind::Pinned => Ok(None),
+        Kind::Everything | Kind::Pinned | Kind::Viewed => Ok(None),
     }
 }
 

@@ -121,7 +121,7 @@
   background: var(--panel-bg); color: var(--text); font: inherit; font-size: 13px;
 }
 .condition-row__field { width: 140px; text-overflow: ellipsis; }
-.condition-row__op { width: 70px; }
+.condition-row__op { width: 132px; }
 .condition-row__value { flex: 1; min-width: 0; }
 .condition-row__remove {
   display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 7px;

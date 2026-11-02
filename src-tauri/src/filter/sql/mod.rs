@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 
-use chrono::NaiveDate;
+use chrono::{DateTime, NaiveDate, Utc};
 use chrono_tz::Tz;
 use rusqlite::types::Value as SqlValue;
 
@@ -30,6 +30,8 @@ pub const OPEN_ISSUES: &str = "i.status_category <> 'done'";
 pub struct Ctx {
     /// The connected account; without one `me` is nobody.
     pub me: Option<String>,
+    /// "In the last n hours" counts back from it.
+    pub now: DateTime<Utc>,
     pub today: NaiveDate,
     /// Dates in conditions are days in this zone.
     pub tz: Tz,

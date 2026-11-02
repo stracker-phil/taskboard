@@ -40,6 +40,7 @@ impl Viewer {
         let tz = self.tz();
         Ok(Ctx {
             me: self.me.clone(),
+            now: self.now,
             today: self.now.with_timezone(&tz).date_naive(),
             tz,
             custom: custom_fields(conn)?,

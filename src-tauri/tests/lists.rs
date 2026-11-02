@@ -10,18 +10,20 @@ use rusqlite::Row;
 use serde_json::json;
 use tempfile::TempDir;
 
+use taskboard_lib::activity::issue_viewed;
 use taskboard_lib::connection::{
     ConnectionInput, JiraAccess, fetch_versions, refresh_projects, save, track_project,
 };
 use taskboard_lib::db::Db;
 use taskboard_lib::error::{AppError, ErrorKind};
-use taskboard_lib::filter::{Condition, Field, Filter};
+use taskboard_lib::filter::{Condition, Field, Filter, Op, Value};
 use taskboard_lib::jira::{Limiter, TokenKind};
 use taskboard_lib::lists::{
     Kind, LIST_VIEW, ListConditions, ListNode, LockedCondition, MatchCount, SidebarTree, SpaceNode,
     SpaceUpdate, ValueKind, Viewer, ensure_tracked_spaces, filter_options, list_conditions,
     list_create, list_delete, list_duplicate, list_match_count, list_move, list_rename,
-    list_set_filter, list_set_look, sidebar_tree, space_move, space_set_accent, space_update,
+    list_set_filter, list_set_look, list_set_window, sidebar_tree, space_move, space_set_accent,
+    space_update,
 };
 use taskboard_lib::look::Accent;
 use taskboard_lib::store::settings::SettingsStore;
@@ -387,7 +389,11 @@ mod the_seeded_levels {
     async fn everything_and_the_home_lists_start_with_one_all_issues_view() {
         let (_dir, db) = lab().await;
 
-        for (kind, group) in [("everything", GroupBy::Project), ("pinned", GroupBy::None)] {
+        for (kind, group) in [
+            ("everything", GroupBy::Project),
+            ("pinned", GroupBy::None),
+            ("viewed", GroupBy::None),
+        ] {
             let views = views_of(&db, node_id(&db, kind).await).await.unwrap();
 
             assert_eq!(view_names(&views), ["All issues"], "{kind}");
@@ -408,7 +414,13 @@ mod the_seeded_levels {
             .iter()
             .map(|n| (n.kind, n.name.as_str(), n.count))
             .collect();
-        assert_eq!(home, [(Kind::Pinned, "Bookmarks", Some(0))]);
+        assert_eq!(
+            home,
+            [
+                (Kind::Viewed, "Recently viewed", Some(0)),
+                (Kind::Pinned, "Bookmarks", Some(0)),
+            ]
+        );
         assert!(tree.pinned_lists.is_empty());
         assert_eq!(tree.everything.kind, Kind::Everything);
         assert_eq!(tree.everything.count, Some(0));
@@ -1066,6 +1078,7 @@ mod the_conditions_a_level_shows {
                 kind: Kind::Everything,
                 locked: vec![],
                 own: vec![],
+                fixed: None,
                 error: None,
                 project_fixed: false,
                 view: vec![],
@@ -1088,6 +1101,7 @@ mod the_conditions_a_level_shows {
                 kind: Kind::Space,
                 locked: vec![locked("this Space")],
                 own: vec![],
+                fixed: None,
                 error: None,
                 project_fixed: false,
                 view: vec![],
@@ -1127,7 +1141,7 @@ mod the_conditions_a_level_shows {
     async fn the_home_lists_leave_the_project_free() {
         let (_dir, db) = tracked_lab().await;
 
-        for kind in ["pinned"] {
+        for kind in ["pinned", "viewed"] {
             let shown = list_conditions(&db, node_id(&db, kind).await, None)
                 .await
                 .unwrap();
@@ -1142,6 +1156,7 @@ mod the_conditions_a_level_shows {
             kind: Kind::List,
             locked: vec![],
             own: vec![],
+            fixed: None,
             error: None,
             project_fixed: true,
             view: vec![],
@@ -1254,6 +1269,264 @@ mod the_conditions_a_level_shows {
     }
 }
 
+mod recently_viewed {
+    use super::*;
+
+    const TWO_HOURS_AGO: &str = "2026-10-28T09:00:00Z";
+    const THIRTY_SIX_HOURS_AGO: &str = "2026-10-26T23:00:00Z";
+
+    fn window(op: Op, count: u32) -> Condition {
+        Condition::new(Field::LastView, op, Some(Value::Days(count)))
+    }
+
+    /// Issues NW-1 (viewed two hours before now),NW-2 (viewed 36 hours before now) and NW-3 (never viewed).
+    async fn viewed_lab() -> (TempDir, Db) {
+        let (dir, db) = tracked_lab().await;
+        let issue = |id: &str, key: &str| {
+            format!(
+                "('{id}', '{key}', '10001', 'Issue {id}', 'Task', 's1', 'new', '2026-10-20T09:00:00.000Z',
+                  '2026-10-20T09:00:00.000Z', '2026-10-20T09:00:00.000Z')"
+            )
+        };
+        let sql = format!(
+            "INSERT INTO cache.status (id, name, category) VALUES ('s1', 'To Do', 'new');
+             INSERT INTO cache.issue (id, key, project_id, summary, issue_type, status_id,
+               status_category, created_at, updated_at, synced_at) VALUES {}, {}, {}",
+            issue("1", "NW-1"),
+            issue("2", "NW-2"),
+            issue("3", "NW-3")
+        );
+        db.write(move |tx, _| {
+            tx.execute_batch(&sql)?;
+            Ok(())
+        })
+        .await
+        .unwrap();
+        issue_viewed(&db, "1".into(), TWO_HOURS_AGO.parse().unwrap())
+            .await
+            .unwrap();
+        issue_viewed(&db, "2".into(), THIRTY_SIX_HOURS_AGO.parse().unwrap())
+            .await
+            .unwrap();
+        (dir, db)
+    }
+
+    async fn shown_keys(db: &Db) -> Vec<String> {
+        let node = node_id(db, "viewed").await;
+        let view = views_of(db, node).await.unwrap()[0].id;
+        let data = view_rows(db, viewer(None), node, view, Narrowing::default())
+            .await
+            .unwrap();
+        let mut keys: Vec<String> = data.rows.values().map(|row| row.key.clone()).collect();
+        keys.sort();
+        keys
+    }
+
+    #[tokio::test]
+    async fn the_page_shows_only_issues_viewed_within_the_last_day() {
+        let (_dir, db) = viewed_lab().await;
+
+        assert_eq!(shown_keys(&db).await, ["NW-1"]);
+    }
+
+    #[tokio::test]
+    async fn a_viewed_subtask_is_a_row_but_an_unviewed_child_of_a_viewed_parent_is_not() {
+        let (_dir, db) = viewed_lab().await;
+        db.write(|tx, _| {
+            tx.execute_batch(
+                "INSERT INTO cache.issue (id, key, project_id, summary, issue_type, type_is_subtask,
+                   parent_id, status_id, status_category, created_at, updated_at, synced_at) VALUES
+                   ('4', 'NW-4', '10001', 'Issue 4', 'Subtask', 1, '1', 's1', 'new',
+                    '2026-10-20T09:00:00.000Z', '2026-10-20T09:00:00.000Z', '2026-10-20T09:00:00.000Z'),
+                   ('5', 'NW-5', '10001', 'Issue 5', 'Subtask', 1, '1', 's1', 'new',
+                    '2026-10-20T09:00:00.000Z', '2026-10-20T09:00:00.000Z', '2026-10-20T09:00:00.000Z')",
+            )?;
+            Ok(())
+        })
+        .await
+        .unwrap();
+        issue_viewed(&db, "5".into(), TWO_HOURS_AGO.parse().unwrap())
+            .await
+            .unwrap();
+
+        assert_eq!(shown_keys(&db).await, ["NW-1", "NW-5"]);
+    }
+
+    #[tokio::test]
+    async fn the_sidebar_counts_the_issues_viewed_within_the_window() {
+        let (_dir, db) = viewed_lab().await;
+
+        let tree = sidebar_tree(&db, viewer(None), false).await.unwrap();
+
+        assert_eq!(tree.home[0].kind, Kind::Viewed);
+        assert_eq!(tree.home[0].count, Some(1));
+    }
+
+    #[tokio::test]
+    async fn the_node_comes_first_in_home_ahead_of_bookmarks_and_global_lists() {
+        let (_dir, db) = tracked_lab().await;
+        let everything = node_id(&db, "everything").await;
+        list_create(&db, viewer(None), everything, "My bugs".into(), None)
+            .await
+            .unwrap();
+
+        let tree = sidebar_tree(&db, viewer(None), false).await.unwrap();
+
+        let kinds: Vec<Kind> = tree.home.iter().map(|n| n.kind).collect();
+        assert_eq!(kinds, [Kind::Viewed, Kind::Pinned, Kind::List]);
+    }
+
+    #[tokio::test]
+    async fn its_condition_is_reported_as_fixed_and_no_other_level_has_one() {
+        let (_dir, db) = tracked_lab().await;
+
+        let shown = list_conditions(&db, node_id(&db, "viewed").await, None)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            shown,
+            ListConditions {
+                kind: Kind::Viewed,
+                locked: vec![],
+                own: vec![],
+                fixed: Some(window(Op::WithinLastHours, 24)),
+                error: None,
+                project_fixed: false,
+                view: vec![],
+                view_error: None,
+            }
+        );
+        for id in [
+            node_id(&db, "everything").await,
+            node_id(&db, "pinned").await,
+            space_node_id(&db, NW).await,
+            list_id(&db, "Open bugs").await,
+        ] {
+            let other = list_conditions(&db, id, None).await.unwrap();
+            assert_eq!(other.fixed, None, "{id}");
+        }
+    }
+
+    #[tokio::test]
+    async fn the_fixed_condition_is_sent_as_fixed() {
+        let (_dir, db) = tracked_lab().await;
+
+        let shown = list_conditions(&db, node_id(&db, "viewed").await, None)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            serde_json::to_value(&shown).unwrap()["fixed"],
+            json!({ "field": "lastView", "op": "withinLastHours", "value": 24 })
+        );
+    }
+
+    #[tokio::test]
+    async fn a_longer_window_in_days_shows_older_views_and_is_reported_as_the_fixed_condition() {
+        let (_dir, db) = viewed_lab().await;
+        let node = node_id(&db, "viewed").await;
+
+        list_set_window(&db, node, Op::WithinLastDays, 2)
+            .await
+            .unwrap();
+
+        assert_eq!(shown_keys(&db).await, ["NW-1", "NW-2"]);
+        let shown = list_conditions(&db, node, None).await.unwrap();
+        assert_eq!(shown.fixed, Some(window(Op::WithinLastDays, 2)));
+        let stored: serde_json::Value = serde_json::from_str(
+            &text(
+                &db,
+                format!("SELECT filter FROM filter_list WHERE id = {node}"),
+            )
+            .await,
+        )
+        .unwrap();
+        assert_eq!(
+            stored,
+            json!({ "conditions": [{ "field": "lastView", "op": "withinLastDays", "value": 2 }] })
+        );
+    }
+
+    #[tokio::test]
+    async fn a_shorter_window_in_hours_drops_views_outside_it() {
+        let (_dir, db) = viewed_lab().await;
+        let node = node_id(&db, "viewed").await;
+
+        list_set_window(&db, node, Op::WithinLastHours, 12)
+            .await
+            .unwrap();
+        assert_eq!(shown_keys(&db).await, ["NW-1"]);
+        list_set_window(&db, node, Op::WithinLastHours, 1)
+            .await
+            .unwrap();
+
+        assert_eq!(shown_keys(&db).await, Vec::<String>::new());
+        let shown = list_conditions(&db, node, None).await.unwrap();
+        assert_eq!(shown.fixed, Some(window(Op::WithinLastHours, 1)));
+    }
+
+    #[tokio::test]
+    async fn only_hours_or_days_of_at_least_one_are_a_window() {
+        let (_dir, db) = viewed_lab().await;
+        let node = node_id(&db, "viewed").await;
+        let before = text(
+            &db,
+            format!("SELECT filter FROM filter_list WHERE id = {node}"),
+        )
+        .await;
+
+        for (op, count) in [
+            (Op::WithinLastHours, 0),
+            (Op::WithinLastDays, 0),
+            (Op::WithinNextDays, 3),
+            (Op::Is, 3),
+            (Op::After, 3),
+        ] {
+            let err = list_set_window(&db, node, op, count).await.unwrap_err();
+            assert_eq!(err.kind(), ErrorKind::InvalidInput, "{op:?} {count}");
+        }
+
+        assert_eq!(
+            text(
+                &db,
+                format!("SELECT filter FROM filter_list WHERE id = {node}")
+            )
+            .await,
+            before
+        );
+    }
+
+    #[tokio::test]
+    async fn no_other_level_has_a_window() {
+        let (_dir, db) = tracked_lab().await;
+
+        for (label, id) in [
+            ("filter list", list_id(&db, "Open bugs").await),
+            ("Everything", node_id(&db, "everything").await),
+            ("Bookmarks", node_id(&db, "pinned").await),
+            ("Space", space_node_id(&db, NW).await),
+        ] {
+            let err = list_set_window(&db, id, Op::WithinLastDays, 3)
+                .await
+                .unwrap_err();
+            assert_eq!(err.kind(), ErrorKind::InvalidInput, "{label}");
+        }
+        let unknown = list_set_window(&db, 9999, Op::WithinLastDays, 3)
+            .await
+            .unwrap_err();
+        assert_eq!(unknown.kind(), ErrorKind::NotFound);
+        assert_eq!(
+            number(
+                &db,
+                "SELECT COUNT(*) FROM filter_list WHERE filter LIKE '%withinLastDays%'"
+            )
+            .await,
+            0
+        );
+    }
+}
+
 mod editing_filter_lists {
     use super::*;
 
@@ -1301,9 +1574,9 @@ mod editing_filter_lists {
                 .iter()
                 .map(|n| n.name.as_str())
                 .collect::<Vec<_>>(),
-            ["Bookmarks", "My bugs"]
+            ["Recently viewed", "Bookmarks", "My bugs"]
         );
-        assert_eq!(tree.home[1].kind, Kind::List);
+        assert_eq!(tree.home[2].kind, Kind::List);
         assert_eq!(
             number(
                 &db,
@@ -1532,7 +1805,7 @@ mod editing_filter_lists {
         let (_dir, db) = tracked_lab().await;
         let nodes_before = number(&db, "SELECT COUNT(*) FROM filter_list").await;
 
-        for kind in ["space", "everything", "pinned"] {
+        for kind in ["space", "everything", "pinned", "viewed"] {
             let id = node_id(&db, kind).await;
             let errors = [
                 list_rename(&db, id, "Renamed".into()).await.unwrap_err(),

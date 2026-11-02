@@ -62,6 +62,12 @@ function treeWith(patch: { nw?: Partial<SpaceNode>; nws?: ListNode[] } = {}): Si
   };
 }
 
+const withRecentlyViewed = (): SidebarTree => {
+  const tree = treeWith();
+  tree.home = [list(4, "Recently viewed", { kind: "viewed", count: 6 }), ...tree.home];
+  return tree;
+};
+
 const NW_ID = 11;
 const NWS_ID = 13;
 const LUM_ID = 12;
@@ -441,6 +447,27 @@ describe("Sidebar", () => {
       expect(run("go.everything")).toBe(true);
     });
 
+    it("opens Recently viewed from go.viewed, and offers it only when the tree has that Home row", async () => {
+      await renderSidebar();
+      expect(run("go.viewed")).toBe(false);
+      cleanup();
+
+      await renderSidebar(withRecentlyViewed());
+
+      expect(run("go.viewed")).toBe(true);
+      expect(mocked.navGo).toHaveBeenCalledWith(4, null);
+    });
+
+    it("opens Recently viewed on ⌘Y", async () => {
+      installCommands("main");
+      await renderSidebar(withRecentlyViewed());
+      render(<Keys />);
+
+      await userEvent.keyboard("{Meta>}y{/Meta}");
+
+      expect(mocked.navGo).toHaveBeenCalledWith(4, null);
+    });
+
     it("opens Bookmarks on ⌘⇧P", async () => {
       installCommands("main");
       await renderSidebar();
@@ -532,6 +559,12 @@ describe("Sidebar", () => {
       await renderSidebar(tree);
 
       await waitFor(() => expect(homeButtons().map((r) => r.textContent)).toEqual(["Everything42"]));
+    });
+
+    it("keeps the Recently viewed row, since only Bookmarks moves to the bar", async () => {
+      await renderSidebar(withRecentlyViewed());
+
+      await waitFor(() => expect(homeButtons().map((r) => r.textContent)).toEqual(["Everything42", "Recently viewed6"]));
     });
 
     it("keeps the Bookmarks row and the pinned lists while the bar is off", async () => {

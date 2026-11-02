@@ -60,7 +60,7 @@ export function HomeRows({ rows, activeId, open }: Props) {
 }
 
 /** The Home rows that have a "Go to" key. */
-const GO_COMMANDS: Partial<Record<ListNode["kind"], string>> = { everything: "go.everything", pinned: "go.pinned" };
+const GO_COMMANDS: Partial<Record<ListNode["kind"], string>> = { everything: "go.everything", pinned: "go.pinned", viewed: "go.viewed" };
 
 function HomeIcon({ kind }: { kind: ListNode["kind"] }) {
   const Icon = HOME_ICONS[kind];

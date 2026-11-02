@@ -8,14 +8,16 @@ interface Props {
   condition: Condition;
   options: FilterOptions;
   onChange: (condition: Condition) => void;
-  onRemove: () => void;
+  /** None for a condition that can't be removed: its field is fixed too, and only `ops` are offered. */
+  onRemove?: () => void;
+  ops?: Op[];
 }
 
-/** One own condition as field / operator / value, with a remove button. */
-export function ConditionRow({ condition, options, onChange, onRemove }: Props) {
+/** One own condition as field / operator / value, with a remove button unless it is fixed. */
+export function ConditionRow({ condition, options, onChange, onRemove, ops: fixedOps }: Props) {
   const id = useId();
   const field: FilterField = options.fields.find((f) => f.id === condition.field) ?? { id: condition.field, name: condition.field, kind: "text" };
-  const ops = opsFor(field.kind);
+  const ops = fixedOps ?? opsFor(field.kind);
 
   const setField = (fieldId: string) => {
     const next = options.fields.find((f) => f.id === fieldId);
@@ -28,7 +30,7 @@ export function ConditionRow({ condition, options, onChange, onRemove }: Props) 
       return;
     }
     const keepsValue = takesDays(op) === takesDays(condition.op) && !takesNoValue(condition.op);
-    let value = keepsValue ? condition.value : startValue(field, op, options);
+    let value = keepsValue ? countIn(op, condition) : startValue(field, op, options);
     if (takesNoValue(op)) value = undefined;
     onChange({ ...condition, op, value });
   };
@@ -38,7 +40,7 @@ export function ConditionRow({ condition, options, onChange, onRemove }: Props) 
       <label className="visually-hidden" htmlFor={`${id}-field`}>
         Field
       </label>
-      <select id={`${id}-field`} className="condition-row__field" value={field.id} onChange={(e) => setField(e.target.value)}>
+      <select id={`${id}-field`} className="condition-row__field" value={field.id} disabled={!onRemove} onChange={(e) => setField(e.target.value)}>
         {options.fields.map((f) => (
           <option key={f.id} value={f.id}>
             {f.name}
@@ -56,11 +58,26 @@ export function ConditionRow({ condition, options, onChange, onRemove }: Props) 
         ))}
       </select>
       <ValueEditor id={`${id}-value`} condition={condition} field={field} options={options} onChange={onChange} />
-      <button type="button" className="condition-row__remove" aria-label="Remove condition" onClick={onRemove}>
-        <X size={14} aria-hidden="true" />
-      </button>
+      {onRemove ? (
+        <button type="button" className="condition-row__remove" aria-label="Remove condition" onClick={onRemove}>
+          <X size={14} aria-hidden="true" />
+        </button>
+      ) : (
+        // Keeps the value as wide as in the other rows.
+        <span className="condition-row__remove" aria-hidden="true" />
+      )}
     </div>
   );
+}
+
+/** A count moving between hours and days keeps its span: 24 hours become 1 day, 2 days 48 hours. */
+function countIn(op: Op, condition: Condition): Condition["value"] {
+  const count = condition.value;
+  if (typeof count !== "number") return count;
+  const hours = (o: Op) => o === "withinLastHours";
+  if (hours(condition.op) && !hours(op)) return Math.max(1, Math.round(count / 24));
+  if (!hours(condition.op) && hours(op)) return count * 24;
+  return count;
 }
 
 function ValueEditor({ id, condition, field, options, onChange }: { id: string; condition: Condition; field: FilterField; options: FilterOptions; onChange: (c: Condition) => void }) {

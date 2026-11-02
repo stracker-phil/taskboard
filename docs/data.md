@@ -83,7 +83,7 @@ unique across sources (Jira's numeric ids; another source prefixes its own):
 | Table | Notes |
 |---|---|
 | `space` | a tracked project as the sidebar shows it: name, icon, color (`1`–`12`), client, position, `default_columns` for new views; its Space settings (`local/0007`): `layouts` (JSON array of the layouts its views offer; null = all), `default_layout` and `default_group` for new views |
-| `filter_list` | WHICH issues: the sidebar tree (`kind` everything, space, list, recent, pinned); a JSON filter ANDed with its ancestors |
+| `filter_list` | WHICH issues: the sidebar tree (`kind` everything, space, list, recent, pinned, viewed); a JSON filter ANDed with its ancestors |
 | `view` | HOW to show a list: one tab; layout, columns, grouping, sort; `filter` (`local/0012`): its own conditions, ANDed with its list's ([ADR 0033](adr/0033-views-can-hold-their-own-filter.md)); `subtasks` (`local/0013`): how subtasks show ([ADR 0037](adr/0037-views-choose-how-subtasks-show.md)); `only_mine` (`local/0014`): the saved Me chip ([ADR 0038](adr/0038-filter-changes-are-drafts-until-the-view-is-saved.md)); `person` (`local/0020`): the saved person chip |
 | `pin` | bookmarked issues, comments, filter lists and views (Bookmarks in the UI; `target_kind` `issue`, `comment`, `filter_list`, `view`), with an optional reason and expiry, an own `title` and the owner's order (`position`, `local/0019`; a new one goes last); active while not removed and not expired (`pins::active`); ended bookmarks stay in Recently removed for 7 days |
 | `write_log` | every change sent to Jira with Jira's refusal, if any, for 180 days (`writes::sent`, `local/0021`, [writes.md](writes.md#record-of-changes)) |
@@ -138,7 +138,11 @@ the connected account's issues, like a view's `Narrowing.me`.
 
 Built in (migration `local/0002`): Everything (one "All issues" view grouped by Space), and under Home
 Bookmarks (kind `pinned`; renamed by `local/0008`). The Unread list (kind `recent`) is gone since `local/0018`,
-with its views and bookmarks: Unread only is a mode of every view ([ADR 0046](adr/0046-unread-is-a-mode-of-every-view.md)). Tracking a project (`lists::ensure_space`) adds its Space node with three views (All issues,
+with its views and bookmarks: Unread only is a mode of every view ([ADR 0046](adr/0046-unread-is-a-mode-of-every-view.md)).
+Recently viewed (kind `viewed`, `local/0025`, position -1 so it leads Home) holds one condition, `lastView`
+`withinLastHours` 24, which only `lists::list_set_window` changes (`withinLastHours` or `withinLastDays`, a count
+of at least 1); `list_conditions` reports it as `fixed`. Its "All issues" view is ungrouped, sorted by last view
+newest first, subtasks hidden (so a viewed subtask is a row but an unviewed child of a viewed issue isn't), with the columns Last view, Assignee, Status, Priority. Tracking a project (`lists::ensure_space`) adds its Space node with three views (All issues,
 Board, Table; grouped by status; the Space's default columns, else Assignee, Epic, Release, Priority) and the
 filter lists Current sprint, Epics, Release *next unreleased version* (when the project has one), Open bugs, each
 with one List view. Positions among siblings stay 0, 1, 2, … (`order.rs`). Deleting a filter list deletes its
