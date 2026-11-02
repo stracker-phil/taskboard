@@ -1073,6 +1073,34 @@ describe("TableView", () => {
       expect(within(rowOf(/NW-2003/)).queryByRole("button", { name: /subtasks$/ })).not.toBeInTheDocument();
     });
 
+    describe("indent guides", () => {
+      const mid = row({ id: "21", key: "NW-2002", summary: "Write the onboarding articles", parentId: "1", depth: 1, childCount: 1 });
+      const leaf = row({ id: "22", key: "NW-2003", summary: "Proofread the welcome article", parentId: "21", depth: 2 });
+      const sibling = row({ id: "23", key: "NW-2004", summary: "Set up the search index", parentId: "1", depth: 1 });
+      const tree = [PARENT, mid, leaf, sibling];
+      const guidesOf = (key: RegExp) => [...rowOf(key).querySelectorAll(".tree-guide")];
+      const isMarked = (guide: Element) => guide.classList.contains("tree-guide--path") || guide.classList.contains("tree-guide--end");
+
+      it("draws one hidden guide per level on a nested row and none on a top-level row", async () => {
+        await renderTable(modeData("hierarchy", tree));
+
+        await screen.findByRole("row", { name: /NW-2003/ });
+        expect([/NW-1042/, /NW-2002/, /NW-2003/].map((key) => guidesOf(key).length)).toEqual([0, 1, 2]);
+        expect(rowOf(/NW-2003/).querySelector(".tree-guides")).toHaveAttribute("aria-hidden", "true");
+      });
+
+      it("marks the path up to the parent while the pointer is over a depth-2 row, and no other row", async () => {
+        await renderTable(modeData("hierarchy", tree));
+        await screen.findByRole("row", { name: /NW-2003/ });
+
+        await userEvent.hover(rowOf(/NW-2003/));
+
+        expect(guidesOf(/NW-2003/)[1]).toHaveClass("tree-guide--end");
+        expect(guidesOf(/NW-2002/)[0]).toHaveClass("tree-guide--end");
+        expect(guidesOf(/NW-2004/).some(isMarked)).toBe(false);
+      });
+    });
+
     it.each([
       ["hierarchy", true],
       ["list", false],

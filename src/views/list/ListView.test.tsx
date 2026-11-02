@@ -583,6 +583,31 @@ describe("ListView", () => {
         expect([/NW-2001/, /NW-2002/, /NW-2003/, /NW-2004/, /NW-2005/, /NW-2006/].map(depthOf)).toEqual(["0", "1", "2", "3", "1", "0"]);
       });
 
+      describe("indent guides", () => {
+        const guidesOf = (key: RegExp) => [...rowOf(key).querySelectorAll(".tree-guide")];
+        const isMarked = (guide: Element) => guide.classList.contains("tree-guide--path") || guide.classList.contains("tree-guide--end");
+
+        it("draws one hidden guide per level on a nested row and none on a top-level row", async () => {
+          await renderList(modeData("hierarchy", tree));
+
+          await screen.findByRole("row", { name: /NW-2003/ });
+          expect([/NW-2001/, /NW-2002/, /NW-2003/, /NW-2004/].map((key) => guidesOf(key).length)).toEqual([0, 1, 2, 3]);
+          expect(rowOf(/NW-2003/).querySelector(".tree-guides")).toHaveAttribute("aria-hidden", "true");
+        });
+
+        it("marks the path up to the parent while the pointer is over a depth-2 row, and no other row", async () => {
+          await renderList(modeData("hierarchy", tree));
+          await screen.findByRole("row", { name: /NW-2003/ });
+
+          await userEvent.hover(rowOf(/NW-2003/));
+
+          expect(guidesOf(/NW-2003/)[1]).toHaveClass("tree-guide--end");
+          expect(guidesOf(/NW-2002/)[0]).toHaveClass("tree-guide--end");
+          expect(guidesOf(/NW-2005/).some(isMarked)).toBe(false);
+          expect(guidesOf(/NW-2004/).some(isMarked)).toBe(false);
+        });
+      });
+
       it("gives a caret to every row with children at any level, and none to the leaves", async () => {
         await renderList(modeData("hierarchy", tree));
 

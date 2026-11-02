@@ -61,3 +61,12 @@
 .table-row__status { font-size: 13px; color: var(--text-secondary); white-space: nowrap; }
 /* The Labels cell stays one line; its labels scroll sideways inside it. */
 .table-row__cell > .list-cell--labels { display: flex; gap: 4px; min-width: 0; max-width: 100%; overflow: auto hidden; isolation: isolate; }
+
+/* Indent guides (list.css → tree-guide) under each parent's caret in the Summary cell, which starts after the
+   24px inset and the key. */
+.table-row { position: relative; --guide-start: calc(24px + var(--table-width-key) + 8px); --guide-step: 23px; --guide-end: 16px; }
+
+/* What scrolled past stays below the header (list.css → list-sticky). */
+.table-sticky { position: sticky; top: 34px; z-index: 1; height: 0; }
+.table-sticky__entry { background: var(--panel-bg); }
+.table-sticky__entry:last-child { box-shadow: 0 1px 0 var(--hairline); }

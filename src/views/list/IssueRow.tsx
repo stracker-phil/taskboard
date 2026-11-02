@@ -14,6 +14,7 @@ import { PickBox } from "./PickBox";
 import type { PickKeys } from "./useRowClicks";
 import { ChildCount, SubtaskIcon } from "../../components/issue/SubtaskIcon";
 import { SubtaskCaret } from "./SubtaskCaret";
+import { TreeGuides } from "./TreeGuides";
 import { useFlash } from "../../lib/motion";
 
 interface Props {
@@ -45,11 +46,13 @@ interface Props {
   childChip?: boolean;
   /** Has an active bookmark. */
   pinned?: boolean;
+  /** Its indent guides in Hierarchy (`treeGuides`). */
+  guides?: string;
 }
 
 export const IssueRow = memo(function IssueRow(props: Props) {
   const { row, columns, position, wrap = false, inlineLabels = false, selected, picked, onSelect, onToggleBox, onPick, onOpen, actions } = props;
-  const { nesting = null, subtasksOpen = true, onToggleSubtasks, childChip = false, pinned = false } = props;
+  const { nesting = null, subtasksOpen = true, onToggleSubtasks, childChip = false, pinned = false, guides } = props;
   const nested = (nesting?.depth ?? 0) > 0;
   const flashing = useFlash(row.updatedAt);
   const className = ["list-row", `list-row--${position}`, wrap && "list-row--wrap", nested && "list-row--child", row.changed && "list-row--changed", flashing && "flash", selected && "list-row--selected", picked && "list-row--picked"]
@@ -79,6 +82,7 @@ export const IssueRow = memo(function IssueRow(props: Props) {
         onClick={(e) => onSelect(row.id, e)}
         onDoubleClick={(e) => opensIssue(e) && onOpen(row.id, e)}
       >
+        {guides && <TreeGuides marks={guides} />}
         <span className="list-row__name" role="gridcell">
           <span className="list-row__title">
             <CopyKey className="list-row__key" issueKey={row.key} />

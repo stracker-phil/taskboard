@@ -157,3 +157,22 @@
 /* The gutter belongs to the row, so the pointer keeps the checkbox while it travels to it. */
 .list-item::before { content: ""; position: absolute; top: 0; bottom: 0; left: -52px; width: 52px; }
 .list-row--picked:not(.list-row--selected) { background: var(--picked-bg); }
+
+/* Hierarchy's indent guides (docs/ux.md → Subtasks): one faint line per level, under the parent's leading edge; the
+   path from the hovered or selected row up to its top-level ancestor is darker, each level's line ending halfway
+   down the row it leads to. Rows and the Table place them with --guide-start, --guide-step and --guide-end. */
+.tree-guides { position: absolute; top: -1px; bottom: -1px; left: 0; width: 0; pointer-events: none; }
+.tree-guide {
+  position: absolute; top: 0; bottom: 0; left: calc(var(--guide-start) + var(--level) * var(--guide-step)); width: 1px;
+  background: var(--tree-guide);
+}
+.tree-guide--path, .tree-guide--end { background: var(--tree-guide-path); }
+.tree-guide--end { bottom: auto; height: var(--guide-end); }
+.list-row { position: relative; --guide-start: 12px; --guide-step: var(--indent-step); --guide-end: 23px; }
+
+/* What scrolled past stays at the top (docs/ux.md → Sticky headers): copies of the group's header and the
+   ancestors whose subtrees are still in view, on the list canvas across the gutters. */
+.list-sticky { position: sticky; top: 0; z-index: 2; height: 0; margin: 0 -24px 0 -52px; }
+.list-sticky__entry { position: absolute; left: 0; right: 0; box-sizing: border-box; padding: 0 24px 0 52px; background: var(--list-bg); }
+.list-sticky__entry:last-child > .list-item--sticky { box-shadow: 0 1px 0 var(--hairline); }
+.list-item--sticky { position: relative; }

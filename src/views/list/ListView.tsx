@@ -4,12 +4,15 @@ import { EmptyLevel } from "../../shell/EmptyLevel";
 import { useColumnsCatalogue, useViewRows } from "../../queries/views";
 import { useStore } from "../../state/store";
 import { columnDef } from "./columns";
-import { flatten, type Item, itemGroupKey, itemHeight, itemKey } from "./flatten";
+import { flatten, GROUP_HEIGHT, type Item, itemGroupKey, itemHeight, itemKey, ROW_HEIGHT } from "./flatten";
 import { GroupHeader } from "./GroupHeader";
 import { IssueRow } from "./IssueRow";
 import { canvasMeasure, columnWidths, fittingColumns, gridTemplate } from "./measure";
 import { useElementWidth } from "./useElementWidth";
 import { useGroupHighlight } from "./useGroupHighlight";
+import { useHoveredRow } from "./useHoveredRow";
+import { useStickyStack } from "./useStickyStack";
+import { treeGuides } from "./hierarchy";
 import { useGroupMotion } from "./useGroupMotion";
 import { useIssueOpening } from "../useIssueOpening";
 import { useRememberedScroll } from "../useRememberedScroll";
@@ -53,6 +56,10 @@ const NO_COLUMNS: Column[] = [];
 const GRID_INSET = 52 + 24 + 32;
 const MORE_PX = 32;
 
+/** A group's header without its gap, or a row on one line, as the stack holds it. */
+const heldHeight = (item: Item) => (item.kind === "group" ? GROUP_HEIGHT : ROW_HEIGHT);
+const NO_GUIDES = new Map<string, string>();
+
 const isOpen = (group: Group, toggled: Record<string, boolean>) => toggled[group.key] ?? !group.collapsedByDefault;
 
 function itemClass(item: Item): string {
@@ -78,6 +85,7 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
   const openIssue = useStore((s) => s.openIssue);
   const { factors, moving, animate } = useGroupMotion();
   const highlight = useGroupHighlight();
+  const hoveredRow = useHoveredRow();
   const actions = useIssueActions();
   const pinned = usePinnedIssues();
   const width = useElementWidth(scrollRef);
@@ -118,6 +126,10 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
   // A closed group's tab opens as its rows fold in.
   const groupOpen = (group: Group) => isOpen(group, toggled) || fold?.open.has(group.key) === true;
   const { virtualizer, groupStartsMoving, itemProps } = useRowSizing(items, factors, wrapTitles, scrollRef, fold);
+  const sticky = useStickyStack(items, virtualizer, { inset: 0, heightOf: heldHeight, held: !fold });
+  const hierarchy = data.subtasks === "hierarchy";
+  const guideTarget = hoveredRow.hovered ?? selected;
+  const guides = useMemo(() => (hierarchy ? treeGuides(items, guideTarget) : NO_GUIDES), [hierarchy, items, guideTarget]);
 
   const toggle = (group: Group) => {
     const opening = !isOpen(group, toggled);
@@ -129,12 +141,48 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
   const open = (id: string) => openIssue(id, { listId, viewId });
   const openIssueInTab = useOpenIssueInTab();
   const openInTab = (id: string, show: boolean) => void openIssueInTab(id, { listId, viewId }, show);
-  const scrollToIndex = (index: number) => virtualizer.scrollToIndex(index, { align: "auto" });
-  const keys = useRowKeys({ ...place, items, rowIds, data, select, toggle, actions, scrollToIndex, open, openInTab });
+  const keys = useRowKeys({ ...place, items, rowIds, data, select, toggle, actions, scrollToIndex: sticky.reveal, open, openInTab });
 
   // Stable, so rows that didn't change skip re-rendering.
   const { onSelect, onOpen, onPick, onToggleBox } = useRowClicks(keys, opening);
   const onToggleSubtasks = useCallback((id: string) => keys.current.setSubtasksOpen(id, !keys.current.subtasksOpen(id)), [keys]);
+
+  /** An item's content, in the list or held in the stack at the top. */
+  const content = (item: Item, index: number, held = false) =>
+    item.kind === "more" ? (
+      <MorePiece item={item} />
+    ) : item.kind === "group" ? (
+      <GroupHeader
+        group={item.group}
+        open={groupOpen(item.group)}
+        tab={item.tab}
+        active={highlight.isActive(item.group.key)}
+        namesColumns
+        headers={shownHeaders}
+        onToggle={() => toggle(item.group)}
+      />
+    ) : (
+      <IssueRow
+        row={item.row}
+        columns={columns}
+        position={held ? "middle" : (fold?.positions.get(index) ?? item.position)}
+        wrap={wrapTitles && !held}
+        inlineLabels={inlineLabels}
+        selected={selected === item.row.id}
+        picked={pickedIds.has(item.row.id)}
+        onSelect={onSelect}
+        onToggleBox={onToggleBox}
+        onPick={onPick}
+        onOpen={onOpen}
+        actions={actions}
+        nesting={item.nesting}
+        subtasksOpen={subtasksOpen(item.row.id)}
+        onToggleSubtasks={onToggleSubtasks}
+        childChip={data.subtasks === "hidden" || (item.nesting?.parent === true && !subtasksOpen(item.row.id))}
+        pinned={pinned.has(item.row.id)}
+        guides={guides.get(item.row.id)}
+      />
+    );
 
   return (
     <div
@@ -144,8 +192,36 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
       aria-rowcount={items.length}
       style={{ "--list-columns": gridTemplate(widths.slice(0, shown)) } as CSSProperties}
       onScroll={onScroll}
-      {...highlight.handlers}
+      onFocus={highlight.handlers.onFocus}
+      onBlur={highlight.handlers.onBlur}
+      onPointerOver={(e) => {
+        highlight.handlers.onPointerOver(e);
+        hoveredRow.onPointerOver(e);
+      }}
+      onPointerLeave={() => {
+        highlight.handlers.onPointerLeave();
+        hoveredRow.onPointerLeave();
+      }}
     >
+      {sticky.entries.length > 0 && (
+        // A copy of what the rows below scrolled past; the rows themselves stay in the grid.
+        <div className="list-sticky" aria-hidden="true">
+          {sticky.entries.map((entry, at) => {
+            const item = items[entry.index];
+            return (
+              <div
+                key={itemKey(item)}
+                className="list-sticky__entry"
+                data-group={itemGroupKey(item)}
+                style={{ top: entry.top, height: entry.height, zIndex: sticky.entries.length - at }}
+                onClick={item.kind === "row" ? () => sticky.reveal(entry.index, "start") : undefined}
+              >
+                <div className="list-item list-item--sticky">{content(item, entry.index, true)}</div>
+              </div>
+            );
+          })}
+        </div>
+      )}
       <div className="list-scroll__space" style={{ height: virtualizer.getTotalSize() }}>
         {virtualizer.getVirtualItems().map((virtual) => {
           const item = items[virtual.index];
@@ -162,39 +238,7 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
                   : undefined
               }
             >
-              {item.kind === "more" ? (
-                <MorePiece item={item} />
-              ) : item.kind === "group" ? (
-                <GroupHeader
-                  group={item.group}
-                  open={groupOpen(item.group)}
-                  tab={item.tab}
-                  active={highlight.isActive(group)}
-                  namesColumns
-                  headers={shownHeaders}
-                  onToggle={() => toggle(item.group)}
-                />
-              ) : (
-                <IssueRow
-                  row={item.row}
-                  columns={columns}
-                  position={fold?.positions.get(virtual.index) ?? item.position}
-                  wrap={wrapTitles}
-                  inlineLabels={inlineLabels}
-                  selected={selected === item.row.id}
-                  picked={pickedIds.has(item.row.id)}
-                  onSelect={onSelect}
-                  onToggleBox={onToggleBox}
-                  onPick={onPick}
-                  onOpen={onOpen}
-                  actions={actions}
-                  nesting={item.nesting}
-                  subtasksOpen={subtasksOpen(item.row.id)}
-                  onToggleSubtasks={onToggleSubtasks}
-                  childChip={data.subtasks === "hidden" || (item.nesting?.parent === true && !subtasksOpen(item.row.id))}
-                  pinned={pinned.has(item.row.id)}
-                />
-              )}
+              {content(item, virtual.index)}
             </div>
           );
         })}

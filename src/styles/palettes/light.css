@@ -36,6 +36,9 @@
   --border-strong: #d4d4d8;
   --hairline: #ededf0;
   --row-hairline: #f1f1f3;
+  /* Hierarchy's indent guides, and the path from the hovered row to its ancestors. */
+  --tree-guide: #dadadf;
+  --tree-guide-path: #a3a3ad;
   --card-border: #e9e9ec;
 
   /* Accent colors to pick from (Settings → Appearance, a Space's own; styles/accents.css): the fill, then the shade

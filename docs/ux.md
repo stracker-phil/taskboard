@@ -261,6 +261,23 @@ one group, Board column or pill per style, whatever the status is called; the Bo
   chevron it shows only while its row has the pointer (or it has focus). A collapsed row shows the count chip.
   Collapsed rows are kept per view (`places.json`); expanded is
   the default.
+- **Indent guides** (`views/list/hierarchy.ts` → `treeGuides`, drawn by `TreeGuides`): in Hierarchy every nested
+  row draws one faint 1px line per level above it (`--tree-guide`), 4px before its parent's key in the List and
+  under its parent's caret in the Table, so a child's parent is the row its line leads up to. The path from the
+  row under the pointer (else the selected row) up to its top-level ancestor is darker (`--tree-guide-path`): each
+  level's line from the ancestor down to the next row on the path, ending halfway down that row. Hover changes the
+  path at once, without a fade, so moving across rows never flickers.
+
+## Sticky headers
+
+What scrolled past stays at the top of the List and the Table (`views/list/stickyStack.ts`, `useStickyStack`):
+the header of the group the first visible rows belong to, once its own top has scrolled past, then in Hierarchy
+each ancestor whose row has scrolled past while rows of its subtree are still in view, outermost first. They are
+copies on the list canvas (the Table: below its header, on the panel), each 30px for a group and one row's height
+(44 on one line, 30 in the Table) for an ancestor; the last has a hairline below it. As a group or a subtree ends,
+its entry is pushed up and the next takes its place. A click on a held row scrolls to it, so it sits right below
+what stays above it; the keys keep the selected row clear of the stack too. Nothing is held while an issue is
+dragged.
 
 ## Picking issues
 

@@ -12,6 +12,9 @@ import { useOpenIssueInTab } from "../../shell/openInTab";
 import { useRowClicks } from "../list/useRowClicks";
 import { useRowKeys } from "../list/useRowKeys";
 import { useRowsPlace } from "../list/useRowsPlace";
+import { useHoveredRow } from "../list/useHoveredRow";
+import { useStickyStack } from "../list/useStickyStack";
+import { treeGuides } from "../list/hierarchy";
 import { nextSort } from "./sortable";
 import { TableHeader } from "./TableHeader";
 import { TableRow } from "./TableRow";
@@ -37,6 +40,8 @@ const TABLE_MORE_PX = 28;
 /** The Table's own header names the columns, so an ungrouped view draws no group header. */
 const drawn = (item: Item) => item.kind !== "group" || item.tab;
 const tableItemHeight = (item: Item) => (item.kind === "more" ? 0 : TABLE_ROW_HEIGHT);
+const NO_GUIDES = new Map<string, string>();
+const tableItemClass = (item: Item) => (item.kind === "group" ? "table-item table-item--group" : "table-item");
 
 const isOpen = (group: Group, toggled: Record<string, boolean>) => toggled[group.key] ?? !group.collapsedByDefault;
 
@@ -69,6 +74,7 @@ function Table({ view, data }: { view: View; data: ViewData }) {
   const actions = useIssueActions();
   const openIssue = useStore((s) => s.openIssue);
   const onScroll = useRememberedScroll(view.listId, view.id, scrollRef);
+  const hoveredRow = useHoveredRow();
 
   const widthOf = (id: string) => resize.liveWidth(id) ?? columnWidth(id, view.widths);
   const columns = data.columns;
@@ -118,6 +124,9 @@ function Table({ view, data }: { view: View; data: ViewData }) {
   }, [factors, fold, virtualizer]);
 
   const tree = data.subtasks === "hierarchy";
+  const sticky = useStickyStack(items, virtualizer, { inset: HEADER_HEIGHT, heightOf: tableItemHeight, held: !fold });
+  const guideTarget = hoveredRow.hovered ?? selected;
+  const guides = useMemo(() => (tree ? treeGuides(items, guideTarget) : NO_GUIDES), [tree, items, guideTarget]);
   const toggle = (group: Group) => {
     const opening = !isOpen(group, toggled);
     setPlace({ toggled: { ...toggled, [group.key]: opening } });
@@ -127,15 +136,49 @@ function Table({ view, data }: { view: View; data: ViewData }) {
   const open = (id: string) => openIssue(id, { listId: view.listId, viewId: view.id });
   const openIssueInTab = useOpenIssueInTab();
   const openInTab = (id: string, show: boolean) => void openIssueInTab(id, { listId: view.listId, viewId: view.id }, show);
-  const scrollToIndex = (index: number) => virtualizer.scrollToIndex(index, { align: "auto" });
-  const keys = useRowKeys({ ...place, items, rowIds, data, select, toggle, actions, scrollToIndex, open, openInTab });
+  const keys = useRowKeys({ ...place, items, rowIds, data, select, toggle, actions, scrollToIndex: sticky.reveal, open, openInTab });
 
   // Stable, so rows that didn't change skip re-rendering.
   const { onSelect, onOpen, onPick, onToggleBox } = useRowClicks(keys, opening);
   const onToggleSubtasks = useCallback((id: string) => keys.current.setSubtasksOpen(id, !keys.current.subtasksOpen(id)), [keys]);
 
+  /** An item's content, in the table or held in the stack below the header. */
+  const content = (item: Item) =>
+    item.kind === "more" ? (
+      <div className="table-more">{item.hidden > 0 ? `+${item.hidden} more` : ""}</div>
+    ) : item.kind === "group" ? (
+      <GroupHeader
+        group={item.group}
+        open={item.open || (fold?.open.has(item.group.key) ?? false)}
+        tab
+        active
+        namesColumns={false}
+        headers={NO_HEADERS}
+        onToggle={() => toggle(item.group)}
+      />
+    ) : (
+      <TableRow
+        row={item.row}
+        columns={columns}
+        selected={selected === item.row.id}
+        picked={pickedIds.has(item.row.id)}
+        onToggleBox={onToggleBox}
+        onSelect={onSelect}
+        onPick={onPick}
+        onOpen={onOpen}
+        inlineLabels={inlineLabels}
+        tree={tree}
+        nesting={item.nesting}
+        subtasksOpen={subtasksOpen(item.row.id)}
+        onToggleSubtasks={onToggleSubtasks}
+        childChip={data.subtasks === "hidden" || (item.nesting?.parent === true && !subtasksOpen(item.row.id))}
+        edits={actions}
+        guides={guides.get(item.row.id)}
+      />
+    );
+
   return (
-    <div ref={scrollRef} className="table-scroll" role="grid" aria-rowcount={items.length} onScroll={onScroll}>
+    <div ref={scrollRef} className="table-scroll" role="grid" aria-rowcount={items.length} onScroll={onScroll} onPointerOver={hoveredRow.onPointerOver} onPointerLeave={hoveredRow.onPointerLeave}>
       <div className="table-content" style={{ minWidth, ...widthVars }}>
         <TableHeader
           listId={view.listId}
@@ -146,6 +189,24 @@ function Table({ view, data }: { view: View; data: ViewData }) {
           onResizeStart={resize.start}
           tree={tree}
         />
+        {sticky.entries.length > 0 && (
+          // A copy of what the rows below scrolled past; the rows themselves stay in the grid.
+          <div className="table-sticky" aria-hidden="true">
+            {sticky.entries.map((entry, at) => {
+              const item = items[entry.index];
+              return (
+                <div
+                  key={itemKey(item)}
+                  className={`${tableItemClass(item)} table-sticky__entry`}
+                  style={{ top: entry.top, height: entry.height, zIndex: sticky.entries.length - at }}
+                  onClick={item.kind === "row" ? () => sticky.reveal(entry.index, "start") : undefined}
+                >
+                  {content(item)}
+                </div>
+              );
+            })}
+          </div>
+        )}
         <div className="table-space" style={{ height: virtualizer.getTotalSize() }}>
           {virtualizer.getVirtualItems().map((virtual) => {
             const item = items[virtual.index];
@@ -153,7 +214,7 @@ function Table({ view, data }: { view: View; data: ViewData }) {
             return (
               <div
                 key={virtual.key}
-                className={item.kind === "group" ? "table-item table-item--group" : "table-item"}
+                className={tableItemClass(item)}
                 style={{
                   height: virtual.size,
                   transform: `translateY(${virtual.start - HEADER_HEIGHT}px)`,
@@ -166,37 +227,7 @@ function Table({ view, data }: { view: View; data: ViewData }) {
                     : undefined
                 }
               >
-                {item.kind === "more" ? (
-                  <div className="table-more">{item.hidden > 0 ? `+${item.hidden} more` : ""}</div>
-                ) : item.kind === "group" ? (
-                  <GroupHeader
-                    group={item.group}
-                    open={item.open || (fold?.open.has(item.group.key) ?? false)}
-                    tab
-                    active
-                    namesColumns={false}
-                    headers={NO_HEADERS}
-                    onToggle={() => toggle(item.group)}
-                  />
-                ) : (
-                  <TableRow
-                    row={item.row}
-                    columns={columns}
-                    selected={selected === item.row.id}
-                    picked={pickedIds.has(item.row.id)}
-                    onToggleBox={onToggleBox}
-                    onSelect={onSelect}
-                    onPick={onPick}
-                    onOpen={onOpen}
-                    inlineLabels={inlineLabels}
-                    tree={tree}
-                    nesting={item.nesting}
-                    subtasksOpen={subtasksOpen(item.row.id)}
-                    onToggleSubtasks={onToggleSubtasks}
-                    childChip={data.subtasks === "hidden" || (item.nesting?.parent === true && !subtasksOpen(item.row.id))}
-                    edits={actions}
-                  />
-                )}
+                {content(item)}
               </div>
             );
           })}
