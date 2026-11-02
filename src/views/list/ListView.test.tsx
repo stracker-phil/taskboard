@@ -602,8 +602,8 @@ describe("ListView", () => {
           await userEvent.hover(rowOf(/NW-2003/));
 
           expect(guidesOf(/NW-2003/)[1]).toHaveClass("tree-guide--end");
-          expect(guidesOf(/NW-2002/)[0]).toHaveClass("tree-guide--through");
-          expect(guidesOf(/NW-2002/)[0]).not.toHaveClass("tree-guide--end");
+          expect(guidesOf(/NW-2002/)[0]).toHaveClass("tree-guide--end");
+          expect(guidesOf(/NW-2002/)[0]).not.toHaveClass("tree-guide--through");
           expect(guidesOf(/NW-2005/).some(isMarked)).toBe(false);
           expect(guidesOf(/NW-2004/).some(isMarked)).toBe(false);
         });

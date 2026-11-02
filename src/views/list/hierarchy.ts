@@ -3,8 +3,8 @@ import type { Item } from "./flatten";
 /** A guide's shape on one level: the parent's line passing by, a branch to a child with a later sibling, the curve
  *  to the last child, or nothing once the parent has no more children below. */
 export const SHAPE = { pass: "|", branch: "+", last: "L", none: " " } as const;
-/** How the path to the hovered or selected row lights a guide: as a straight line through the row, as the branch
- *  into the hovered or selected row itself, or not at all. */
+/** How the path to the hovered or selected row lights a guide: as a straight line through the row, as the curved
+ *  branch into a row on the path, or not at all. */
 export const LIT = { through: "p", end: "e", off: "-" } as const;
 
 /** Per nested row two characters per level above it, its shape and how the path lights it, as a string so a
@@ -48,8 +48,7 @@ function hasLaterSibling(items: Item[]): boolean[] {
   return later;
 }
 
-/** Each level's line from the ancestor down through the next row on the path; only the target's own level branches
- *  into its row. */
+/** Each level's line from the ancestor down to the next row on the path, curving into it. */
 function lightPath(items: Item[], guides: Map<string, string[]>, target: number) {
   let node = target;
   for (let level = depthOf(items[target]) - 1; level >= 0; level--) {
@@ -58,7 +57,7 @@ function lightPath(items: Item[], guides: Map<string, string[]>, target: number)
     for (let at = ancestor + 1; at <= node; at++) {
       const item = items[at];
       const levels = item.kind === "row" ? guides.get(item.row.id) : undefined;
-      if (levels) levels[level] = levels[level][0] + (at === target ? LIT.end : LIT.through);
+      if (levels) levels[level] = levels[level][0] + (at === node ? LIT.end : LIT.through);
     }
     node = ancestor;
   }

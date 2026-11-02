@@ -257,18 +257,17 @@ one group, Board column or pill per style, whatever the status is called; the Bo
   "3 child issues" as its tooltip. List: a subtask is a row like any other, with the glyph before its title.
   Hierarchy: each result's subtree follows it, every level indented 24 more (`list-row--child`, the row's
   `--depth`); a 16px caret (`SubtaskCaret`) collapses or expands its subtree at any level: a top-level row's sits
-  in the gutter left of the card, under its group's chevron; a nested row's 6 before its key. Like the group's
+  in the gutter left of the card, under its group's chevron; a nested row's just before its key, right of the indent guide's branch. Like the group's
   chevron it shows only while its row has the pointer (or it has focus). A collapsed row shows the count chip.
   Collapsed rows are kept per view (`places.json`); expanded is
   the default.
 - **Indent guides** (`views/list/hierarchy.ts` → `treeGuides`, drawn by `TreeGuides`): in Hierarchy the rows draw a
-  quiet tree in `--tree-guide` (1px, square corners): each parent's line runs down from under it (4px before its key
-  in the List, under its caret in the Table) past its children and stops at its last child; each child is marked by
+  quiet tree in `--tree-guide` (1px, square corners): each parent's line runs down from under it (under its key's first
+  letter in the List, under its caret in the Table) past its children and stops at its last child; each child is marked by
   a 6px tick off the line. A nested List row's separator starts at its key, so the tree stays clear of the row
   lines. For the row under the pointer (else the selected row) the path up to its top-level ancestor turns
-  `--tree-guide-path`: each level's line runs straight through the rows down to the next row on the path, the ticks
-  it passes draw in, and the row's own branch grows from the line into it, 9px long with a 4px curve
-  (`--motion-base`, the branch `--motion-slow`).
+  `--tree-guide-path`: each level's line runs straight down to the next row on the path and curves into it, 9px
+  long with a 4px radius, and the ticks it passes draw in (`--motion-base`, the curve `--motion-slow`).
 
 ## Sticky headers
 

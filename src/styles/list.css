@@ -130,7 +130,8 @@
 }
 /* Like the group's chevron: only while the row has the pointer, or the caret has focus. */
 .list-item:hover > .list-row-caret, .list-row-caret:focus-visible { opacity: 1; }
-.list-row-caret--nested { left: calc(var(--depth) * var(--indent-step) - 6px); }
+/* Right of the indent guide's branch into the row, just before its key. */
+.list-row-caret--nested { left: calc(var(--depth) * var(--indent-step) + 2px); }
 .list-row-caret--wrap { top: 14px; transform: none; }
 /* The hover actions sit on the first line too, so they stay put when marking read shortens the title. */
 .list-row--wrap .row-actions { top: -4px; transform: none; }
@@ -179,7 +180,7 @@
   clip-path: inset(0 100% 100% 0); transition: clip-path var(--motion-slow) var(--ease-out);
 }
 .tree-guide--end .tree-guide__branch { clip-path: inset(0 -1px -1px 0); }
-.list-row { position: relative; --guide-start: 12px; --guide-step: var(--indent-step); --guide-mid: 22px; }
+.list-row { position: relative; --guide-start: 20px; --guide-step: var(--indent-step); --guide-mid: 22px; }
 /* A nested row's separator starts at its key, so the tree beside it stays clear of the row lines. */
 .list-row--child:not(.list-row--first, .list-row--only) { border-top-color: transparent; }
 .list-row--child:not(.list-row--first, .list-row--only)::after {

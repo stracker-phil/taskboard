@@ -30,7 +30,7 @@ describe("treeGuides", () => {
     expect(guides(items, "Target")).toEqual({
       Early: "+p",
       EarlyChild: "|pL-",
-      Parent: "+p",
+      Parent: "+e",
       Before: "|-+p",
       Target: "|-+e",
       After: "|-L-",
@@ -39,11 +39,14 @@ describe("treeGuides", () => {
     });
   });
 
-  it("marks exactly one level as the end of the path: the target's last level", () => {
+  it("marks one end per path level: the target on its last level and each ancestor on the level above it", () => {
     const marks = guides(items, "Target");
     const ends = Object.entries(marks).flatMap(([id, row]) => [...row.matchAll(/.e/g)].map((end) => [id, end.index]));
 
-    expect(ends).toEqual([["Target", 2]]);
+    expect(ends).toEqual([
+      ["Parent", 0],
+      ["Target", 2],
+    ]);
   });
 
   it("ends the path at a depth-1 target and leaves its subtree unlit", () => {
