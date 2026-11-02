@@ -28,7 +28,6 @@ beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
   mocked.getSettings.mockResolvedValue(settings());
-  mocked.pinCreate.mockResolvedValue(undefined);
 });
 
 describe("PinPopover", () => {

@@ -30,8 +30,6 @@ beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
   mocked.pinsList.mockResolvedValue(pins());
-  mocked.issueForget.mockResolvedValue(undefined);
-  mocked.pinRemove.mockResolvedValue(undefined);
 });
 
 describe("GoneNotice", () => {

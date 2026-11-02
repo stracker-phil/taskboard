@@ -7,7 +7,8 @@ import { attempt } from "../state/requests";
 export function GoneNotice({ issue, onRemoved }: { issue: IssueDetail; onRemoved: () => void }) {
   const pin = usePinOf("issue", issue.id);
   const remove = async () => {
-    if ((await attempt(api.issueForget(issue.id), "Could not remove it from the cache")) !== null) onRemoved();
+    // The command answers nothing (null), so success is marked before `attempt` turns a failure into null.
+    if (await attempt(api.issueForget(issue.id).then(() => true), "Could not remove it from the cache")) onRemoved();
   };
   return (
     <div className="gone-notice">

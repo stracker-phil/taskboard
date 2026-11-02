@@ -40,7 +40,6 @@ beforeEach(() => {
   mocked.pinsList.mockResolvedValue(pins());
   mocked.copyText.mockResolvedValue(undefined);
   mocked.placeGet.mockResolvedValue(null);
-  mocked.placeSet.mockResolvedValue(undefined);
   spies = [
     vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(1000),
     vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(800),

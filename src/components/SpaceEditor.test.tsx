@@ -31,7 +31,6 @@ async function renderFields(s: SpaceNode, clientOnly = false) {
 beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
-  mocked.spaceUpdate.mockResolvedValue(undefined);
   mocked.sidebarTree.mockResolvedValue(sidebarTree([space()]));
 });
 

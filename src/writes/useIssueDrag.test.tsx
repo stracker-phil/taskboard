@@ -53,7 +53,6 @@ beforeEach(() => {
   mocked.sidebarTree.mockResolvedValue(sidebarTree([]));
   mocked.pinsList.mockResolvedValue(pins());
   mocked.placeGet.mockResolvedValue(null);
-  mocked.placeSet.mockResolvedValue(undefined);
   mocked.connectionGet.mockResolvedValue(connectionView({ siteUrl: "" }));
   spies = [
     vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(1000),

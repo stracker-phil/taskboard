@@ -880,7 +880,6 @@ describe("Toolbar Me mode", () => {
     });
 
     it("opens the Me Mode settings from Fields…", async () => {
-      mocked.runCommand.mockResolvedValue(undefined);
       renderToolbar(SPACE_LEVEL);
       await userEvent.click(optionsButton());
 

@@ -32,7 +32,6 @@ beforeEach(() => {
   mocked.viewSetSort.mockResolvedValue(view());
   mocked.viewSetWidths.mockResolvedValue(view());
   mocked.placeGet.mockResolvedValue(null);
-  mocked.placeSet.mockResolvedValue(undefined);
   mocked.copyText.mockResolvedValue(undefined);
   spies = [
     vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(1000),

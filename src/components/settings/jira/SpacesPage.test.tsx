@@ -33,8 +33,6 @@ const NORTHWIND = () => space({ client: "Northwind" });
 beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
-  mocked.spaceMove.mockResolvedValue(undefined);
-  mocked.spaceUpdate.mockResolvedValue(undefined);
 });
 
 describe("SpacesPage", () => {

@@ -49,8 +49,6 @@ beforeEach(() => {
   mocked.connectionGet.mockResolvedValue(connectionView());
   mocked.pinsList.mockResolvedValue(pins());
   mocked.modesGet.mockResolvedValue({ meEverywhere: false, unreadOnly: false, bookmarksBar: false });
-  mocked.listMarkAllSeen.mockResolvedValue(undefined);
-  mocked.openUrl.mockResolvedValue(undefined);
 });
 
 describe("Header", () => {
@@ -87,11 +85,6 @@ describe("Header", () => {
   });
 
   describe("renaming from the title", () => {
-    beforeEach(() => {
-      mocked.spaceUpdate.mockResolvedValue(undefined);
-      mocked.listRename.mockResolvedValue(undefined);
-    });
-
     it("renames a Space when its name is clicked", async () => {
       await renderHeader(SPACE_LEVEL);
 

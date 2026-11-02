@@ -76,9 +76,6 @@ beforeEach(() => {
   resetStore();
   mocked.pinsList.mockResolvedValue(pins());
   mocked.getSettings.mockResolvedValue(settings());
-  mocked.issueForget.mockResolvedValue(undefined);
-  mocked.issuesMarkSeen.mockResolvedValue(undefined);
-  mocked.pinRemove.mockResolvedValue(undefined);
   serve(issueDetail(), EPIC);
   mocked.issueRelated.mockResolvedValue(related());
   mocked.issueActivity.mockResolvedValue([]);

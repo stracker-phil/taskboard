@@ -65,7 +65,6 @@ function renderPeek(onClose = vi.fn(), onExpand = vi.fn()) {
 beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
-  mocked.issueForget.mockResolvedValue(undefined);
   mocked.pinsList.mockResolvedValue(pins());
   mocked.getSettings.mockResolvedValue(settings());
   mocked.issueGet.mockResolvedValue(detail());

@@ -43,7 +43,6 @@ beforeEach(() => {
   mocked.pinsList.mockResolvedValue(pins());
   mocked.columnsCatalogue.mockResolvedValue(COLUMNS);
   mocked.placeGet.mockResolvedValue(null);
-  mocked.placeSet.mockResolvedValue(undefined);
   mocked.copyText.mockResolvedValue(undefined);
   mocked.connectionGet.mockResolvedValue(connectionView({ siteUrl: "" }));
   spies = [

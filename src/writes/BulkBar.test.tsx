@@ -75,8 +75,6 @@ beforeEach(() => {
   ]);
   mocked.issuesBulkAssignees.mockResolvedValue([ALEX, SAM]);
   mocked.issuesWriteMany.mockResolvedValue(outcome());
-  mocked.issuesMarkSeen.mockResolvedValue(undefined);
-  mocked.pinCreate.mockResolvedValue(undefined);
 });
 
 describe("BulkBar", () => {

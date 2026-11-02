@@ -502,13 +502,29 @@ describe("ColumnsPopover", () => {
 
   describe("Use as Space default", () => {
     it("saves the view's columns as the Space's default", async () => {
-      mocked.spaceDefaultColumns.mockResolvedValue(undefined);
       const popover = await openColumns(view({ columns: ["assignee", "priority"] }), "10001");
 
       await userEvent.click(within(popover).getByRole("button", { name: "Use as Space default" }));
 
       expect(mocked.spaceDefaultColumns).toHaveBeenCalledWith("10001", ["assignee", "priority"]);
+    });
+
+    it("toasts its success when the command resolves null, as Tauri does for a unit result", async () => {
+      const popover = await openColumns(view({ columns: ["assignee", "priority"] }), "10001");
+
+      await userEvent.click(within(popover).getByRole("button", { name: "Use as Space default" }));
+
       await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("New views in this Space start with these columns"));
+    });
+
+    it("shows a toast when the default cannot be saved", async () => {
+      mocked.spaceDefaultColumns.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
+      const popover = await openColumns();
+
+      await userEvent.click(within(popover).getByRole("button", { name: "Use as Space default" }));
+
+      await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not save the Space's default columns: Disk full"));
+      expect(useStore.getState().toasts.map((t) => t.message)).not.toContain("New views in this Space start with these columns");
     });
 
     it("is not offered outside a Space", async () => {
