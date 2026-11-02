@@ -170,7 +170,7 @@
 .tree-guide--last:not(.tree-guide--through)::before { bottom: auto; height: calc(var(--guide-mid) + 1px); }
 .tree-guide--branch::after, .tree-guide--last::after { content: ""; top: var(--guide-mid); width: 6px; border-top: 1px solid var(--tree-guide); }
 /* On the path: one straight, darker line; the ticks it passes draw in. */
-.tree-guide--through::before { border-left-color: var(--tree-guide-path); }
+.tree-guide.tree-guide--through::before { border-left-color: var(--tree-guide-path); }
 .tree-guide--through::after, .tree-guide--end::after { width: 0; }
 /* The branch into the hovered or selected row: down to the row's middle, then a little past where its tick ended. */
 .tree-guide__branch {
