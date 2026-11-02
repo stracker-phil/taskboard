@@ -10,6 +10,7 @@ import { runPageAction } from "../commands/pageActions";
 import { createQueryClient } from "../queries/queryClient";
 import { resetStore, useStore } from "../state/store";
 import { connectionView } from "../test/jira";
+import { nav } from "../test/nav";
 import { listTarget, pinItem, pins } from "../test/pins";
 import { space } from "../test/spaces";
 import { listNode, view } from "../test/views";
@@ -263,7 +264,7 @@ describe("Header", () => {
       });
 
       it("passes the open view and its narrowing when the level is on screen", async () => {
-        mocked.navCurrent.mockResolvedValue({ location: { listId: 1, viewId: 7 }, expanded: [] });
+        mocked.navCurrent.mockResolvedValue(nav({ listId: 1, viewId: 7 }));
         mocked.viewsOf.mockResolvedValue([view({ id: 7, listId: 1, onlyMine: true })]);
         await renderHeader(everything(3));
         await waitFor(() => expect(mocked.viewsOf).toHaveBeenCalledWith(1));
@@ -275,7 +276,7 @@ describe("Header", () => {
       });
 
       it("passes no view when another level is open", async () => {
-        mocked.navCurrent.mockResolvedValue({ location: { listId: 11, viewId: 101 }, expanded: [] });
+        mocked.navCurrent.mockResolvedValue(nav({ listId: 11, viewId: 101 }));
         await renderHeader(everything(3));
         await act(async () => {});
 

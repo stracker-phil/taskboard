@@ -1,7 +1,11 @@
-//! Where the main window is: a sidebar level and one of its views (`nav.json`). Each level remembers its last
-//! view; the last place comes back at launch.
+//! Where the main window is: a sidebar level and one of its views (`nav.json`), per tab (`tabs.rs`). Each level
+//! remembers its last view; the tabs and their places come back at launch.
 
 pub mod commands;
+mod tabs;
+
+pub use tabs::Tab;
+use tabs::{SavedTab, normalize};
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -35,15 +39,25 @@ pub struct Nav {
     pub location: Option<Location>,
     /// Space nodes the owner expanded; the active Space shows expanded regardless.
     pub expanded: Vec<i64>,
+    /// The open tabs in strip order, at least one; the active one is at `location`.
+    pub tabs: Vec<Tab>,
+    pub active_tab: u32,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 #[serde(default, rename_all = "camelCase")]
 struct Saved {
+    /// The active tab's place.
     location: Option<Location>,
     /// Level id (as text, a JSON key) → its last view.
     last_views: BTreeMap<String, i64>,
     expanded: Vec<i64>,
+    /// Empty in a file from before tabs (`tabs::normalize`).
+    tabs: Vec<SavedTab>,
+    active_tab: u32,
+    next_tab: u32,
+    /// The places of the last closed tabs, newest last.
+    closed: Vec<Location>,
 }
 
 /// Told when the place changes, whoever moved it (the page, a menu, the CLI).
@@ -78,24 +92,50 @@ impl NavStore {
         }
     }
 
-    /// The saved place if it still exists, else Everything.
+    /// The saved place if it still exists, else Everything; every tab's likewise.
     pub async fn current(&self, db: &Db) -> AppResult<Nav> {
-        let saved = self.store.read(Saved::clone);
+        let mut saved = self.store.read(Saved::clone);
+        normalize(&mut saved);
         let expanded = saved.expanded.clone();
-        let location = db
+        let active_tab = saved.active_tab;
+        let (location, tabs) = db
             .read(move |conn| {
-                if let Some(at) = saved.location
-                    && let Some(found) = resolve(conn, &saved, at.list_id, Some(at.view_id))?
-                {
-                    return Ok(Some(found));
-                }
-                match everything(conn)? {
-                    Some(id) => resolve(conn, &saved, id, None),
-                    None => Ok(None),
-                }
+                let place = |at: Option<Location>| -> AppResult<Option<Location>> {
+                    if let Some(at) = at
+                        && let Some(found) = resolve(conn, &saved, at.list_id, Some(at.view_id))?
+                    {
+                        return Ok(Some(found));
+                    }
+                    match everything(conn)? {
+                        Some(id) => resolve(conn, &saved, id, None),
+                        None => Ok(None),
+                    }
+                };
+                let location = place(saved.location)?;
+                let tabs = saved
+                    .tabs
+                    .iter()
+                    .map(|tab| {
+                        let location = if tab.id == saved.active_tab {
+                            location
+                        } else {
+                            place(tab.location)?
+                        };
+                        Ok(Tab {
+                            id: tab.id,
+                            location,
+                        })
+                    })
+                    .collect::<AppResult<Vec<_>>>()?;
+                Ok((location, tabs))
             })
             .await?;
-        Ok(Nav { location, expanded })
+        Ok(Nav {
+            location,
+            expanded,
+            tabs,
+            active_tab,
+        })
     }
 
     /// Opens `list_id` at `view_id`, or at the view it showed last, or its default view.
@@ -116,6 +156,7 @@ impl NavStore {
                 .update_async(move |s| {
                     s.location = Some(at);
                     s.last_views.insert(at.list_id.to_string(), at.view_id);
+                    normalize(s);
                 })
                 .await?;
             if before != Some(at) {

@@ -10,6 +10,7 @@ import { installCommands } from "../commands";
 import { clearCommands } from "../commands/registry";
 import { createQueryClient } from "../queries/queryClient";
 import { resetStore, useStore } from "../state/store";
+import { nav } from "../test/nav";
 import { sidebarTree, space } from "../test/spaces";
 import { listNode, view } from "../test/views";
 import { Window } from "./Window";
@@ -37,7 +38,7 @@ function renderWindow(sidebarHidden: boolean) {
 beforeEach(() => {
   vi.clearAllMocks();
   installCommands("main");
-  mocked.navCurrent.mockResolvedValue({ location: { listId: 11, viewId: 101 }, expanded: [] });
+  mocked.navCurrent.mockResolvedValue(nav({ listId: 11, viewId: 101 }));
   mocked.sidebarTree.mockResolvedValue(sidebarTree([space({ lists: [listNode({ id: 21, name: "My open issues" })] })]));
   mocked.viewsOf.mockResolvedValue([view()]);
 });

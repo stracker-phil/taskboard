@@ -156,6 +156,13 @@ export const api = {
   navCurrent: () => invoke<Nav>("nav_current"),
   /** Opens a level at `viewId`, or at its last or default view when `viewId` is null. */
   navGo: (listId: number, viewId: number | null) => invoke<Nav>("nav_go", { listId, viewId }),
+  /** A new tab at the level (at `viewId`, else its last or default view; the active tab's place without a level),
+   *  switched to with `activate`. */
+  navTabNew: (listId: number | null, viewId: number | null, activate: boolean) => invoke<Nav>("nav_tab_new", { listId, viewId, activate }),
+  navTabActivate: (id: number) => invoke<Nav>("nav_tab_activate", { id }),
+  navTabClose: (id: number) => invoke<Nav>("nav_tab_close", { id }),
+  /** Moves the tab before `before`, or to the end. */
+  navTabMove: (id: number, before: number | null) => invoke<Nav>("nav_tab_move", { id, before }),
   /** The Space nodes the owner expanded in the sidebar. */
   navSetExpanded: (expanded: number[]) => invoke<Nav>("nav_set_expanded", { expanded }),
   /** A filter list's icon by name; null goes back to the folder. */

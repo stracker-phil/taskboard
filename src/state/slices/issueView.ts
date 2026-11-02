@@ -6,9 +6,19 @@ export interface IssueOrigin {
   viewId: number;
 }
 
-/** The full Issue view, shown in place of the view: the issue on top, the ones it was opened from below. */
+export interface IssueViewState {
+  origin: IssueOrigin;
+  stack: string[];
+}
+
+/** The full Issue view, shown in place of the view: the issue on top, the ones it was opened from below. Each
+ *  tab keeps its own: switching tabs parks the shown one and brings back the other's. */
 export interface IssueViewSlice {
-  issueView: { origin: IssueOrigin; stack: string[] } | null;
+  issueView: IssueViewState | null;
+  /** The Issue views of the tabs not shown, by tab id. */
+  parkedIssueViews: Record<number, IssueViewState>;
+  /** Parks the shown Issue view with tab `from` and shows tab `to`'s; tabs no longer open (`open`) lose theirs. */
+  switchTab: (from: number, to: number, open: number[]) => void;
   openIssue: (id: string, origin: IssueOrigin) => void;
   /** Opens a related issue (an epic, a child, a link) on top; back returns to the one before. */
   openRelated: (id: string) => void;
@@ -22,6 +32,14 @@ export interface IssueViewSlice {
 export const issueViewSlice: Slice<IssueViewSlice> = {
   create: (set, get) => ({
     issueView: null,
+    parkedIssueViews: {},
+    switchTab: (from, to, open) =>
+      set((s) => {
+        const parked: Record<number, IssueViewState> = {};
+        for (const id of open) if (id !== to && s.parkedIssueViews[id]) parked[id] = s.parkedIssueViews[id];
+        if (s.issueView && open.includes(from)) parked[from] = s.issueView;
+        return { issueView: s.parkedIssueViews[to] ?? null, parkedIssueViews: parked };
+      }),
     openIssue: (id, origin) => set({ issueView: { origin, stack: [id] } }),
     openRelated: (id) =>
       set((s) => (s.issueView && s.issueView.stack.at(-1) !== id ? { issueView: { ...s.issueView, stack: [...s.issueView.stack, id] } } : s)),

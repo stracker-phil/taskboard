@@ -9,6 +9,8 @@ import { usePinOf } from "../../queries/pins";
 import { attempt } from "../../state/requests";
 import { useStore } from "../../state/store";
 import { copyAppLink } from "../../views/list/useIssueActions";
+import { useTabs } from "../../queries/sidebar";
+import { useOpenInTab } from "../openInTab";
 import { DropLine } from "./DropLine";
 import { ListCount } from "./ListCount";
 import { useDragReorder } from "./useDragReorder";
@@ -80,10 +82,14 @@ interface RowProps {
 function FilterListRow({ list, active, renaming, onOpen, onRename, onRenameDone, dragProps }: RowProps) {
   const pin = usePinOf("filterList", String(list.id));
   const [editingLook, setEditingLook] = useState(false);
+  const tabs = useTabs();
+  const openInTab = useOpenInTab();
   const openMenu = (e: MouseEvent) =>
     openContextMenu(
       e,
       [
+        { text: "Open in New Tab", run: () => void tabs.open(list.id, null, true) },
+        "separator",
         { text: "Rename", run: onRename },
         { text: "Icon and Color…", run: () => setEditingLook(true) },
         { text: "Duplicate", run: () => void attempt(api.listDuplicate(list.id), "Could not duplicate the filter list") },
@@ -118,7 +124,11 @@ function FilterListRow({ list, active, renaming, onOpen, onRename, onRenameDone,
         data-state={active ? "active" : undefined}
         aria-current={active ? "page" : undefined}
         title={active ? "Click to rename" : undefined}
-        onClick={active ? onRename : onOpen}
+        onClick={(e) => {
+          if (openInTab(e, list.id)) return;
+          if (active) onRename();
+          else onOpen();
+        }}
         onDoubleClick={onRename}
       >
         <span className="sb-list__icon-slot" aria-hidden="true" />

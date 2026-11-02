@@ -56,8 +56,9 @@ stands in Taskboard. The numbers in this table are Taskboard's.
 | [0044](0044-writes-show-at-once-and-settle-after-jira.md) | Writes show at once and settle after Jira | Accepted (2026-10-31) |
 | [0045](0045-me-mode-is-a-set-of-rules-in-a-scope.md) | Me mode is a set of rules in a scope | Accepted (2026-11-01) |
 | [0046](0046-unread-is-a-mode-of-every-view.md) | Unread is a mode of every view | Accepted (2026-11-01) |
-| [0047](0047-the-bookmarks-bar-is-the-only-top-bar.md) | The bookmarks bar is the only top bar | Accepted (2026-11-01) |
+| [0047](0047-the-bookmarks-bar-is-the-only-top-bar.md) | The bookmarks bar is the only top bar | Accepted (2026-11-01); amended by 0050 |
 | [0048](0048-every-change-sent-to-jira-is-recorded-locally.md) | Every change sent to Jira is recorded locally | Accepted (2026-11-01) |
 | [0049](0049-hardened-runtime-strict-csp-and-no-navigation.md) | Hardened runtime, strict CSP and no navigation | Accepted (2026-11-01) |
+| [0050](0050-tabs-in-the-main-window.md) | Tabs in the main window, owned by Rust's NavStore | Accepted (2026-11-02) |
 
 Open: integrations with Daybook and TimeTracker.

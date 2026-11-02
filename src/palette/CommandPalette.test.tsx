@@ -15,6 +15,7 @@ import { NAV_KEY, SIDEBAR_KEY } from "../queries/sidebar";
 import { registerSettingsPage } from "../registry/settingsPages";
 import { resetStore, useStore } from "../state/store";
 import { connectionView } from "../test/jira";
+import { nav } from "../test/nav";
 import { issueHit, listHit, menuCommand, parts, savedSearch, viewHit } from "../test/palette";
 import { sidebarTree, space } from "../test/spaces";
 import { CommandPalette } from "./CommandPalette";
@@ -58,7 +59,7 @@ async function renderPalette({ results = {}, tree = TREE, location = null, siteU
   mocked.searchForget.mockImplementation(async (text) => recent.filter((r) => r !== text));
   mocked.paletteQuery.mockResolvedValue({ issues: [], lists: [], views: [], ...results });
   mocked.sidebarTree.mockResolvedValue(tree);
-  mocked.navCurrent.mockResolvedValue({ location, expanded: [] });
+  mocked.navCurrent.mockResolvedValue(nav(location));
   mocked.connectionGet.mockResolvedValue(connectionView({ siteUrl }));
   mocked.menuCommands.mockResolvedValue(menu);
   mocked.listCreate.mockResolvedValue(NEW_LIST_ID);

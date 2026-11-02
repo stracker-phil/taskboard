@@ -6,6 +6,8 @@ import { api } from "../../api";
 import { useShortcuts } from "../../commands/useShortcuts";
 import { HOME_ICONS } from "../levels";
 import { ListCount } from "./ListCount";
+import { useTabs } from "../../queries/sidebar";
+import { useOpenInTab } from "../openInTab";
 
 interface Props {
   rows: ListNode[];
@@ -16,6 +18,8 @@ interface Props {
 /** Everything, Bookmarks and the global filter lists: icon, label, count. */
 export function HomeRows({ rows, activeId, open }: Props) {
   const { key } = useShortcuts();
+  const tabs = useTabs();
+  const openInTab = useOpenInTab();
   return (
     <nav className="sb-home" aria-label="Home">
       {rows.map((node) => {
@@ -30,11 +34,15 @@ export function HomeRows({ rows, activeId, open }: Props) {
             data-state={active ? "active" : undefined}
             aria-current={active ? "page" : undefined}
             title={goKey ? `${node.name} (${goKey})` : undefined}
-            onClick={() => open(node.id)}
-            onContextMenu={
-              node.kind === "pinned"
-                ? (e) => openContextMenu(e, [{ text: "Show in Bookmarks Bar", run: () => void attempt(api.modeSet("bookmarksBar", true), "Could not move the bookmarks") }], "Bookmarks")
-                : undefined
+            onClick={(e) => !openInTab(e, node.id) && open(node.id)}
+            onContextMenu={(e) =>
+              openContextMenu(
+                e,
+                node.kind === "pinned"
+                  ? [{ text: "Show in Bookmarks Bar", run: () => void attempt(api.modeSet("bookmarksBar", true), "Could not move the bookmarks") }]
+                  : [{ text: "Open in New Tab", run: () => void tabs.open(node.id, null, true) }],
+                node.name,
+              )
             }
           >
             {node.kind === "list" ? (

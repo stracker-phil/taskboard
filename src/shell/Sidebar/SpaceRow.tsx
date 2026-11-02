@@ -10,6 +10,8 @@ import { renameSpace } from "../../components/spaceUpdates";
 import { attempt } from "../../state/requests";
 import { useStore } from "../../state/store";
 import { copyAppLink } from "../../views/list/useIssueActions";
+import { useTabs } from "../../queries/sidebar";
+import { useOpenInTab } from "../openInTab";
 
 interface Props {
   space: SpaceNode;
@@ -34,10 +36,14 @@ interface Props {
  *  the chevron folds its lists. */
 export function SpaceRow({ space, active, holdsActive, expanded, renaming, onOpen, onToggle, onRename, onRenameDone, onEditClient, onAddList, dragHandle }: Props) {
   const [editingLook, setEditingLook] = useState(false);
+  const tabs = useTabs();
+  const openInTab = useOpenInTab();
   const openMenu = (e: MouseEvent) =>
     openContextMenu(
       e,
       [
+        { text: "Open in New Tab", run: () => void tabs.open(space.listId, null, true) },
+        "separator",
         { text: "Rename", run: onRename },
         { text: "Icon and Color…", run: () => setEditingLook(true) },
         { text: "Client label…", run: onEditClient },
@@ -79,7 +85,11 @@ export function SpaceRow({ space, active, holdsActive, expanded, renaming, onOpe
           className="sb-space__main"
           aria-current={active ? "page" : undefined}
           title={active ? "Click to rename" : undefined}
-          onClick={active ? onRename : onOpen}
+          onClick={(e) => {
+            if (openInTab(e, space.listId)) return;
+            if (active) onRename();
+            else onOpen();
+          }}
           onDoubleClick={onRename}
         >
           <span className="sb-row__label">{space.name}</span>

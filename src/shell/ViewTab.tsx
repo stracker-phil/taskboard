@@ -1,3 +1,4 @@
+import { useOpenInTab } from "./openInTab";
 import type { HTMLAttributes, MouseEvent } from "react";
 import { api, type View } from "../api";
 import { useShortcuts } from "../commands/useShortcuts";
@@ -25,6 +26,7 @@ interface Props {
 /** One view tab: its tile (an own look, else the layout's) and name. */
 export function ViewTab({ view, index, active, renaming, onOpen, onRename, onRenameDone, onEditLook, onMenu, dragProps }: Props) {
   const opens = useShortcuts().key(`view.select.${index + 1}`);
+  const openInTab = useOpenInTab();
   const tile = (
     <span
       className="view-tab__look"
@@ -63,8 +65,12 @@ export function ViewTab({ view, index, active, renaming, onOpen, onRename, onRen
       aria-selected={active}
       data-active={active || undefined}
       title={active ? "Click to rename, drag to move" : opens ? `Open (${opens}), drag to move` : "Drag to move"}
-      onClick={active ? onRename : onOpen}
-      onDoubleClick={onRename}
+      onClick={(e) => {
+        if (openInTab(e, view.listId, view.id)) return;
+        if (active) onRename();
+        else onOpen();
+      }}
+      onDoubleClick={(e) => !e.metaKey && onRename()}
       onContextMenu={onMenu}
       data-view-id={view.id}
       {...dragProps}

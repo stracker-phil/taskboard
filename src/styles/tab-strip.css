@@ -1,0 +1,21 @@
+/* The main window's tabs (docs/ux.md → Tabs): the bookmarks bar's look; the active tab carries the panel's color. */
+.tab-strip { display: flex; align-items: center; height: 36px; padding: 0 8px 0 0; box-sizing: border-box; }
+.tab-strip__tabs { position: relative; display: flex; flex: 1; align-items: center; gap: 2px; min-width: 0; height: 100%; overflow-x: auto; scrollbar-width: none; }
+.tab-strip__tab {
+  position: relative; display: flex; flex: 1 1 0; align-items: center; gap: 4px; min-width: 110px; max-width: 220px; height: 26px;
+  padding: 0 4px 0 10px; box-sizing: border-box; border-radius: 7px; color: var(--text-secondary); font-size: 12.5px;
+  white-space: nowrap; cursor: default; transition: background-color var(--motion-fast) var(--ease-out), color var(--motion-fast) var(--ease-out);
+}
+.tab-strip__tab:hover { background: var(--fill-hover); color: var(--text); }
+.tab-strip__tab--active, .tab-strip__tab--active:hover { background: var(--panel-bg); color: var(--text); box-shadow: var(--shadow-raised); }
+.tab-strip__tab[data-dragging] { opacity: 0.5; }
+.tab-strip__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* The close button keeps its slot and shows on the active tab and the one under the pointer. */
+.tab-strip__close {
+  display: grid; flex: none; place-items: center; width: 18px; height: 18px; padding: 0; border: 0; border-radius: 5px;
+  background: none; color: var(--text-tertiary); opacity: 0; cursor: default;
+  transition: opacity var(--motion-fast) var(--ease-out), background-color var(--motion-fast) var(--ease-out);
+}
+.tab-strip__tab--active .tab-strip__close, .tab-strip__tab:hover .tab-strip__close, .tab-strip__close:focus-visible { opacity: 1; }
+.tab-strip__close:hover { background: var(--hover-bg); color: var(--text); }
+.tab-strip__drop { position: absolute; top: 6px; bottom: 6px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--accent); pointer-events: none; }

@@ -9,12 +9,13 @@ import { api, type IssueDetail, type Nav } from "../api";
 import { createQueryClient } from "../queries/queryClient";
 import { resetStore, useStore } from "../state/store";
 import { connectionView } from "../test/jira";
+import { nav } from "../test/nav";
 import { view } from "../test/views";
 import { CurrentPeek } from "./CurrentPeek";
 
 const mocked = vi.mocked(api, true);
 
-const AT_LIST: Nav = { location: { listId: 11, viewId: 101 }, expanded: [] };
+const AT_LIST: Nav = nav({ listId: 11, viewId: 101 });
 const PLACE = { scrollTop: 0, toggled: {}, collapsedParents: [], selectedId: "10042", peekOpen: true };
 
 const detail = (): IssueDetail => ({
@@ -65,7 +66,7 @@ beforeEach(() => {
 
 describe("CurrentPeek", () => {
   it("renders nothing without a location", async () => {
-    mocked.navCurrent.mockResolvedValue({ location: null, expanded: [] });
+    mocked.navCurrent.mockResolvedValue(nav(null));
     resetStore({ places: { "11:101": PLACE } });
 
     const { container } = renderPeek();

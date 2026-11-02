@@ -70,6 +70,20 @@ describe("ShortcutsPage", () => {
       expect(within(menu).getByText("Full Sync")).toBeInTheDocument();
       expect(within(menu).getByText("⌘⇧R")).toBeInTheDocument();
     });
+
+    it.each([
+      ["Close Tab or Window", "⌘W"],
+      ["New Tab", "⌘⇧T"],
+      ["Previous Tab", "⌘⇧["],
+      ["Next Tab", "⌘⇧]"],
+      ["Reopen Closed Tab", "⌘⌥T"],
+    ])("lists the menu's tab key %s as %s", async (title, key) => {
+      await renderPage();
+
+      const menu = screen.getByRole("region", { name: "In the menu" });
+      expect(within(menu).getByText(title)).toBeInTheDocument();
+      expect(within(menu).getByText(key)).toBeInTheDocument();
+    });
   });
 
   describe("search", () => {

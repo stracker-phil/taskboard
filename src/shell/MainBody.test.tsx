@@ -12,6 +12,7 @@ import { resetStore, useStore } from "../state/store";
 import { boardColumn, boardData } from "../test/board";
 import { groupOf, row, viewData } from "../test/issues";
 import { projectCounts, syncOverview } from "../test/jira";
+import { nav } from "../test/nav";
 import { pinItem, pins } from "../test/pins";
 import { lumenSpace, sidebarTree, space } from "../test/spaces";
 import { listNode, view } from "../test/views";
@@ -57,7 +58,7 @@ function deferred<T>() {
 
 describe("MainBody", () => {
   it("asks to connect Jira while no project is tracked", async () => {
-    mocked.navCurrent.mockResolvedValue({ location: { listId: 11, viewId: 101 }, expanded: [] });
+    mocked.navCurrent.mockResolvedValue(nav({ listId: 11, viewId: 101 }));
 
     renderBody();
 
@@ -66,7 +67,7 @@ describe("MainBody", () => {
   });
 
   it("shows the sync status while the tracked project has no cached issues", async () => {
-    mocked.navCurrent.mockResolvedValue({ location: { listId: 11, viewId: 101 }, expanded: [] });
+    mocked.navCurrent.mockResolvedValue(nav({ listId: 11, viewId: 101 }));
     mocked.syncOverview.mockResolvedValue(syncOverview({ projects: [projectCounts({ cached: 0, open: 0 })] }));
 
     renderBody();
@@ -77,7 +78,7 @@ describe("MainBody", () => {
 
   it("shows the list of the current place once a project has cached issues", async () => {
     const issue = row({ summary: "Redesign the pricing page" });
-    mocked.navCurrent.mockResolvedValue({ location: { listId: 11, viewId: 101 }, expanded: [] });
+    mocked.navCurrent.mockResolvedValue(nav({ listId: 11, viewId: 101 }));
     mocked.syncOverview.mockResolvedValue(syncOverview({ projects: [projectCounts()] }));
     mocked.viewsOf.mockResolvedValue([view({ layout: "list" })]);
     mocked.viewRows.mockResolvedValue(viewData([groupOf([issue])], [issue]));
@@ -89,7 +90,7 @@ describe("MainBody", () => {
   });
 
   it("draws nothing while the views of the current place are still loading", async () => {
-    mocked.navCurrent.mockResolvedValue({ location: { listId: 11, viewId: 101 }, expanded: [] });
+    mocked.navCurrent.mockResolvedValue(nav({ listId: 11, viewId: 101 }));
     mocked.syncOverview.mockResolvedValue(syncOverview({ projects: [projectCounts()] }));
     mocked.viewsOf.mockReturnValue(new Promise(() => {}));
 
@@ -107,7 +108,7 @@ describe("MainBody", () => {
 
   describe("on the Pinned level", () => {
     beforeEach(() => {
-      mocked.navCurrent.mockResolvedValue({ location: { listId: 3, viewId: 0 }, expanded: [] });
+      mocked.navCurrent.mockResolvedValue(nav({ listId: 3, viewId: 0 }));
       mocked.sidebarTree.mockResolvedValue({ ...sidebarTree([]), home: [listNode({ id: 3, kind: "pinned", name: "Pinned", count: null })] });
       mocked.syncOverview.mockResolvedValue(syncOverview({ projects: [projectCounts()] }));
     });
@@ -133,7 +134,7 @@ describe("MainBody", () => {
   describe("layouts", () => {
     beforeEach(() => {
       const issue = row({ summary: "Redesign the pricing page" });
-      mocked.navCurrent.mockResolvedValue({ location: { listId: 11, viewId: 101 }, expanded: [] });
+      mocked.navCurrent.mockResolvedValue(nav({ listId: 11, viewId: 101 }));
       mocked.syncOverview.mockResolvedValue(syncOverview({ projects: [projectCounts()] }));
       mocked.viewRows.mockResolvedValue(viewData([groupOf([issue])], [issue]));
     });
@@ -174,7 +175,7 @@ describe("MainBody", () => {
   describe("title wrapping", () => {
     beforeEach(() => {
       const issue = row({ key: "NW-1042", summary: "Redesign the pricing page" });
-      mocked.navCurrent.mockResolvedValue({ location: { listId: 11, viewId: 101 }, expanded: [] });
+      mocked.navCurrent.mockResolvedValue(nav({ listId: 11, viewId: 101 }));
       mocked.syncOverview.mockResolvedValue(syncOverview({ projects: [projectCounts()] }));
       mocked.viewRows.mockResolvedValue(viewData([groupOf([issue])], [issue]));
     });
@@ -198,7 +199,7 @@ describe("MainBody", () => {
 
   describe("narrowing", () => {
     beforeEach(() => {
-      mocked.navCurrent.mockResolvedValue({ location: { listId: 11, viewId: 101 }, expanded: [] });
+      mocked.navCurrent.mockResolvedValue(nav({ listId: 11, viewId: 101 }));
       mocked.syncOverview.mockResolvedValue(syncOverview({ projects: [projectCounts()] }));
     });
 
@@ -283,7 +284,7 @@ describe("MainBody", () => {
     const SAVED = { scrollTop: 0, toggled: {}, collapsedParents: [], selectedId: null, peekOpen: false };
 
     beforeEach(() => {
-      mocked.navCurrent.mockResolvedValue({ location: { listId: 11, viewId: 101 }, expanded: [] });
+      mocked.navCurrent.mockResolvedValue(nav({ listId: 11, viewId: 101 }));
       mocked.syncOverview.mockResolvedValue(syncOverview({ projects: [projectCounts()] }));
       mocked.placeGet.mockResolvedValue(SAVED);
     });
@@ -302,7 +303,7 @@ describe("MainBody", () => {
     const RUNNING = { state: "running", job: "full" } as const;
     const FINISHED = projectCounts({ lastFullAt: "2026-10-27T09:00:00Z" });
     const UNFINISHED = projectCounts({ id: "10002", key: "LUM", name: "Lumen iOS app", cached: 5, lastFullAt: null });
-    const at = (listId: number) => mocked.navCurrent.mockResolvedValue({ location: { listId, viewId: 101 }, expanded: [] });
+    const at = (listId: number) => mocked.navCurrent.mockResolvedValue(nav({ listId, viewId: 101 }));
 
     beforeEach(() => {
       const issue = row({ summary: "Redesign the pricing page" });
@@ -365,12 +366,12 @@ describe("MainBody", () => {
     const dataOf = (...rows: ReturnType<typeof row>[]) => viewData([groupOf(rows)], rows);
 
     beforeEach(() => {
-      mocked.navCurrent.mockResolvedValue({ location: { listId: 11, viewId: 101 }, expanded: [] });
+      mocked.navCurrent.mockResolvedValue(nav({ listId: 11, viewId: 101 }));
       mocked.syncOverview.mockResolvedValue(syncOverview({ projects: [projectCounts()] }));
     });
 
     const goTo = (client: ReturnType<typeof renderBody>, viewId: number) =>
-      act(() => client.setQueryData(NAV_KEY, { location: { listId: 11, viewId }, expanded: [] }));
+      act(() => client.setQueryData(NAV_KEY, nav({ listId: 11, viewId })));
 
     it("keeps the old view on screen until the new view's rows arrive", async () => {
       const next = deferred<ReturnType<typeof dataOf>>();
@@ -460,7 +461,7 @@ describe("MainBody", () => {
   });
 
   it("keeps the sync status when there are issues but no place to show", async () => {
-    mocked.navCurrent.mockResolvedValue({ location: null, expanded: [] });
+    mocked.navCurrent.mockResolvedValue(nav(null));
     mocked.syncOverview.mockResolvedValue(syncOverview({ projects: [projectCounts()] }));
 
     renderBody();

@@ -12,6 +12,7 @@ import { runPageAction } from "../../commands/pageActions";
 import { createQueryClient } from "../../queries/queryClient";
 import { SIDEBAR_KEY } from "../../queries/sidebar";
 import { resetStore, useStore } from "../../state/store";
+import { nav as navWith } from "../../test/nav";
 import { listTarget, pinItem, pins } from "../../test/pins";
 import { lumenSpace, space } from "../../test/spaces";
 import { ConfirmHost } from "../../components/ConfirmSheet";
@@ -65,7 +66,7 @@ const NW_ID = 11;
 const NWS_ID = 13;
 const LUM_ID = 12;
 
-const navAt = (listId: number | null, expanded: number[] = []): Nav => ({ location: listId === null ? null : { listId, viewId: 0 }, expanded });
+const navAt = (listId: number | null, expanded: number[] = []): Nav => navWith(listId === null ? null : { listId, viewId: 0 }, { expanded });
 
 async function renderSidebar(tree: SidebarTree = treeWith(), nav: Nav = navAt(null)) {
   mocked.sidebarTree.mockResolvedValue(tree);
@@ -263,6 +264,70 @@ describe("Sidebar", () => {
 
       expect(await screen.findByRole("img", { name: "Unknown field 'severity'" })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /^Open bugs/ })).toHaveTextContent(/^Open bugs$/);
+    });
+  });
+
+  describe("opening in a tab", () => {
+    const rowOf: Record<string, () => Promise<HTMLElement>> = {
+      "a Space": async () => spaceButton("Northwind support"),
+      "a filter list": () => screen.findByRole("button", { name: named("Epics") }),
+      "a Home row": async () => screen.getByRole("button", { name: named("Everything") }),
+    };
+    const listIdOf: Record<string, number> = { "a Space": NWS_ID, "a filter list": EPICS.id, "a Home row": 1 };
+
+    describe.each(Object.keys(rowOf))("on %s", (kind) => {
+      beforeEach(async () => {
+        await renderSidebar(treeWith(), navAt(null, [NW_ID]));
+      });
+
+      it("opens a tab behind the shown one on ⌘-click and leaves the place alone", async () => {
+        fireEvent.click(await rowOf[kind](), { metaKey: true });
+
+        expect(mocked.navTabNew).toHaveBeenCalledWith(listIdOf[kind], null, false);
+        expect(mocked.navGo).not.toHaveBeenCalled();
+      });
+
+      it("opens a tab and shows it on ⌘⇧-click", async () => {
+        fireEvent.click(await rowOf[kind](), { metaKey: true, shiftKey: true });
+
+        expect(mocked.navTabNew).toHaveBeenCalledWith(listIdOf[kind], null, true);
+        expect(mocked.navGo).not.toHaveBeenCalled();
+      });
+
+      it("opens a tab and shows it from the context menu's Open in New Tab", async () => {
+        fireEvent.contextMenu(await rowOf[kind]());
+
+        await chooseFromMenu("Open in New Tab");
+
+        expect(mocked.navTabNew).toHaveBeenCalledWith(listIdOf[kind], null, true);
+      });
+    });
+
+    it("does not rename the current Space on ⌘-click", async () => {
+      await renderSidebar(treeWith(), navAt(NW_ID));
+
+      fireEvent.click(await screen.findByRole("button", { name: named("Website relaunch"), current: "page" }), { metaKey: true });
+
+      expect(mocked.navTabNew).toHaveBeenCalledWith(NW_ID, null, false);
+      expect(screen.queryByRole("textbox", { name: "Space name" })).not.toBeInTheDocument();
+    });
+
+    it("does not rename the current filter list on ⌘-click", async () => {
+      await renderSidebar(treeWith(), navAt(EPICS.id, [NW_ID]));
+
+      fireEvent.click(await screen.findByRole("button", { name: named("Epics") }), { metaKey: true });
+
+      expect(mocked.navTabNew).toHaveBeenCalledWith(EPICS.id, null, false);
+      expect(screen.queryByRole("textbox", { name: "Filter list name" })).not.toBeInTheDocument();
+    });
+
+    it("shows an error toast when the tab cannot be opened", async () => {
+      mocked.navTabNew.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
+      await renderSidebar();
+
+      fireEvent.click(spaceButton("Northwind support"), { metaKey: true });
+
+      expect(await screen.findByText("Could not open a tab: Disk full")).toBeInTheDocument();
     });
   });
 
@@ -489,12 +554,20 @@ describe("Sidebar", () => {
       expect(mocked.modeSet).toHaveBeenCalledWith("bookmarksBar", true);
     });
 
-    it("is the only Home row with that menu", async () => {
+    it("has no Open in New Tab", async () => {
+      await renderSidebar();
+
+      await userEvent.pointer({ keys: "[MouseRight]", target: screen.getByRole("button", { name: "Bookmarks" }) });
+
+      expect(menuRows()).toEqual(["Show in Bookmarks Bar"]);
+    });
+
+    it("is the only Home row with that entry: the others offer a new tab only", async () => {
       await renderSidebar();
 
       await userEvent.pointer({ keys: "[MouseRight]", target: screen.getByRole("button", { name: named("Everything") }) });
 
-      expect(screen.queryByRole("menuitem", { name: "Show in Bookmarks Bar" })).not.toBeInTheDocument();
+      expect(menuRows()).toEqual(["Open in New Tab"]);
     });
   });
 
@@ -553,7 +626,7 @@ describe("Sidebar", () => {
 
     it("opens a menu named after the list with Rename, Icon and Color, Duplicate, Add to Home and Delete", () => {
       expect(screen.getByRole("menu", { name: "Epics" })).toBeInTheDocument();
-      expect(menuRows()).toEqual(["Rename", "Icon and Color…", "Duplicate", "Add to Home", "Copy Taskboard Link", "Delete"]);
+      expect(menuRows()).toEqual(["Open in New Tab", "Rename", "Icon and Color…", "Duplicate", "Add to Home", "Copy Taskboard Link", "Delete"]);
     });
 
     it("copies the Taskboard link to the list and says so", async () => {
@@ -747,7 +820,7 @@ describe("Sidebar", () => {
 
     it("opens a menu named after the Space with Rename, Icon and Color, Client label, Space Settings and Stop tracking", () => {
       expect(screen.getByRole("menu", { name: "Website relaunch" })).toBeInTheDocument();
-      expect(menuRows()).toEqual(["Rename", "Icon and Color…", "Client label…", "Space Settings…", "Copy Taskboard Link", "Stop tracking"]);
+      expect(menuRows()).toEqual(["Open in New Tab", "Rename", "Icon and Color…", "Client label…", "Space Settings…", "Copy Taskboard Link", "Stop tracking"]);
     });
 
     it("copies the Taskboard link to the Space and says so", async () => {

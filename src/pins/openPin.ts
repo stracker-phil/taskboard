@@ -34,3 +34,11 @@ export function pinName(pin: PinItem): string {
       return target.name;
   }
 }
+
+/** The level and view a list or view bookmark opens; none for an issue or a comment. */
+export function pinPlace(pin: PinItem): { listId: number; viewId: number | null } | null {
+  const target = pin.target;
+  if (target.kind === "view") return { listId: target.listId, viewId: target.id };
+  if (target.kind === "list") return { listId: target.id, viewId: null };
+  return null;
+}

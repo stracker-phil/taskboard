@@ -144,7 +144,7 @@ mod tests {
                 ("Refresh", "sync:refresh", Some("CmdOrCtrl+R")),
                 ("Full Sync", "sync:full", Some("CmdOrCtrl+Shift+R")),
                 ("Reset Cache…", "app:settings:cache", None),
-                ("Close Window", "window:close", Some("CmdOrCtrl+W")),
+                ("Close Tab or Window", "window:close", Some("CmdOrCtrl+W")),
             ]
         );
     }
@@ -165,6 +165,10 @@ mod tests {
                 "nav:nextList",
                 "page:view.previous",
                 "page:view.next",
+                "nav:newTab",
+                "nav:previousTab",
+                "nav:nextTab",
+                "nav:reopenTab",
             ]
         );
     }

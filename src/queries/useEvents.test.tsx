@@ -11,6 +11,7 @@ import { SyncPage } from "../components/settings/jira/SyncPage";
 import { emitEvent } from "../test/apiMock";
 import { connectionView, PROJECTS, projectCounts, syncOverview } from "../test/jira";
 import { row, statusStyle, viewData } from "../test/issues";
+import { nav as navAt } from "../test/nav";
 import { settings } from "../test/settings";
 import { lumenSpace, sidebarTree, space } from "../test/spaces";
 import { useModes } from "./modes";
@@ -272,7 +273,7 @@ describe("useEvents", () => {
 
     async function renderPlace() {
       mocked.sidebarTree.mockResolvedValue(sidebarTree([space()]));
-      mocked.navCurrent.mockResolvedValue({ location: null, expanded: [] });
+      mocked.navCurrent.mockResolvedValue(navAt(null));
       render(
         <QueryClientProvider client={createQueryClient()}>
           <PlaceHarness />
@@ -298,7 +299,7 @@ describe("useEvents", () => {
       await renderPlace();
       await screen.findByText("Place: none");
 
-      act(() => emitEvent(api, "nav_changed", { location: { listId: 12, viewId: 7 }, expanded: [12] }));
+      act(() => emitEvent(api, "nav_changed", navAt({ listId: 12, viewId: 7 }, { expanded: [12] })));
 
       expect(await screen.findByText("Place: 12/7")).toBeInTheDocument();
     });
@@ -306,7 +307,7 @@ describe("useEvents", () => {
     it("asks Rust for the place again when local_changed arrives", async () => {
       await renderPlace();
       await screen.findByText("Place: none");
-      mocked.navCurrent.mockResolvedValue({ location: { listId: 11, viewId: 3 }, expanded: [] });
+      mocked.navCurrent.mockResolvedValue(navAt({ listId: 11, viewId: 3 }));
 
       act(() => emitEvent(api, "local_changed", { parts: ["views"] }));
 

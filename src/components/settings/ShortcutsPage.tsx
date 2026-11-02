@@ -14,7 +14,11 @@ const MENU_KEYS: { title: string; binding: string }[] = [
   { title: "Toggle Sidebar", binding: "Mod+\\" },
   { title: "Refresh", binding: "Mod+R" },
   { title: "Full Sync", binding: "Mod+Shift+R" },
-  { title: "Close Window", binding: "Mod+W" },
+  { title: "Close Tab or Window", binding: "Mod+W" },
+  { title: "New Tab", binding: "Mod+Shift+T" },
+  { title: "Previous Tab", binding: "Mod+Shift+[" },
+  { title: "Next Tab", binding: "Mod+Shift+]" },
+  { title: "Reopen Closed Tab", binding: "Mod+Alt+T" },
   { title: "Quit Taskboard", binding: "Mod+Q" },
 ];
 

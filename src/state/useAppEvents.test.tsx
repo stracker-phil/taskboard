@@ -8,6 +8,7 @@ import { installCommands } from "../commands";
 import { usePageAction } from "../commands/pageActions";
 import { clearCommands, registerCommands } from "../commands/registry";
 import { emitEvent } from "../test/apiMock";
+import { nav } from "../test/nav";
 import { view } from "../test/views";
 import { narrowingKey } from "./slices/narrowing";
 import { resetStore, useStore } from "./store";
@@ -53,7 +54,7 @@ describe("useAppEvents launch events", () => {
 
   describe("onlyMine", () => {
     beforeEach(() => {
-      mocked.navCurrent.mockResolvedValue({ location: origin, expanded: [] });
+      mocked.navCurrent.mockResolvedValue(nav(origin));
     });
 
     it.each([
@@ -109,7 +110,7 @@ describe("useAppEvents launch events", () => {
     });
 
     it("changes nothing when navigation has no location", async () => {
-      mocked.navCurrent.mockResolvedValue({ location: null, expanded: [] });
+      mocked.navCurrent.mockResolvedValue(nav(null));
       mocked.takeLaunchEvents.mockResolvedValue([{ type: "onlyMine", on: true }]);
 
       await mountEvents();

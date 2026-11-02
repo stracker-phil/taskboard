@@ -10,7 +10,7 @@ import { onSelectView } from "../commands/viewKeys";
 import { LookPopover } from "../components/look/LookPopover";
 import { openContextMenu, openMenu, type MenuEntry } from "../components/menu";
 import { useDragReorder } from "./Sidebar/useDragReorder";
-import { useNavGo, useViews } from "../queries/sidebar";
+import { useNavGo, useTabs, useViews } from "../queries/sidebar";
 import { attempt } from "../state/requests";
 import { useStore } from "../state/store";
 import { copyAppLink } from "../views/list/useIssueActions";
@@ -21,6 +21,7 @@ import { ViewTab } from "./ViewTab";
 export function ViewTabs({ listId, viewId }: { listId: number; viewId: number }) {
   const { data: views = [] } = useViews(listId);
   const open = useNavGo();
+  const tabs = useTabs();
   const [renamingId, setRenamingId] = useState<number | null>(null);
   const { title } = useShortcuts();
   const [lookingId, setLookingId] = useState<number | null>(null);
@@ -84,6 +85,8 @@ export function ViewTabs({ listId, viewId }: { listId: number; viewId: number })
     openContextMenu(
       e,
       [
+        { text: "Open in New Tab", run: () => void tabs.open(view.listId, view.id, true) },
+        "separator",
         ...editing(view),
         { caption: "Layout" },
         ...offered.map(

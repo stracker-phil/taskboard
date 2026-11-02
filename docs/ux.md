@@ -46,7 +46,8 @@ The owner's rule (2026-10-30), for every control, list and popover:
   sidebar), 12px radius, `--shadow-panel`. Popovers anchor to the panel.
 - **Traffic lights** are the native ones, inside the sidebar's top 18px strip (`trafficLightPosition` 20, 24);
   the strip and empty chrome drag the window. There is no icon rail or status bar, and no top bar but the
-  bookmarks bar ([ADR 0047](adr/0047-the-bookmarks-bar-is-the-only-top-bar.md)).
+  bookmarks bar ([ADR 0047](adr/0047-the-bookmarks-bar-is-the-only-top-bar.md)) and, from a second tab, the tabs
+  ([ADR 0050](adr/0050-tabs-in-the-main-window.md)).
 - **Bookmarks bar** (`src/pins/BookmarksBar.tsx`, `styles/bookmarks-bar.css`; View → Show Bookmarks Bar ⇧⌘B,
   `view:toggleBookmarksBar`, checked while shown; `modes.json` `bookmarksBar`): the bookmarks in a 36px row on
   `--window-bg` above the panel, beside the traffic-light strip; with the sidebar hidden it sits in the 42px strip
@@ -58,6 +59,15 @@ The owner's rule (2026-10-30), for every control, list and popover:
   by the width only (`fitCount`), which ends with All Bookmarks. While the bar shows, the sidebar drops the
   Bookmarks row and the bookmarked lists under Home (the Home rows glide, `useHeightGlide`); the Bookmarks row's
   context menu has Show in Bookmarks Bar.
+- **Tabs** (`src/shell/TabStrip.tsx`, `styles/tab-strip.css`; Rust's `nav/tabs.rs`): from the second tab a 36px
+  strip under the bookmarks bar (its slot grows from 0, so the panel glides; one tab shows none). Each tab is
+  "Level · View" (the level alone when it has one view), sharing the width between 110 and 220px, the strip
+  scrolling sideways past that; the active tab is `--panel-bg` with `--shadow-raised`, the others flat like the
+  bookmarks. A click shows a tab, × (on the active tab and the hovered one) or a middle click closes it, a drag
+  moves it, right-click has New Tab, Close Tab and Close Other Tabs. A tab keeps its own Issue view and the drafts
+  of its view; switching swaps them before the frame paints. Go → New Tab ⌘⇧T, Previous / Next Tab ⌘⇧[ / ⌘⇧],
+  Reopen Closed Tab ⌘⌥T; File → Close Tab or Window ⌘W. "Open in New Tab" sits in the menus of Spaces, filter
+  lists, Home rows, view tabs and list or view bookmarks; ⌘-click on those opens a tab behind, ⌘⇧-click shows it.
 - **Sidebar** ([below](#sidebar)): ⌘\ or the sidebar toggle hides it; the panel then takes the full width under
   a 42px strip that keeps the traffic lights off it. The state is kept in `ui_state.json`.
 - **Sidebar toggle** (`src/shell/SidebarToggle.tsx`): a 34px button (panel icon 17/1.8, styled like Settings)

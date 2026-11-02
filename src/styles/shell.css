@@ -110,3 +110,5 @@
 /* The bookmarks bar above the panel: it grows from nothing, so the panel glides down instead of jumping. */
 .shell__bookmarks { flex: none; height: 0; overflow: hidden; transition: height var(--motion-slow) var(--ease-out); }
 .shell__bookmarks--open { height: 36px; }
+.shell__tabs { flex: none; height: 0; overflow: hidden; transition: height var(--motion-slow) var(--ease-out); }
+.shell__tabs--open { height: 36px; }

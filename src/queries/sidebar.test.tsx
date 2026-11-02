@@ -8,10 +8,11 @@ vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await impo
 import { api } from "../api";
 import { narrowingKey } from "../state/slices/narrowing";
 import { resetStore, useStore } from "../state/store";
+import { nav as navAt, tab, tabbedNav } from "../test/nav";
 import { lumenSpace, sidebarTree, space } from "../test/spaces";
 import { view } from "../test/views";
 import { createQueryClient } from "./queryClient";
-import { useNav, useNavGo, useSetExpanded, useSidebar, useSpaces, useViews } from "./sidebar";
+import { useNav, useNavGo, useSetExpanded, useSidebar, useSpaces, useTabs, useViews } from "./sidebar";
 
 const mocked = vi.mocked(api, true);
 
@@ -22,9 +23,15 @@ function Probe({ listId }: { listId: number | null }) {
   const { data: views } = useViews(listId);
   const open = useNavGo();
   const setExpanded = useSetExpanded();
+  const tabs = useTabs();
   return (
     <>
       <p>Place: {nav?.location ? `${nav.location.listId}/${nav.location.viewId}` : "none"}</p>
+      <p>Tabs: {nav ? `${nav.tabs.map((t) => t.id).join(",")} (showing ${nav.activeTab})` : "unknown"}</p>
+      <button onClick={() => void tabs.open(12, 5, true)}>Open tab</button>
+      <button onClick={() => void tabs.activate(1)}>Show tab 1</button>
+      <button onClick={() => void tabs.close(2)}>Close tab 2</button>
+      <button onClick={() => void tabs.move(1, null)}>Move tab 1 last</button>
       <p>Expanded: {nav?.expanded.join(",") ?? "unknown"}</p>
       <p>Everything: {tree?.everything.name ?? "loading"}</p>
       <p>Spaces: {spaces?.map((s) => s.name).join(", ") ?? "loading"}</p>
@@ -47,15 +54,15 @@ beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
   mocked.sidebarTree.mockResolvedValue(sidebarTree([space(), lumenSpace()]));
-  mocked.navCurrent.mockResolvedValue({ location: null, expanded: [] });
-  mocked.navGo.mockImplementation(async (listId, viewId) => ({ location: { listId, viewId: viewId ?? 0 }, expanded: [] }));
-  mocked.navSetExpanded.mockImplementation(async (expanded) => ({ location: null, expanded }));
+  mocked.navCurrent.mockResolvedValue(navAt(null));
+  mocked.navGo.mockImplementation(async (listId, viewId) => navAt({ listId, viewId: viewId ?? 0 }));
+  mocked.navSetExpanded.mockImplementation(async (expanded) => navAt(null, { expanded }));
   mocked.viewsOf.mockResolvedValue([]);
 });
 
 describe("sidebar queries", () => {
   it("loads the tree, its Spaces in order and Rust's current place", async () => {
-    mocked.navCurrent.mockResolvedValue({ location: { listId: 11, viewId: 101 }, expanded: [11] });
+    mocked.navCurrent.mockResolvedValue(navAt({ listId: 11, viewId: 101 }, { expanded: [11] }));
 
     renderProbe();
 
@@ -111,7 +118,7 @@ describe("sidebar queries", () => {
     const peekOpen = (listId: number, viewId: number) => useStore.getState().places[narrowingKey(listId, viewId)]?.peekOpen;
 
     async function renderAt(listId: number, viewId: number) {
-      mocked.navCurrent.mockResolvedValue({ location: { listId, viewId }, expanded: [] });
+      mocked.navCurrent.mockResolvedValue(navAt({ listId, viewId }));
       resetStore({ issueView: { origin: { listId, viewId }, stack: ["10042"] } });
       act(() => useStore.getState().updatePlace(12, 5, { peekOpen: true }));
       renderProbe();
@@ -138,9 +145,75 @@ describe("sidebar queries", () => {
     });
   });
 
+  describe("tabs", () => {
+    const AT_LIST = { listId: 11, viewId: 101 };
+    const TWO = tabbedNav([tab(1, AT_LIST), tab(2, { listId: 12, viewId: 5 })], 2);
+
+    it("shows the tabs Rust answers with when one is opened", async () => {
+      mocked.navCurrent.mockResolvedValue(navAt(AT_LIST));
+      mocked.navTabNew.mockResolvedValue(TWO);
+      renderProbe();
+      await screen.findByText("Tabs: 1 (showing 1)");
+
+      await userEvent.click(screen.getByRole("button", { name: "Open tab" }));
+
+      expect(mocked.navTabNew).toHaveBeenCalledWith(12, 5, true);
+      expect(await screen.findByText("Tabs: 1,2 (showing 2)")).toBeInTheDocument();
+      expect(screen.getByText("Place: 12/5")).toBeInTheDocument();
+    });
+
+    it("shows the tab Rust answers with when one is shown", async () => {
+      mocked.navCurrent.mockResolvedValue(tabbedNav(TWO.tabs, 2));
+      mocked.navTabActivate.mockResolvedValue(tabbedNav(TWO.tabs, 1));
+      renderProbe();
+      await screen.findByText("Tabs: 1,2 (showing 2)");
+
+      await userEvent.click(screen.getByRole("button", { name: "Show tab 1" }));
+
+      expect(mocked.navTabActivate).toHaveBeenCalledWith(1);
+      expect(await screen.findByText("Tabs: 1,2 (showing 1)")).toBeInTheDocument();
+    });
+
+    it("drops the tab Rust answers without when one is closed", async () => {
+      mocked.navCurrent.mockResolvedValue(TWO);
+      mocked.navTabClose.mockResolvedValue(navAt(AT_LIST));
+      renderProbe();
+      await screen.findByText("Tabs: 1,2 (showing 2)");
+
+      await userEvent.click(screen.getByRole("button", { name: "Close tab 2" }));
+
+      expect(mocked.navTabClose).toHaveBeenCalledWith(2);
+      expect(await screen.findByText("Tabs: 1 (showing 1)")).toBeInTheDocument();
+    });
+
+    it("shows the order Rust answers with when one is moved", async () => {
+      mocked.navCurrent.mockResolvedValue(TWO);
+      mocked.navTabMove.mockResolvedValue(tabbedNav([TWO.tabs[1], TWO.tabs[0]], 2));
+      renderProbe();
+      await screen.findByText("Tabs: 1,2 (showing 2)");
+
+      await userEvent.click(screen.getByRole("button", { name: "Move tab 1 last" }));
+
+      expect(mocked.navTabMove).toHaveBeenCalledWith(1, null);
+      expect(await screen.findByText("Tabs: 2,1 (showing 2)")).toBeInTheDocument();
+    });
+
+    it("keeps the tabs and shows an error toast when Rust refuses", async () => {
+      mocked.navCurrent.mockResolvedValue(TWO);
+      mocked.navTabClose.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
+      renderProbe();
+      await screen.findByText("Tabs: 1,2 (showing 2)");
+
+      await userEvent.click(screen.getByRole("button", { name: "Close tab 2" }));
+
+      await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not close the tab: Disk full"));
+      expect(screen.getByText("Tabs: 1,2 (showing 2)")).toBeInTheDocument();
+    });
+  });
+
   describe("expanding Spaces", () => {
     it("replaces the expanded Spaces with what Rust answers", async () => {
-      mocked.navSetExpanded.mockResolvedValue({ location: null, expanded: [12] });
+      mocked.navSetExpanded.mockResolvedValue(navAt(null, { expanded: [12] }));
       renderProbe();
       await screen.findByText("Expanded:");
 

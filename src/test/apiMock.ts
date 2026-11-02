@@ -47,6 +47,7 @@ import {
 import { capabilityRows } from "./capabilities";
 import { filterOptions } from "./filters";
 import { issueDetail } from "./issues";
+import { nav } from "./nav";
 import { settings } from "./settings";
 import { spaceConfig } from "./spaces";
 import { view } from "./views";
@@ -137,9 +138,13 @@ export function createApiMock(): Api {
     spaceSetField: vi.fn(),
     teamMatrix: vi.fn(async (): Promise<TeamMatrix> => ({ spaces: [], people: [] })),
     spaceSetMember: vi.fn(async (): Promise<TeamMatrix> => ({ spaces: [], people: [] })),
-    navCurrent: vi.fn(async (): Promise<Nav> => ({ location: null, expanded: [] })),
-    navGo: vi.fn(async (listId: number, viewId: number | null): Promise<Nav> => ({ location: { listId, viewId: viewId ?? 0 }, expanded: [] })),
-    navSetExpanded: vi.fn(async (expanded: number[]): Promise<Nav> => ({ location: null, expanded })),
+    navCurrent: vi.fn(async (): Promise<Nav> => nav(null)),
+    navGo: vi.fn(async (listId: number, viewId: number | null): Promise<Nav> => nav({ listId, viewId: viewId ?? 0 })),
+    navTabNew: vi.fn(async (listId: number | null, viewId: number | null): Promise<Nav> => nav(listId === null ? null : { listId, viewId: viewId ?? 0 })),
+    navTabActivate: vi.fn(async (): Promise<Nav> => nav(null)),
+    navTabClose: vi.fn(async (): Promise<Nav> => nav(null)),
+    navTabMove: vi.fn(async (): Promise<Nav> => nav(null)),
+    navSetExpanded: vi.fn(async (expanded: number[]): Promise<Nav> => nav(null, { expanded })),
     viewsOf: vi.fn().mockResolvedValue([]),
     viewCreate: vi.fn(),
     viewRename: vi.fn(),

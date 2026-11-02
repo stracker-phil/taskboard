@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect } from "react";
+import { type ReactNode, useEffect, useLayoutEffect, useRef } from "react";
 import { IssueView } from "../issue/IssueView";
 import { BookmarksBar } from "../pins/BookmarksBar";
 import { useModes } from "../queries/modes";
@@ -12,6 +12,7 @@ import { TokenBanner } from "./TokenBanner";
 import { findLevel } from "./levels";
 import { Sidebar } from "./Sidebar/Sidebar";
 import { SidebarToggle } from "./SidebarToggle";
+import { TabStrip } from "./TabStrip";
 import { Toolbar } from "./toolbar/Toolbar";
 import { ViewTabs } from "./ViewTabs";
 
@@ -26,7 +27,9 @@ interface Props {
 export function Window({ sidebarHidden, children }: Props) {
   const issueView = useStore((s) => s.issueView);
   const { bookmarksBar } = useModes();
-  useCloseIssueOnNavigation();
+  const { data: nav } = useNav();
+  const tabbed = (nav?.tabs.length ?? 0) > 1;
+  useIssueViewFollowsTheTab();
   useDiscardDraftsOnLeave();
   return (
     <div className={sidebarHidden ? "shell shell--sidebar-hidden" : "shell"}>
@@ -44,6 +47,10 @@ export function Window({ sidebarHidden, children }: Props) {
             {bookmarksBar && <BookmarksBar />}
           </div>
         )}
+        {/* Always there, so a second tab grows it and the panel glides; one tab needs no strip. */}
+        <div className={tabbed ? "shell__tabs shell__tabs--open" : "shell__tabs"} inert={!tabbed}>
+          {tabbed && nav && <TabStrip nav={nav} />}
+        </div>
         <main className="content-panel">
           {issueView ? (
             <IssueView key={issueView.stack.length} id={issueView.stack[issueView.stack.length - 1]} origin={issueView.origin} />
@@ -64,31 +71,39 @@ export function Window({ sidebarHidden, children }: Props) {
   );
 }
 
-/** Going to another level or view (sidebar, tabs, keys) leaves the Issue view. */
-function useCloseIssueOnNavigation() {
+/** Going to another level or view (sidebar, view tabs, keys) leaves the Issue view. Switching tabs parks it with
+ *  its tab and brings back the other tab's, before the frame is painted, so one tab's Issue view never shows over
+ *  another's place. */
+function useIssueViewFollowsTheTab() {
   const { data: nav } = useNav();
   const closeIssue = useStore((s) => s.closeIssue);
+  const switchTab = useStore((s) => s.switchTab);
+  const shownTab = useRef<number | null>(null);
   const listId = nav?.location?.listId;
   const viewId = nav?.location?.viewId;
-  useEffect(() => {
-    const open = useStore.getState().issueView;
+  const activeTab = nav?.activeTab;
+  const tabIds = nav?.tabs.map((tab) => tab.id).join(",") ?? "";
+  useLayoutEffect(() => {
     // Before the place has loaded nothing has moved yet.
-    if (listId === undefined) return;
+    if (listId === undefined || activeTab === undefined) return;
+    const from = shownTab.current;
+    shownTab.current = activeTab;
+    if (from !== null && from !== activeTab) return switchTab(from, activeTab, tabIds.split(",").map(Number));
+    const open = useStore.getState().issueView;
     if (open && (open.origin.listId !== listId || open.origin.viewId !== viewId)) closeIssue();
-  }, [listId, viewId, closeIssue]);
+  }, [listId, viewId, activeTab, tabIds, closeIssue, switchTab]);
 }
 
 /** Leaving a view drops its drafts and its text filter (ADR 0038); the Issue view, the preview and the Peek
- *  over it don't change the nav place, so they keep them. */
+ *  over it don't change the nav place, so they keep them. Every open tab's view keeps its own. */
 function useDiscardDraftsOnLeave() {
   const { data: nav } = useNav();
-  const keepOnly = useStore((s) => s.keepOnlyNarrowing);
-  const listId = nav?.location?.listId;
-  const viewId = nav?.location?.viewId;
+  const keep = useStore((s) => s.keepNarrowings);
+  const keys = nav?.tabs.flatMap((tab) => (tab.location ? [narrowingKey(tab.location.listId, tab.location.viewId)] : [])).join("|");
   useEffect(() => {
-    if (listId === undefined || viewId === undefined) return;
-    keepOnly(narrowingKey(listId, viewId));
-  }, [listId, viewId, keepOnly]);
+    if (keys === undefined || keys === "") return;
+    keep(keys.split("|"));
+  }, [keys, keep]);
 }
 
 /** The current level's header, view tabs and toolbar, once the tree and the place are known. */

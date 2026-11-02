@@ -11,7 +11,7 @@ use taskboard_lib::connection::track_project;
 use taskboard_lib::db::Db;
 use taskboard_lib::error::ErrorKind;
 use taskboard_lib::lists::{Viewer, list_create, list_delete, space_move};
-use taskboard_lib::nav::{Location, Nav, NavStore};
+use taskboard_lib::nav::{Location, Nav, NavStore, Tab};
 use taskboard_lib::test_support::temp_config_dir;
 use taskboard_lib::views::{View, view_delete, views_of};
 
@@ -140,14 +140,17 @@ mod the_starting_place {
         let current = nav.current(&db).await.unwrap();
 
         let everything = everything(&db).await;
+        let at = serde_json::json!({
+            "listId": everything,
+            "viewId": default_view(&db, everything).await,
+        });
         assert_eq!(
             serde_json::to_value(&current).unwrap(),
             serde_json::json!({
-                "location": {
-                    "listId": everything,
-                    "viewId": default_view(&db, everything).await,
-                },
+                "location": at,
                 "expanded": [7],
+                "tabs": [{ "id": current.active_tab, "location": at }],
+                "activeTab": current.active_tab,
             })
         );
     }
@@ -823,5 +826,597 @@ mod stepping_through_spaces {
         assert_eq!(forward, before);
         assert_eq!(backward, before);
         assert_eq!(place(&before), at_default(&db, everything(&db).await).await);
+    }
+}
+
+fn tab_ids(nav: &Nav) -> Vec<u32> {
+    nav.tabs.iter().map(|t| t.id).collect()
+}
+
+fn tab_places(nav: &Nav) -> Vec<Option<Location>> {
+    nav.tabs.iter().map(|t| t.location).collect()
+}
+
+fn active_place(nav: &Nav) -> Option<Location> {
+    nav.tabs
+        .iter()
+        .find(|t| t.id == nav.active_tab)
+        .and_then(|t| t.location)
+}
+
+/// Tabs at Everything, Website relaunch and Northwind support, in that order, the last one active.
+async fn three_tabs(nav: &NavStore, db: &Db) -> (Nav, [Location; 3]) {
+    let places = [
+        at_default(db, everything(db).await).await,
+        at_default(db, space(db, NW).await).await,
+        at_default(db, space(db, NWS).await).await,
+    ];
+    nav.new_tab(db, Some(places[1].list_id), None, true)
+        .await
+        .unwrap();
+    let current = nav
+        .new_tab(db, Some(places[2].list_id), None, true)
+        .await
+        .unwrap();
+    (current, places)
+}
+
+mod tabs_at_the_start {
+    use super::*;
+
+    #[tokio::test]
+    async fn a_fresh_store_has_one_tab_at_the_starting_place() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+
+        let current = nav.current(&db).await.unwrap();
+
+        let start = at_default(&db, everything(&db).await).await;
+        assert_eq!(
+            current.tabs,
+            [Tab {
+                id: current.active_tab,
+                location: Some(start)
+            }]
+        );
+        assert_eq!(nav.tab_count(), 1);
+        assert_eq!(nav.active_tab(), current.active_tab);
+    }
+
+    #[tokio::test]
+    async fn a_file_from_before_tabs_loads_as_one_tab_at_its_place() {
+        let (dir, db) = lab().await;
+        let nw = space(&db, NW).await;
+        let board = view_named(&db, nw, "Board").await;
+        std::fs::write(
+            dir.path().join("nav.json"),
+            serde_json::json!({
+                "location": { "listId": nw, "viewId": board },
+                "lastViews": { nw.to_string(): board },
+                "expanded": [nw],
+            })
+            .to_string(),
+        )
+        .unwrap();
+
+        let nav = NavStore::open(dir.path());
+        let current = nav.current(&db).await.unwrap();
+
+        let at = Location {
+            list_id: nw,
+            view_id: board,
+        };
+        assert_eq!(
+            current.tabs,
+            [Tab {
+                id: current.active_tab,
+                location: Some(at)
+            }]
+        );
+        assert_eq!(current.location, Some(at));
+        assert_eq!(current.expanded, [nw]);
+    }
+
+    #[tokio::test]
+    async fn the_tabs_and_the_active_one_survive_a_restart() {
+        let (dir, db) = lab().await;
+        let before = {
+            let nav = NavStore::open(dir.path());
+            three_tabs(&nav, &db).await;
+            let first = nav.current(&db).await.unwrap().tabs[0].id;
+            nav.activate_tab(&db, first).await.unwrap()
+        };
+
+        let reopened = NavStore::open(dir.path());
+
+        assert_eq!(before.tabs.len(), 3);
+        assert_eq!(reopened.current(&db).await.unwrap(), before);
+    }
+}
+
+mod opening_tabs {
+    use super::*;
+
+    #[tokio::test]
+    async fn a_level_opens_in_a_new_tab_after_the_active_one_at_its_default_view() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        let first = nav.current(&db).await.unwrap().active_tab;
+        let nw = space(&db, NW).await;
+        let nws = space(&db, NWS).await;
+        let with_nw = nav.new_tab(&db, Some(nw), None, false).await.unwrap();
+        let nw_tab = with_nw.tabs[1].id;
+
+        let current = nav.new_tab(&db, Some(nws), None, false).await.unwrap();
+
+        let nws_tab = current.tabs[1].id;
+        assert_eq!(tab_ids(&current), [first, nws_tab, nw_tab]);
+        assert_eq!(
+            tab_places(&current)[1..],
+            [
+                Some(at_default(&db, nws).await),
+                Some(at_default(&db, nw).await)
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn a_level_opens_in_a_new_tab_at_the_view_it_showed_last() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        let nw = space(&db, NW).await;
+        let board = view_named(&db, nw, "Board").await;
+        nav.go(&db, nw, Some(board)).await.unwrap();
+        nav.go(&db, everything(&db).await, None).await.unwrap();
+
+        let current = nav.new_tab(&db, Some(nw), None, false).await.unwrap();
+
+        assert_eq!(
+            current.tabs[1].location,
+            Some(Location {
+                list_id: nw,
+                view_id: board
+            })
+        );
+    }
+
+    #[tokio::test]
+    async fn a_requested_view_wins_over_the_last_one() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        let nw = space(&db, NW).await;
+        let table = view_named(&db, nw, "Table").await;
+        nav.go(&db, nw, Some(view_named(&db, nw, "Board").await))
+            .await
+            .unwrap();
+
+        let current = nav
+            .new_tab(&db, Some(nw), Some(table), false)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            current.tabs[1].location,
+            Some(Location {
+                list_id: nw,
+                view_id: table
+            })
+        );
+    }
+
+    #[tokio::test]
+    async fn without_a_level_the_new_tab_copies_the_active_place() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        let nw = space(&db, NW).await;
+        let at = nav
+            .go(&db, nw, Some(view_named(&db, nw, "Table").await))
+            .await
+            .unwrap()
+            .location;
+
+        let current = nav.new_tab(&db, None, None, false).await.unwrap();
+
+        assert_eq!(tab_places(&current), [at, at]);
+    }
+
+    #[tokio::test]
+    async fn a_background_tab_keeps_the_place_and_the_active_tab() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        let before = nav.current(&db).await.unwrap();
+
+        let current = nav
+            .new_tab(&db, Some(space(&db, NW).await), None, false)
+            .await
+            .unwrap();
+
+        assert_eq!(current.location, before.location);
+        assert_eq!(current.active_tab, before.active_tab);
+        assert_eq!(current.tabs.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn an_activated_tab_moves_the_place_and_becomes_active() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        let nw = space(&db, NW).await;
+
+        let current = nav.new_tab(&db, Some(nw), None, true).await.unwrap();
+
+        assert_eq!(current.active_tab, current.tabs[1].id);
+        assert_eq!(place(&current), at_default(&db, nw).await);
+        assert_eq!(nav.active_tab(), current.active_tab);
+    }
+
+    #[tokio::test]
+    async fn every_tab_gets_its_own_id() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        let (current, _) = three_tabs(&nav, &db).await;
+
+        let mut ids = tab_ids(&current);
+        ids.sort();
+        ids.dedup();
+
+        assert_eq!(ids.len(), 3);
+        assert_eq!(nav.tab_count(), 3);
+    }
+}
+
+mod switching_tabs {
+    use super::*;
+
+    #[tokio::test]
+    async fn activating_a_tab_shows_its_place() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        let (current, places) = three_tabs(&nav, &db).await;
+
+        let back = nav.activate_tab(&db, current.tabs[0].id).await.unwrap();
+
+        assert_eq!(back.active_tab, current.tabs[0].id);
+        assert_eq!(place(&back), places[0]);
+        assert_eq!(tab_places(&back), places.map(Some));
+    }
+
+    #[tokio::test]
+    async fn activating_an_unknown_tab_changes_nothing() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        let (current, _) = three_tabs(&nav, &db).await;
+
+        let after = nav.activate_tab(&db, 9999).await.unwrap();
+
+        assert_eq!(after, current);
+    }
+
+    #[tokio::test]
+    async fn going_somewhere_changes_only_the_active_tabs_place() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        let (current, places) = three_tabs(&nav, &db).await;
+        let nw = places[1].list_id;
+        nav.activate_tab(&db, current.tabs[1].id).await.unwrap();
+
+        let after = nav.go(&db, bookmarks(&db).await, None).await.unwrap();
+
+        let moved = at_default(&db, bookmarks(&db).await).await;
+        assert_eq!(
+            tab_places(&after),
+            [Some(places[0]), Some(moved), Some(places[2])]
+        );
+        assert_eq!(place(&after), moved);
+        assert_ne!(moved.list_id, nw);
+    }
+
+    #[tokio::test]
+    async fn activating_a_tab_at_another_place_notifies_and_clears_read_here() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        let (current, _) = three_tabs(&nav, &db).await;
+        nav.keep_read(&["a".to_string()]);
+        let count = Arc::new(AtomicUsize::new(0));
+        let seen = count.clone();
+        nav.on_move(Box::new(move || {
+            seen.fetch_add(1, Ordering::SeqCst);
+        }));
+
+        nav.activate_tab(&db, current.tabs[0].id).await.unwrap();
+
+        assert_eq!(count.load(Ordering::SeqCst), 1);
+        assert_eq!(nav.read_here_ids(), Vec::<String>::new());
+    }
+
+    #[tokio::test]
+    async fn activating_the_active_tab_does_not_notify_or_clear_read_here() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        let (current, _) = three_tabs(&nav, &db).await;
+        nav.keep_read(&["a".to_string()]);
+        let count = Arc::new(AtomicUsize::new(0));
+        let seen = count.clone();
+        nav.on_move(Box::new(move || {
+            seen.fetch_add(1, Ordering::SeqCst);
+        }));
+
+        nav.activate_tab(&db, current.active_tab).await.unwrap();
+
+        assert_eq!(count.load(Ordering::SeqCst), 0);
+        assert_eq!(nav.read_here_ids(), vec!["a".to_string()]);
+    }
+
+    #[tokio::test]
+    async fn stepping_forward_wraps_from_the_last_tab_to_the_first() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        let (current, _) = three_tabs(&nav, &db).await;
+        let ids = tab_ids(&current);
+
+        let mut visited = Vec::new();
+        for _ in 0..3 {
+            visited.push(nav.step_tab(&db, 1).await.unwrap().active_tab);
+        }
+
+        assert_eq!(visited, [ids[0], ids[1], ids[2]]);
+    }
+
+    #[tokio::test]
+    async fn stepping_backward_wraps_from_the_first_tab_to_the_last() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        let (current, _) = three_tabs(&nav, &db).await;
+        let ids = tab_ids(&current);
+        nav.activate_tab(&db, ids[0]).await.unwrap();
+
+        let mut visited = Vec::new();
+        for _ in 0..3 {
+            visited.push(nav.step_tab(&db, -1).await.unwrap().active_tab);
+        }
+
+        assert_eq!(visited, [ids[2], ids[1], ids[0]]);
+    }
+
+    #[tokio::test]
+    async fn stepping_with_one_tab_stays_put() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        let before = nav.current(&db).await.unwrap();
+
+        assert_eq!(nav.step_tab(&db, 1).await.unwrap(), before);
+        assert_eq!(nav.step_tab(&db, -1).await.unwrap(), before);
+    }
+}
+
+mod closing_tabs {
+    use super::*;
+
+    #[tokio::test]
+    async fn the_last_tab_cannot_be_closed() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        let before = nav.current(&db).await.unwrap();
+
+        let after = nav.close_tab(&db, before.active_tab).await.unwrap();
+
+        assert_eq!(after, before);
+    }
+
+    #[tokio::test]
+    async fn closing_the_active_tab_shows_its_right_neighbor() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        let (current, places) = three_tabs(&nav, &db).await;
+        let ids = tab_ids(&current);
+        nav.activate_tab(&db, ids[1]).await.unwrap();
+
+        let after = nav.close_tab(&db, ids[1]).await.unwrap();
+
+        assert_eq!(tab_ids(&after), [ids[0], ids[2]]);
+        assert_eq!(after.active_tab, ids[2]);
+        assert_eq!(place(&after), places[2]);
+    }
+
+    #[tokio::test]
+    async fn closing_the_active_last_tab_shows_its_left_neighbor() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        let (current, places) = three_tabs(&nav, &db).await;
+        let ids = tab_ids(&current);
+
+        let after = nav.close_tab(&db, ids[2]).await.unwrap();
+
+        assert_eq!(tab_ids(&after), [ids[0], ids[1]]);
+        assert_eq!(after.active_tab, ids[1]);
+        assert_eq!(place(&after), places[1]);
+    }
+
+    #[tokio::test]
+    async fn closing_a_background_tab_keeps_the_place_and_notifies_nobody() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        let (current, places) = three_tabs(&nav, &db).await;
+        let ids = tab_ids(&current);
+        let count = Arc::new(AtomicUsize::new(0));
+        let seen = count.clone();
+        nav.on_move(Box::new(move || {
+            seen.fetch_add(1, Ordering::SeqCst);
+        }));
+
+        let after = nav.close_tab(&db, ids[0]).await.unwrap();
+
+        assert_eq!(tab_ids(&after), [ids[1], ids[2]]);
+        assert_eq!(after.active_tab, ids[2]);
+        assert_eq!(place(&after), places[2]);
+        assert_eq!(count.load(Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test]
+    async fn closing_an_unknown_tab_changes_nothing() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        let (current, _) = three_tabs(&nav, &db).await;
+
+        let after = nav.close_tab(&db, 9999).await.unwrap();
+
+        assert_eq!(after, current);
+    }
+}
+
+mod reopening_tabs {
+    use super::*;
+
+    #[tokio::test]
+    async fn the_last_closed_place_comes_back_as_the_active_tab() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        let (current, places) = three_tabs(&nav, &db).await;
+        let ids = tab_ids(&current);
+        nav.close_tab(&db, ids[1]).await.unwrap();
+
+        let after = nav.reopen_tab(&db).await.unwrap();
+
+        assert_eq!(after.tabs.len(), 3);
+        assert_eq!(place(&after), places[1]);
+        assert_eq!(active_place(&after), Some(places[1]));
+        assert!(!ids.contains(&after.active_tab));
+    }
+
+    #[tokio::test]
+    async fn closed_tabs_come_back_newest_first() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        let (current, places) = three_tabs(&nav, &db).await;
+        let ids = tab_ids(&current);
+        nav.close_tab(&db, ids[1]).await.unwrap();
+        nav.close_tab(&db, ids[2]).await.unwrap();
+
+        let first = nav.reopen_tab(&db).await.unwrap();
+        let second = nav.reopen_tab(&db).await.unwrap();
+
+        assert_eq!(place(&first), places[2]);
+        assert_eq!(place(&second), places[1]);
+        assert_eq!(second.tabs.len(), 3);
+    }
+
+    #[tokio::test]
+    async fn with_nothing_closed_nothing_opens() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        let before = nav.current(&db).await.unwrap();
+
+        assert_eq!(nav.reopen_tab(&db).await.unwrap(), before);
+    }
+
+    #[tokio::test]
+    async fn only_the_last_ten_closed_tabs_are_kept() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        let nw = space(&db, NW).await;
+        let mut current = nav.current(&db).await.unwrap();
+        for _ in 0..12 {
+            current = nav.new_tab(&db, Some(nw), None, false).await.unwrap();
+        }
+        let first = current.active_tab;
+        for tab in current.tabs.iter().filter(|t| t.id != first) {
+            nav.close_tab(&db, tab.id).await.unwrap();
+        }
+        assert_eq!(nav.tab_count(), 1);
+
+        for _ in 0..15 {
+            nav.reopen_tab(&db).await.unwrap();
+        }
+
+        assert_eq!(nav.tab_count(), 11);
+    }
+
+    #[tokio::test]
+    async fn closed_tabs_survive_a_restart() {
+        let (dir, db) = lab().await;
+        {
+            let nav = NavStore::open(dir.path());
+            let (current, _) = three_tabs(&nav, &db).await;
+            nav.close_tab(&db, current.tabs[1].id).await.unwrap();
+        }
+
+        let reopened = NavStore::open(dir.path());
+        let after = reopened.reopen_tab(&db).await.unwrap();
+
+        assert_eq!(place(&after), at_default(&db, space(&db, NW).await).await);
+    }
+}
+
+mod moving_tabs {
+    use super::*;
+
+    #[tokio::test]
+    async fn a_tab_moves_before_another_one() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        let (current, places) = three_tabs(&nav, &db).await;
+        let ids = tab_ids(&current);
+
+        let after = nav.move_tab(&db, ids[2], Some(ids[0])).await.unwrap();
+
+        assert_eq!(tab_ids(&after), [ids[2], ids[0], ids[1]]);
+        assert_eq!(after.active_tab, ids[2]);
+        assert_eq!(place(&after), places[2]);
+    }
+
+    #[tokio::test]
+    async fn a_tab_moves_to_the_end_without_a_target() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        let (current, _) = three_tabs(&nav, &db).await;
+        let ids = tab_ids(&current);
+
+        let after = nav.move_tab(&db, ids[0], None).await.unwrap();
+
+        assert_eq!(tab_ids(&after), [ids[1], ids[2], ids[0]]);
+    }
+
+    #[tokio::test]
+    async fn moving_an_unknown_tab_changes_nothing() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        let (current, _) = three_tabs(&nav, &db).await;
+
+        let after = nav.move_tab(&db, 9999, None).await.unwrap();
+
+        assert_eq!(after, current);
+    }
+}
+
+mod vanished_tab_places {
+    use super::*;
+
+    #[tokio::test]
+    async fn a_background_tab_whose_list_was_deleted_shows_everything() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        let epics = epics(&db).await;
+        nav.new_tab(&db, Some(epics), None, false).await.unwrap();
+
+        list_delete(&db, epics).await.unwrap();
+
+        let current = nav.current(&db).await.unwrap();
+        let everything = at_default(&db, everything(&db).await).await;
+        assert_eq!(tab_places(&current), [Some(everything), Some(everything)]);
+    }
+
+    #[tokio::test]
+    async fn a_background_tab_whose_view_was_deleted_shows_the_levels_default() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        let nw = space(&db, NW).await;
+        let board = view_named(&db, nw, "Board").await;
+        nav.new_tab(&db, Some(nw), Some(board), false)
+            .await
+            .unwrap();
+
+        view_delete(&db, board).await.unwrap();
+
+        let current = nav.current(&db).await.unwrap();
+        assert_eq!(current.tabs[1].location, Some(at_default(&db, nw).await));
     }
 }

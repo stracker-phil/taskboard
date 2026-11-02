@@ -54,10 +54,10 @@ pub fn register(bus: &mut Bus) {
             .run(|app| async move { crate::diagnostics::export_sent_changes(app).await }),
     );
     bus.add(
-        Command::new("window:close", "Close Window")
-            .help("Hide the focused window")
+        Command::new("window:close", "Close Tab or Window")
+            .help("Close the tab, or hide the window with one tab or none")
             .hidden()
-            .run_now(window::close_focused),
+            .run_now(crate::nav::commands::close_tab_or_window),
     );
     bus.add(
         Command::new("app:show", "Show Taskboard")

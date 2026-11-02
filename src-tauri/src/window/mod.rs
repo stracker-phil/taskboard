@@ -82,6 +82,11 @@ fn focused_window(app: &AppHandle) -> Option<WebviewWindow> {
         .find(|window| window.is_focused().unwrap_or(false))
 }
 
+/// The label of the window in front, if any.
+pub fn focused_label(app: &AppHandle) -> Option<String> {
+    focused_window(app).map(|window| window.label().to_string())
+}
+
 /// ⌘W: hides the window in front.
 pub fn close_focused(app: &AppHandle) {
     if let Some(window) = focused_window(app) {

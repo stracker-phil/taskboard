@@ -88,6 +88,36 @@ describe("clearDrafts", () => {
   });
 });
 
+describe("keepNarrowings", () => {
+  it("keeps the narrowings of every view it is given and drops the rest", () => {
+    useStore.getState().setNarrowing(KEY, { me: true, text: "login" });
+    useStore.getState().setNarrowing(OTHER, { view: [HIGH] });
+    useStore.getState().setNarrowing("12:201", { text: "pricing" });
+
+    useStore.getState().keepNarrowings([KEY, OTHER]);
+
+    expect(Object.keys(narrowings()).sort()).toEqual([KEY, OTHER]);
+    expect(narrowings()[KEY]).toEqual({ ...NO_VIEW_NARROWING, me: true, text: "login" });
+    expect(narrowings()[OTHER]).toEqual({ ...NO_VIEW_NARROWING, view: [HIGH] });
+  });
+
+  it("drops everything for no views", () => {
+    useStore.getState().setNarrowing(KEY, { me: true });
+
+    useStore.getState().keepNarrowings([]);
+
+    expect(narrowings()).toEqual({});
+  });
+
+  it("ignores views that have no narrowing", () => {
+    useStore.getState().setNarrowing(KEY, { me: true });
+
+    useStore.getState().keepNarrowings([KEY, "99:1"]);
+
+    expect(narrowings()).toEqual({ [KEY]: { ...NO_VIEW_NARROWING, me: true } });
+  });
+});
+
 describe("keepOnlyNarrowing", () => {
   it("drops the text, epic and drafts of every other view", () => {
     useStore.getState().setNarrowing(OTHER, { me: true, text: "login", epic: "10001", list: [HIGH] });

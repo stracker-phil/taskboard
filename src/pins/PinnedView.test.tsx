@@ -9,6 +9,7 @@ import { api } from "../api";
 import { MenuHost } from "../components/menu";
 import { createQueryClient } from "../queries/queryClient";
 import { resetStore, useStore } from "../state/store";
+import { nav } from "../test/nav";
 import { commentTarget, issueTarget, listTarget, pinItem, pins, viewTarget } from "../test/pins";
 import { PinnedView } from "./PinnedView";
 
@@ -34,7 +35,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
   mocked.pinsList.mockResolvedValue(pins());
-  mocked.navCurrent.mockResolvedValue({ location: { listId: 3, viewId: 0 }, expanded: [] });
+  mocked.navCurrent.mockResolvedValue(nav({ listId: 3, viewId: 0 }));
 });
 
 describe("PinnedView", () => {

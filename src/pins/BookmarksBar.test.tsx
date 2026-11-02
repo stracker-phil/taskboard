@@ -9,6 +9,7 @@ import { api, type PinItem } from "../api";
 import { MenuHost } from "../components/menu";
 import { createQueryClient } from "../queries/queryClient";
 import { resetStore, useStore } from "../state/store";
+import { nav } from "../test/nav";
 import { commentTarget, listTarget, pinItem, pins, viewTarget } from "../test/pins";
 import { sidebarTree } from "../test/spaces";
 import { listNode } from "../test/views";
@@ -43,7 +44,7 @@ const choose = (name: RegExp | string) => userEvent.click(within(screen.getByRol
 beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
-  mocked.navCurrent.mockResolvedValue({ location: { listId: 11, viewId: 101 }, expanded: [] });
+  mocked.navCurrent.mockResolvedValue(nav({ listId: 11, viewId: 101 }));
   mocked.sidebarTree.mockResolvedValue({ ...sidebarTree([]), home: [listNode({ id: 3, kind: "pinned", name: "Bookmarks", count: null })] });
 });
 
@@ -97,6 +98,58 @@ describe("BookmarksBar", () => {
       await userEvent.click(bookmark("Sprint board"));
 
       expect(mocked.navGo).toHaveBeenCalledWith(21, 7);
+    });
+  });
+
+  describe("opening in a tab", () => {
+    it.each([
+      ["a list", "My open issues", 21, null],
+      ["a view", "Sprint board", 21, 7],
+    ])("opens %s in a tab behind the shown one on ⌘-click, leaving the place alone", async (_kind, name, listId, viewId) => {
+      await renderBar();
+
+      fireEvent.click(bookmark(name), { metaKey: true });
+
+      expect(mocked.navTabNew).toHaveBeenCalledWith(listId, viewId, false);
+      expect(mocked.navGo).not.toHaveBeenCalled();
+    });
+
+    it("opens a view in a tab and shows it on ⌘⇧-click", async () => {
+      await renderBar();
+
+      fireEvent.click(bookmark("Sprint board"), { metaKey: true, shiftKey: true });
+
+      expect(mocked.navTabNew).toHaveBeenCalledWith(21, 7, true);
+    });
+
+    it("still opens an issue over the view on ⌘-click", async () => {
+      await renderBar();
+
+      await waitFor(() => {
+        fireEvent.click(bookmark("Redesign the pricing page"), { metaKey: true });
+        expect(useStore.getState().issueView).toEqual({ origin: { listId: 11, viewId: 101 }, stack: ["10042"] });
+      });
+      expect(mocked.navTabNew).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["a list", "My open issues", 21, null],
+      ["a view", "Sprint board", 21, 7],
+    ])("opens %s in a tab and shows it from the context menu", async (_kind, name, listId, viewId) => {
+      await renderBar();
+      await rightClick(bookmark(name));
+
+      await choose("Open in New Tab");
+
+      expect(mocked.navTabNew).toHaveBeenCalledWith(listId, viewId, true);
+    });
+
+    it("offers no Open in New Tab on an issue bookmark", async () => {
+      await renderBar();
+
+      await rightClick(bookmark("Redesign the pricing page"));
+
+      expect(within(screen.getByRole("menu")).queryByRole("menuitem", { name: "Open in New Tab" })).not.toBeInTheDocument();
     });
   });
 

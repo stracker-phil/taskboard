@@ -5,11 +5,12 @@ import { InlineRename } from "../components/InlineRename";
 import { StatusSquare } from "../components/issue/StatusSquare";
 import { openContextMenu, openMenu, type MenuEntry } from "../components/menu";
 import { usePins } from "../queries/pins";
-import { useSidebar, useNavGo } from "../queries/sidebar";
+import { useSidebar, useNavGo, useTabs } from "../queries/sidebar";
 import { useDragReorder } from "../shell/Sidebar/useDragReorder";
 import { LayoutTile } from "../shell/viewLayouts";
 import { attempt } from "../state/requests";
-import { pinName, useOpenPin } from "./openPin";
+import { pinName, pinPlace, useOpenPin } from "./openPin";
+import { useOpenInTab } from "../shell/openInTab";
 import { fitCount } from "./fitCount";
 
 const GAP = 2;
@@ -21,6 +22,8 @@ export function BookmarksBar() {
   const { data: tree } = useSidebar();
   const go = useNavGo();
   const open = useOpenPin();
+  const tabs = useTabs();
+  const openInTab = useOpenInTab();
   const pins = data?.active ?? [];
   const [renaming, setRenaming] = useState<number | null>(null);
   const { shown, rowRef, measure } = useBarFit(pins.map((pin) => pin.id));
@@ -35,10 +38,15 @@ export function BookmarksBar() {
     rowRef.current = element;
   };
 
+  const openPlaceInTab = (pin: PinItem) => {
+    const at = pinPlace(pin);
+    if (at) void tabs.open(at.listId, at.viewId, true);
+  };
   const toSidebar = () => void attempt(api.modeSet("bookmarksBar", false), "Could not move the bookmarks");
   const rename = (pin: PinItem, title: string | null) => void attempt(api.pinRename(pin.id, title), "Could not rename the bookmark");
   const pinEntries = (pin: PinItem): MenuEntry[] => [
     { text: "Open", run: () => open(pin) },
+    ...(pinPlace(pin) ? [{ text: "Open in New Tab", run: () => openPlaceInTab(pin) }] : []),
     { text: "Rename Bookmark…", run: () => setRenaming(pin.id) },
     ...(pin.title ? [{ text: "Use Original Name", hint: pinName({ ...pin, title: null }), run: () => rename(pin, null) }] : []),
     { text: "Remove Bookmark", run: () => void attempt(api.pinRemove(pin.id), "Could not remove the bookmark") },
@@ -79,7 +87,10 @@ export function BookmarksBar() {
               hidden={hidden}
               title={pin.title ? pinName({ ...pin, title: null }) : (pin.reason ?? undefined)}
               {...(hidden ? {} : pin.id === renaming ? item(index) : { ...item(index), ...handle(index) })}
-              onClick={() => open(pin)}
+              onClick={(e) => {
+                const at = pinPlace(pin);
+                if (!at || !openInTab(e, at.listId, at.viewId)) open(pin);
+              }}
               onContextMenu={(e) => openContextMenu(e, pinEntries(pin), pinName(pin))}
             >
               <PinIcon pin={pin} />

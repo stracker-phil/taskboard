@@ -27,6 +27,8 @@ export interface NarrowingSlice {
   clearDrafts: (key: string) => void;
   /** Drops every other view's narrowing and drafts: the window left them. */
   keepOnlyNarrowing: (key: string) => void;
+  /** Keeps the narrowings and drafts of the views the open tabs show; the rest were left. */
+  keepNarrowings: (keys: string[]) => void;
   /** Bumped to open the toolbar's Filter popover from elsewhere (an empty list's Edit filter). */
   filterRequests: number;
   requestFilter: () => void;
@@ -37,7 +39,7 @@ export const NO_VIEW_NARROWING: ViewNarrowing = { text: "", epic: null, me: null
 export const narrowingKey = (listId: number, viewId: number) => `${listId}:${viewId}`;
 
 export const narrowingSlice: Slice<NarrowingSlice> = {
-  create: (set) => ({
+  create: (set, get) => ({
     narrowings: {},
     setNarrowing: (key, patch) =>
       set((s) => ({ narrowings: { ...s.narrowings, [key]: { ...(s.narrowings[key] ?? NO_VIEW_NARROWING), ...patch } } })),
@@ -47,12 +49,11 @@ export const narrowingSlice: Slice<NarrowingSlice> = {
         if (!current) return s;
         return { narrowings: { ...s.narrowings, [key]: { ...current, me: null, person: undefined, list: null, view: null } } };
       }),
-    keepOnlyNarrowing: (key) =>
+    keepOnlyNarrowing: (key) => get().keepNarrowings([key]),
+    keepNarrowings: (keys) =>
       set((s) => {
-        const others = Object.keys(s.narrowings).filter((k) => k !== key);
-        if (others.length === 0) return s;
-        const kept = s.narrowings[key];
-        return { narrowings: kept ? { [key]: kept } : {} };
+        if (Object.keys(s.narrowings).every((k) => keys.includes(k))) return s;
+        return { narrowings: Object.fromEntries(Object.entries(s.narrowings).filter(([k]) => keys.includes(k))) };
       }),
     filterRequests: 0,
     requestFilter: () => set((s) => ({ filterRequests: s.filterRequests + 1 })),

@@ -612,7 +612,11 @@ location: Location | null,
 /**
  * Space nodes the owner expanded; the active Space shows expanded regardless.
  */
-expanded: Array<number>, };
+expanded: Array<number>, 
+/**
+ * The open tabs in strip order, at least one; the active one is at `location`.
+ */
+tabs: Array<Tab>, activeTab: number, };
 
 /**
  * What macOS notifications announce after a change sync (`notify/`).
@@ -925,6 +929,15 @@ keepHistoryDays: number,
 clearCacheOnQuit: boolean, };
 
 export type SyncState = { "state": "idle", lastOk: string | null, } | { "state": "running", job: Job, } | { "state": "error", kind: ErrorKind, message: string, since: string, retryAt: string, lastOk: string | null, } | { "state": "offline", since: string, retryAt: string, lastOk: string | null, } | { "state": "paused", message: string, };
+
+/**
+ * A tab as the page draws it.
+ */
+export type Tab = { id: number, 
+/**
+ * None only while no level exists.
+ */
+location: Location | null, };
 
 export type TeamCell = { active: boolean, 
 /**

@@ -230,6 +230,43 @@ describe("ViewTabs", () => {
     });
   });
 
+  describe("⌘-click", () => {
+    it("opens the view in a tab behind the shown one, leaving the place alone", async () => {
+      await renderTabs();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Sprint board" }), { metaKey: true });
+
+      expect(mocked.navTabNew).toHaveBeenCalledWith(11, 102, false);
+      expect(mocked.navGo).not.toHaveBeenCalled();
+    });
+
+    it("opens the view in a tab and shows it with ⇧", async () => {
+      await renderTabs();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Sprint board" }), { metaKey: true, shiftKey: true });
+
+      expect(mocked.navTabNew).toHaveBeenCalledWith(11, 102, true);
+      expect(mocked.navGo).not.toHaveBeenCalled();
+    });
+
+    it("does not rename the selected view", async () => {
+      await renderTabs();
+
+      fireEvent.click(screen.getByRole("tab", { name: "List" }), { metaKey: true });
+
+      expect(mocked.navTabNew).toHaveBeenCalledWith(11, 101, false);
+      expect(screen.queryByRole("textbox", { name: "View name" })).not.toBeInTheDocument();
+    });
+
+    it("does not rename a view on a double click", async () => {
+      await renderTabs();
+
+      fireEvent.doubleClick(screen.getByRole("tab", { name: "Sprint board" }), { metaKey: true });
+
+      expect(screen.queryByRole("textbox", { name: "View name" })).not.toBeInTheDocument();
+    });
+  });
+
   describe("double-click", () => {
     it("shows the inline rename field and saves the new name", async () => {
       mocked.viewRename.mockResolvedValue({ ...BOARD, name: "Release board" });
@@ -427,8 +464,18 @@ describe("ViewTabs", () => {
       await rightClick("Sprint board");
 
       const menu = within(screen.getByRole("menu", { name: "Sprint board" }));
-      expect(menu.getAllByRole("menuitem").map((r) => r.textContent)).toEqual(["Rename", "Icon and Color…", "Duplicate", "Bookmark View", "Copy Taskboard Link", "Delete"]);
+      expect(menu.getAllByRole("menuitem").map((r) => r.textContent)).toEqual(["Open in New Tab", "Rename", "Icon and Color…", "Duplicate", "Bookmark View", "Copy Taskboard Link", "Delete"]);
       expect(menu.getByRole("group", { name: "Layout" })).toBeInTheDocument();
+    });
+
+    it("opens the view in a new tab and shows it", async () => {
+      await renderTabs();
+      await rightClick("Sprint board");
+
+      await choose("Open in New Tab");
+
+      expect(mocked.navTabNew).toHaveBeenCalledWith(11, 102, true);
+      expect(mocked.navGo).not.toHaveBeenCalled();
     });
 
     describe("bookmarking", () => {

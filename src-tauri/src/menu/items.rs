@@ -35,7 +35,7 @@ pub const FILE_SYNC: &[Item] = &[
 ];
 /// Opens Settings at the Cache group, which asks before it empties the cache.
 pub const RESET_CACHE: Item = plain("Reset Cache…", "app:settings:cache");
-pub const CLOSE: Item = item("Close Window", "window:close", "CmdOrCtrl+W");
+pub const CLOSE: Item = item("Close Tab or Window", "window:close", "CmdOrCtrl+W");
 pub const PALETTE: Item = item("Command Palette…", "page:palette.open", "CmdOrCtrl+K");
 pub const GO_LEVELS: &[Item] = &[
     PALETTE,
@@ -53,6 +53,17 @@ pub const GO_MOVES: &[Item] = &[
     item("Next List", "nav:nextList", "CmdOrCtrl+Alt+BracketRight"),
     item("Previous View", "page:view.previous", "Ctrl+Shift+Tab"),
     item("Next View", "page:view.next", "Ctrl+Tab"),
+];
+/// The main window's tabs (ADR 0050); ⌘W closes one (File → Close Window).
+pub const GO_TABS: &[Item] = &[
+    item("New Tab", "nav:newTab", "CmdOrCtrl+Shift+T"),
+    item(
+        "Previous Tab",
+        "nav:previousTab",
+        "CmdOrCtrl+Shift+BracketLeft",
+    ),
+    item("Next Tab", "nav:nextTab", "CmdOrCtrl+Shift+BracketRight"),
+    item("Reopen Closed Tab", "nav:reopenTab", "CmdOrCtrl+Alt+T"),
 ];
 pub const LIST_LAYOUTS: &[Item] = &[
     item("Show as List", "page:view.layout.list", "CmdOrCtrl+Ctrl+1"),
@@ -128,7 +139,7 @@ pub type MenuDef = (&'static str, &'static [&'static [Item]]);
 
 pub const APP_MENU: MenuDef = (crate::APP_NAME, &[&[SETTINGS], &[QUIT]]);
 pub const FILE_MENU: MenuDef = ("File", &[FILE, FILE_SYNC, &[RESET_CACHE], &[CLOSE]]);
-pub const GO_MENU: MenuDef = ("Go", &[GO_LEVELS, GO_MOVES]);
+pub const GO_MENU: MenuDef = ("Go", &[GO_LEVELS, GO_MOVES, GO_TABS]);
 /// The layouts come last: changing a view's layout is rare.
 pub const LIST_MENU: MenuDef = ("List", &[LIST_TOOLBAR, LIST_SEEN, LIST_LAYOUTS]);
 pub const ISSUE_MENU: MenuDef = ("Issue", &[ISSUE]);
@@ -171,6 +182,7 @@ mod tests {
             FILE_SYNC,
             GO_LEVELS,
             GO_MOVES,
+            GO_TABS,
             LIST_LAYOUTS,
             LIST_TOOLBAR,
             LIST_SEEN,
@@ -384,8 +396,46 @@ mod tests {
                 ("Full Sync", "sync:full", Some("CmdOrCtrl+Shift+R")),
             ]
         );
-        assert_eq!(CLOSE.label, "Close Window");
+        assert_eq!(CLOSE.label, "Close Tab or Window");
         assert_eq!(CLOSE.command, "window:close");
+    }
+
+    #[test]
+    fn the_go_menu_holds_the_tab_commands_after_the_moves() {
+        let tabs: Vec<(&str, &str, Option<&str>)> = GO_TABS
+            .iter()
+            .map(|item| (item.label, item.command, item.accelerator))
+            .collect();
+        assert_eq!(
+            tabs,
+            [
+                ("New Tab", "nav:newTab", Some("CmdOrCtrl+Shift+T")),
+                (
+                    "Previous Tab",
+                    "nav:previousTab",
+                    Some("CmdOrCtrl+Shift+BracketLeft")
+                ),
+                (
+                    "Next Tab",
+                    "nav:nextTab",
+                    Some("CmdOrCtrl+Shift+BracketRight")
+                ),
+                (
+                    "Reopen Closed Tab",
+                    "nav:reopenTab",
+                    Some("CmdOrCtrl+Alt+T")
+                ),
+            ]
+        );
+        let groups: Vec<&str> = GO_MENU.1.iter().map(|g| g[0].command).collect();
+        assert_eq!(
+            groups,
+            [
+                GO_LEVELS[0].command,
+                GO_MOVES[0].command,
+                GO_TABS[0].command
+            ]
+        );
     }
 
     #[test]

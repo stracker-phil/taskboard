@@ -150,7 +150,7 @@ src-tauri/
   src/me_mode/               which issues are mine in Me mode: the assignee plus the owner's rules (ADR 0045)
   src/team/                  who is on which Space's team: its assignees by default, the owner's choices on top
   src/avatars/               people's profile pictures: freshness, the `cache.avatar` rows, `user_avatar` (data URLs)
-  src/nav/                   where the main window is (level and view, nav.json); previous/next Space
+  src/nav/                   where the main window is (level and view, its tabs, nav.json); previous/next Space
   src/<feature>/             one folder per feature: types, pure logic, commands.rs, tests
   src/window/ menu/          the main and Settings windows, the native app menu (menu/items.rs: the items and
                              menus; build.rs: the menu bar; palette.rs: its items for the palette)

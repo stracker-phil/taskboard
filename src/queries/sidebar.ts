@@ -61,3 +61,26 @@ export function useSetExpanded() {
     [client],
   );
 }
+
+/** The tab actions; each takes Rust's new place and tabs into the cache. */
+export function useTabs() {
+  const client = useQueryClient();
+  const take = useCallback(
+    (call: Promise<Nav>, failure: string) =>
+      call.then(
+        (nav) => void client.setQueryData<Nav>(NAV_KEY, nav),
+        (e: unknown) => void fail(e, failure),
+      ),
+    [client],
+  );
+  return {
+    /** A new tab at the level (and view, else its last one); `activate` shows it, else it waits in the strip. */
+    open: useCallback(
+      (listId: number, viewId: number | null, activate: boolean) => take(api.navTabNew(listId, viewId, activate), "Could not open a tab"),
+      [take],
+    ),
+    activate: useCallback((id: number) => take(api.navTabActivate(id), "Could not show the tab"), [take]),
+    close: useCallback((id: number) => take(api.navTabClose(id), "Could not close the tab"), [take]),
+    move: useCallback((id: number, before: number | null) => take(api.navTabMove(id, before), "Could not move the tab"), [take]),
+  };
+}
