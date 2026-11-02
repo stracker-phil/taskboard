@@ -2,10 +2,13 @@
 //! remembers its last view; the tabs and their places come back at launch.
 
 pub mod commands;
+mod history;
 mod tabs;
 
+pub use history::Direction;
+use history::Step;
 pub use tabs::Tab;
-use tabs::{SavedTab, normalize};
+use tabs::{SavedTab, active_tab_mut, normalize};
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -42,6 +45,11 @@ pub struct Nav {
     /// The open tabs in strip order, at least one; the active one is at `location`.
     pub tabs: Vec<Tab>,
     pub active_tab: u32,
+    /// The issue the active tab's Issue view shows, as the page last reported it; Back and Forward set it.
+    pub issue: Option<String>,
+    /// The active tab has somewhere to go back or forward to.
+    pub can_back: bool,
+    pub can_forward: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
@@ -98,6 +106,14 @@ impl NavStore {
         normalize(&mut saved);
         let expanded = saved.expanded.clone();
         let active_tab = saved.active_tab;
+        let (issue, can_back, can_forward) =
+            active_tab_mut(&mut saved).map_or((None, false, false), |tab| {
+                (
+                    tab.issue.clone(),
+                    tab.history.can(Direction::Back),
+                    tab.history.can(Direction::Forward),
+                )
+            });
         let (location, tabs) = db
             .read(move |conn| {
                 let place = |at: Option<Location>| -> AppResult<Option<Location>> {
@@ -135,13 +151,29 @@ impl NavStore {
             expanded,
             tabs,
             active_tab,
+            issue,
+            can_back,
+            can_forward,
         })
     }
 
-    /// Opens `list_id` at `view_id`, or at the view it showed last, or its default view.
+    /// Opens `list_id` at `view_id`, or at the view it showed last, or its default view. A new place is a step
+    /// Back returns from.
     pub async fn go(&self, db: &Db, list_id: i64, view_id: Option<i64>) -> AppResult<Nav> {
+        self.show(db, list_id, view_id, true).await
+    }
+
+    /// `go`; `step` notes the place left in the active tab's history and closes its issue.
+    async fn show(
+        &self,
+        db: &Db,
+        list_id: i64,
+        view_id: Option<i64>,
+        step: bool,
+    ) -> AppResult<Nav> {
         let saved = self.store.read(Saved::clone);
         let before = saved.location;
+        let left = if step { self.here(db).await? } else { None };
         let found = db
             .read(move |conn| {
                 node(conn, list_id)?;
@@ -154,6 +186,20 @@ impl NavStore {
             }
             self.store
                 .update_async(move |s| {
+                    normalize(s);
+                    if step
+                        && left != Some(at)
+                        && let Some(tab) = active_tab_mut(s)
+                    {
+                        if let Some(from) = left {
+                            let issue = tab.issue.take();
+                            tab.history.left(Step {
+                                location: from,
+                                issue,
+                            });
+                        }
+                        tab.issue = None;
+                    }
                     s.location = Some(at);
                     s.last_views.insert(at.list_id.to_string(), at.view_id);
                     normalize(s);
@@ -164,6 +210,86 @@ impl NavStore {
             }
         }
         self.current(db).await
+    }
+
+    /// The page shows `issue` in the active tab's Issue view, or none: another issue is a step Back returns from.
+    pub async fn set_issue(&self, db: &Db, issue: Option<String>) -> AppResult<Nav> {
+        let location = self.here(db).await?;
+        self.store
+            .update_async(move |s| {
+                normalize(s);
+                let Some(tab) = active_tab_mut(s) else {
+                    return;
+                };
+                if tab.issue == issue {
+                    return;
+                }
+                if let Some(location) = location {
+                    let from = Step {
+                        location,
+                        issue: tab.issue.take(),
+                    };
+                    tab.history.left(from);
+                }
+                tab.issue = issue;
+            })
+            .await?;
+        self.current(db).await
+    }
+
+    /// The place shown: the saved one, or where a fresh store starts before it saved one.
+    async fn here(&self, db: &Db) -> AppResult<Option<Location>> {
+        match self.store.read(|s| s.location) {
+            Some(at) => Ok(Some(at)),
+            None => Ok(self.current(db).await?.location),
+        }
+    }
+
+    /// Goes back or forward in the active tab's history, past steps whose level is gone. `Nav::issue` is the issue
+    /// to show there.
+    pub async fn travel(&self, db: &Db, direction: Direction) -> AppResult<Nav> {
+        loop {
+            let next = self
+                .store
+                .update_async(move |s| {
+                    normalize(s);
+                    active_tab_mut(s).and_then(|tab| tab.history.take(direction))
+                })
+                .await?;
+            let Some(next) = next else {
+                return self.current(db).await;
+            };
+            let saved = self.store.read(Saved::clone);
+            let before = saved.location;
+            let (list_id, view_id) = (next.location.list_id, next.location.view_id);
+            let found = db
+                .read(move |conn| resolve(conn, &saved, list_id, Some(view_id)))
+                .await?;
+            let Some(at) = found else {
+                continue;
+            };
+            self.store
+                .update_async(move |s| {
+                    normalize(s);
+                    let location = s.location;
+                    if let Some(tab) = active_tab_mut(s) {
+                        if let Some(location) = location {
+                            let issue = tab.issue.take();
+                            tab.history.arrived(direction, Step { location, issue });
+                        }
+                        tab.issue = next.issue;
+                    }
+                    s.location = Some(at);
+                    s.last_views.insert(at.list_id.to_string(), at.view_id);
+                    normalize(s);
+                })
+                .await?;
+            if before != Some(at) {
+                self.read_here().clear();
+                self.moved();
+            }
+            return self.current(db).await;
+        }
     }
 
     /// The next (`step` 1) or previous (-1) tracked Space, wrapping around; from a level outside the Spaces,

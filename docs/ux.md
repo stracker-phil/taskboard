@@ -76,7 +76,12 @@ The owner's rule (2026-10-30), for every control, list and popover:
   (behind; ⌘⇧ shows it) or Issue → Open in New Tab ⌘⇧↩ (shown); the double-click's ⌘-clicks leave the picks as
   they were. Such a tab is named by the issue's key and title. ⌘⇧1–⌘⇧9 show the first to ninth tab.
 - **Sidebar** ([below](#sidebar)): ⌘\ or the sidebar toggle hides it; the panel then takes the full width under
-  a 34px title strip that keeps the traffic lights off it and holds the first bar (84px in). The state is kept in `ui_state.json`.
+  a 34px title strip that keeps the traffic lights off it and holds the first bar, 20px after Back and Forward. The state is kept in `ui_state.json`.
+- **Back and Forward** (`src/shell/NavArrows.tsx`, [ADR 0052](adr/0052-back-and-forward-live-in-each-tabs-nav.md)):
+  two 26px arrow buttons (16/1.8, `--text-tertiary`, `--fill-hover` under the pointer, 35% while there is nowhere
+  to go) that the frame draws 20px right of the traffic lights and level with them, in every layout: over the
+  sidebar's top, or in the title strip ahead of the tabs or the bookmarks bar. They walk the active tab's places and
+  issues (⌘[ and ⌘], Go → Back and Forward); a step back to an issue opens it in the Issue view again.
 - **Sidebar toggle** (`src/shell/SidebarToggle.tsx`): a 34px button (panel icon 17/1.8, styled like Settings)
   that the frame, not the sidebar, draws 12px from the window's left and bottom edges, so it never moves. With
   the sidebar shown it is the footer's first item; hidden, it floats over the panel's lower-left corner on
@@ -882,7 +887,7 @@ global shortcuts.
 - **Menus** (`src-tauri/src/menu/`), in the Mac order: Taskboard, File, Edit, Go, List, Issue, View, Window, Help.
   File holds the core actions (New Filter List ⌘N, New View ⌘T; Refresh ⌘R, Full Sync ⇧⌘R; Reset Cache…,
   which opens Settings → Sync → Cache to confirm; Close Window ⌘W). Go moves around (Command Palette ⌘K,
-  Everything ⇧⌘E, Recently Viewed ⌘Y, Bookmarks ⇧⌘P, Previous/Next Space ⌥⌘↑/↓, Previous/Next List ⌥⌘[/] (within the
+  Everything ⇧⌘E, Recently Viewed ⌘Y, Bookmarks ⇧⌘P, Back ⌘[, Forward ⌘], Previous/Next Space ⌥⌘↑/↓, Previous/Next List ⌥⌘[/] (within the
   Space, or among the levels outside the Spaces, wrapping), Previous/Next View ⌃⇧⇥/⌃⇥, then the level's views by
   name with ⌘1–⌘9, the shown one checked). List acts on the shown issues (Group and Sort… ⌥⌘G, Columns… ⌥⌘C, Edit
   Filter… ⌥⌘F, Only My Issues ⇧⌘M, Me Mode Options…, Unread Only ⇧⌘U, Filter This View ⌘F, Save View ⌘S, Revert View; Mark All as Read ⇧⌘A; last, as

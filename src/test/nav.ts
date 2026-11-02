@@ -11,10 +11,22 @@ export const nav = (location: Place, patch: Partial<Nav> = {}): Nav => ({
   expanded: [],
   tabs: [{ id: 1, location }],
   activeTab: 1,
+  issue: null,
+  canBack: false,
+  canForward: false,
   ...patch,
 });
 
 /** The nav of a window with these tabs, `activeTab` showing; its location is the active tab's. */
 export function tabbedNav(tabs: Tab[], activeTab: number, patch: Partial<Nav> = {}): Nav {
-  return { location: tabs.find((t) => t.id === activeTab)?.location ?? null, expanded: [], tabs, activeTab, ...patch };
+  return {
+    location: tabs.find((t) => t.id === activeTab)?.location ?? null,
+    expanded: [],
+    tabs,
+    activeTab,
+    issue: null,
+    canBack: false,
+    canForward: false,
+    ...patch,
+  };
 }

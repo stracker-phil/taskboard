@@ -11,7 +11,7 @@ use taskboard_lib::connection::track_project;
 use taskboard_lib::db::Db;
 use taskboard_lib::error::ErrorKind;
 use taskboard_lib::lists::{Viewer, list_create, list_delete, space_move};
-use taskboard_lib::nav::{Location, Nav, NavStore, Tab};
+use taskboard_lib::nav::{Direction, Location, Nav, NavStore, Tab};
 use taskboard_lib::test_support::temp_config_dir;
 use taskboard_lib::views::{View, view_delete, views_of};
 
@@ -151,6 +151,9 @@ mod the_starting_place {
                 "expanded": [7],
                 "tabs": [{ "id": current.active_tab, "location": at }],
                 "activeTab": current.active_tab,
+                "issue": null,
+                "canBack": false,
+                "canForward": false,
             })
         );
     }
@@ -1419,5 +1422,414 @@ mod vanished_tab_places {
 
         let current = nav.current(&db).await.unwrap();
         assert_eq!(current.tabs[1].location, Some(at_default(&db, nw).await));
+    }
+}
+
+mod back_and_forward {
+    use super::*;
+
+    fn key(issue: &str) -> Option<String> {
+        Some(issue.to_string())
+    }
+
+    async fn back(nav: &NavStore, db: &Db) -> Nav {
+        nav.travel(db, Direction::Back).await.unwrap()
+    }
+
+    async fn forward(nav: &NavStore, db: &Db) -> Nav {
+        nav.travel(db, Direction::Forward).await.unwrap()
+    }
+
+    fn counted(nav: &NavStore) -> Arc<AtomicUsize> {
+        let count = Arc::new(AtomicUsize::new(0));
+        let seen = count.clone();
+        nav.on_move(Box::new(move || {
+            seen.fetch_add(1, Ordering::SeqCst);
+        }));
+        count
+    }
+
+    #[tokio::test]
+    async fn a_fresh_store_has_nowhere_to_go_and_travelling_changes_nothing() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        let before = nav.current(&db).await.unwrap();
+
+        assert!(!before.can_back && !before.can_forward);
+        assert_eq!(before.issue, None);
+        assert_eq!(back(&nav, &db).await, before);
+        assert_eq!(forward(&nav, &db).await, before);
+    }
+
+    #[tokio::test]
+    async fn back_returns_to_the_place_left_and_forward_returns_again() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        let start = at_default(&db, everything(&db).await).await;
+        let nw = at_default(&db, space(&db, NW).await).await;
+        let nws = at_default(&db, space(&db, NWS).await).await;
+        nav.go(&db, nw.list_id, None).await.unwrap();
+        nav.go(&db, nws.list_id, None).await.unwrap();
+
+        let places = [
+            place(&back(&nav, &db).await),
+            place(&back(&nav, &db).await),
+            place(&forward(&nav, &db).await),
+            place(&forward(&nav, &db).await),
+        ];
+
+        assert_eq!(places, [nw, start, nw, nws]);
+    }
+
+    #[tokio::test]
+    async fn another_view_of_the_same_level_is_a_step() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        let nw = space(&db, NW).await;
+        let board = view_named(&db, nw, "Board").await;
+        nav.go(&db, nw, None).await.unwrap();
+        nav.go(&db, nw, Some(board)).await.unwrap();
+
+        let after = back(&nav, &db).await;
+
+        assert_eq!(place(&after), at_default(&db, nw).await);
+        assert_eq!(
+            place(&forward(&nav, &db).await),
+            Location {
+                list_id: nw,
+                view_id: board
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn going_to_the_current_place_records_no_step() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        let nw = space(&db, NW).await;
+        nav.go(&db, nw, None).await.unwrap();
+
+        nav.go(&db, nw, None).await.unwrap();
+        let after = back(&nav, &db).await;
+
+        assert_eq!(place(&after), at_default(&db, everything(&db).await).await);
+        assert!(!after.can_back);
+    }
+
+    #[tokio::test]
+    async fn the_flags_follow_where_the_tab_can_go() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        let nw = space(&db, NW).await;
+        let nws = space(&db, NWS).await;
+
+        let moved = nav.go(&db, nw, None).await.unwrap();
+        let went_back = back(&nav, &db).await;
+        let went_forward = forward(&nav, &db).await;
+        back(&nav, &db).await;
+        let branched = nav.go(&db, nws, None).await.unwrap();
+
+        let flags =
+            [moved, went_back, went_forward, branched].map(|nav| (nav.can_back, nav.can_forward));
+        assert_eq!(
+            flags,
+            [(true, false), (false, true), (true, false), (true, false)]
+        );
+    }
+
+    #[tokio::test]
+    async fn a_new_step_after_going_back_drops_what_lay_ahead() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        let nw = space(&db, NW).await;
+        let nws = space(&db, NWS).await;
+        nav.go(&db, nw, None).await.unwrap();
+        back(&nav, &db).await;
+        nav.go(&db, nws, None).await.unwrap();
+
+        let after = forward(&nav, &db).await;
+
+        assert_eq!(place(&after), at_default(&db, nws).await);
+    }
+
+    #[tokio::test]
+    async fn an_issue_shown_at_a_level_is_a_step_back_and_forward_restore() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        let start = at_default(&db, everything(&db).await).await;
+        let nw = at_default(&db, space(&db, NW).await).await;
+        nav.go(&db, nw.list_id, None).await.unwrap();
+
+        let opened = nav.set_issue(&db, key("NW-1")).await.unwrap();
+        let closed = back(&nav, &db).await;
+        let earlier = back(&nav, &db).await;
+        let again = forward(&nav, &db).await;
+        let reopened = forward(&nav, &db).await;
+
+        assert_eq!((place(&opened), opened.issue), (nw, key("NW-1")));
+        assert_eq!((place(&closed), closed.issue), (nw, None));
+        assert_eq!((place(&earlier), earlier.issue), (start, None));
+        assert_eq!((place(&again), again.issue), (nw, None));
+        assert_eq!((place(&reopened), reopened.issue), (nw, key("NW-1")));
+    }
+
+    #[tokio::test]
+    async fn another_issue_is_another_step() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        nav.go(&db, space(&db, NW).await, None).await.unwrap();
+        nav.set_issue(&db, key("NW-1")).await.unwrap();
+        nav.set_issue(&db, key("NW-2")).await.unwrap();
+
+        let first = back(&nav, &db).await;
+        let second = back(&nav, &db).await;
+
+        assert_eq!(first.issue, key("NW-1"));
+        assert_eq!(second.issue, None);
+    }
+
+    #[tokio::test]
+    async fn the_same_issue_reported_twice_records_one_step() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        let nw = space(&db, NW).await;
+        nav.go(&db, nw, None).await.unwrap();
+        nav.set_issue(&db, key("NW-1")).await.unwrap();
+        nav.set_issue(&db, key("NW-1")).await.unwrap();
+
+        let closed = back(&nav, &db).await;
+        let earlier = back(&nav, &db).await;
+
+        assert_eq!(
+            (place(&closed), closed.issue),
+            (at_default(&db, nw).await, None)
+        );
+        assert_eq!(
+            place(&earlier),
+            at_default(&db, everything(&db).await).await
+        );
+        assert!(!earlier.can_back);
+    }
+
+    #[tokio::test]
+    async fn reporting_no_issue_when_none_is_shown_records_nothing() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+
+        let after = nav.set_issue(&db, None).await.unwrap();
+
+        assert!(!after.can_back);
+        assert_eq!(after.issue, None);
+    }
+
+    #[tokio::test]
+    async fn closing_an_issue_is_a_step_back_returns_from() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        nav.go(&db, space(&db, NW).await, None).await.unwrap();
+        nav.set_issue(&db, key("NW-1")).await.unwrap();
+
+        let closed = nav.set_issue(&db, None).await.unwrap();
+        let reopened = back(&nav, &db).await;
+
+        assert_eq!(closed.issue, None);
+        assert_eq!(reopened.issue, key("NW-1"));
+    }
+
+    #[tokio::test]
+    async fn going_to_another_level_closes_the_issue_and_back_reopens_it() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        let nw = at_default(&db, space(&db, NW).await).await;
+        nav.go(&db, nw.list_id, None).await.unwrap();
+        nav.set_issue(&db, key("NW-1")).await.unwrap();
+
+        let elsewhere = nav.go(&db, space(&db, NWS).await, None).await.unwrap();
+        let returned = back(&nav, &db).await;
+
+        assert_eq!(elsewhere.issue, None);
+        assert_eq!((place(&returned), returned.issue), (nw, key("NW-1")));
+    }
+
+    #[tokio::test]
+    async fn travelling_notifies_when_the_place_changes_but_an_issue_step_does_not() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        nav.go(&db, space(&db, NW).await, None).await.unwrap();
+        let count = counted(&nav);
+
+        nav.set_issue(&db, key("NW-1")).await.unwrap();
+        back(&nav, &db).await;
+        assert_eq!(count.load(Ordering::SeqCst), 0);
+
+        back(&nav, &db).await;
+        forward(&nav, &db).await;
+        assert_eq!(count.load(Ordering::SeqCst), 2);
+    }
+
+    #[tokio::test]
+    async fn travelling_to_another_place_clears_the_issues_read_here() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        nav.go(&db, space(&db, NW).await, None).await.unwrap();
+        nav.keep_read(&["a".to_string()]);
+
+        back(&nav, &db).await;
+
+        assert_eq!(nav.read_here_ids(), Vec::<String>::new());
+    }
+
+    #[tokio::test]
+    async fn a_step_to_a_deleted_list_is_skipped() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        let epics = epics(&db).await;
+        let nw = at_default(&db, space(&db, NW).await).await;
+        nav.go(&db, epics, None).await.unwrap();
+        nav.go(&db, nw.list_id, None).await.unwrap();
+        list_delete(&db, epics).await.unwrap();
+
+        let skipped = back(&nav, &db).await;
+        let ahead = forward(&nav, &db).await;
+
+        assert_eq!(
+            place(&skipped),
+            at_default(&db, everything(&db).await).await
+        );
+        assert_eq!(place(&ahead), nw);
+    }
+
+    #[tokio::test]
+    async fn switching_tabs_records_no_step() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        let (current, _) = three_tabs(&nav, &db).await;
+        assert!(!current.can_back && !current.can_forward);
+
+        for id in tab_ids(&current) {
+            let shown = nav.activate_tab(&db, id).await.unwrap();
+            assert!(!shown.can_back && !shown.can_forward, "tab {id}");
+        }
+        let stepped = nav.step_tab(&db, 1).await.unwrap();
+        assert!(!stepped.can_back && !stepped.can_forward);
+    }
+
+    #[tokio::test]
+    async fn a_background_tab_and_a_reopened_tab_record_no_step() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        let nw = space(&db, NW).await;
+
+        let background = nav.new_tab(&db, Some(nw), None, false).await.unwrap();
+        let closed = nav.close_tab(&db, background.tabs[1].id).await.unwrap();
+        let reopened = nav.reopen_tab(&db).await.unwrap();
+
+        assert!(!background.can_back);
+        assert!(!closed.can_back);
+        assert!(!reopened.can_back);
+    }
+
+    #[tokio::test]
+    async fn each_tab_has_its_own_history() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        let (current, places) = three_tabs(&nav, &db).await;
+        let ids = tab_ids(&current);
+        nav.activate_tab(&db, ids[1]).await.unwrap();
+        nav.go(&db, bookmarks(&db).await, None).await.unwrap();
+
+        let other = nav.activate_tab(&db, ids[2]).await.unwrap();
+        let first = nav.activate_tab(&db, ids[0]).await.unwrap();
+        let own = nav.activate_tab(&db, ids[1]).await.unwrap();
+        let after = back(&nav, &db).await;
+
+        assert!(!other.can_back);
+        assert!(!first.can_back);
+        assert!(own.can_back);
+        assert_eq!(after.active_tab, ids[1]);
+        assert_eq!(place(&after), places[1]);
+        assert_eq!(tab_places(&after), places.map(Some));
+    }
+
+    #[tokio::test]
+    async fn each_tab_keeps_its_own_issue() {
+        let (dir, db) = lab().await;
+        let nav = NavStore::open(dir.path());
+        let (current, _) = three_tabs(&nav, &db).await;
+        let ids = tab_ids(&current);
+        nav.activate_tab(&db, ids[1]).await.unwrap();
+        nav.set_issue(&db, key("NW-1")).await.unwrap();
+
+        let other = nav.activate_tab(&db, ids[2]).await.unwrap();
+        let own = nav.activate_tab(&db, ids[1]).await.unwrap();
+
+        assert_eq!(other.issue, None);
+        assert_eq!(own.issue, key("NW-1"));
+    }
+
+    #[tokio::test]
+    async fn the_history_and_the_issue_survive_a_restart() {
+        let (dir, db) = lab().await;
+        let nw = at_default(&db, space(&db, NW).await).await;
+        let nws = at_default(&db, space(&db, NWS).await).await;
+        {
+            let nav = NavStore::open(dir.path());
+            nav.go(&db, nw.list_id, None).await.unwrap();
+            nav.go(&db, nws.list_id, None).await.unwrap();
+            nav.set_issue(&db, key("NWS-4")).await.unwrap();
+            back(&nav, &db).await;
+        }
+
+        let reopened = NavStore::open(dir.path());
+        let current = reopened.current(&db).await.unwrap();
+        let closed = back(&reopened, &db).await;
+        let ahead = forward(&reopened, &db).await;
+
+        assert_eq!((current.can_back, current.can_forward), (true, true));
+        assert_eq!((place(&current), current.issue), (nws, None));
+        assert_eq!(place(&closed), nw);
+        assert_eq!((place(&ahead), ahead.issue), (nws, None));
+    }
+
+    #[tokio::test]
+    async fn an_issue_survives_a_restart() {
+        let (dir, db) = lab().await;
+        {
+            let nav = NavStore::open(dir.path());
+            nav.set_issue(&db, key("NW-1")).await.unwrap();
+        }
+
+        let reopened = NavStore::open(dir.path());
+
+        assert_eq!(reopened.current(&db).await.unwrap().issue, key("NW-1"));
+    }
+
+    #[tokio::test]
+    async fn a_file_from_before_history_loads_without_steps_and_records_new_ones() {
+        let (dir, db) = lab().await;
+        let nw = at_default(&db, space(&db, NW).await).await;
+        let nws = at_default(&db, space(&db, NWS).await).await;
+        let at = serde_json::json!({ "listId": nw.list_id, "viewId": nw.view_id });
+        std::fs::write(
+            dir.path().join("nav.json"),
+            serde_json::json!({
+                "location": at,
+                "tabs": [{ "id": 1, "location": at }],
+                "activeTab": 1,
+                "nextTab": 2,
+            })
+            .to_string(),
+        )
+        .unwrap();
+
+        let nav = NavStore::open(dir.path());
+        let loaded = nav.current(&db).await.unwrap();
+        nav.go(&db, nws.list_id, None).await.unwrap();
+        let after = back(&nav, &db).await;
+
+        assert_eq!(place(&loaded), nw);
+        assert_eq!(loaded.issue, None);
+        assert!(!loaded.can_back && !loaded.can_forward);
+        assert_eq!(place(&after), nw);
     }
 }

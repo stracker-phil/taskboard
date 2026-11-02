@@ -4,6 +4,7 @@
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
+use super::history::History;
 use super::{Location, Nav, NavStore, Saved};
 use crate::db::Db;
 use crate::error::AppResult;
@@ -11,11 +12,22 @@ use crate::error::AppResult;
 /// Closed tabs ⌘⌥T can bring back.
 const CLOSED_KEPT: usize = 10;
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct SavedTab {
     pub id: u32,
     pub location: Option<Location>,
+    /// The issue its Issue view shows, as the page reports it (`NavStore::set_issue`).
+    #[serde(default)]
+    pub issue: Option<String>,
+    #[serde(default)]
+    pub history: History,
+}
+
+/// The active tab; `normalize` makes sure there is one.
+pub(super) fn active_tab_mut(saved: &mut Saved) -> Option<&mut SavedTab> {
+    let active = saved.active_tab;
+    saved.tabs.iter_mut().find(|t| t.id == active)
 }
 
 /// A tab as the page draws it.
@@ -35,6 +47,7 @@ pub(super) fn normalize(saved: &mut Saved) {
         saved.tabs.push(SavedTab {
             id,
             location: saved.location,
+            ..SavedTab::default()
         });
         saved.active_tab = id;
     }
@@ -96,6 +109,7 @@ impl NavStore {
                     SavedTab {
                         id,
                         location: at.or(s.location),
+                        ..SavedTab::default()
                     },
                 );
                 id
@@ -122,7 +136,7 @@ impl NavStore {
             })
             .await?;
         match tab.location {
-            Some(at) => self.go(db, at.list_id, Some(at.view_id)).await,
+            Some(at) => self.show(db, at.list_id, Some(at.view_id), false).await,
             None => self.current(db).await,
         }
     }

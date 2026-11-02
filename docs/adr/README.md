@@ -61,5 +61,6 @@ stands in Taskboard. The numbers in this table are Taskboard's.
 | [0049](0049-hardened-runtime-strict-csp-and-no-navigation.md) | Hardened runtime, strict CSP and no navigation | Accepted (2026-11-01) |
 | [0050](0050-tabs-in-the-main-window.md) | Tabs in the main window, owned by Rust's NavStore | Accepted (2026-11-02) |
 | [0051](0051-each-views-me-mode-has-its-own-rules.md) | Each view's Me mode has its own rules | Accepted (2026-11-02) |
+| [0052](0052-back-and-forward-live-in-each-tabs-nav.md) | Back and Forward live in each tab's nav | Accepted (2026-11-02) |
 
 Open: integrations with Daybook and TimeTracker.

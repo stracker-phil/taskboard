@@ -2,7 +2,7 @@ import { type ReactNode, useEffect, useLayoutEffect, useRef } from "react";
 import { IssueView } from "../issue/IssueView";
 import { BookmarksBar } from "../pins/BookmarksBar";
 import { useModes } from "../queries/modes";
-import { useNav, useSidebar, useViews } from "../queries/sidebar";
+import { useNav, useReportShownIssue, useSidebar, useViews } from "../queries/sidebar";
 import { narrowingKey } from "../state/slices/narrowing";
 import { useStore } from "../state/store";
 import { HoverPeek } from "../issue/hoverPeek/HoverPeek";
@@ -11,6 +11,7 @@ import { Header } from "./Header";
 import { TokenBanner } from "./TokenBanner";
 import { findLevel } from "./levels";
 import { Sidebar } from "./Sidebar/Sidebar";
+import { NavArrows } from "./NavArrows";
 import { SidebarToggle } from "./SidebarToggle";
 import { TabStrip } from "./TabStrip";
 import { Toolbar } from "./toolbar/Toolbar";
@@ -33,11 +34,13 @@ export function Window({ sidebarHidden, children }: Props) {
   const tabsInTitlebar = sidebarHidden && !bookmarksBar;
   const tabsRow = tabbed && !tabsInTitlebar;
   useIssueViewFollowsTheTab();
+  useReportShownIssue(issueView ? issueView.stack[issueView.stack.length - 1] : null);
   useDiscardDraftsOnLeave();
   return (
     <div className={sidebarHidden ? "shell shell--sidebar-hidden" : "shell"}>
       {!sidebarHidden && <Sidebar />}
       <SidebarToggle sidebarHidden={sidebarHidden} />
+      <NavArrows />
       {/* The gaps around the panel drag the window too. */}
       <div className="shell__content" data-tauri-drag-region>
         {sidebarHidden ? (

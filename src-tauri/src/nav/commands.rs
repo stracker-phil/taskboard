@@ -2,7 +2,7 @@
 
 use tauri::{AppHandle, Emitter, Manager, State};
 
-use super::Nav;
+use super::{Direction, Nav};
 use crate::bus::{Command, CommandBus};
 use crate::error::AppResult;
 use crate::events::NAV_CHANGED_EVENT;
@@ -56,6 +56,23 @@ pub async fn nav_tab_move(
     before: Option<u32>,
 ) -> AppResult<Nav> {
     state.nav.move_tab(&state.db, id, before).await
+}
+
+/// The active tab's Issue view shows `issue`, or none.
+#[tauri::command]
+pub async fn nav_set_issue(state: State<'_, AppState>, issue: Option<String>) -> AppResult<Nav> {
+    state.nav.set_issue(&state.db, issue).await
+}
+
+/// Back in the active tab's history; `Nav::issue` is the issue to show there.
+#[tauri::command]
+pub async fn nav_back(state: State<'_, AppState>) -> AppResult<Nav> {
+    state.nav.travel(&state.db, Direction::Back).await
+}
+
+#[tauri::command]
+pub async fn nav_forward(state: State<'_, AppState>) -> AppResult<Nav> {
+    state.nav.travel(&state.db, Direction::Forward).await
 }
 
 #[tauri::command]

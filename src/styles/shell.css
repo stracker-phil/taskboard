@@ -54,7 +54,19 @@
   flex: none;
   height: 34px;
 }
-.shell__titlebar > .bookmarks-bar, .shell__titlebar > .tab-strip { padding-left: 84px; }
+/* What shares the title bar starts 20px after Back and Forward. */
+.shell__titlebar > .bookmarks-bar, .shell__titlebar > .tab-strip { padding-left: calc(var(--nav-arrows-end) + 20px); }
+
+/* Back and Forward: 20px right of the traffic lights (they end at x 80), level with them, in every layout. */
+.shell { --nav-arrows-end: 154px; }
+.nav-arrows { position: absolute; top: 8px; left: 100px; z-index: 3; display: flex; gap: 2px; }
+.nav-arrows__btn {
+  display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: none; border-radius: 7px;
+  background: transparent; color: var(--text-tertiary);
+  transition: background-color var(--motion-fast) var(--ease-out), opacity var(--motion-fast) var(--ease-out);
+}
+.nav-arrows__btn:hover:not(:disabled) { background: var(--fill-hover); }
+.nav-arrows__btn:disabled { opacity: 0.35; }
 
 .content-panel {
   position: relative;

@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Nav } from "../api";
 import { fail } from "../state/requests";
@@ -44,6 +44,36 @@ export function useNavGo() {
     },
     [client],
   );
+}
+
+/** Goes back or forward in the active tab: to that place, with its issue open in the Issue view or none. */
+export function useTravel() {
+  const client = useQueryClient();
+  return useCallback(
+    (direction: "back" | "forward") =>
+      (direction === "back" ? api.navBack() : api.navForward()).then(
+        (nav) => {
+          client.setQueryData<Nav>(NAV_KEY, nav);
+          const store = useStore.getState();
+          if (nav.issue && nav.location) store.openIssue(nav.issue, { listId: nav.location.listId, viewId: nav.location.viewId });
+          else store.closeIssue();
+        },
+        (e: unknown) => void fail(e, "Could not go there"),
+      ),
+    [client],
+  );
+}
+
+/** Tells Rust which issue the Issue view shows, so it is a step of the tab's history. */
+export function useReportShownIssue(issue: string | null) {
+  const client = useQueryClient();
+  useEffect(() => {
+    // The reply may be older than a move made meanwhile, so the place is asked again instead.
+    void api.navSetIssue(issue).then(
+      () => client.invalidateQueries({ queryKey: NAV_KEY }),
+      () => {},
+    );
+  }, [client, issue]);
 }
 
 /** Saves which Spaces are expanded. */

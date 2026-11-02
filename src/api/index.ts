@@ -171,6 +171,11 @@ export const api = {
   navTabMove: (id: number, before: number | null) => invoke<Nav>("nav_tab_move", { id, before }),
   /** The Space nodes the owner expanded in the sidebar. */
   navSetExpanded: (expanded: number[]) => invoke<Nav>("nav_set_expanded", { expanded }),
+  /** The active tab's Issue view shows `issue`, or none (its Back and Forward steps). */
+  navSetIssue: (issue: string | null) => invoke<Nav>("nav_set_issue", { issue }),
+  /** Back or forward in the active tab's history; `Nav.issue` is the issue to show there. */
+  navBack: () => invoke<Nav>("nav_back"),
+  navForward: () => invoke<Nav>("nav_forward"),
   /** A filter list's icon by name; null goes back to the folder. */
   /** No icon is the folder; no color shows the icon plain. */
   listSetLook: (id: number, icon: string | null, color: string | null) => invoke<void>("list_set_look", { id, icon, color }),

@@ -58,5 +58,7 @@ export const PAGE_ACTION_COMMANDS: Command[] = [
   action("go.everything", "Go to Everything", "Mod+Shift+E"),
   action("go.pinned", "Go to Bookmarks", "Mod+Shift+P"),
   action("go.viewed", "Go to Recently Viewed", "Mod+Y"),
+  action("history.back", "Back", "Mod+["),
+  action("history.forward", "Forward", "Mod+]"),
   action("view.markAllSeen", "Mark All as Read", "Mod+Shift+A"),
 ];

@@ -629,7 +629,15 @@ expanded: Array<number>,
 /**
  * The open tabs in strip order, at least one; the active one is at `location`.
  */
-tabs: Array<Tab>, activeTab: number, };
+tabs: Array<Tab>, activeTab: number, 
+/**
+ * The issue the active tab's Issue view shows, as the page last reported it; Back and Forward set it.
+ */
+issue: string | null, 
+/**
+ * The active tab has somewhere to go back or forward to.
+ */
+canBack: boolean, canForward: boolean, };
 
 /**
  * What macOS notifications announce after a change sync (`notify/`).

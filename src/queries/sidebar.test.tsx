@@ -1,6 +1,7 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
+import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
@@ -12,7 +13,7 @@ import { nav as navAt, tab, tabbedNav } from "../test/nav";
 import { lumenSpace, sidebarTree, space } from "../test/spaces";
 import { view } from "../test/views";
 import { createQueryClient } from "./queryClient";
-import { useNav, useNavGo, useSetExpanded, useSidebar, useSpaces, useTabs, useViews } from "./sidebar";
+import { useNav, useNavGo, useReportShownIssue, useSetExpanded, useSidebar, useSpaces, useTabs, useTravel, useViews } from "./sidebar";
 
 const mocked = vi.mocked(api, true);
 
@@ -42,6 +43,26 @@ function Probe({ listId }: { listId: number | null }) {
   );
 }
 
+function Traveller() {
+  const travel = useTravel();
+  return (
+    <>
+      <button onClick={() => void travel("back")}>Travel back</button>
+      <button onClick={() => void travel("forward")}>Travel forward</button>
+    </>
+  );
+}
+
+function Reporter({ issue }: { issue: string | null }) {
+  useReportShownIssue(issue);
+  const { data: nav } = useNav();
+  return <p>Can go back: {nav?.canBack ? "yes" : "no"}</p>;
+}
+
+function renderWith(ui: ReactNode) {
+  render(<QueryClientProvider client={createQueryClient()}>{ui}</QueryClientProvider>);
+}
+
 function renderProbe(listId: number | null = null) {
   render(
     <QueryClientProvider client={createQueryClient()}>
@@ -57,6 +78,7 @@ beforeEach(() => {
   mocked.navCurrent.mockResolvedValue(navAt(null));
   mocked.navGo.mockImplementation(async (listId, viewId) => navAt({ listId, viewId: viewId ?? 0 }));
   mocked.navSetExpanded.mockImplementation(async (expanded) => navAt(null, { expanded }));
+  mocked.navSetIssue.mockResolvedValue(navAt(null));
   mocked.viewsOf.mockResolvedValue([]);
 });
 
@@ -208,6 +230,111 @@ describe("sidebar queries", () => {
 
       await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not close the tab: Disk full"));
       expect(screen.getByText("Tabs: 1,2 (showing 2)")).toBeInTheDocument();
+    });
+  });
+
+  describe("travelling back and forward", () => {
+    const AT_LIST = { listId: 11, viewId: 101 };
+    const OTHER = { listId: 12, viewId: 5 };
+
+    function renderTraveller() {
+      renderWith(
+        <>
+          <Probe listId={null} />
+          <Traveller />
+        </>,
+      );
+    }
+
+    it.each([
+      ["back", "Travel back", mocked.navBack],
+      ["forward", "Travel forward", mocked.navForward],
+    ])("opens the Issue view on the issue Rust answers with when going %s", async (_direction, button, call) => {
+      call.mockResolvedValue(navAt(OTHER, { issue: "10042" }));
+      mocked.navCurrent.mockResolvedValue(navAt(AT_LIST));
+      renderTraveller();
+      await screen.findByText("Place: 11/101");
+
+      await userEvent.click(screen.getByRole("button", { name: button }));
+
+      expect(await screen.findByText("Place: 12/5")).toBeInTheDocument();
+      expect(useStore.getState().issueView).toEqual({ origin: OTHER, stack: ["10042"] });
+    });
+
+    it.each([
+      ["back", "Travel back", mocked.navBack],
+      ["forward", "Travel forward", mocked.navForward],
+    ])("closes the Issue view when going %s lands on a place without an issue", async (_direction, button, call) => {
+      call.mockResolvedValue(navAt(AT_LIST, { issue: null }));
+      mocked.navCurrent.mockResolvedValue(navAt(AT_LIST, { issue: "10042" }));
+      resetStore({ issueView: { origin: AT_LIST, stack: ["10042"] } });
+      renderTraveller();
+      await screen.findByText("Place: 11/101");
+
+      await userEvent.click(screen.getByRole("button", { name: button }));
+
+      await waitFor(() => expect(useStore.getState().issueView).toBeNull());
+    });
+
+    it("keeps the Issue view and shows an error toast when Rust refuses", async () => {
+      mocked.navBack.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
+      mocked.navCurrent.mockResolvedValue(navAt(AT_LIST));
+      resetStore({ issueView: { origin: AT_LIST, stack: ["10042"] } });
+      renderTraveller();
+      await screen.findByText("Place: 11/101");
+
+      await userEvent.click(screen.getByRole("button", { name: "Travel back" }));
+
+      await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not go there: Disk full"));
+      expect(useStore.getState().issueView).not.toBeNull();
+    });
+  });
+
+  describe("reporting the shown issue", () => {
+    it("tells Rust the issue when it changes, and null when it closes", async () => {
+      const client = createQueryClient();
+      const { rerender } = render(
+        <QueryClientProvider client={client}>
+          <Reporter issue={null} />
+        </QueryClientProvider>,
+      );
+      await waitFor(() => expect(mocked.navSetIssue).toHaveBeenLastCalledWith(null));
+
+      rerender(
+        <QueryClientProvider client={client}>
+          <Reporter issue="10042" />
+        </QueryClientProvider>,
+      );
+      await waitFor(() => expect(mocked.navSetIssue).toHaveBeenLastCalledWith("10042"));
+
+      rerender(
+        <QueryClientProvider client={client}>
+          <Reporter issue={null} />
+        </QueryClientProvider>,
+      );
+      await waitFor(() => expect(mocked.navSetIssue).toHaveBeenLastCalledWith(null));
+    });
+
+    it("asks for the place again afterwards, so the arrows follow Rust's history", async () => {
+      let reported = false;
+      mocked.navSetIssue.mockImplementation(async () => {
+        reported = true;
+        return navAt(null);
+      });
+      mocked.navCurrent.mockImplementation(async () => navAt(null, { canBack: reported }));
+
+      renderWith(<Reporter issue="10042" />);
+
+      expect(await screen.findByText("Can go back: yes")).toBeInTheDocument();
+    });
+
+    it("stays quiet when Rust refuses the report", async () => {
+      mocked.navSetIssue.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
+
+      renderWith(<Reporter issue="10042" />);
+      await waitFor(() => expect(mocked.navSetIssue).toHaveBeenCalledWith("10042"));
+
+      expect(useStore.getState().toasts).toEqual([]);
     });
   });
 

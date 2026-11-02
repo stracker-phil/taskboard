@@ -89,6 +89,33 @@ describe("Window", () => {
     });
   });
 
+  describe("history arrows", () => {
+    it("are in the window and follow what Rust reports about the history", async () => {
+      await renderWindow(false, navOf({ listId: 11, viewId: 101 }, { canBack: true }));
+
+      await waitFor(() => expect(screen.getByRole("button", { name: "Back" })).toBeEnabled());
+      expect(screen.getByRole("button", { name: "Forward" })).toBeDisabled();
+    });
+
+    it("tell Rust which issue is shown when it opens, and null when it closes", async () => {
+      await renderWindow(false);
+
+      act(() => useStore.getState().openIssue("10042", { listId: 11, viewId: 101 }));
+      await waitFor(() => expect(mocked.navSetIssue).toHaveBeenLastCalledWith("10042"));
+      act(() => useStore.getState().closeIssue());
+
+      await waitFor(() => expect(mocked.navSetIssue).toHaveBeenLastCalledWith(null));
+    });
+
+    it("tell Rust the issue on top when the Issue view stacks another", async () => {
+      await renderWindow(true);
+
+      act(() => useStore.getState().openRelated("10043"));
+
+      await waitFor(() => expect(mocked.navSetIssue).toHaveBeenLastCalledWith("10043"));
+    });
+  });
+
   describe("tab strip", () => {
     it("is hidden while there is one tab", async () => {
       await renderWindow(false);

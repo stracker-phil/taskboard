@@ -136,8 +136,17 @@ describe("page action titles", () => {
     ["go.viewed", "Go to Recently Viewed"],
     ["view.markAllSeen", "Mark All as Read"],
     ["toolbar.unread", "Unread Only"],
+    ["history.back", "Back"],
+    ["history.forward", "Forward"],
   ])("name %s %s", (id, title) => {
     expect(getCommand(id)?.title).toBe(title);
+  });
+
+  it.each([
+    ["history.back", "Mod+["],
+    ["history.forward", "Mod+]"],
+  ])("binds %s to %s by default", (id, binding) => {
+    expect(getCommand(id)?.defaultBinding).toBe(binding);
   });
 });
 

@@ -44,6 +44,8 @@ pub const GO_LEVELS: &[Item] = &[
     item("Bookmarks", "page:go.pinned", "CmdOrCtrl+Shift+P"),
 ];
 pub const GO_MOVES: &[Item] = &[
+    item("Back", "page:history.back", "CmdOrCtrl+BracketLeft"),
+    item("Forward", "page:history.forward", "CmdOrCtrl+BracketRight"),
     item("Previous Space", "nav:previousSpace", "CmdOrCtrl+Alt+Up"),
     item("Next Space", "nav:nextSpace", "CmdOrCtrl+Alt+Down"),
     item(
@@ -249,6 +251,8 @@ mod tests {
                 "go.everything",
                 "go.viewed",
                 "go.pinned",
+                "history.back",
+                "history.forward",
                 "view.previous",
                 "view.next",
                 "toolbar.group",
@@ -308,6 +312,25 @@ mod tests {
                     "Next List",
                     "nav:nextList",
                     Some("CmdOrCtrl+Alt+BracketRight")
+                ),
+            ]
+        );
+    }
+
+    #[test]
+    fn back_and_forward_open_the_go_moves_with_the_bracket_keys() {
+        let first: Vec<(&str, &str, Option<&str>)> = GO_MOVES[..2]
+            .iter()
+            .map(|item| (item.label, item.command, item.accelerator))
+            .collect();
+        assert_eq!(
+            first,
+            [
+                ("Back", "page:history.back", Some("CmdOrCtrl+BracketLeft")),
+                (
+                    "Forward",
+                    "page:history.forward",
+                    Some("CmdOrCtrl+BracketRight")
                 ),
             ]
         );
