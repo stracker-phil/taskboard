@@ -345,6 +345,11 @@ and runs everything the menus offer ([ADR 0043](adr/0043-the-palette-runs-the-me
   footer shows them as buttons (the active one is lit; clicking it again clears the field), and with nothing
   typed the palette lists them under "Narrow to" (↩ types the prefix). The field's placeholder names what the
   prefix searches.
+- **Searches**, with nothing typed, above "Narrow to": *Recent Searches*, the last 10 typed searches that led to an
+  issue, a list or a view, newest first (a clock; ↩ types it again, ⌘⌫ forgets it; kept in `ui_state.json` by
+  `search_remember`), then *Saved Searches*, the filter lists whose only condition searches for text, as ⌘S saves
+  them (`search/saved.rs`; a magnifier instead of their "Search: " prefix, and their Space; ↩ opens the list, ⌥↩
+  types its text to change it first).
 - Issues (8, with `#` 40): a whole key or a bare number first, then full-text hits (every word as a prefix; key
   and summary weigh most). Each 46px row: status square, mono key (70), the summary with the match bold, the
   status pill, ↩ on the active row; a comment-only match adds "Matched in comment: “…”" under it.

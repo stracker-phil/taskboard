@@ -32,8 +32,9 @@ export interface UiSlice {
   dismissToast: (id: number) => void;
 }
 
+/** The window layout only: Rust keeps the stored recent searches whatever this sends for them. */
 function saveUiState({ sidebarHidden, activityWidth }: UiSlice) {
-  void api.setUiState({ sidebarHidden, activityWidth }).catch((e) => fail(e, "Could not save the window layout"));
+  void api.setUiState({ sidebarHidden, activityWidth, recentSearches: [] }).catch((e) => fail(e, "Could not save the window layout"));
 }
 
 let nextToastId = 1;

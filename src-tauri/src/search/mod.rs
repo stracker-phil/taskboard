@@ -5,6 +5,7 @@ pub mod commands;
 mod fts;
 mod palette;
 mod places;
+mod saved;
 
 pub use fts::{KeyHint, key_hint, match_expression};
 pub use palette::{
@@ -12,6 +13,7 @@ pub use palette::{
     query,
 };
 pub use places::{ListHit, ViewHit};
+pub use saved::{SavedSearch, saved_searches};
 
 /// Issues (alias `i`) whose key, summary, description or comments hold every word of a `match_expression`.
 pub const TEXT_MATCH: &str =

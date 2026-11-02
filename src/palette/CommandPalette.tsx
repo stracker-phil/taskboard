@@ -1,13 +1,13 @@
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import { api, type IssueHit, type ListHit, type Nav, type ViewHit } from "../api";
+import { api, type IssueHit, type ListHit, type Nav, type SavedSearch, type ViewHit } from "../api";
 import { NAV_KEY, useNav, useNavGo, useSidebar } from "../queries/sidebar";
 import { runBusCommand } from "../state/requests";
 import { useStore } from "../state/store";
 import { useIssueActions } from "../views/list/useIssueActions";
 import { collectCommands, snapshotPage, type PaletteCommand } from "./commands";
-import { CommandRow, IssueRow, ListRow, PrefixButtons, PrefixRow, ViewRow } from "./PaletteRows";
+import { CommandRow, IssueRow, ListRow, PrefixButtons, PrefixRow, RecentSearchRow, SavedSearchRow, ViewRow } from "./PaletteRows";
 import { parsePrefix, PREFIXES, SCOPES, type Prefix } from "./prefixes";
 import { ranked } from "./rank";
 import { saveSearch } from "./saveSearch";
@@ -19,6 +19,8 @@ const DEBOUNCE_MS = 80;
 /** Every searched prefix is its own entry: unused ones go soon. */
 const RESULTS_GC_MS = 15_000;
 const MENU_COMMANDS_KEY = ["menuCommands"];
+const SAVED_SEARCHES_KEY = ["savedSearches"];
+const RECENT_SEARCHES_KEY = ["recentSearches"];
 
 /** `value` once it has stopped changing for `DEBOUNCE_MS`. */
 function useSettled(value: string): string {
@@ -30,7 +32,14 @@ function useSettled(value: string): string {
   return settled;
 }
 
-type Item = { kind: "issue"; hit: IssueHit } | { kind: "list"; hit: ListHit } | { kind: "view"; hit: ViewHit } | { kind: "command"; command: PaletteCommand } | { kind: "prefix"; prefix: Prefix };
+type Item =
+  | { kind: "issue"; hit: IssueHit }
+  | { kind: "list"; hit: ListHit }
+  | { kind: "view"; hit: ViewHit }
+  | { kind: "command"; command: PaletteCommand }
+  | { kind: "prefix"; prefix: Prefix }
+  | { kind: "saved"; saved: SavedSearch }
+  | { kind: "recent"; text: string };
 
 interface Section {
   heading: string;
@@ -87,6 +96,13 @@ function Palette({ initialText }: { initialText: string }) {
   });
   const { data: menu } = useQuery({ queryKey: MENU_COMMANDS_KEY, queryFn: api.menuCommands });
   const commands = useMemo(() => collectCommands(menu ?? [], page), [menu, page]);
+  // Lists change elsewhere (⌘S, the sidebar), so every opening asks again; the empty palette waits for both
+  // answers and shows its sections at once, so "Narrow to" never moves down under the pointer.
+  const savedQuery = useQuery({ queryKey: SAVED_SEARCHES_KEY, queryFn: api.savedSearches, refetchOnMount: "always" });
+  const recentQuery = useQuery({ queryKey: RECENT_SEARCHES_KEY, queryFn: api.recentSearches, refetchOnMount: "always" });
+  const searchesShown = savedQuery.isFetchedAfterMount && recentQuery.isFetchedAfterMount;
+  const saved = savedQuery.data ?? [];
+  const recent = recentQuery.data ?? [];
 
   const issues = (mode === null || mode === "issues") && query ? (results?.issues ?? []) : [];
   const lists = (mode === null || mode === "lists") && (query || mode === "lists") ? (results?.lists ?? []) : [];
@@ -106,7 +122,13 @@ function Palette({ initialText }: { initialText: string }) {
     if (items.length > 0) sections.push({ heading, items });
   };
   if (mode === "commands") sections.push(...commandSections(commands, query));
-  else if (mode === null && !query) add("Narrow to", PREFIXES.map((p): Item => ({ kind: "prefix", prefix: p })));
+  else if (mode === null && !query) {
+    if (searchesShown) {
+      add("Recent Searches", recent.map((text): Item => ({ kind: "recent", text })));
+      add("Saved Searches", saved.map((search): Item => ({ kind: "saved", saved: search })));
+      add("Narrow to", PREFIXES.map((p): Item => ({ kind: "prefix", prefix: p })));
+    }
+  }
   else {
     add("Issues", issues.map((hit): Item => ({ kind: "issue", hit })));
     add(mode === "lists" ? "Lists" : "Filter lists", [...lists.map((hit): Item => ({ kind: "list", hit })), ...views.map((hit): Item => ({ kind: "view", hit }))]);
@@ -139,13 +161,20 @@ function Palette({ initialText }: { initialText: string }) {
     updatePlace(location.listId, location.viewId, { selectedId: hit.id, peekOpen: false });
     showIssue(hit.id, { listId: location.listId, viewId: location.viewId });
   };
+  // A search that led to an issue or a list is worth offering again.
+  const remember = () => {
+    if (query && mode !== "commands") void api.searchRemember(query).then((list) => client.setQueryData(RECENT_SEARCHES_KEY, list), () => {});
+  };
   const run = async (item: Item | undefined) => {
     if (!item) return;
     if (item.kind === "prefix") return narrow(item.prefix.char);
+    if (item.kind === "recent") return narrow(item.text);
+    if (item.kind === "issue" || item.kind === "list" || item.kind === "view") remember();
     if (item.kind === "issue") return openIssue(item.hit);
     dismiss();
     if (item.kind === "list") return go(item.hit.id);
     if (item.kind === "view") return go(item.hit.list.id, item.hit.viewId);
+    if (item.kind === "saved") return go(item.saved.listId);
     return item.command.run();
   };
 
@@ -161,6 +190,15 @@ function Palette({ initialText }: { initialText: string }) {
     } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       handled();
       if (all.length > 0) setActive((at) => (at + (e.key === "ArrowDown" ? 1 : -1) + all.length) % all.length);
+    } else if (e.key === "Enter" && e.altKey && all[active]?.kind === "saved") {
+      // ⌥↩ searches for a saved search's text here, to change it before going on.
+      handled();
+      const item = all[active];
+      if (item.kind === "saved") narrow(item.saved.text);
+    } else if (e.key === "Backspace" && mod && text === "" && all[active]?.kind === "recent") {
+      handled();
+      const item = all[active];
+      if (item.kind === "recent") void api.searchForget(item.text).then((list) => client.setQueryData(RECENT_SEARCHES_KEY, list), () => {});
     } else if (e.key === "Enter" && mod) {
       handled();
       if (activeIssue && openInJira) {
@@ -213,6 +251,10 @@ function Palette({ initialText }: { initialText: string }) {
         return option(`command:${item.command.id}`, "palette__option palette__action", <CommandRow command={item.command} showSection={mode !== "commands" || query !== ""} />, item);
       case "prefix":
         return option(`prefix:${item.prefix.char}`, "palette__option palette__action", <PrefixRow prefix={item.prefix} />, item);
+      case "saved":
+        return option(`saved:${item.saved.listId}`, "palette__option palette__list", <SavedSearchRow saved={item.saved} />, item);
+      case "recent":
+        return option(`recent:${item.text}`, "palette__option palette__action", <RecentSearchRow text={item.text} />, item);
     }
   };
   const counts = [plural(issues.length, "issue"), plural(lists.length + views.length, "list"), plural(commandCount, "command")].filter(Boolean).join(" · ");
@@ -253,6 +295,16 @@ function Palette({ initialText }: { initialText: string }) {
             <>
               <span>⌘↩ open in Jira</span>
               <span>⌘C copy key</span>
+            </>
+          ) : all[active]?.kind === "saved" ? (
+            <>
+              <span>↩ open</span>
+              <span>⌥↩ edit the search</span>
+            </>
+          ) : all[active]?.kind === "recent" ? (
+            <>
+              <span>↩ search</span>
+              <span>⌘⌫ remove</span>
             </>
           ) : (
             <span>↩ open</span>

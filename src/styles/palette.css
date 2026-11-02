@@ -38,6 +38,7 @@
 .palette__meta { flex: none; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
 .palette__action svg { flex: none; color: var(--text-tertiary); }
 .palette__tile-gap { flex: none; width: 20px; }
+.palette__glyph { display: grid; flex: none; place-items: center; width: 20px; height: 20px; color: var(--text-muted); }
 .palette__footer {
   display: flex; flex: none; align-items: center; gap: 18px; height: 38px; padding: 0 18px; border-top: 1px solid var(--border);
   background: var(--panel-subtle-bg); font-size: 12px; color: var(--text-muted); white-space: nowrap;

@@ -18,7 +18,7 @@ describe("ui slice", () => {
   });
 
   it("loads the sidebar state and the activity width Rust saved", async () => {
-    mocked.getUiState.mockResolvedValue({ sidebarHidden: true, activityWidth: 520 });
+    mocked.getUiState.mockResolvedValue({ sidebarHidden: true, activityWidth: 520, recentSearches: [] });
 
     await useStore.getState().loadUiState();
 
@@ -40,7 +40,7 @@ describe("ui slice", () => {
     useStore.getState().toggleSidebar();
 
     expect(useStore.getState().sidebarHidden).toBe(true);
-    expect(mocked.setUiState).toHaveBeenCalledWith({ sidebarHidden: true, activityWidth: 520 });
+    expect(mocked.setUiState).toHaveBeenCalledWith({ sidebarHidden: true, activityWidth: 520, recentSearches: [] });
   });
 
   it("saves both fields when the activity width is set, keeping the sidebar state", () => {
@@ -48,6 +48,12 @@ describe("ui slice", () => {
 
     useStore.getState().setActivityWidth(448);
 
-    expect(mocked.setUiState).toHaveBeenCalledWith({ sidebarHidden: true, activityWidth: 448 });
+    expect(mocked.setUiState).toHaveBeenCalledWith({ sidebarHidden: true, activityWidth: 448, recentSearches: [] });
+  });
+
+  it("sends no recent searches when saving the layout, as Rust keeps the stored ones", () => {
+    useStore.getState().toggleSidebar();
+
+    expect(mocked.setUiState).toHaveBeenCalledWith(expect.objectContaining({ recentSearches: [] }));
   });
 });

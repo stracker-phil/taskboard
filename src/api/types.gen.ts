@@ -757,6 +757,16 @@ parentId: string | null,
  */
 depth: number, };
 
+export type SavedSearch = { listId: number, name: string, 
+/**
+ * What it searches for.
+ */
+text: string, 
+/**
+ * The Space it sits in; none at the top of the sidebar.
+ */
+space: string | null, };
+
 export type ScopeView = { 
 /**
  * Empty while nothing is tracked and there is no override.
@@ -970,7 +980,12 @@ export type UiState = { sidebarHidden: boolean,
 /**
  * The Issue view's activity column in points; none is the default width.
  */
-activityWidth: number | null, };
+activityWidth: number | null, 
+/**
+ * The palette's last searches, newest first (`RECENT_SEARCHES` at most); only `remember_search` and
+ * `forget_search` change them.
+ */
+recentSearches: Array<string>, };
 
 /**
  * A user field the Me popup may offer, for Settings' "Add Field…".

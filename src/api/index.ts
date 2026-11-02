@@ -28,6 +28,7 @@ import type {
   Keybindings,
   LaunchEvent,
   LinkTarget,
+  SavedSearch,
   BulkOutcome,
   BulkStatus,
   IssueChange,
@@ -205,6 +206,12 @@ export const api = {
   issueRelated: (id: string) => invoke<Related>("issue_related", { id }),
   /** The command palette's issues (by key and full text) and filter lists for the typed text; a scope searches one kind with room for more. */
   paletteQuery: (text: string, scope: PaletteScope = "all") => invoke<PaletteResults>("palette_query", { text, scope }),
+  /** The filter lists that only search for text (the palette's saved searches). */
+  savedSearches: () => invoke<SavedSearch[]>("saved_searches"),
+  /** The palette's last searches, newest first; remembering or forgetting one answers the new list. */
+  recentSearches: () => invoke<string[]>("recent_searches"),
+  searchRemember: (text: string) => invoke<string[]>("search_remember", { text }),
+  searchForget: (text: string) => invoke<string[]>("search_forget", { text }),
   /** Every enabled item of the app menu, in menu order, for the command palette. */
   menuCommands: () => invoke<MenuCommand[]>("menu_commands"),
   /** Their highlight and change chip clear. */

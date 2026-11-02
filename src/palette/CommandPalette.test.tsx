@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
 
-import { api, type ListNode, type MenuCommand, type Nav, type PaletteResults, type SidebarTree } from "../api";
+import { api, type ListNode, type MenuCommand, type Nav, type PaletteResults, type SavedSearch, type SidebarTree } from "../api";
 import { installCommands, useCommandKeys } from "../commands";
 import { registerCommands } from "../commands/registry";
 import type { MenuEntry } from "../components/menu";
@@ -15,7 +15,7 @@ import { NAV_KEY, SIDEBAR_KEY } from "../queries/sidebar";
 import { registerSettingsPage } from "../registry/settingsPages";
 import { resetStore, useStore } from "../state/store";
 import { connectionView } from "../test/jira";
-import { issueHit, listHit, menuCommand, parts, viewHit } from "../test/palette";
+import { issueHit, listHit, menuCommand, parts, savedSearch, viewHit } from "../test/palette";
 import { sidebarTree, space } from "../test/spaces";
 import { CommandPalette } from "./CommandPalette";
 import { usePaletteMenu, type PaletteMenu } from "./menus";
@@ -36,6 +36,9 @@ interface Setup {
   menu?: MenuCommand[];
   /** A part of the page's own menus. */
   pageMenu?: PaletteMenu;
+  saved?: SavedSearch[];
+  /** Searches remembered earlier, newest first. */
+  recent?: string[];
 }
 
 function Keys() {
@@ -48,7 +51,11 @@ function PageMenu({ menu }: { menu: PaletteMenu }) {
   return null;
 }
 
-async function renderPalette({ results = {}, tree = TREE, location = null, siteUrl = "", menu = [], pageMenu }: Setup = {}) {
+async function renderPalette({ results = {}, tree = TREE, location = null, siteUrl = "", menu = [], pageMenu, saved = [], recent = [] }: Setup = {}) {
+  mocked.savedSearches.mockResolvedValue(saved);
+  mocked.recentSearches.mockResolvedValue(recent);
+  mocked.searchRemember.mockImplementation(async (text) => [text, ...recent.filter((r) => r !== text)]);
+  mocked.searchForget.mockImplementation(async (text) => recent.filter((r) => r !== text));
   mocked.paletteQuery.mockResolvedValue({ issues: [], lists: [], views: [], ...results });
   mocked.sidebarTree.mockResolvedValue(tree);
   mocked.navCurrent.mockResolvedValue({ location, expanded: [] });
@@ -68,6 +75,8 @@ async function renderPalette({ results = {}, tree = TREE, location = null, siteU
       expect(client.getQueryData(SIDEBAR_KEY)).toBeDefined();
       expect(client.getQueryData(NAV_KEY)).toBeDefined();
       expect(client.getQueryData(["menuCommands"])).toBeDefined();
+      expect(client.getQueryData(["savedSearches"])).toBeDefined();
+      expect(client.getQueryData(["recentSearches"])).toBeDefined();
     });
   }
   return client;
@@ -938,6 +947,253 @@ describe("CommandPalette", () => {
 
       await waitFor(() => expect(mocked.listCreate).toHaveBeenCalled());
       expect(mocked.navGo).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("recent and saved searches", () => {
+    const SAVED = savedSearch();
+    const RECENT = ["refund", "invoice"];
+
+    describe("listing", () => {
+      it("shows Recent Searches, then Saved Searches, then Narrow to", async () => {
+        await renderPalette({ saved: [SAVED], recent: RECENT });
+
+        expect(headings()).toEqual(["Recent Searches", "Saved Searches", "Narrow to"]);
+        expect(options("Recent Searches").map((o) => o.textContent)).toEqual(["refund", "invoice"]);
+      });
+
+      it.each<[string, Setup, string[]]>([
+        ["both are empty", {}, ["Narrow to"]],
+        ["there are no recent searches", { saved: [SAVED] }, ["Saved Searches", "Narrow to"]],
+        ["there are no saved searches", { recent: RECENT }, ["Recent Searches", "Narrow to"]],
+      ])("hides the empty sections when %s", async (_, setup, expected) => {
+        await renderPalette(setup);
+
+        expect(headings()).toEqual(expected);
+      });
+
+      it("names a saved search without its “Search: ” prefix, with its Space", async () => {
+        await renderPalette({ saved: [SAVED] });
+
+        const row = within(screen.getByRole("region", { name: "Saved Searches" })).getByRole("option");
+        expect(within(row).getByText("contact")).toBeInTheDocument();
+        expect(within(row).getByText("Website relaunch")).toBeInTheDocument();
+        expect(row.textContent).not.toContain("Search:");
+      });
+
+      it("shows a saved search's name as it is when it has no prefix", async () => {
+        await renderPalette({ saved: [savedSearch({ name: "Late invoices", text: "invoice" })] });
+
+        expect(within(screen.getByRole("option", { name: /Late invoices/ })).getByText("Late invoices")).toBeInTheDocument();
+      });
+
+      it("calls a saved search “saved search” when it belongs to no Space", async () => {
+        await renderPalette({ saved: [savedSearch({ space: null })] });
+
+        expect(within(screen.getByRole("option", { name: /contact/ })).getByText("saved search")).toBeInTheDocument();
+      });
+
+      it.each(["contact", ">", "#", "/"])("is replaced by the results once “%s” is typed", async (typed) => {
+        await renderPalette({ saved: [SAVED], recent: RECENT });
+
+        await search(typed);
+
+        expect(screen.queryByRole("region", { name: "Recent Searches" })).not.toBeInTheDocument();
+        expect(screen.queryByRole("region", { name: "Saved Searches" })).not.toBeInTheDocument();
+      });
+    });
+
+    describe("choosing", () => {
+      it("types a recent search into the field and keeps the palette open", async () => {
+        await renderPalette({ recent: RECENT });
+
+        await userEvent.click(screen.getByRole("option", { name: "invoice" }));
+
+        expect(input()).toHaveValue("invoice");
+        expect(input()).toHaveFocus();
+        expect(screen.getByRole("dialog")).toBeInTheDocument();
+        expect(mocked.navGo).not.toHaveBeenCalled();
+      });
+
+      it("types the selected recent search into the field on ↩", async () => {
+        await renderPalette({ recent: RECENT });
+
+        await userEvent.keyboard("{Enter}");
+
+        expect(input()).toHaveValue("refund");
+      });
+
+      it("opens the list of a saved search and closes", async () => {
+        await renderPalette({ saved: [SAVED] });
+
+        await userEvent.click(screen.getByRole("option", { name: /contact/ }));
+
+        expect(mocked.navGo).toHaveBeenCalledWith(SAVED.listId, null);
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      });
+
+      it("opens the list of the selected saved search on ↩", async () => {
+        await renderPalette({ saved: [SAVED] });
+
+        await userEvent.keyboard("{Enter}");
+
+        expect(mocked.navGo).toHaveBeenCalledWith(SAVED.listId, null);
+      });
+
+      it("types a saved search's text into the field on ⌥↩ instead of opening it", async () => {
+        await renderPalette({ saved: [savedSearch({ name: "Search: refunds", text: "refund status:open" })] });
+
+        await userEvent.keyboard("{Alt>}{Enter}{/Alt}");
+
+        expect(input()).toHaveValue("refund status:open");
+        expect(screen.getByRole("dialog")).toBeInTheDocument();
+        expect(mocked.navGo).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("forgetting a recent search with ⌘⌫", () => {
+      it("asks Rust to forget the selected one, and its row goes", async () => {
+        await renderPalette({ recent: RECENT });
+
+        await userEvent.keyboard("{Meta>}{Backspace}{/Meta}");
+
+        await waitFor(() => expect(screen.queryByRole("option", { name: "refund" })).not.toBeInTheDocument());
+        expect(mocked.searchForget).toHaveBeenCalledWith("refund");
+        expect(screen.getByRole("option", { name: "invoice" })).toBeInTheDocument();
+      });
+
+      it("drops the whole section with the last recent search", async () => {
+        await renderPalette({ recent: ["refund"], saved: [SAVED] });
+
+        await userEvent.keyboard("{Meta>}{Backspace}{/Meta}");
+
+        await waitFor(() => expect(headings()).toEqual(["Saved Searches", "Narrow to"]));
+      });
+
+      it("forgets the one that is selected, not the first", async () => {
+        await renderPalette({ recent: RECENT });
+
+        await userEvent.keyboard("{ArrowDown}{Meta>}{Backspace}{/Meta}");
+
+        await waitFor(() => expect(screen.queryByRole("option", { name: "invoice" })).not.toBeInTheDocument());
+        expect(mocked.searchForget).toHaveBeenCalledWith("invoice");
+      });
+
+      it("does nothing while the field has text", async () => {
+        await renderPalette({ recent: RECENT });
+        await userEvent.click(screen.getByRole("option", { name: "refund" }));
+
+        await userEvent.keyboard("{Meta>}{Backspace}{/Meta}");
+
+        expect(mocked.searchForget).not.toHaveBeenCalled();
+        expect(screen.getByRole("dialog")).toBeInTheDocument();
+      });
+
+      it.each<[string, Setup, string]>([
+        ["a saved search", { saved: [SAVED] }, "contact"],
+        ["a prefix", {}, "Commands"],
+      ])("does nothing on %s", async (_, setup, name) => {
+        await renderPalette(setup);
+
+        await userEvent.keyboard("{Meta>}{Backspace}{/Meta}");
+
+        expect(mocked.searchForget).not.toHaveBeenCalled();
+        expect(screen.getByRole("option", { name: new RegExp(name) })).toBeInTheDocument();
+      });
+    });
+
+    describe("remembering", () => {
+      it.each<[string, Partial<PaletteResults>, RegExp]>([
+        ["an issue", { issues: [issueHit()] }, /NW-43/],
+        ["a filter list", { lists: [listHit()] }, /Current sprint/],
+        ["a view", { views: [viewHit()] }, /Sprint board/],
+      ])("remembers the typed query when %s is opened", async (_, results, name) => {
+        await renderPalette({ results });
+        await search("sprint");
+
+        await userEvent.click(await screen.findByRole("option", { name }));
+
+        await waitFor(() => expect(mocked.searchRemember).toHaveBeenCalledWith("sprint"));
+      });
+
+      it("remembers the query without its prefix", async () => {
+        await renderPalette({ results: { issues: [issueHit()] } });
+        await search("#contact");
+
+        await userEvent.click(await screen.findByRole("option", { name: /NW-43/ }));
+
+        await waitFor(() => expect(mocked.searchRemember).toHaveBeenCalledWith("contact"));
+      });
+
+      it("does not remember a query that ends in a command", async () => {
+        await renderPalette({ menu: FILE_MENU });
+        await search("refresh");
+
+        await userEvent.click(screen.getByRole("option", { name: /Refresh now/ }));
+
+        await waitFor(() => expect(mocked.runCommand).toHaveBeenCalledWith("sync:refresh"));
+        expect(mocked.searchRemember).not.toHaveBeenCalled();
+      });
+
+      it("does not remember a command typed after “>”", async () => {
+        await renderPalette({ menu: [menuCommand({ menu: "Go", label: "Go to inbox", command: "go:inbox" })] });
+        await search(">inbox");
+
+        await userEvent.click(screen.getByRole("option", { name: /Go to inbox/ }));
+
+        await waitFor(() => expect(mocked.runCommand).toHaveBeenCalledWith("go:inbox"));
+        expect(mocked.searchRemember).not.toHaveBeenCalled();
+      });
+
+      it("does not remember a bare prefix when a list is opened from it", async () => {
+        await renderPalette({ results: { lists: [listHit()] } });
+        await search("/");
+
+        await userEvent.click(await screen.findByRole("option", { name: /Current sprint/ }));
+
+        await waitFor(() => expect(mocked.navGo).toHaveBeenCalledWith(21, null));
+        expect(mocked.searchRemember).not.toHaveBeenCalled();
+      });
+
+      it("does not remember anything when a saved search is opened", async () => {
+        await renderPalette({ saved: [SAVED] });
+
+        await userEvent.click(screen.getByRole("option", { name: /contact/ }));
+
+        await waitFor(() => expect(mocked.navGo).toHaveBeenCalledWith(SAVED.listId, null));
+        expect(mocked.searchRemember).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("footer hints", () => {
+      it("offers ⌥↩ to edit the search while a saved search is selected", async () => {
+        await renderPalette({ saved: [SAVED] });
+
+        expect(screen.getByText("⌥↩ edit the search")).toBeInTheDocument();
+        expect(screen.getByText("↩ open")).toBeInTheDocument();
+        expect(screen.queryByText("⌘⌫ remove")).not.toBeInTheDocument();
+      });
+
+      it("offers ⌘⌫ to remove while a recent search is selected", async () => {
+        await renderPalette({ recent: RECENT });
+
+        expect(screen.getByText("⌘⌫ remove")).toBeInTheDocument();
+        expect(screen.getByText("↩ search")).toBeInTheDocument();
+        expect(screen.queryByText("⌥↩ edit the search")).not.toBeInTheDocument();
+      });
+
+      it("follows the selection from a recent row to a saved row and on to a prefix", async () => {
+        await renderPalette({ recent: ["refund"], saved: [SAVED] });
+        expect(screen.getByText("⌘⌫ remove")).toBeInTheDocument();
+
+        await userEvent.keyboard("{ArrowDown}");
+        expect(screen.getByText("⌥↩ edit the search")).toBeInTheDocument();
+        expect(screen.queryByText("⌘⌫ remove")).not.toBeInTheDocument();
+
+        await userEvent.keyboard("{ArrowDown}");
+        expect(screen.getByText("↩ open")).toBeInTheDocument();
+        expect(screen.queryByText("⌥↩ edit the search")).not.toBeInTheDocument();
+      });
     });
   });
 });

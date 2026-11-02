@@ -1,7 +1,8 @@
 import { api, type Nav, type SidebarTree } from "../api";
 import { attempt } from "../state/requests";
 
-const NEW_LIST_PREFIX = "Search: ";
+/** How a saved search's filter list is named; the palette shows a magnifier instead. */
+export const NEW_LIST_PREFIX = "Search: ";
 
 /** The current Space, else Everything: where a saved search goes. */
 function saveTarget(tree: SidebarTree | undefined, nav: Nav | undefined): number | undefined {

@@ -1,4 +1,4 @@
-import type { IssueHit, ListHit, MenuCommand, TextPart, ViewHit } from "../api/types";
+import type { IssueHit, ListHit, MenuCommand, SavedSearch, TextPart, ViewHit } from "../api/types";
 
 /** Plain text, or the parts of a match: `parts("Fix the ", ["login"], " form")` marks "login" strong. */
 export function parts(...pieces: (string | [string])[]): TextPart[] {
@@ -29,6 +29,11 @@ export function issueHit(patch: Partial<IssueHit> = {}): IssueHit {
 /** A filter list of the "Website relaunch" Space; override per test. */
 export function listHit(patch: Partial<ListHit> = {}): ListHit {
   return { id: 21, name: "Current sprint", projectId: "10001", isSpace: false, ...patch };
+}
+
+/** A saved search (a filter list named "Search: …") in the "Website relaunch" Space; override per test. */
+export function savedSearch(patch: Partial<SavedSearch> = {}): SavedSearch {
+  return { listId: 41, name: "Search: contact", text: "contact", space: "Website relaunch", ...patch };
 }
 
 /** A view of the "Current sprint" filter list; override per test. */

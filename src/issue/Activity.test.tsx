@@ -181,7 +181,7 @@ describe("Activity", () => {
       await userEvent.keyboard("{ArrowLeft}");
 
       expect(await handle()).toHaveAttribute("aria-valuenow", "416");
-      expect(mocked.setUiState).toHaveBeenLastCalledWith({ sidebarHidden: false, activityWidth: 416 });
+      expect(mocked.setUiState).toHaveBeenLastCalledWith({ sidebarHidden: false, activityWidth: 416, recentSearches: [] });
     });
 
     it("narrows by 16 on ArrowRight and saves it", async () => {
@@ -191,7 +191,7 @@ describe("Activity", () => {
       await userEvent.keyboard("{ArrowRight}");
 
       expect(await handle()).toHaveAttribute("aria-valuenow", "384");
-      expect(mocked.setUiState).toHaveBeenLastCalledWith({ sidebarHidden: false, activityWidth: 384 });
+      expect(mocked.setUiState).toHaveBeenLastCalledWith({ sidebarHidden: false, activityWidth: 384, recentSearches: [] });
     });
 
     it("stops widening at the maximum", async () => {

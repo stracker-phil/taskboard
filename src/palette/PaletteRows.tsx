@@ -1,11 +1,12 @@
-import { Check, CornerDownLeft, Zap } from "lucide-react";
-import type { IssueHit, ListHit, SidebarTree, TextPart, ViewHit } from "../api";
+import { Check, CornerDownLeft, History, Search, Zap } from "lucide-react";
+import type { IssueHit, ListHit, SavedSearch, SidebarTree, TextPart, ViewHit } from "../api";
 import { LayoutTile } from "../shell/viewLayouts";
 import { SpaceTile } from "../components/SpaceTile";
 import { StatusPill } from "../components/issue/StatusPill";
 import { StatusSquare } from "../components/issue/StatusSquare";
 import type { PaletteCommand } from "./commands";
 import { PREFIXES, type Prefix } from "./prefixes";
+import { NEW_LIST_PREFIX } from "./saveSearch";
 
 function Marked({ parts }: { parts: TextPart[] }) {
   return (
@@ -106,4 +107,30 @@ export function PrefixButtons({ active, onPick }: { active: Prefix | null; onPic
       </button>
     );
   });
+}
+
+/** A saved search: a magnifier where its name says "Search: ", and its Space. */
+export function SavedSearchRow({ saved }: { saved: SavedSearch }) {
+  const name = saved.name.startsWith(NEW_LIST_PREFIX) ? saved.name.slice(NEW_LIST_PREFIX.length) : saved.name;
+  return (
+    <>
+      <span className="palette__glyph" aria-hidden="true">
+        <Search size={15} />
+      </span>
+      <span className="palette__summary">{name}</span>
+      <span className="palette__meta">{saved.space ?? "saved search"}</span>
+    </>
+  );
+}
+
+/** A search typed earlier that led somewhere. */
+export function RecentSearchRow({ text }: { text: string }) {
+  return (
+    <>
+      <span className="palette__glyph" aria-hidden="true">
+        <History size={15} />
+      </span>
+      <span className="palette__summary">{text}</span>
+    </>
+  );
 }
