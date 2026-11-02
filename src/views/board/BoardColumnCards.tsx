@@ -2,6 +2,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { memo, useEffect, useRef } from "react";
 import type { Row } from "../../api";
 import type { RowActionHandlers } from "../list/RowActions";
+import type { PickKeys } from "../list/useRowClicks";
 import { BoardCard } from "./BoardCard";
 
 interface Props {
@@ -11,7 +12,10 @@ interface Props {
   inlineLabels: boolean;
   /** The keyboard's current card when it is in this column. */
   selected: string | null;
-  onOpen: (id: string) => void;
+  /** The Board's picked cards. */
+  pickedIds: ReadonlySet<string>;
+  onOpen: (id: string, mods?: PickKeys) => void;
+  onToggleBox: (id: string) => void;
   actions: RowActionHandlers;
   /** The ids of the bookmarked issues. */
   pinned: ReadonlySet<string>;
@@ -21,7 +25,8 @@ const CARD_ESTIMATE = 110;
 const CARD_GAP = 8;
 
 /** A column's cards, virtualized: a Space with thousands of issues mounts only the cards on screen. */
-export const BoardColumnCards = memo(function BoardColumnCards({ ids, rows, fields, inlineLabels, selected, onOpen, actions, pinned }: Props) {
+export const BoardColumnCards = memo(function BoardColumnCards({ ids, rows, fields, inlineLabels, selected, pickedIds, onOpen, onToggleBox, actions, pinned }: Props) {
+  const picking = pickedIds.size > 0;
   const scrollRef = useRef<HTMLDivElement>(null);
   const virtualizer = useVirtualizer({
     count: ids.length,
@@ -53,7 +58,18 @@ export const BoardColumnCards = memo(function BoardColumnCards({ ids, rows, fiel
               ref={virtualizer.measureElement}
               style={{ transform: `translateY(${virtual.start}px)` }}
             >
-              <BoardCard row={row} fields={fields} inlineLabels={inlineLabels} selected={row.id === selected} onOpen={onOpen} actions={actions} pinned={pinned.has(row.id)} />
+              <BoardCard
+                row={row}
+                fields={fields}
+                inlineLabels={inlineLabels}
+                selected={picking ? pickedIds.has(row.id) : row.id === selected}
+                picked={pickedIds.has(row.id)}
+                picking={picking}
+                onOpen={onOpen}
+                onToggleBox={onToggleBox}
+                actions={actions}
+                pinned={pinned.has(row.id)}
+              />
             </div>
           ) : null;
         })}

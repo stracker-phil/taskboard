@@ -71,7 +71,9 @@ interface RowsProps {
 function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const place = useRowsPlace(listId, viewId, data);
-  const { toggled, collapsedParents, selected, setPlace, subtasksOpen } = place;
+  const { toggled, collapsedParents, selected, picked, setPlace, subtasksOpen } = place;
+  const pickedIds = useMemo(() => new Set(picked), [picked]);
+  const picking = picked.length > 0;
   const openIssue = useStore((s) => s.openIssue);
   const { factors, moving, animate } = useGroupMotion();
   const highlight = useGroupHighlight();
@@ -128,7 +130,7 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
   const keys = useRowKeys({ ...place, items, rowIds, data, select, toggle, actions, scrollToIndex, open });
 
   // Stable, so rows that didn't change skip re-rendering.
-  const { onSelect, onOpen, onPick } = useRowClicks(keys, opening);
+  const { onSelect, onOpen, onPick, onToggleBox } = useRowClicks(keys, opening);
   const onToggleSubtasks = useCallback((id: string) => keys.current.setSubtasksOpen(id, !keys.current.subtasksOpen(id)), [keys]);
 
   return (
@@ -176,8 +178,11 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
                   position={fold?.positions.get(virtual.index) ?? item.position}
                   wrap={wrapTitles}
                   inlineLabels={inlineLabels}
-                  selected={selected === item.row.id}
+                  selected={picking ? pickedIds.has(item.row.id) : selected === item.row.id}
+                  picked={pickedIds.has(item.row.id)}
+                  picking={picking}
                   onSelect={onSelect}
+                  onToggleBox={onToggleBox}
                   onPick={onPick}
                   onOpen={onOpen}
                   actions={actions}

@@ -8,6 +8,7 @@ import { isBelow } from "./flatten";
 
 const NO_TOGGLED: Record<string, boolean> = {};
 const NO_PARENTS: string[] = [];
+const NO_PICKS: string[] = [];
 
 /** Where the owner left a List or Table (open groups, collapsed parents, the selected row, its peek), loaded
  *  on mount, and the changes to it. */
@@ -17,6 +18,8 @@ export function useRowsPlace(listId: number, viewId: number, data: ViewData) {
   const collapsedParents = useStore((s) => s.places[key]?.collapsedParents) ?? NO_PARENTS;
   const selected = useStore((s) => s.places[key]?.selectedId ?? null);
   const peekOpen = useStore((s) => s.places[key]?.peekOpen ?? false);
+  const storedPicks = useStore((s) => s.picked[key]) ?? NO_PICKS;
+  const storePicked = useStore((s) => s.setPicked);
   const loadPlace = useStore((s) => s.loadPlace);
   const updatePlace = useStore((s) => s.updatePlace);
   const client = useQueryClient();
@@ -31,6 +34,15 @@ export function useRowsPlace(listId: number, viewId: number, data: ViewData) {
   useEffect(() => {
     if (previewGone) updatePlace(listId, viewId, { peekOpen: false });
   }, [previewGone, updatePlace, listId, viewId]);
+
+  // Picks last while the view shows; a narrowing that hides a picked row leaves it out of any bulk change.
+  useEffect(() => () => storePicked(key, []), [storePicked, key]);
+  const picked = useMemo(() => storedPicks.filter((id) => id in data.rows), [storedPicks, data.rows]);
+  /** Picking closes the preview: it shows one issue, a bulk change acts on several. */
+  const setPicked = (ids: string[]) => {
+    storePicked(key, ids);
+    if (ids.length > 0 && peekOpen) updatePlace(listId, viewId, { peekOpen: false });
+  };
 
   const collapsed = useMemo(() => new Set(collapsedParents), [collapsedParents]);
   const setPlace = (patch: Partial<ViewPlace>) => updatePlace(listId, viewId, patch);
@@ -50,5 +62,5 @@ export function useRowsPlace(listId: number, viewId: number, data: ViewData) {
     for (const neighbor of [rowIds[at - 1], rowIds[at + 1]]) if (neighbor) prefetchIssue(client, neighbor);
   };
 
-  return { toggled, collapsedParents, selected, peekOpen, setPlace, subtasksOpen, setSubtasksOpen, select };
+  return { toggled, collapsedParents, selected, peekOpen, picked, setPicked, setPlace, subtasksOpen, setSubtasksOpen, select };
 }

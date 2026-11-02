@@ -38,6 +38,10 @@
   transition: background-color var(--motion-fast) var(--ease-out);
 }
 .table-row:hover { background: var(--row-hover-bg); }
+/* A row's 24px left inset holds its checkbox (list.css → picking) instead of a spacer. */
+.table-row::before { content: none; }
+.table-row__pick { display: grid; flex: none; place-items: center; width: 24px; height: 100%; }
+.table-row:hover .pick-box { opacity: 1; }
 .table-row--changed, .table-row--changed:hover { background: var(--changed-bg); }
 .table-row--selected, .table-row--selected:hover { background: var(--selection-bg); }
 .table-row__cell { display: flex; flex: none; align-items: center; gap: 7px; min-width: 0; box-sizing: border-box; padding-right: 12px; overflow: hidden; }

@@ -7,6 +7,9 @@ import { EpicChip } from "../../components/issue/EpicChip";
 import { LabelChips } from "../../components/issue/LabelChips";
 import { PriorityFlag } from "../../components/issue/PriorityFlag";
 import { RowActions, type RowActionHandlers } from "../list/RowActions";
+import { keepTextUnselected } from "../list/opensIssue";
+import { PickBox } from "../list/PickBox";
+import type { PickKeys } from "../list/useRowClicks";
 import { useFlash } from "../../lib/motion";
 
 interface Props {
@@ -14,16 +17,21 @@ interface Props {
   fields: string[];
   /** The labels as tags after the title, while they aren't a card field. */
   inlineLabels?: boolean;
-  /** The keyboard's current card. */
+  /** Highlighted: the keyboard's current card, or a picked one while cards are picked. */
   selected?: boolean;
-  onOpen: (id: string) => void;
+  /** Its checkbox is ticked. */
+  picked?: boolean;
+  /** Cards are picked: every checkbox shows. */
+  picking?: boolean;
+  onOpen: (id: string, mods?: PickKeys) => void;
+  onToggleBox?: (id: string) => void;
   actions: RowActionHandlers;
   /** Has an active bookmark. */
   pinned?: boolean;
 }
 
 /** A Board card: the summary first, always wrapped, the key in the bottom-right corner; changed cards are tinted. */
-export const BoardCard = memo(function BoardCard({ row, fields, inlineLabels = false, selected = false, onOpen, actions, pinned = false }: Props) {
+export const BoardCard = memo(function BoardCard({ row, fields, inlineLabels = false, selected = false, picked = false, picking = false, onOpen, onToggleBox, actions, pinned = false }: Props) {
   const shows = (field: string) => fields.includes(field);
   const flashing = useFlash(row.updatedAt);
   const epic = shows("epic") && row.epic;
@@ -35,7 +43,8 @@ export const BoardCard = memo(function BoardCard({ row, fields, inlineLabels = f
       tabIndex={0}
       aria-label={`${row.key} ${row.summary}`}
       data-issue-id={row.id}
-      onClick={() => onOpen(row.id)}
+      onMouseDown={keepTextUnselected}
+      onClick={(e) => onOpen(row.id, e)}
       onKeyDown={(e) => {
         if (e.key === "Enter" && e.target === e.currentTarget) onOpen(row.id);
       }}
@@ -63,6 +72,9 @@ export const BoardCard = memo(function BoardCard({ row, fields, inlineLabels = f
         {row.changed && <span className="board-card__dot" title="Changed since yesterday" />}
         <CopyKey className="board-card__key" issueKey={row.key} />
       </div>
+      {onToggleBox && (
+        <PickBox issueKey={row.key} picked={picked} onToggle={() => onToggleBox(row.id)} className={picking ? "board-card__pick pick-box--shown" : "board-card__pick"} />
+      )}
       <span className="board-card__actions">
         <RowActions issueId={row.id} issueKey={row.key} changed={row.changed} actions={actions} pinned={pinned} />
       </span>

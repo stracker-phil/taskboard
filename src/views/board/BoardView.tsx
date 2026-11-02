@@ -13,6 +13,7 @@ import { useIssueActions } from "../list/useIssueActions";
 import { usePinnedIssues } from "../list/usePinnedIssues";
 import { BoardColumnCards } from "./BoardColumnCards";
 import { useBoardKeys } from "./useBoardKeys";
+import { useBoardPicks } from "./useBoardPicks";
 import { colorClass, DropTray, DropZone, zoneOf } from "../../writes/DropZone";
 import { type Drag, useIssueDrag } from "../../writes/useIssueDrag";
 
@@ -53,7 +54,8 @@ function Board({ view, data }: { view: View; data: BoardData }) {
     },
     [select, open],
   );
-  useBoardKeys(data, selected, select, open, actions);
+  const picks = useBoardPicks(placeKey, data, selected, select, openCard);
+  useBoardKeys(data, selected, select, open, actions, picks);
   // A Board that groups by nothing shows status columns.
   const columnGroups = data.columns.map((column) => ({ key: column.key, label: column.name }));
   const boardRef = useRef<HTMLDivElement>(null);
@@ -109,7 +111,9 @@ function Board({ view, data }: { view: View; data: BoardData }) {
               fields={data.cardFields}
               inlineLabels={inlineLabels}
               selected={selected !== null && column.ids.includes(selected) ? selected : null}
-              onOpen={openCard}
+              pickedIds={picks.pickedIds}
+              onOpen={picks.onCard}
+              onToggleBox={picks.onToggleBox}
               actions={actions}
               pinned={pinned}
             />

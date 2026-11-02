@@ -1,10 +1,18 @@
 import { type RefObject, useCallback, useEffect, useRef } from "react";
 import type { IssueOpening } from "../../api";
 import { useDoubleClickMs } from "../../queries/useDoubleClickMs";
+import { pickRange, toggleBox, togglePick } from "./picking";
 import type { RowKeyState } from "./useRowKeys";
 
+/** The modifier keys of a row click that pick rows: ⌘ adds or removes one, ⇧ picks a range. */
+export interface PickKeys {
+  metaKey: boolean;
+  shiftKey: boolean;
+}
+
 /** A row's click and double-click for the List and Table. A click selects at once; when it opens the preview,
- *  the preview waits out the double-click interval, so a double-click opens the Issue view alone. */
+ *  the preview waits out the double-click interval, so a double-click opens the Issue view alone. ⌘ and ⇧ clicks
+ *  and the checkbox pick rows instead and open nothing; a plain click drops the picks. */
 export function useRowClicks(keys: RefObject<RowKeyState>, opening: IssueOpening) {
   const interval = useDoubleClickMs();
   const pendingPreview = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -14,9 +22,20 @@ export function useRowClicks(keys: RefObject<RowKeyState>, opening: IssueOpening
   }, []);
 
   const onSelect = useCallback(
-    (id: string) => {
+    (id: string, mods?: PickKeys) => {
       clearTimeout(pendingPreview.current);
-      const { select, open, peekOpen } = keys.current;
+      const { select, open, peekOpen, rowIds, picked, selected, setPicked } = keys.current;
+      if (mods?.metaKey) {
+        setPicked(togglePick(rowIds, picked, id, selected));
+        select(id, false);
+        return;
+      }
+      if (mods?.shiftKey) {
+        setPicked(pickRange(rowIds, selected, id));
+        if (selected === null) select(id, false);
+        return;
+      }
+      if (picked.length > 0) setPicked([]);
       if (opening === "full") {
         select(id, false);
         open(id);
@@ -42,9 +61,20 @@ export function useRowClicks(keys: RefObject<RowKeyState>, opening: IssueOpening
   const onPick = useCallback(
     (id: string) => {
       clearTimeout(pendingPreview.current);
-      keys.current.select(id, keys.current.peekOpen);
+      const { picked, setPicked, select, peekOpen } = keys.current;
+      if (picked.length > 0) setPicked([]);
+      select(id, peekOpen);
     },
     [keys],
   );
-  return { onSelect, onOpen, onPick };
+  /** A row's checkbox: picks or unpicks that row alone. */
+  const onToggleBox = useCallback(
+    (id: string) => {
+      clearTimeout(pendingPreview.current);
+      const { rowIds, picked, setPicked } = keys.current;
+      setPicked(toggleBox(rowIds, picked, id));
+    },
+    [keys],
+  );
+  return { onSelect, onOpen, onPick, onToggleBox };
 }

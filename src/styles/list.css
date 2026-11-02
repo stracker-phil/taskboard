@@ -135,3 +135,10 @@
 /* The hover actions sit on the first line too, so they stay put when marking read shortens the title. */
 .list-row--wrap .row-actions { top: -4px; transform: none; }
 .list-row--child .list-row__name { padding-left: calc(var(--depth) * var(--indent-step)); }
+
+/* Picking rows for a bulk change: a checkbox that shows while its row has the pointer, once it is ticked, and on
+   every row while any is picked. It sits in the List's gutter left of the caret, where nothing else is drawn. */
+.pick-box { margin: 0; width: 14px; height: 14px; accent-color: var(--accent); opacity: 0; transition: opacity var(--motion-base) var(--ease-out); }
+.pick-box:checked, .pick-box--shown, .pick-box:focus-visible, .list-item:hover > .pick-box { opacity: 1; }
+.list-pick { position: absolute; left: -48px; top: 22px; transform: translateY(-50%); z-index: 1; }
+.list-pick--wrap { top: 15px; transform: none; }

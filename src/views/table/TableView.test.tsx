@@ -693,6 +693,93 @@ describe("TableView", () => {
     });
   });
 
+  describe("picking", () => {
+    const THIRD = row({ id: "3", key: "NW-1003", summary: "Fix the footer links" });
+    const rows = [OPEN, DONE, THIRD];
+    const flat = () => viewData([groupOf(rows)], rows, { groupBy: "none" });
+    const pickedKeys = () =>
+      screen
+        .getAllByRole("checkbox")
+        .filter((b) => (b as HTMLInputElement).checked)
+        .map((b) => b.getAttribute("aria-label")?.replace("Pick ", ""));
+
+    beforeEach(() => {
+      installCommands("main");
+    });
+
+    it("picks the ⌘-clicked row with the selected one, and opens no preview", async () => {
+      await renderTable(flat());
+      await userEvent.click(await screen.findByText("Redesign the pricing page"));
+
+      fireEvent.click(screen.getByText("Publish the launch notes"), { metaKey: true });
+      await pastDoubleClickInterval();
+
+      expect(pickedKeys()).toEqual(["NW-1042", "NW-1001"]);
+      expect(place()).toMatchObject({ selectedId: "2", peekOpen: false });
+    });
+
+    it("unpicks a picked row on a second ⌘-click", async () => {
+      await renderTable(flat());
+      fireEvent.click(await screen.findByText("Publish the launch notes"), { metaKey: true });
+      fireEvent.click(screen.getByText("Fix the footer links"), { metaKey: true });
+
+      fireEvent.click(screen.getByText("Fix the footer links"), { metaKey: true });
+
+      expect(pickedKeys()).toEqual(["NW-1001"]);
+    });
+
+    it("picks the rows from the selected one to the ⇧-clicked one", async () => {
+      await renderTable(flat());
+      await userEvent.click(await screen.findByText("Redesign the pricing page"));
+
+      fireEvent.click(screen.getByText("Fix the footer links"), { shiftKey: true });
+
+      expect(pickedKeys()).toEqual(["NW-1042", "NW-1001", "NW-1003"]);
+    });
+
+    it("drops the picks on a plain click", async () => {
+      await renderTable(flat());
+      fireEvent.click(await screen.findByText("Publish the launch notes"), { metaKey: true });
+
+      await userEvent.click(screen.getByText("Fix the footer links"));
+
+      expect(pickedKeys()).toEqual([]);
+      expect(place().selectedId).toBe("3");
+    });
+
+    it("picks only its own row from the checkbox, leaving the selection and the preview alone", async () => {
+      await renderTable(flat());
+      await userEvent.click(await screen.findByText("Redesign the pricing page"));
+      await waitFor(() => expect(place().peekOpen).toBe(true), PREVIEW_WAIT);
+      await press("peek.close");
+
+      await userEvent.click(screen.getByRole("checkbox", { name: "Pick NW-1003" }));
+      await pastDoubleClickInterval();
+
+      expect(pickedKeys()).toEqual(["NW-1003"]);
+      expect(place()).toMatchObject({ selectedId: "1", peekOpen: false });
+      expect(useStore.getState().issueView).toBeNull();
+    });
+
+    it("opens no Issue view when a checkbox is double-clicked", async () => {
+      await renderTable(flat());
+
+      await userEvent.dblClick(await screen.findByRole("checkbox", { name: "Pick NW-1003" }));
+
+      expect(useStore.getState().issueView).toBeNull();
+    });
+
+    it("drops the picks on Esc", async () => {
+      await renderTable(flat());
+      fireEvent.click(await screen.findByText("Publish the launch notes"), { metaKey: true });
+      expect(pickedKeys()).toEqual(["NW-1001"]);
+
+      await press("peek.close");
+
+      expect(pickedKeys()).toEqual([]);
+    });
+  });
+
   describe("saved place", () => {
     const groups = () => [
       groupOf([OPEN], { key: "status:progress", label: "In Progress" }),

@@ -5,7 +5,9 @@ import { StatusSquare } from "../../components/issue/StatusSquare";
 import { CellValue, cellEditProps, type CellEditHandlers } from "../list/cellEdits";
 import { columnDef } from "../list/columns";
 import { LabelChips } from "../../components/issue/LabelChips";
-import { opensIssue } from "../list/opensIssue";
+import { keepTextUnselected, opensIssue } from "../list/opensIssue";
+import { PickBox } from "../list/PickBox";
+import type { PickKeys } from "../list/useRowClicks";
 import { ChildCount, SubtaskIcon } from "../../components/issue/SubtaskIcon";
 import type { Nesting } from "../list/flatten";
 import { SubtaskCaret } from "../list/SubtaskCaret";
@@ -37,8 +39,14 @@ function Cell({ id, className, row, edits, onPick, children }: CellProps) {
 interface Props {
   row: Row;
   columns: string[];
+  /** Highlighted: the selected row, or a picked one while rows are picked. */
   selected: boolean;
-  onSelect: (id: string) => void;
+  /** Its checkbox is ticked. */
+  picked: boolean;
+  /** Rows are picked: every checkbox shows. */
+  picking: boolean;
+  onSelect: (id: string, mods?: PickKeys) => void;
+  onToggleBox: (id: string) => void;
   /** Selects without opening: a cell that opens a menu. */
   onPick: (id: string) => void;
   /** A double-click: always the full Issue view. */
@@ -59,12 +67,15 @@ interface Props {
 
 /** One issue: key, summary, status, then the view's cells; the widths come from the table's variables. */
 export const TableRow = memo(function TableRow(props: Props) {
-  const { row, columns, inlineLabels = false, selected, onSelect, onPick, onOpen, edits } = props;
+  const { row, columns, inlineLabels = false, selected, picked, picking, onSelect, onToggleBox, onPick, onOpen, edits } = props;
   const { tree = false, nesting = null, subtasksOpen = true, onToggleSubtasks, childChip = false } = props;
   const flashing = useFlash(row.updatedAt);
   const className = ["table-row", tree && "table-row--tree", nesting?.parent && "table-row--parent", nesting && nesting.depth > 0 && "table-row--child", row.changed && "table-row--changed", flashing && "flash", selected && "table-row--selected"].filter(Boolean).join(" ");
   return (
-    <div className={className} style={{ "--depth": nesting?.depth ?? 0 } as CSSProperties} role="row" aria-selected={selected} data-issue-id={row.id} onClick={() => onSelect(row.id)} onDoubleClick={(e) => opensIssue(e) && onOpen(row.id)}>
+    <div className={className} style={{ "--depth": nesting?.depth ?? 0 } as CSSProperties} role="row" aria-selected={selected} data-issue-id={row.id} onMouseDown={keepTextUnselected} onClick={(e) => onSelect(row.id, e)} onDoubleClick={(e) => opensIssue(e) && onOpen(row.id)}>
+      <span className="table-row__pick">
+        <PickBox issueKey={row.key} picked={picked} onToggle={() => onToggleBox(row.id)} className={picking ? "pick-box--shown" : ""} />
+      </span>
       <span className="table-row__cell table-row__key" role="gridcell" style={cellWidth("key")}>
         <CopyKey issueKey={row.key} />
       </span>

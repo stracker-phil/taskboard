@@ -2,6 +2,7 @@ import { type RefObject, useEffect, useRef } from "react";
 import type { Group, ViewData, ViewPlace } from "../../api";
 import { onIssueKeys } from "../../commands/issueKeys";
 import { type Item, itemGroupKey } from "./flatten";
+import { extendPick } from "./picking";
 import type { RowActionHandlers } from "./RowActions";
 import { explainWritesOff } from "../../writes/runWrite";
 import { assignMenuAnchor } from "../../writes/assignMenu";
@@ -15,6 +16,9 @@ export interface RowKeyState {
   rowIds: string[];
   selected: string | null;
   peekOpen: boolean;
+  /** The rows picked for a bulk change, in their shown order. */
+  picked: string[];
+  setPicked: (ids: string[]) => void;
   data: ViewData;
   select: (id: string, openPeek: boolean) => void;
   toggle: (group: Group) => void;
@@ -41,13 +45,25 @@ export function useRowKeys(current: RowKeyState): RefObject<RowKeyState> {
     };
     return onIssueKeys({
       move: (step) => {
-        const { rowIds, selected, peekOpen, items, scrollToIndex, select } = state.current;
+        const { rowIds, selected, peekOpen, items, scrollToIndex, select, picked, setPicked } = state.current;
         if (rowIds.length === 0) return;
+        if (picked.length > 0) setPicked([]);
         const at = selected === null ? -1 : rowIds.indexOf(selected);
         const next = rowIds[Math.min(Math.max(at + step, 0), rowIds.length - 1)];
         select(next, peekOpen);
         scrollToIndex(items.findIndex((item) => item.kind === "row" && item.row.id === next));
       },
+      extend: (step) => {
+        const { rowIds, selected, picked, items, scrollToIndex, select, setPicked } = state.current;
+        const next = extendPick(rowIds, picked, selected, step);
+        setPicked(next.picked);
+        if (next.selected === null) return;
+        select(next.selected, false);
+        scrollToIndex(items.findIndex((item) => item.kind === "row" && item.row.id === next.selected));
+      },
+      pickAll: () => state.current.setPicked(state.current.rowIds),
+      clearPicks: () => state.current.setPicked([]),
+      hasPicks: () => state.current.picked.length > 0,
       setGroupOpen: (open) => {
         const { items, data, selected, toggle, select, peekOpen, setSubtasksOpen, subtasksOpen } = state.current;
         const row = items.find((item) => item.kind === "row" && item.row.id === selected);
@@ -123,9 +139,12 @@ export function useRowKeys(current: RowKeyState): RefObject<RowKeyState> {
         if (data.rows[selected]?.changed) actions.markSeen(selected);
         else actions.markUnread(selected);
       },
+      // The preview shows one issue: opening it drops the picks.
       togglePeek: () => {
-        const { selected, peekOpen, setPlace } = state.current;
-        if (selected) setPlace({ peekOpen: !peekOpen });
+        const { selected, peekOpen, setPlace, picked, setPicked } = state.current;
+        if (!selected) return;
+        if (!peekOpen && picked.length > 0) setPicked([]);
+        setPlace({ peekOpen: !peekOpen });
       },
       hasSelection: () => state.current.selected !== null,
       peekOpen: () => state.current.peekOpen,

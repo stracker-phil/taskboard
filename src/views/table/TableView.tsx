@@ -58,7 +58,9 @@ export function TableView({ view, narrowing }: Props) {
 function Table({ view, data }: { view: View; data: ViewData }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const place = useRowsPlace(view.listId, view.id, data);
-  const { toggled, collapsedParents, selected, setPlace, subtasksOpen } = place;
+  const { toggled, collapsedParents, selected, picked, setPlace, subtasksOpen } = place;
+  const pickedIds = useMemo(() => new Set(picked), [picked]);
+  const picking = picked.length > 0;
   const { factors, moving, animate } = useGroupMotion();
   const settings = useViewSettings(view);
   const resize = useColumnResize((id, width) => void settings.setWidth(id, width));
@@ -127,7 +129,7 @@ function Table({ view, data }: { view: View; data: ViewData }) {
   const keys = useRowKeys({ ...place, items, rowIds, data, select, toggle, actions, scrollToIndex, open });
 
   // Stable, so rows that didn't change skip re-rendering.
-  const { onSelect, onOpen, onPick } = useRowClicks(keys, opening);
+  const { onSelect, onOpen, onPick, onToggleBox } = useRowClicks(keys, opening);
   const onToggleSubtasks = useCallback((id: string) => keys.current.setSubtasksOpen(id, !keys.current.subtasksOpen(id)), [keys]);
 
   return (
@@ -178,7 +180,10 @@ function Table({ view, data }: { view: View; data: ViewData }) {
                   <TableRow
                     row={item.row}
                     columns={columns}
-                    selected={selected === item.row.id}
+                    selected={picking ? pickedIds.has(item.row.id) : selected === item.row.id}
+                    picked={pickedIds.has(item.row.id)}
+                    picking={picking}
+                    onToggleBox={onToggleBox}
                     onSelect={onSelect}
                     onPick={onPick}
                     onOpen={onOpen}

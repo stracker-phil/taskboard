@@ -45,7 +45,10 @@
 .board-card:focus-visible { border-color: var(--accent); }
 .board-card--changed { border-color: var(--changed-border); background: var(--changed-bg); }
 /* Weighted like the List's titles. */
-.board-card__title { margin: 0; font-size: 14px; line-height: 22px; white-space: normal; overflow-wrap: anywhere; }
+.board-card__title { margin: 0; padding-right: 20px; font-size: 14px; line-height: 22px; white-space: normal; overflow-wrap: anywhere; }
+/* The checkbox (list.css → picking) sits at the end of the title's first line, in room the title keeps free. */
+.board-card__pick { position: absolute; top: 16px; right: 14px; }
+.board-card:hover .pick-box { opacity: 1; }
 .board-card--changed .board-card__summary { font-weight: 600; }
 .board-card__tags { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
 .board-card__tags > .epic-chip { max-width: 100%; }

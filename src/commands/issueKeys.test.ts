@@ -29,6 +29,10 @@ function handlers(patch: Partial<IssueKeyHandlers> = {}) {
     changePriority: vi.fn(),
     rename: vi.fn(),
     togglePeek: vi.fn(),
+    extend: vi.fn(),
+    pickAll: vi.fn(),
+    clearPicks: vi.fn(),
+    hasPicks: () => false,
     hasSelection: () => true,
     peekOpen: () => true,
     ...patch,
@@ -72,6 +76,9 @@ describe("issue keys", () => {
       ["D", "d", {}],
       ["A", "a", {}],
       ["⇧P", "P", { shift: true }],
+      ["⇧J", "J", { shift: true }],
+      ["⇧K", "K", { shift: true }],
+      ["⌘A", "a", { meta: true }],
       ["F2", "F2", {}],
     ])("leaves %s to nobody", (_label, key, mods) => {
       expect(press(key, mods)).toBeNull();
@@ -91,6 +98,119 @@ describe("issue keys", () => {
       void press(key)?.run();
 
       expect(h.move).toHaveBeenCalledWith(step);
+    });
+  });
+
+  describe("picking", () => {
+    it.each([
+      ["⇧J", "J", 1],
+      ["⇧↓", "ArrowDown", 1],
+      ["⇧K", "K", -1],
+      ["⇧↑", "ArrowUp", -1],
+    ])("%s extends the picks by %i", (_label, key, step) => {
+      const h = handlers();
+      register(h);
+
+      void press(key, { shift: true })?.run();
+
+      expect(h.extend).toHaveBeenCalledWith(step);
+      expect(h.move).not.toHaveBeenCalled();
+    });
+
+    it("leaves ⇧J to nobody where the view cannot pick", () => {
+      register(handlers({ extend: undefined }));
+
+      expect(press("J", { shift: true })).toBeNull();
+    });
+
+    it("⌘A picks every row", () => {
+      const h = handlers();
+      register(h);
+
+      void press("a", { meta: true })?.run();
+
+      expect(h.pickAll).toHaveBeenCalled();
+    });
+
+    it("leaves ⌘A to the native Select All where the view cannot pick", () => {
+      register(handlers({ pickAll: undefined }));
+
+      expect(press("a", { meta: true })).toBeNull();
+    });
+
+    it("leaves ⌘A to a focused text field", () => {
+      register(handlers());
+      const input = document.createElement("input");
+      document.body.append(input);
+      input.focus();
+
+      expect(press("a", { meta: true })).toBeNull();
+    });
+
+    it("leaves ⌘A to an open dialog", () => {
+      register(handlers());
+      document.body.innerHTML = '<div role="dialog">Confirm</div>';
+
+      expect(press("a", { meta: true })).toBeNull();
+    });
+
+    describe("Escape", () => {
+      it("drops the picks while rows are picked, even with the peek open", () => {
+        const h = handlers({ hasPicks: () => true, peekOpen: () => true });
+        register(h);
+
+        const command = press("Escape");
+        void command?.run();
+
+        expect(command?.id).toBe("peek.close");
+        expect(h.clearPicks).toHaveBeenCalled();
+        expect(h.closePeek).not.toHaveBeenCalled();
+      });
+
+      it("drops the picks where there is no preview", () => {
+        const h = handlers({ hasPicks: () => true, peekOpen: () => false });
+        register(h);
+
+        const command = press("Escape");
+        void command?.run();
+
+        expect(command?.id).toBe("peek.close");
+        expect(h.clearPicks).toHaveBeenCalled();
+      });
+
+      it("closes the peek when nothing is picked", () => {
+        const h = handlers({ hasPicks: () => false, peekOpen: () => true });
+        register(h);
+
+        const command = press("Escape");
+        void command?.run();
+
+        expect(command?.id).toBe("peek.close");
+        expect(h.closePeek).toHaveBeenCalled();
+        expect(h.clearPicks).not.toHaveBeenCalled();
+      });
+
+      it("does nothing when nothing is picked and the peek is closed", () => {
+        register(handlers({ hasPicks: () => false, peekOpen: () => false }));
+
+        expect(press("Escape")).toBeNull();
+      });
+
+      it("is left to a focused text field", () => {
+        register(handlers({ hasPicks: () => true }));
+        const input = document.createElement("input");
+        document.body.append(input);
+        input.focus();
+
+        expect(press("Escape")).toBeNull();
+      });
+
+      it("is left to an open dialog", () => {
+        register(handlers({ hasPicks: () => true }));
+        document.body.innerHTML = '<div role="dialog">Confirm</div>';
+
+        expect(press("Escape")).toBeNull();
+      });
     });
   });
 

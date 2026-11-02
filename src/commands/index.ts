@@ -51,10 +51,10 @@ export function installCommands(windowName: WindowName) {
 /** A context menu takes its own keys. */
 const inMenu = (target: EventTarget | null) => target instanceof Element && !!target.closest('[role="menu"]');
 
-/** ↵ and Space activate the focused button or link rather than a command. */
+/** ↵ and Space activate the focused button, link or checkbox rather than a command. */
 function activatesControl(e: KeyboardEvent): boolean {
   if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || (e.key !== "Enter" && e.key !== " ")) return false;
-  return e.target instanceof Element && !!e.target.closest('button, a[href], [role="button"], [role="option"]');
+  return e.target instanceof Element && !!e.target.closest('button, a[href], input[type="checkbox"], [role="button"], [role="option"]');
 }
 
 /** Capture-phase keydown handler for the window. */

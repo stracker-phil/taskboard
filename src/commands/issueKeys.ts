@@ -5,6 +5,13 @@ import { isTextInput } from "./registry";
 /** What the shown view does with the issue keys; the List registers it while it is on screen. */
 export interface IssueKeyHandlers {
   move: (step: 1 | -1) => void;
+  /** ⇧J / ⇧K: picks the next row too, where rows can be picked. */
+  extend?: (step: 1 | -1) => void;
+  /** ⌘A: picks every row the view shows. */
+  pickAll?: () => void;
+  /** Esc, before closing the preview: drops the picks. */
+  clearPicks?: () => void;
+  hasPicks?: () => boolean;
   /** The selected row's group: ← closes it, → opens it. */
   setGroupOpen: (open: boolean) => void;
   closePeek: () => void;
@@ -55,10 +62,24 @@ export const ISSUE_KEY_COMMANDS: Command[] = [
   { id: "issue.next.arrow", title: "Next issue (arrow)", scope: "main", defaultBinding: "ArrowDown", when: () => handlers !== null, run: () => handlers?.move(1) },
   { id: "issue.previous", title: "Previous issue", scope: "main", defaultBinding: "K", when: () => handlers !== null, run: () => handlers?.move(-1) },
   { id: "issue.previous.arrow", title: "Previous issue (arrow)", scope: "main", defaultBinding: "ArrowUp", when: () => handlers !== null, run: () => handlers?.move(-1) },
+  { id: "issue.pickNext", title: "Pick the next issue too", scope: "main", defaultBinding: "Shift+J", when: () => handlers?.extend !== undefined, run: () => handlers?.extend?.(1) },
+  { id: "issue.pickNext.arrow", title: "Pick the next issue too (arrow)", scope: "main", defaultBinding: "Shift+ArrowDown", when: () => handlers?.extend !== undefined, run: () => handlers?.extend?.(1) },
+  { id: "issue.pickPrevious", title: "Pick the previous issue too", scope: "main", defaultBinding: "Shift+K", when: () => handlers?.extend !== undefined, run: () => handlers?.extend?.(-1) },
+  { id: "issue.pickPrevious.arrow", title: "Pick the previous issue too (arrow)", scope: "main", defaultBinding: "Shift+ArrowUp", when: () => handlers?.extend !== undefined, run: () => handlers?.extend?.(-1) },
+  // ⌘A stays Edit → Select All in a text field and where no rows can be picked.
+  { id: "issue.pickAll", title: "Pick all issues", scope: "main", defaultBinding: "Mod+A", when: () => handlers?.pickAll !== undefined && !isTextInput(document.activeElement) && !document.querySelector("[role=dialog]"), run: () => handlers?.pickAll?.() },
   { id: "group.collapse", title: "Collapse the issue's group", scope: "main", defaultBinding: "ArrowLeft", when: selected, run: () => handlers?.setGroupOpen(false) },
   { id: "group.expand", title: "Expand the issue's group", scope: "main", defaultBinding: "ArrowRight", when: selected, run: () => handlers?.setGroupOpen(true) },
-  // Escape in a text field (the title being renamed) leaves the field first.
-  { id: "peek.close", title: "Close the preview", scope: "main", defaultBinding: "Escape", when: () => (handlers?.peekOpen() ?? false) && !document.querySelector("[role=dialog]") && !isTextInput(document.activeElement), run: () => handlers?.closePeek() },
+  // Escape in a text field (the title being renamed) leaves the field first. Picks go before the preview; picking
+  // closes the preview, so the two never wait at once.
+  {
+    id: "peek.close",
+    title: "Close the preview or drop the picked issues",
+    scope: "main",
+    defaultBinding: "Escape",
+    when: () => ((handlers?.peekOpen() ?? false) || (handlers?.hasPicks?.() ?? false)) && !document.querySelector("[role=dialog]") && !isTextInput(document.activeElement),
+    run: () => (handlers?.hasPicks?.() ? handlers.clearPicks?.() : handlers?.closePeek()),
+  },
   { id: "issue.copyKey", title: "Copy issue key", scope: "main", defaultBinding: "Mod+C", when: () => selected() && nothingElseToCopy(), run: () => handlers?.copyKey() },
   { id: "issue.copyUrl", title: "Copy issue URL", scope: "main", defaultBinding: "Mod+Shift+C", when: selected, run: () => handlers?.copyUrl() },
   { id: "issue.copyAppLink", title: "Copy Taskboard link", scope: "main", defaultBinding: "Mod+Alt+Shift+C", when: selected, run: () => handlers?.copyAppLink() },

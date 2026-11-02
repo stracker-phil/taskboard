@@ -9,7 +9,9 @@ import { columnDef } from "./columns";
 import type { CardPosition, Nesting } from "./flatten";
 import { RowActions, type RowActionHandlers } from "./RowActions";
 import { LabelChips } from "../../components/issue/LabelChips";
-import { opensIssue } from "./opensIssue";
+import { keepTextUnselected, opensIssue } from "./opensIssue";
+import { PickBox } from "./PickBox";
+import type { PickKeys } from "./useRowClicks";
 import { ChildCount, SubtaskIcon } from "../../components/issue/SubtaskIcon";
 import { SubtaskCaret } from "./SubtaskCaret";
 import { useFlash } from "../../lib/motion";
@@ -23,8 +25,14 @@ interface Props {
   wrap?: boolean;
   /** The labels as tags after the title. */
   inlineLabels?: boolean;
+  /** Highlighted: the selected row, or a picked one while rows are picked. */
   selected: boolean;
-  onSelect: (id: string) => void;
+  /** Its checkbox is ticked. */
+  picked: boolean;
+  /** Rows are picked: every checkbox shows. */
+  picking: boolean;
+  onSelect: (id: string, mods?: PickKeys) => void;
+  onToggleBox: (id: string) => void;
   /** Selects without opening: a cell that opens a menu. */
   onPick: (id: string) => void;
   /** A double-click: always the full Issue view. */
@@ -42,7 +50,7 @@ interface Props {
 }
 
 export const IssueRow = memo(function IssueRow(props: Props) {
-  const { row, columns, position, wrap = false, inlineLabels = false, selected, onSelect, onPick, onOpen, actions } = props;
+  const { row, columns, position, wrap = false, inlineLabels = false, selected, picked, picking, onSelect, onToggleBox, onPick, onOpen, actions } = props;
   const { nesting = null, subtasksOpen = true, onToggleSubtasks, childChip = false, pinned = false } = props;
   const nested = (nesting?.depth ?? 0) > 0;
   const flashing = useFlash(row.updatedAt);
@@ -61,8 +69,18 @@ export const IssueRow = memo(function IssueRow(props: Props) {
   const caretClass = ["list-row-caret", nested && "list-row-caret--nested", wrap && "list-row-caret--wrap"].filter(Boolean).join(" ");
   return (
     <>
+      <PickBox issueKey={row.key} picked={picked} onToggle={() => onToggleBox(row.id)} className={["list-pick", wrap && "list-pick--wrap", picking && "pick-box--shown"].filter(Boolean).join(" ")} />
       {nesting?.parent && <SubtaskCaret className={caretClass} style={indentStyle} open={subtasksOpen} onToggle={() => onToggleSubtasks?.(row.id)} />}
-      <div className={className} style={indentStyle} role="row" aria-selected={selected} data-issue-id={row.id} onClick={() => onSelect(row.id)} onDoubleClick={(e) => opensIssue(e) && onOpen(row.id)}>
+      <div
+        className={className}
+        style={indentStyle}
+        role="row"
+        aria-selected={selected}
+        data-issue-id={row.id}
+        onMouseDown={keepTextUnselected}
+        onClick={(e) => onSelect(row.id, e)}
+        onDoubleClick={(e) => opensIssue(e) && onOpen(row.id)}
+      >
         <span className="list-row__name" role="gridcell">
           <StatusSquare style={row.style} />
           <span className="list-row__title">

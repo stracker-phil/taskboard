@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -65,12 +65,12 @@ async function renderList(data: ViewData, openWith: IssueOpening | null = null) 
       <MenuHost />
     </QueryClientProvider>
   );
-  const { rerender } = render(tree(NO_NARROWING));
+  const { rerender, unmount } = render(tree(NO_NARROWING));
   await screen.findByRole("grid");
   await waitFor(() => expect(place()).toBeDefined());
   await waitFor(() => expect(mocked.getSettings).toHaveBeenCalled());
   await act(async () => {});
-  return { narrowTo: (narrowing: Narrowing) => rerender(tree(narrowing)) };
+  return { narrowTo: (narrowing: Narrowing) => rerender(tree(narrowing)), unmount };
 }
 
 const OPEN = row({ id: "1", key: "NW-1042", summary: "Redesign the pricing page", commentCount: 3 });
@@ -1114,6 +1114,212 @@ describe("ListView", () => {
       expect(screen.queryByText("Redesign the pricing page")).not.toBeInTheDocument();
       expect(screen.getByText("Fix the footer links")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Expand Alpha" })).toBeInTheDocument();
+    });
+  });
+
+  describe("picking", () => {
+    const SECOND = row({ id: "3", key: "NW-1003", summary: "Fix the footer links" });
+    const rows = [OPEN, DONE, SECOND];
+    const data = () => viewData([groupOf(rows)], rows);
+    const press = (id: string) => act(async () => void (await getCommand(id)?.run()));
+    const box = (key: string) => screen.getByRole("checkbox", { name: `Pick ${key}` });
+    const pickedKeys = () =>
+      screen
+        .getAllByRole("checkbox")
+        .filter((b) => (b as HTMLInputElement).checked)
+        .map((b) => b.getAttribute("aria-label")?.replace("Pick ", ""));
+    const text = (summary: string) => screen.findByText(summary);
+
+    beforeEach(() => {
+      installCommands("main");
+    });
+
+    it("picks the ⌘-clicked row with the selected one, and opens no preview even after the double-click interval", async () => {
+      await renderList(data(), "preview");
+      await userEvent.click(await text("Redesign the pricing page"));
+
+      fireEvent.click(await text("Publish the launch notes"), { metaKey: true });
+      await pastDoubleClickInterval();
+
+      expect(pickedKeys()).toEqual(["NW-1042", "NW-1001"]);
+      expect(place()).toMatchObject({ selectedId: "2", peekOpen: false });
+    });
+
+    it("picks only the ⌘-clicked row when nothing is selected", async () => {
+      await renderList(data(), "preview");
+
+      fireEvent.click(await text("Publish the launch notes"), { metaKey: true });
+
+      expect(pickedKeys()).toEqual(["NW-1001"]);
+    });
+
+    it("unpicks a picked row on a second ⌘-click", async () => {
+      await renderList(data(), "preview");
+      fireEvent.click(await text("Publish the launch notes"), { metaKey: true });
+      fireEvent.click(await text("Fix the footer links"), { metaKey: true });
+      expect(pickedKeys()).toEqual(["NW-1001", "NW-1003"]);
+
+      fireEvent.click(await text("Fix the footer links"), { metaKey: true });
+
+      expect(pickedKeys()).toEqual(["NW-1001"]);
+    });
+
+    it("marks the picked rows as selected and the others not", async () => {
+      await renderList(data(), "preview");
+
+      fireEvent.click(await text("Publish the launch notes"), { metaKey: true });
+
+      expect(screen.getByRole("row", { name: /NW-1001/ })).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByRole("row", { name: /NW-1042/ })).toHaveAttribute("aria-selected", "false");
+    });
+
+    it("picks the rows from the selected one to the ⇧-clicked one", async () => {
+      await renderList(data(), "preview");
+      await userEvent.click(await text("Redesign the pricing page"));
+
+      fireEvent.click(await text("Fix the footer links"), { shiftKey: true });
+
+      expect(pickedKeys()).toEqual(["NW-1042", "NW-1001", "NW-1003"]);
+    });
+
+    it("picks the range upward when the ⇧-clicked row is above the selected one", async () => {
+      await renderList(data(), "preview");
+      await userEvent.click(await text("Fix the footer links"));
+
+      fireEvent.click(await text("Publish the launch notes"), { shiftKey: true });
+
+      expect(pickedKeys()).toEqual(["NW-1001", "NW-1003"]);
+    });
+
+    it("drops the picks and selects the row on a plain click", async () => {
+      await renderList(data(), "preview");
+      fireEvent.click(await text("Publish the launch notes"), { metaKey: true });
+
+      await userEvent.click(await text("Fix the footer links"));
+
+      expect(pickedKeys()).toEqual([]);
+      expect(place().selectedId).toBe("3");
+    });
+
+    it("picks only its own row from the checkbox, leaving the selection and the preview alone", async () => {
+      await renderList(data(), "preview");
+      await userEvent.click(await text("Redesign the pricing page"));
+      await waitFor(() => expect(place().peekOpen).toBe(true), PREVIEW_WAIT);
+      await press("peek.close");
+
+      await userEvent.click(box("NW-1003"));
+      await pastDoubleClickInterval();
+
+      expect(pickedKeys()).toEqual(["NW-1003"]);
+      expect(place()).toMatchObject({ selectedId: "1", peekOpen: false });
+      expect(useStore.getState().issueView).toBeNull();
+    });
+
+    it("unpicks a row from its checkbox", async () => {
+      await renderList(data(), "preview");
+      await userEvent.click(await screen.findByRole("checkbox", { name: "Pick NW-1003" }));
+
+      await userEvent.click(box("NW-1003"));
+
+      expect(pickedKeys()).toEqual([]);
+    });
+
+    it("opens no Issue view when a checkbox is double-clicked", async () => {
+      await renderList(data(), "preview");
+
+      await userEvent.dblClick(await screen.findByRole("checkbox", { name: "Pick NW-1003" }));
+
+      expect(useStore.getState().issueView).toBeNull();
+    });
+
+    it("opens no Issue view on a ⌘-double-click", async () => {
+      await renderList(data(), "preview");
+
+      fireEvent.dblClick(await text("Publish the launch notes"), { metaKey: true });
+
+      expect(useStore.getState().issueView).toBeNull();
+    });
+
+    it("picks every shown row on ⌘A", async () => {
+      await renderList(data(), "preview");
+      await screen.findByRole("row", { name: /NW-1042/ });
+
+      await press("issue.pickAll");
+
+      expect(pickedKeys()).toEqual(["NW-1042", "NW-1001", "NW-1003"]);
+    });
+
+    it("drops the picks on Esc", async () => {
+      await renderList(data(), "preview");
+      await screen.findByRole("row", { name: /NW-1042/ });
+      await press("issue.pickAll");
+
+      await press("peek.close");
+
+      expect(pickedKeys()).toEqual([]);
+    });
+
+    it("adds the row below the picks on ⇧J and selects it", async () => {
+      await renderList(data(), "preview");
+      await userEvent.click(await text("Redesign the pricing page"));
+
+      await press("issue.pickNext");
+      expect(pickedKeys()).toEqual(["NW-1042", "NW-1001"]);
+      await press("issue.pickNext");
+
+      expect(pickedKeys()).toEqual(["NW-1042", "NW-1001", "NW-1003"]);
+      expect(place().selectedId).toBe("3");
+    });
+
+    it("adds the row above the picks on ⇧K", async () => {
+      await renderList(data(), "preview");
+      await userEvent.click(await text("Fix the footer links"));
+
+      await press("issue.pickPrevious");
+
+      expect(pickedKeys()).toEqual(["NW-1001", "NW-1003"]);
+    });
+
+    it("drops the picks when J moves the selection", async () => {
+      await renderList(data(), "preview");
+      await userEvent.click(await text("Redesign the pricing page"));
+      await press("issue.pickNext");
+
+      await press("issue.next");
+
+      expect(pickedKeys()).toEqual([]);
+    });
+
+    it("opens the preview and drops the picks on Space", async () => {
+      await renderList(data(), "preview");
+      fireEvent.click(await text("Publish the launch notes"), { metaKey: true });
+
+      await press("issue.togglePeek");
+
+      expect(pickedKeys()).toEqual([]);
+      expect(place()).toMatchObject({ selectedId: "2", peekOpen: true });
+    });
+
+    it("closes an open preview when rows get picked", async () => {
+      await renderList(data(), "preview");
+      await userEvent.click(await text("Redesign the pricing page"));
+      await waitFor(() => expect(place().peekOpen).toBe(true), PREVIEW_WAIT);
+
+      fireEvent.click(await text("Publish the launch notes"), { metaKey: true });
+
+      expect(pickedKeys()).toEqual(["NW-1042", "NW-1001"]);
+      expect(place().peekOpen).toBe(false);
+    });
+
+    it("forgets the picks when the view goes away", async () => {
+      const { unmount } = await renderList(data(), "preview");
+      await screen.findByRole("row", { name: /NW-1042/ });
+      await press("issue.pickAll");
+      expect(useStore.getState().picked["11:101"]).toEqual(["1", "2", "3"]);
+
+      unmount();
+
+      expect(useStore.getState().picked["11:101"]).toEqual([]);
     });
   });
 

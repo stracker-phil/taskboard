@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -7,6 +7,7 @@ vi.mock("../../api", async (orig) => ({ ...(await orig<object>()), api: (await i
 
 import { api, type BoardData, type View } from "../../api";
 import { installCommands, useCommandKeys } from "../../commands";
+import { getCommand } from "../../commands/registry";
 import { createQueryClient } from "../../queries/queryClient";
 import { narrowingKey } from "../../state/slices/narrowing";
 import { resetStore, useStore } from "../../state/store";
@@ -387,8 +388,133 @@ describe("BoardView", () => {
     });
   });
 
+  describe("picking", () => {
+    const cards = [
+      row({ id: "1", key: "NW-101", summary: "Draft the sitemap" }),
+      row({ id: "2", key: "NW-102", summary: "Write the footer copy" }),
+      row({ id: "3", key: "NW-103", summary: "Pick the typefaces" }),
+      row({ id: "4", key: "NW-104", summary: "Build the header" }),
+      row({ id: "5", key: "NW-105", summary: "Wire up the search" }),
+      row({ id: "6", key: "NW-106", summary: "Register the domain" }),
+      row({ id: "7", key: "NW-107", summary: "Check the contrast" }),
+    ];
+    const BOARD_DATA = boardData(
+      [
+        boardColumn({ key: "1", name: "To Do", style: "todo", ids: ["1", "2", "3"] }),
+        boardColumn({ key: "4", name: "In Review", style: "progress", ids: ["7"], collapsed: true }),
+        boardColumn({ key: "3", name: "In Progress", style: "progress", ids: ["4", "5"] }),
+        boardColumn({ key: "5", name: "Done", style: "done", ids: ["6"] }),
+      ],
+      cards,
+    );
+    const card = (summary: string) => screen.getByRole("article", { name: new RegExp(summary) });
+    const pickedKeys = () =>
+      screen
+        .getAllByRole("checkbox")
+        .filter((b) => (b as HTMLInputElement).checked)
+        .map((b) => b.getAttribute("aria-label")?.replace("Pick ", ""));
+    const press = (id: string) => act(async () => void (await getCommand(id)?.run()));
+
+    beforeEach(() => {
+      installCommands("main");
+    });
+
+    it("picks a ⌘-clicked card without opening the Issue view", async () => {
+      await renderBoard(BOARD_DATA);
+
+      fireEvent.click(card("Write the footer copy"), { metaKey: true });
+
+      expect(pickedKeys()).toEqual(["NW-102"]);
+      expect(useStore.getState().issueView).toBeNull();
+    });
+
+    it("picks the current card too with the first ⌘-click, and unpicks on a second", async () => {
+      await renderBoard(BOARD_DATA);
+      fireEvent.click(card("Draft the sitemap"), { metaKey: true });
+      fireEvent.click(card("Pick the typefaces"), { metaKey: true });
+      expect(pickedKeys()).toEqual(["NW-101", "NW-103"]);
+
+      fireEvent.click(card("Pick the typefaces"), { metaKey: true });
+
+      expect(pickedKeys()).toEqual(["NW-101"]);
+    });
+
+    it("picks a ⇧-clicked range in reading order across the open columns", async () => {
+      await renderBoard(BOARD_DATA);
+      fireEvent.click(card("Write the footer copy"), { metaKey: true });
+
+      fireEvent.click(card("Wire up the search"), { shiftKey: true });
+
+      expect(pickedKeys()).toEqual(["NW-102", "NW-103", "NW-104", "NW-105"]);
+      expect(useStore.getState().issueView).toBeNull();
+    });
+
+    it("drops the picks and opens the Issue view on a plain click", async () => {
+      await renderBoard(BOARD_DATA);
+      fireEvent.click(card("Draft the sitemap"), { metaKey: true });
+
+      await userEvent.click(card("Pick the typefaces"));
+
+      expect(pickedKeys()).toEqual([]);
+      expect(useStore.getState().issueView?.stack).toEqual(["3"]);
+    });
+
+    it("picks a card from its checkbox without opening the Issue view", async () => {
+      await renderBoard(BOARD_DATA);
+
+      await userEvent.click(screen.getByRole("checkbox", { name: "Pick NW-104" }));
+
+      expect(pickedKeys()).toEqual(["NW-104"]);
+      expect(useStore.getState().issueView).toBeNull();
+    });
+
+    it("unpicks a card from its checkbox", async () => {
+      await renderBoard(BOARD_DATA);
+      await userEvent.click(screen.getByRole("checkbox", { name: "Pick NW-104" }));
+
+      await userEvent.click(screen.getByRole("checkbox", { name: "Pick NW-104" }));
+
+      expect(pickedKeys()).toEqual([]);
+    });
+
+    it("picks every card of the open columns on ⌘A, leaving a collapsed column out", async () => {
+      await renderBoard(BOARD_DATA);
+
+      await press("issue.pickAll");
+
+      expect(pickedKeys()).toEqual(["NW-101", "NW-102", "NW-103", "NW-104", "NW-105", "NW-106"]);
+    });
+
+    it("drops the picks on Esc", async () => {
+      await renderBoard(BOARD_DATA);
+      await press("issue.pickAll");
+
+      await press("peek.close");
+
+      expect(pickedKeys()).toEqual([]);
+    });
+
+    it("answers Esc only while cards are picked, as the Board has no preview", async () => {
+      await renderBoard(BOARD_DATA);
+      expect(getCommand("peek.close")?.when?.()).toBe(false);
+
+      await press("issue.pickAll");
+
+      expect(getCommand("peek.close")?.when?.()).toBe(true);
+    });
+
+    it("drops the picks when J moves the current card", async () => {
+      await renderBoard(BOARD_DATA);
+      await press("issue.pickAll");
+
+      await press("issue.next");
+
+      expect(pickedKeys()).toEqual([]);
+    });
+  });
+
   describe("keys", () => {
-    const todo = [row({ id: "1", key: "NW-101", summary: "Draft the sitemap" }), row({ id: "2", key: "NW-102", summary: "Write the footer copy" }), row({ id: "3", key: "NW-103", summary: "Pick the typefaces" })];
+    const todo =[row({ id: "1", key: "NW-101", summary: "Draft the sitemap" }), row({ id: "2", key: "NW-102", summary: "Write the footer copy" }), row({ id: "3", key: "NW-103", summary: "Pick the typefaces" })];
     const progress = [row({ id: "4", key: "NW-104", summary: "Build the header" }), row({ id: "5", key: "NW-105", summary: "Wire up the search" })];
     const review = [row({ id: "7", key: "NW-107", summary: "Check the contrast" })];
     const done = [row({ id: "6", key: "NW-106", summary: "Register the domain" })];

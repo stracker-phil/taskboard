@@ -245,6 +245,22 @@ one group, Board column or pill per style, whatever the status is called; the Bo
   Collapsed rows are kept per view (`places.json`); expanded is
   the default.
 
+## Picking issues
+
+Issues are picked for a bulk change (`views/list/picking.ts`, the store's `picked` per view, never saved; the
+Board's `views/board/useBoardPicks.ts`):
+- **⌘-click** adds or removes a row or card; the first one also picks the selected row, as Finder does. **⇧-click**
+  picks the rows from the selected one to the clicked one (the press selects no text). **⌘A** picks every row the
+  view shows (in a text field or the Issue view it stays Select All); **⇧J / ⇧K** (⇧↓ / ⇧↑) add the row past the
+  picks' bottom or top edge. **Esc**, a plain click, J/K and opening the preview drop the picks.
+- **The checkbox** (`PickBox`, a native checkbox in the accent color) toggles its row alone. It shows while its row
+  or card has the pointer, once ticked, and on every row while any is picked: in the List in the gutter 48 left of
+  the row (left of the subtask caret, vertically on the first line), in the Table in the row's 24px left inset (the
+  spacer it replaces), on a Board card at the end of the title's first line, in room the title always keeps free.
+- Picked rows and cards look selected; while any is picked, the selected row alone doesn't. Picking closes the
+  preview, which shows one issue. A ⌘ or ⇧ click or double-click opens nothing, and a narrowing that hides a picked
+  row leaves it out. Leaving the view drops the picks.
+
 ## Peek
 
 ⌥ + hover over any issue (anything marked `data-issue-id`: List and Table rows, Board cards, related and child
@@ -808,7 +824,7 @@ global shortcuts.
   never what the page shows. Help has Open Log Folder and Show Data Folder. Plain-letter keys stay off menu
   items so they never take a typed letter; Copy Key has no ⌘C there because Edit → Copy owns it.
 - Bare keys never fire in text fields; there only ⌘ and ⌃ combinations and Escape do.
-- ↵ and Space on a focused button or link activate it. `Tab` moves focus (sidebar, tabs, toolbar, content).
+- ↵ and Space on a focused button, link or checkbox activate it. `Tab` moves focus (sidebar, tabs, toolbar, content).
 - A command has one binding; ⌘1–⌘9 open the nth view tab.
 - **Issues** (`commands/issueKeys.ts`, registered by the shown List, Table, Board or Issue view; the List and the Table share `views/list/useRowKeys.ts`): J or ↓ and K or ↑
   move (on the Board through a column's cards, ← and → to the neighboring column; in a List or Table ← and → close and
@@ -816,6 +832,7 @@ global shortcuts.
   level, and ← on a nested row selects its parent), Space opens or closes the preview (the Board opens the Issue view), ↩ opens the Issue
   view, E the epic, P adds or removes a bookmark (default duration), M marks read or unread, ⌘C copies the key (only with no text
   field focused and no text selected), ⌘⇧C the URL, ⌘↩ opens it in Jira, esc closes the preview or goes back.
+  ⌘A and ⇧J/⇧K pick issues, esc drops the picks before it closes the preview ([Picking issues](#picking-issues)).
 - **A click on an issue key copies it** ("Copied NW-1042", `components/issue/CopyKey.tsx`): in List and Table rows,
   on Board cards, in Bookmarks, in the Issue view's header and title line, the preview's header and related, child
   and subtask rows. The click and a double-click stop at the key, so the row or card neither selects nor opens;

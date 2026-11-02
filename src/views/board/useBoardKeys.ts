@@ -1,6 +1,9 @@
 import { useEffect, useRef } from "react";
 import type { BoardData } from "../../api";
 import { onIssueKeys } from "../../commands/issueKeys";
+import type { useBoardPicks } from "./useBoardPicks";
+
+type BoardPicks = Pick<ReturnType<typeof useBoardPicks>, "picked" | "setPicked" | "pickAll">;
 import type { RowActionHandlers } from "../list/RowActions";
 import { explainWritesOff } from "../../writes/runWrite";
 import { assignMenuAnchor } from "../../writes/assignMenu";
@@ -16,10 +19,11 @@ export function useBoardKeys(
   select: (id: string) => void,
   open: (id: string) => void,
   actions: RowActionHandlers & { copyUrl: (key: string) => void; copyAppLink: (key: string) => void; canChangeTitle: boolean },
+  picks: BoardPicks,
 ) {
-  const state = useRef({ data, selected, select, open, actions });
+  const state = useRef({ data, selected, select, open, actions, picks });
   useEffect(() => {
-    state.current = { data, selected, select, open, actions };
+    state.current = { data, selected, select, open, actions, picks };
   });
   useEffect(() => {
     const columns = () => state.current.data.columns.filter((c) => !c.collapsed && c.ids.length > 0);
@@ -33,7 +37,11 @@ export function useBoardKeys(
       if (row) run(row.key);
     };
     return onIssueKeys({
+      pickAll: () => state.current.picks.pickAll(),
+      clearPicks: () => state.current.picks.setPicked([]),
+      hasPicks: () => state.current.picks.picked.length > 0,
       move: (step) => {
+        if (state.current.picks.picked.length > 0) state.current.picks.setPicked([]);
         const { all, column, index } = where();
         if (all.length === 0) return;
         if (column < 0) return state.current.select(all[0].ids[0]);
