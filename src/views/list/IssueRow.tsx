@@ -3,7 +3,6 @@ import type { Row } from "../../api";
 import { CopyKey } from "../../components/issue/CopyKey";
 import { ChangeChip } from "../../components/issue/ChangeChip";
 import { CommentCount } from "../../components/issue/CommentCount";
-import { StatusSquare } from "../../components/issue/StatusSquare";
 import { CellValue, cellEditProps } from "./cellEdits";
 import { columnDef } from "./columns";
 import type { CardPosition, Nesting } from "./flatten";
@@ -16,6 +15,7 @@ import { ChildCount, SubtaskIcon } from "../../components/issue/SubtaskIcon";
 import { SubtaskCaret } from "./SubtaskCaret";
 import { TreeGuides } from "./TreeGuides";
 import { useFlash } from "../../lib/motion";
+import { StatusSquareButton } from "../../writes/StatusSquareButton";
 
 interface Props {
   row: Row;
@@ -87,7 +87,7 @@ export const IssueRow = memo(function IssueRow(props: Props) {
           <span className="list-row__title">
             <CopyKey className="list-row__key" issueKey={row.key} />
             {row.isSubtask && <SubtaskIcon />}
-            <StatusSquare style={row.style} />
+            <StatusSquareButton issue={row} changeStatus={actions.changeStatus} onPick={onPick} />
             <span className="list-row__summary">{row.summary}</span>
             {inlineLabels && <LabelChips labels={row.labels} className={wrap ? "row-labels row-labels--flow" : "row-labels"} />}
             {wrap && flowingChips}

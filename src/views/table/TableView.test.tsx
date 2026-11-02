@@ -520,6 +520,24 @@ describe("TableView", () => {
       expect(cell("In Progress")).toHaveAttribute("aria-haspopup", "menu");
     });
 
+    it("opens the status menu from the status square, without opening the preview", async () => {
+      await renderEditable({}, { ...TABLE, openWith: "preview" });
+
+      await userEvent.click(screen.getByRole("button", { name: "Change the status of NW-1042 (In Progress)" }));
+      await pastDoubleClickInterval();
+
+      const menu = await screen.findByRole("menu", { name: "Status of NW-1042" });
+      expect(within(menu).getByRole("menuitem", { name: /In Review/ })).toBeInTheDocument();
+      expect(place()).toMatchObject({ selectedId: "1", peekOpen: false });
+      expect(useStore.getState().issueView).toBeNull();
+    });
+
+    it("shows no status square button while changes to Jira are off", async () => {
+      await renderEditable({ allowJiraChanges: false });
+
+      expect(screen.queryByRole("button", { name: /Change the status of/ })).not.toBeInTheDocument();
+    });
+
     it("opens the priority menu from the Priority cell, and choosing an entry writes it", async () => {
       await renderEditable();
 

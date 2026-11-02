@@ -243,6 +243,35 @@ describe("BoardView", () => {
       expect(squareOf(/NW-1042/)).toHaveClass("status-square--progress");
     });
 
+    describe("as a button", () => {
+      const REVIEW = { id: "31", statusId: "3", statusName: "In Review", style: "review", opensJira: false } as const;
+      const groupBy = "priority";
+
+      beforeEach(() => {
+        mocked.issueTransitions.mockResolvedValue([REVIEW]);
+      });
+
+      it("opens the status menu rather than the Issue view when clicked", async () => {
+        mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ allowJiraChanges: true }) }));
+        await renderBoard(boardData([HIGH], [PRICING, NOTES]), view({ layout: "board", groupBy }));
+
+        await userEvent.click(await screen.findByRole("button", { name: "Change the status of NW-1042 (In Progress)" }));
+
+        const menu = await screen.findByRole("menu", { name: "Status of NW-1042" });
+        expect(within(menu).getByRole("menuitem", { name: /In Review/ })).toBeInTheDocument();
+        expect(useStore.getState().issueView).toBeNull();
+      });
+
+      it("is a plain square, not a button, while changes to Jira are off", async () => {
+        mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ allowJiraChanges: false }) }));
+        await renderBoard(boardData([HIGH], [PRICING, NOTES]), view({ layout: "board", groupBy }));
+        await waitFor(() => expect(mocked.getSettings).toHaveBeenCalled());
+
+        expect(squareOf(/NW-1042/)).toHaveAttribute("title", "In Progress");
+        expect(screen.queryByRole("button", { name: /Change the status of/ })).not.toBeInTheDocument();
+      });
+    });
+
     it.each(["status", "statusType", "none"] as const)("shows no square when grouped by %s", async (groupBy) => {
       await renderBoard(boardData([PROGRESS, DONE], [PRICING, NOTES]), view({ layout: "board", groupBy }));
 

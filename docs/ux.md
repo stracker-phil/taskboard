@@ -199,7 +199,11 @@ one group, Board column or pill per style, whatever the status is called; the Bo
 (Settings → Spaces → the Space → Statuses) override it per status for that Space only.
 
 - **StatusSquare** (`components/issue/StatusSquare.tsx`): the only status marker, a filled 10 × 10 square,
-  radius 3, in `--status-*-square` (To do gray, Backlog lighter). No rings or outlines anywhere.
+  radius 3, in `--status-*-square` (To do gray, Backlog lighter). No rings or outlines anywhere. In List and
+  Table rows and on Board cards it is a `StatusSquareButton` (`writes/StatusSquareButton.tsx`): its tooltip
+  names the status, and while status changes to Jira are on a click selects the row and opens the status menu
+  under the square (as D does; D anchors there too). The hover shades a 3px `--cell-hover-bg` halo; the square
+  keeps its size, with a 5px wider hit area.
 - **StatusPill**: caps, text only, symmetric padding, `--status-*-bg/fg/border`. Variants: default (26 high,
   12/700, 7 radius, 1px border, dashed for Backlog), `peek` (24, 11/700, no border), `activity` (20, 10/700), `tab` (the List's
   group tab: 30, 0.04em, top corners 8, all corners when closed; To do uses `--status-todo-tab-*`).

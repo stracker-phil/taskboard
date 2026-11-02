@@ -6,12 +6,12 @@ import { CommentCount } from "../../components/issue/CommentCount";
 import { EpicChip } from "../../components/issue/EpicChip";
 import { LabelChips } from "../../components/issue/LabelChips";
 import { PriorityFlag } from "../../components/issue/PriorityFlag";
-import { StatusSquare } from "../../components/issue/StatusSquare";
 import { RowActions, type RowActionHandlers } from "../list/RowActions";
 import { keepTextUnselected, opensIssue } from "../list/opensIssue";
 import { PickBox } from "../list/PickBox";
 import type { PickKeys } from "../list/useRowClicks";
 import { useFlash } from "../../lib/motion";
+import { StatusSquareButton } from "../../writes/StatusSquareButton";
 
 interface Props {
   row: Row;
@@ -54,7 +54,7 @@ export const BoardCard = memo(function BoardCard({ row, fields, inlineLabels = f
       }}
     >
       <p className="board-card__title">
-        {statusSquare && <StatusSquare style={row.style} />}
+        {statusSquare && <StatusSquareButton issue={row} changeStatus={actions.changeStatus} />}
         <span className="board-card__summary">{row.summary}</span>
         {inlineLabels && <LabelChips labels={row.labels} className="row-labels row-labels--flow" />}
       </p>

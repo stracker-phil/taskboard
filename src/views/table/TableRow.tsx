@@ -1,7 +1,6 @@
 import { type CSSProperties, memo, type ReactNode } from "react";
 import type { Row } from "../../api";
 import { CopyKey } from "../../components/issue/CopyKey";
-import { StatusSquare } from "../../components/issue/StatusSquare";
 import { CellValue, cellEditProps, type CellEditHandlers } from "../list/cellEdits";
 import { columnDef } from "../list/columns";
 import { LabelChips } from "../../components/issue/LabelChips";
@@ -14,6 +13,7 @@ import { SubtaskCaret } from "../list/SubtaskCaret";
 import { TreeGuides } from "../list/TreeGuides";
 import { widthVar } from "./widths";
 import { useFlash } from "../../lib/motion";
+import { StatusSquareButton } from "../../writes/StatusSquareButton";
 
 const cellWidth = (id: string): CSSProperties => ({ width: `var(${widthVar(id)})` });
 
@@ -84,7 +84,7 @@ export const TableRow = memo(function TableRow(props: Props) {
       <span className="table-row__cell table-row__summary" role="gridcell">
         {nesting?.parent && <SubtaskCaret open={subtasksOpen} onToggle={() => onToggleSubtasks?.(row.id)} />}
         {row.isSubtask && <SubtaskIcon />}
-        <StatusSquare style={row.style} />
+        <StatusSquareButton issue={row} changeStatus={edits.changeStatus} onPick={onPick} />
         <span className="table-row__title">{row.summary}</span>
         {childChip && <ChildCount count={row.childCount} />}
         {inlineLabels && <LabelChips labels={row.labels} className="row-labels" />}

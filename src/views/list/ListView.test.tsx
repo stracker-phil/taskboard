@@ -1995,6 +1995,25 @@ describe("ListView", () => {
       expect(screen.getByRole("row", { name: /NW-1042/ })).toHaveAttribute("aria-selected", "true");
     });
 
+    it("opens the status menu from the status square, without opening the preview", async () => {
+      await renderEditable({}, "preview");
+
+      await userEvent.click(screen.getByRole("button", { name: "Change the status of NW-1042 (In Progress)" }));
+      await pastDoubleClickInterval();
+
+      const menu = await screen.findByRole("menu", { name: "Status of NW-1042" });
+      expect(within(menu).getByRole("menuitem", { name: /In Review/ })).toBeInTheDocument();
+      expect(place()).toMatchObject({ selectedId: "1", peekOpen: false });
+      expect(useStore.getState().issueView).toBeNull();
+    });
+
+    it("leaves the status square a plain, named square while changes to Jira are off", async () => {
+      await renderEditable({ allowJiraChanges: false });
+
+      expect(screen.queryByRole("button", { name: /Change the status of/ })).not.toBeInTheDocument();
+      expect(within(screen.getByRole("row", { name: /NW-1042/ })).getAllByTitle("In Progress").length).toBeGreaterThan(0);
+    });
+
     it("selects the row without opening the preview, even after the double-click interval", async () => {
       await renderEditable({}, "preview");
 
