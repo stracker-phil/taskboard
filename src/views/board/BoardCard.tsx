@@ -6,6 +6,7 @@ import { CommentCount } from "../../components/issue/CommentCount";
 import { EpicChip } from "../../components/issue/EpicChip";
 import { LabelChips } from "../../components/issue/LabelChips";
 import { PriorityFlag } from "../../components/issue/PriorityFlag";
+import { StatusSquare } from "../../components/issue/StatusSquare";
 import { RowActions, type RowActionHandlers } from "../list/RowActions";
 import { keepTextUnselected, opensIssue } from "../list/opensIssue";
 import { PickBox } from "../list/PickBox";
@@ -17,6 +18,8 @@ interface Props {
   fields: string[];
   /** The labels as tags after the title, while they aren't a card field. */
   inlineLabels?: boolean;
+  /** The status square before the title, when the columns aren't the statuses. */
+  statusSquare?: boolean;
   /** Highlighted: the keyboard's current card. */
   selected?: boolean;
   /** Its checkbox is ticked. */
@@ -31,7 +34,7 @@ interface Props {
 }
 
 /** A Board card: the summary first, always wrapped, the key in the bottom-right corner; changed cards are tinted. */
-export const BoardCard = memo(function BoardCard({ row, fields, inlineLabels = false, selected = false, picked = false, onOpen, onToggleBox, onOpenInTab, actions, pinned = false }: Props) {
+export const BoardCard = memo(function BoardCard({ row, fields, inlineLabels = false, statusSquare = false, selected = false, picked = false, onOpen, onToggleBox, onOpenInTab, actions, pinned = false }: Props) {
   const shows = (field: string) => fields.includes(field);
   const flashing = useFlash(row.updatedAt);
   const epic = shows("epic") && row.epic;
@@ -51,6 +54,7 @@ export const BoardCard = memo(function BoardCard({ row, fields, inlineLabels = f
       }}
     >
       <p className="board-card__title">
+        {statusSquare && <StatusSquare style={row.style} />}
         <span className="board-card__summary">{row.summary}</span>
         {inlineLabels && <LabelChips labels={row.labels} className="row-labels row-labels--flow" />}
       </p>

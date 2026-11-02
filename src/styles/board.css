@@ -50,6 +50,7 @@
 .board-card__pick { position: absolute; top: 16px; right: 14px; }
 .board-card:hover .pick-box { opacity: 1; }
 .board-card--changed .board-card__summary { font-weight: 600; }
+.board-card__title > .status-square { margin: 6px 8px 0 0; vertical-align: top; }
 .board-card__tags { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
 .board-card__tags > .epic-chip { max-width: 100%; }
 .board-card__labels { display: contents; }

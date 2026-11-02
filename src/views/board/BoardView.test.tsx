@@ -229,6 +229,29 @@ describe("BoardView", () => {
     });
   });
 
+  describe("the status square on a card", () => {
+    const HIGH = boardColumn({ key: "high", name: "High", mark: null, ids: ["1", "2"] });
+    const squareOf = (name: RegExp) => screen.getByRole("article", { name }).querySelector(".status-square");
+
+    it.each(["priority", "assignee"] as const)("shows the square of the row's status style before the summary when grouped by %s", async (groupBy) => {
+      await renderBoard(boardData([HIGH], [PRICING, NOTES]), view({ layout: "board", groupBy }));
+
+      const square = squareOf(/NW-1001/)!;
+      expect(square).toHaveClass("status-square--done");
+      const summary = within(screen.getByRole("article", { name: /NW-1001/ })).getByText("Publish the launch notes");
+      expect(square.compareDocumentPosition(summary) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(squareOf(/NW-1042/)).toHaveClass("status-square--progress");
+    });
+
+    it.each(["status", "statusType", "none"] as const)("shows no square when grouped by %s", async (groupBy) => {
+      await renderBoard(boardData([PROGRESS, DONE], [PRICING, NOTES]), view({ layout: "board", groupBy }));
+
+      expect(screen.getAllByRole("article")).toHaveLength(2);
+      expect(squareOf(/NW-1042/)).toBeNull();
+      expect(squareOf(/NW-1001/)).toBeNull();
+    });
+  });
+
   describe("cards", () => {
     const FULL = row({
       id: "1",

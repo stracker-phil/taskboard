@@ -666,7 +666,7 @@ the same way ([writes.md](writes.md#drag-and-drop)).
   `--status-*-count` and a collapse button; a collapsed one is a 48 × 300 strip with the header pill turned 90° (`status-pill--vertical`: the
   same 26px and padding, centered; owner, 2026-10-29) and the
   count, also turned 90° so a long number fits, and expands on click. Done starts collapsed; the choice is kept per view.
-- Cards (gap 10, padding 12 14, 10px radius, `--card-border`, `--shadow-card`): the summary first, 14/400 like
+- Cards (gap 10, padding 12 14, 10px radius, `--card-border`, `--shadow-card`): the summary first (after the status square unless the columns are statuses or status types), 14/400 like
   the List's titles (600 when changed), always wrapped and never truncated, with the inline labels after it;
   then the epic chip and label chips (wrapping); then avatars, release chip, comment count, priority flag and,
   in the bottom-right corner, the mono key (a 7px `--changed-dot` before it when changed). Card fields (the

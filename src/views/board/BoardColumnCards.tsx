@@ -10,6 +10,7 @@ interface Props {
   rows: Record<string, Row>;
   fields: string[];
   inlineLabels: boolean;
+  statusSquare: boolean;
   /** The keyboard's current card when it is in this column. */
   selected: string | null;
   /** The Board's picked cards. */
@@ -26,7 +27,7 @@ const CARD_ESTIMATE = 110;
 const CARD_GAP = 8;
 
 /** A column's cards, virtualized: a Space with thousands of issues mounts only the cards on screen. */
-export const BoardColumnCards = memo(function BoardColumnCards({ ids, rows, fields, inlineLabels, selected, pickedIds, onOpen, onToggleBox, onOpenInTab, actions, pinned }: Props) {
+export const BoardColumnCards = memo(function BoardColumnCards({ ids, rows, fields, inlineLabels, statusSquare, selected, pickedIds, onOpen, onToggleBox, onOpenInTab, actions, pinned }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const virtualizer = useVirtualizer({
     count: ids.length,
@@ -62,6 +63,7 @@ export const BoardColumnCards = memo(function BoardColumnCards({ ids, rows, fiel
                 row={row}
                 fields={fields}
                 inlineLabels={inlineLabels}
+                statusSquare={statusSquare}
                 selected={row.id === selected}
                 picked={pickedIds.has(row.id)}
                 onOpen={onOpen}

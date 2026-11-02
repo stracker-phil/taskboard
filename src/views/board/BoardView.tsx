@@ -64,7 +64,8 @@ function Board({ view, data }: { view: View; data: BoardData }) {
   // A Board that groups by nothing shows status columns.
   const columnGroups = data.columns.map((column) => ({ key: column.key, label: column.name }));
   const boardRef = useRef<HTMLDivElement>(null);
-  const { drag, onPointerDown } = useIssueDrag(view.groupBy === "none" ? "status" : view.groupBy, columnGroups, actions.openInJira, boardRef, "x");
+  const columnsBy = view.groupBy === "none" ? "status" : view.groupBy;
+  const { drag, onPointerDown } = useIssueDrag(columnsBy, columnGroups, actions.openInJira, boardRef, "x");
   const dragCard = (e: PointerEvent<HTMLElement>, column: BoardColumn) => {
     const card = (e.target as HTMLElement).closest<HTMLElement>("[data-issue-id]");
     const row = card?.dataset.issueId ? data.rows[card.dataset.issueId] : undefined;
@@ -115,6 +116,7 @@ function Board({ view, data }: { view: View; data: BoardData }) {
               rows={data.rows}
               fields={data.cardFields}
               inlineLabels={inlineLabels}
+              statusSquare={columnsBy !== "status" && columnsBy !== "statusType"}
               selected={selected !== null && column.ids.includes(selected) ? selected : null}
               pickedIds={picks.pickedIds}
               onOpen={picks.onCard}
