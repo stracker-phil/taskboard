@@ -35,6 +35,8 @@ pub fn handlers() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
         commands::log_frontend_error,
         commands::take_launch_events,
         changes::issues_mark_seen,
+        crate::activity::commands::issue_viewed,
+        crate::activity::commands::issue_previewed,
         changes::issue_mark_unread,
         crate::links::app_link,
         pins::pins_list,

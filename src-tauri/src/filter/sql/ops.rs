@@ -147,7 +147,8 @@ fn is_sprint_state(value: &str) -> bool {
     SPRINT_STATES.contains(&value)
 }
 
-/// Days are whole days in `ctx.tz`; "within the last n days" starts n days before today.
+/// Days are whole days in `ctx.tz`; "within the last n days" starts n days before today. Hours count back from
+/// now.
 pub(super) fn date(c: &Condition, expr: &Sql, timestamp: bool, ctx: &Ctx) -> AppResult<Compiled> {
     let bound = |day: NaiveDate| -> SqlValue {
         if timestamp {
@@ -174,6 +175,11 @@ pub(super) fn date(c: &Condition, expr: &Sql, timestamp: bool, ctx: &Ctx) -> App
                 .ok_or_else(|| rejected(c, "is out of range"))?;
             between(from, days_after(c, ctx.today, 1)?)
         }
+        // Stored timestamps are UTC text with milliseconds (`time::format_utc`), as SQLite's `%f` writes them.
+        Op::WithinLastHours if timestamp => expr.fill(
+            "{} >= strftime('%Y-%m-%dT%H:%M:%fZ', 'now', ?)",
+            vec![SqlValue::Text(format!("-{} hours", hours(c)?))],
+        ),
         Op::WithinNextDays => {
             let until = days_after(c, ctx.today, u64::from(days(c)?) + 1)?;
             between(ctx.today, until)
@@ -258,6 +264,13 @@ fn days(c: &Condition) -> AppResult<u32> {
     match c.value {
         Some(Value::Days(days)) => Ok(days),
         _ => Err(needs(c, "a number of days")),
+    }
+}
+
+fn hours(c: &Condition) -> AppResult<u32> {
+    match c.value {
+        Some(Value::Days(hours)) => Ok(hours),
+        _ => Err(needs(c, "a number of hours")),
     }
 }
 

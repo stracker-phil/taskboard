@@ -266,6 +266,33 @@ describe("FilterPopover", () => {
       expect(within(popover).getByLabelText("Value")).toHaveValue(7);
     });
 
+    it("starts an hours condition at 7 for a timestamp field", async () => {
+      const popover = await openFilter(FILTER_LIST);
+
+      await userEvent.selectOptions(within(popover).getByLabelText("Field"), "Last view");
+      await userEvent.selectOptions(within(popover).getByLabelText("Operator"), "in last (hours)");
+
+      expect(within(popover).getByLabelText("Value")).toHaveValue(7);
+      expect(draft()?.list).toEqual([{ field: "lastView", op: "withinLastHours", value: 7 }]);
+    });
+
+    it("offers the hours operator for Last interaction but not for a date field", async () => {
+      const popover = await openFilter(FILTER_LIST);
+
+      await userEvent.selectOptions(within(popover).getByLabelText("Field"), "Last interaction");
+      expect(within(popover).getByRole("option", { name: "in last (hours)" })).toBeInTheDocument();
+      await userEvent.selectOptions(within(popover).getByLabelText("Field"), "Due date");
+
+      expect(within(popover).queryByRole("option", { name: "in last (hours)" })).not.toBeInTheDocument();
+    });
+
+    it("takes a calendar date for a timestamp field's before operator", async () => {
+      const popover = await openFilter(listConditions({ kind: "list", own: [{ field: "lastView", op: "before", value: "2026-10-01" }] }));
+
+      expect(within(popover).getByLabelText("Value")).toHaveAttribute("type", "date");
+      expect(within(popover).getByLabelText("Value")).toHaveValue("2026-10-01");
+    });
+
     it("counts the drafted conditions instead of the saved ones", async () => {
       const popover = await openFilter(FILTER_LIST);
       await waitFor(() => expect(mocked.listMatchCount).toHaveBeenLastCalledWith(21, { conditions: [HIGH_PRIORITY] }, false));

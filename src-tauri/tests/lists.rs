@@ -928,7 +928,7 @@ mod the_tree_on_the_demo_site {
 
         let ids: Vec<&str> = options.fields.iter().map(|f| f.id.as_str()).collect();
         assert_eq!(
-            ids[..15],
+            ids[..17],
             [
                 "status",
                 "statusCategory",
@@ -943,11 +943,16 @@ mod the_tree_on_the_demo_site {
                 "due",
                 "updated",
                 "created",
+                "lastView",
+                "lastInteraction",
                 "project",
                 "text",
             ]
         );
         let kind_of = |id: &str| options.fields.iter().find(|f| f.id == id).map(|f| f.kind);
+        for id in ["updated", "created", "lastView", "lastInteraction"] {
+            assert_eq!(kind_of(id), Some(ValueKind::Timestamp), "{id}");
+        }
         assert_eq!(kind_of("text"), Some(ValueKind::Search));
         assert_eq!(
             options

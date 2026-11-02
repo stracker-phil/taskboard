@@ -214,6 +214,61 @@ describe("useEvents", () => {
     });
   });
 
+  describe("activity-only local changes", () => {
+    function ActivityHarness() {
+      useEvents();
+      const { data: view } = useViewRows(11, 101);
+      const { data: spaces } = useSpaces();
+      const { data: nav } = useNav();
+      return (
+        <p>
+          Rows: {view ? Object.values(view.rows).map((r) => r.key).join(", ") : "loading"}; spaces: {spaces?.map((s) => s.name).join(", ") ?? "loading"}; nav: {nav ? "loaded" : "loading"}
+        </p>
+      );
+    }
+
+    async function renderActivity() {
+      mocked.viewRows.mockResolvedValue(viewData([], [row({ key: "NW-1" })]));
+      mocked.sidebarTree.mockResolvedValue(sidebarTree([space()]));
+      mocked.navCurrent.mockResolvedValue(navAt(null));
+      render(
+        <QueryClientProvider client={createQueryClient()}>
+          <ActivityHarness />
+        </QueryClientProvider>,
+      );
+      await screen.findByText("Rows: NW-1; spaces: Website relaunch; nav: loaded");
+      await waitFor(() => expect(mocked.listen).toHaveBeenCalledWith("local_changed", expect.any(Function)));
+      mocked.navCurrent.mockClear();
+      mocked.viewRows.mockResolvedValue(viewData([], [row({ key: "NW-1" }), row({ id: "10043", key: "NW-2" })]));
+      mocked.sidebarTree.mockResolvedValue(sidebarTree([space(), lumenSpace()]));
+    }
+
+    it("refetches the view rows and the sidebar when only activity changed", async () => {
+      await renderActivity();
+
+      act(() => emitEvent(api, "local_changed", { parts: ["activity"] }));
+
+      expect(await screen.findByText("Rows: NW-1, NW-2; spaces: Website relaunch, Lumen iOS app; nav: loaded")).toBeInTheDocument();
+    });
+
+    it("leaves everything else alone when only activity changed", async () => {
+      await renderActivity();
+
+      act(() => emitEvent(api, "local_changed", { parts: ["activity"] }));
+      await screen.findByText(/Rows: NW-1, NW-2/);
+
+      expect(mocked.navCurrent).not.toHaveBeenCalled();
+    });
+
+    it("refetches everything when activity changed together with other parts", async () => {
+      await renderActivity();
+
+      act(() => emitEvent(api, "local_changed", { parts: ["activity", "views"] }));
+
+      await waitFor(() => expect(mocked.navCurrent).toHaveBeenCalled());
+    });
+  });
+
   describe("modes", () => {
     function ModesHarness() {
       useEvents();

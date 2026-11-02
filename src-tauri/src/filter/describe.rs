@@ -59,6 +59,11 @@ pub fn parts(c: &Condition, names: &Names) -> Parts {
         Some(Value::Days(n)) => format!("{n} days"),
         _ => "days".to_string(),
     };
+    let hours = || match c.value {
+        Some(Value::Days(1)) => "hour".to_string(),
+        Some(Value::Days(n)) => format!("{n} hours"),
+        _ => "hours".to_string(),
+    };
     let (op, value) = match c.op {
         Op::Is => ("=", one()),
         Op::IsNot => ("≠", one()),
@@ -70,6 +75,7 @@ pub fn parts(c: &Condition, names: &Names) -> Parts {
         Op::Before => ("before", one()),
         Op::After => ("after", one()),
         Op::WithinLastDays => ("in the last", days()),
+        Op::WithinLastHours => ("in the last", hours()),
         Op::WithinNextDays => ("in the next", days()),
     };
     Parts {
@@ -94,6 +100,8 @@ fn field_name(field: &Field, names: &Names) -> String {
         Field::Due => "Due date",
         Field::Updated => "Updated",
         Field::Created => "Created",
+        Field::LastView => "Last view",
+        Field::LastInteraction => "Last interaction",
         Field::Project => "Project",
         Field::Text => "Text",
         Field::Custom(id) => return names.fields.get(id).cloned().unwrap_or_else(|| id.clone()),
@@ -231,6 +239,19 @@ mod tests {
                 "Created in the last day",
             ),
             (
+                Field::LastView,
+                Op::WithinLastHours,
+                Some(Value::Days(24)),
+                "Last view in the last 24 hours",
+            ),
+            (
+                Field::LastInteraction,
+                Op::WithinLastHours,
+                Some(Value::Days(1)),
+                "Last interaction in the last hour",
+            ),
+            (Field::LastView, Op::IsEmpty, None, "Last view is empty"),
+            (
                 Field::Due,
                 Op::WithinNextDays,
                 Some(Value::Days(3)),
@@ -263,6 +284,8 @@ mod tests {
             (Field::Due, "Due date"),
             (Field::Updated, "Updated"),
             (Field::Created, "Created"),
+            (Field::LastView, "Last view"),
+            (Field::LastInteraction, "Last interaction"),
             (Field::Project, "Project"),
             (Field::Text, "Text"),
             (custom("customfield_10073"), "Notes"),

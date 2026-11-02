@@ -22,6 +22,8 @@ export function row(patch: Partial<Row> = {}): Row {
     labels: [],
     sprint: null,
     due: null,
+    lastView: null,
+    lastInteraction: null,
     custom: {},
     childCount: 0,
     depth: 0,

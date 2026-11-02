@@ -1228,3 +1228,145 @@ mod naming_and_ordering {
         assert_eq!(tree.pinned_lists[1].id, sprint);
     }
 }
+
+mod issue_activity {
+    use rusqlite::OptionalExtension;
+
+    use super::*;
+
+    const LATER: &str = "2026-10-28T11:00:00Z";
+
+    /// `(viewed_at, interacted_at)` of an issue; none when it has no activity row.
+    async fn activity(db: &Db, issue_id: &str) -> Option<(Option<String>, Option<String>)> {
+        let issue_id = issue_id.to_string();
+        db.read(move |conn| {
+            Ok(conn
+                .query_row(
+                    "SELECT viewed_at, interacted_at FROM issue_activity WHERE issue_id = ?1",
+                    [issue_id],
+                    |r| Ok((r.get(0)?, r.get(1)?)),
+                )
+                .optional()?)
+        })
+        .await
+        .unwrap()
+    }
+
+    fn interacted_at(text: &str) -> Option<(Option<String>, Option<String>)> {
+        Some((None, Some(text.to_string())))
+    }
+
+    #[tokio::test]
+    async fn pinning_an_issue_counts_as_an_interaction_but_not_a_view() {
+        let (_dir, db) = lab().await;
+
+        pin_issue(&db, NOW, "1001", PinDuration::Today).await;
+
+        assert_eq!(
+            activity(&db, "1001").await,
+            interacted_at("2026-10-28T10:00:00.000Z")
+        );
+        assert_eq!(activity(&db, "1002").await, None);
+    }
+
+    #[tokio::test]
+    async fn pinning_an_issue_again_moves_its_interaction() {
+        let (_dir, db) = lab().await;
+        pin_issue(&db, NOW, "1001", PinDuration::Today).await;
+
+        pin_issue(&db, LATER, "1001", PinDuration::Week).await;
+
+        assert_eq!(
+            activity(&db, "1001").await,
+            interacted_at("2026-10-28T11:00:00.000Z")
+        );
+    }
+
+    #[tokio::test]
+    async fn removing_the_pin_of_an_issue_counts_as_an_interaction() {
+        let (_dir, db) = lab().await;
+        pin_issue(&db, NOW, "1001", PinDuration::UntilUnpinned).await;
+        let id = pins_at(&db, NOW).await.active[0].id;
+
+        pin_remove(&db, viewer(LATER), id).await.unwrap();
+
+        assert_eq!(
+            activity(&db, "1001").await,
+            interacted_at("2026-10-28T11:00:00.000Z")
+        );
+    }
+
+    #[tokio::test]
+    async fn ending_a_pin_that_already_ended_is_not_an_interaction() {
+        let (_dir, db) = lab().await;
+        pin_issue(&db, NOW, "1001", PinDuration::UntilUnpinned).await;
+        let id = pins_at(&db, NOW).await.active[0].id;
+        pin_remove(&db, viewer(LATER), id).await.unwrap();
+
+        pin_remove(&db, viewer("2026-10-28T12:00:00Z"), id)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            activity(&db, "1001").await,
+            interacted_at("2026-10-28T11:00:00.000Z")
+        );
+    }
+
+    #[tokio::test]
+    async fn toggling_an_issue_on_and_off_stamps_the_interaction_each_time() {
+        let (_dir, db) = lab().await;
+
+        pin_toggle_issue(&db, viewer(NOW), "1001".into(), PinDuration::UntilUnpinned)
+            .await
+            .unwrap();
+        assert_eq!(
+            activity(&db, "1001").await,
+            interacted_at("2026-10-28T10:00:00.000Z")
+        );
+
+        pin_toggle_issue(
+            &db,
+            viewer(LATER),
+            "1001".into(),
+            PinDuration::UntilUnpinned,
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            activity(&db, "1001").await,
+            interacted_at("2026-10-28T11:00:00.000Z")
+        );
+    }
+
+    #[tokio::test]
+    async fn pinning_a_comment_or_a_list_leaves_the_issues_untouched() {
+        let (_dir, db) = lab().await;
+        let everything = node_id(&db, "everything").await;
+
+        pin(&db, NOW, PinKind::Comment, "c1", PinDuration::Today, None).await;
+        pin_list(&db, NOW, everything, PinDuration::Today).await;
+        let id = pins_at(&db, NOW).await.active[0].id;
+        pin_remove(&db, viewer(LATER), id).await.unwrap();
+
+        assert_eq!(number(&db, "SELECT COUNT(*) FROM issue_activity").await, 0);
+    }
+
+    #[tokio::test]
+    async fn pinning_a_missing_issue_stamps_nothing() {
+        let (_dir, db) = lab().await;
+
+        pin_create(
+            &db,
+            viewer(NOW),
+            PinKind::Issue,
+            "9999".into(),
+            PinDuration::Today,
+            None,
+        )
+        .await
+        .unwrap_err();
+
+        assert_eq!(number(&db, "SELECT COUNT(*) FROM issue_activity").await, 0);
+    }
+}

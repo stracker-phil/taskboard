@@ -10,6 +10,7 @@ use rusqlite::types::Value as SqlValue;
 mod ops;
 
 use super::model::{Condition, Field};
+use crate::activity;
 use crate::error::{AppError, AppResult};
 
 /// Issues of tracked projects that Jira still lists.
@@ -171,6 +172,14 @@ fn shape(field: &Field, ctx: &Ctx) -> AppResult<Shape> {
         },
         Field::Created => Shape::Date {
             expr: Sql::column("i.created_at"),
+            timestamp: true,
+        },
+        Field::LastView => Shape::Date {
+            expr: Sql::column(activity::LAST_VIEW),
+            timestamp: true,
+        },
+        Field::LastInteraction => Shape::Date {
+            expr: Sql::column(activity::LAST_INTERACTION),
             timestamp: true,
         },
         Field::Text => Shape::FullText,

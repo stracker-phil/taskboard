@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 
-use chrono::NaiveDate;
+use chrono::{NaiveDate, Utc};
 use rusqlite::params_from_iter;
 use serde_json::{Value as Json, json};
 use tempfile::TempDir;
@@ -12,6 +12,7 @@ use taskboard_lib::db::Db;
 use taskboard_lib::error::{AppResult, ErrorKind};
 use taskboard_lib::filter::{Condition, Ctx, CustomField, Field, Op, Value, compile};
 use taskboard_lib::test_support::temp_config_dir;
+use taskboard_lib::time::format_utc;
 
 const ALEX: &str = "acc-alex";
 
@@ -706,6 +707,207 @@ async fn created_conditions_split_days_at_local_midnight() {
         ],
     )
     .await;
+}
+
+type Stamps = Vec<(&'static str, Option<String>, Option<String>)>;
+
+impl Fixture {
+    /// Fills `issue_activity` with `(issue id, viewed_at, interacted_at)`.
+    async fn stamp(&self, stamps: Stamps) {
+        self.db
+            .write(move |tx, _| {
+                for (issue_id, viewed, interacted) in stamps {
+                    tx.execute(
+                        "INSERT INTO issue_activity (issue_id, viewed_at, interacted_at) VALUES (?1, ?2, ?3)",
+                        rusqlite::params![issue_id, viewed, interacted],
+                    )?;
+                }
+                Ok(())
+            })
+            .await
+            .unwrap();
+    }
+}
+
+fn at(text: &str) -> Option<String> {
+    Some(text.to_string())
+}
+
+fn hours_ago(hours: i64) -> Option<String> {
+    Some(format_utc(Utc::now() - chrono::Duration::hours(hours)))
+}
+
+#[tokio::test]
+async fn last_view_conditions_split_days_at_local_midnight_and_empty_means_never_viewed() {
+    let fx = Fixture::new().await;
+    fx.stamp(vec![
+        (
+            "NW-1",
+            at("2026-10-27T10:00:00.000Z"),
+            at("2026-10-28T09:00:00.000Z"),
+        ),
+        (
+            "NW-2",
+            at("2026-10-20T10:00:00.000Z"),
+            at("2026-10-20T10:00:00.000Z"),
+        ),
+        (
+            "NW-3",
+            at("2026-10-28T09:00:00.000Z"),
+            at("2026-10-28T09:00:00.000Z"),
+        ),
+        ("NW-4", None, at("2026-10-21T09:00:00.000Z")),
+    ])
+    .await;
+    fx.check(
+        None,
+        vec![
+            case(
+                Field::LastView,
+                Op::Before,
+                one("2026-10-28"),
+                &["NW-1", "NW-2"],
+            ),
+            case(Field::LastView, Op::After, one("2026-10-27"), &["NW-3"]),
+            case(Field::LastView, Op::WithinLastDays, days(0), &["NW-3"]),
+            case(
+                Field::LastView,
+                Op::WithinLastDays,
+                days(1),
+                &["NW-1", "NW-3"],
+            ),
+            case(
+                Field::LastView,
+                Op::WithinLastDays,
+                days(7),
+                &["NW-1", "NW-3"],
+            ),
+            case(Field::LastView, Op::IsEmpty, None, &["NW-4", "NW-5"]),
+            case(
+                Field::LastView,
+                Op::IsNotEmpty,
+                None,
+                &["NW-1", "NW-2", "NW-3"],
+            ),
+        ],
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn last_interaction_conditions_look_at_the_interaction_and_not_the_view() {
+    let fx = Fixture::new().await;
+    fx.stamp(vec![
+        (
+            "NW-1",
+            at("2026-10-27T10:00:00.000Z"),
+            at("2026-10-28T09:00:00.000Z"),
+        ),
+        (
+            "NW-2",
+            at("2026-10-20T10:00:00.000Z"),
+            at("2026-10-20T10:00:00.000Z"),
+        ),
+        (
+            "NW-3",
+            at("2026-10-28T09:00:00.000Z"),
+            at("2026-10-28T09:00:00.000Z"),
+        ),
+        ("NW-4", None, at("2026-10-21T09:00:00.000Z")),
+    ])
+    .await;
+    fx.check(
+        None,
+        vec![
+            case(
+                Field::LastInteraction,
+                Op::Before,
+                one("2026-10-21"),
+                &["NW-2"],
+            ),
+            case(
+                Field::LastInteraction,
+                Op::WithinLastDays,
+                days(0),
+                &["NW-1", "NW-3"],
+            ),
+            case(
+                Field::LastInteraction,
+                Op::WithinLastDays,
+                days(7),
+                &["NW-1", "NW-3", "NW-4"],
+            ),
+            case(Field::LastInteraction, Op::IsEmpty, None, &["NW-5"]),
+            case(
+                Field::LastInteraction,
+                Op::IsNotEmpty,
+                None,
+                &["NW-1", "NW-2", "NW-3", "NW-4"],
+            ),
+        ],
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn within_last_hours_is_a_rolling_window_back_from_now() {
+    let fx = Fixture::new().await;
+    fx.stamp(vec![
+        ("NW-1", hours_ago(1), hours_ago(1)),
+        ("NW-2", hours_ago(30), hours_ago(30)),
+        ("NW-3", None, hours_ago(2)),
+    ])
+    .await;
+    fx.check(
+        None,
+        vec![
+            case(Field::LastView, Op::WithinLastHours, days(2), &["NW-1"]),
+            case(Field::LastView, Op::WithinLastHours, days(24), &["NW-1"]),
+            case(
+                Field::LastView,
+                Op::WithinLastHours,
+                days(48),
+                &["NW-1", "NW-2"],
+            ),
+            case(
+                Field::LastInteraction,
+                Op::WithinLastHours,
+                days(3),
+                &["NW-1", "NW-3"],
+            ),
+            case(
+                Field::LastInteraction,
+                Op::WithinLastHours,
+                days(24),
+                &["NW-1", "NW-3"],
+            ),
+            case(
+                Field::LastInteraction,
+                Op::WithinLastHours,
+                days(48),
+                &["NW-1", "NW-2", "NW-3"],
+            ),
+        ],
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn within_last_hours_applies_to_timestamps_only() {
+    let fx = Fixture::new().await;
+    fx.assert_refused(
+        [
+            (Field::Due, Op::WithinLastHours, days(3)),
+            (Field::Priority, Op::WithinLastHours, days(3)),
+            (Field::Labels, Op::WithinLastHours, days(3)),
+            (custom(10076), Op::WithinLastHours, days(3)),
+            (Field::LastView, Op::WithinLastHours, one("3")),
+            (Field::LastInteraction, Op::WithinLastHours, None),
+        ]
+        .into_iter()
+        .map(|(field, op, value)| Condition::new(field, op, value))
+        .collect(),
+    );
 }
 
 #[tokio::test]

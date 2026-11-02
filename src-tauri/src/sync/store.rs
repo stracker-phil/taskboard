@@ -94,13 +94,14 @@ pub fn record_reconcile(conn: &Connection, now: &str) -> AppResult<()> {
     Ok(())
 }
 
-/// Removes the issue with its search row and seen mark; comments and changes go with it.
+/// Removes the issue with its search row, seen mark and activity; comments and changes go with it.
 pub fn forget_issue(conn: &Connection, id: &str) -> AppResult<bool> {
     conn.execute(
         "DELETE FROM cache.issue_fts WHERE rowid = CAST(?1 AS INTEGER)",
         [id],
     )?;
     conn.execute("DELETE FROM issue_seen WHERE issue_id = ?1", [id])?;
+    conn.execute("DELETE FROM issue_activity WHERE issue_id = ?1", [id])?;
     Ok(conn.execute("DELETE FROM cache.issue WHERE id = ?1", [id])? > 0)
 }
 
@@ -522,6 +523,55 @@ mod tests {
         ] {
             assert_eq!(count(&db, sql).await, expected, "{sql}");
         }
+    }
+
+    async fn stamp_issues_1_and_2(db: &Db) {
+        db.write(|tx, _| {
+            tx.execute_batch(
+                "INSERT INTO issue_activity (issue_id, viewed_at, interacted_at) VALUES
+                   ('1', '2026-01-05T00:00:00.000Z', '2026-01-05T00:00:00.000Z'),
+                   ('2', NULL, '2026-01-06T00:00:00.000Z');",
+            )?;
+            Ok(())
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn forgetting_an_issue_deletes_its_activity_and_keeps_the_others() {
+        let (_dir, db) = lab().await;
+        stamp_issues_1_and_2(&db).await;
+
+        let removed = db.write(|tx, _| forget_issue(tx, "1")).await.unwrap();
+
+        assert!(removed);
+        assert_eq!(
+            count(
+                &db,
+                "SELECT COUNT(*) FROM issue_activity WHERE issue_id = '1'"
+            )
+            .await,
+            0
+        );
+        assert_eq!(
+            count(
+                &db,
+                "SELECT COUNT(*) FROM issue_activity WHERE issue_id = '2'"
+            )
+            .await,
+            1
+        );
+    }
+
+    #[tokio::test]
+    async fn forgetting_a_project_keeps_the_activity_of_its_issues() {
+        let (_dir, db) = lab().await;
+        stamp_issues_1_and_2(&db).await;
+
+        db.write(|tx, _| forget_project(tx, NW)).await.unwrap();
+
+        assert_eq!(count(&db, "SELECT COUNT(*) FROM issue_activity").await, 2);
     }
 
     #[tokio::test]

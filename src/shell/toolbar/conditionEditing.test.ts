@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Condition, FilterField, FilterOptions, Op, ValueKind } from "../../api";
-import { choicesFor, isComplete, newCondition, opsFor, pickedValues, shownOp, startValue, takesDays, takesNoValue, withValues } from "./conditionEditing";
+import { OP_NAMES, choicesFor, isComplete, newCondition, opsFor, pickedValues, shownOp, startValue, takesDays, takesNoValue, withValues } from "./conditionEditing";
 
 const OPTIONS: FilterOptions = {
   fields: [],
@@ -26,6 +26,7 @@ describe("opsFor", () => {
     ["statusCategory", ["is", "isNot"]],
     ["project", ["is", "isNot"]],
     ["date", ["before", "after", "withinLastDays", "withinNextDays", "isEmpty", "isNotEmpty"]],
+    ["timestamp", ["before", "after", "withinLastHours", "withinLastDays", "withinNextDays", "isEmpty", "isNotEmpty"]],
     ["text", ["contains", "is", "isEmpty", "isNotEmpty"]],
     ["search", ["contains"]],
     ["number", ["is", "isNot", "isEmpty", "isNotEmpty"]],
@@ -39,8 +40,12 @@ describe("operator kinds", () => {
     expect([takesNoValue("isEmpty"), takesNoValue("isNotEmpty"), takesNoValue("is")]).toEqual([true, true, false]);
   });
 
-  it("knows which operators count days", () => {
-    expect([takesDays("withinLastDays"), takesDays("withinNextDays"), takesDays("before")]).toEqual([true, true, false]);
+  it("knows which operators count days or hours", () => {
+    expect([takesDays("withinLastDays"), takesDays("withinNextDays"), takesDays("withinLastHours"), takesDays("before")]).toEqual([true, true, true, false]);
+  });
+
+  it("names the hour operator so it is told apart from the day one", () => {
+    expect(OP_NAMES.withinLastHours).toBe("in last (hours)");
   });
 });
 
@@ -57,7 +62,7 @@ describe("choicesFor", () => {
     expect(choicesFor("statusCategory", OPTIONS)?.map((c) => c.id)).toEqual(["new", "indeterminate", "done"]);
   });
 
-  it.each<ValueKind>(["text", "date", "number"])("offers no choices for a typed %s field", (kind) => {
+  it.each<ValueKind>(["text", "date", "timestamp", "number"])("offers no choices for a typed %s field", (kind) => {
     expect(choicesFor(kind, OPTIONS)).toBeNull();
   });
 });
@@ -69,6 +74,10 @@ describe("startValue", () => {
 
   it("is 7 days for a day-counting operator", () => {
     expect(startValue(field("updated", "date"), "withinLastDays", OPTIONS)).toBe(7);
+  });
+
+  it("is a count of 7 for the hours of a timestamp field", () => {
+    expect(startValue(field("lastView", "timestamp"), "withinLastHours", OPTIONS)).toBe(7);
   });
 
   it("is the first choice of a picker", () => {
@@ -142,7 +151,9 @@ describe("isComplete", () => {
     ["blank text", { field: "customfield_10071", op: "contains", value: "   " }, false],
     ["a missing value", { field: "status", op: "is" }, false],
     ["a positive day count", { field: "updated", op: "withinLastDays", value: 7 }, true],
-    ["a zero day count", { field: "updated", op: "withinLastDays", value: 0 }, false],
+    ["a positive hour count", { field: "lastView", op: "withinLastHours", value: 12 }, true],
+    ["a zero hour count", { field: "lastView", op: "withinLastHours", value: 0 }, false],
+    ["a zero day count",{ field: "updated", op: "withinLastDays", value: 0 }, false],
     ["a list of values", { field: "labels", op: "in", value: ["web"] }, true],
     ["an empty list of values", { field: "labels", op: "in", value: [] }, false],
   ])("judges %s", (_, condition, expected) => {

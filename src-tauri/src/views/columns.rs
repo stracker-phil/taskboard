@@ -10,7 +10,7 @@ use crate::filter::RELEVANT_FIELD;
 use crate::space_config::hidden_columns;
 
 /// Standard column ids with their names, in the Columns popover's order.
-const STANDARD: [(&str, &str); 9] = [
+const STANDARD: [(&str, &str); 11] = [
     ("status", "Status"),
     ("statusType", "Status type"),
     ("assignee", "Assignee"),
@@ -20,6 +20,8 @@ const STANDARD: [(&str, &str); 9] = [
     ("labels", "Labels"),
     ("sprint", "Sprint"),
     ("due", "Due"),
+    ("lastView", "Last view"),
+    ("lastInteraction", "Last interaction"),
 ];
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
@@ -165,6 +167,8 @@ mod tests {
                 "labels",
                 "sprint",
                 "due",
+                "lastView",
+                "lastInteraction",
                 BETA,
                 ZONE
             ]
@@ -172,6 +176,23 @@ mod tests {
         let status_type = columns.iter().find(|c| c.id == "statusType").unwrap();
         assert_eq!(status_type.name, "Status type");
         assert!(!status_type.custom);
+    }
+
+    #[tokio::test]
+    async fn the_last_view_and_last_interaction_columns_are_standard_columns() {
+        let (_dir, db) = lab().await;
+        let everything = level(&db, "kind = 'everything'").await;
+
+        let columns = columns_catalogue(&db, everything).await.unwrap();
+
+        for (id, name) in [
+            ("lastView", "Last view"),
+            ("lastInteraction", "Last interaction"),
+        ] {
+            let column = columns.iter().find(|c| c.id == id).unwrap();
+            assert_eq!(column.name, name, "{id}");
+            assert!(!column.custom, "{id}");
+        }
     }
 
     #[tokio::test]

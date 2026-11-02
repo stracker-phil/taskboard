@@ -356,6 +356,59 @@ describe("Peek", () => {
       expect(mocked.issuesMarkSeen).not.toHaveBeenCalled();
     });
 
+    describe("recording the preview", () => {
+      async function showPlain(seenAfterSeconds?: number) {
+        if (seenAfterSeconds !== undefined) mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ seenAfterSeconds }) }));
+        serveByKey();
+        const view = renderSwitchable("10043");
+        await vi.waitFor(() => expect(screen.getByRole("heading", { name: "Issue 10043" })).toBeInTheDocument());
+        await advance(0);
+        return view;
+      }
+
+      it("records the preview once the issue has been shown for the default two seconds, read or unread", async () => {
+        await showPlain();
+
+        await vi.advanceTimersByTimeAsync(1500);
+        expect(mocked.issuePreviewed).not.toHaveBeenCalled();
+        await vi.advanceTimersByTimeAsync(700);
+
+        expect(mocked.issuePreviewed).toHaveBeenCalledWith("10043");
+      });
+
+      it("waits for the delay set in the settings", async () => {
+        await showPlain(5);
+
+        await vi.advanceTimersByTimeAsync(4500);
+        expect(mocked.issuePreviewed).not.toHaveBeenCalled();
+        await vi.advanceTimersByTimeAsync(700);
+
+        expect(mocked.issuePreviewed).toHaveBeenCalledWith("10043");
+      });
+
+      it("does not record a preview that is closed before the delay", async () => {
+        const { unmount } = await showPlain();
+
+        await vi.advanceTimersByTimeAsync(1000);
+        unmount();
+        await vi.advanceTimersByTimeAsync(5000);
+
+        expect(mocked.issuePreviewed).not.toHaveBeenCalled();
+      });
+
+      it("records only the issue the preview rests on when it moves on before the delay", async () => {
+        const { show } = await showPlain();
+
+        await vi.advanceTimersByTimeAsync(1000);
+        show("10042");
+        await vi.waitFor(() => expect(screen.getByRole("heading", { name: "Issue 10042" })).toBeInTheDocument());
+        await advance(2500);
+
+        expect(mocked.issuePreviewed).toHaveBeenCalledWith("10042");
+        expect(mocked.issuePreviewed).not.toHaveBeenCalledWith("10043");
+      });
+    });
+
     it("does not mark an issue without unseen changes", async () => {
       serveByKey();
       renderSwitchable("10043");

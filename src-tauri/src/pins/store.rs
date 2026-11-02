@@ -1,11 +1,13 @@
 //! Creating, naming, ordering and ending pins. A target has at most one active pin; pinning it again replaces its
 //! duration and reason and keeps its name and place.
 
+use chrono::{DateTime, Utc};
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 use super::duration::{PinDuration, expires_at};
+use crate::activity;
 use crate::db::{Changes, Db, LocalPart};
 use crate::error::{AppError, AppResult};
 use crate::lists::Viewer;
@@ -113,19 +115,32 @@ fn pin(
         )?,
     };
     changes.local_changed(LocalPart::Pins);
+    if kind == PinKind::Issue {
+        activity::stamp_interaction(conn, changes, target, viewer.now)?;
+    }
     Ok(())
 }
 
-fn unpin(conn: &Connection, changes: &mut Changes, id: i64, now: &str) -> AppResult<()> {
+fn unpin(conn: &Connection, changes: &mut Changes, id: i64, now: DateTime<Utc>) -> AppResult<()> {
+    let issue: Option<String> = conn
+        .query_row(
+            "SELECT target_id FROM pin WHERE id = ?1 AND target_kind = ?2",
+            params![id, PinKind::Issue.as_str()],
+            |row| row.get(0),
+        )
+        .optional()?;
     let ended = conn.execute(
         &format!(
             "UPDATE pin AS p SET unpinned_at = ?1 WHERE p.id = ?2 AND {}",
             active("?1")
         ),
-        params![now, id],
+        params![format_utc(now), id],
     )?;
     if ended > 0 {
         changes.local_changed(LocalPart::Pins);
+        if let Some(issue) = issue {
+            activity::stamp_interaction(conn, changes, &issue, now)?;
+        }
     }
     Ok(())
 }
@@ -199,7 +214,7 @@ pub async fn pin_move(db: &Db, viewer: Viewer, id: i64, before: Option<i64>) -> 
 
 /// Ends the pin now; it moves to Recently unpinned.
 pub async fn pin_remove(db: &Db, viewer: Viewer, id: i64) -> AppResult<()> {
-    db.write(move |tx, changes| unpin(tx, changes, id, &format_utc(viewer.now)))
+    db.write(move |tx, changes| unpin(tx, changes, id, viewer.now))
         .await
 }
 
@@ -213,7 +228,7 @@ pub async fn pin_toggle_issue(
     db.write(move |tx, changes| {
         let now = format_utc(viewer.now);
         match active_pin(tx, PinKind::Issue, &id, &now)? {
-            Some(pin_id) => unpin(tx, changes, pin_id, &now),
+            Some(pin_id) => unpin(tx, changes, pin_id, viewer.now),
             None => pin(tx, changes, &viewer, PinKind::Issue, &id, duration, None),
         }
     })

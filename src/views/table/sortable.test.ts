@@ -3,7 +3,7 @@ import type { SortBy } from "../../api";
 import { nextSort, sortByOf } from "./sortable";
 
 describe("sortByOf", () => {
-  it.each(["key", "summary", "status", "priority", "due"])("lets the %s column sort by itself", (id) => {
+  it.each(["key", "summary", "status", "priority", "due", "lastView", "lastInteraction"])("lets the %s column sort by itself", (id) => {
     expect(sortByOf(id)).toBe(id);
   });
 
@@ -19,6 +19,8 @@ describe("nextSort", () => {
     ["status", false],
     ["priority", true],
     ["due", true],
+    ["lastView", true],
+    ["lastInteraction", true],
   ])("starts a newly sorted %s column with descending=%s", (by, descending) => {
     expect(nextSort({ by: "updated", descending: false }, by)).toEqual({ by, descending });
   });

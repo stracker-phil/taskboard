@@ -248,6 +248,26 @@ describe("IssueView", () => {
       expect(stack()).toEqual(["10041"]);
     });
 
+    it("records a view of the issue when it opens", async () => {
+      renderIssue("10042");
+
+      await waitFor(() => expect(mocked.issueViewed).toHaveBeenCalledWith("10042"));
+    });
+
+    it("records a view of each issue stepped to with Next and Previous", async () => {
+      renderStepping("10042");
+      const next = screen.getByRole("button", { name: "Next issue" });
+      await waitFor(() => expect(next).toBeEnabled());
+
+      await userEvent.click(next);
+      await waitFor(() => expect(mocked.issueViewed).toHaveBeenCalledWith("10043"));
+      const previous = screen.getByRole("button", { name: "Previous issue" });
+      await waitFor(() => expect(previous).toBeEnabled());
+      await userEvent.click(previous);
+
+      await waitFor(() => expect(mocked.issueViewed.mock.calls.map(([id]) => id)).toEqual(["10042", "10043", "10042"]));
+    });
+
     it("disables Previous on the first issue", async () => {
       renderIssue("10041");
 

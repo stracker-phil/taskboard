@@ -2,7 +2,8 @@
 
 use std::collections::BTreeMap;
 
-use chrono::{Datelike, NaiveDate};
+use chrono::{DateTime, Datelike, NaiveDate};
+use chrono_tz::Tz;
 use serde::Serialize;
 use serde_json::Value as Json;
 use ts_rs::TS;
@@ -33,6 +34,10 @@ pub struct Row {
     pub sprint: Option<String>,
     /// The due date as the list shows it ("Oct 30").
     pub due: Option<String>,
+    /// When the owner last opened it in the Issue view, as the list shows it (`format_moment`).
+    pub last_view: Option<String>,
+    /// When the owner last viewed, previewed, bookmarked or changed it in the app.
+    pub last_interaction: Option<String>,
     /// Custom column values by field id; a field without a value is absent.
     pub custom: BTreeMap<String, Cell>,
     /// Its direct children in the cache (an epic's stories, a story's subtasks), whatever the view's filter.
@@ -181,6 +186,20 @@ pub fn format_due(due: NaiveDate, today: NaiveDate) -> String {
     }
 }
 
+/// A stored UTC time in the owner's zone: the time today ("14:05"), "Yesterday", else the day as `format_due`
+/// shows it. `None` when it can't be read.
+pub fn format_moment(at: &str, today: NaiveDate, tz: Tz) -> Option<String> {
+    let local = DateTime::parse_from_rfc3339(at).ok()?.with_timezone(&tz);
+    let day = local.date_naive();
+    Some(if day == today {
+        local.format("%H:%M").to_string()
+    } else if today.pred_opt() == Some(day) {
+        "Yesterday".to_string()
+    } else {
+        format_due(day, today)
+    })
+}
+
 /// A custom field's JSON value as a cell, by its Jira schema type.
 pub fn cell(kind: &str, value: &Json, me: Option<&str>) -> Option<Cell> {
     match (kind, value) {
@@ -312,6 +331,46 @@ mod tests {
             ("2025-12-31", "Dec 31, 2025"),
         ] {
             assert_eq!(format_due(date(due), today), expected, "{due}");
+        }
+    }
+
+    #[test]
+    fn a_moment_shows_as_time_yesterday_or_day_in_the_owners_zone() {
+        let today = date("2026-10-28");
+        let berlin = chrono_tz::Europe::Berlin;
+        for (at, expected) in [
+            ("2026-10-28T13:05:00.000Z", Some("14:05")),
+            ("2026-10-27T23:00:00.000Z", Some("00:00")),
+            ("2026-10-27T22:59:00.000Z", Some("Yesterday")),
+            ("2026-10-27T08:00:00.000Z", Some("Yesterday")),
+            ("2026-10-26T10:00:00.000Z", Some("Oct 26")),
+            ("2026-03-04T10:00:00.000Z", Some("Mar 4")),
+            ("2025-12-31T10:00:00.000Z", Some("Dec 31, 2025")),
+            ("yesterday", None),
+            ("2026-10-28", None),
+            ("", None),
+        ] {
+            assert_eq!(
+                format_moment(at, today, berlin).as_deref(),
+                expected,
+                "{at}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_moment_just_after_local_midnight_is_still_yesterday_in_a_zone_behind_utc() {
+        let today = date("2026-10-28");
+        let new_york = chrono_tz::America::New_York;
+        for (at, expected) in [
+            ("2026-10-28T03:59:00.000Z", "Yesterday"),
+            ("2026-10-28T04:00:00.000Z", "00:00"),
+        ] {
+            assert_eq!(
+                format_moment(at, today, new_york).as_deref(),
+                Some(expected),
+                "{at}"
+            );
         }
     }
 

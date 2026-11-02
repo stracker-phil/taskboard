@@ -73,6 +73,16 @@ const STANDARD: Record<string, ColumnDef> = {
     cell: (row) => (row.due ? <span className="list-cell--tertiary">{row.due}</span> : NONE),
     measure: (row, m) => widthOf.text(m, row.due ?? EMPTY),
   },
+  lastView: {
+    width: 80,
+    cell: (row) => (row.lastView ? <span className="list-cell--tertiary">{row.lastView}</span> : NONE),
+    measure: (row, m) => widthOf.text(m, row.lastView ?? EMPTY),
+  },
+  lastInteraction: {
+    width: 80,
+    cell: (row) => (row.lastInteraction ? <span className="list-cell--tertiary">{row.lastInteraction}</span> : NONE),
+    measure: (row, m) => widthOf.text(m, row.lastInteraction ?? EMPTY),
+  },
 };
 
 const CUSTOM_WIDTH = 90;

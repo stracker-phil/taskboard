@@ -1,7 +1,7 @@
 import type { Sort, SortBy } from "../../api";
 
-const SORTABLE: Record<string, SortBy> = { key: "key", summary: "summary", status: "status", priority: "priority", due: "due" };
-const DESCENDING_FIRST: SortBy[] = ["updated", "created", "priority", "due"];
+const SORTABLE: Record<string, SortBy> = { key: "key", summary: "summary", status: "status", priority: "priority", due: "due", lastView: "lastView", lastInteraction: "lastInteraction" };
+const DESCENDING_FIRST: SortBy[] = ["updated", "created", "priority", "due", "lastView", "lastInteraction"];
 
 /** The sort a column header stands for, or null when the column cannot sort. */
 export function sortByOf(columnId: string): SortBy | null {

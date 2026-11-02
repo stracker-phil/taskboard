@@ -616,7 +616,7 @@ button, Escape and a press outside close it, focus goes back to the button).
 
 - **Group: Status** (30 high, `--border`, 8 radius): a [menu](#menus) of the groupings (Status, Space, Client,
   Assignee, Epic, Release, Priority, Due date, None) with Sort by ▸ (Updated, Created, Priority, Key, Due date,
-  Summary, Status; Ascending, Descending). Saves to the view. Space and Client are offered only on Everything,
+  Summary, Status, Last view, Last interaction; Ascending, Descending). Saves to the view. Space and Client are offered only on Everything,
   where issues of several Spaces meet (elsewhere only while the view already groups by one).
 - **Subtasks** (List and Table only, right after Columns; `SubtasksButton.tsx`): the subtask icon, labeled by
   the mode: icon only while hidden ("Subtasks: Hidden" to assistive tech, "Subtasks" as its tooltip), "Subtasks"

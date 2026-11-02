@@ -3,6 +3,7 @@
 use chrono::{DateTime, Duration, Utc};
 use rusqlite::{Connection, params};
 
+use crate::activity;
 use crate::db::Db;
 use crate::error::{AppError, AppResult};
 use crate::time::format_utc;
@@ -22,14 +23,20 @@ pub struct SentChange {
     pub error: Option<String>,
 }
 
-/// Records a change Jira was asked for, with its refusal if any. A record that can't be stored doesn't fail the
-/// change.
+/// Records a change Jira was asked for, with its refusal if any; a change Jira took counts as using the issue. A
+/// record that can't be stored doesn't fail the change.
 pub async fn record(db: &Db, issue_id: &str, change: String, refusal: Option<&AppError>) {
     let issue_id = issue_id.to_string();
     let error = refusal.map(AppError::to_string);
     let now = Utc::now();
     let stored = db
-        .write(move |tx, _| insert(tx, now, &issue_id, &change, error.as_deref()))
+        .write(move |tx, changes| {
+            insert(tx, now, &issue_id, &change, error.as_deref())?;
+            if error.is_none() {
+                activity::stamp_interaction(tx, changes, &issue_id, now)?;
+            }
+            Ok(())
+        })
         .await;
     if let Err(e) = stored {
         log::warn!("A change sent to Jira wasn't recorded: {e}");
@@ -204,6 +211,46 @@ mod tests {
 
         assert_eq!(newest_two, ["c", "b"]);
         assert_eq!(all(&db).await.len(), 3);
+    }
+
+    async fn activity_of(
+        db: &Db,
+        issue_id: &'static str,
+    ) -> Option<(Option<String>, Option<String>)> {
+        use rusqlite::OptionalExtension;
+        db.read(move |conn| {
+            Ok(conn
+                .query_row(
+                    "SELECT viewed_at, interacted_at FROM issue_activity WHERE issue_id = ?1",
+                    [issue_id],
+                    |r| Ok((r.get(0)?, r.get(1)?)),
+                )
+                .optional()?)
+        })
+        .await
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn a_change_jira_took_counts_as_an_interaction_but_not_a_view() {
+        let (_dir, db) = db_with_cached_issue().await;
+
+        record(&db, "20001", "Status: Done".into(), None).await;
+
+        let (viewed, interacted) = activity_of(&db, "20001").await.unwrap();
+        assert_eq!(viewed, None);
+        assert!(interacted.is_some());
+    }
+
+    #[tokio::test]
+    async fn a_change_jira_refused_is_not_an_interaction() {
+        let (_dir, db) = db_with_cached_issue().await;
+        let refusal = AppError::InvalidInput("Not allowed".into());
+
+        record(&db, "20001", "Status: Done".into(), Some(&refusal)).await;
+
+        assert_eq!(all(&db).await.len(), 1);
+        assert_eq!(activity_of(&db, "20001").await, None);
     }
 
     #[tokio::test]

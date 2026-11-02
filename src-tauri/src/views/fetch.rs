@@ -27,8 +27,8 @@ pub(super) struct Source<'a> {
 const SELECT: &str = "i.id, i.key, i.summary, i.status_id, COALESCE(st.name, ''), i.status_category,
     i.comment_count, i.assignee_id, u.name, e.id, e.summary, e.epic_color, i.fix_versions, i.priority,
     i.labels, i.sprint, i.due_date, i.updated_at, i.created_at, i.project_id, i.parent_id,
-    (SELECT COUNT(*) FROM cache.issue c WHERE c.parent_id = i.id AND c.gone = 0)";
-const CUSTOM_AT: usize = 22;
+    (SELECT COUNT(*) FROM cache.issue c WHERE c.parent_id = i.id AND c.gone = 0), a.viewed_at, a.interacted_at";
+const CUSTOM_AT: usize = 24;
 
 pub(super) fn fetch(
     conn: &Connection,
@@ -52,6 +52,7 @@ pub(super) fn fetch(
          LEFT JOIN cache.status st ON st.id = i.status_id
          LEFT JOIN cache.user u ON u.account_id = i.assignee_id
          LEFT JOIN cache.issue e ON e.id = i.parent_id AND e.is_epic = 1
+         LEFT JOIN issue_activity a ON a.issue_id = i.id
          WHERE {condition}"
     ))?;
     let mut rows = query.query(params_from_iter(paths.chain(params)))?;
@@ -75,6 +76,12 @@ fn row_from(r: &rusqlite::Row, source: &Source) -> AppResult<(Row, Facts)> {
     let due_date = r
         .get::<_, Option<String>>(16)?
         .and_then(|d| NaiveDate::parse_from_str(&d, "%Y-%m-%d").ok());
+    let last_view: Option<String> = r.get(22)?;
+    let last_interaction: Option<String> = r.get(23)?;
+    let moment = |at: &Option<String>| {
+        at.as_deref()
+            .and_then(|at| rows::format_moment(at, source.ctx.today, source.ctx.tz))
+    };
     let epic = match (
         r.get::<_, Option<String>>(9)?,
         r.get::<_, Option<String>>(10)?,
@@ -121,6 +128,8 @@ fn row_from(r: &rusqlite::Row, source: &Source) -> AppResult<(Row, Facts)> {
             .collect(),
         sprint: r.get(15)?,
         due: due_date.map(|d| rows::format_due(d, source.ctx.today)),
+        last_view: moment(&last_view),
+        last_interaction: moment(&last_interaction),
         custom: custom_cells(r, source)?,
         is_subtask: false,
         parent_id: r.get(20)?,
@@ -135,6 +144,8 @@ fn row_from(r: &rusqlite::Row, source: &Source) -> AppResult<(Row, Facts)> {
         due_date,
         updated_at: r.get(17)?,
         created_at: r.get(18)?,
+        last_view,
+        last_interaction,
     };
     Ok((row, facts))
 }

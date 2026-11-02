@@ -521,7 +521,7 @@ export type LocalChanged = { parts: Array<LocalPart>, };
 /**
  * A part of the owner's own setup (the local file).
  */
-export type LocalPart = "spaces" | "lists" | "views" | "pins" | "styles";
+export type LocalPart = "spaces" | "lists" | "views" | "pins" | "styles" | "activity";
 
 /**
  * A sidebar level (a `filter_list` id: Everything, a Home list, a Space or a filter list) and its view.
@@ -632,7 +632,7 @@ tabs: Array<Tab>, activeTab: number, };
  */
 export type NotifyAbout = "nothing" | "mentionsAndAssignments" | "myIssues";
 
-export type Op = "is" | "isNot" | "in" | "notIn" | "isEmpty" | "isNotEmpty" | "contains" | "before" | "after" | "withinLastDays" | "withinNextDays";
+export type Op = "is" | "isNot" | "in" | "notIn" | "isEmpty" | "isNotEmpty" | "contains" | "before" | "after" | "withinLastDays" | "withinLastHours" | "withinNextDays";
 
 export type PaletteResults = { issues: Array<IssueHit>, lists: Array<ListHit>, 
 /**
@@ -754,6 +754,14 @@ changeNote: string | null, assignees: Array<Person>, epic: EpicChip | null, rele
  */
 due: string | null, 
 /**
+ * When the owner last opened it in the Issue view, as the list shows it (`format_moment`).
+ */
+lastView: string | null, 
+/**
+ * When the owner last viewed, previewed, bookmarked or changed it in the app.
+ */
+lastInteraction: string | null, 
+/**
  * Custom column values by field id; a field without a value is absent.
  */
 custom: { [key in string]: Cell }, 
@@ -829,7 +837,7 @@ text: string, };
 
 export type Sort = { by: SortBy, descending: boolean, };
 
-export type SortBy = "updated" | "created" | "priority" | "due" | "key" | "summary" | "status";
+export type SortBy = "updated" | "created" | "priority" | "due" | "key" | "summary" | "status" | "lastView" | "lastInteraction";
 
 /**
  * A Space's settings page, apart from its name and look (`SpaceUpdate`) and its statuses.
@@ -1031,7 +1039,7 @@ export type Value = number | string | Array<string>;
 /**
  * How a field's value is picked.
  */
-export type ValueKind = "status" | "statusCategory" | "type" | "user" | "priority" | "epic" | "release" | "sprint" | "label" | "project" | "date" | "text" | "number" | "search";
+export type ValueKind = "status" | "statusCategory" | "type" | "user" | "priority" | "epic" | "release" | "sprint" | "label" | "project" | "date" | "timestamp" | "text" | "number" | "search";
 
 export type View = { id: number, listId: number, name: string, layout: Layout, 
 /**

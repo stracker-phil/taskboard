@@ -228,6 +228,10 @@ export const api = {
   menuCommands: () => invoke<MenuCommand[]>("menu_commands"),
   /** Their highlight and change chip clear. */
   issuesMarkSeen: (ids: string[]) => invoke<void>("issues_mark_seen", { ids }),
+  /** The Issue view shows the issue: its last view and last interaction. */
+  issueViewed: (id: string) => invoke<void>("issue_viewed", { id }),
+  /** The preview stayed on the issue: its last interaction. */
+  issuePreviewed: (id: string) => invoke<void>("issue_previewed", { id }),
   /** Unread again: from the activity item at `from` (its time) on, or the whole issue. */
   issueMarkUnread: (id: string, from: string | null = null) => invoke<void>("issue_mark_unread", { id, from }),
   pinsList: () => invoke<Pins>("pins_list"),

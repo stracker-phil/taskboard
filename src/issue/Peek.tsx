@@ -16,7 +16,7 @@ import { RichFields } from "./RichFields";
 import { GoneNotice } from "./GoneNotice";
 import { IssueMissing } from "./IssueMissing";
 import { SinceBanner } from "./SinceBanner";
-import { useSeenAfter } from "./useSeenAfter";
+import { usePreviewedAfter, useSeenAfter } from "./useSeenAfter";
 import { WebLinks } from "./WebLinks";
 import { PinButton } from "../pins/PinButton";
 import { useIssueActions } from "../views/list/useIssueActions";
@@ -35,6 +35,7 @@ export function Peek({ id, onClose, onExpand }: { id: string; onClose: () => voi
   const bodyRef = useRef<HTMLDivElement>(null);
   const { key, title } = useShortcuts();
   useSeenAfter(id, issue?.unread ?? false);
+  usePreviewedAfter(id);
 
   useEffect(() => {
     if (bodyRef.current) bodyRef.current.scrollTop = 0;

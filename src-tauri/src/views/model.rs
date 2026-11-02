@@ -48,6 +48,8 @@ pub enum SortBy {
     Key,
     Summary,
     Status,
+    LastView,
+    LastInteraction,
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, TS)]

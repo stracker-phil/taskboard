@@ -7,6 +7,7 @@ use std::sync::Arc;
 use chrono::{DateTime, NaiveDate, Utc};
 use tempfile::TempDir;
 
+use taskboard_lib::activity::{issue_previewed, issue_viewed};
 use taskboard_lib::connection::{
     ConnectionInput, JiraAccess, fetch_versions, refresh_projects, save, track_project,
 };
@@ -483,6 +484,67 @@ mod rows {
 
     #[tokio::test]
     #[ignore = "syncs the demo site into a temp database"]
+    async fn a_row_shows_when_it_was_last_viewed_and_used_in_the_owners_zone() {
+        let site = Site::new().await;
+        for (key, at, viewed) in [
+            ("NW-1042", "2026-10-28T09:05:00Z", true),
+            ("NW-1044", "2026-10-27T15:00:00Z", false),
+            ("NW-977", "2026-03-04T10:00:00Z", true),
+        ] {
+            let id = site.issue_id(key).await;
+            let at = at.parse::<DateTime<Utc>>().unwrap();
+            if viewed {
+                issue_viewed(site.db(), id, at).await.unwrap();
+            } else {
+                issue_previewed(site.db(), id, at).await.unwrap();
+            }
+        }
+
+        let data = site.nw_data(Narrowing::default()).await;
+
+        let shown = |key: &str| {
+            let row = row_of(&data, key);
+            (row.last_view.as_deref(), row.last_interaction.as_deref())
+        };
+        assert_eq!(shown("NW-1042"), (Some("10:05"), Some("10:05")));
+        assert_eq!(shown("NW-1044"), (None, Some("Yesterday")));
+        assert_eq!(shown("NW-977"), (Some("Mar 4"), Some("Mar 4")));
+        let touched = ["NW-1042", "NW-1044", "NW-977"];
+        for row in data
+            .rows
+            .values()
+            .filter(|r| !touched.contains(&r.key.as_str()))
+        {
+            assert_eq!(
+                (&row.last_view, &row.last_interaction),
+                (&None, &None),
+                "{}",
+                row.key
+            );
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn the_last_view_and_interaction_of_a_row_serialize_in_camel_case() {
+        let site = Site::new().await;
+        let id = site.issue_id("NW-1042").await;
+        issue_viewed(site.db(), id, "2026-10-28T09:05:00Z".parse().unwrap())
+            .await
+            .unwrap();
+
+        let data = site.nw_data(Narrowing::default()).await;
+
+        let json = serde_json::to_value(row_of(&data, "NW-1042")).unwrap();
+        assert_eq!(json["lastView"], "10:05");
+        assert_eq!(json["lastInteraction"], "10:05");
+        let untouched = serde_json::to_value(row_of(&data, "NW-977")).unwrap();
+        assert!(untouched["lastView"].is_null());
+        assert!(untouched["lastInteraction"].is_null());
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
     async fn nobody_is_marked_changed_after_the_first_sync() {
         let site = Site::new().await;
 
@@ -585,6 +647,101 @@ mod sorting {
             let stamps: Vec<&String> = group.row_ids.iter().map(|id| &updated[id]).collect();
             assert!(stamps.windows(2).all(|w| w[0] >= w[1]), "{}", group.label);
         }
+    }
+
+    async fn ungrouped_keys_sorted_by(
+        site: &Site,
+        by: SortBy,
+        descending: bool,
+        stamps: &[(&str, &str)],
+    ) -> Vec<String> {
+        let (space, view) = site.nw().await;
+        view_set_group(site.db(), view, GroupBy::None)
+            .await
+            .unwrap();
+        view_set_sort(site.db(), view, Sort { by, descending })
+            .await
+            .unwrap();
+        for (key, at) in stamps {
+            let id = site.issue_id(key).await;
+            issue_viewed(site.db(), id, at.parse().unwrap())
+                .await
+                .unwrap();
+        }
+        let data = site.data(space, view, Narrowing::default()).await;
+        assert_eq!(data.groups.len(), 1);
+        group_keys(&data, &data.groups[0])
+    }
+
+    const VIEWED: [(&str, &str); 3] = [
+        ("NW-1042", "2026-10-28T09:00:00Z"),
+        ("NW-1044", "2026-10-27T09:00:00Z"),
+        ("NW-977", "2026-10-20T09:00:00Z"),
+    ];
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn by_last_view_ascending_lists_the_oldest_view_first_and_never_viewed_issues_last() {
+        let site = Site::new().await;
+
+        let keys = ungrouped_keys_sorted_by(&site, SortBy::LastView, false, &VIEWED).await;
+
+        assert_eq!(keys[..3], ["NW-977", "NW-1044", "NW-1042"]);
+        assert_eq!(
+            keys.len(),
+            site.nw_data(Narrowing::default()).await.rows.len()
+        );
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn by_last_view_descending_lists_the_latest_view_first_and_never_viewed_issues_last() {
+        let site = Site::new().await;
+
+        let keys = ungrouped_keys_sorted_by(&site, SortBy::LastView, true, &VIEWED).await;
+
+        assert_eq!(keys[..3], ["NW-1042", "NW-1044", "NW-977"]);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn by_last_interaction_orders_by_the_interaction_and_puts_untouched_issues_last() {
+        let site = Site::new().await;
+        let (_, view) = site.nw().await;
+        view_set_group(site.db(), view, GroupBy::None)
+            .await
+            .unwrap();
+        view_set_sort(
+            site.db(),
+            view,
+            Sort {
+                by: SortBy::LastInteraction,
+                descending: true,
+            },
+        )
+        .await
+        .unwrap();
+        for (key, at, viewed) in [
+            ("NW-1042", "2026-10-26T09:00:00Z", true),
+            ("NW-1044", "2026-10-28T09:00:00Z", false),
+            ("NW-977", "2026-10-27T09:00:00Z", false),
+        ] {
+            let id = site.issue_id(key).await;
+            let at = at.parse::<DateTime<Utc>>().unwrap();
+            if viewed {
+                issue_viewed(site.db(), id, at).await.unwrap();
+            } else {
+                issue_previewed(site.db(), id, at).await.unwrap();
+            }
+        }
+
+        let (space, view) = site.nw().await;
+        let data = site.data(space, view, Narrowing::default()).await;
+
+        assert_eq!(
+            group_keys(&data, &data.groups[0])[..3],
+            ["NW-1044", "NW-977", "NW-1042"]
+        );
     }
 
     #[tokio::test]
@@ -3017,7 +3174,7 @@ mod catalog {
 
         let ids: Vec<&str> = columns.iter().map(|c| c.id.as_str()).collect();
         assert_eq!(
-            ids[..9],
+            ids[..11],
             [
                 "status",
                 "statusType",
@@ -3027,12 +3184,14 @@ mod catalog {
                 "priority",
                 "labels",
                 "sprint",
-                "due"
+                "due",
+                "lastView",
+                "lastInteraction"
             ]
         );
         assert_eq!(columns[1].name, "Status type");
-        assert!(columns[..9].iter().all(|c| !c.custom));
-        assert!(columns[9..].iter().all(|c| c.custom));
+        assert!(columns[..11].iter().all(|c| !c.custom));
+        assert!(columns[11..].iter().all(|c| c.custom));
         let reviewer = columns.iter().find(|c| c.id == REVIEWER).unwrap();
         assert_eq!(reviewer.name, "Reviewer");
         assert!(reviewer.custom);

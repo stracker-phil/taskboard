@@ -15,8 +15,7 @@ export function holdUnread(id: string) {
 /** Marks the shown issue read once it has been open for the owner's delay (Settings → General); leaving it
  *  sooner doesn't, and neither does an issue the owner just marked unread. */
 export function useSeenAfter(id: string, unread: boolean) {
-  const { data: settings } = useSettings();
-  const delay = (settings?.behaviour.seenAfterSeconds ?? DEFAULT_SECONDS) * 1000;
+  const delay = useSeenDelay();
   useEffect(
     () => () => {
       if (heldUnread === id) heldUnread = null;
@@ -28,4 +27,18 @@ export function useSeenAfter(id: string, unread: boolean) {
     const timer = setTimeout(() => void api.issuesMarkSeen([id]).catch(() => {}), delay);
     return () => clearTimeout(timer);
   }, [id, unread, delay]);
+}
+
+/** Counts the previewed issue as used once it has been shown for the same delay, so passing it doesn't. */
+export function usePreviewedAfter(id: string) {
+  const delay = useSeenDelay();
+  useEffect(() => {
+    const timer = setTimeout(() => void api.issuePreviewed(id).catch(() => {}), delay);
+    return () => clearTimeout(timer);
+  }, [id, delay]);
+}
+
+function useSeenDelay(): number {
+  const { data: settings } = useSettings();
+  return (settings?.behaviour.seenAfterSeconds ?? DEFAULT_SECONDS) * 1000;
 }

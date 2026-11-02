@@ -72,13 +72,17 @@ pub enum Field {
     Due,
     Updated,
     Created,
+    /// When the owner last opened the issue in the Issue view (`activity`).
+    LastView,
+    /// When the owner last viewed, previewed, bookmarked or changed the issue in the app.
+    LastInteraction,
     Project,
     /// Key, summary, description or comments hold every word (full-text search).
     Text,
     Custom(String),
 }
 
-const SYSTEM_FIELDS: [(Field, &str); 15] = [
+const SYSTEM_FIELDS: [(Field, &str); 17] = [
     (Field::Status, "status"),
     (Field::StatusCategory, "statusCategory"),
     (Field::Type, "type"),
@@ -92,6 +96,8 @@ const SYSTEM_FIELDS: [(Field, &str); 15] = [
     (Field::Due, "due"),
     (Field::Updated, "updated"),
     (Field::Created, "created"),
+    (Field::LastView, "lastView"),
+    (Field::LastInteraction, "lastInteraction"),
     (Field::Project, "project"),
     (Field::Text, "text"),
 ];
@@ -139,6 +145,8 @@ pub enum Op {
     Before,
     After,
     WithinLastDays,
+    /// The last n hours up to now; timestamps only.
+    WithinLastHours,
     WithinNextDays,
 }
 
@@ -156,6 +164,7 @@ impl Op {
             Op::Before => "before",
             Op::After => "after",
             Op::WithinLastDays => "withinLastDays",
+            Op::WithinLastHours => "withinLastHours",
             Op::WithinNextDays => "withinNextDays",
         }
     }
@@ -228,6 +237,8 @@ mod tests {
             ("due", Field::Due),
             ("updated", Field::Updated),
             ("created", Field::Created),
+            ("lastView", Field::LastView),
+            ("lastInteraction", Field::LastInteraction),
             ("project", Field::Project),
             ("text", Field::Text),
             (
@@ -261,6 +272,7 @@ mod tests {
             (Op::Before, "before"),
             (Op::After, "after"),
             (Op::WithinLastDays, "withinLastDays"),
+            (Op::WithinLastHours, "withinLastHours"),
             (Op::WithinNextDays, "withinNextDays"),
         ] {
             assert_eq!(serde_json::to_value(op).unwrap(), json!(name), "{name}");

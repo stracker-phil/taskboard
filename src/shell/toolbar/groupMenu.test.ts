@@ -71,6 +71,17 @@ describe("groupMenu", () => {
     expect(sortMenu.filter((e) => e.checked).map((e) => e.text)).toEqual(["Due date", "Ascending"]);
   });
 
+  it.each([
+    ["Last view", "lastView"],
+    ["Last interaction", "lastInteraction"],
+  ] as const)("offers %s in the Sort by submenu and sorts by it", (text, by) => {
+    const { sortMenu, setSort } = build("status", { by: "updated", descending: true });
+
+    sortMenu.find((e) => e.text === text)!.run!();
+
+    expect(setSort).toHaveBeenCalledWith({ by, descending: true });
+  });
+
   it("sorts by a chosen key and keeps the direction", () => {
     const { sortMenu, setSort } = build("status", { by: "updated", descending: true });
 

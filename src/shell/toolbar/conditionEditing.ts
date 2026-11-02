@@ -11,6 +11,7 @@ export const OP_NAMES: Record<Op, string> = {
   before: "before",
   after: "after",
   withinLastDays: "in last",
+  withinLastHours: "in last (hours)",
   withinNextDays: "in next",
 };
 
@@ -27,6 +28,7 @@ const OPS: Record<ValueKind, Op[]> = {
   label: PICKED,
   project: ["is", "isNot"],
   date: ["before", "after", "withinLastDays", "withinNextDays", "isEmpty", "isNotEmpty"],
+  timestamp: ["before", "after", "withinLastHours", "withinLastDays", "withinNextDays", "isEmpty", "isNotEmpty"],
   text: ["contains", "is", "isEmpty", "isNotEmpty"],
   number: ["is", "isNot", "isEmpty", "isNotEmpty"],
   search: ["contains"],
@@ -43,7 +45,8 @@ export const opsFor = (kind: ValueKind): Op[] => OPS[kind];
 export const takesNoValue = (op: Op) => op === "isEmpty" || op === "isNotEmpty";
 export const DEFAULT_DAYS = 7;
 
-export const takesDays = (op: Op) => op === "withinLastDays" || op === "withinNextDays";
+/** Takes a count: of days, or of hours for `withinLastHours`. */
+export const takesDays = (op: Op) => op === "withinLastDays" || op === "withinNextDays" || op === "withinLastHours";
 
 /** The choices a picker offers for a field, or null when the value is typed. */
 export function choicesFor(kind: ValueKind, options: FilterOptions): Choice[] | null {

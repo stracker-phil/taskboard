@@ -142,6 +142,8 @@ pub enum ValueKind {
     Label,
     Project,
     Date,
+    /// A date with a time of day: also offers "in the last n hours".
+    Timestamp,
     Text,
     Number,
     /// Words searched in the key, summary, description and comments.
@@ -198,8 +200,14 @@ const STANDARD_FIELDS: &[(Field, &str, ValueKind)] = &[
     (Field::Sprint, "Sprint", ValueKind::Sprint),
     (Field::Labels, "Labels", ValueKind::Label),
     (Field::Due, "Due date", ValueKind::Date),
-    (Field::Updated, "Updated", ValueKind::Date),
-    (Field::Created, "Created", ValueKind::Date),
+    (Field::Updated, "Updated", ValueKind::Timestamp),
+    (Field::Created, "Created", ValueKind::Timestamp),
+    (Field::LastView, "Last view", ValueKind::Timestamp),
+    (
+        Field::LastInteraction,
+        "Last interaction",
+        ValueKind::Timestamp,
+    ),
     (Field::Project, "Project", ValueKind::Project),
     (Field::Text, "Text", ValueKind::Search),
 ];

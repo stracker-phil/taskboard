@@ -22,6 +22,8 @@ const SORT_NAMES: Record<SortBy, string> = {
   due: "Due date",
   summary: "Summary",
   status: "Status",
+  lastView: "Last view",
+  lastInteraction: "Last interaction",
 };
 
 /** Groupings that only tell issues apart across Spaces. */

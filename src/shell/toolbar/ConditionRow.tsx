@@ -91,7 +91,7 @@ function ValueEditor({ id, condition, field, options, onChange }: { id: string; 
   return (
     <>
       {label}
-      <input id={id} className="condition-row__value" type={field.kind === "date" ? "date" : "text"} value={text} onChange={(e) => onChange({ ...condition, value: e.target.value })} />
+      <input id={id} className="condition-row__value" type={field.kind === "date" || field.kind === "timestamp" ? "date" : "text"} value={text} onChange={(e) => onChange({ ...condition, value: e.target.value })} />
     </>
   );
 }

@@ -10,7 +10,7 @@ All in the config dir (`~/Library/Application Support/com.philippstracker.taskbo
 
 | File | Holds | Reset cache |
 |---|---|---|
-| `local.sqlite` | The owner's setup: Spaces, filter lists, views, bookmarks (`pin`), status style overrides, read and unread marks (`issue_seen`) | kept |
+| `local.sqlite` | The owner's setup: Spaces, filter lists, views, bookmarks (`pin`), status style overrides, read and unread marks (`issue_seen`), last views and interactions (`issue_activity`) | kept |
 | `cache.sqlite` | The tracker mirror (Jira today): spaces, issues, comments, people, versions, fields, change log, sync state, search index | deleted and recreated empty; with `sync.clearCacheOnQuit` also at every quit and launch |
 | `settings.json`, `keybindings.json`, `ui_state.json`, `modes.json`, `places.json` | Settings, key overrides, window layout (the hidden sidebar, the activity column's width), the app-wide modes Rust applies to every view (`store/modes.rs`: Me mode in all views, Unread only, the bookmarks bar), each view's remembered place (`store/`; no longer the Me chip or the text filter, [ADR 0038](adr/0038-filter-changes-are-drafts-until-the-view-is-saved.md): an old `onlyMine` seeds `view.only_mine` once at startup, `text` is ignored) | kept |
 | `nav.json` | The main window's place: the open level and view, the open tabs and the active one, the last closed tabs' places, each level's last view, the expanded Spaces (`nav/`, `nav/tabs.rs`; a file without tabs is one tab). A place that no longer exists falls back to the level's default view, then to Everything | kept |
@@ -91,6 +91,7 @@ unique across sources (Jira's numeric ids; another source prefixes its own):
 | `space_field` | how a custom field shows in one Space: `hiddenInList`, `hiddenInDetail` or `hidden`; no row = visible (`space_config`) |
 | `space_member` | the owner's choice who is on a Space's team (`active` 0/1); no row = the default: on for anyone ever assigned one of its issues, off for everyone else (`team`, `local/0017`, which replaced `space_member_off`) |
 | `issue_seen` | when the owner last looked at an issue: changes after it are unseen (`changes::UNSEEN`); `unread`: marked unread by the owner, unread until read again. In the local file since `local/0015`, so a cache reset keeps it (`db::connection::carry_over_seen` copied the cache's rows once); no foreign key to `cache.issue`, `sync::store::forget_issue` deletes the row with its issue |
+| `issue_activity` | (`local/0024`, `activity`) `viewed_at`: when the owner last opened the issue in the Issue view (`issue_viewed`); `interacted_at`: when they last viewed it, previewed it for the read delay (`issue_previewed`), bookmarked it or unbookmarked it (`pins::store`), or Jira took a change sent from the app (`writes::sent::record`). Both UTC text, null until it happens; a stamp announces `local_changed` with `activity`, which refreshes only rows and counts. No foreign key; `forget_issue` deletes the row with its issue |
 
 Project ids in `local` point into `cache`; SQLite can't enforce that across files, so code cleans up.
 
@@ -109,11 +110,13 @@ JSON; no condition is stored as null:
 
 - `field`: `status` (id), `statusCategory` (`new`, `indeterminate`, `done`), `type` (name), `assignee`,
   `reporter` (account id or `me`), `priority` (name), `epic` (the parent's issue id), `release` (fix version id),
-  `sprint` (`active`, `future`, `closed` or a sprint id), `labels`, `due`, `updated`, `created`, `project` (id),
+  `sprint` (`active`, `future`, `closed` or a sprint id), `labels`, `due`, `updated`, `created`, `lastView`,
+  `lastInteraction` (`issue_activity`), `project` (id),
   or a custom field id (Jira schema types user, option, string, number, date, datetime, array).
 - `op`: `is`, `isNot`, `in`, `notIn`, `isEmpty`, `isNotEmpty`, `contains` (labels and text fields), `before`,
   `after` (`YYYY-MM-DD`), `withinLastDays`, `withinNextDays` (a number of days; dates are days in the account's
-  time zone).
+  time zone), `withinLastHours` (a number of hours back from now; times only: `updated`, `created`, `lastView`,
+  `lastInteraction`).
 - `value`: a string, a list of strings or a number of days, as the operator needs.
 
 A view holds the same JSON in `view.filter` (migration `local/0012`, [ADR 0033](adr/0033-views-can-hold-their-own-filter.md)):
@@ -177,9 +180,10 @@ exactly the rows the view shows (`views::unseen_ids` with a `ViewAt`); without a
 | `none` | one group, no header |
 
 `sort.by`: `updated`, `created`, `priority` (highest first when descending), `key` (by number within a
-project), `due`, `summary`, `status`; empty priorities and due dates sort last either way; ties keep the
+project), `due`, `summary`, `status`, `lastView`, `lastInteraction`; empty priorities, due dates, last views and
+last interactions sort last either way; ties keep the
 issue id order. Columns are standard ids (`statusType`, `assignee`, `epic`, `release`, `priority`, `labels`, `sprint`,
-`due`) or a Jira custom field id (`columns_catalogue` lists them; Jira's internal `any` fields and the sprint
+`due`, `lastView`, `lastInteraction`: the time today, "Yesterday", else the day) or a Jira custom field id (`columns_catalogue` lists them; Jira's internal `any` fields and the sprint
 field are left out). `view.widths` (migration `local/0003`) holds the Table layout's column widths by column id; `view.wrap_titles` (`local/0004`, default on) whether the List wraps long titles; `view.inline_labels` (`local/0011`, default on) whether labels show as tags after the title while the view has no Labels column; `view.open_with` (`local/0009`, `preview`, `full` or null for Settings → General) what a click on an issue opens; `filter_list.icon` (`local/0006`) and `filter_list.color`, `view.icon`, `view.color` (`local/0010`) the tile look (`look.rs`: a letter, digit or emoji, or a line icon name, on tile color 1–12; no icon shows the folder or the layout's tile, no color the plain icon); `view.collapsed` (`local/0005`) a Board's collapsed or expanded columns by group key (a status id when grouped by status; the rest keep their default, Done collapsed). `view_board` returns one column per group of the view's `group_by`: by status (also for `none`) in the Board order (Backlog, To do, In progress, Blocked, In review, Done, then Jira's status order), by status type in that style order, otherwise the List's groups (`views::groups::group`) in their order. `read_view` and `list_views` fit a view to its Space (`space_config`): a layout the Space switched off shows as its default layout, `View.layouts` lists the offered ones, and columns of fields the Space hides from lists are left out; `columns_catalogue(list_id)` leaves them out too (outside the Spaces only fields every Space hides).
 `space_status_style` holds the owner's style per Space and status (`status_style_set`); `status_style::Styles::of` resolves an issue's style with its own Space's choice.
 

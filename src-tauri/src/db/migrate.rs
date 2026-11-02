@@ -29,6 +29,7 @@ pub const LOCAL: &[&str] = &[
     include_str!("../../migrations/local/0021_write_log.sql"),
     include_str!("../../migrations/local/0022_space_accent.sql"),
     include_str!("../../migrations/local/0023_view_me_rules.sql"),
+    include_str!("../../migrations/local/0024_issue_activity.sql"),
 ];
 pub const CACHE: &[&str] = &[
     include_str!("../../migrations/cache/0001_init.sql"),

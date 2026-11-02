@@ -55,6 +55,9 @@ pub struct Facts {
     pub due_date: Option<NaiveDate>,
     pub updated_at: String,
     pub created_at: String,
+    /// UTC text, as `issue_activity` stores it.
+    pub last_view: Option<String>,
+    pub last_interaction: Option<String>,
 }
 
 pub struct SpaceInfo {
@@ -289,6 +292,8 @@ mod tests {
             sprint: None,
             due: None,
             updated_at: String::new(),
+            last_view: None,
+            last_interaction: None,
             custom: BTreeMap::new(),
             child_count: 0,
             is_subtask: false,
@@ -306,6 +311,8 @@ mod tests {
             due_date: None,
             updated_at: String::new(),
             created_at: String::new(),
+            last_view: None,
+            last_interaction: None,
         }
     }
 

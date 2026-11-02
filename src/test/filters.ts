@@ -1,6 +1,6 @@
 import type { FilterOptions, ListConditions } from "../api/types";
 
-/** The 14 standard filter fields and no cached choices; override per test. */
+/** The 16 standard filter fields and no cached choices; override per test. */
 export function filterOptions(patch: Partial<FilterOptions> = {}): FilterOptions {
   return {
     fields: [
@@ -15,8 +15,10 @@ export function filterOptions(patch: Partial<FilterOptions> = {}): FilterOptions
       { id: "sprint", name: "Sprint", kind: "sprint" },
       { id: "labels", name: "Labels", kind: "label" },
       { id: "due", name: "Due date", kind: "date" },
-      { id: "updated", name: "Updated", kind: "date" },
-      { id: "created", name: "Created", kind: "date" },
+      { id: "updated", name: "Updated", kind: "timestamp" },
+      { id: "created", name: "Created", kind: "timestamp" },
+      { id: "lastView", name: "Last view", kind: "timestamp" },
+      { id: "lastInteraction", name: "Last interaction", kind: "timestamp" },
       { id: "project", name: "Project", kind: "project" },
     ],
     statuses: [],

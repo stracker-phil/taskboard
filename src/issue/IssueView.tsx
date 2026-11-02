@@ -71,6 +71,7 @@ export function IssueView({ id, origin }: { id: string; origin: IssueOrigin }) {
     // Comments may be newer in Jira than in the cache; a failure (offline) leaves the cached ones.
     void api.issueSyncComments(id).catch(() => {});
     refreshIssueExtras(id);
+    void api.issueViewed(id).catch(() => {});
   }, [id]);
   useEffect(() => {
     for (const neighbor of [neighbors.previous, neighbors.next]) if (neighbor) prefetchIssue(client, neighbor);

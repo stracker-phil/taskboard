@@ -213,6 +213,8 @@ export function createApiMock(): Api {
     issueToggleMine: vi.fn(async (): Promise<WriteOutcome> => ({ done: "Done", reverse: null })),
     issueSyncComments: vi.fn().mockResolvedValue(false),
     issuesMarkSeen: done(),
+    issueViewed: done(),
+    issuePreviewed: done(),
     issueMarkUnread: done(),
     listMarkAllSeen: done(),
     pinsList: vi.fn(async (): Promise<Pins> => ({ active: [], recentlyUnpinned: [] })),

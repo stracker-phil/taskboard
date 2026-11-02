@@ -1707,6 +1707,34 @@ describe("ListView", () => {
       expect(template).toBe("minmax(0, 1fr) 181px");
     });
 
+    describe("last view and last interaction columns", () => {
+      const catalogue = () =>
+        mocked.columnsCatalogue.mockResolvedValue([
+          ...COLUMNS,
+          { id: "lastView", name: "Last view", custom: false },
+          { id: "lastInteraction", name: "Last interaction", custom: false },
+        ]);
+      const cellsOf = async (issue: Row) => {
+        catalogue();
+        await renderList(viewData([groupOf([issue])], [issue], { columns: ["lastView", "lastInteraction"], groupBy: "none" }));
+        return within(await screen.findByRole("row", { name: new RegExp(issue.key) })).getAllByRole("gridcell").slice(1);
+      };
+
+      it("shows when the issue was last viewed and last interacted with", async () => {
+        const cells = await cellsOf(row({ lastView: "Oct 30", lastInteraction: "Oct 29" }));
+
+        expect(cells.map((c) => c.textContent)).toEqual(["Oct 30", "Oct 29"]);
+        expect(screen.getByRole("columnheader", { name: "Last view" })).toBeInTheDocument();
+        expect(screen.getByRole("columnheader", { name: "Last interaction" })).toBeInTheDocument();
+      });
+
+      it("shows a dash for an issue that was never viewed or interacted with", async () => {
+        const cells = await cellsOf(row({ lastView: null, lastInteraction: null }));
+
+        expect(cells.map((c) => c.textContent)).toEqual(["—", "—"]);
+      });
+    });
+
     describe("cells without a value", () => {
       const bare = row({ id: "6", key: "NW-1006", summary: "Update the footer" });
       const cellsOf = async (issue: Row) => {

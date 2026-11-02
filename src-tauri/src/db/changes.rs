@@ -15,6 +15,8 @@ pub enum LocalPart {
     Views,
     Pins,
     Styles,
+    /// When issues were last viewed or used (`activity`); only rows and counts depend on it.
+    Activity,
 }
 
 /// Collected by a write's closure; empty means nothing to announce.
@@ -256,11 +258,12 @@ mod tests {
                     LocalPart::Lists,
                     LocalPart::Views,
                     LocalPart::Pins,
-                    LocalPart::Styles
+                    LocalPart::Styles,
+                    LocalPart::Activity
                 ]
             })
             .unwrap(),
-            json!({ "parts": ["spaces", "lists", "views", "pins", "styles"] })
+            json!({ "parts": ["spaces", "lists", "views", "pins", "styles", "activity"] })
         );
     }
 }
