@@ -8,7 +8,7 @@ use tauri::{AppHandle, Manager, Wry};
 
 use super::items::{
     APP_MENU, FILE_MENU, GO_MENU, HELP_MENU, ISSUE_MENU, Item, LIST_MENU, MenuDef, QUIT, RELOAD,
-    SETTINGS, VIEW, VIEW_MENU,
+    SETTINGS, VIEW, VIEW_MENU, WINDOW_MENU, WINDOW_TABS,
 };
 use super::place::{Place, VIEW_KEYS};
 use crate::bus::{self, CommandStatus};
@@ -143,9 +143,11 @@ pub fn build(app: &AppHandle, place: &Place) -> tauri::Result<Menu<Wry>> {
         .separator()
         .fullscreen()
         .build()?;
-    let window = SubmenuBuilder::new(app, "Window")
+    let window = SubmenuBuilder::new(app, WINDOW_MENU.0)
         .minimize()
         .maximize()
+        .separator();
+    let window = with_items(&ctx, window, WINDOW_TABS)?
         .separator()
         .bring_all_to_front()
         .build()?;

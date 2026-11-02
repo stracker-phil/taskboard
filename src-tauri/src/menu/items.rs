@@ -54,8 +54,8 @@ pub const GO_MOVES: &[Item] = &[
     item("Previous View", "page:view.previous", "Ctrl+Shift+Tab"),
     item("Next View", "page:view.next", "Ctrl+Tab"),
 ];
-/// The main window's tabs (ADR 0050); ⌘W closes one (File → Close Window).
-pub const GO_TABS: &[Item] = &[
+/// The main window's tabs (ADR 0050); ⌘W closes one (File → Close Tab or Window).
+pub const WINDOW_TABS: &[Item] = &[
     item("New Tab", "nav:newTab", "CmdOrCtrl+Shift+T"),
     item(
         "Previous Tab",
@@ -144,15 +144,24 @@ pub type MenuDef = (&'static str, &'static [&'static [Item]]);
 
 pub const APP_MENU: MenuDef = (crate::APP_NAME, &[&[SETTINGS], &[QUIT]]);
 pub const FILE_MENU: MenuDef = ("File", &[FILE, FILE_SYNC, &[RESET_CACHE], &[CLOSE]]);
-pub const GO_MENU: MenuDef = ("Go", &[GO_LEVELS, GO_MOVES, GO_TABS]);
+pub const GO_MENU: MenuDef = ("Go", &[GO_LEVELS, GO_MOVES]);
 /// The layouts come last: changing a view's layout is rare.
 pub const LIST_MENU: MenuDef = ("List", &[LIST_TOOLBAR, LIST_SEEN, LIST_LAYOUTS]);
 pub const ISSUE_MENU: MenuDef = ("Issue", &[ISSUE]);
 pub const VIEW_MENU: MenuDef = ("View", &[VIEW, &[RELOAD]]);
+/// Between macOS's Minimize/Zoom and Bring All to Front.
+pub const WINDOW_MENU: MenuDef = ("Window", &[WINDOW_TABS]);
 pub const HELP_MENU: MenuDef = ("Help", &[HELP]);
 /// Every menu with items of its own, in menu bar order.
 pub const MENUS: &[MenuDef] = &[
-    APP_MENU, FILE_MENU, GO_MENU, LIST_MENU, ISSUE_MENU, VIEW_MENU, HELP_MENU,
+    APP_MENU,
+    FILE_MENU,
+    GO_MENU,
+    LIST_MENU,
+    ISSUE_MENU,
+    VIEW_MENU,
+    WINDOW_MENU,
+    HELP_MENU,
 ];
 
 #[cfg(test)]
@@ -187,7 +196,7 @@ mod tests {
             FILE_SYNC,
             GO_LEVELS,
             GO_MOVES,
-            GO_TABS,
+            WINDOW_TABS,
             LIST_LAYOUTS,
             LIST_TOOLBAR,
             LIST_SEEN,
@@ -407,8 +416,8 @@ mod tests {
     }
 
     #[test]
-    fn the_go_menu_holds_the_tab_commands_after_the_moves() {
-        let tabs: Vec<(&str, &str, Option<&str>)> = GO_TABS
+    fn the_window_menu_holds_the_tab_commands_and_the_go_menu_does_not() {
+        let tabs: Vec<(&str, &str, Option<&str>)> = WINDOW_TABS
             .iter()
             .map(|item| (item.label, item.command, item.accelerator))
             .collect();
@@ -433,15 +442,26 @@ mod tests {
                 ),
             ]
         );
-        let groups: Vec<&str> = GO_MENU.1.iter().map(|g| g[0].command).collect();
+        assert_eq!(WINDOW_MENU.0, "Window");
+        let window_groups: Vec<Vec<&str>> = WINDOW_MENU
+            .1
+            .iter()
+            .map(|g| g.iter().map(|item| item.command).collect())
+            .collect();
         assert_eq!(
-            groups,
-            [
-                GO_LEVELS[0].command,
-                GO_MOVES[0].command,
-                GO_TABS[0].command
-            ]
+            window_groups,
+            [["nav:newTab", "nav:previousTab", "nav:nextTab", "nav:reopenTab"]]
         );
+        let go_groups: Vec<&str> = GO_MENU.1.iter().map(|g| g[0].command).collect();
+        assert_eq!(go_groups, [GO_LEVELS[0].command, GO_MOVES[0].command]);
+        let go_commands: Vec<&str> = GO_MENU
+            .1
+            .iter()
+            .flat_map(|g| g.iter().map(|item| item.command))
+            .collect();
+        for tab in ["nav:newTab", "nav:previousTab", "nav:nextTab", "nav:reopenTab"] {
+            assert!(!go_commands.contains(&tab), "{tab}");
+        }
     }
 
     #[test]

@@ -116,6 +116,7 @@ mod tests {
                 "List",
                 "Issue",
                 "View",
+                "Window",
                 "Help"
             ]
         );
@@ -165,10 +166,26 @@ mod tests {
                 "nav:nextList",
                 "page:view.previous",
                 "page:view.next",
-                "nav:newTab",
-                "nav:previousTab",
-                "nav:nextTab",
-                "nav:reopenTab",
+            ]
+        );
+    }
+
+    #[test]
+    fn the_window_menu_lists_the_tab_commands_in_order_with_keys() {
+        let items = listed_anywhere(&Except(&[]));
+
+        let window: Vec<(&str, Option<&str>)> = items
+            .iter()
+            .filter(|c| c.menu == "Window")
+            .map(|c| (c.command.as_str(), c.accelerator.as_deref()))
+            .collect();
+        assert_eq!(
+            window,
+            [
+                ("nav:newTab", Some("CmdOrCtrl+Shift+T")),
+                ("nav:previousTab", Some("CmdOrCtrl+Shift+BracketLeft")),
+                ("nav:nextTab", Some("CmdOrCtrl+Shift+BracketRight")),
+                ("nav:reopenTab", Some("CmdOrCtrl+Alt+T")),
             ]
         );
     }

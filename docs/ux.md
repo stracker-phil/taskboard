@@ -65,7 +65,7 @@ The owner's rule (2026-10-30), for every control, list and popover:
   scrolling sideways past that; the active tab is `--panel-bg` with `--shadow-raised`, the others flat like the
   bookmarks. A click shows a tab, × (on the active tab and the hovered one) or a middle click closes it, a drag
   moves it, right-click has New Tab, Close Tab and Close Other Tabs. A tab keeps its own Issue view and the drafts
-  of its view; switching swaps them before the frame paints. Go → New Tab ⌘⇧T, Previous / Next Tab ⌘⇧[ / ⌘⇧],
+  of its view; switching swaps them before the frame paints. Window → New Tab ⌘⇧T, Previous / Next Tab ⌘⇧[ / ⌘⇧],
   Reopen Closed Tab ⌘⌥T; File → Close Tab or Window ⌘W. "Open in New Tab" sits in the menus of Spaces, filter
   lists, Home rows, view tabs and list or view bookmarks; ⌘-click on those opens a tab behind, ⌘⇧-click shows it.
   An issue opens in its own tab, at its view with its Issue view shown, by a ⌘ double-click on its row or card
