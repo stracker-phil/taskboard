@@ -2,7 +2,7 @@ import { type RefObject, useEffect, useRef } from "react";
 import type { Group, ViewData, ViewPlace } from "../../api";
 import { onIssueKeys } from "../../commands/issueKeys";
 import { type Item, itemGroupKey } from "./flatten";
-import { extendPick } from "./picking";
+import { extendPick, toggleBox } from "./picking";
 import type { RowActionHandlers } from "./RowActions";
 import { explainWritesOff } from "../../writes/runWrite";
 import { assignMenuAnchor } from "../../writes/assignMenu";
@@ -48,9 +48,8 @@ export function useRowKeys(current: RowKeyState): RefObject<RowKeyState> {
     };
     return onIssueKeys({
       move: (step) => {
-        const { rowIds, selected, peekOpen, items, scrollToIndex, select, picked, setPicked } = state.current;
+        const { rowIds, selected, peekOpen, items, scrollToIndex, select } = state.current;
         if (rowIds.length === 0) return;
-        if (picked.length > 0) setPicked([]);
         const at = selected === null ? -1 : rowIds.indexOf(selected);
         const next = rowIds[Math.min(Math.max(at + step, 0), rowIds.length - 1)];
         select(next, peekOpen);
@@ -63,6 +62,10 @@ export function useRowKeys(current: RowKeyState): RefObject<RowKeyState> {
         if (next.selected === null) return;
         select(next.selected, false);
         scrollToIndex(items.findIndex((item) => item.kind === "row" && item.row.id === next.selected));
+      },
+      togglePick: () => {
+        const { rowIds, picked, selected, setPicked } = state.current;
+        if (selected) setPicked(toggleBox(rowIds, picked, selected));
       },
       pickAll: () => state.current.setPicked(state.current.rowIds),
       clearPicks: () => state.current.setPicked([]),

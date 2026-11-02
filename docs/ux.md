@@ -263,18 +263,18 @@ one group, Board column or pill per style, whatever the status is called; the Bo
 Issues are picked for a bulk change (`views/list/picking.ts`, the store's `picked` per view, never saved; the
 Board's `views/board/useBoardPicks.ts`):
 - **⌘-click** adds or removes a row or card; the first one also picks the selected row, as Finder does. **⇧-click**
-  picks the rows from the selected one to the clicked one (the press selects no text). **⌘A** picks every row the
+  picks the rows from the selected one to the clicked one (the press selects no text). **X** picks the selected row or drops it. **⌘A** picks every row the
   view shows (in a text field or the Issue view it stays Select All); **⇧J / ⇧K** (⇧↓ / ⇧↑) add the row past the
-  picks' bottom or top edge. **Esc**, a plain click, J/K and opening the preview drop the picks.
+  picks' bottom or top edge. J/K move the current row (still highlighted) and keep the picks. **Esc**, a plain click and opening the preview drop
+  the picks.
 - **The checkbox** (`PickBox`) toggles its row alone. It is drawn, not native: 14px, radius 4, a 1.5px
   `--pick-line` outline (`--pick-line-hover` under the pointer), ticked a `--pick-fill` square with a `--pick-check`
-  tick. It fades in (`--motion-base`) while its row or card has the pointer, once ticked, and on the current row
-  while any is picked; the other unticked boxes stay hidden. In the List it sits in the gutter 42 left of the row,
+  tick. It fades in (`--motion-base`) while its row or card has the pointer or once ticked; no other box shows. In the List it sits in the gutter 42 left of the row,
   centered on the subtask caret's line, and the whole gutter counts as the row's, so the pointer keeps the box on
   its way there; in the Table in the row's 24px left inset (the spacer it replaces); on a Board card at the end of
   the title's first line, in room the title always keeps free.
 - Picked rows and cards get the neutral `--picked-bg` (a picked card also `--border-strong`), apart from the
-  accent's selection and unread tints; while any is picked, the selected row isn't highlighted. Picking closes the
+  accent's selection and unread tints; the current row keeps its selection highlight, picked or not. Picking closes the
   preview, which shows one issue. A ⌘ or ⇧ click or double-click opens nothing, and a narrowing that hides a picked
   row leaves it out. Leaving the view drops the picks.
 - **The bulk bar** (`writes/BulkBar.tsx`) fades in centered 16 over the view's bottom while anything is picked: the

@@ -440,31 +440,31 @@ describe("BoardView", () => {
         screen.getAllByRole("checkbox").forEach((b) => expect(b).not.toHaveClass("pick-box--shown"));
       });
 
-      it("marks the picked cards as picked, not selected", async () => {
+      it("marks the picked cards as picked, and the current one also as selected", async () => {
         await renderBoard(BOARD_DATA);
 
         fireEvent.click(card("Write the footer copy"), { metaKey: true });
         fireEvent.click(card("Pick the typefaces"), { metaKey: true });
 
+        expect(card("Write the footer copy")).toHaveClass("board-card--picked");
+        expect(card("Write the footer copy")).not.toHaveClass("board-card--selected");
+        expect(card("Pick the typefaces")).toHaveClass("board-card--picked", "board-card--selected");
         for (const summary of ["Write the footer copy", "Pick the typefaces"]) {
-          expect(card(summary)).toHaveClass("board-card--picked");
-          expect(card(summary)).not.toHaveClass("board-card--selected");
           expect(card(summary)).toHaveAttribute("aria-current", "true");
         }
         expect(card("Draft the sitemap")).not.toHaveAttribute("aria-current");
       });
 
-      it("shows the checkbox of the current card only, while cards are picked", async () => {
+      it("shows no extra checkbox for the current card while cards are picked", async () => {
         await renderBoard(BOARD_DATA);
 
         fireEvent.click(card("Write the footer copy"), { metaKey: true });
         fireEvent.click(card("Pick the typefaces"), { metaKey: true });
 
-        expect(box("NW-103")).toHaveClass("pick-box--shown");
         expect(box("NW-103")).toBeChecked();
-        expect(box("NW-102")).not.toHaveClass("pick-box--shown");
         expect(box("NW-102")).toBeChecked();
-        expect(box("NW-101")).not.toHaveClass("pick-box--shown");
+        expect(box("NW-101")).not.toBeChecked();
+        screen.getAllByRole("checkbox").forEach((b) => expect(b).not.toHaveClass("pick-box--shown"));
       });
     });
 
@@ -608,13 +608,68 @@ describe("BoardView", () => {
       expect(getCommand("peek.close")?.when?.()).toBe(true);
     });
 
-    it("drops the picks when J moves the current card", async () => {
+    it("keeps the picks when J or K moves the current card", async () => {
       await renderBoard(BOARD_DATA);
       await press("issue.pickAll");
 
       await press("issue.next");
+      await press("issue.next");
+      await press("issue.previous");
 
+      expect(pickedKeys()).toEqual(["NW-101", "NW-102", "NW-103", "NW-104", "NW-105", "NW-106"]);
+      expect(card("Draft the sitemap")).toHaveClass("board-card--selected", "board-card--picked");
+      expect(card("Write the footer copy")).not.toHaveClass("board-card--selected");
+    });
+
+    it("keeps the selected highlight on a picked current card only", async () => {
+      await renderBoard(BOARD_DATA);
+      await press("issue.next");
+      await press("issue.togglePick");
+      await press("issue.next");
+      await press("issue.togglePick");
+
+      expect(card("Draft the sitemap")).toHaveClass("board-card--picked");
+      expect(card("Draft the sitemap")).not.toHaveClass("board-card--selected");
+      expect(card("Write the footer copy")).toHaveClass("board-card--picked", "board-card--selected");
+    });
+
+    it("picks the current card on X and drops it on a second X", async () => {
+      await renderBoard(BOARD_DATA);
+      await press("issue.next");
+
+      await press("issue.togglePick");
+      expect(pickedKeys()).toEqual(["NW-101"]);
+      expect(within(await screen.findByRole("toolbar", { name: "Picked issues" })).getByText("1 picked")).toBeInTheDocument();
+
+      await press("issue.togglePick");
       expect(pickedKeys()).toEqual([]);
+    });
+
+    it("picks two cards with X, J and X", async () => {
+      await renderBoard(BOARD_DATA);
+      await press("issue.next");
+
+      await press("issue.togglePick");
+      await press("issue.next");
+      await press("issue.togglePick");
+
+      expect(pickedKeys()).toEqual(["NW-101", "NW-102"]);
+    });
+
+    it("disables X while no card is current", async () => {
+      await renderBoard(BOARD_DATA);
+
+      expect(getCommand("issue.togglePick")?.when?.()).toBe(false);
+    });
+
+    it("titles a pick box with its action", async () => {
+      await renderBoard(BOARD_DATA);
+      const box = screen.getByRole("checkbox", { name: "Pick NW-101" });
+      expect(box).toHaveAttribute("title", "Pick (X)");
+
+      await userEvent.click(box);
+
+      expect(screen.getByRole("checkbox", { name: "Pick NW-101" })).toHaveAttribute("title", "Drop from the picks (X)");
     });
 
     describe("the bulk bar", () => {

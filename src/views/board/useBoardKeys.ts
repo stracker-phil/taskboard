@@ -3,7 +3,7 @@ import type { BoardData } from "../../api";
 import { onIssueKeys } from "../../commands/issueKeys";
 import type { useBoardPicks } from "./useBoardPicks";
 
-type BoardPicks = Pick<ReturnType<typeof useBoardPicks>, "picked" | "setPicked" | "pickAll">;
+type BoardPicks = Pick<ReturnType<typeof useBoardPicks>, "picked" | "setPicked" | "pickAll" | "onToggleBox">;
 import type { RowActionHandlers } from "../list/RowActions";
 import { explainWritesOff } from "../../writes/runWrite";
 import { assignMenuAnchor } from "../../writes/assignMenu";
@@ -39,11 +39,13 @@ export function useBoardKeys(
       if (row) run(row.key);
     };
     return onIssueKeys({
+      togglePick: () => {
+        if (state.current.selected) state.current.picks.onToggleBox(state.current.selected);
+      },
       pickAll: () => state.current.picks.pickAll(),
       clearPicks: () => state.current.picks.setPicked([]),
       hasPicks: () => state.current.picks.picked.length > 0,
       move: (step) => {
-        if (state.current.picks.picked.length > 0) state.current.picks.setPicked([]);
         const { all, column, index } = where();
         if (all.length === 0) return;
         if (column < 0) return state.current.select(all[0].ids[0]);

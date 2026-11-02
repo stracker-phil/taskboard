@@ -752,7 +752,7 @@ describe("TableView", () => {
       expect(pickedKeys()).toEqual(["NW-1001"]);
     });
 
-    it("highlights the selected row only while nothing is picked", async () => {
+    it("highlights the selected row", async () => {
       await renderTable(flat());
 
       await userEvent.click(await screen.findByText("Redesign the pricing page"));
@@ -763,32 +763,87 @@ describe("TableView", () => {
       expect(screen.getByRole("row", { name: /NW-1001/ })).toHaveAttribute("aria-selected", "false");
     });
 
-    it("highlights the picked rows as picked, not selected, and drops the selected highlight", async () => {
+    it("highlights the picked rows as picked and keeps the selected highlight on the current row", async () => {
       await renderTable(flat());
       await userEvent.click(await screen.findByText("Redesign the pricing page"));
 
       fireEvent.click(screen.getByText("Publish the launch notes"), { metaKey: true });
 
-      for (const key of [/NW-1042/, /NW-1001/]) {
-        const picked = screen.getByRole("row", { name: key });
-        expect(picked).toHaveClass("table-row--picked");
-        expect(picked).not.toHaveClass("table-row--selected");
-        expect(picked).toHaveAttribute("aria-selected", "true");
-      }
+      const current = screen.getByRole("row", { name: /NW-1001/ });
+      const other = screen.getByRole("row", { name: /NW-1042/ });
+      expect(current).toHaveClass("table-row--picked", "table-row--selected");
+      expect(current).toHaveAttribute("aria-selected", "true");
+      expect(other).toHaveClass("table-row--picked");
+      expect(other).not.toHaveClass("table-row--selected");
+      expect(other).toHaveAttribute("aria-selected", "true");
       expect(screen.getByRole("row", { name: /NW-1003/ })).toHaveAttribute("aria-selected", "false");
     });
 
-    it("shows the checkbox of the current row only, while rows are picked", async () => {
+    it("titles a pick box with its action", async () => {
+      await renderTable(flat());
+      const box = await screen.findByRole("checkbox", { name: "Pick NW-1042" });
+      expect(box).toHaveAttribute("title", "Pick (X)");
+
+      await userEvent.click(box);
+
+      expect(screen.getByRole("checkbox", { name: "Pick NW-1042" })).toHaveAttribute("title", "Drop from the picks (X)");
+    });
+
+    it("keeps the picks when J or K moves the selection", async () => {
+      await renderTable(flat());
+      await userEvent.click(await screen.findByText("Redesign the pricing page"));
+      await press("issue.pickNext");
+
+      await press("issue.next");
+      expect(pickedKeys()).toEqual(["NW-1042", "NW-1001"]);
+      expect(place().selectedId).toBe("3");
+
+      await press("issue.previous");
+      expect(pickedKeys()).toEqual(["NW-1042", "NW-1001"]);
+      expect(place().selectedId).toBe("2");
+    });
+
+    it("picks the selected row on X and drops it on a second X", async () => {
+      await renderTable(flat());
+      await userEvent.click(await screen.findByText("Redesign the pricing page"));
+
+      await press("issue.togglePick");
+      expect(pickedKeys()).toEqual(["NW-1042"]);
+      expect(within(await screen.findByRole("toolbar", { name: "Picked issues" })).getByText("1 picked")).toBeInTheDocument();
+
+      await press("issue.togglePick");
+      expect(pickedKeys()).toEqual([]);
+    });
+
+    it("picks two rows with X, J and X", async () => {
+      await renderTable(flat());
+      await userEvent.click(await screen.findByText("Redesign the pricing page"));
+
+      await press("issue.togglePick");
+      await press("issue.next");
+      await press("issue.togglePick");
+
+      expect(pickedKeys()).toEqual(["NW-1042", "NW-1001"]);
+      expect(screen.getByRole("row", { name: /NW-1001/ })).toHaveClass("table-row--selected");
+    });
+
+    it("disables X while no row is selected", async () => {
+      await renderTable(flat());
+      await screen.findByText("Publish the launch notes");
+
+      expect(getCommand("issue.togglePick")?.when?.()).toBe(false);
+    });
+
+    it("shows no extra checkbox for the current row while rows are picked", async () => {
       await renderTable(flat());
       await userEvent.click(await screen.findByText("Redesign the pricing page"));
 
       fireEvent.click(screen.getByText("Publish the launch notes"), { metaKey: true });
 
-      expect(screen.getByRole("checkbox", { name: "Pick NW-1001" })).toHaveClass("pick-box--shown");
       expect(screen.getByRole("checkbox", { name: "Pick NW-1001" })).toBeChecked();
-      expect(screen.getByRole("checkbox", { name: "Pick NW-1042" })).not.toHaveClass("pick-box--shown");
       expect(screen.getByRole("checkbox", { name: "Pick NW-1042" })).toBeChecked();
-      expect(screen.getByRole("checkbox", { name: "Pick NW-1003" })).not.toHaveClass("pick-box--shown");
+      expect(screen.getByRole("checkbox", { name: "Pick NW-1003" })).not.toBeChecked();
+      screen.getAllByRole("checkbox").forEach((b) => expect(b).not.toHaveClass("pick-box--shown"));
     });
 
     it("shows no checkbox without the pointer while nothing is picked", async () => {

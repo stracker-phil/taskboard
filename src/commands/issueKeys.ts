@@ -7,6 +7,8 @@ export interface IssueKeyHandlers {
   move: (step: 1 | -1) => void;
   /** ⇧J / ⇧K: picks the next row too, where rows can be picked. */
   extend?: (step: 1 | -1) => void;
+  /** X: picks the selected row, or drops it from the picks. */
+  togglePick?: () => void;
   /** ⌘A: picks every row the view shows. */
   pickAll?: () => void;
   /** Esc, before closing the preview: drops the picks. */
@@ -64,6 +66,7 @@ export const ISSUE_KEY_COMMANDS: Command[] = [
   { id: "issue.next.arrow", title: "Next issue (arrow)", scope: "main", defaultBinding: "ArrowDown", when: () => handlers !== null, run: () => handlers?.move(1) },
   { id: "issue.previous", title: "Previous issue", scope: "main", defaultBinding: "K", when: () => handlers !== null, run: () => handlers?.move(-1) },
   { id: "issue.previous.arrow", title: "Previous issue (arrow)", scope: "main", defaultBinding: "ArrowUp", when: () => handlers !== null, run: () => handlers?.move(-1) },
+  { id: "issue.togglePick", title: "Pick the issue or drop it from the picks", scope: "main", defaultBinding: "X", when: () => selected() && handlers?.togglePick !== undefined, run: () => handlers?.togglePick?.() },
   { id: "issue.pickNext", title: "Pick the next issue too", scope: "main", defaultBinding: "Shift+J", when: () => handlers?.extend !== undefined, run: () => handlers?.extend?.(1) },
   { id: "issue.pickNext.arrow", title: "Pick the next issue too (arrow)", scope: "main", defaultBinding: "Shift+ArrowDown", when: () => handlers?.extend !== undefined, run: () => handlers?.extend?.(1) },
   { id: "issue.pickPrevious", title: "Pick the previous issue too", scope: "main", defaultBinding: "Shift+K", when: () => handlers?.extend !== undefined, run: () => handlers?.extend?.(-1) },

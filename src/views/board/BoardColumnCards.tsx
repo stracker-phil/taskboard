@@ -27,7 +27,6 @@ const CARD_GAP = 8;
 
 /** A column's cards, virtualized: a Space with thousands of issues mounts only the cards on screen. */
 export const BoardColumnCards = memo(function BoardColumnCards({ ids, rows, fields, inlineLabels, selected, pickedIds, onOpen, onToggleBox, onOpenInTab, actions, pinned }: Props) {
-  const picking = pickedIds.size > 0;
   const scrollRef = useRef<HTMLDivElement>(null);
   const virtualizer = useVirtualizer({
     count: ids.length,
@@ -63,9 +62,8 @@ export const BoardColumnCards = memo(function BoardColumnCards({ ids, rows, fiel
                 row={row}
                 fields={fields}
                 inlineLabels={inlineLabels}
-                selected={!picking && row.id === selected}
+                selected={row.id === selected}
                 picked={pickedIds.has(row.id)}
-                showBox={picking && row.id === selected}
                 onOpen={onOpen}
                 onToggleBox={onToggleBox}
                 onOpenInTab={onOpenInTab}

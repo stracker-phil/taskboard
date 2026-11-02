@@ -1173,7 +1173,7 @@ describe("ListView", () => {
       expect(screen.getByRole("row", { name: /NW-1042/ })).toHaveAttribute("aria-selected", "false");
     });
 
-    it("highlights the selected row only while nothing is picked", async () => {
+    it("highlights the selected row", async () => {
       await renderList(data(), "preview");
 
       await userEvent.click(await text("Redesign the pricing page"));
@@ -1184,32 +1184,42 @@ describe("ListView", () => {
       expect(screen.getByRole("row", { name: /NW-1001/ })).toHaveAttribute("aria-selected", "false");
     });
 
-    it("highlights the picked rows as picked, not selected, and drops the selected highlight", async () => {
+    it("highlights the picked rows as picked and keeps the selected highlight on the current row", async () => {
       await renderList(data(), "preview");
       await userEvent.click(await text("Redesign the pricing page"));
 
       fireEvent.click(await text("Publish the launch notes"), { metaKey: true });
 
-      for (const key of [/NW-1042/, /NW-1001/]) {
-        const picked = screen.getByRole("row", { name: key });
-        expect(picked).toHaveClass("list-row--picked");
-        expect(picked).not.toHaveClass("list-row--selected");
-        expect(picked).toHaveAttribute("aria-selected", "true");
-      }
+      const current = screen.getByRole("row", { name: /NW-1001/ });
+      const other = screen.getByRole("row", { name: /NW-1042/ });
+      expect(current).toHaveClass("list-row--picked", "list-row--selected");
+      expect(current).toHaveAttribute("aria-selected", "true");
+      expect(other).toHaveClass("list-row--picked");
+      expect(other).not.toHaveClass("list-row--selected");
+      expect(other).toHaveAttribute("aria-selected", "true");
       expect(screen.getByRole("row", { name: /NW-1003/ })).toHaveAttribute("aria-selected", "false");
     });
 
-    it("shows the checkbox of the current row only, while rows are picked", async () => {
+    it("titles a pick box with its action and key", async () => {
+      await renderList(data(), "preview");
+      await screen.findByRole("row", { name: /NW-1042/ });
+      expect(box("NW-1042")).toHaveAttribute("title", "Pick (X)");
+
+      await userEvent.click(box("NW-1042"));
+
+      expect(box("NW-1042")).toHaveAttribute("title", "Drop from the picks (X)");
+    });
+
+    it("shows no extra checkbox for the current row while rows are picked", async () => {
       await renderList(data(), "preview");
       await userEvent.click(await text("Redesign the pricing page"));
 
       fireEvent.click(await text("Publish the launch notes"), { metaKey: true });
 
-      expect(box("NW-1001")).toHaveClass("pick-box--shown");
       expect(box("NW-1001")).toBeChecked();
-      expect(box("NW-1042")).not.toHaveClass("pick-box--shown");
       expect(box("NW-1042")).toBeChecked();
-      expect(box("NW-1003")).not.toHaveClass("pick-box--shown");
+      expect(box("NW-1003")).not.toBeChecked();
+      screen.getAllByRole("checkbox").forEach((b) => expect(b).not.toHaveClass("pick-box--shown"));
     });
 
     it("shows no checkbox without the pointer while nothing is picked", async () => {
@@ -1397,14 +1407,57 @@ describe("ListView", () => {
       expect(pickedKeys()).toEqual(["NW-1001", "NW-1003"]);
     });
 
-    it("drops the picks when J moves the selection", async () => {
+    it("keeps the picks when J moves the selection", async () => {
       await renderList(data(), "preview");
       await userEvent.click(await text("Redesign the pricing page"));
       await press("issue.pickNext");
 
       await press("issue.next");
 
+      expect(pickedKeys()).toEqual(["NW-1042", "NW-1001"]);
+      expect(place().selectedId).toBe("3");
+    });
+
+    it("keeps the picks when K moves the selection", async () => {
+      await renderList(data(), "preview");
+      await userEvent.click(await text("Fix the footer links"));
+      await press("issue.pickPrevious");
+
+      await press("issue.previous");
+
+      expect(pickedKeys()).toEqual(["NW-1001", "NW-1003"]);
+      expect(place().selectedId).toBe("1");
+    });
+
+    it("picks the selected row on X and drops it on a second X", async () => {
+      await renderList(data(), "preview");
+      await userEvent.click(await text("Redesign the pricing page"));
+
+      await press("issue.togglePick");
+      expect(pickedKeys()).toEqual(["NW-1042"]);
+      expect(within(await screen.findByRole("toolbar", { name: "Picked issues" })).getByText("1 picked")).toBeInTheDocument();
+
+      await press("issue.togglePick");
       expect(pickedKeys()).toEqual([]);
+    });
+
+    it("picks two rows with X, J and X", async () => {
+      await renderList(data(), "preview");
+      await userEvent.click(await text("Redesign the pricing page"));
+
+      await press("issue.togglePick");
+      await press("issue.next");
+      await press("issue.togglePick");
+
+      expect(pickedKeys()).toEqual(["NW-1042", "NW-1001"]);
+      expect(screen.getByRole("row", { name: /NW-1001/ })).toHaveClass("list-row--selected");
+    });
+
+    it("disables X while no row is selected", async () => {
+      await renderList(data(), "preview");
+      await screen.findByRole("row", { name: /NW-1042/ });
+
+      expect(getCommand("issue.togglePick")?.when?.()).toBe(false);
     });
 
     it("opens the preview and drops the picks on Space", async () => {

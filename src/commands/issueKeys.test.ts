@@ -79,6 +79,7 @@ describe("issue keys", () => {
       ["⇧J", "J", { shift: true }],
       ["⇧K", "K", { shift: true }],
       ["⌘A", "a", { meta: true }],
+      ["X", "x", {}],
       ["F2", "F2", {}],
     ])("leaves %s to nobody", (_label, key, mods) => {
       expect(press(key, mods)).toBeNull();
@@ -115,6 +116,36 @@ describe("issue keys", () => {
 
       expect(h.extend).toHaveBeenCalledWith(step);
       expect(h.move).not.toHaveBeenCalled();
+    });
+
+    describe("X", () => {
+      it("picks the selected row or drops it from the picks", () => {
+        const h = handlers({ togglePick: vi.fn() });
+        register(h);
+
+        const command = press("x");
+        void command?.run();
+
+        expect(command?.id).toBe("issue.togglePick");
+        expect(h.togglePick).toHaveBeenCalled();
+        expect(h.move).not.toHaveBeenCalled();
+      });
+
+      it("is ignored without a selected row", () => {
+        register(handlers({ togglePick: vi.fn(), hasSelection: () => false }));
+
+        expect(press("x")).toBeNull();
+      });
+
+      it("is ignored where the view cannot pick", () => {
+        register(handlers());
+
+        expect(press("x")).toBeNull();
+      });
+
+      it("is ignored without a view that handles the issue keys", () => {
+        expect(press("x")).toBeNull();
+      });
     });
 
     it("leaves ⇧J to nobody where the view cannot pick", () => {

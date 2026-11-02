@@ -75,7 +75,6 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
   const place = useRowsPlace(listId, viewId, data);
   const { toggled, collapsedParents, selected, picked, setPlace, subtasksOpen } = place;
   const pickedIds = useMemo(() => new Set(picked), [picked]);
-  const picking = picked.length > 0;
   const openIssue = useStore((s) => s.openIssue);
   const { factors, moving, animate } = useGroupMotion();
   const highlight = useGroupHighlight();
@@ -182,9 +181,8 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
                   position={fold?.positions.get(virtual.index) ?? item.position}
                   wrap={wrapTitles}
                   inlineLabels={inlineLabels}
-                  selected={!picking && selected === item.row.id}
+                  selected={selected === item.row.id}
                   picked={pickedIds.has(item.row.id)}
-                  showBox={picking && selected === item.row.id}
                   onSelect={onSelect}
                   onToggleBox={onToggleBox}
                   onPick={onPick}
