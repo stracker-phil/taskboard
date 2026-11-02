@@ -585,7 +585,7 @@ describe("ListView", () => {
 
       describe("indent guides", () => {
         const guidesOf = (key: RegExp) => [...rowOf(key).querySelectorAll(".tree-guide")];
-        const isMarked = (guide: Element) => guide.classList.contains("tree-guide--path") || guide.classList.contains("tree-guide--end");
+        const isMarked = (guide: Element) => guide.classList.contains("tree-guide--through") || guide.classList.contains("tree-guide--end");
 
         it("draws one hidden guide per level on a nested row and none on a top-level row", async () => {
           await renderList(modeData("hierarchy", tree));
@@ -602,7 +602,8 @@ describe("ListView", () => {
           await userEvent.hover(rowOf(/NW-2003/));
 
           expect(guidesOf(/NW-2003/)[1]).toHaveClass("tree-guide--end");
-          expect(guidesOf(/NW-2002/)[0]).toHaveClass("tree-guide--end");
+          expect(guidesOf(/NW-2002/)[0]).toHaveClass("tree-guide--through");
+          expect(guidesOf(/NW-2002/)[0]).not.toHaveClass("tree-guide--end");
           expect(guidesOf(/NW-2005/).some(isMarked)).toBe(false);
           expect(guidesOf(/NW-2004/).some(isMarked)).toBe(false);
         });

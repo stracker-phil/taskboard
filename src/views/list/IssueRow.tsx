@@ -82,7 +82,7 @@ export const IssueRow = memo(function IssueRow(props: Props) {
         onClick={(e) => onSelect(row.id, e)}
         onDoubleClick={(e) => opensIssue(e) && onOpen(row.id, e)}
       >
-        {guides && <TreeGuides marks={guides} />}
+        {guides && <TreeGuides guides={guides} />}
         <span className="list-row__name" role="gridcell">
           <span className="list-row__title">
             <CopyKey className="list-row__key" issueKey={row.key} />

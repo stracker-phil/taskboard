@@ -1,31 +1,64 @@
 import type { Item } from "./flatten";
 
-/** Indent-guide marks: a faint line, the highlighted path, or the path's end. */
-export const GUIDE = { line: "l", path: "p", end: "e" } as const;
+/** A guide's shape on one level: the parent's line passing by, a branch to a child with a later sibling, the curve
+ *  to the last child, or nothing once the parent has no more children below. */
+export const SHAPE = { pass: "|", branch: "+", last: "L", none: " " } as const;
+/** How the path to the hovered or selected row lights a guide: as a straight line through the row, as the branch
+ *  into the hovered or selected row itself, or not at all. */
+export const LIT = { through: "p", end: "e", off: "-" } as const;
 
-/** Indent marks per nested row, one per level above it, as a string so a memoized row re-renders only when its own
- *  marks change. The path runs from `target` up to its top-level ancestor. */
+/** Per nested row two characters per level above it, its shape and how the path lights it, as a string so a
+ *  memoized row re-renders only when its own guides change. */
 export function treeGuides(items: Item[], target: string | null): Map<string, string> {
-  const marks = new Map<string, string[]>();
-  for (const item of items) {
+  const later = hasLaterSibling(items);
+  const guides = new Map<string, string[]>();
+  const ancestors: number[] = [];
+  items.forEach((item, index) => {
     const depth = depthOf(item);
-    if (item.kind === "row" && depth > 0) marks.set(item.row.id, Array<string>(depth).fill(GUIDE.line));
-  }
+    if (depth < 0) return;
+    ancestors.length = depth;
+    ancestors[depth] = index;
+    if (item.kind !== "row" || depth === 0) return;
+    const levels = Array.from({ length: depth }, (_, level) => {
+      const branch = ancestors[level + 1];
+      if (branch === index) return (later[index] ? SHAPE.branch : SHAPE.last) + LIT.off;
+      return (later[branch] ? SHAPE.pass : SHAPE.none) + LIT.off;
+    });
+    guides.set(item.row.id, levels);
+  });
   const at = target === null ? -1 : items.findIndex((item) => item.kind === "row" && item.row.id === target);
-  if (at >= 0) markPath(items, marks, at);
-  return new Map([...marks].map(([id, row]) => [id, row.join("")]));
+  if (at >= 0) lightPath(items, guides, at);
+  return new Map([...guides].map(([id, levels]) => [id, levels.join("")]));
 }
 
-/** Each level's line from the ancestor down to the next row on the path, ending at that row. */
-function markPath(items: Item[], marks: Map<string, string[]>, target: number) {
+/** Whether each row has a sibling after it: a row at its depth before anything shallower. */
+function hasLaterSibling(items: Item[]): boolean[] {
+  const later: boolean[] = [];
+  const seen: boolean[] = [];
+  for (let at = items.length - 1; at >= 0; at--) {
+    const depth = depthOf(items[at]);
+    if (depth < 0) {
+      seen.length = 0;
+      continue;
+    }
+    later[at] = seen[depth] === true;
+    seen.length = depth + 1;
+    seen[depth] = true;
+  }
+  return later;
+}
+
+/** Each level's line from the ancestor down through the next row on the path; only the target's own level branches
+ *  into its row. */
+function lightPath(items: Item[], guides: Map<string, string[]>, target: number) {
   let node = target;
   for (let level = depthOf(items[target]) - 1; level >= 0; level--) {
     const ancestor = ancestorAt(items, node, level);
     if (ancestor < 0) return;
     for (let at = ancestor + 1; at <= node; at++) {
       const item = items[at];
-      const row = item.kind === "row" ? marks.get(item.row.id) : undefined;
-      if (row) row[level] = at === node ? GUIDE.end : GUIDE.path;
+      const levels = item.kind === "row" ? guides.get(item.row.id) : undefined;
+      if (levels) levels[level] = levels[level][0] + (at === target ? LIT.end : LIT.through);
     }
     node = ancestor;
   }

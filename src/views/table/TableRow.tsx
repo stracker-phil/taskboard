@@ -74,7 +74,7 @@ export const TableRow = memo(function TableRow(props: Props) {
   const className = ["table-row", tree && "table-row--tree", nesting?.parent && "table-row--parent", nesting && nesting.depth > 0 && "table-row--child", row.changed && "table-row--changed", flashing && "flash", selected && "table-row--selected", picked && "table-row--picked"].filter(Boolean).join(" ");
   return (
     <div className={className} style={{ "--depth": nesting?.depth ?? 0 } as CSSProperties} role="row" aria-selected={selected || picked} data-issue-id={row.id} onMouseDown={keepTextUnselected} onClick={(e) => onSelect(row.id, e)} onDoubleClick={(e) => opensIssue(e) && onOpen(row.id, e)}>
-      {guides && <TreeGuides marks={guides} />}
+      {guides && <TreeGuides guides={guides} />}
       <span className="table-row__pick">
         <PickBox issueKey={row.key} picked={picked} onToggle={() => onToggleBox(row.id)} />
       </span>

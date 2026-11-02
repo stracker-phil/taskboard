@@ -7,67 +7,62 @@ export interface Span {
   end: number;
 }
 
-/** An item held at the top of the stack: `top` is its place below the stack's top edge. */
-export interface StickyEntry {
+/**
+ * A group header or a parent row that sticks while its group or subtree is in view. Its copy lies exactly over the
+ * item and is CSS-sticky inside a track that spans the item and everything under it: it sticks at `offset` below the
+ * scroller's top and is pushed out where the track ends, so it moves with the scroll itself and never lags or jumps.
+ */
+export interface Track {
   index: number;
+  /** The track's top and height in the scroller: from the item's own top to the end of its group or subtree. */
   top: number;
   height: number;
+  /** Where the copy sticks: below the group header and the ancestors that stick above it. */
+  offset: number;
+  /** -1 for a group header; deeper tracks are drawn first, so the outer ones cover them. */
+  depth: number;
 }
 
-interface Held extends StickyEntry {
-  /** Where its group or subtree ends in the scroller; past it the entry is pushed up. */
-  endsAt: number;
-}
-
-/** The group header and the ancestors still in view above the line `scrollTop` (where rows start to hide),
- *  outermost first, each pushed up as its group or subtree ends. `heightOf` is an item's height while held. */
-export function stickyStack(items: Item[], spans: Span[], scrollTop: number, heightOf: (item: Item) => number): StickyEntry[] {
-  const held: Held[] = [];
-  let line = scrollTop;
-  const hold = (index: number, endsAt: number) => {
-    const height = heightOf(items[index]);
-    held.push({ index, height, endsAt, top: line - scrollTop });
-    line += height;
-  };
-  const first = firstEndingAfter(spans, line);
-  if (first < 0) return [];
-  const group = groupOf(items, first);
-  // A group's item may start with the gap above it; only its header's own top counts.
-  if (group >= 0 && spans[group].end - heightOf(items[group]) < line) hold(group, spans[groupEnd(items, group)].end);
-  for (let depth = 0; ; depth++) {
-    const at = firstEndingAfter(spans, line);
-    // The row at the line must sit at this depth or under it; a shallower one has left the held subtree.
-    if (at < 0 || depthOf(items[at]) < depth) break;
-    const holder = depthOf(items[at]) === depth ? at : ancestorAt(items, at, depth);
-    if (holder < 0 || spans[holder].start >= line) break;
-    const end = subtreeEnd(items, holder);
-    if (end === holder) break;
-    hold(holder, spans[end].end);
+/** The tracks of the drawn items' group headers, ancestors and the drawn parents, but those scrolled past
+ *  `scrollTop`. `heightAt` is an item's height while it sticks (a group's header without the gap above it). */
+export function stickyTracks(items: Item[], spans: Span[], drawn: number[], scrollTop: number, heightAt: (index: number) => number): Track[] {
+  const candidates = new Set<number>();
+  for (const index of drawn) {
+    const group = groupOf(items, index);
+    if (group >= 0) candidates.add(group);
+    for (const ancestor of ancestorsOf(items, index)) candidates.add(ancestor);
+    const hasChildren = items[index].kind === "row" && subtreeEnd(items, index) > index;
+    if (hasChildren) candidates.add(index);
   }
-  return pushUp(held, scrollTop);
-}
-
-/** Each entry rises once its group or subtree ends; entries ending at the same row rise as one block, one ending
- *  sooner slides under the entry above. */
-function pushUp(held: Held[], scrollTop: number): StickyEntry[] {
-  for (const entry of held) entry.top = Math.min(entry.top, entry.endsAt - scrollTop - entry.height);
-  for (let at = held.length - 2; at >= 0; at--) {
-    if (held[at].endsAt === held[at + 1].endsAt) held[at].top = Math.min(held[at].top, held[at + 1].top - held[at].height);
+  const tracks: Track[] = [];
+  for (const index of candidates) {
+    const isGroup = items[index].kind === "group";
+    const last = isGroup ? groupEnd(items, index) : subtreeEnd(items, index);
+    const top = isGroup ? spans[index].end - heightAt(index) : spans[index].start;
+    const height = spans[last].end - top;
+    const offset = stackAbove(items, index, heightAt);
+    if (top + height > scrollTop + offset) tracks.push({ index, top, height, offset, depth: depthOf(items[index]) });
   }
-  return held.map(({ index, top, height }) => ({ index, top, height }));
+  return tracks.sort((a, b) => b.depth - a.depth || a.index - b.index);
 }
 
-/** How far below the top an item stays clear of the stack that holds its group and ancestors. */
-export function stackAbove(items: Item[], index: number, heightOf: (item: Item) => number): number {
+/** How far below the top an item stays clear of the group header and ancestors that stick above it. */
+export function stackAbove(items: Item[], index: number, heightAt: (index: number) => number): number {
   const group = groupOf(items, index);
-  let room = group >= 0 && group !== index ? heightOf(items[group]) : 0;
+  const header = group >= 0 && group !== index ? heightAt(group) : 0;
+  return ancestorsOf(items, index).reduce((room, ancestor) => room + heightAt(ancestor), header);
+}
+
+/** A row's ancestors in its group, nearest first. */
+function ancestorsOf(items: Item[], index: number): number[] {
+  const found: number[] = [];
   let at = index;
   for (let depth = depthOf(items[index]) - 1; depth >= 0; depth--) {
     at = ancestorAt(items, at, depth);
     if (at < 0) break;
-    room += heightOf(items[at]);
+    found.push(at);
   }
-  return room;
+  return found;
 }
 
 /** The index of the group header an item belongs to; -1 before the first. */
@@ -75,22 +70,6 @@ function groupOf(items: Item[], index: number): number {
   let at = index;
   while (at >= 0 && items[at].kind !== "group") at--;
   return at;
-}
-
-function firstEndingAfter(spans: Span[], line: number): number {
-  let low = 0;
-  let high = spans.length - 1;
-  let found = -1;
-  while (low <= high) {
-    const mid = (low + high) >> 1;
-    if (spans[mid].end > line) {
-      found = mid;
-      high = mid - 1;
-    } else {
-      low = mid + 1;
-    }
-  }
-  return found;
 }
 
 function groupEnd(items: Item[], group: number): number {

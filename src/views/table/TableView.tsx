@@ -1,5 +1,5 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useCallback, useLayoutEffect, useMemo, useRef } from "react";
+import { type PointerEvent as ReactPointerEvent, useCallback, useLayoutEffect, useMemo, useRef } from "react";
 import type { Group, Narrowing, View, ViewData } from "../../api";
 import { useViewRows } from "../../queries/views";
 import { useStore } from "../../state/store";
@@ -13,7 +13,7 @@ import { useRowClicks } from "../list/useRowClicks";
 import { useRowKeys } from "../list/useRowKeys";
 import { useRowsPlace } from "../list/useRowsPlace";
 import { useHoveredRow } from "../list/useHoveredRow";
-import { useStickyStack } from "../list/useStickyStack";
+import { inMotion, useStickyStack } from "../list/useStickyStack";
 import { treeGuides } from "../list/hierarchy";
 import { nextSort } from "./sortable";
 import { TableHeader } from "./TableHeader";
@@ -124,7 +124,7 @@ function Table({ view, data }: { view: View; data: ViewData }) {
   }, [factors, fold, virtualizer]);
 
   const tree = data.subtasks === "hierarchy";
-  const sticky = useStickyStack(items, virtualizer, { inset: HEADER_HEIGHT, heightOf: tableItemHeight, held: !fold });
+  const sticky = useStickyStack(items, virtualizer, { inset: HEADER_HEIGHT, heightAt: () => TABLE_ROW_HEIGHT, held: !fold });
   const guideTarget = hoveredRow.hovered ?? selected;
   const guides = useMemo(() => (tree ? treeGuides(items, guideTarget) : NO_GUIDES), [tree, items, guideTarget]);
   const toggle = (group: Group) => {
@@ -142,7 +142,12 @@ function Table({ view, data }: { view: View; data: ViewData }) {
   const { onSelect, onOpen, onPick, onToggleBox } = useRowClicks(keys, opening);
   const onToggleSubtasks = useCallback((id: string) => keys.current.setSubtasksOpen(id, !keys.current.subtasksOpen(id)), [keys]);
 
-  /** An item's content, in the table or held in the stack below the header. */
+  const dragFrom = (item: Item) =>
+    item.kind === "row"
+      ? (e: ReactPointerEvent<HTMLElement>) => onPointerDown(e, { id: item.row.id, key: item.row.key, summary: item.row.summary, fromKey: item.groupKey }, e.currentTarget)
+      : undefined;
+
+  /** An item's content, in the table or as its sticky copy. */
   const content = (item: Item) =>
     item.kind === "more" ? (
       <div className="table-more">{item.hidden > 0 ? `+${item.hidden} more` : ""}</div>
@@ -189,24 +194,6 @@ function Table({ view, data }: { view: View; data: ViewData }) {
           onResizeStart={resize.start}
           tree={tree}
         />
-        {sticky.entries.length > 0 && (
-          // A copy of what the rows below scrolled past; the rows themselves stay in the grid.
-          <div className="table-sticky" aria-hidden="true">
-            {sticky.entries.map((entry, at) => {
-              const item = items[entry.index];
-              return (
-                <div
-                  key={itemKey(item)}
-                  className={`${tableItemClass(item)} table-sticky__entry`}
-                  style={{ top: entry.top, height: entry.height, zIndex: sticky.entries.length - at }}
-                  onClick={item.kind === "row" ? () => sticky.reveal(entry.index, "start") : undefined}
-                >
-                  {content(item)}
-                </div>
-              );
-            })}
-          </div>
-        )}
         <div className="table-space" style={{ height: virtualizer.getTotalSize() }}>
           {virtualizer.getVirtualItems().map((virtual) => {
             const item = items[virtual.index];
@@ -221,13 +208,22 @@ function Table({ view, data }: { view: View; data: ViewData }) {
                   ...(factor < 1 && { opacity: factor, overflow: "hidden" }),
                   ...(fold && { opacity: fold.opacity[virtual.index], overflowY: "clip" }),
                 }}
-                onPointerDown={
-                  item.kind === "row"
-                    ? (e) => onPointerDown(e, { id: item.row.id, key: item.row.key, summary: item.row.summary, fromKey: item.groupKey }, e.currentTarget)
-                    : undefined
-                }
+                onPointerDown={dragFrom(item)}
               >
                 {content(item)}
+              </div>
+            );
+          })}
+          {sticky.tracks.filter((track) => !inMotion(items[track.index], factors)).map((track) => {
+            const item = items[track.index];
+            return (
+              // The copy that sticks below the header while its group or subtree is in view.
+              <div key={`track:${itemKey(item)}`} className="table-track" style={{ top: track.top - HEADER_HEIGHT, height: track.height }} aria-hidden="true">
+                <div className="table-track__item" style={{ top: HEADER_HEIGHT + track.offset }} onClick={() => sticky.reveal(track.index)} onPointerDown={dragFrom(item)}>
+                  <div className={`${tableItemClass(item)} table-item--held`} style={{ height: TABLE_ROW_HEIGHT }}>
+                    {content(item)}
+                  </div>
+                </div>
               </div>
             );
           })}

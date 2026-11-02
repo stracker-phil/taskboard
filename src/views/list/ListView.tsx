@@ -1,17 +1,17 @@
-import { type CSSProperties, useCallback, useMemo, useRef } from "react";
+import { type CSSProperties, type PointerEvent as ReactPointerEvent, useCallback, useMemo, useRef } from "react";
 import type { Column, Group, IssueOpening, Narrowing, ViewData } from "../../api";
 import { EmptyLevel } from "../../shell/EmptyLevel";
 import { useColumnsCatalogue, useViewRows } from "../../queries/views";
 import { useStore } from "../../state/store";
 import { columnDef } from "./columns";
-import { flatten, GROUP_HEIGHT, type Item, itemGroupKey, itemHeight, itemKey, ROW_HEIGHT } from "./flatten";
+import { flatten, GROUP_HEIGHT, type Item, itemGroupKey, itemHeight, itemKey } from "./flatten";
 import { GroupHeader } from "./GroupHeader";
 import { IssueRow } from "./IssueRow";
 import { canvasMeasure, columnWidths, fittingColumns, gridTemplate } from "./measure";
 import { useElementWidth } from "./useElementWidth";
 import { useGroupHighlight } from "./useGroupHighlight";
 import { useHoveredRow } from "./useHoveredRow";
-import { useStickyStack } from "./useStickyStack";
+import { inMotion, useStickyStack } from "./useStickyStack";
 import { treeGuides } from "./hierarchy";
 import { useGroupMotion } from "./useGroupMotion";
 import { useIssueOpening } from "../useIssueOpening";
@@ -56,8 +56,6 @@ const NO_COLUMNS: Column[] = [];
 const GRID_INSET = 52 + 24 + 32;
 const MORE_PX = 32;
 
-/** A group's header without its gap, or a row on one line, as the stack holds it. */
-const heldHeight = (item: Item) => (item.kind === "group" ? GROUP_HEIGHT : ROW_HEIGHT);
 const NO_GUIDES = new Map<string, string>();
 
 const isOpen = (group: Group, toggled: Record<string, boolean>) => toggled[group.key] ?? !group.collapsedByDefault;
@@ -126,7 +124,9 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
   // A closed group's tab opens as its rows fold in.
   const groupOpen = (group: Group) => isOpen(group, toggled) || fold?.open.has(group.key) === true;
   const { virtualizer, groupStartsMoving, itemProps } = useRowSizing(items, factors, wrapTitles, scrollRef, fold);
-  const sticky = useStickyStack(items, virtualizer, { inset: 0, heightOf: heldHeight, held: !fold });
+  // A group sticks by its header alone, without the gap above it; a row as tall as it was measured.
+  const heightAt = (index: number) => (items[index].kind === "group" ? GROUP_HEIGHT : virtualizer.measurementsCache[index].size);
+  const sticky = useStickyStack(items, virtualizer, { inset: 0, heightAt, held: !fold });
   const hierarchy = data.subtasks === "hierarchy";
   const guideTarget = hoveredRow.hovered ?? selected;
   const guides = useMemo(() => (hierarchy ? treeGuides(items, guideTarget) : NO_GUIDES), [hierarchy, items, guideTarget]);
@@ -147,8 +147,13 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
   const { onSelect, onOpen, onPick, onToggleBox } = useRowClicks(keys, opening);
   const onToggleSubtasks = useCallback((id: string) => keys.current.setSubtasksOpen(id, !keys.current.subtasksOpen(id)), [keys]);
 
-  /** An item's content, in the list or held in the stack at the top. */
-  const content = (item: Item, index: number, held = false) =>
+  const dragFrom = (item: Item) =>
+    item.kind === "row"
+      ? (e: ReactPointerEvent<HTMLElement>) => onPointerDown(e, { id: item.row.id, key: item.row.key, summary: item.row.summary, fromKey: item.groupKey }, e.currentTarget)
+      : undefined;
+
+  /** An item's content, in the list or as its sticky copy. */
+  const content = (item: Item, index: number) =>
     item.kind === "more" ? (
       <MorePiece item={item} />
     ) : item.kind === "group" ? (
@@ -165,8 +170,8 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
       <IssueRow
         row={item.row}
         columns={columns}
-        position={held ? "middle" : (fold?.positions.get(index) ?? item.position)}
-        wrap={wrapTitles && !held}
+        position={fold?.positions.get(index) ?? item.position}
+        wrap={wrapTitles}
         inlineLabels={inlineLabels}
         selected={selected === item.row.id}
         picked={pickedIds.has(item.row.id)}
@@ -203,25 +208,6 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
         hoveredRow.onPointerLeave();
       }}
     >
-      {sticky.entries.length > 0 && (
-        // A copy of what the rows below scrolled past; the rows themselves stay in the grid.
-        <div className="list-sticky" aria-hidden="true">
-          {sticky.entries.map((entry, at) => {
-            const item = items[entry.index];
-            return (
-              <div
-                key={itemKey(item)}
-                className="list-sticky__entry"
-                data-group={itemGroupKey(item)}
-                style={{ top: entry.top, height: entry.height, zIndex: sticky.entries.length - at }}
-                onClick={item.kind === "row" ? () => sticky.reveal(entry.index, "start") : undefined}
-              >
-                <div className="list-item list-item--sticky">{content(item, entry.index, true)}</div>
-              </div>
-            );
-          })}
-        </div>
-      )}
       <div className="list-scroll__space" style={{ height: virtualizer.getTotalSize() }}>
         {virtualizer.getVirtualItems().map((virtual) => {
           const item = items[virtual.index];
@@ -232,13 +218,20 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
               {...itemProps(virtual, item)}
               className={itemClass(item)}
               data-group={group}
-              onPointerDown={
-                item.kind === "row"
-                  ? (e) => onPointerDown(e, { id: item.row.id, key: item.row.key, summary: item.row.summary, fromKey: group }, e.currentTarget)
-                  : undefined
-              }
+              onPointerDown={dragFrom(item)}
             >
               {content(item, virtual.index)}
+            </div>
+          );
+        })}
+        {sticky.tracks.filter((track) => !inMotion(items[track.index], factors)).map((track) => {
+          const item = items[track.index];
+          return (
+            // The copy that sticks while the item's group or subtree is in view; the item itself stays in the grid.
+            <div key={`track:${itemKey(item)}`} className="list-track" style={{ top: track.top, height: track.height }} aria-hidden="true">
+              <div className="list-track__item" style={{ top: track.offset }} onClick={() => sticky.reveal(track.index)} data-group={itemGroupKey(item)} onPointerDown={dragFrom(item)}>
+                <div className="list-item list-item--held">{content(item, track.index)}</div>
+              </div>
             </div>
           );
         })}

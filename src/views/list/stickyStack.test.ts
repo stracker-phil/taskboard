@@ -1,88 +1,78 @@
 import { describe, expect, it } from "vitest";
 import { outline, spansOf } from "../../test/items";
 import type { Item } from "./flatten";
-import { stackAbove, stickyStack } from "./stickyStack";
+import { stackAbove, stickyTracks } from "./stickyStack";
 
 const H = 40;
 const evenly = () => H;
 
 /** Everything is 40 high, so item `i` lies between `40 * i` and `40 * (i + 1)`. */
-const stackAt = (items: Item[], top: number) => stickyStack(items, spansOf(items, evenly), top, evenly);
+const tracksAt = (items: Item[], drawn: number[], scrollTop = 0, heightAt: (index: number) => number = evenly) =>
+  stickyTracks(items, spansOf(items, evenly), drawn, scrollTop, heightAt);
 
-describe("stickyStack", () => {
+const all = (items: Item[]) => items.map((_, index) => index);
+
+describe("stickyTracks", () => {
   const tree = outline("#first", "Root", "-Child", "--Leaf", "--Leaf2", "-Child2", "-Child3", "Root2", "#second", "Lone");
 
-  it("holds nothing at scroll 0", () => {
-    expect(stackAt(tree, 0)).toEqual([]);
-  });
-
-  it("holds nothing while the next group's header is still at the line", () => {
-    expect(stackAt(tree, 8 * H)).toEqual([]);
-  });
-
-  it("holds the group header, then each ancestor of the rows under the line, outermost first", () => {
-    expect(stackAt(tree, 70)).toEqual([
-      { index: 0, top: 0, height: H },
-      { index: 1, top: H, height: H },
-      { index: 2, top: 2 * H, height: H },
+  it("gives a track to each group and each parent row, deepest first and groups last", () => {
+    expect(tracksAt(tree, all(tree))).toEqual([
+      { index: 2, top: 2 * H, height: 3 * H, offset: 2 * H, depth: 1 },
+      { index: 1, top: H, height: 6 * H, offset: H, depth: 0 },
+      { index: 0, top: 0, height: 8 * H, offset: 0, depth: -1 },
+      { index: 8, top: 8 * H, height: 2 * H, offset: 0, depth: -1 },
     ]);
   });
 
-  it("holds only the group header while top-level leaves are under the line", () => {
-    const leaves = outline("#first", "A", "B", "C", "#second", "D");
+  it("gives leaves no track", () => {
+    const leaves = outline("#first", "A", "B", "C");
 
-    expect(stackAt(leaves, 50)).toEqual([{ index: 0, top: 0, height: H }]);
+    expect(tracksAt(leaves, [1, 2, 3]).map((track) => track.index)).toEqual([0]);
   });
 
-  it("pushes a child up as its own subtree ends, leaving its parent in place", () => {
-    expect(stackAt(tree, 100)).toEqual([
-      { index: 0, top: 0, height: H },
-      { index: 1, top: H, height: H },
-      { index: 2, top: 60, height: H },
-    ]);
+  it("adds the group and the ancestors of a drawn deep row although they are not drawn", () => {
+    expect(tracksAt(tree, [3]).map((track) => track.index)).toEqual([2, 1, 0]);
   });
 
-  it("slides entries whose subtrees end together up as one block", () => {
-    const nested = outline("#first", "Root", "-Child", "--Leaf", "--Leaf2", "#second", "Lone");
-
-    expect(stackAt(nested, 110)).toEqual([
-      { index: 0, top: -30, height: H },
-      { index: 1, top: 10, height: H },
-      { index: 2, top: 50, height: H },
-    ]);
+  it("tracks only the groups and parents of what is drawn", () => {
+    expect(tracksAt(tree, [9]).map((track) => track.index)).toEqual([8]);
   });
 
-  it("drops the held ancestors that the row at the line has left", () => {
-    expect(stackAt(tree, 200)).toEqual([
-      { index: 0, top: 0, height: H },
-      { index: 1, top: H, height: H },
-    ]);
+  it("leaves out a track whose end has scrolled above where it would stick", () => {
+    expect(tracksAt(tree, all(tree), 5 * H).map((track) => track.index)).toEqual([1, 0, 8]);
+    expect(tracksAt(tree, all(tree), 7 * H).map((track) => track.index)).toEqual([0, 8]);
   });
 
-  it("pushes the group header up as the group's last row ends", () => {
-    expect(stackAt(tree, 300)).toEqual([{ index: 0, top: -20, height: H }]);
+  it("keeps a track whose end lies below its stick line", () => {
+    const [child] = tracksAt(tree, all(tree), 100);
+
+    expect(child).toMatchObject({ index: 2, offset: 2 * H });
   });
 
-  it("lets the next group's header take over once it has scrolled past", () => {
-    expect(stackAt(tree, 330)).toEqual([{ index: 8, top: 0, height: H }]);
+  it("starts a group's track where its header ends, since its span may begin with a gap", () => {
+    const items = outline("#first", "A", "#second", "B");
+    const spans = spansOf(items, (item) => (item.kind === "group" ? 50 : H));
+
+    const tracks = stickyTracks(items, spans, [2], 0, (index) => (items[index].kind === "group" ? 30 : H));
+
+    expect(tracks).toEqual([{ index: 2, top: spans[2].end - 30, height: spans[3].end - (spans[2].end - 30), offset: 0, depth: -1 }]);
   });
 
-  it("measures the stack with the height each item has while held", () => {
-    const items = outline("#first", "Root", "-Child", "--Leaf", "--Leaf2", "-Child2");
-    const held = (item: Item) => (item.kind === "group" ? 30 : 20);
-    const spans = spansOf(items, () => H);
+  it("sticks nested tracks below the group header and ancestors, measured by their heights", () => {
+    const items = outline("#first", "Root", "-Child", "--Leaf");
+    const heightAt = (index: number) => (index === 0 ? 30 : 20);
 
-    expect(stickyStack(items, spans, 100, held)).toEqual([
-      { index: 0, top: 0, height: 30 },
-      { index: 1, top: 30, height: 20 },
-      { index: 2, top: 50, height: 20 },
+    expect(tracksAt(items, [3], 0, heightAt).map(({ index, offset }) => [index, offset])).toEqual([
+      [2, 50],
+      [1, 30],
+      [0, 0],
     ]);
   });
 });
 
 describe("stackAbove", () => {
   const items = outline("#first", "Root", "-Child", "--Leaf", "#second", "Lone");
-  const heightOf = (item: Item) => (item.kind === "group" ? 30 : 44);
+  const heightAt = (index: number) => (items[index].kind === "group" ? 30 : 44);
 
   it.each([
     ["a group header", 0, 0],
@@ -91,6 +81,6 @@ describe("stackAbove", () => {
     ["a deeply nested row", 3, 30 + 44 + 44],
     ["a row in the next group", 5, 30],
   ])("is the room taken by the group header and ancestors of %s", (_, index, room) => {
-    expect(stackAbove(items, index, heightOf)).toBe(room);
+    expect(stackAbove(items, index, heightAt)).toBe(room);
   });
 });

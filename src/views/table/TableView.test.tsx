@@ -1079,7 +1079,7 @@ describe("TableView", () => {
       const sibling = row({ id: "23", key: "NW-2004", summary: "Set up the search index", parentId: "1", depth: 1 });
       const tree = [PARENT, mid, leaf, sibling];
       const guidesOf = (key: RegExp) => [...rowOf(key).querySelectorAll(".tree-guide")];
-      const isMarked = (guide: Element) => guide.classList.contains("tree-guide--path") || guide.classList.contains("tree-guide--end");
+      const isMarked = (guide: Element) => guide.classList.contains("tree-guide--through") || guide.classList.contains("tree-guide--end");
 
       it("draws one hidden guide per level on a nested row and none on a top-level row", async () => {
         await renderTable(modeData("hierarchy", tree));
@@ -1089,6 +1089,16 @@ describe("TableView", () => {
         expect(rowOf(/NW-2003/).querySelector(".tree-guides")).toHaveAttribute("aria-hidden", "true");
       });
 
+      it("shapes each level as a tree: a branch to a child with a later sibling, a line passing by, the last child's curve", async () => {
+        await renderTable(modeData("hierarchy", tree));
+
+        await screen.findByRole("row", { name: /NW-2003/ });
+        expect(guidesOf(/NW-2002/)[0]).toHaveClass("tree-guide--branch");
+        expect(guidesOf(/NW-2003/)[0]).toHaveClass("tree-guide--pass");
+        expect(guidesOf(/NW-2003/)[1]).toHaveClass("tree-guide--last");
+        expect(guidesOf(/NW-2004/)[0]).toHaveClass("tree-guide--last");
+      });
+
       it("marks the path up to the parent while the pointer is over a depth-2 row, and no other row", async () => {
         await renderTable(modeData("hierarchy", tree));
         await screen.findByRole("row", { name: /NW-2003/ });
@@ -1096,7 +1106,8 @@ describe("TableView", () => {
         await userEvent.hover(rowOf(/NW-2003/));
 
         expect(guidesOf(/NW-2003/)[1]).toHaveClass("tree-guide--end");
-        expect(guidesOf(/NW-2002/)[0]).toHaveClass("tree-guide--end");
+        expect(guidesOf(/NW-2002/)[0]).toHaveClass("tree-guide--through");
+        expect(guidesOf(/NW-2002/)[0]).not.toHaveClass("tree-guide--end");
         expect(guidesOf(/NW-2004/).some(isMarked)).toBe(false);
       });
     });

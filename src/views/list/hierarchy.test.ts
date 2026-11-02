@@ -7,29 +7,55 @@ const guides = (items: ReturnType<typeof outline>, target: string | null) => Obj
 describe("treeGuides", () => {
   const items = outline("#a", "Root", "-Early", "--EarlyChild", "-Parent", "--Before", "--Target", "--After", "-Later", "--LaterChild", "NextRoot");
 
-  it("marks the path from the target up to its top-level ancestor, level by level", () => {
-    expect(guides(items, "Target")).toEqual({
-      Early: "p",
-      EarlyChild: "pl",
-      Parent: "e",
-      Before: "lp",
-      Target: "le",
-      After: "ll",
-      Later: "l",
-      LaterChild: "ll",
+  it("shapes each level: a branch for a child with a later sibling, a curve for the last child, a line passing by or nothing below", () => {
+    expect(guides(items, null)).toEqual({
+      Early: "+-",
+      EarlyChild: "|-L-",
+      Parent: "+-",
+      Before: "|-+-",
+      Target: "|-+-",
+      After: "|-L-",
+      Later: "L-",
+      LaterChild: " -L-",
     });
   });
 
-  it("ends the path at a depth-1 target and leaves its subtree plain", () => {
+  it("does not treat rows on either side of a group boundary as siblings", () => {
+    const grouped = outline("#a", "Root", "-Early", "#b", "-Orphan", "--Child");
+
+    expect(guides(grouped, null)).toEqual({ Early: "L-", Orphan: "L-", Child: " -L-" });
+  });
+
+  it("lights the path from the target up to its top-level ancestor, level by level", () => {
+    expect(guides(items, "Target")).toEqual({
+      Early: "+p",
+      EarlyChild: "|pL-",
+      Parent: "+p",
+      Before: "|-+p",
+      Target: "|-+e",
+      After: "|-L-",
+      Later: "L-",
+      LaterChild: " -L-",
+    });
+  });
+
+  it("marks exactly one level as the end of the path: the target's last level", () => {
+    const marks = guides(items, "Target");
+    const ends = Object.entries(marks).flatMap(([id, row]) => [...row.matchAll(/.e/g)].map((end) => [id, end.index]));
+
+    expect(ends).toEqual([["Target", 2]]);
+  });
+
+  it("ends the path at a depth-1 target and leaves its subtree unlit", () => {
     expect(guides(items, "Parent")).toEqual({
-      Early: "p",
-      EarlyChild: "pl",
-      Parent: "e",
-      Before: "ll",
-      Target: "ll",
-      After: "ll",
-      Later: "l",
-      LaterChild: "ll",
+      Early: "+p",
+      EarlyChild: "|pL-",
+      Parent: "+e",
+      Before: "|-+-",
+      Target: "|-+-",
+      After: "|-L-",
+      Later: "L-",
+      LaterChild: " -L-",
     });
   });
 
@@ -37,14 +63,14 @@ describe("treeGuides", () => {
     ["no target", null],
     ["a top-level target", "Root"],
     ["a target that is not shown", "Missing"],
-  ])("draws only plain lines for %s", (_, target) => {
-    expect(Object.values(guides(items, target)).every((marks) => /^l+$/.test(marks))).toBe(true);
+  ])("lights nothing for %s", (_, target) => {
+    expect(Object.values(guides(items, target)).every((marks) => /^(.-)+$/.test(marks))).toBe(true);
   });
 
-  it("gives every nested row one mark per level and none to top-level rows", () => {
+  it("gives every nested row two characters per level and none to top-level rows", () => {
     const marks = guides(items, null);
 
-    expect(marks).toMatchObject({ Early: "l", EarlyChild: "ll", Target: "ll" });
+    expect(marks).toMatchObject({ Early: "+-", EarlyChild: "|-L-", Target: "|-+-" });
     expect(marks).not.toHaveProperty("Root");
     expect(marks).not.toHaveProperty("NextRoot");
   });
@@ -52,7 +78,7 @@ describe("treeGuides", () => {
   it("stops the path at the start of its group", () => {
     const grouped = outline("#a", "Root", "-Early", "#b", "-Orphan", "--Target");
 
-    expect(guides(grouped, "Target")).toEqual({ Early: "l", Orphan: "l", Target: "le" });
+    expect(guides(grouped, "Target")).toEqual({ Early: "L-", Orphan: "L-", Target: " -Le" });
   });
 });
 

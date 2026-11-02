@@ -261,23 +261,26 @@ one group, Board column or pill per style, whatever the status is called; the Bo
   chevron it shows only while its row has the pointer (or it has focus). A collapsed row shows the count chip.
   Collapsed rows are kept per view (`places.json`); expanded is
   the default.
-- **Indent guides** (`views/list/hierarchy.ts` → `treeGuides`, drawn by `TreeGuides`): in Hierarchy every nested
-  row draws one faint 1px line per level above it (`--tree-guide`), 4px before its parent's key in the List and
-  under its parent's caret in the Table, so a child's parent is the row its line leads up to. The path from the
-  row under the pointer (else the selected row) up to its top-level ancestor is darker (`--tree-guide-path`): each
-  level's line from the ancestor down to the next row on the path, ending halfway down that row. Hover changes the
-  path at once, without a fade, so moving across rows never flickers.
+- **Indent guides** (`views/list/hierarchy.ts` → `treeGuides`, drawn by `TreeGuides`): in Hierarchy the rows draw a
+  quiet tree in `--tree-guide` (1px, square corners): each parent's line runs down from under it (4px before its key
+  in the List, under its caret in the Table) past its children and stops at its last child; each child is marked by
+  a 6px tick off the line. A nested List row's separator starts at its key, so the tree stays clear of the row
+  lines. For the row under the pointer (else the selected row) the path up to its top-level ancestor turns
+  `--tree-guide-path`: each level's line runs straight through the rows down to the next row on the path, the ticks
+  it passes draw in, and the row's own branch grows from the line into it, 9px long with a 4px curve
+  (`--motion-base`, the branch `--motion-slow`).
 
 ## Sticky headers
 
-What scrolled past stays at the top of the List and the Table (`views/list/stickyStack.ts`, `useStickyStack`):
-the header of the group the first visible rows belong to, once its own top has scrolled past, then in Hierarchy
-each ancestor whose row has scrolled past while rows of its subtree are still in view, outermost first. They are
-copies on the list canvas (the Table: below its header, on the panel), each 30px for a group and one row's height
-(44 on one line, 30 in the Table) for an ancestor; the last has a hairline below it. As a group or a subtree ends,
-its entry is pushed up and the next takes its place. A click on a held row scrolls to it, so it sits right below
-what stays above it; the keys keep the selected row clear of the stack too. Nothing is held while an issue is
-dragged.
+What scrolled past stays at the top of the List and the Table (`views/list/stickyStack.ts` → `stickyTracks`,
+`useStickyStack`): the header of the group the rows at the top belong to, then in Hierarchy each ancestor of those
+rows, outermost first; in the Table below its own header. Each group header and parent in view gets a copy that
+lies exactly over it, `position: sticky` inside a track spanning the item and its group or subtree (`list-track`,
+`table-track`): the browser holds it at the top, below what sticks above it, and pushes it out where the track
+ends, so it moves with the scroll itself and never lags, jumps or doubles. An unscrolled view draws no copies;
+while an issue is dragged none show, and while a group opens or closes its rows' copies wait. A click on a stuck
+row scrolls to it, so it sits right below what sticks above it; the keys keep the selected row clear of the stack
+too.
 
 ## Picking issues
 
