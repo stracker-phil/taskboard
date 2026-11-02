@@ -29,17 +29,21 @@ export function Window({ sidebarHidden, children }: Props) {
   const { bookmarksBar } = useModes();
   const { data: nav } = useNav();
   const tabbed = (nav?.tabs.length ?? 0) > 1;
+  const tabStrip = tabbed && nav ? <TabStrip nav={nav} /> : null;
+  const tabsInTitlebar = sidebarHidden && !bookmarksBar;
+  const tabsRow = tabbed && !tabsInTitlebar;
   useIssueViewFollowsTheTab();
   useDiscardDraftsOnLeave();
   return (
     <div className={sidebarHidden ? "shell shell--sidebar-hidden" : "shell"}>
       {!sidebarHidden && <Sidebar />}
       <SidebarToggle sidebarHidden={sidebarHidden} />
-      <div className="shell__content">
+      {/* The gaps around the panel drag the window too. */}
+      <div className="shell__content" data-tauri-drag-region>
         {sidebarHidden ? (
-          // The strip that keeps the traffic lights off the panel holds the bar after them.
+          // The strip that keeps the traffic lights off the panel holds the bookmarks bar, or else the tabs.
           <div className="shell__titlebar" data-tauri-drag-region>
-            {bookmarksBar && <BookmarksBar />}
+            {bookmarksBar ? <BookmarksBar /> : tabStrip}
           </div>
         ) : (
           // Always there, so turning the bar on or off grows or shrinks it and the panel glides.
@@ -47,9 +51,9 @@ export function Window({ sidebarHidden, children }: Props) {
             {bookmarksBar && <BookmarksBar />}
           </div>
         )}
-        {/* Always there, so a second tab grows it and the panel glides; one tab needs no strip. */}
-        <div className={tabbed ? "shell__tabs shell__tabs--open" : "shell__tabs"} inert={!tabbed}>
-          {tabbed && nav && <TabStrip nav={nav} />}
+        {/* Always there, so a second tab or the bar pushing the tabs down grows it and the panel glides. */}
+        <div className={tabsRow ? "shell__tabs shell__tabs--open" : "shell__tabs"} inert={!tabsRow}>
+          {tabsRow && tabStrip}
         </div>
         <main className="content-panel">
           {issueView ? (

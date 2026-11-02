@@ -1,6 +1,5 @@
 /* The bookmarks bar (docs/ux.md → Bookmarks): flat items on the window background, like the sidebar's rows. */
-.bookmarks-bar { display: flex; align-items: center; gap: 4px; height: 36px; padding: 0 8px 0 0; box-sizing: border-box; }
-.shell__titlebar .bookmarks-bar { height: 42px; padding-left: 84px; }
+.bookmarks-bar { display: flex; align-items: center; gap: 4px; height: 34px; padding: 0 8px 0 0; box-sizing: border-box; }
 .bookmarks-bar__items { position: relative; display: flex; flex: 1; align-items: center; gap: 2px; min-width: 0; height: 100%; overflow: hidden; }
 .bookmarks-bar__item, .bookmarks-bar__more {
   display: flex; flex: none; align-items: center; gap: 6px; height: 26px; padding: 0 9px; box-sizing: border-box;

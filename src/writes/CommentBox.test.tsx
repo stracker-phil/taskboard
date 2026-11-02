@@ -93,6 +93,20 @@ describe("CommentBox", () => {
     await vi.waitFor(() => expect(input).toHaveValue(""));
   });
 
+  it("empties the box and gives up focus once a comment sent with ⌘↩ went through", async () => {
+    mocked.issueComment.mockResolvedValue({ done: "Commented on NW-1042", reverse: null });
+    renderBox();
+    const input = await box();
+
+    await userEvent.type(input, "Ready for review");
+    expect(input).toHaveFocus();
+    await userEvent.keyboard("{Meta>}{Enter}{/Meta}");
+
+    await vi.waitFor(() => expect(input).toHaveValue(""));
+    expect(input).not.toHaveFocus();
+    expect(document.activeElement).not.toBe(input);
+  });
+
   it("does not send an empty comment on ⌘↩", async () => {
     renderBox();
     await userEvent.click(await box());

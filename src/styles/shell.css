@@ -44,13 +44,17 @@
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+  /* With the strips' own 4px, every bar and the panel keep 8px of draggable window above them. */
+  padding-top: 4px;
+  box-sizing: border-box;
 }
 
-/* Without the sidebar a window-colored strip keeps the traffic lights off the panel. */
+/* Without the sidebar a window-colored strip keeps the traffic lights off the panel and holds the first bar. */
 .shell__titlebar {
   flex: none;
-  height: 42px;
+  height: 34px;
 }
+.shell__titlebar > .bookmarks-bar, .shell__titlebar > .tab-strip { padding-left: 84px; }
 
 .content-panel {
   position: relative;
@@ -58,7 +62,7 @@
   flex-direction: row;
   flex: 1;
   min-height: 0;
-  margin: 8px 8px 8px 0;
+  margin: 4px 8px 8px 0;
   overflow: hidden;
   border-radius: 12px;
   background: var(--panel-bg);
@@ -66,7 +70,7 @@
 }
 
 .shell--sidebar-hidden .content-panel {
-  margin: 0 8px 8px;
+  margin-left: 8px;
 }
 
 /* The view under the header and the tabs. */
@@ -109,6 +113,8 @@
 
 /* The bookmarks bar above the panel: it grows from nothing, so the panel glides down instead of jumping. */
 .shell__bookmarks { flex: none; height: 0; overflow: hidden; transition: height var(--motion-slow) var(--ease-out); }
-.shell__bookmarks--open { height: 36px; }
+.shell__bookmarks--open { height: 34px; }
 .shell__tabs { flex: none; height: 0; overflow: hidden; transition: height var(--motion-slow) var(--ease-out); }
-.shell__tabs--open { height: 36px; }
+.shell__tabs--open { height: 34px; }
+/* Below the bookmarks in the sidebar-less title strip: the tabs line up with the panel's edge. */
+.shell--sidebar-hidden .shell__tabs .tab-strip { padding-left: 8px; }

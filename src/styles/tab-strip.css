@@ -1,5 +1,5 @@
 /* The main window's tabs (docs/ux.md → Tabs): the bookmarks bar's look; the active tab carries the panel's color. */
-.tab-strip { display: flex; align-items: center; height: 36px; padding: 0 8px 0 0; box-sizing: border-box; }
+.tab-strip { display: flex; align-items: center; height: 34px; padding: 0 8px 0 0; box-sizing: border-box; }
 .tab-strip__tabs { position: relative; display: flex; flex: 1; align-items: center; gap: 2px; min-width: 0; height: 100%; overflow-x: auto; scrollbar-width: none; }
 .tab-strip__tab {
   position: relative; display: flex; flex: 1 1 0; align-items: center; gap: 4px; min-width: 110px; max-width: 220px; height: 26px;
@@ -19,3 +19,5 @@
 .tab-strip__tab--active .tab-strip__close, .tab-strip__tab:hover .tab-strip__close, .tab-strip__close:focus-visible { opacity: 1; }
 .tab-strip__close:hover { background: var(--hover-bg); color: var(--text); }
 .tab-strip__drop { position: absolute; top: 6px; bottom: 6px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--accent); pointer-events: none; }
+/* No slot grows in the title strip, so the tabs fade in there. */
+.shell__titlebar > .tab-strip { animation: fade-in var(--motion-base) var(--ease-out); }

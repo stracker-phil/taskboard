@@ -2313,6 +2313,7 @@ mod editing_views {
                 "subtasks": "hidden",
                 "onlyMine": false,
                 "person": null,
+                "meRules": null,
                 "icon": null,
                 "color": null,
                 "position": 0,

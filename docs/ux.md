@@ -43,15 +43,17 @@ The owner's rule (2026-10-30), for every control, list and popover:
 
 - **Frame** (`src/shell/Window.tsx`, `styles/shell.css`): a 264px sidebar (padding 16 12 12, gap 16) on
   `--window-bg`, beside the content panel: `--panel-bg`, inset 8px top, right and bottom (none toward the
-  sidebar), 12px radius, `--shadow-panel`. Popovers anchor to the panel.
+  sidebar), 12px radius, `--shadow-panel`. Popovers anchor to the panel. The content column and every strip
+  above the panel drag the window: each bar and the panel keep 8px of window above them (the column's 4px top
+  padding plus a 34px strip's 4px around its 26px items), so there is always room to grab the window.
 - **Traffic lights** are the native ones, inside the sidebar's top 18px strip (`trafficLightPosition` 20, 24);
   the strip and empty chrome drag the window. There is no icon rail or status bar, and no top bar but the
   bookmarks bar ([ADR 0047](adr/0047-the-bookmarks-bar-is-the-only-top-bar.md)) and, from a second tab, the tabs
   ([ADR 0050](adr/0050-tabs-in-the-main-window.md)).
 - **Bookmarks bar** (`src/pins/BookmarksBar.tsx`, `styles/bookmarks-bar.css`; View → Show Bookmarks Bar ⇧⌘B,
-  `view:toggleBookmarksBar`, checked while shown; `modes.json` `bookmarksBar`): the bookmarks in a 36px row on
-  `--window-bg` above the panel, beside the traffic-light strip; with the sidebar hidden it sits in the 42px strip
-  after the traffic lights. Turning it on grows its slot from 0, so the panel glides down (`--motion-slow`). Items
+  `view:toggleBookmarksBar`, checked while shown; `modes.json` `bookmarksBar`): the bookmarks in a 34px row on
+  `--window-bg` above the panel, beside the traffic-light strip; with the sidebar hidden it sits in the title
+  strip after the traffic lights. Turning it on grows its slot from 0, so the panel glides down (`--motion-slow`). Items
   are flat like sidebar rows (26px, 7px radius, 12.5px `--text-secondary`, `--fill-hover`): the status square, a
   folder or a layout tile, and the bookmark's name (`pinName`, at most 220px, ellipsis). A click opens it, a drag
   moves it (`useDragReorder` across, the view tabs' drop line), right-click has Open, Rename Bookmark…, Use
@@ -59,8 +61,10 @@ The owner's rule (2026-10-30), for every control, list and popover:
   by the width only (`fitCount`), which ends with All Bookmarks. While the bar shows, the sidebar drops the
   Bookmarks row and the bookmarked lists under Home (the Home rows glide, `useHeightGlide`); the Bookmarks row's
   context menu has Show in Bookmarks Bar.
-- **Tabs** (`src/shell/TabStrip.tsx`, `styles/tab-strip.css`; Rust's `nav/tabs.rs`): from the second tab a 36px
-  strip under the bookmarks bar (its slot grows from 0, so the panel glides; one tab shows none). Each tab is
+- **Tabs** (`src/shell/TabStrip.tsx`, `styles/tab-strip.css`; Rust's `nav/tabs.rs`): from the second tab a 34px
+  strip under the bookmarks bar (its slot grows from 0, so the panel glides; one tab shows none). With the sidebar
+  hidden and the bookmarks bar off, the tabs fade in in the title strip after the traffic lights instead; under
+  the bookmarks there they start 8px in, in line with the panel. Each tab is
   "Level · View" (the level alone when it has one view), sharing the width between 110 and 220px, the strip
   scrolling sideways past that; the active tab is `--panel-bg` with `--shadow-raised`, the others flat like the
   bookmarks. A click shows a tab, × (on the active tab and the hovered one) or a middle click closes it, a drag
@@ -72,7 +76,7 @@ The owner's rule (2026-10-30), for every control, list and popover:
   (behind; ⌘⇧ shows it) or Issue → Open in New Tab ⌘⇧↩ (shown); the double-click's ⌘-clicks leave the picks as
   they were. Such a tab is named by the issue's key and title. ⌘⇧1–⌘⇧9 show the first to ninth tab.
 - **Sidebar** ([below](#sidebar)): ⌘\ or the sidebar toggle hides it; the panel then takes the full width under
-  a 42px strip that keeps the traffic lights off it. The state is kept in `ui_state.json`.
+  a 34px title strip that keeps the traffic lights off it and holds the first bar (84px in). The state is kept in `ui_state.json`.
 - **Sidebar toggle** (`src/shell/SidebarToggle.tsx`): a 34px button (panel icon 17/1.8, styled like Settings)
   that the frame, not the sidebar, draws 12px from the window's left and bottom edges, so it never moves. With
   the sidebar shown it is the footer's first item; hidden, it floats over the panel's lower-left corner on

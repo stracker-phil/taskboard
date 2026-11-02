@@ -340,6 +340,40 @@ describe("Window", () => {
 
       expect(bar()).not.toBeInTheDocument();
     });
+
+    describe("with two tabs and the sidebar hidden", () => {
+      beforeEach(() => {
+        mocked.navCurrent.mockResolvedValue(twoTabs(1));
+      });
+
+      it("shows the tab strip once, in place of the bookmarks bar, while the bar is off", async () => {
+        renderShell(true, false);
+
+        await screen.findByRole("navigation", { name: "Tabs" });
+        expect(screen.getAllByRole("navigation", { name: "Tabs" })).toHaveLength(1);
+        expect(bar()).not.toBeInTheDocument();
+      });
+
+      it("shows the bookmarks bar and the tab strip below it while the bar is on", async () => {
+        renderShell(true, true);
+
+        const tabs = await screen.findByRole("navigation", { name: "Tabs" });
+        const found = await screen.findByRole("navigation", { name: "Bookmarks" });
+        expect(screen.getAllByRole("navigation", { name: "Tabs" })).toHaveLength(1);
+        expect(found.compareDocumentPosition(tabs) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      });
+    });
+
+    it.each([
+      ["off", false],
+      ["on", true],
+    ])("shows no tab strip with one tab while the bar is %s and the sidebar is hidden", async (_state, bookmarksBar) => {
+      renderShell(true, bookmarksBar);
+      await screen.findByText("View body");
+      if (bookmarksBar) await screen.findByRole("navigation", { name: "Bookmarks" });
+
+      expect(screen.queryByRole("navigation", { name: "Tabs" })).not.toBeInTheDocument();
+    });
   });
 
   describe("without an Issue view", () => {

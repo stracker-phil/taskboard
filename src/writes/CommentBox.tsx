@@ -1,4 +1,5 @@
-import { useState, type KeyboardEvent } from "react";
+import { useRef, useState, type KeyboardEvent } from "react";
+import { flushSync } from "react-dom";
 import { api } from "../api";
 import { attempt } from "../state/requests";
 import { useStore } from "../state/store";
@@ -9,15 +10,20 @@ export function CommentBox({ issueId }: { issueId: string }) {
   const jiraChanges = useJiraChange("comment");
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+  const input = useRef<HTMLTextAreaElement>(null);
   if (!jiraChanges) return null;
   const empty = text.trim() === "";
   const send = () => {
     if (empty || sending) return;
     setSending(true);
     void attempt(api.issueComment(issueId, text), "Could not add the comment").then((outcome) => {
-      setSending(false);
-      if (!outcome) return;
-      setText("");
+      if (!outcome) return setSending(false);
+      // Re-enabled first: a disabled field ignores blur(), and blurring hands the keys back to the Issue view.
+      flushSync(() => {
+        setSending(false);
+        setText("");
+      });
+      input.current?.blur();
       useStore.getState().toast("success", outcome.done);
     });
   };
@@ -40,6 +46,7 @@ export function CommentBox({ issueId }: { issueId: string }) {
       }}
     >
       <textarea
+        ref={input}
         className="comment-box__input"
         aria-label="Add a comment"
         placeholder="Add a comment…"
