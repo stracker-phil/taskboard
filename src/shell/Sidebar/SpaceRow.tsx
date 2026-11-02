@@ -7,7 +7,7 @@ import { InlineRename } from "../../components/InlineRename";
 import { openContextMenu } from "../../components/menu";
 import { SpaceLookButton } from "../../components/SpaceLookButton";
 import { renameSpace } from "../../components/spaceUpdates";
-import { attempt, runBusCommand } from "../../state/requests";
+import { attempt } from "../../state/requests";
 import { useStore } from "../../state/store";
 import { copyAppLink } from "../../views/list/useIssueActions";
 
@@ -41,7 +41,7 @@ export function SpaceRow({ space, active, holdsActive, expanded, renaming, onOpe
         { text: "Rename", run: onRename },
         { text: "Icon and Color…", run: () => setEditingLook(true) },
         { text: "Client label…", run: onEditClient },
-        { text: "Space Settings…", run: () => runBusCommand(`app:settings:space:${space.projectId}`, "Could not open the Space's settings") },
+        { text: "Space Settings…", run: () => useStore.getState().setSpaceSheet(space.projectId) },
         { text: "Copy Taskboard Link", run: () => copyAppLink({ kind: "level", listId: space.listId, viewId: null }, `Copied the Taskboard link to ${space.name}`) },
         "separator",
         { text: "Stop tracking", danger: true, run: () => void stopTracking(space) },

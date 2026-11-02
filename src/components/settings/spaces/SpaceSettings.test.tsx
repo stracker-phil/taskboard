@@ -54,7 +54,6 @@ describe("SpaceSettings", () => {
   });
 
   it("opens the look popover from the header tile and saves the chosen color", async () => {
-    mocked.spaceUpdate.mockResolvedValue(undefined);
     await renderSettings();
 
     await userEvent.click(screen.getByRole("button", { name: "Icon and color of Website relaunch" }));
@@ -70,6 +69,18 @@ describe("SpaceSettings", () => {
     await userEvent.click(screen.getByRole("button", { name: "Spaces" }));
 
     expect(onBack).toHaveBeenCalled();
+  });
+
+  it("has no Spaces button without onBack", async () => {
+    mocked.spaceConfig.mockResolvedValue(spaceConfig());
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <SpaceSettings space={space()} />
+      </QueryClientProvider>,
+    );
+    await screen.findByRole("region", { name: "Layouts" });
+
+    expect(screen.queryByRole("button", { name: "Spaces" })).not.toBeInTheDocument();
   });
 
   describe("layouts", () => {

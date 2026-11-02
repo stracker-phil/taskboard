@@ -8,6 +8,8 @@ interface Props {
   role?: "dialog" | "alertdialog";
   labelledBy?: string;
   describedBy?: string;
+  /** Added to the sheet, for a sheet of its own size. */
+  className?: string;
   children: ReactNode;
 }
 
@@ -19,7 +21,7 @@ function focusables(root: HTMLElement): HTMLElement[] {
 
 /** A sheet over a scrim (Daybook's): Escape and a click on the scrim close it, Tab stays inside, and focus returns
  *  to the element that opened it. */
-export function Modal({ onClose, role = "dialog", labelledBy, describedBy, children }: Props) {
+export function Modal({ onClose, role = "dialog", labelledBy, describedBy, className, children }: Props) {
   const sheetRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
   useEffect(() => {
@@ -72,7 +74,7 @@ export function Modal({ onClose, role = "dialog", labelledBy, describedBy, child
     <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div
         ref={sheetRef}
-        className="dialog sheet"
+        className={className ? `dialog sheet ${className}` : "dialog sheet"}
         role={role}
         aria-modal="true"
         aria-labelledby={labelledBy}

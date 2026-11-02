@@ -9,6 +9,7 @@ import { trackWindowFocus } from "./lib/windowFocus";
 import { queryClient } from "./queries/queryClient";
 import { useAppearance } from "./lib/theme";
 import { CommandPalette } from "./palette/CommandPalette";
+import { SpaceSheet } from "./shell/SpaceSheet";
 import { TooltipHost } from "./components/TooltipHost";
 import { usePinExpiry } from "./queries/pins";
 import { useEvents } from "./queries/useEvents";
@@ -40,6 +41,7 @@ function MainWindow() {
         <MainBody />
       </Window>
       <CommandPalette />
+      <SpaceSheet />
       <TooltipHost />
       <ConfirmHost />
       <MenuHost />

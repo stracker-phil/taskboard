@@ -97,12 +97,7 @@ beforeEach(() => {
   mocked.pinsList.mockResolvedValue(pins());
   mocked.modesGet.mockResolvedValue({ meEverywhere: false, unreadOnly: false, bookmarksBar: false });
   mocked.listCreate.mockResolvedValue(30);
-  mocked.listRename.mockResolvedValue(undefined);
   mocked.listDuplicate.mockResolvedValue(31);
-  mocked.listDelete.mockResolvedValue(undefined);
-  mocked.listMove.mockResolvedValue(undefined);
-  mocked.spaceMove.mockResolvedValue(undefined);
-  mocked.spaceUpdate.mockResolvedValue(undefined);
 });
 
 describe("Sidebar", () => {
@@ -637,9 +632,6 @@ describe("Sidebar", () => {
     const atEpics = navAt(EPICS.id, [NW_ID]);
     const atSprint = navAt(SPRINT.id, [NW_ID]);
 
-    beforeEach(() => {
-      mocked.listSetLook.mockResolvedValue(undefined);
-    });
 
     it("opens the Icon and color dialog from the current list's icon button without opening the list", async () => {
       await renderSidebar(treeWith(), atEpics);
@@ -768,18 +760,11 @@ describe("Sidebar", () => {
       expect(await screen.findByText("Copied the Taskboard link to Website relaunch")).toBeInTheDocument();
     });
 
-    it("opens the Space's settings through the bus command", async () => {
+    it("opens the Space's settings sheet", async () => {
       await chooseFromMenu("Space Settings…");
 
-      expect(mocked.runCommand).toHaveBeenCalledWith("app:settings:space:10001");
-    });
-
-    it("shows an error toast when the settings cannot be opened", async () => {
-      mocked.runCommand.mockRejectedValue({ kind: "io", message: "No window", code: null });
-
-      await chooseFromMenu("Space Settings…");
-
-      expect(await screen.findByText("Could not open the Space's settings: No window")).toBeInTheDocument();
+      expect(useStore.getState().spaceSheet).toBe("10001");
+      expect(mocked.runCommand).not.toHaveBeenCalled();
     });
 
     it("renames the Space in place, keeping its icon, color and client", async () => {

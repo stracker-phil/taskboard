@@ -60,6 +60,16 @@ describe("Modal", () => {
     expect(screen.getByRole("alertdialog")).toBeInTheDocument();
   });
 
+  it("adds its className to the sheet", () => {
+    render(
+      <Modal labelledBy="t" className="wide-sheet" onClose={() => {}}>
+        <h2 id="t">Wide</h2>
+      </Modal>,
+    );
+
+    expect(screen.getByRole("dialog", { name: "Wide" })).toHaveClass("dialog", "sheet", "wide-sheet");
+  });
+
   it("keeps Tab inside, wrapping from the last control to the first and back", async () => {
     render(<Host />);
     await userEvent.click(screen.getByRole("button", { name: "Open" }));

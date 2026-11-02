@@ -29,17 +29,20 @@ const VISIBILITY_HELP: Record<FieldVisibility, string> = {
 };
 const VISIBILITIES = Object.keys(VISIBILITY_NAMES) as FieldVisibility[];
 
-/** One Space's settings page, opened from the Spaces list or the sidebar's Space Settings…. */
-export function SpaceSettings({ space, onBack }: { space: SpaceNode; onBack: () => void }) {
+/** One Space's settings page: in Settings → Spaces with a way back to the list, or alone in the main window's
+ *  sheet (the sidebar's Space Settings…), without one. */
+export function SpaceSettings({ space, onBack }: { space: SpaceNode; onBack?: () => void }) {
   const { data: config } = useSpaceConfig(space.projectId);
   const [editingLook, setEditingLook] = useState(false);
   return (
     <>
       <div className="space-settings-head">
-        <button type="button" className="btn space-settings-back" onClick={onBack}>
-          <ChevronLeft size={14} aria-hidden="true" />
-          Spaces
-        </button>
+        {onBack && (
+          <button type="button" className="btn space-settings-back" onClick={onBack}>
+            <ChevronLeft size={14} aria-hidden="true" />
+            Spaces
+          </button>
+        )}
         <SpaceLookButton space={space} size={22} className="space-settings-head__tile" open={editingLook} onOpenChange={setEditingLook} />
         <h3 className="space-settings-head__name">{space.name}</h3>
         <span className="mono settings-row-desc">{space.key}</span>

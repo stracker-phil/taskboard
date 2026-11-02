@@ -17,6 +17,14 @@
 }
 .dialog.sheet h2 { margin: 0; font-size: 13px; font-weight: 700; color: var(--settings-text-strong); }
 .dialog.sheet p { margin: 0; line-height: 1.4; }
+/* A Space's settings over the main window: the Settings window's page in a wide sheet that scrolls inside. */
+.dialog.sheet.space-sheet {
+  width: min(640px, calc(100vw - 32px)); height: min(760px, calc(100vh - 60px)); gap: 0; padding: 0; overflow: hidden;
+  background: var(--settings-bg); color: var(--settings-text);
+}
+.space-sheet .settings-pane { min-height: 0; border-radius: inherit; }
+.space-sheet .settings-pane > header { height: 52px; padding: 8px 16px 0 20px; }
+.space-sheet__spacer { flex: 1; }
 .dialog .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
 .dialog .actions .btn { min-width: 70px; height: 28px; border-radius: 8px; }
 .toasts {

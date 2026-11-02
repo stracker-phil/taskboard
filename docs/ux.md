@@ -773,8 +773,10 @@ no separate Settings design; owner, 2026-10-28). Its colors are the `--settings-
     key, ignoring case) and a Track switch per project.
   - **Spaces** (`SpacesPage`): the tracked Spaces in sidebar order, each a row with its tile, name, key and
     client and Move Up / Move Down buttons; clicking the row opens that Space's own page (`spaces/SpaceSettings`,
-    ClickUp's Space settings; also the sidebar menu's Space Settings…, `app:settings:space:<projectId>`), with
-    "‹ Spaces" back to the list. *General*: its fields (`SpaceFields` in `components/SpaceEditor.tsx`): Name
+    ClickUp's Space settings; also `app:settings:space:<projectId>`), with "‹ Spaces" back to the list. The
+    sidebar menu's Space Settings… shows the same page in a sheet over the main window (`shell/SpaceSheet.tsx`,
+    640 wide, scrolling inside, in the Settings window's look, without "‹ Spaces"; Done or esc closes it); both edit
+    the same settings. *General*: its fields (`SpaceFields` in `components/SpaceEditor.tsx`): Name
     (empty uses the project's), Icon and color (the look editor; a Space always has a color) and Client (empty means internal). *Layouts*: a switch per layout
     its views offer (one stays on), the default layout of new views and their grouping. *Statuses*: only the
     statuses this Space's issues are in, under a section per Jira category, with a search field; a row: the pill,
