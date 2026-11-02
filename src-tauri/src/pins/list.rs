@@ -78,6 +78,9 @@ pub enum Pinned {
         list_id: i64,
         name: String,
         layout: Layout,
+        /// The view tab's own icon and color (`look`), so the bookmark shows the tab's tile.
+        icon: Option<String>,
+        color: Option<String>,
         /// The level's name.
         list: String,
         /// The Space the level belongs to, unless the level is that Space or a global list.
@@ -269,16 +272,15 @@ fn view_target(conn: &Connection, id: &str) -> AppResult<Option<Pinned>> {
     let Some((id, list_id, name, list, space)) = found else {
         return Ok(None);
     };
-    // The layout as the level shows it: a layout its Space switched off shows as the Space's default.
-    let layout = list_views(conn, list_id)?
-        .into_iter()
-        .find(|v| v.id == id)
-        .map(|v| v.layout);
-    Ok(layout.map(|layout| Pinned::View {
+    // The view as the level shows it: a layout its Space switched off shows as the Space's default.
+    let view = list_views(conn, list_id)?.into_iter().find(|v| v.id == id);
+    Ok(view.map(|view| Pinned::View {
         id,
         list_id,
         name,
-        layout,
+        layout: view.layout,
+        icon: view.icon,
+        color: view.color,
         list,
         space,
     }))

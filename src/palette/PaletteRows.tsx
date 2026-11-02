@@ -1,6 +1,6 @@
 import { Check, CornerDownLeft, History, Search, Zap } from "lucide-react";
 import type { IssueHit, ListHit, SavedSearch, SidebarTree, TextPart, ViewHit } from "../api";
-import { LayoutTile } from "../shell/viewLayouts";
+import { ViewTile } from "../shell/viewLayouts";
 import { SpaceTile } from "../components/SpaceTile";
 import { StatusPill } from "../components/issue/StatusPill";
 import { StatusSquare } from "../components/issue/StatusSquare";
@@ -55,7 +55,7 @@ export function ViewRow({ hit, tree }: { hit: ViewHit; tree: SidebarTree | undef
   const level = space && !hit.list.isSpace ? `${space.name} › ${hit.list.name}` : hit.list.name;
   return (
     <>
-      <LayoutTile layout={hit.layout} />
+      <ViewTile layout={hit.layout} icon={hit.icon} color={hit.color} />
       <span className="palette__summary">
         {level} › {hit.name}
       </span>

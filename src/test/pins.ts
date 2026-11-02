@@ -39,6 +39,8 @@ export const viewTarget = (patch: Partial<Extract<Pinned, { kind: "view" }>> = {
   listId: 21,
   name: "Sprint board",
   layout: "board",
+  icon: null,
+  color: null,
   list: "My open issues",
   space: "Website relaunch",
   ...patch,

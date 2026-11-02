@@ -67,6 +67,18 @@ describe("BookmarksBar", () => {
       expect(screen.queryByRole("button", { name: "Redesign the pricing page" })).not.toBeInTheDocument();
     });
 
+    it("draws a bookmarked view with the letter icon of its view tab", async () => {
+      await renderBar([pinItem({ id: 3, target: viewTarget({ icon: "R", color: "3" }) })]);
+
+      expect(bookmark(/Sprint board/)).toHaveTextContent(/^R\s*Sprint board$/);
+    });
+
+    it("draws a bookmarked view without a look as its layout tile, with no letter", async () => {
+      await renderBar([VIEW]);
+
+      expect(bookmark(/Sprint board/)).toHaveTextContent(/^Sprint board$/);
+    });
+
     it("explains how to add one when there are none", async () => {
       await renderBar([]);
 

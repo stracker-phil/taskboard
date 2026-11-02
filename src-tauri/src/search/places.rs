@@ -28,6 +28,9 @@ pub struct ViewHit {
     pub view_id: i64,
     pub name: String,
     pub layout: Layout,
+    /// The view tab's own icon and color (`look`).
+    pub icon: Option<String>,
+    pub color: Option<String>,
 }
 
 /// A level with the name of the Space it belongs to, for its path.
@@ -132,6 +135,8 @@ pub fn view_matches(conn: &Connection, text: &str, limit: usize) -> AppResult<Ve
                     view_id: view.id,
                     name: view.name,
                     layout: view.layout,
+                    icon: view.icon,
+                    color: view.color,
                 });
                 if hits.len() == limit {
                     return Ok(hits);

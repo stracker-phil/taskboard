@@ -38,5 +38,5 @@ export function savedSearch(patch: Partial<SavedSearch> = {}): SavedSearch {
 
 /** A view of the "Current sprint" filter list; override per test. */
 export function viewHit(patch: Partial<ViewHit> = {}): ViewHit {
-  return { list: listHit(), viewId: 201, name: "Sprint board", layout: "board", ...patch };
+  return { list: listHit(), viewId: 201, name: "Sprint board", layout: "board", icon: null, color: null, ...patch };
 }

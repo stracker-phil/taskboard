@@ -1,4 +1,4 @@
-import { LayoutTile } from "../shell/viewLayouts";
+import { ViewTile } from "../shell/viewLayouts";
 import { useQueryClient } from "@tanstack/react-query";
 import { Folder, MessageSquare, X } from "lucide-react";
 import { useEffect, useState, type HTMLAttributes, type MouseEvent, type ReactNode, type RefObject } from "react";
@@ -237,7 +237,7 @@ function Target({ pin, children }: { pin: PinItem; children: ReactNode }) {
     case "view":
       return (
         <>
-          <LayoutTile layout={target.layout} />
+          <ViewTile layout={target.layout} icon={target.icon} color={target.color} />
           <span className="pin-table__space">{target.space ? `${target.space} / ${target.list} ›` : `${target.list} ›`}</span>
           {children}
         </>

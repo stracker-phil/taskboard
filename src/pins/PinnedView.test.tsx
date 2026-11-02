@@ -122,6 +122,20 @@ describe("PinnedView", () => {
       expect(row.getByText("Sprint board")).toBeInTheDocument();
     });
 
+    it("draws a view with the letter icon of its view tab", async () => {
+      mocked.pinsList.mockResolvedValue(pins([pinItem({ target: viewTarget({ icon: "r", color: "3" }) })]));
+      renderPinned();
+
+      expect(within(await rowOf(/Sprint board/)).getByText("R")).toBeInTheDocument();
+    });
+
+    it("draws a view without a look as its layout tile, with no letter", async () => {
+      mocked.pinsList.mockResolvedValue(pins([pinItem({ target: viewTarget() })]));
+      renderPinned();
+
+      expect(await rowOf(/Sprint board/)).toHaveTextContent(/^Website relaunch \/ My open issues ›Sprint board/);
+    });
+
     it("shows a view of a Space level or global list without a Space prefix", async () => {
       mocked.pinsList.mockResolvedValue(pins([pinItem({ target: viewTarget({ space: null }) })]));
       renderPinned();

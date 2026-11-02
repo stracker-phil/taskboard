@@ -7,7 +7,7 @@ import { openContextMenu, openMenu, type MenuEntry } from "../components/menu";
 import { usePins } from "../queries/pins";
 import { useSidebar, useNavGo, useTabs } from "../queries/sidebar";
 import { useDragReorder } from "../shell/Sidebar/useDragReorder";
-import { LayoutTile } from "../shell/viewLayouts";
+import { ViewTile } from "../shell/viewLayouts";
 import { attempt } from "../state/requests";
 import { pinName, pinPlace, useOpenPin } from "./openPin";
 import { useOpenInTab } from "../shell/openInTab";
@@ -121,7 +121,7 @@ function PinIcon({ pin }: { pin: PinItem }) {
     case "list":
       return <Folder size={13} strokeWidth={2} aria-hidden="true" className="bookmarks-bar__icon" />;
     case "view":
-      return <LayoutTile layout={target.layout} />;
+      return <ViewTile layout={target.layout} icon={target.icon} color={target.color} />;
   }
 }
 

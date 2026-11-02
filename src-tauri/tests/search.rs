@@ -23,7 +23,7 @@ use taskboard_lib::sync::{Emit, SyncContext, full_sync};
 use taskboard_lib::test_support::demo::{DEMO_NOW, ME_EMAIL};
 use taskboard_lib::test_support::fake_jira::{DEMO_TOKEN, FakeJira};
 use taskboard_lib::test_support::{FakeSecrets, temp_config_dir};
-use taskboard_lib::views::{Layout, Narrowing, view_rows, views_of};
+use taskboard_lib::views::{Layout, Narrowing, view_rows, view_set_look, views_of};
 
 const ME_ACCOUNT_ID: &str = "712020:5a1e0c3f-8d2b-4f61-9c7e-1b2a3c4d5e01";
 const PROJECT_IDS: [&str; 5] = ["10001", "10002", "10003", "10004", "10005"];
@@ -698,6 +698,8 @@ mod views {
                     view_id: board.id,
                     name: "Board".into(),
                     layout: Layout::Board,
+                    icon: None,
+                    color: None,
                 }],
                 "{text:?}"
             );
@@ -837,6 +839,8 @@ mod views {
             view_id: 8,
             name: "Board".into(),
             layout: Layout::Board,
+            icon: Some("rocket".into()),
+            color: Some("3".into()),
         };
 
         assert_eq!(
@@ -851,8 +855,32 @@ mod views {
                 "viewId": 8,
                 "name": "Board",
                 "layout": "board",
+                "icon": "rocket",
+                "color": "3",
             })
         );
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn a_view_hit_carries_the_look_of_its_tab() {
+        let site = Site::new().await;
+        let space = site.space_id(NW).await;
+        let board = views_of(site.db(), space)
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|v| v.name == "Board")
+            .unwrap();
+        view_set_look(site.db(), board.id, Some("rocket".into()), Some("3".into()))
+            .await
+            .unwrap();
+
+        let results = site.palette("website board").await;
+
+        assert_eq!(results.views.len(), 1);
+        assert_eq!(results.views[0].icon.as_deref(), Some("rocket"));
+        assert_eq!(results.views[0].color.as_deref(), Some("3"));
     }
 }
 

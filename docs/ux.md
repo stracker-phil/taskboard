@@ -55,7 +55,7 @@ The owner's rule (2026-10-30), for every control, list and popover:
   `--window-bg` above the panel, beside the traffic-light strip; with the sidebar hidden it sits in the title
   strip after the traffic lights. Turning it on grows its slot from 0, so the panel glides down (`--motion-slow`). Items
   are flat like sidebar rows (26px, 7px radius, 12.5px `--text-secondary`, `--fill-hover`): the status square, a
-  folder or a layout tile, and the bookmark's name (`pinName`, at most 220px, ellipsis). A click opens it, a drag
+  folder or the view's tile (`ViewTile`: the tab's own icon and color, else the layout tile), and the bookmark's name (`pinName`, at most 220px, ellipsis). A click opens it, a drag
   moves it (`useDragReorder` across, the view tabs' drop line), right-click has Open, Rename Bookmark…, Use
   Original Name, Remove Bookmark and Show Bookmarks in Sidebar. What doesn't fit folds into the » button's menu,
   by the width only (`fitCount`), which ends with All Bookmarks. While the bar shows, the sidebar drops the
@@ -376,7 +376,7 @@ and runs everything the menus offer ([ADR 0043](adr/0043-the-palette-runs-the-me
   status pill, ↩ on the active row; a comment-only match adds "Matched in comment: “…”" under it.
 - Filter lists (6; with `/` every list, also with nothing typed): Spaces and lists whose path holds every typed
   word ("web sprint" finds Website relaunch › Current sprint); Space tile and "Space › List". Then their views
-  (`search/places.rs`), when a word is in the view's name: the layout tile and "Space › List › View", opened at
+  (`search/places.rs`), when a word is in the view's name: the view's tile and "Space › List › View", opened at
   that view.
 - Commands (6 without a prefix, all with `>`): Open KEY in Jira (⌘↩) and Save “text” as a filter list (⌘S; a
   `text contains` list under the current Space or Everything, opened), then every enabled menu item
@@ -402,7 +402,7 @@ and views can be bookmarked; a filter list's bookmark puts it under Home.
 - The row toolbar's Bookmark and P toggle the issue's bookmark (with the default duration) without the popover;
   the filter-list context menu has Add to Home / Remove from Home. A Space's or filter list's header has a
   `PinButton` right after the name (always shown, muted until bookmarked); a view tab's context menu has
-  Bookmark View / Remove Bookmark (the default duration). The Bookmarks page lists a view as its layout tile and
+  Bookmark View / Remove Bookmark (the default duration). The Bookmarks page lists a view as its tile and
   "Space / List › View", opened at that view.
 - Removing a bookmark on the Bookmarks page keeps its row in place, grayed with "Removed" and no X, until the page
   is left ([Stable controls](#stable-controls)).

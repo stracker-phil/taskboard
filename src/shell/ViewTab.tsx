@@ -3,9 +3,8 @@ import type { HTMLAttributes, MouseEvent } from "react";
 import { api, type View } from "../api";
 import { useShortcuts } from "../commands/useShortcuts";
 import { InlineRename } from "../components/InlineRename";
-import { Tile } from "../components/look/Tile";
 import { attempt } from "../state/requests";
-import { LAYOUTS, LayoutTile } from "./viewLayouts";
+import { ViewTile } from "./viewLayouts";
 
 interface Props {
   view: View;
@@ -37,11 +36,7 @@ export function ViewTab({ view, index, active, renaming, onOpen, onRename, onRen
         onEditLook(e.currentTarget);
       }}
     >
-      {view.icon || view.color ? (
-        <Tile icon={view.icon} color={view.color} fallback={LAYOUTS[view.layout].icon} size={view.color ? 18 : 15} />
-      ) : (
-        <LayoutTile layout={view.layout} />
-      )}
+      <ViewTile layout={view.layout} icon={view.icon} color={view.color} />
     </span>
   );
   if (renaming) {

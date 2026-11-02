@@ -1,5 +1,6 @@
 import { Kanban, List, Table2, type LucideIcon } from "lucide-react";
 import type { Layout } from "../api";
+import { Tile, type Look } from "../components/look/Tile";
 
 export const LAYOUTS: Record<Layout, { name: string; icon: LucideIcon; hint: string }> = {
   list: { name: "List", icon: List, hint: "Groups of rows" },
@@ -8,7 +9,7 @@ export const LAYOUTS: Record<Layout, { name: string; icon: LucideIcon; hint: str
 };
 export const LAYOUT_ORDER: Layout[] = ["list", "board", "table"];
 
-/** A layout's glyph on its color: the view tabs and the layout rows of their menus. */
+/** A layout's glyph on its color. */
 export function LayoutTile({ layout }: { layout: Layout }) {
   const { icon: Icon } = LAYOUTS[layout];
   return (
@@ -16,4 +17,10 @@ export function LayoutTile({ layout }: { layout: Layout }) {
       <Icon size={11} strokeWidth={2.8} />
     </span>
   );
+}
+
+/** A view's icon: its own look, or its layout's tile when it has none. */
+export function ViewTile({ layout, icon, color }: Look & { layout: Layout }) {
+  if (!icon && !color) return <LayoutTile layout={layout} />;
+  return <Tile icon={icon} color={color} fallback={LAYOUTS[layout].icon} size={color ? 18 : 15} />;
 }

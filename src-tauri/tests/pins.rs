@@ -18,7 +18,7 @@ use taskboard_lib::status_style::Style;
 use taskboard_lib::test_support::temp_config_dir;
 use taskboard_lib::views::rows::person;
 use taskboard_lib::views::{
-    GroupBy, Layout, Narrowing, view_create, view_delete, view_rows, views_of,
+    GroupBy, Layout, Narrowing, view_create, view_delete, view_rows, view_set_look, views_of,
 };
 
 const NOW: &str = "2026-10-28T10:00:00Z";
@@ -640,7 +640,43 @@ mod bookmarked_views {
             layout,
             list: list.into(),
             space: space.map(String::from),
+            icon: None,
+            color: None,
         }
+    }
+
+    fn look_of(pinned: &Pinned) -> (Option<&str>, Option<&str>) {
+        match pinned {
+            Pinned::View { icon, color, .. } => (icon.as_deref(), color.as_deref()),
+            other => panic!("not a view: {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn a_bookmarked_view_carries_the_look_of_its_tab_and_follows_a_change() {
+        let (_dir, db) = lab().await;
+        let space = node_id(&db, "space").await;
+        let board = view_id(&db, space, "Board").await;
+        pin_view(&db, NOW, board).await;
+        assert_eq!(
+            look_of(&pins_at(&db, NOW).await.active[0].target),
+            (None, None)
+        );
+
+        view_set_look(&db, board, Some("rocket".into()), Some("3".into()))
+            .await
+            .unwrap();
+        let first = pins_at(&db, NOW).await;
+        view_set_look(&db, board, Some("R".into()), Some("5".into()))
+            .await
+            .unwrap();
+        let second = pins_at(&db, NOW).await;
+
+        assert_eq!(
+            look_of(&first.active[0].target),
+            (Some("rocket"), Some("3"))
+        );
+        assert_eq!(look_of(&second.active[0].target), (Some("R"), Some("5")));
     }
 
     #[tokio::test]
@@ -824,6 +860,8 @@ mod bookmarked_views {
                 "layout": "list",
                 "list": "Open bugs",
                 "space": "Website relaunch",
+                "icon": null,
+                "color": null,
             })
         );
     }

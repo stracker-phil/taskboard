@@ -679,6 +679,10 @@ gone: boolean, } | { "kind": "comment", id: string, issueId: string, issueKey: s
  */
 space: string | null, } | { "kind": "view", id: number, listId: number, name: string, layout: Layout, 
 /**
+ * The view tab's own icon and color (`look`), so the bookmark shows the tab's tile.
+ */
+icon: string | null, color: string | null, 
+/**
  * The level's name.
  */
 list: string, 
@@ -1098,7 +1102,11 @@ export type ViewGroup = { key: string, label: string, };
 /**
  * One view of a level, opened at that view.
  */
-export type ViewHit = { list: ListHit, viewId: number, name: string, layout: Layout, };
+export type ViewHit = { list: ListHit, viewId: number, name: string, layout: Layout, 
+/**
+ * The view tab's own icon and color (`look`).
+ */
+icon: string | null, color: string | null, };
 
 export type ViewPlace = { scrollTop: number, 
 /**
