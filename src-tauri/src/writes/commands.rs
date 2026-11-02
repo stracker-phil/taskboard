@@ -3,12 +3,13 @@
 use tauri::State;
 
 use super::{
-    Assignees, Change, DropOutcome, DropTargets, Priorities, TransitionOption, ViewGroup,
-    WriteOutcome,
+    Assignees, BulkOutcome, BulkStatus, Change, DropOutcome, DropTargets, IssueChange, Priorities,
+    TransitionOption, ViewGroup, WriteOutcome,
 };
 use crate::error::AppResult;
 use crate::state::AppState;
 use crate::views::GroupBy;
+use crate::views::rows::{Person, Priority};
 
 #[tauri::command]
 pub async fn issue_write(
@@ -106,4 +107,48 @@ pub async fn issue_drop(
 pub async fn issue_assignees(state: State<'_, AppState>, id: String) -> AppResult<Assignees> {
     let me = crate::team::Me::of(&state.settings.get().connection);
     super::assignees(&state.db, id, me).await
+}
+
+/// The statuses every picked issue can be moved to, each with the moves that get the issues there.
+#[tauri::command]
+pub async fn issues_bulk_statuses(
+    state: State<'_, AppState>,
+    ids: Vec<String>,
+) -> AppResult<Vec<BulkStatus>> {
+    let settings = state.settings.get();
+    let source = crate::sync::source_for(&state.jira, &settings.connection)?;
+    super::bulk_statuses(&state.db, source.as_ref(), ids).await
+}
+
+/// The priorities every picked issue's edit screen offers.
+#[tauri::command]
+pub async fn issues_bulk_priorities(
+    state: State<'_, AppState>,
+    ids: Vec<String>,
+) -> AppResult<Vec<Priority>> {
+    let settings = state.settings.get();
+    let source = crate::sync::source_for(&state.jira, &settings.connection)?;
+    super::bulk_priorities(source.as_ref(), ids).await
+}
+
+/// Who may be assigned all the picked issues.
+#[tauri::command]
+pub async fn issues_bulk_assignees(
+    state: State<'_, AppState>,
+    ids: Vec<String>,
+) -> AppResult<Vec<Person>> {
+    super::bulk_assignees(&state.db, &state.settings.get(), ids).await
+}
+
+/// Sends the changes one after another; `what` and `total` word the toast.
+#[tauri::command]
+pub async fn issues_write_many(
+    state: State<'_, AppState>,
+    changes: Vec<IssueChange>,
+    what: String,
+    total: usize,
+) -> AppResult<BulkOutcome> {
+    let settings = state.settings.get();
+    let source = crate::sync::source_for(&state.jira, &settings.connection)?;
+    super::apply_many(&state.db, source.as_ref(), &settings, changes, what, total).await
 }

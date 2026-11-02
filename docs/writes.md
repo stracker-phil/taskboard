@@ -137,6 +137,16 @@ keeps its place and size; ↩ or clicking elsewhere saves, esc cancels without c
 and leaving the app keeps the edit open. F2 on a List or Table row opens its Preview to edit there, on a Board card
 the Issue view. The sent title shows until Jira's answer replaces it; a refusal puts the old one back.
 
+## Several issues at once
+
+`writes::bulk` serves the bulk bar ([ux.md](ux.md#picking-issues)). The menus ask once per picked issue (a
+`transitions` or `editmeta` request each, within the rate limit) and keep what all of them allow: a status by name,
+since workflows differ between projects, leaving out moves that need Jira's own screen and issues already in it; the
+priorities in the first issue's order; me and the people on every picked issue's Space's team. `apply_many` sends the
+changes one after another through `apply`, so each is checked against the switches, recorded and settled like a
+single change, and a refusal doesn't stop the rest. Its `BulkOutcome` words the toast, counts what changed and what
+Jira refused, and carries each changed issue's reverse for **Change back**, itself a bulk change.
+
 ## Web links
 
 `issue_add_web_link(id, url, title)` (`writes::add_web_link`) adds a web link (Jira's remote link: a pull request,
@@ -167,6 +177,10 @@ A change refused before it is sent (changes off, a switched-off kind) records no
 | `issue_write(id, Priority { name })` | sets the priority to one the edit screen offers |
 | `issue_write(id, Title { text })` | renames the issue |
 | `issue_transitions(id)` | the moves Jira offers from the issue's status |
+| `issues_bulk_statuses(ids)` | the statuses every picked issue can move to (or is in), with each issue's move |
+| `issues_bulk_priorities(ids)` | the priorities every picked issue's edit screen offers |
+| `issues_bulk_assignees(ids)` | me and whoever is on the team of every picked issue's Space |
+| `issues_write_many(changes, what, total)` | sends the changes one after another through `apply`; one outcome for the toast, with the reverses |
 | `issue_priorities(id)` | the priorities the issue's edit screen offers, and the one it has |
 | `issue_comment(id, text)` | adds a plain-text comment |
 | `issue_add_web_link(id, url, title)` | adds a web link; `title` null names it after its pull request or address |

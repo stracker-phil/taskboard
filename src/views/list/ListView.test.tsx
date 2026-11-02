@@ -1321,6 +1321,70 @@ describe("ListView", () => {
 
       expect(useStore.getState().picked["11:101"]).toEqual([]);
     });
+
+    describe("the bulk bar", () => {
+      const bar = () => screen.queryByRole("toolbar", { name: "Picked issues" });
+      const statusButton = () => within(screen.getByRole("toolbar", { name: "Picked issues" })).getByRole("button", { name: "Status" });
+      const DONE_STATUS = { statusName: "Done", style: "done" as const, changes: [{ issueId: "1", change: { kind: "transition" as const, transitionId: "31" } }] };
+
+      beforeEach(() => {
+        mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ allowJiraChanges: true }) }));
+      });
+
+      it("shows no bar while nothing is picked", async () => {
+        await renderList(data(), "preview");
+        await screen.findByRole("row", { name: /NW-1042/ });
+
+        expect(bar()).not.toBeInTheDocument();
+      });
+
+      it("shows the bar with the count once rows are picked", async () => {
+        await renderList(data(), "preview");
+
+        fireEvent.click(await text("Publish the launch notes"), { metaKey: true });
+
+        expect(within(await screen.findByRole("toolbar", { name: "Picked issues" })).getByText("1 picked")).toBeInTheDocument();
+      });
+
+      it("drops the picks and hides the bar with the × button", async () => {
+        await renderList(data(), "preview");
+        await screen.findByRole("row", { name: /NW-1042/ });
+        await press("issue.pickAll");
+
+        await userEvent.click(await screen.findByRole("button", { name: "Drop the picks" }));
+
+        expect(pickedKeys()).toEqual([]);
+        await waitFor(() => expect(bar()).not.toBeInTheDocument());
+      });
+
+      it("D opens the bulk status menu for the picks instead of the single issue's", async () => {
+        await renderList(data(), "preview");
+        await screen.findByRole("row", { name: /NW-1042/ });
+        await press("issue.pickAll");
+        await waitFor(() => expect(statusButton()).toBeEnabled());
+
+        await press("issue.changeStatus");
+
+        expect(await screen.findByRole("menu", { name: "Status of the picked issues" })).toBeInTheDocument();
+        expect(mocked.issuesBulkStatuses).toHaveBeenCalledWith(["1", "2", "3"]);
+        expect(mocked.issueTransitions).not.toHaveBeenCalled();
+      });
+
+      it("keeps the picks after a bulk change", async () => {
+        mocked.issuesBulkStatuses.mockResolvedValue([DONE_STATUS]);
+        await renderList(data(), "preview");
+        await screen.findByRole("row", { name: /NW-1042/ });
+        await press("issue.pickAll");
+        await waitFor(() => expect(statusButton()).toBeEnabled());
+        await userEvent.click(statusButton());
+
+        await userEvent.click(within(await screen.findByRole("menu", { name: "Status of the picked issues" })).getByRole("menuitem", { name: /Done/ }));
+
+        await waitFor(() => expect(mocked.issuesWriteMany).toHaveBeenCalledWith(DONE_STATUS.changes, "Moved to Done", 3));
+        expect(pickedKeys()).toEqual(["NW-1042", "NW-1001", "NW-1003"]);
+        expect(bar()).toBeInTheDocument();
+      });
+    });
   });
 
   describe("narrow width", () => {

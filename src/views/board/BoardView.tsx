@@ -14,6 +14,7 @@ import { usePinnedIssues } from "../list/usePinnedIssues";
 import { BoardColumnCards } from "./BoardColumnCards";
 import { useBoardKeys } from "./useBoardKeys";
 import { useBoardPicks } from "./useBoardPicks";
+import { BulkBar } from "../../writes/BulkBar";
 import { colorClass, DropTray, DropZone, zoneOf } from "../../writes/DropZone";
 import { type Drag, useIssueDrag } from "../../writes/useIssueDrag";
 
@@ -122,6 +123,7 @@ function Board({ view, data }: { view: View; data: BoardData }) {
         ),
       )}
       <DropTray drag={drag} groups={columnGroups} host={boardRef} />
+      <BulkBar picked={picks.picked} onClear={() => picks.setPicked([])} />
     </div>
   );
 }

@@ -142,6 +142,28 @@ export type BoardData = { columns: Array<BoardColumn>, rows: { [key in string]: 
  */
 cardFields: Array<string>, };
 
+/**
+ * What a bulk change did, for one toast.
+ */
+export type BulkOutcome = { 
+/**
+ * "Moved to Done: 5 issues", or with refusals "Moved to Done: 4 of 5 issues. NW-1043: …".
+ */
+done: string, changed: number, refused: number, 
+/**
+ * Sets each changed issue back to what it had.
+ */
+reverse: Array<IssueChange> | null, };
+
+/**
+ * A status every picked issue can reach (or is in), with the moves that get each one there.
+ */
+export type BulkStatus = { statusName: string, style: Style, 
+/**
+ * One per issue not in the status yet.
+ */
+changes: Array<IssueChange>, };
+
 export type CacheSize = { bytes: number, 
 /**
  * The share of the file that deletions left empty, 0 to 1.
@@ -314,6 +336,11 @@ export type GroupBy = "status" | "statusType" | "project" | "client" | "assignee
  * What the group header draws before its label.
  */
 export type GroupMark = { "kind": "status", style: Style, } | { "kind": "space", letter: string, color: string | null, } | { "kind": "person", person: Person, } | { "kind": "epic", color: number, } | { "kind": "priority", level: number, };
+
+/**
+ * A change to one of the picked issues.
+ */
+export type IssueChange = { issueId: string, change: Change, };
 
 export type IssueDetail = { id: string, key: string, 
 /**

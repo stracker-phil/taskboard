@@ -9,6 +9,7 @@ import { explainWritesOff } from "../../writes/runWrite";
 import { assignMenuAnchor } from "../../writes/assignMenu";
 import { priorityMenuAnchor } from "../../writes/priorityMenu";
 import { requestRename } from "../../writes/EditableTitle";
+import { openBulkMenu } from "../../writes/BulkBar";
 import { statusMenuAnchor } from "../../writes/statusMenu";
 
 /** The Board's issue keys: J/K (↓/↑) move through a column's cards, ←/→ to the neighboring open column, ↩
@@ -74,6 +75,7 @@ export function useBoardKeys(
         if (selected) (actions.toggleMine ?? explainWritesOff)(selected);
       },
       changeStatus: () => {
+        if (state.current.picks.picked.length > 0) return openBulkMenu("status");
         const { selected, actions, data } = state.current;
         const row = selected ? data.rows[selected] : undefined;
         if (!row) return;
@@ -81,6 +83,7 @@ export function useBoardKeys(
         else explainWritesOff();
       },
       assignTo: () => {
+        if (state.current.picks.picked.length > 0) return openBulkMenu("assign");
         const { selected, actions, data } = state.current;
         const row = selected ? data.rows[selected] : undefined;
         if (!row) return;
@@ -96,6 +99,7 @@ export function useBoardKeys(
         requestRename(selected);
       },
       changePriority: () => {
+        if (state.current.picks.picked.length > 0) return openBulkMenu("priority");
         const { selected, actions, data } = state.current;
         const row = selected ? data.rows[selected] : undefined;
         if (!row) return;

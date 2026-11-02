@@ -8,6 +8,7 @@ import { explainWritesOff } from "../../writes/runWrite";
 import { assignMenuAnchor } from "../../writes/assignMenu";
 import { priorityMenuAnchor } from "../../writes/priorityMenu";
 import { requestRename } from "../../writes/EditableTitle";
+import { openBulkMenu } from "../../writes/BulkBar";
 import { statusMenuAnchor } from "../../writes/statusMenu";
 
 /** What the List's and Table's issue keys act on: this render's rows, selection and changes. */
@@ -105,6 +106,7 @@ export function useRowKeys(current: RowKeyState): RefObject<RowKeyState> {
         if (selected) (actions.toggleMine ?? explainWritesOff)(selected);
       },
       changeStatus: () => {
+        if (state.current.picked.length > 0) return openBulkMenu("status");
         const { selected, actions, data } = state.current;
         const row = selected ? data.rows[selected] : undefined;
         if (!row) return;
@@ -112,6 +114,7 @@ export function useRowKeys(current: RowKeyState): RefObject<RowKeyState> {
         else explainWritesOff();
       },
       assignTo: () => {
+        if (state.current.picked.length > 0) return openBulkMenu("assign");
         const { selected, actions, data } = state.current;
         const row = selected ? data.rows[selected] : undefined;
         if (!row) return;
@@ -127,6 +130,7 @@ export function useRowKeys(current: RowKeyState): RefObject<RowKeyState> {
         requestRename(selected);
       },
       changePriority: () => {
+        if (state.current.picked.length > 0) return openBulkMenu("priority");
         const { selected, actions, data } = state.current;
         const row = selected ? data.rows[selected] : undefined;
         if (!row) return;

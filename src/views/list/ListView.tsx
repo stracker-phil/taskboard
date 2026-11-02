@@ -19,6 +19,7 @@ import { useRowClicks } from "./useRowClicks";
 import { useRowKeys } from "./useRowKeys";
 import { LIST_PADDING_TOP, useRowSizing } from "./useRowSizing";
 import { useRowsPlace } from "./useRowsPlace";
+import { BulkBar } from "../../writes/BulkBar";
 import { DropTray, DropZone, zoneOf } from "../../writes/DropZone";
 import { foldSpans, type Fold } from "./dragFold";
 import { useDragFold } from "./useDragFold";
@@ -199,6 +200,7 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
         {drag && fold && <GroupZones drag={drag} items={items} fold={fold} />}
       </div>
       <DropTray drag={drag} groups={dropGroups} host={scrollRef} />
+      <BulkBar picked={picked} onClear={() => place.setPicked([])} />
     </div>
   );
 }

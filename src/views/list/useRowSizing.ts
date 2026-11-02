@@ -6,6 +6,8 @@ import { revealedHeights } from "./groupReveal";
 
 /** Space above the first group. */
 export const LIST_PADDING_TOP = 22;
+/** Room after the last row, so it scrolls clear of the bulk bar. */
+const LIST_PADDING_BOTTOM = 64;
 
 /** How far a row's group is open while it animates (1 when still). */
 function motionFactor(item: Item, factors: Record<string, number>): number {
@@ -35,7 +37,7 @@ export function useRowSizing(items: Item[], factors: Record<string, number>, wra
     measureElement: (element, _entry, instance) =>
       Math.round(element.getBoundingClientRect().height) || heightOf(instance.indexFromElement(element)),
     paddingStart: LIST_PADDING_TOP,
-    paddingEnd: 40,
+    paddingEnd: LIST_PADDING_BOTTOM,
     overscan: 12,
   });
 

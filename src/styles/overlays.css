@@ -23,12 +23,15 @@
   position: fixed;
   right: 16px;
   bottom: 16px;
+  transition: bottom var(--motion-base) var(--ease-out);
   z-index: 70;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   gap: 8px;
 }
+/* Above the bulk bar while issues are picked, so a narrow window never puts one over the other. */
+body:has(.bulk-bar:not(.bulk-bar--leaving)) .toasts { bottom: 72px; }
 .toast {
   display: flex;
   align-items: flex-start;

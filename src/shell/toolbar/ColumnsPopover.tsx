@@ -66,8 +66,9 @@ export function ColumnsPopover({ view, spaceProjectId, anchor, onClose }: Props)
 
   const saveAsSpaceDefault = async () => {
     if (!spaceProjectId) return;
-    const done = await attempt(api.spaceDefaultColumns(spaceProjectId, view.columns), "Could not save the Space's default columns");
-    if (done !== null) toast("success", "New views in this Space start with these columns");
+    // The command answers nothing (null), so success is marked before `attempt` turns a failure into null.
+    const done = await attempt(api.spaceDefaultColumns(spaceProjectId, view.columns).then(() => true), "Could not save the Space's default columns");
+    if (done) toast("success", "New views in this Space start with these columns");
   };
 
   return (

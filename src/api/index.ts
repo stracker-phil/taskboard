@@ -28,7 +28,11 @@ import type {
   Keybindings,
   LaunchEvent,
   LinkTarget,
+  BulkOutcome,
+  BulkStatus,
+  IssueChange,
   Priorities,
+  Priority,
   Layout,
   MenuCommand,
   FilterOptions,
@@ -252,6 +256,12 @@ export const api = {
   /** The moves Jira offers from the issue's status. */
   issueTransitions: (id: string) => invoke<TransitionOption[]>("issue_transitions", { id }),
   issuePriorities: (id: string) => invoke<Priorities>("issue_priorities", { id }),
+  /** For the picked issues: the statuses, priorities and people every one of them allows. */
+  issuesBulkStatuses: (ids: string[]) => invoke<BulkStatus[]>("issues_bulk_statuses", { ids }),
+  issuesBulkPriorities: (ids: string[]) => invoke<Priority[]>("issues_bulk_priorities", { ids }),
+  issuesBulkAssignees: (ids: string[]) => invoke<Person[]>("issues_bulk_assignees", { ids }),
+  /** Sends the changes one after another; `what` and `total` word the toast. */
+  issuesWriteMany: (changes: IssueChange[], what: string, total: number) => invoke<BulkOutcome>("issues_write_many", { changes, what, total }),
   /** The person's profile picture as a `data:` URL, fetched and cached by Rust; null shows initials. */
   userAvatar: (accountId: string) => invoke<string | null>("user_avatar", { accountId }),
   placeGet: (listId: number, viewId: number) => invoke<ViewPlace | null>("place_get", { listId, viewId }),

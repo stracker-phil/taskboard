@@ -2,7 +2,8 @@
 .table-scroll { height: 100%; overflow: auto; }
 /* Rows and the header run edge to edge, so hover and selection reach the panel's sides; their 24px side insets
    are spacers inside them (TableView's SIDE_PADDING). Group headings keep the inset as padding. */
-.table-content { box-sizing: border-box; width: 100%; }
+/* The bottom room lets the last rows scroll clear of the bulk bar and the floating sidebar toggle. */
+.table-content { box-sizing: border-box; width: 100%; padding-bottom: 64px; }
 .table-header::before, .table-header::after, .table-row::before, .table-row::after { content: ""; flex: none; width: 24px; }
 
 .table-header {

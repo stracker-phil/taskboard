@@ -37,7 +37,6 @@
 .shell--sidebar-hidden .sidebar-toggle:hover { background: var(--panel-bg); box-shadow: var(--shadow-hover); color: var(--text); }
 
 /* Views whose content reaches the panel's lower-left corner scroll it clear of the floating toggle. */
-.shell--sidebar-hidden .table-content { padding-bottom: 46px; }
 .shell--sidebar-hidden .board { padding-bottom: 46px; }
 
 .shell__content {

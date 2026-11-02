@@ -8,12 +8,14 @@ vi.mock("../../api", async (orig) => ({ ...(await orig<object>()), api: (await i
 import { api, type BoardData, type View } from "../../api";
 import { installCommands, useCommandKeys } from "../../commands";
 import { getCommand } from "../../commands/registry";
+import { MenuHost } from "../../components/menu";
 import { createQueryClient } from "../../queries/queryClient";
 import { narrowingKey } from "../../state/slices/narrowing";
 import { resetStore, useStore } from "../../state/store";
 import { boardColumn, boardData } from "../../test/board";
 import { ALEX, row, SAM } from "../../test/issues";
 import { issueTarget, pinItem, pins } from "../../test/pins";
+import { behaviour, settings } from "../../test/settings";
 import { sidebarTree, space } from "../../test/spaces";
 import { view } from "../../test/views";
 import { BoardView } from "./BoardView";
@@ -58,6 +60,7 @@ async function renderBoard(data: BoardData, current: View = BOARD) {
   const rendered = render(
     <QueryClientProvider client={createQueryClient()}>
       <BoardView view={current} />
+      <MenuHost />
     </QueryClientProvider>,
   );
   await screen.findByRole("list", { name: "Board" });
@@ -510,6 +513,66 @@ describe("BoardView", () => {
       await press("issue.next");
 
       expect(pickedKeys()).toEqual([]);
+    });
+
+    describe("the bulk bar", () => {
+      const bar = () => screen.queryByRole("toolbar", { name: "Picked issues" });
+      const statusButton = () => within(screen.getByRole("toolbar", { name: "Picked issues" })).getByRole("button", { name: "Status" });
+      const DONE_STATUS = { statusName: "Done", style: "done" as const, changes: [{ issueId: "1", change: { kind: "transition" as const, transitionId: "31" } }] };
+
+      beforeEach(() => {
+        mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ allowJiraChanges: true }) }));
+      });
+
+      it("shows no bar while nothing is picked", async () => {
+        await renderBoard(BOARD_DATA);
+
+        expect(bar()).not.toBeInTheDocument();
+      });
+
+      it("shows the bar with the count once cards are picked", async () => {
+        await renderBoard(BOARD_DATA);
+
+        fireEvent.click(card("Write the footer copy"), { metaKey: true });
+
+        expect(within(await screen.findByRole("toolbar", { name: "Picked issues" })).getByText("1 picked")).toBeInTheDocument();
+      });
+
+      it("drops the picks and hides the bar with the × button", async () => {
+        await renderBoard(BOARD_DATA);
+        await press("issue.pickAll");
+
+        await userEvent.click(await screen.findByRole("button", { name: "Drop the picks" }));
+
+        expect(pickedKeys()).toEqual([]);
+        await waitFor(() => expect(bar()).not.toBeInTheDocument());
+      });
+
+      it("D opens the bulk status menu for the picks instead of the single issue's", async () => {
+        await renderBoard(BOARD_DATA);
+        await press("issue.pickAll");
+        await waitFor(() => expect(statusButton()).toBeEnabled());
+
+        await press("issue.changeStatus");
+
+        expect(await screen.findByRole("menu", { name: "Status of the picked issues" })).toBeInTheDocument();
+        expect(mocked.issuesBulkStatuses).toHaveBeenCalledWith(["1", "2", "3", "4", "5", "6"]);
+        expect(mocked.issueTransitions).not.toHaveBeenCalled();
+      });
+
+      it("keeps the picks after a bulk change", async () => {
+        mocked.issuesBulkStatuses.mockResolvedValue([DONE_STATUS]);
+        await renderBoard(BOARD_DATA);
+        await press("issue.pickAll");
+        await waitFor(() => expect(statusButton()).toBeEnabled());
+        await userEvent.click(statusButton());
+
+        await userEvent.click(within(await screen.findByRole("menu", { name: "Status of the picked issues" })).getByRole("menuitem", { name: /Done/ }));
+
+        await waitFor(() => expect(mocked.issuesWriteMany).toHaveBeenCalledWith(DONE_STATUS.changes, "Moved to Done", 6));
+        expect(pickedKeys()).toEqual(["NW-101", "NW-102", "NW-103", "NW-104", "NW-105", "NW-106"]);
+        expect(bar()).toBeInTheDocument();
+      });
     });
   });
 

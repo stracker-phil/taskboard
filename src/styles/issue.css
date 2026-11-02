@@ -210,3 +210,16 @@ body.is-dragging-issue, body.is-dragging-issue * { cursor: grabbing !important; 
 
 /* A title being renamed keeps its place and size; the ring is an outline, so it takes no room. */
 .issue-title--editing { outline: 2px solid var(--focus-ring); outline-offset: 4px; border-radius: 4px; }
+
+/* The bulk bar (docs/ux.md → Picking issues): centered over the bottom of the view, above the rows; it fades in and
+   out and hides while an issue is dragged, so it never meets the drop tray. */
+.bulk-bar {
+  position: absolute; bottom: 16px; left: 50%; z-index: 3; display: flex; align-items: center; gap: 4px;
+  padding: 6px; transform: translateX(-50%); border: 1px solid var(--border); border-radius: 12px;
+  background: var(--panel-bg); box-shadow: var(--shadow-popover); white-space: nowrap;
+  animation: fade-in var(--motion-base) var(--ease-out);
+  transition: opacity var(--motion-base) var(--ease-out);
+}
+.bulk-bar--leaving, body.is-dragging-issue .bulk-bar { opacity: 0; pointer-events: none; }
+.bulk-bar__count { padding: 0 8px 0 6px; font-size: 13px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+.bulk-bar__divider { width: 1px; height: 18px; margin: 0 4px; background: var(--hairline); }

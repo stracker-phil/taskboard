@@ -201,7 +201,7 @@ one group, Board column or pill per style, whatever the status is called; the Bo
 
 `src/views/list/`, fed by `view_rows` (`views/query.rs`): Rust filters, groups and sorts, the page only draws.
 
-- The list canvas is `--list-bg` under a `--hairline`; padding 22 24 40 52 (a 30px chevron gutter).
+- The list canvas is `--list-bg` under a `--hairline`; padding 22 24 64 52 (a 30px chevron gutter; the bottom room keeps the last rows clear of the bulk bar).
 - Each group is a white card (radius 10, top-left 0, `--shadow-group-card`, `--row-hairline` between rows)
   with its **tab** sitting on it: a status pill (`tab` variant; for other groupings a neutral tab with the
   Space tile, avatar, epic color or flag) and the count. Clicking the tab toggles the group; a closed group is
@@ -260,6 +260,16 @@ Board's `views/board/useBoardPicks.ts`):
 - Picked rows and cards look selected; while any is picked, the selected row alone doesn't. Picking closes the
   preview, which shows one issue. A ⌘ or ⇧ click or double-click opens nothing, and a narrowing that hides a picked
   row leaves it out. Leaving the view drops the picks.
+- **The bulk bar** (`writes/BulkBar.tsx`) fades in centered 16 over the view's bottom while anything is picked: the
+  count, then Status, Assign and Priority (menus, `writes/bulkMenus.tsx`), Mark Read and Bookmark, and × to drop the
+  picks. Every button keeps its slot: one whose kind of change is switched off is greyed with the reason as its
+  tooltip, and a menu's button shows pressed while its choices load. **D**, **A** and **⇧P** open the same menus
+  under the bar's buttons while issues are picked. The menus offer only what every picked issue allows (statuses by
+  name, reachable or already set; the priorities every edit screen offers; me and whoever is on every picked issue's
+  Space's team). The changes go one after another; one toast says what happened ("Moved to Done: 5 issues", or
+  "… 4 of 5 issues. NW-1043: …" with the first refusal) with **Change back** for those that changed. The picks stay
+  for the next change. The bar hides while an issue is dragged; toasts rise above it; the List and the Table keep
+  64 after their last row so it scrolls clear of the bar.
 
 ## Peek
 

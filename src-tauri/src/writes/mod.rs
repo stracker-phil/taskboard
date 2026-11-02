@@ -1,6 +1,7 @@
 //! Changes Taskboard makes in the tracker; the rules are in `docs/writes.md`.
 
 mod assign;
+mod bulk;
 pub mod commands;
 mod comment;
 mod drop;
@@ -16,6 +17,10 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 pub use assign::{Assignees, assignees, toggle_mine};
+pub use bulk::{
+    BulkOutcome, BulkStatus, IssueChange, apply_many, bulk_assignees, bulk_priorities,
+    bulk_statuses,
+};
 pub use comment::{MAX_COMMENT_CHARS, add_comment};
 pub use drop::{DropOutcome, DropTarget, DropTargets, ViewGroup, arrange, drop_on, drop_targets};
 pub use pending::{forget_all, overlay};

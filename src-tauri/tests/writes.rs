@@ -3394,3 +3394,544 @@ mod forgetting_writes {
         assert_eq!(rig.cached_assignee(NW_1044).await.as_deref(), Some(JONAS));
     }
 }
+
+mod bulk {
+    use super::*;
+    use taskboard_lib::writes::{
+        BulkOutcome, BulkStatus, IssueChange, apply_many, bulk_assignees, bulk_priorities,
+        bulk_statuses,
+    };
+
+    const NWS_PROJECT: &str = "10002";
+
+    fn transition(issue_id: &str, transition_id: &str) -> IssueChange {
+        IssueChange {
+            issue_id: issue_id.into(),
+            change: Change::Transition {
+                transition_id: transition_id.into(),
+            },
+        }
+    }
+
+    fn priority_of(issue_id: &str, name: &str) -> IssueChange {
+        IssueChange {
+            issue_id: issue_id.into(),
+            change: Change::Priority { name: name.into() },
+        }
+    }
+
+    /// A status offered with a move per issue; a move's id is its target status's id.
+    fn offered(name: &str, style: Style, status_id: &str, issues: &[&str]) -> BulkStatus {
+        BulkStatus {
+            status_name: name.into(),
+            style,
+            changes: issues
+                .iter()
+                .map(|issue| transition(issue, status_id))
+                .collect(),
+        }
+    }
+
+    fn ids(issues: &[&str]) -> Vec<String> {
+        issues.iter().map(|id| id.to_string()).collect()
+    }
+
+    async fn statuses(rig: &Rig, issues: &[&str]) -> Vec<BulkStatus> {
+        let source = rig.ctx.source().unwrap();
+        bulk_statuses(&rig.ctx.db, &*source, ids(issues))
+            .await
+            .unwrap()
+    }
+
+    async fn priorities_of(rig: &Rig, issues: &[&str]) -> Value {
+        let source = rig.ctx.source().unwrap();
+        let found = bulk_priorities(&*source, ids(issues)).await.unwrap();
+        serde_json::to_value(found).unwrap()
+    }
+
+    async fn people(rig: &Rig, issues: &[&str]) -> AppResult<Vec<String>> {
+        let found = bulk_assignees(&rig.ctx.db, &rig.settings(), ids(issues)).await?;
+        Ok(found.into_iter().map(|person| person.name).collect())
+    }
+
+    async fn run(rig: &Rig, changes: Vec<IssueChange>, what: &str, total: usize) -> BulkOutcome {
+        let source = rig.ctx.source().unwrap();
+        apply_many(
+            &rig.ctx.db,
+            &*source,
+            &rig.settings(),
+            changes,
+            what.into(),
+            total,
+        )
+        .await
+        .unwrap()
+    }
+
+    /// The changes the bulk menu offers for the status, applied as the bar does.
+    async fn move_all(rig: &Rig, status_name: &str, issues: &[&str]) -> BulkOutcome {
+        let offered = statuses(rig, issues).await;
+        let status = offered
+            .into_iter()
+            .find(|s| s.status_name == status_name)
+            .unwrap();
+        run(
+            rig,
+            status.changes,
+            &format!("Moved to {status_name}"),
+            issues.len(),
+        )
+        .await
+    }
+
+    fn account_of(name: &str) -> String {
+        demo::demo()
+            .users
+            .iter()
+            .find(|user| user["displayName"] == name)
+            .and_then(|user| user["accountId"].as_str())
+            .unwrap()
+            .to_string()
+    }
+
+    async fn first_issue_of(rig: &Rig, project_id: &'static str) -> String {
+        rig.ctx
+            .db
+            .read(move |conn| {
+                Ok(conn.query_row(
+                    "SELECT id FROM cache.issue WHERE project_id = ?1 AND gone = 0 ORDER BY id LIMIT 1",
+                    [project_id],
+                    |row| row.get(0),
+                )?)
+            })
+            .await
+            .unwrap()
+    }
+
+    async fn set_member(rig: &Rig, project_id: &str, account_id: &str, active: bool) {
+        space_set_member(
+            &rig.ctx.db,
+            project_id.into(),
+            account_id.into(),
+            active,
+            None,
+        )
+        .await
+        .unwrap();
+    }
+
+    mod statuses_offered {
+        use super::*;
+
+        #[tokio::test]
+        async fn for_issues_in_the_same_status_are_those_both_can_reach_with_a_move_each() {
+            let rig = Rig::synced().await;
+
+            let found = statuses(&rig, &[NW_1042, NW_1049]).await;
+
+            assert_eq!(
+                found,
+                [
+                    offered("To Do", Style::Todo, TO_DO, &[NW_1042, NW_1049]),
+                    offered("In Review", Style::Review, IN_REVIEW, &[NW_1042, NW_1049]),
+                    offered("Blocked", Style::Blocked, BLOCKED, &[NW_1042, NW_1049]),
+                    offered("Done", Style::Done, DONE, &[NW_1042, NW_1049]),
+                ]
+            );
+        }
+
+        #[tokio::test]
+        async fn include_a_status_one_issue_is_in_with_only_the_other_issues_move() {
+            let rig = Rig::synced().await;
+
+            let found = statuses(&rig, &[NW_1042, NW_1044]).await;
+
+            assert_eq!(
+                found,
+                [
+                    offered("To Do", Style::Todo, TO_DO, &[NW_1042, NW_1044]),
+                    offered("In Review", Style::Review, IN_REVIEW, &[NW_1042]),
+                    offered("Blocked", Style::Blocked, BLOCKED, &[NW_1042, NW_1044]),
+                    offered("Done", Style::Done, DONE, &[NW_1042, NW_1044]),
+                    offered("In Progress", Style::Progress, IN_PROGRESS, &[NW_1044]),
+                ]
+            );
+        }
+
+        #[tokio::test]
+        async fn leave_out_a_status_all_the_issues_are_in() {
+            let rig = Rig::synced().await;
+            rig.move_to(NW_1044, IN_PROGRESS).await;
+
+            let found = statuses(&rig, &[NW_1042, NW_1044, NW_1049]).await;
+
+            let names: Vec<&str> = found.iter().map(|s| s.status_name.as_str()).collect();
+            assert_eq!(names, ["To Do", "In Review", "Blocked", "Done"]);
+            assert!(found.iter().all(|s| s.changes.len() == 3));
+        }
+
+        #[tokio::test]
+        async fn leave_out_a_status_whose_move_needs_jiras_screen() {
+            let rig = Rig::synced().await;
+            rig.fake.require_screen(BLOCKED);
+
+            let found = statuses(&rig, &[NW_1042, NW_1049]).await;
+
+            let names: Vec<&str> = found.iter().map(|s| s.status_name.as_str()).collect();
+            assert_eq!(names, ["To Do", "In Review", "Done"]);
+        }
+
+        #[tokio::test]
+        async fn serialize_for_the_page_in_camel_case() {
+            let rig = Rig::synced().await;
+
+            let found = statuses(&rig, &[NW_1042]).await;
+
+            assert_eq!(
+                serde_json::to_value(&found[3]).unwrap(),
+                json!({
+                    "statusName": "Done",
+                    "style": "done",
+                    "changes": [{
+                        "issueId": NW_1042,
+                        "change": { "kind": "transition", "transitionId": DONE },
+                    }],
+                })
+            );
+        }
+    }
+
+    mod priorities_offered {
+        use super::*;
+
+        #[tokio::test]
+        async fn are_the_edit_screens_priorities_with_their_levels() {
+            let rig = Rig::synced().await;
+
+            let found = priorities_of(&rig, &[NW_1042, NW_1049]).await;
+
+            assert_eq!(
+                found,
+                json!([
+                    { "name": "Highest", "level": 1 },
+                    { "name": "High", "level": 2 },
+                    { "name": "Medium", "level": 3 },
+                    { "name": "Low", "level": 4 },
+                    { "name": "Lowest", "level": 5 },
+                ])
+            );
+        }
+
+        #[tokio::test]
+        async fn keep_only_what_every_issue_offers_in_the_first_issues_order() {
+            let rig = Rig::synced().await;
+            let edit_screen = |names: &[&str]| {
+                let allowed: Vec<Value> =
+                    names.iter().map(|name| json!({ "name": name })).collect();
+                json!({ "fields": { "priority": { "allowedValues": allowed } } })
+            };
+            rig.fake
+                .answer_next(200, edit_screen(&["Highest", "High", "Medium", "Low"]));
+            rig.fake
+                .answer_next(200, edit_screen(&["Lowest", "Low", "High"]));
+
+            let found = priorities_of(&rig, &[NW_1042, NW_1049]).await;
+
+            assert_eq!(
+                found,
+                json!([
+                    { "name": "High", "level": 2 },
+                    { "name": "Low", "level": 4 },
+                ])
+            );
+        }
+
+        #[tokio::test]
+        async fn are_none_without_issues() {
+            let rig = Rig::synced().await;
+
+            assert_eq!(priorities_of(&rig, &[]).await, json!([]));
+        }
+    }
+
+    mod assignees_offered {
+        use super::*;
+
+        #[tokio::test]
+        async fn are_the_spaces_team_with_me_first_once_for_issues_of_one_space() {
+            let rig = Rig::synced().await;
+
+            let found = people(&rig, &[NW_1042, NW_1044]).await.unwrap();
+
+            assert_eq!(
+                found,
+                ["Alex Morgan", "Anna Lutz", "Jonas Reiter", "Marta Klein"]
+            );
+        }
+
+        #[tokio::test]
+        async fn always_include_me_first_even_when_switched_off_the_team() {
+            let rig = Rig::synced().await;
+            set_member(&rig, NW_PROJECT, ALEX, false).await;
+
+            let found = bulk_assignees(&rig.ctx.db, &rig.settings(), ids(&[NW_1044]))
+                .await
+                .unwrap();
+
+            assert_eq!(found[0].account_id, ALEX);
+            assert_eq!(found.len(), 4);
+        }
+
+        #[tokio::test]
+        async fn for_issues_of_two_spaces_are_the_people_on_both_teams() {
+            let rig = Rig::synced().await;
+            let other = first_issue_of(&rig, NWS_PROJECT).await;
+            set_member(&rig, NWS_PROJECT, &account_of("Anna Lutz"), false).await;
+            set_member(&rig, NWS_PROJECT, MARTA, false).await;
+            set_member(&rig, NWS_PROJECT, JONAS, true).await;
+
+            let found = people(&rig, &[NW_1044, other.as_str()]).await.unwrap();
+
+            assert_eq!(found, ["Alex Morgan", "Jonas Reiter"]);
+        }
+
+        #[tokio::test]
+        async fn leave_out_someone_switched_off_in_one_of_the_spaces() {
+            let rig = Rig::synced().await;
+            let other = first_issue_of(&rig, NWS_PROJECT).await;
+            set_member(&rig, NWS_PROJECT, &account_of("Anna Lutz"), false).await;
+            set_member(&rig, NWS_PROJECT, MARTA, false).await;
+            set_member(&rig, NWS_PROJECT, JONAS, true).await;
+            set_member(&rig, NW_PROJECT, JONAS, false).await;
+
+            let found = people(&rig, &[NW_1044, other.as_str()]).await.unwrap();
+
+            assert_eq!(found, ["Alex Morgan"]);
+        }
+
+        #[tokio::test]
+        async fn fail_as_not_found_for_an_issue_missing_from_the_cache() {
+            let rig = Rig::synced().await;
+
+            let err = people(&rig, &[NW_1044, "999999"]).await.unwrap_err();
+
+            assert_eq!(err.kind(), ErrorKind::NotFound);
+        }
+    }
+
+    mod applying_many {
+        use super::*;
+
+        #[tokio::test]
+        async fn lands_every_change_in_the_cache_and_in_jira() {
+            let rig = Rig::synced().await;
+
+            let outcome = move_all(&rig, "Done", &[NW_1042, NW_1049]).await;
+
+            assert_eq!(
+                outcome,
+                BulkOutcome {
+                    done: "Moved to Done: 2 issues".into(),
+                    changed: 2,
+                    refused: 0,
+                    reverse: Some(vec![
+                        transition(NW_1042, IN_PROGRESS),
+                        transition(NW_1049, IN_PROGRESS),
+                    ]),
+                }
+            );
+            for id in [NW_1042, NW_1049] {
+                assert_eq!(
+                    rig.cached_status(id).await,
+                    (DONE.to_string(), "done".to_string()),
+                    "{id}"
+                );
+                assert_eq!(rig.jira_status(id).await, DONE, "{id}");
+            }
+            assert_eq!(rig.pending_writes().await, 0);
+            assert_eq!(rig.transitions_posted(), 2);
+        }
+
+        #[tokio::test]
+        async fn the_reverse_changes_applied_the_same_way_restore_the_old_values() {
+            let rig = Rig::synced().await;
+            let outcome = move_all(&rig, "Done", &[NW_1042, NW_1049]).await;
+
+            let back = run(&rig, outcome.reverse.unwrap(), "Changed back", 2).await;
+
+            assert_eq!(back.done, "Changed back: 2 issues");
+            assert_eq!((back.changed, back.refused), (2, 0));
+            for id in [NW_1042, NW_1049] {
+                assert_eq!(
+                    rig.cached_status(id).await,
+                    (IN_PROGRESS.to_string(), "indeterminate".to_string()),
+                    "{id}"
+                );
+                assert_eq!(rig.jira_status(id).await, IN_PROGRESS, "{id}");
+            }
+            assert_eq!(rig.pending_writes().await, 0);
+        }
+
+        #[tokio::test]
+        async fn a_refusal_names_its_issue_and_the_rest_still_apply() {
+            let rig = Rig::synced().await;
+            rig.fake
+                .answer_next_write(400, json!({ "errorMessages": ["Not allowed"] }));
+
+            let outcome = move_all(&rig, "Done", &[NW_1042, NW_1049]).await;
+
+            assert_eq!(
+                outcome,
+                BulkOutcome {
+                    done: "Moved to Done: 1 of 2 issues. NW-1042: Jira refused the change: Not allowed"
+                        .into(),
+                    changed: 1,
+                    refused: 1,
+                    reverse: Some(vec![transition(NW_1049, IN_PROGRESS)]),
+                }
+            );
+            assert_eq!(rig.jira_status(NW_1042).await, IN_PROGRESS);
+            assert_eq!(rig.jira_status(NW_1049).await, DONE);
+            assert_eq!(
+                rig.cached_status(NW_1042).await,
+                (IN_PROGRESS.to_string(), "indeterminate".to_string())
+            );
+            assert_eq!(
+                rig.cached_status(NW_1049).await,
+                (DONE.to_string(), "done".to_string())
+            );
+            assert_eq!(rig.pending_writes().await, 0);
+            assert_eq!(rig.transitions_posted(), 2);
+        }
+
+        #[tokio::test]
+        async fn a_kind_of_change_switched_off_refuses_every_change_and_sends_nothing() {
+            let rig = Rig::synced().await;
+            rig.ctx
+                .settings
+                .edit(|s| s.behaviour.disabled_changes = vec![Capability::ChangePriority])
+                .await
+                .unwrap();
+            let requests_before = rig.fake.requests().len();
+
+            let outcome = run(
+                &rig,
+                vec![priority_of(NW_1042, "Low"), priority_of(NW_1049, "Low")],
+                "Set priority to Low",
+                2,
+            )
+            .await;
+
+            assert_eq!(
+                outcome,
+                BulkOutcome {
+                    done: "Set priority to Low: 0 of 2 issues. NW-1042: “Change the priority” is switched off in Settings → Connection."
+                        .into(),
+                    changed: 0,
+                    refused: 2,
+                    reverse: None,
+                }
+            );
+            assert_eq!(rig.fake.requests().len(), requests_before);
+            assert_eq!(rig.cached_priority(NW_1042).await.as_deref(), Some("High"));
+        }
+
+        #[tokio::test]
+        async fn words_a_single_issue_in_the_singular() {
+            let rig = Rig::synced().await;
+
+            let outcome = move_all(&rig, "Done", &[NW_1042]).await;
+
+            assert_eq!(outcome.done, "Moved to Done: 1 issue");
+            assert_eq!(outcome.changed, 1);
+        }
+
+        #[tokio::test]
+        async fn counts_the_issues_that_needed_no_change_as_changed() {
+            let rig = Rig::synced().await;
+
+            let outcome = move_all(&rig, "In Progress", &[NW_1042, NW_1044]).await;
+
+            assert_eq!(
+                outcome,
+                BulkOutcome {
+                    done: "Moved to In Progress: 2 issues".into(),
+                    changed: 2,
+                    refused: 0,
+                    reverse: Some(vec![transition(NW_1044, IN_REVIEW)]),
+                }
+            );
+            assert_eq!(rig.transitions_posted(), 1);
+        }
+
+        #[tokio::test]
+        async fn without_changes_offers_no_reverse() {
+            let rig = Rig::synced().await;
+
+            let outcome = run(&rig, Vec::new(), "Moved to Done", 0).await;
+
+            assert_eq!(
+                outcome,
+                BulkOutcome {
+                    done: "Moved to Done: 0 issues".into(),
+                    changed: 0,
+                    refused: 0,
+                    reverse: None,
+                }
+            );
+        }
+    }
+
+    mod for_the_page {
+        use super::*;
+
+        #[test]
+        fn the_outcome_serializes_in_camel_case() {
+            let outcome = BulkOutcome {
+                done: "Moved to Done: 2 issues".into(),
+                changed: 2,
+                refused: 0,
+                reverse: Some(vec![transition(NW_1042, IN_PROGRESS)]),
+            };
+
+            assert_eq!(
+                serde_json::to_value(&outcome).unwrap(),
+                json!({
+                    "done": "Moved to Done: 2 issues",
+                    "changed": 2,
+                    "refused": 0,
+                    "reverse": [{
+                        "issueId": NW_1042,
+                        "change": { "kind": "transition", "transitionId": IN_PROGRESS },
+                    }],
+                })
+            );
+        }
+
+        #[test]
+        fn an_outcome_without_a_reverse_serializes_it_as_null() {
+            let outcome = BulkOutcome {
+                done: "Moved to Done: 0 of 1 issue".into(),
+                changed: 0,
+                refused: 1,
+                reverse: None,
+            };
+
+            assert_eq!(
+                serde_json::to_value(&outcome).unwrap()["reverse"],
+                Value::Null
+            );
+        }
+
+        #[test]
+        fn an_issue_change_reads_the_pages_json() {
+            let change: IssueChange = serde_json::from_value(json!({
+                "issueId": NW_1042,
+                "change": { "kind": "priority", "name": "Low" },
+            }))
+            .unwrap();
+
+            assert_eq!(change, priority_of(NW_1042, "Low"));
+        }
+    }
+}

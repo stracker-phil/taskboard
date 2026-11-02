@@ -22,6 +22,7 @@ import { columnWidth, SUMMARY_MIN_WIDTH, widthVar } from "./widths";
 import { revealedHeights } from "../list/groupReveal";
 import { foldSpans, type Fold } from "../list/dragFold";
 import { useDragFold } from "../list/useDragFold";
+import { BulkBar } from "../../writes/BulkBar";
 import { DropTray, DropZone, zoneOf } from "../../writes/DropZone";
 import { type Drag, useIssueDrag } from "../../writes/useIssueDrag";
 
@@ -203,6 +204,7 @@ function Table({ view, data }: { view: View; data: ViewData }) {
         </div>
       </div>
       <DropTray drag={drag} groups={dropGroups} host={scrollRef} />
+      <BulkBar picked={picked} onClear={() => place.setPicked([])} />
     </div>
   );
 }
