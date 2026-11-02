@@ -73,6 +73,7 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
     groupMenu(
       view.groupBy,
       view.sort,
+      level.kind === "home" && level.node.kind === "everything",
       (groupBy) => edit(api.viewSetGroup(view.id, groupBy), "Could not change the grouping"),
       (sort) => edit(api.viewSetSort(view.id, sort), "Could not change the sort order"),
     );

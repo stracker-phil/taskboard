@@ -228,6 +228,27 @@ describe("Toolbar page actions", () => {
       expect(await screen.findByRole("menu", { name: "Group" })).toBeInTheDocument();
     });
 
+    it("offers no Space or Client grouping on a Space level", async () => {
+      renderToolbar(SPACE_LEVEL);
+
+      run("toolbar.group");
+
+      const menu = within(await screen.findByRole("menu", { name: "Group" }));
+      expect(menu.getByRole("menuitemradio", { name: "Assignee" })).toBeInTheDocument();
+      expect(menu.queryByRole("menuitemradio", { name: "Space" })).not.toBeInTheDocument();
+      expect(menu.queryByRole("menuitemradio", { name: "Client" })).not.toBeInTheDocument();
+    });
+
+    it("offers the Space and Client groupings on Everything", async () => {
+      renderToolbar({ kind: "home", node: listNode({ id: 1, kind: "everything", name: "Everything" }) });
+
+      run("toolbar.group");
+
+      const menu = within(await screen.findByRole("menu", { name: "Group" }));
+      expect(menu.getByRole("menuitemradio", { name: "Space" })).toBeInTheDocument();
+      expect(menu.getByRole("menuitemradio", { name: "Client" })).toBeInTheDocument();
+    });
+
     it("groups by the chosen entry", async () => {
       mocked.viewSetGroup.mockResolvedValue(view({ groupBy: "priority" }));
       renderToolbar();

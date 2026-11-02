@@ -24,9 +24,14 @@ const SORT_NAMES: Record<SortBy, string> = {
   status: "Status",
 };
 
-/** The Group button's menu: the groupings, then Sort by ▸ with the sort keys and the direction. */
-export function groupMenu(groupBy: GroupBy, sort: Sort, setGroup: (g: GroupBy) => void, setSort: (s: Sort) => void): MenuEntry[] {
-  const groups = (Object.keys(GROUP_NAMES) as GroupBy[]).map((g) => ({ text: GROUP_NAMES[g], checked: g === groupBy, run: () => setGroup(g) }));
+/** Groupings that only tell issues apart across Spaces. */
+const ACROSS_SPACES: GroupBy[] = ["project", "client"];
+
+/** The Group button's menu: the groupings, then Sort by ▸ with the sort keys and the direction. Space and Client
+ *  are offered only where issues of several Spaces meet (`acrossSpaces`), or while the view already uses one. */
+export function groupMenu(groupBy: GroupBy, sort: Sort, acrossSpaces: boolean, setGroup: (g: GroupBy) => void, setSort: (s: Sort) => void): MenuEntry[] {
+  const offered = (Object.keys(GROUP_NAMES) as GroupBy[]).filter((g) => acrossSpaces || g === groupBy || !ACROSS_SPACES.includes(g));
+  const groups = offered.map((g) => ({ text: GROUP_NAMES[g], checked: g === groupBy, run: () => setGroup(g) }));
   const keys = (Object.keys(SORT_NAMES) as SortBy[]).map((by) => ({ text: SORT_NAMES[by], checked: by === sort.by, run: () => setSort({ ...sort, by }) }));
   return [
     ...groups,

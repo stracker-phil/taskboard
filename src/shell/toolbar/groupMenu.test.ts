@@ -5,21 +5,56 @@ import { groupMenu } from "./groupMenu";
 
 const entriesOf = (entries: MenuEntry[]) => entries.filter((e): e is MenuItem => e !== "separator" && !("caption" in e));
 
-function build(groupBy: GroupBy = "status", sort: Sort = { by: "updated", descending: true }) {
+function build(groupBy: GroupBy = "status", sort: Sort = { by: "updated", descending: true }, acrossSpaces = true) {
   const setGroup = vi.fn();
   const setSort = vi.fn();
-  const menu = entriesOf(groupMenu(groupBy, sort, setGroup, setSort));
+  const menu = entriesOf(groupMenu(groupBy, sort, acrossSpaces, setGroup, setSort));
   const sortMenu = entriesOf(menu.find((e) => e.text === "Sort by")!.items!);
   return { menu, sortMenu, setGroup, setSort };
 }
+
+const groupingsOf = (menu: MenuItem[]) => menu.filter((e) => e.text !== "Sort by");
 
 describe("groupMenu", () => {
   it("lists the groupings and checks only the current one", () => {
     const { menu } = build("epic");
 
-    const groupings = menu.filter((e) => e.text !== "Sort by");
+    const groupings = groupingsOf(menu);
     expect(groupings.map((e) => e.text)).toEqual(["Status", "Status type", "Space", "Client", "Assignee", "Epic", "Release", "Priority", "Due date", "None"]);
     expect(groupings.filter((e) => e.checked).map((e) => e.text)).toEqual(["Epic"]);
+  });
+
+  describe("Space and Client groupings", () => {
+    it("are left out when the issues come from a single Space", () => {
+      const { menu } = build("status", undefined, false);
+
+      const names = groupingsOf(menu).map((e) => e.text);
+      expect(names).not.toContain("Space");
+      expect(names).not.toContain("Client");
+      expect(names).toContain("Assignee");
+    });
+
+    it("are both offered across Spaces", () => {
+      const { menu } = build("status", undefined, true);
+
+      expect(groupingsOf(menu).map((e) => e.text)).toEqual(expect.arrayContaining(["Space", "Client"]));
+    });
+
+    it("keep the one the view already groups by, checked, but not the other", () => {
+      const { menu } = build("project", undefined, false);
+
+      const groupings = groupingsOf(menu);
+      expect(groupings.find((e) => e.text === "Space")?.checked).toBe(true);
+      expect(groupings.map((e) => e.text)).not.toContain("Client");
+    });
+
+    it("keep Client, checked, when the view groups by it outside Everything", () => {
+      const { menu } = build("client", undefined, false);
+
+      const groupings = groupingsOf(menu);
+      expect(groupings.find((e) => e.text === "Client")?.checked).toBe(true);
+      expect(groupings.map((e) => e.text)).not.toContain("Space");
+    });
   });
 
   it("groups by the chosen entry", () => {
