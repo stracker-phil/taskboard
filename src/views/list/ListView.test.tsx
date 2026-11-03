@@ -1823,6 +1823,26 @@ describe("ListView", () => {
       expect(await screen.findByText("Redesign the pricing page")).toBeInTheDocument();
     });
 
+    describe("a Space group's tab", () => {
+      const spaceGroup = (icon: string | null) =>
+        groupOf([OPEN], { key: "space:web", label: "Website", mark: { kind: "space", icon, initial: "W", color: "2" } });
+
+      it("shows the Space's initial when it has no icon", async () => {
+        await renderList(viewData([spaceGroup(null)], [OPEN], { groupBy: "project" }));
+
+        const tab = await screen.findByRole("button", { name: "Website" });
+        expect(within(tab).getByText("W")).toBeInTheDocument();
+      });
+
+      it("shows the Space's emoji icon instead of the initial", async () => {
+        await renderList(viewData([spaceGroup("🚀")], [OPEN], { groupBy: "project" }));
+
+        const tab = await screen.findByRole("button", { name: "Website" });
+        expect(within(tab).getByText("🚀")).toBeInTheDocument();
+        expect(within(tab).queryByText("W")).not.toBeInTheDocument();
+      });
+    });
+
     it("lists the visible columns' names in every group header", async () => {
       await renderList(viewData(groups(), [OPEN, DONE], { columns: ["assignee", "priority"] }));
 

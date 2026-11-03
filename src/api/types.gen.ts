@@ -348,7 +348,11 @@ export type GroupBy = "status" | "statusType" | "project" | "client" | "assignee
 /**
  * What the group header draws before its label.
  */
-export type GroupMark = { "kind": "status", style: Style, } | { "kind": "space", letter: string, color: string | null, } | { "kind": "person", person: Person, } | { "kind": "epic", color: number, } | { "kind": "priority", level: number, };
+export type GroupMark = { "kind": "status", style: Style, } | { "kind": "space", icon: string | null, 
+/**
+ * Drawn when `icon` is None.
+ */
+initial: string, color: string | null, } | { "kind": "person", person: Person, } | { "kind": "epic", color: number, } | { "kind": "priority", level: number, };
 
 /**
  * A change to one of the picked issues.

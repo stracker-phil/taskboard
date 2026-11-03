@@ -7,10 +7,8 @@ use rusqlite::Connection;
 use super::groups::{SpaceInfo, Version};
 use crate::error::AppResult;
 
-/// The owner's icon letter, else the name's first letter.
-fn space_letter(icon: Option<String>, name: &str) -> String {
-    icon.filter(|i| !i.is_empty())
-        .unwrap_or_else(|| name.chars().take(1).flat_map(char::to_uppercase).collect())
+fn first_letter(name: &str) -> String {
+    name.chars().take(1).flat_map(char::to_uppercase).collect()
 }
 
 pub(super) fn spaces(conn: &Connection) -> AppResult<HashMap<String, SpaceInfo>> {
@@ -26,7 +24,8 @@ pub(super) fn spaces(conn: &Connection) -> AppResult<HashMap<String, SpaceInfo>>
             row.get::<_, String>(0)?,
             SpaceInfo {
                 position: 0,
-                letter: space_letter(icon, &name),
+                icon: icon.filter(|i| !i.is_empty()),
+                initial: first_letter(&name),
                 name,
                 color: row.get(3)?,
                 client: row.get(4)?,

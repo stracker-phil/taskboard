@@ -2,6 +2,7 @@ import { DisclosureChevron } from "../../components/DisclosureChevron";
 import type { Group, GroupMark } from "../../api";
 import { Avatar } from "../../components/issue/Avatar";
 import { PriorityFlag } from "../../components/issue/PriorityFlag";
+import { Tile } from "../../components/look/Tile";
 
 interface Props {
   group: Group;
@@ -61,11 +62,7 @@ function tabClass(mark: GroupMark | null, open: boolean): string {
 export function Mark({ mark }: { mark: GroupMark | null }) {
   switch (mark?.kind) {
     case "space":
-      return (
-        <span className="space-tile space-tile--20" style={{ background: `var(--space-tile-${mark.color ?? "1"})` }} aria-hidden="true">
-          {mark.letter}
-        </span>
-      );
+      return <Tile icon={mark.icon} color={mark.color ?? "1"} fallback={mark.initial} size={20} />;
     case "person":
       return <Avatar person={mark.person} size={20} />;
     case "epic":

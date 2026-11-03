@@ -31,8 +31,11 @@ pub enum GroupMark {
     Status {
         style: Style,
     },
+    /// The Space's tile, as the sidebar draws it.
     Space {
-        letter: String,
+        icon: Option<String>,
+        /// Drawn when `icon` is None.
+        initial: String,
         color: Option<String>,
     },
     Person {
@@ -63,7 +66,8 @@ pub struct Facts {
 pub struct SpaceInfo {
     pub position: usize,
     pub name: String,
-    pub letter: String,
+    pub icon: Option<String>,
+    pub initial: String,
     pub color: Option<String>,
     pub client: Option<String>,
 }
@@ -128,7 +132,8 @@ fn slot_of(row: &Row, facts: &Facts, by: GroupBy, lookup: &Lookup) -> (Order, Gr
                 &facts.project_id,
                 &space.name,
                 Some(GroupMark::Space {
-                    letter: space.letter.clone(),
+                    icon: space.icon.clone(),
+                    initial: space.initial.clone(),
                     color: space.color.clone(),
                 }),
                 (space.position as i64, String::new()),
@@ -541,7 +546,8 @@ mod tests {
         SpaceInfo {
             position,
             name: name.to_string(),
-            letter: name[..1].to_string(),
+            icon: None,
+            initial: name[..1].to_string(),
             color: None,
             client: client.map(str::to_string),
         }
@@ -566,8 +572,52 @@ mod tests {
         assert_eq!(
             groups[0].mark,
             Some(GroupMark::Space {
-                letter: "A".to_string(),
+                icon: None,
+                initial: "A".to_string(),
                 color: None
+            })
+        );
+    }
+
+    #[test]
+    fn a_project_group_carries_the_space_icon_beside_the_initial_of_its_name() {
+        let with_icon = |icon: &str| SpaceInfo {
+            icon: Some(icon.to_string()),
+            color: Some("3".to_string()),
+            ..space(0, "Alpha App", None)
+        };
+        for icon in ["rocket", "🚀"] {
+            let spaces = HashMap::from([("p1".to_string(), with_icon(icon))]);
+            let rows = [in_project("1", "p1")];
+            let groups = run_with(&rows, GroupBy::Project, &spaces, &HashMap::new());
+
+            assert_eq!(
+                groups[0].mark,
+                Some(GroupMark::Space {
+                    icon: Some(icon.to_string()),
+                    initial: "A".to_string(),
+                    color: Some("3".to_string()),
+                }),
+                "{icon}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_space_mark_serializes_as_a_space_kind_with_icon_and_initial() {
+        let mark = GroupMark::Space {
+            icon: Some("rocket".to_string()),
+            initial: "A".to_string(),
+            color: None,
+        };
+
+        assert_eq!(
+            serde_json::to_value(&mark).unwrap(),
+            serde_json::json!({
+                "kind": "space",
+                "icon": "rocket",
+                "initial": "A",
+                "color": null
             })
         );
     }

@@ -15,7 +15,9 @@ use taskboard_lib::db::Db;
 use taskboard_lib::error::ErrorKind;
 use taskboard_lib::filter::{Condition, Field, Filter, Op, Value};
 use taskboard_lib::jira::{Limiter, TokenKind};
-use taskboard_lib::lists::{SidebarTree, Viewer, list_conditions, list_create, sidebar_tree};
+use taskboard_lib::lists::{
+    SidebarTree, SpaceUpdate, Viewer, list_conditions, list_create, sidebar_tree, space_update,
+};
 use taskboard_lib::me_mode::{MeMatch, MeRule};
 use taskboard_lib::status_style::{Style, status_style_set, status_styles_list};
 use taskboard_lib::store::settings::SettingsStore;
@@ -335,6 +337,55 @@ mod grouping {
                 .all(|g| matches!(g.mark, Some(GroupMark::Space { .. })))
         );
         assert!(data.groups.iter().all(|g| !g.collapsed_by_default));
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn project_groups_carry_the_icon_the_owner_set_and_none_without_one() {
+        let site = Site::new().await;
+        let icon = |icon: Option<&str>| SpaceUpdate {
+            icon: icon.map(str::to_string),
+            ..SpaceUpdate::default()
+        };
+        space_update(site.db(), PROJECT_IDS[0].into(), icon(Some("rocket")))
+            .await
+            .unwrap();
+        space_update(site.db(), PROJECT_IDS[1].into(), icon(Some("🚀")))
+            .await
+            .unwrap();
+        space_update(site.db(), PROJECT_IDS[2].into(), icon(None))
+            .await
+            .unwrap();
+        let everything = site.everything().await;
+        let view = site.first_view(everything).await;
+        view_set_group(site.db(), view, GroupBy::Project)
+            .await
+            .unwrap();
+
+        let data = site.data(everything, view, Narrowing::default()).await;
+
+        let tile = |key: &str| {
+            let group = data.groups.iter().find(|g| g.key == key).unwrap();
+            match group.mark.clone() {
+                Some(GroupMark::Space { icon, initial, .. }) => {
+                    (icon, initial, group.label.clone())
+                }
+                other => panic!("{key}: {other:?}"),
+            }
+        };
+        for (key, expected) in [
+            (PROJECT_IDS[0], Some("rocket")),
+            (PROJECT_IDS[1], Some("🚀")),
+            (PROJECT_IDS[2], None),
+        ] {
+            let (icon, initial, label) = tile(key);
+            assert_eq!(icon.as_deref(), expected, "{key}");
+            assert_eq!(
+                initial,
+                label.chars().next().unwrap().to_uppercase().to_string(),
+                "{key}"
+            );
+        }
     }
 
     #[tokio::test]
