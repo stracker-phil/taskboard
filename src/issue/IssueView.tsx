@@ -1,14 +1,12 @@
-import { ArrowDown, ArrowLeft, ArrowUp, CheckCheck, CircleDot, Link2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Link2 } from "lucide-react";
 import { useShortcuts } from "../commands/useShortcuts";
 import { CopyKey } from "../components/issue/CopyKey";
 import { useQueryClient } from "@tanstack/react-query";
 import { type RefObject, useEffect, useMemo, useRef } from "react";
 import { api, type IssueDetail } from "../api";
 import { onIssueKeys } from "../commands/issueKeys";
-import { OpenInJiraButton } from "../components/OpenInJiraButton";
 import { SpaceTile } from "../components/SpaceTile";
 import { hasContent } from "../lib/jiraHtml";
-import { formatLocalTime } from "../lib/time";
 import { prefetchIssue, refreshIssueExtras, useIssue, useIssueRelated } from "../queries/issues";
 import { useNavGo, useSidebar, useViews } from "../queries/sidebar";
 import { useRequestNarrowing, useViewRows } from "../queries/views";
@@ -17,7 +15,6 @@ import { narrowingKey } from "../state/slices/narrowing";
 import type { IssueOrigin } from "../state/slices/issueView";
 import { attempt } from "../state/requests";
 import { useStore } from "../state/store";
-import { PinButton } from "../pins/PinButton";
 import { useIssueActions } from "../views/list/useIssueActions";
 import { Activity } from "./Activity";
 import { Attachments } from "./Attachments";
@@ -25,7 +22,8 @@ import { flatten } from "../views/list/flatten";
 import { GoneNotice } from "./GoneNotice";
 import { IssueMissing } from "./IssueMissing";
 import { SinceBanner } from "./SinceBanner";
-import { holdUnread, useSeenAfter } from "./useSeenAfter";
+import { useSeenAfter } from "./useSeenAfter";
+import { ActionButton, IssueActions, toggleRead } from "./IssueActions";
 import { FieldGrid } from "./FieldGrid";
 import { IssueFind } from "./find/IssueFind";
 import { JiraHtml } from "./JiraHtml";
@@ -115,9 +113,6 @@ function IssueHeader({
   const { title } = useShortcuts();
   return (
     <header className="issue-header">
-      <button type="button" className="issue-header__icon" aria-label={`Back to ${originName ?? "the list"}`} title={title("Back", "issue.back")} onClick={onBack}>
-        <ArrowLeft size={16} strokeWidth={2} aria-hidden="true" />
-      </button>
       <nav className="issue-header__crumbs" aria-label="Breadcrumb">
         {space && (
           <>
@@ -145,18 +140,17 @@ function IssueHeader({
       </nav>
       <span className="issue-header__spacer" />
       <IssueFind rootRef={findIn} />
-      {issue && <span className="issue-header__updated">Updated {formatLocalTime(issue.updatedAt)}</span>}
-      <button type="button" className="issue-header__nav" aria-label="Previous issue" title={title("Previous", "issue.previous")} disabled={!neighbors.previous} onClick={() => neighbors.previous && showIssue(neighbors.previous)}>
-        <ArrowUp size={14} strokeWidth={2} aria-hidden="true" />
-      </button>
-      <button type="button" className="issue-header__nav" aria-label="Next issue" title={title("Next", "issue.next")} disabled={!neighbors.next} onClick={() => neighbors.next && showIssue(neighbors.next)}>
-        <ArrowDown size={14} strokeWidth={2} aria-hidden="true" />
-      </button>
-      {issue && <ReadToggle issue={issue} />}
-      {issue && <PinButton kind="issue" target={issue.id} label="Bookmark this issue" meta={issue.key} command="issue.togglePin" className="issue-header__nav" />}
-      {issue && actions.openInJira && (
-        <OpenInJiraButton onClick={() => actions.openInJira?.(issue.key)} command="issue.openInJira" />
-      )}
+      <IssueActions
+        issue={issue}
+        onClose={onBack}
+        closeCommand="issue.back"
+        before={
+          <>
+            <ActionButton label="Previous issue" command="issue.previous" icon={ArrowUp} disabled={!neighbors.previous} onClick={() => neighbors.previous && showIssue(neighbors.previous)} />
+            <ActionButton label="Next issue" command="issue.next" icon={ArrowDown} disabled={!neighbors.next} onClick={() => neighbors.next && showIssue(neighbors.next)} />
+          </>
+        }
+      />
     </header>
   );
 }
@@ -212,27 +206,6 @@ function IssueMain({ issue, origin }: { issue: IssueDetail; origin: IssueOrigin 
   );
 }
 
-/** Read marks it read now; unread keeps it unread while it stays open. */
-function toggleRead(issue: IssueDetail) {
-  if (issue.unread) {
-    void attempt(api.issuesMarkSeen([issue.id]), "Could not mark it read");
-    return;
-  }
-  holdUnread(issue.id);
-  void attempt(api.issueMarkUnread(issue.id), "Could not mark it unread");
-}
-
-function ReadToggle({ issue }: { issue: IssueDetail }) {
-  const label = issue.unread ? "Mark as read" : "Mark as unread";
-  const Icon = issue.unread ? CheckCheck : CircleDot;
-  const { title } = useShortcuts();
-  return (
-    <button type="button" className="issue-header__nav" aria-label={label} title={title(label, "issue.markSeen")} onClick={() => toggleRead(issue)}>
-      <Icon size={14} strokeWidth={2} aria-hidden="true" />
-    </button>
-  );
-}
-
 /** J/K move to the neighbors; E opens the epic; ⌘C, ⌘⇧C and ⌘↩ act on the shown issue. */
 function IssueKeys({ issue, neighbors }: { issue: IssueDetail | undefined; neighbors: { previous: string | null; next: string | null } }) {
   const showIssue = useStore((s) => s.showIssue);
@@ -243,10 +216,11 @@ function IssueKeys({ issue, neighbors }: { issue: IssueDetail | undefined; neigh
     state.current = { issue, neighbors, showIssue, openRelated, actions };
   });
   useEffect(() => {
-    const withKey = (run: (key: string) => void) => {
-      const key = state.current.issue?.key;
-      if (key) run(key);
+    const withIssue = (run: (issue: IssueDetail) => void) => {
+      const issue = state.current.issue;
+      if (issue) run(issue);
     };
+    const withKey = (run: (key: string) => void) => withIssue((issue) => run(issue.key));
     return onIssueKeys({
       move: (step) => {
         const { neighbors, showIssue } = state.current;
@@ -258,6 +232,7 @@ function IssueKeys({ issue, neighbors }: { issue: IssueDetail | undefined; neigh
       copyKey: () => withKey((key) => state.current.actions.copyKey(key)),
       copyUrl: () => withKey((key) => state.current.actions.copyUrl(key)),
       copyAppLink: () => withKey((key) => state.current.actions.copyAppLink(key)),
+      copyMarkdown: () => withIssue((issue) => state.current.actions.copyMarkdown(issue)),
       openInJira: () => withKey((key) => state.current.actions.openInJira?.(key)),
       openEpic: () => {
         const epic = state.current.issue?.epic;
@@ -295,10 +270,7 @@ function IssueKeys({ issue, neighbors }: { issue: IssueDetail | undefined; neigh
         if (actions.changePriority) actions.changePriority(issue, priorityMenuAnchor(issue.id));
         else explainWritesOff();
       },
-      toggleRead: () => {
-        const issue = state.current.issue;
-        if (issue) toggleRead(issue);
-      },
+      toggleRead: () => withIssue(toggleRead),
       hasSelection: () => state.current.issue !== undefined,
       peekOpen: () => false,
     });

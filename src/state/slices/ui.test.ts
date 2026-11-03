@@ -18,11 +18,32 @@ describe("ui slice", () => {
   });
 
   it("loads the sidebar state and the activity width Rust saved", async () => {
-    mocked.getUiState.mockResolvedValue({ sidebarHidden: true, activityWidth: 520, recentSearches: [] });
+    mocked.getUiState.mockResolvedValue({ sidebarHidden: true, activityWidth: 520, activityFilter: "all", recentSearches: [] });
 
     await useStore.getState().loadUiState();
 
     expect(useStore.getState()).toMatchObject({ sidebarHidden: true, activityWidth: 520 });
+  });
+
+  it("starts with all activity shown", () => {
+    expect(useStore.getState().activityFilter).toBe("all");
+  });
+
+  it("loads the activity filter Rust saved", async () => {
+    mocked.getUiState.mockResolvedValue({ sidebarHidden: false, activityWidth: null, activityFilter: "changes", recentSearches: [] });
+
+    await useStore.getState().loadUiState();
+
+    expect(useStore.getState().activityFilter).toBe("changes");
+  });
+
+  it("saves the activity filter when it is set, keeping the other fields", () => {
+    resetStore({ sidebarHidden: true, activityWidth: 520 });
+
+    useStore.getState().setActivityFilter("comments");
+
+    expect(useStore.getState().activityFilter).toBe("comments");
+    expect(mocked.setUiState).toHaveBeenCalledWith({ sidebarHidden: true, activityWidth: 520, activityFilter: "comments", recentSearches: [] });
   });
 
   it("toasts an error and keeps the defaults when the layout cannot be loaded", async () => {
@@ -40,7 +61,7 @@ describe("ui slice", () => {
     useStore.getState().toggleSidebar();
 
     expect(useStore.getState().sidebarHidden).toBe(true);
-    expect(mocked.setUiState).toHaveBeenCalledWith({ sidebarHidden: true, activityWidth: 520, recentSearches: [] });
+    expect(mocked.setUiState).toHaveBeenCalledWith({ sidebarHidden: true, activityWidth: 520, activityFilter: "all", recentSearches: [] });
   });
 
   it("saves both fields when the activity width is set, keeping the sidebar state", () => {
@@ -48,7 +69,7 @@ describe("ui slice", () => {
 
     useStore.getState().setActivityWidth(448);
 
-    expect(mocked.setUiState).toHaveBeenCalledWith({ sidebarHidden: true, activityWidth: 448, recentSearches: [] });
+    expect(mocked.setUiState).toHaveBeenCalledWith({ sidebarHidden: true, activityWidth: 448, activityFilter: "all", recentSearches: [] });
   });
 
   it("sends no recent searches when saving the layout, as Rust keeps the stored ones", () => {

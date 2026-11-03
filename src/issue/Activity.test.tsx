@@ -1,11 +1,13 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
 
 import { api, type ActivityItem } from "../api";
+import { installCommands } from "../commands";
+import { clearCommands, setOverrides } from "../commands/registry";
 import { createQueryClient } from "../queries/queryClient";
 import { resetStore, useStore } from "../state/store";
 import { ALEX, SAM, changeItem, commentItem } from "../test/issues";
@@ -181,7 +183,7 @@ describe("Activity", () => {
       await userEvent.keyboard("{ArrowLeft}");
 
       expect(await handle()).toHaveAttribute("aria-valuenow", "416");
-      expect(mocked.setUiState).toHaveBeenLastCalledWith({ sidebarHidden: false, activityWidth: 416, recentSearches: [] });
+      expect(mocked.setUiState).toHaveBeenLastCalledWith({ sidebarHidden: false, activityWidth: 416, activityFilter: "all", recentSearches: [] });
     });
 
     it("narrows by 16 on ArrowRight and saves it", async () => {
@@ -191,7 +193,7 @@ describe("Activity", () => {
       await userEvent.keyboard("{ArrowRight}");
 
       expect(await handle()).toHaveAttribute("aria-valuenow", "384");
-      expect(mocked.setUiState).toHaveBeenLastCalledWith({ sidebarHidden: false, activityWidth: 384, recentSearches: [] });
+      expect(mocked.setUiState).toHaveBeenLastCalledWith({ sidebarHidden: false, activityWidth: 384, activityFilter: "all", recentSearches: [] });
     });
 
     it("stops widening at the maximum", async () => {
@@ -316,6 +318,65 @@ describe("Activity", () => {
       await userEvent.click(screen.getByRole("button", { name: "Changes" }));
 
       expect(screen.getByText("Nothing here yet.")).toBeInTheDocument();
+    });
+
+    it("saves the chosen filter with the window layout", async () => {
+      renderActivity(items());
+      await screen.findByText("Sam Lee");
+
+      await userEvent.click(screen.getByRole("button", { name: "Comments" }));
+
+      expect(mocked.setUiState).toHaveBeenLastCalledWith({ sidebarHidden: false, activityWidth: null, activityFilter: "comments", recentSearches: [] });
+    });
+
+    it("shows the saved filter when an issue is opened", async () => {
+      mocked.getUiState.mockResolvedValue({ sidebarHidden: false, activityWidth: null, activityFilter: "changes", recentSearches: [] });
+      await useStore.getState().loadUiState();
+
+      renderActivity(items());
+
+      expect(await screen.findByText("Created the issue")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Changes" })).toHaveAttribute("aria-pressed", "true");
+      expect(screen.queryByText("Sam Lee")).not.toBeInTheDocument();
+    });
+
+    it("keeps the chosen filter for the next issue shown", async () => {
+      renderActivity(items());
+      await screen.findByText("Sam Lee");
+      await userEvent.click(screen.getByRole("button", { name: "Comments" }));
+      cleanup();
+
+      renderActivity(items());
+
+      expect(await screen.findByText("Sam Lee")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Comments" })).toHaveAttribute("aria-pressed", "true");
+      expect(screen.queryByText("Created the issue")).not.toBeInTheDocument();
+    });
+
+    describe("keys", () => {
+      beforeEach(() => {
+        installCommands("main");
+      });
+      afterEach(() => {
+        clearCommands();
+      });
+
+      it.each([
+        ["All", "⌥1"],
+        ["Comments", "⌥2"],
+        ["Changes", "⌥3"],
+      ])("shows the key of %s in its tooltip", async (name, key) => {
+        renderActivity(items());
+
+        expect(await screen.findByRole("button", { name })).toHaveAttribute("title", `${name} (${key})`);
+      });
+
+      it("drops the key from the tooltip when it is unbound", async () => {
+        setOverrides({ "activity.comments": null });
+        renderActivity(items());
+
+        expect(await screen.findByRole("button", { name: "Comments" })).toHaveAttribute("title", "Comments");
+      });
     });
   });
 

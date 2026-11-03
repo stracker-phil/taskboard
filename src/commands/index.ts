@@ -8,6 +8,7 @@ import { ISSUE_KEY_COMMANDS } from "./issueKeys";
 import { VIEW_KEY_COMMANDS } from "./viewKeys";
 import { TAB_KEY_COMMANDS } from "./tabKeys";
 import { PAGE_ACTION_COMMANDS } from "./pageActions";
+import { ACTIVITY_KEY_COMMANDS } from "./activityKeys";
 
 /** The window this page runs in: the Taskboard window (`main`) or Settings. */
 export type WindowName = "main" | "settings";
@@ -39,6 +40,7 @@ const APP_COMMANDS: Command[] = [
   ...TAB_KEY_COMMANDS,
   ...PAGE_ACTION_COMMANDS,
   ...ISSUE_KEY_COMMANDS,
+  ...ACTIVITY_KEY_COMMANDS,
   { id: "settings.close", title: "Close Settings", scope: "settings", defaultBinding: "Escape", when: escapeIsFree, run: () => runBusCommand("window:close", "Could not close the window") },
   { id: "settings.search", title: "Search Settings", scope: "settings", defaultBinding: "Mod+F", run: () => document.querySelector<HTMLInputElement>(".settings-nav-search")?.focus() },
 ];

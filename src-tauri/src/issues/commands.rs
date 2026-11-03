@@ -60,6 +60,13 @@ pub async fn issue_web_links(state: State<'_, AppState>, id: String) -> AppResul
     super::issue_web_links(&state.db, id).await
 }
 
+/// The issue as Markdown: front matter, description, rich fields, web links and comments, oldest first.
+#[tauri::command]
+pub async fn issue_markdown(state: State<'_, AppState>, id: String) -> AppResult<String> {
+    let site_url = state.settings.get().connection.site_url;
+    super::issue_markdown(&state.db, viewer(&state), site_url, id).await
+}
+
 /// Fetches the issue's web links; true when they changed.
 #[tauri::command]
 pub async fn issue_sync_web_links(state: State<'_, AppState>, id: String) -> AppResult<bool> {

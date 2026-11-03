@@ -20,14 +20,6 @@
 .peek__key { font-family: var(--font-mono); color: var(--text); }
 .peek__dot { color: var(--text-faint); }
 .peek__spacer { flex: 1; }
-.peek__btn {
-  display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border: 0;
-  border-radius: 7px; background: transparent; color: var(--text-tertiary);
-  transition: background-color var(--motion-fast) var(--ease-out), color var(--motion-fast) var(--ease-out);
-}
-.peek__btn:hover:not(:disabled) { background: var(--hover-bg); color: var(--text); }
-.peek__btn:disabled { opacity: 0.45; }
-
 .peek__body { display: flex; flex: 1; flex-direction: column; gap: 16px; min-height: 0; overflow: auto; padding: 20px 24px; }
 .peek__body > * { animation: fade-in var(--motion-base) var(--ease-out); }
 .peek__title { margin: 0; font-size: 22px; font-weight: 750; line-height: 1.25; color: var(--text); }

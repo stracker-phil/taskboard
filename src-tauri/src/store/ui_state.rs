@@ -16,9 +16,22 @@ pub struct UiState {
     pub sidebar_hidden: bool,
     /// The Issue view's activity column in points; none is the default width.
     pub activity_width: Option<u32>,
+    /// What the Issue view's activity column shows; every issue opens with the last choice.
+    pub activity_filter: ActivityFilter,
     /// The palette's last searches, newest first (`RECENT_SEARCHES` at most); only `remember_search` and
     /// `forget_search` change them.
     pub recent_searches: Vec<String>,
+}
+
+/// The Issue view's activity filter: everything, only comments or only recorded changes.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq, TS)]
+#[ts(export, export_to = "src/api/types.gen.ts")]
+#[serde(rename_all = "camelCase")]
+pub enum ActivityFilter {
+    #[default]
+    All,
+    Comments,
+    Changes,
 }
 
 /// How many searches the palette remembers.
@@ -212,6 +225,7 @@ mod tests {
         let value = serde_json::to_value(UiState {
             sidebar_hidden: true,
             activity_width: Some(320),
+            activity_filter: ActivityFilter::Comments,
             recent_searches: strings(&["checkout"]),
         })
         .unwrap();
@@ -220,9 +234,66 @@ mod tests {
             serde_json::json!({
                 "sidebarHidden": true,
                 "activityWidth": 320,
+                "activityFilter": "comments",
                 "recentSearches": ["checkout"]
             })
         );
+    }
+
+    #[test]
+    fn activity_filters_serialize_as_camel_case_words() {
+        for (filter, expected) in [
+            (ActivityFilter::All, "all"),
+            (ActivityFilter::Comments, "comments"),
+            (ActivityFilter::Changes, "changes"),
+        ] {
+            assert_eq!(
+                serde_json::to_value(filter).unwrap(),
+                serde_json::json!(expected),
+                "{filter:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn without_a_file_the_activity_filter_shows_everything() {
+        let dir = temp_config_dir();
+        assert_eq!(
+            UiStateStore::open(dir.path()).get().activity_filter,
+            ActivityFilter::All
+        );
+    }
+
+    #[test]
+    fn an_old_file_without_the_activity_filter_loads_all() {
+        let dir = temp_config_dir();
+        fs::write(
+            dir.path().join("ui_state.json"),
+            r#"{"sidebarHidden": true, "activityWidth": 300}"#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            UiStateStore::open(dir.path()).get().activity_filter,
+            ActivityFilter::All
+        );
+        assert_eq!(backups(dir.path()), 0);
+    }
+
+    #[tokio::test]
+    async fn a_saved_activity_filter_comes_back_after_reopening() {
+        let dir = temp_config_dir();
+        for filter in [ActivityFilter::Changes, ActivityFilter::Comments] {
+            UiStateStore::open(dir.path())
+                .set(UiState {
+                    activity_filter: filter,
+                    ..Default::default()
+                })
+                .await
+                .unwrap();
+
+            assert_eq!(UiStateStore::open(dir.path()).get().activity_filter, filter);
+        }
     }
 
     #[tokio::test]
@@ -244,6 +315,7 @@ mod tests {
             serde_json::json!({
                 "sidebarHidden": true,
                 "activityWidth": 320,
+                "activityFilter": "all",
                 "recentSearches": []
             })
         );
@@ -383,6 +455,7 @@ mod tests {
                 .set(UiState {
                     sidebar_hidden: true,
                     activity_width: Some(280),
+                    activity_filter: ActivityFilter::Changes,
                     recent_searches: older.clone(),
                 })
                 .await
@@ -393,6 +466,7 @@ mod tests {
                 UiState {
                     sidebar_hidden: true,
                     activity_width: Some(280),
+                    activity_filter: ActivityFilter::Changes,
                     recent_searches: strings(&["invoice", "checkout"]),
                 },
                 "{older:?}"

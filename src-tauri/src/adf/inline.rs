@@ -1,6 +1,6 @@
 //! Inline nodes: text with its marks, breaks, mentions, emoji, dates, status lozenges, cards and media.
 
-use chrono::DateTime;
+use chrono::{DateTime, Utc};
 use serde_json::Value;
 
 use super::{Media, escape, one_of, web_address};
@@ -18,30 +18,18 @@ pub(super) fn render(kind: &str, node: &Value, media: &Media, out: &mut String) 
         ),
         "hardBreak" => out.push_str("<br>"),
         "mention" => {
-            let name = attrs["text"].as_str().unwrap_or_default();
             let mine = media.me.is_some() && attrs["id"].as_str() == media.me;
             out.push_str(if mine {
                 "<span class=\"adf-mention adf-mention--me\">@"
             } else {
                 "<span class=\"adf-mention\">@"
             });
-            escape(name.strip_prefix('@').unwrap_or(name), out);
+            escape(mention_name(attrs), out);
             out.push_str("</span>");
         }
-        "emoji" => escape(
-            attrs["text"]
-                .as_str()
-                .or(attrs["shortName"].as_str())
-                .unwrap_or_default(),
-            out,
-        ),
+        "emoji" => escape(emoji_text(attrs), out),
         "date" => {
-            let day = attrs["timestamp"]
-                .as_str()
-                .and_then(|ms| ms.parse().ok())
-                .or(attrs["timestamp"].as_i64())
-                .and_then(DateTime::from_timestamp_millis);
-            if let Some(day) = day {
+            if let Some(day) = date(attrs) {
                 out.push_str(&day.format("%b %-d, %Y").to_string());
             }
         }
@@ -56,6 +44,29 @@ pub(super) fn render(kind: &str, node: &Value, media: &Media, out: &mut String) 
         _ => return false,
     }
     true
+}
+
+/// A mention's name without its leading `@`.
+pub(super) fn mention_name(attrs: &Value) -> &str {
+    let name = attrs["text"].as_str().unwrap_or_default();
+    name.strip_prefix('@').unwrap_or(name)
+}
+
+/// An emoji's character, else its short name.
+pub(super) fn emoji_text(attrs: &Value) -> &str {
+    attrs["text"]
+        .as_str()
+        .or(attrs["shortName"].as_str())
+        .unwrap_or_default()
+}
+
+/// A date node's day, from its timestamp in milliseconds (a string or a number).
+pub(super) fn date(attrs: &Value) -> Option<DateTime<Utc>> {
+    attrs["timestamp"]
+        .as_str()
+        .and_then(|ms| ms.parse().ok())
+        .or(attrs["timestamp"].as_i64())
+        .and_then(DateTime::from_timestamp_millis)
 }
 
 /// Text inside its marks: a link outermost, code innermost. Colors are left out.

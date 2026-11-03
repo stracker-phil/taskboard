@@ -1,6 +1,8 @@
 import { CircleDot, Bookmark } from "lucide-react";
-import { Fragment, useState } from "react";
-import { api, type ActivityItem, type ChangeValue } from "../api";
+import { Fragment } from "react";
+import { api, type ActivityFilter, type ActivityItem, type ChangeValue } from "../api";
+import { ACTIVITY_FILTERS } from "../commands/activityKeys";
+import { useShortcuts } from "../commands/useShortcuts";
 import { Avatar } from "../components/issue/Avatar";
 import { StatusPill } from "../components/issue/StatusPill";
 import { formatLocalTime } from "../lib/time";
@@ -8,17 +10,12 @@ import { useIssueActivity } from "../queries/issues";
 import { usePinOf } from "../queries/pins";
 import { PinButton } from "../pins/PinButton";
 import { attempt } from "../state/requests";
+import { useStore } from "../state/store";
 import { JiraHtml } from "./JiraHtml";
 import { holdUnread } from "./useSeenAfter";
 import { ACTIVITY_WIDTH, useActivityWidth } from "./useActivityWidth";
 import { CommentBox } from "../writes/CommentBox";
 
-type Filter = "all" | "comments" | "changes";
-const FILTERS: { id: Filter; label: string }[] = [
-  { id: "all", label: "All" },
-  { id: "comments", label: "Comments" },
-  { id: "changes", label: "Changes" },
-];
 
 /** Jira's other field names show lowercased ("Fix Version" → "fix version"). */
 const FIELD_NAMES: Record<string, string> = { due_date: "due date", duedate: "due date" };
@@ -134,10 +131,18 @@ function ActivityList({ items, issueId }: { items: ActivityItem[]; issueId: stri
   ));
 }
 
+function isShown(item: ActivityItem, filter: ActivityFilter): boolean {
+  if (filter === "comments") return item.kind === "comment";
+  if (filter === "changes") return item.kind !== "comment";
+  return true;
+}
+
 export function Activity({ id }: { id: string }) {
-  const [filter, setFilter] = useState<Filter>("all");
+  const filter = useStore((s) => s.activityFilter);
+  const setFilter = useStore((s) => s.setActivityFilter);
+  const { title } = useShortcuts();
   const { data: items = [] } = useIssueActivity(id);
-  const shown = items.filter((item) => filter === "all" || (filter === "comments") === (item.kind === "comment"));
+  const shown = items.filter((item) => isShown(item, filter));
   const { width, dragging, handle } = useActivityWidth();
   return (
     <aside className="activity" aria-label="Activity" style={{ width }} data-resizing={dragging || undefined}>
@@ -155,8 +160,8 @@ export function Activity({ id }: { id: string }) {
       <header className="activity__header">
         <h2>Activity</h2>
         <div className="segmented" role="group" aria-label="Show">
-          {FILTERS.map((f) => (
-            <button key={f.id} type="button" className="segmented__btn" aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}>
+          {ACTIVITY_FILTERS.map((f) => (
+            <button key={f.id} type="button" className="segmented__btn" aria-pressed={filter === f.id} title={title(f.label, f.command)} onClick={() => setFilter(f.id)}>
               {f.label}
             </button>
           ))}

@@ -76,7 +76,7 @@ pub struct CustomField {
 }
 
 pub async fn issue_get(db: &Db, viewer: Viewer, id: String) -> AppResult<IssueDetail> {
-    db.read(move |conn| read(conn, &viewer, &id)).await
+    db.read(move |conn| read_detail(conn, &viewer, &id)).await
 }
 
 const SELECT: &str = "SELECT i.id, i.key, i.issue_type, i.summary, i.status_id, COALESCE(st.name, ''),
@@ -91,7 +91,7 @@ const SELECT: &str = "SELECT i.id, i.key, i.issue_type, i.summary, i.status_id, 
     LEFT JOIN cache.issue e ON e.id = i.parent_id AND e.is_epic = 1
     WHERE i.id = ?1";
 
-fn read(conn: &Connection, viewer: &Viewer, id: &str) -> AppResult<IssueDetail> {
+pub(super) fn read_detail(conn: &Connection, viewer: &Viewer, id: &str) -> AppResult<IssueDetail> {
     let ctx = viewer.ctx(conn)?;
     let me = ctx.me.as_deref();
     let styles = Styles::load(conn)?;

@@ -20,6 +20,7 @@ export interface IssueKeyHandlers {
   copyKey: () => void;
   copyUrl: () => void;
   copyAppLink: () => void;
+  copyMarkdown?: () => void;
   openInJira: () => void;
   /** ↩: the selected issue in the full Issue view; absent where the issue is already open. */
   open?: () => void;
@@ -88,6 +89,7 @@ export const ISSUE_KEY_COMMANDS: Command[] = [
   { id: "issue.copyKey", title: "Copy issue key", scope: "main", defaultBinding: "Mod+C", when: () => selected() && nothingElseToCopy(), run: () => handlers?.copyKey() },
   { id: "issue.copyUrl", title: "Copy issue URL", scope: "main", defaultBinding: "Mod+Shift+C", when: selected, run: () => handlers?.copyUrl() },
   { id: "issue.copyAppLink", title: "Copy Taskboard link", scope: "main", defaultBinding: "Mod+Alt+Shift+C", when: selected, run: () => handlers?.copyAppLink() },
+  { id: "issue.copyMarkdown", title: "Copy issue as Markdown", scope: "main", when: () => selected() && handlers?.copyMarkdown !== undefined, run: () => handlers?.copyMarkdown?.() },
   { id: "issue.open", title: "Open the issue", scope: "main", defaultBinding: "Enter", when: () => selected() && handlers?.open !== undefined, run: () => handlers?.open?.() },
   { id: "issue.openInNewTab", title: "Open the issue in a new tab", scope: "main", defaultBinding: "Mod+Shift+Enter", when: () => selected() && handlers?.openInNewTab !== undefined, run: () => handlers?.openInNewTab?.() },
   { id: "issue.openEpic", title: "Open the issue's epic", scope: "main", defaultBinding: "E", when: selected, run: () => handlers?.openEpic() },

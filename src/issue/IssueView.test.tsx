@@ -7,7 +7,7 @@ vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await impo
 
 import { api, type IssueDetail, type Row, type ViewPlace } from "../api";
 import { installCommands } from "../commands";
-import { getCommand, resolveKeydown } from "../commands/registry";
+import { allCommands, bindingFor, getCommand, resolveKeydown } from "../commands/registry";
 import { issueKey } from "../queries/issues";
 import { createQueryClient } from "../queries/queryClient";
 import type { IssueOrigin } from "../state/slices/issueView";
@@ -187,30 +187,78 @@ describe("IssueView", () => {
       expect(screen.queryByRole("button", { name: /^Copy the link to/ })).not.toBeInTheDocument();
     });
 
-    it("goes back to the origin from the back button", async () => {
+    it("goes back to the origin from the Close button", async () => {
       renderIssue();
 
-      await userEvent.click(await screen.findByRole("button", { name: "Back to List" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Close" }));
 
       expect(useStore.getState().issueView).toBeNull();
     });
 
-    it("goes back to the previous issue when the issue was opened from another one", async () => {
+    it("goes back to the previous issue from Close when the issue was opened from another one", async () => {
       renderIssue();
       act(() => useStore.getState().openRelated("10001"));
 
-      await userEvent.click(await screen.findByRole("button", { name: "Back to List" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Close" }));
 
       expect(stack()).toEqual(["10042"]);
     });
 
-    it("offers Open in Jira on the Jira site", async () => {
+    it("has no Back button and no Updated time", async () => {
+      renderIssue();
+      await title("Checkout: address validation for DACH postcodes");
+
+      expect(screen.queryByRole("button", { name: /^Back/ })).not.toBeInTheDocument();
+      expect(screen.queryByText(/^Updated/)).not.toBeInTheDocument();
+    });
+
+    it("puts Close last, after the other header actions", async () => {
+      mocked.connectionGet.mockResolvedValue(connectionView({ siteUrl: "https://example.atlassian.net" }));
+      renderIssue();
+      await screen.findByRole("button", { name: "Open in Jira" });
+
+      const order = ["Previous issue", "Next issue", "Mark as unread", "Bookmark this issue", "Copy as Markdown", "Open in Jira", "Close"];
+      const buttons = screen.getAllByRole("button").map((b) => b.getAttribute("aria-label"));
+      expect(buttons.filter((label) => label && order.includes(label))).toEqual(order);
+    });
+
+    it("offers Open in Jira as an icon button on the Jira site", async () => {
       mocked.connectionGet.mockResolvedValue(connectionView({ siteUrl: "https://example.atlassian.net" }));
       renderIssue();
 
-      await userEvent.click(await screen.findByRole("button", { name: "Open in Jira" }));
+      const open = await screen.findByRole("button", { name: "Open in Jira" });
+      expect(open.textContent).toBe("");
+      await userEvent.click(open);
 
       expect(mocked.openUrl).toHaveBeenCalledWith("https://example.atlassian.net/browse/NW-1042");
+    });
+
+    it("copies the issue as Markdown and says so in a toast", async () => {
+      mocked.issueMarkdown.mockResolvedValue("# NW-1042 Checkout");
+      renderIssue();
+
+      await userEvent.click(await screen.findByRole("button", { name: "Copy as Markdown" }));
+
+      expect(mocked.issueMarkdown).toHaveBeenCalledWith("10042");
+      await waitFor(() => expect(mocked.copyText).toHaveBeenCalledWith("# NW-1042 Checkout"));
+      await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Copied NW-1042 as Markdown"));
+    });
+
+    it("copies nothing and shows an error toast when the Markdown cannot be made", async () => {
+      mocked.issueMarkdown.mockRejectedValue({ kind: "db", message: "Disk full", code: null });
+      renderIssue();
+
+      await userEvent.click(await screen.findByRole("button", { name: "Copy as Markdown" }));
+
+      await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not make the Markdown: Disk full"));
+      expect(mocked.copyText).not.toHaveBeenCalled();
+    });
+
+    it("registers the issue.copyMarkdown command without a default key", () => {
+      installCommands("main");
+
+      expect(allCommands().find((c) => c.id === "issue.copyMarkdown")?.title).toBe("Copy issue as Markdown");
+      expect(bindingFor("issue.copyMarkdown", {})).toBeNull();
     });
 
     it("offers no Open in Jira without a site", async () => {

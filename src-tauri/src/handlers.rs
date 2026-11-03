@@ -97,6 +97,7 @@ pub fn handlers() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
         crate::issues::commands::issue_related,
         crate::issues::commands::issue_sync_comments,
         crate::issues::commands::issue_web_links,
+        crate::issues::commands::issue_markdown,
         crate::issues::commands::issue_sync_web_links,
         crate::issues::commands::issue_sync_history,
         crate::writes::commands::issue_write,

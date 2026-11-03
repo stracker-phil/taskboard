@@ -251,6 +251,48 @@ describe("Peek", () => {
     expect(onExpand).toHaveBeenCalled();
   });
 
+  describe("header actions", () => {
+    it("lists Mark as unread, Bookmark, Copy as Markdown, Open in Jira, Full view and Close in that order", async () => {
+      mocked.connectionGet.mockResolvedValue(connectionView({ siteUrl: "https://example.atlassian.net" }));
+      renderPeek();
+      await screen.findByRole("button", { name: "Open in Jira" });
+
+      const order = ["Mark as unread", "Bookmark this issue", "Copy as Markdown", "Open in Jira", "Full view", "Close"];
+      const buttons = screen.getAllByRole("button").map((b) => b.getAttribute("aria-label"));
+      expect(buttons.filter((label) => label && order.includes(label))).toEqual(order);
+    });
+
+    it("marks an unread issue read from the Mark as read button", async () => {
+      mocked.issueGet.mockResolvedValue(detail({ unread: true }));
+      renderPeek();
+
+      await userEvent.click(await screen.findByRole("button", { name: "Mark as read" }));
+
+      expect(mocked.issuesMarkSeen).toHaveBeenCalledWith(["10042"]);
+      expect(mocked.issueMarkUnread).not.toHaveBeenCalled();
+    });
+
+    it("marks a read issue unread from the Mark as unread button", async () => {
+      renderPeek();
+
+      await userEvent.click(await screen.findByRole("button", { name: "Mark as unread" }));
+
+      expect(mocked.issueMarkUnread).toHaveBeenCalledWith("10042");
+      expect(mocked.issuesMarkSeen).not.toHaveBeenCalled();
+    });
+
+    it("copies the issue as Markdown and says so in a toast", async () => {
+      mocked.issueMarkdown.mockResolvedValue("# NW-1042 Redesign the pricing page");
+      renderPeek();
+
+      await userEvent.click(await screen.findByRole("button", { name: "Copy as Markdown" }));
+
+      expect(mocked.issueMarkdown).toHaveBeenCalledWith("10042");
+      await waitFor(() => expect(mocked.copyText).toHaveBeenCalledWith("# NW-1042 Redesign the pricing page"));
+      await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Copied NW-1042 as Markdown"));
+    });
+  });
+
   describe("unread changes", () => {
     const SINCE = { label: "Since yesterday", text: "2 new comments, moved to Review." };
 
@@ -259,7 +301,7 @@ describe("Peek", () => {
       renderPeek();
 
       expect(await screen.findByRole("status")).toHaveTextContent("Since yesterday: 2 new comments, moved to Review.");
-      expect(screen.queryByRole("button", { name: "Mark as read" })).not.toBeInTheDocument();
+      expect(within(screen.getByRole("status")).queryByRole("button", { name: "Mark as read" })).not.toBeInTheDocument();
     });
 
     it("shows no banner for an issue without unread changes", async () => {

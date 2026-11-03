@@ -179,6 +179,7 @@ export function createApiMock(): Api {
     issueActivity: vi.fn().mockResolvedValue([]),
     issueRelated: vi.fn(async (): Promise<Related> => ({ children: { open: [], done: [] }, links: [] })),
     issueWebLinks: vi.fn().mockResolvedValue([]),
+    issueMarkdown: vi.fn().mockResolvedValue("# Demo issue\n"),
     issueSyncWebLinks: vi.fn().mockResolvedValue(false),
     issueAddWebLink: vi.fn(async (): Promise<WriteOutcome> => ({ done: "Added the link to NW-1042", reverse: null })),
     issueSyncHistory: vi.fn().mockResolvedValue(false),

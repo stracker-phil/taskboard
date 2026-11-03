@@ -20,7 +20,7 @@ export function useBoardKeys(
   select: (id: string) => void,
   open: (id: string) => void,
   openInTab: (id: string, show: boolean) => void,
-  actions: RowActionHandlers & { copyUrl: (key: string) => void; copyAppLink: (key: string) => void; canChangeTitle: boolean },
+  actions: RowActionHandlers & { copyUrl: (key: string) => void; copyAppLink: (key: string) => void; copyMarkdown: (issue: { id: string; key: string }) => void; canChangeTitle: boolean },
   picks: BoardPicks,
 ) {
   const state = useRef({ data, selected, select, open, openInTab, actions, picks });
@@ -62,6 +62,10 @@ export function useBoardKeys(
       copyKey: () => withKey((key) => state.current.actions.copyKey(key)),
       copyUrl: () => withKey((key) => state.current.actions.copyUrl(key)),
       copyAppLink: () => withKey((key) => state.current.actions.copyAppLink(key)),
+      copyMarkdown: () => {
+        const row = state.current.selected ? state.current.data.rows[state.current.selected] : undefined;
+        if (row) state.current.actions.copyMarkdown(row);
+      },
       openInJira: () => withKey((key) => state.current.actions.openInJira?.(key)),
       open: () => {
         if (state.current.selected) state.current.open(state.current.selected);

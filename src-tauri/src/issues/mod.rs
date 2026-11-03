@@ -9,6 +9,7 @@ mod detail;
 mod fetched;
 mod history;
 mod inline_image;
+mod markdown;
 mod preview;
 mod related;
 mod web_links;
@@ -23,6 +24,7 @@ pub use inline_image::{
     INLINE_IMAGE_SCHEME, InlineImage, MAX_INLINE_IMAGE_BYTES, attachment_image, image_path,
     image_response,
 };
+pub use markdown::issue_markdown;
 pub use preview::{
     attachment_file, cache_root, cached_path, clear as clear_attachment_cache, is_reusable,
     safe_filename,

@@ -161,6 +161,16 @@ ADF or it isn't a document. Search text still comes from the HTML (`text::html_t
   remote is referenced ([ADR 0039](adr/0039-inline-images-come-from-issue-attachments-through-rust.md)).
 - **Unknown nodes** render their text or their children; a node that isn't an object is skipped.
 
+**Copy as Markdown** (`issue_markdown`, `issues/markdown/`): `mod.rs` reads the issue from the cache (the
+description, the custom fields the Issue view shows via `detail::read_detail`, the cached web links, the
+comments) and `compose.rs` `compose` writes it: YAML front matter (`source` from `browse_url`, `status`,
+`assignee`, `priority`; a line without a value is left out, values are quoted only where YAML needs it), `# summary`,
+then a `##` section per text with content (Description, each field, Weblinks, Comments, oldest first, each under
+`### author · YYYY-MM-DD HH:MM` in the owner's time zone). `adf::to_markdown` (`adf/markdown/`) renders ADF as
+Markdown: headings two levels lower (h1 → `###`), tight nested lists, task lists `- [ ]`/`- [x]`, fenced code with
+its language, quotes and panels as `>`, pipe tables (the first row is the header), media as `[attachment: name]`;
+where only Jira's HTML exists, `text::html_to_paragraphs` keeps its paragraphs as plain text.
+
 **Search pages** come one after another: `SearchPages::next_page` sends the previous page's `nextPageToken`
 and stops after a page with `isLast` (or without a token). A failed page is returned once, then the cursor
 ends; the caller decides whether to repeat the job.

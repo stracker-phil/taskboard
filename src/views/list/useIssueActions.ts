@@ -25,6 +25,13 @@ export function copyAppLink(target: LinkTarget, done: string) {
   });
 }
 
+/** Copies the issue with its fields, web links and comments as Markdown. */
+function copyAsMarkdown(issue: { id: string; key: string }) {
+  void attempt(api.issueMarkdown(issue.id), "Could not make the Markdown").then((markdown) => {
+    if (markdown !== null) copyWithToast(markdown, `Copied ${issue.key} as Markdown`);
+  });
+}
+
 /** Per-issue actions; null when they can't run: the URL actions without a Jira site, the writes (`toggleMine`,
  *  `changeStatus`, `assignTo`, `changePriority`) while changes to Jira, or that kind of change, are off. */
 export function useIssueActions() {
@@ -45,6 +52,7 @@ export function useIssueActions() {
         if (url) copyWithToast(url, `Copied the link to ${key}`);
       },
       copyAppLink: (key: string) => copyAppLink({ kind: "issue", key }, `Copied the Taskboard link to ${key}`),
+      copyMarkdown: copyAsMarkdown,
       openInJira,
       markSeen: (id: string) => void attempt(api.issuesMarkSeen([id]), "Could not mark it read"),
       markUnread: (id: string) => void attempt(api.issueMarkUnread(id), "Could not mark it unread"),

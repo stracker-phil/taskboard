@@ -28,7 +28,7 @@
 .pin-popover__actions { display: flex; justify-content: flex-end; gap: 8px; }
 
 /* A pinned target's button stays amber. */
-.peek__btn[aria-pressed="true"], .issue-header__nav[aria-pressed="true"], .row-actions__btn[aria-pressed="true"] { color: var(--pin-icon); }
+.issue-actions__btn[aria-pressed="true"], .row-actions__btn[aria-pressed="true"] { color: var(--pin-icon); }
 .row-actions__btn[aria-pressed="true"] { opacity: 1; }
 
 .comment-card__spacer { flex: 1; }

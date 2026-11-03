@@ -60,18 +60,18 @@ describe("Window", () => {
     it("keeps it while the place stays on the view it was opened from", async () => {
       await renderWindow(true);
 
-      expect(await screen.findByRole("button", { name: /^Back to / })).toBeInTheDocument();
+      expect(await screen.findByRole("button", { name: "Close" })).toBeInTheDocument();
       expect(screen.queryByText("View body")).not.toBeInTheDocument();
       expect(useStore.getState().issueView).not.toBeNull();
     });
 
     it("keeps it when the same place is announced again", async () => {
       await renderWindow(true);
-      await screen.findByRole("button", { name: /^Back to / });
+      await screen.findByRole("button", { name: "Close" });
 
       await goTo(nav(11, 101));
 
-      expect(screen.getByRole("button", { name: /^Back to / })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
     });
 
     it.each([
@@ -79,12 +79,12 @@ describe("Window", () => {
       ["another view of the same list", nav(11, 102)],
     ])("closes it and shows the view body when the place moves to %s", async (_name, target) => {
       await renderWindow(true);
-      await screen.findByRole("button", { name: /^Back to / });
+      await screen.findByRole("button", { name: "Close" });
 
       await goTo(target);
 
       expect(await screen.findByText("View body")).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: /^Back to / })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Close" })).not.toBeInTheDocument();
       expect(useStore.getState().issueView).toBeNull();
     });
   });
@@ -138,29 +138,29 @@ describe("Window", () => {
   });
 
   describe("with two tabs", () => {
-    const backButton = () => screen.queryByRole("button", { name: /^Back to / });
+    const closeButton = () =>screen.queryByRole("button", { name: "Close" });
 
     it("hides the Issue view when the other tab is shown and brings it back with the first tab", async () => {
       await renderWindow(true, twoTabs(1));
-      await screen.findByRole("button", { name: /^Back to / });
+      await screen.findByRole("button", { name: "Close" });
 
       await goTo(twoTabs(2));
 
       expect(await screen.findByText("View body")).toBeInTheDocument();
-      expect(backButton()).not.toBeInTheDocument();
+      expect(closeButton()).not.toBeInTheDocument();
       await goTo(twoTabs(1));
-      expect(await screen.findByRole("button", { name: /^Back to / })).toBeInTheDocument();
+      expect(await screen.findByRole("button", { name: "Close" })).toBeInTheDocument();
       expect(screen.queryByText("View body")).not.toBeInTheDocument();
     });
 
     it("closes the Issue view when the shown tab moves to another place", async () => {
       await renderWindow(true, twoTabs(1));
-      await screen.findByRole("button", { name: /^Back to / });
+      await screen.findByRole("button", { name: "Close" });
 
       await goTo(twoTabs(1, { listId: 11, viewId: 102 }));
 
       expect(await screen.findByText("View body")).toBeInTheDocument();
-      expect(backButton()).not.toBeInTheDocument();
+      expect(closeButton()).not.toBeInTheDocument();
       expect(useStore.getState().issueView).toBeNull();
     });
 
@@ -295,7 +295,7 @@ describe("Window", () => {
       await draftMe();
 
       act(() => useStore.getState().openIssue("10042", { listId: 11, viewId: 101 }));
-      await userEvent.click(await screen.findByRole("button", { name: /^Back to / }));
+      await userEvent.click(await screen.findByRole("button", { name: "Close" }));
 
       expect(await screen.findByRole("button", { name: "Save View" })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Me", pressed: true })).toBeInTheDocument();
@@ -411,7 +411,7 @@ describe("Window", () => {
       await goTo(nav(21, 201));
 
       expect(screen.getByText("View body")).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: /^Back to / })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Close" })).not.toBeInTheDocument();
     });
   });
 });

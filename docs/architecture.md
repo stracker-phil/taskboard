@@ -130,7 +130,7 @@ src-tauri/
   src/notify/                macOS notifications for news that concerns the owner, after a change sync
   src/writes/                changes to Jira (assign): shown at once, sent once, settled by fetching the issue again
   src/adf/                   Atlassian Document Format to HTML for descriptions, rich fields and comments (pure;
-                             media.rs: attached images as placeholders the page fills)
+                             media.rs: attached images as placeholders the page fills; markdown/: ADF to Markdown)
   src/filter/                filter conditions: the model, SQL compiler, conditions in words
   src/lists/ views/          the sidebar tree with counts and defaults; the view tabs and the view query (filter,
                              group, sort, rows, columns; subtasks.rs the results' descendants per subtask mode;
@@ -142,7 +142,8 @@ src-tauri/
   src/changes/               unseen (unread) changes: the change chip and Since-yesterday words, read and unread
   src/issues/                one issue: detail, custom fields, related issues, activity, comments, web links,
                              attachments (preview.rs: the downloaded copies for Quick Look; inline_image.rs: images in
-                             rich text as data URLs), history (fetched.rs: how often details are fetched)
+                             rich text as data URLs), history (fetched.rs: how often details are fetched), markdown/: the
+                             issue as Markdown for the clipboard
   src/quicklook.rs           macOS only: the Quick Look panel on one file (ADR 0035)
   src/status_style/          the six status styles (status types): detection and the owner's overrides per Space
   src/space_config/          a Space's own settings: offered layouts, new views' layout and grouping, field visibility

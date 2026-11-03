@@ -5,6 +5,11 @@
  */
 export type Accent = "purple" | "pink" | "red" | "orange" | "yellow" | "green" | "teal" | "graphite" | "blue";
 
+/**
+ * The Issue view's activity filter: everything, only comments or only recorded changes.
+ */
+export type ActivityFilter = "all" | "comments" | "changes";
+
 export type ActivityItem = { "kind": "comment", id: string, author: Person | null, 
 /**
  * Rendered from the comment's ADF, else Jira's rendered HTML; untrusted: the page sanitizes it.
@@ -1043,6 +1048,10 @@ export type UiState = { sidebarHidden: boolean,
  * The Issue view's activity column in points; none is the default width.
  */
 activityWidth: number | null, 
+/**
+ * What the Issue view's activity column shows; every issue opens with the last choice.
+ */
+activityFilter: ActivityFilter, 
 /**
  * The palette's last searches, newest first (`RECENT_SEARCHES` at most); only `remember_search` and
  * `forget_search` change them.

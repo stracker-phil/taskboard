@@ -1,4 +1,3 @@
-import { ExternalLink, Maximize2, X } from "lucide-react";
 import { CopyKey } from "../components/issue/CopyKey";
 import { useEffect, useRef } from "react";
 import { useShortcuts } from "../commands/useShortcuts";
@@ -18,8 +17,7 @@ import { IssueMissing } from "./IssueMissing";
 import { SinceBanner } from "./SinceBanner";
 import { usePreviewedAfter, useSeenAfter } from "./useSeenAfter";
 import { WebLinks } from "./WebLinks";
-import { PinButton } from "../pins/PinButton";
-import { useIssueActions } from "../views/list/useIssueActions";
+import { IssueActions } from "./IssueActions";
 import { StatusMenuButton } from "../writes/StatusMenuButton";
 
 /** A footer hint ("J / K next"); none while its keys are unbound. */
@@ -31,9 +29,8 @@ function KeyHint({ keys, text }: { keys: string[]; text: string }) {
 /** The 540px panel beside the list (artboard 4): the selected issue at a glance. */
 export function Peek({ id, onClose, onExpand }: { id: string; onClose: () => void; onExpand: () => void }) {
   const { data: issue, error } = useIssue(id);
-  const actions = useIssueActions();
   const bodyRef = useRef<HTMLDivElement>(null);
-  const { key, title } = useShortcuts();
+  const { key } = useShortcuts();
   useSeenAfter(id, issue?.unread ?? false);
   usePreviewedAfter(id);
 
@@ -54,18 +51,7 @@ export function Peek({ id, onClose, onExpand }: { id: string; onClose: () => voi
           </>
         )}
         <span className="peek__spacer" />
-        {issue && <PinButton kind="issue" target={issue.id} label="Bookmark this issue" meta={issue.key} command="issue.togglePin" className="peek__btn" />}
-        {issue && actions.openInJira && (
-          <button type="button" className="peek__btn" aria-label="Open in Jira" title={title("Open in Jira", "issue.openInJira")} onClick={() => actions.openInJira?.(issue.key)}>
-            <ExternalLink size={14} strokeWidth={1.9} aria-hidden="true" />
-          </button>
-        )}
-        <button type="button" className="peek__btn" aria-label="Full view" title={title("Full view", "issue.open")} onClick={onExpand}>
-          <Maximize2 size={14} strokeWidth={1.9} aria-hidden="true" />
-        </button>
-        <button type="button" className="peek__btn" aria-label="Close" title={title("Close", "peek.close")} onClick={onClose}>
-          <X size={18} strokeWidth={1.9} aria-hidden="true" />
-        </button>
+        <IssueActions issue={issue} onClose={onClose} closeCommand="peek.close" onExpand={onExpand} />
       </header>
       <div ref={bodyRef} className="peek__body">
         {issue ? <Body issue={issue} onExpand={onExpand} onClose={onClose} /> : error ? <IssueMissing error={error} className="peek__missing" /> : null}

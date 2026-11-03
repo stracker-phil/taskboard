@@ -262,6 +262,8 @@ export const api = {
   issueSyncComments: (id: string) => invoke<boolean>("issue_sync_comments", { id }),
   /** The issue's cached web links (pull requests, documents). */
   issueWebLinks: (id: string) => invoke<WebLink[]>("issue_web_links", { id }),
+  /** The issue as Markdown for the clipboard: front matter, description, rich fields, web links, comments. */
+  issueMarkdown: (id: string) => invoke<string>("issue_markdown", { id }),
   /** Fetches the issue's web links from Jira; true when they changed. */
   issueSyncWebLinks: (id: string) => invoke<boolean>("issue_sync_web_links", { id }),
   /** Fetches the issue's history (Jira's changelog) at most every 5 minutes; true when it changed. */

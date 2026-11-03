@@ -40,16 +40,16 @@ describe("App", () => {
 
       act(() => emitEvent(api, "toggle_sidebar", null));
       expect(screen.queryByRole("complementary", { name: "Sidebar" })).not.toBeInTheDocument();
-      expect(mocked.setUiState).toHaveBeenLastCalledWith({ sidebarHidden: true, activityWidth: null, recentSearches: [] });
+      expect(mocked.setUiState).toHaveBeenLastCalledWith({ sidebarHidden: true, activityWidth: null, activityFilter: "all", recentSearches: [] });
       expect(await screen.findByText("Connect Jira in Settings")).toBeInTheDocument();
 
       act(() => emitEvent(api, "toggle_sidebar", null));
       expect(screen.getByRole("complementary", { name: "Sidebar" })).toBeInTheDocument();
-      expect(mocked.setUiState).toHaveBeenLastCalledWith({ sidebarHidden: false, activityWidth: null, recentSearches: [] });
+      expect(mocked.setUiState).toHaveBeenLastCalledWith({ sidebarHidden: false, activityWidth: null, activityFilter: "all", recentSearches: [] });
     });
 
     it("starts hidden when the saved layout has the sidebar hidden", async () => {
-      mocked.getUiState.mockResolvedValue({ sidebarHidden: true, activityWidth: null, recentSearches: [] });
+      mocked.getUiState.mockResolvedValue({ sidebarHidden: true, activityWidth: null, activityFilter: "all", recentSearches: [] });
 
       await renderApp();
 

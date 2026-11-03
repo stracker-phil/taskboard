@@ -346,7 +346,12 @@ always opens the Issue view, and only it: a click selects the row at once, but a
 system's double-click interval (`useRowClicks`, the `double_click_ms` command) and a double-click cancels it. An
 open preview follows the click at once. A Board always opens the Issue view.
 
-- Header 50: mono key · type text, then Bookmark (with bookmarks), Open in Jira, Full view, Close.
+- Header 50: mono key · type text, then the issue actions (`issue/IssueActions.tsx`, the Issue view's too): Mark as
+  read or unread, Bookmark (with bookmarks), Copy as Markdown, Open in Jira (`ExternalLink`), Full view, Close. They
+  sit at 0.65 opacity behind a transparent border and fade to full with a border and tint on hover; Close is always
+  at full strength. Copy as Markdown (`issue_markdown`, also the `issue.copyMarkdown` command, unbound by default)
+  copies front matter (source URL, status, assignee, priority), the title, every filled content field as a `##`
+  section, the web links and the comments, oldest first.
 - Body: title 22/750, one line of chips (status pill `peek`, epic chip, release outline chip, priority,
   assignee), the sanitized description, web links, the latest three activity items with "All activity".
 - Footer 36: the keys.
@@ -481,10 +486,11 @@ Replace and × (dismissed for the rest of the day). Nothing blocks: the app keep
 Full view button or E (the selected issue's epic); esc goes back one step (an opened epic or child, then the
 view with its place intact).
 
-- Header 50: back, breadcrumb (Space tile and name / list or view / key and a copy-link button), **Find in this
-  issue**, "Updated …", previous and next in the view's order (also J/K), Mark as read or unread (I assigns to me or
-  unassigns, without a button; the field grid's status pill opens the status menu, also D, Jira's own key), Bookmark (with
-  bookmarks), **Open in Jira** (`OpenInJiraButton`, the content header's too).
+- Header 50: breadcrumb (Space tile and name / list or view / key and a copy-link button), **Find in this
+  issue**, then the preview's issue actions (`issue/IssueActions.tsx`) led by previous and next in the view's order
+  (also J/K): Mark as read or unread (I assigns to me or unassigns, without a button; the field grid's status pill
+  opens the status menu, also D, Jira's own key), Bookmark (with bookmarks), Copy as Markdown, Open in Jira and Close
+  (esc) at the right edge, which goes back one step.
   Previous and next step through the rows the view shows (not those in collapsed groups or subtrees), move the
   view's selection along, and keep the current issue on screen until the next one loads (the neighbors load
   ahead). An issue missing from the cache says so; any other failure shows Rust's reason.
@@ -514,7 +520,9 @@ view with its place intact).
 - The breadcrumb's Space and list are buttons that go there. Going to the place already shown (sidebar, tabs,
   breadcrumb) closes the Issue view and the preview (`useNavGo`).
 - Activity (400 wide by default, 300–720 by dragging its left edge or ←/→ on the focused edge; saved in
-  `ui_state.json` `activityWidth` for every issue, `useActivityWidth`; `--panel-subtle-bg`): All / Comments / Changes, comment cards and change lines (status
+  `ui_state.json` `activityWidth` for every issue, `useActivityWidth`; `--panel-subtle-bg`): All / Comments / Changes
+  (⌥1 / ⌥2 / ⌥3, `commands/activityKeys.ts`; the choice is saved in `ui_state.json` `activityFilter` and every issue
+  opens with it), comment cards and change lines (status
   changes as activity pills; a change line shows who changed what on its first line and from → to on a second, each line truncating instead of wrapping), newest first; the comment box waits for writes. Opening an issue fetches its
   comments when the cached ones may be behind (`issue_sync_comments`). Change lines come from Jira's changelog
   ([ADR 0031](adr/0031-issue-history-comes-from-the-changelog-on-demand.md)) and the sync's own records: "<Author>

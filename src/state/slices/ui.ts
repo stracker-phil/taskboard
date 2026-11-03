@@ -1,4 +1,4 @@
-import { api } from "../../api";
+import { api, type ActivityFilter } from "../../api";
 import { fail } from "../requests";
 import type { Slice } from "../store";
 
@@ -24,17 +24,20 @@ export interface UiSlice {
   sidebarHidden: boolean;
   /** The Issue view's activity column (`activityWidth`); null is the default. */
   activityWidth: number | null;
+  /** What the Issue view's activity column shows (`activityFilter`); every issue opens with it. */
+  activityFilter: ActivityFilter;
   loadUiState: () => Promise<void>;
   toggleSidebar: () => void;
   setActivityWidth: (width: number) => void;
+  setActivityFilter: (filter: ActivityFilter) => void;
   toasts: Toast[];
   toast: (kind: Toast["kind"], message: string, action?: ToastAction) => void;
   dismissToast: (id: number) => void;
 }
 
 /** The window layout only: Rust keeps the stored recent searches whatever this sends for them. */
-function saveUiState({ sidebarHidden, activityWidth }: UiSlice) {
-  void api.setUiState({ sidebarHidden, activityWidth, recentSearches: [] }).catch((e) => fail(e, "Could not save the window layout"));
+function saveUiState({ sidebarHidden, activityWidth, activityFilter }: UiSlice) {
+  void api.setUiState({ sidebarHidden, activityWidth, activityFilter, recentSearches: [] }).catch((e) => fail(e, "Could not save the window layout"));
 }
 
 let nextToastId = 1;
@@ -44,12 +47,13 @@ export const uiSlice: Slice<UiSlice> = {
   create: (set, get) => ({
     sidebarHidden: false,
     activityWidth: null,
+    activityFilter: "all",
     toasts: [],
 
     async loadUiState() {
       try {
         const ui = await api.getUiState();
-        set({ sidebarHidden: ui.sidebarHidden, activityWidth: ui.activityWidth });
+        set({ sidebarHidden: ui.sidebarHidden, activityWidth: ui.activityWidth, activityFilter: ui.activityFilter });
       } catch (e) {
         fail(e, "Could not load the window layout");
       }
@@ -62,6 +66,11 @@ export const uiSlice: Slice<UiSlice> = {
 
     setActivityWidth(activityWidth) {
       set({ activityWidth });
+      saveUiState(get());
+    },
+
+    setActivityFilter(activityFilter) {
+      set({ activityFilter });
       saveUiState(get());
     },
 
