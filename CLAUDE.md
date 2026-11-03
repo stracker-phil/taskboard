@@ -58,7 +58,8 @@ Test, lint and format-check commands run through the `ci` agent, never in the ma
 - `bun run build:app` + `scripts/dev/launch.sh`: debug build, restarted next to the terminal without stealing focus
 - `scripts/dev/js.sh` / `scripts/dev/screenshot.sh`: drive (store: `window.taskboard`) and capture the running
   debug window in the background
-- `scripts/create-signing-cert.sh` (once per Mac) makes the certificate that keeps privacy grants
+- Signing prefers an Apple Development certificate (Xcode, free Apple ID; ADR 0053); without one,
+  `scripts/create-signing-cert.sh` (once per Mac) makes the local fallback that keeps privacy grants
 
 ## Workflow
 Finish every step with the `ship-step` skill. Rules in `.claude/rules/`; `testing.md` says which agents in

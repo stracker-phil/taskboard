@@ -71,7 +71,7 @@ All screenshots show made-up demo data from the debug build.
 
 ```sh
 bun install
-scripts/create-signing-cert.sh   # once per Mac
+scripts/create-signing-cert.sh   # once per Mac, only without an Apple Development certificate
 bun run release
 ```
 

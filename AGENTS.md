@@ -28,7 +28,7 @@ As shipped it builds and runs on **macOS on Apple Silicon** only; everything els
 git clone <this repository>
 cd taskboard
 bun install
-scripts/create-signing-cert.sh   # once per Mac; keeps privacy grants across rebuilds
+scripts/create-signing-cert.sh   # once per Mac without an Apple Development certificate (ADR 0053)
 bun run build:app                # debug bundle: src-tauri/target/debug/bundle/macos/Taskboard (Debug).app
 bun run release                  # release bundle and .dmg, installed to ~/Applications and ~/.local/bin
 ```

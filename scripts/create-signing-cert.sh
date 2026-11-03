@@ -1,8 +1,9 @@
 #!/bin/zsh
 # Creates the self-signed "Taskboard Local Signing" code-signing certificate in the login keychain, once
-# per Mac. scripts/sign-app.sh signs every build with it, so an Accessibility grant survives rebuilds.
+# per Mac, the fallback for a Mac without an Apple Development certificate (ADR 0053). scripts/sign-app.sh
+# signs with it then, so an Accessibility grant survives rebuilds (the Keychain still asks once per build).
 # Running it again on a Mac that has the certificate only repeats the last step: allowing codesign to use the
-# key without asking, which stops the keychain prompt on every build.
+# key without asking, which stops the signing prompt on every build.
 set -e
 NAME="Taskboard Local Signing"
 KEYCHAIN="$HOME/Library/Keychains/login.keychain-db"
