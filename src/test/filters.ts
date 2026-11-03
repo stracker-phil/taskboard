@@ -21,6 +21,7 @@ export function filterOptions(patch: Partial<FilterOptions> = {}): FilterOptions
       { id: "lastInteraction", name: "Last interaction", kind: "timestamp" },
       { id: "project", name: "Project", kind: "project" },
     ],
+    hiddenFields: [],
     statuses: [],
     types: [],
     users: [],

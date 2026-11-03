@@ -159,7 +159,7 @@ describe("useEvents", () => {
     function QueriesHarness() {
       useEvents();
       const { data: view } = useViewRows(11, 101);
-      const { data: options } = useFilterOptions();
+      const { data: options } = useFilterOptions(11);
       const { data: first } = useIssue("1");
       const { data: second } = useIssue("2");
       return (

@@ -22,8 +22,20 @@ pub const RELEVANT_FIELD: &str = "(used = 1 OR shown = 1
     OR id IN (SELECT c.value FROM view v, json_each(v.columns) c)
     OR id IN (SELECT json_extract(c.value, '$.field') FROM filter_list l, json_each(l.filter, '$.conditions') c))";
 
+/// An issue's status category as its Space sees it: from the status type the owner picked there
+/// (`status_style`), else Jira's.
+macro_rules! status_category {
+    () => {
+        "COALESCE((SELECT CASE o.style WHEN 'done' THEN 'done' WHEN 'todo' THEN 'new' WHEN 'backlog' THEN 'new'
+             ELSE 'indeterminate' END
+           FROM space_status_style o WHERE o.project_id = i.project_id AND o.status_id = i.status_id),
+         i.status_category)"
+    };
+}
+pub const STATUS_CATEGORY: &str = status_category!();
+
 /// Issues the sidebar counts.
-pub const OPEN_ISSUES: &str = "i.status_category <> 'done'";
+pub const OPEN_ISSUES: &str = concat!(status_category!(), " <> 'done'");
 
 /// What compiling needs to know beyond the conditions.
 #[derive(Clone, Debug)]
@@ -148,7 +160,7 @@ fn shape(field: &Field, ctx: &Ctx) -> AppResult<Shape> {
     };
     Ok(match field {
         Field::Status => scalar("i.status_id", ScalarKind::Id),
-        Field::StatusCategory => scalar("i.status_category", ScalarKind::Id),
+        Field::StatusCategory => scalar(STATUS_CATEGORY, ScalarKind::Id),
         Field::Type => scalar("i.issue_type", ScalarKind::Id),
         Field::Priority => scalar("i.priority", ScalarKind::Id),
         Field::Project => scalar("i.project_id", ScalarKind::Id),

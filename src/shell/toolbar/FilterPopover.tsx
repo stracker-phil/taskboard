@@ -28,7 +28,7 @@ interface Props {
  *  only by Save View. Built-in levels only offer the view's. */
 export function FilterPopover({ listId, viewId, anchor, dirty, onSave, onClose }: Props) {
   const { data: conditions } = useListConditions(listId, viewId);
-  const { data: options } = useFilterOptions();
+  const { data: options } = useFilterOptions(listId);
   return (
     <Popover label="Filter" anchor={anchor} onClose={onClose} className="filter-popover">
       {conditions && options ? <Editor key={`${listId}:${viewId}`} listId={listId} viewId={viewId} conditions={conditions} options={options} dirty={dirty} onSave={onSave} onClose={onClose} /> : null}

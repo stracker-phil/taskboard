@@ -124,8 +124,8 @@ pub async fn list_conditions(
     super::list_conditions(&state.db, id, view_id).await
 }
 
-/// The fields and values the Filter popover offers.
+/// The fields and values the Filter popover offers on a level.
 #[tauri::command]
-pub async fn filter_options(state: State<'_, AppState>) -> AppResult<FilterOptions> {
-    super::filter_options(&state.db).await
+pub async fn filter_options(state: State<'_, AppState>, list_id: i64) -> AppResult<FilterOptions> {
+    super::filter_options(&state.db, list_id).await
 }

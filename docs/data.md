@@ -108,7 +108,8 @@ JSON; no condition is stored as null:
 ] }
 ```
 
-- `field`: `status` (id), `statusCategory` (`new`, `indeterminate`, `done`), `type` (name), `assignee`,
+- `field`: `status` (id), `statusCategory` (`new`, `indeterminate`, `done`; the category of the status type the
+  owner picked in the issue's Space, else Jira's: `filter::STATUS_CATEGORY`, also the sidebar's open counts), `type` (name), `assignee`,
   `reporter` (account id or `me`), `priority` (name), `epic` (the parent's issue id), `release` (fix version id),
   `sprint` (`active`, `future`, `closed` or a sprint id), `labels`, `due`, `updated`, `created`, `lastView`,
   `lastInteraction` (`issue_activity`), `project` (id),

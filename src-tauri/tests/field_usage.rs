@@ -94,7 +94,7 @@ async fn offered(db: &Db) -> (Vec<String>, Vec<String>) {
         .filter(|c| c.custom)
         .map(|c| c.id)
         .collect();
-    let filters = filter_options(db)
+    let filters = filter_options(db, everything(db).await)
         .await
         .unwrap()
         .fields

@@ -4,6 +4,7 @@ import { OP_NAMES, choicesFor, isComplete, newCondition, opsFor, pickedValues, s
 
 const OPTIONS: FilterOptions = {
   fields: [],
+  hiddenFields: [],
   statuses: [
     { id: "3", name: "In Progress" },
     { id: "4", name: "Done" },

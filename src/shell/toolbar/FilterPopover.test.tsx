@@ -462,6 +462,52 @@ describe("FilterPopover", () => {
     });
   });
 
+  describe("a field the Space hides", () => {
+    const REVIEW_NOTES = { id: "customfield_10071", name: "Review notes", kind: "text" } as const;
+    const WITH_HIDDEN = filterOptions({ hiddenFields: [REVIEW_NOTES] });
+    const fieldNames = (select: HTMLElement) => within(select).getAllByRole("option").map((o) => o.textContent);
+
+    beforeEach(() => {
+      mocked.filterOptions.mockResolvedValue(WITH_HIDDEN);
+    });
+
+    it("is not offered in the field select of a new condition", async () => {
+      const popover = await openFilter(FILTER_LIST);
+      await userEvent.click(within(section(popover, LIST_SECTION)).getByRole("button", { name: "+ Add condition" }));
+
+      for (const select of within(popover).getAllByLabelText("Field")) expect(fieldNames(select)).not.toContain("Review notes");
+    });
+
+    it("shows its name selected in a list condition that already uses it", async () => {
+      const popover = await openFilter(listConditions({ kind: "list", own: [{ field: REVIEW_NOTES.id, op: "contains", value: "pricing" }] }));
+
+      const select = within(section(popover, LIST_SECTION)).getByLabelText("Field");
+      expect(select).toHaveDisplayValue("Review notes");
+      expect(within(popover).getByLabelText("Value")).toHaveValue("pricing");
+    });
+
+    it("shows its name selected in a view condition that already uses it, and offers it in no other row", async () => {
+      const popover = await openFilter(listConditions({ kind: "list", own: [HIGH_PRIORITY], view: [{ field: REVIEW_NOTES.id, op: "contains", value: "pricing" }] }));
+
+      const viewField = within(section(popover, VIEW_SECTION)).getByLabelText("Field");
+      expect(viewField).toHaveDisplayValue("Review notes");
+      expect(fieldNames(viewField)).toContain("Review notes");
+      expect(fieldNames(within(section(popover, LIST_SECTION)).getByLabelText("Field"))).not.toContain("Review notes");
+    });
+  });
+
+  describe("the options it asks for", () => {
+    it("are those of its own level", async () => {
+      mocked.filterOptions.mockImplementation(async (listId) =>
+        filterOptions({ fields: [{ id: "status", name: listId === 21 ? "Status of 21" : "Status of other", kind: "status" }] }),
+      );
+
+      const popover = await openFilter(listConditions({ kind: "list", own: [IN_PROGRESS] }), 21);
+
+      expect(within(popover).getByLabelText("Field")).toHaveDisplayValue("Status of 21");
+    });
+  });
+
   describe("sections", () => {
     it("shows both All views of this list and This view on a filter list, each with its own conditions", async () => {
       const popover = await openFilter(listConditions({ kind: "list", own: [HIGH_PRIORITY], view: [NO_DUE_DATE] }));

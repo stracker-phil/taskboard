@@ -935,8 +935,9 @@ mod the_tree_on_the_demo_site {
     #[ignore = "syncs the demo site into a temp database"]
     async fn the_filter_fields_are_the_standard_ones_then_the_custom_fields_worth_filtering() {
         let site = Synced::new().await;
+        let everything = node_id(site.db(), "everything").await;
 
-        let options = filter_options(site.db()).await.unwrap();
+        let options = filter_options(site.db(), everything).await.unwrap();
 
         let ids: Vec<&str> = options.fields.iter().map(|f| f.id.as_str()).collect();
         assert_eq!(
@@ -989,8 +990,9 @@ mod the_tree_on_the_demo_site {
     #[ignore = "syncs the demo site into a temp database"]
     async fn the_filter_choices_come_from_the_cache_in_a_useful_order() {
         let site = Synced::new().await;
+        let everything = node_id(site.db(), "everything").await;
 
-        let options = filter_options(site.db()).await.unwrap();
+        let options = filter_options(site.db(), everything).await.unwrap();
 
         assert!(!options.statuses.is_empty());
         let priorities: Vec<&str> = options.priorities.iter().map(|c| c.name.as_str()).collect();
@@ -1041,7 +1043,9 @@ mod filter_status_choices {
         )
         .await;
 
-        let options = filter_options(&db).await.unwrap();
+        let options = filter_options(&db, node_id(&db, "everything").await)
+            .await
+            .unwrap();
 
         let statuses: Vec<(&str, &str)> = options
             .statuses
@@ -1049,6 +1053,238 @@ mod filter_status_choices {
             .map(|c| (c.id.as_str(), c.name.as_str()))
             .collect();
         assert_eq!(statuses, [("s2", "Done"), ("s1", "To Do")]);
+    }
+}
+
+mod filter_fields_per_level {
+    use super::*;
+    use taskboard_lib::space_config::{FieldVisibility, space_set_field};
+
+    const ZONE: &str = "customfield_10001";
+    const BETA: &str = "customfield_10003";
+
+    async fn two_spaces() -> (TempDir, Db) {
+        let (dir, db) = tracked_lab().await;
+        track_project(&db, NWS.into(), true).await.unwrap();
+        execute(
+            &db,
+            "INSERT INTO cache.field (id, name, type, used) VALUES
+               ('customfield_10001', 'Zone', 'string', 1),
+               ('customfield_10003', 'Beta', 'string', 1)",
+        )
+        .await;
+        (dir, db)
+    }
+
+    async fn hide(db: &Db, project: &str, field: &str, visibility: FieldVisibility) {
+        space_set_field(db, project.into(), field.into(), visibility)
+            .await
+            .unwrap();
+    }
+
+    /// The custom fields offered, then the custom fields kept out.
+    async fn custom_fields(db: &Db, level: i64) -> (Vec<String>, Vec<String>) {
+        let options = filter_options(db, level).await.unwrap();
+        let custom = |fields: Vec<taskboard_lib::lists::FilterField>| {
+            fields
+                .into_iter()
+                .map(|f| f.id)
+                .filter(|id| id.starts_with("customfield_"))
+                .collect::<Vec<_>>()
+        };
+        (custom(options.fields), custom(options.hidden_fields))
+    }
+
+    #[tokio::test]
+    async fn a_field_hidden_in_lists_or_everywhere_moves_to_the_hidden_fields_of_that_space_and_its_lists()
+     {
+        for visibility in [FieldVisibility::HiddenInList, FieldVisibility::Hidden] {
+            let (_dir, db) = two_spaces().await;
+            let space = space_node_id(&db, NW).await;
+            let list = list_create(&db, viewer(None), space, "Bugs".into(), Some(bugs()))
+                .await
+                .unwrap();
+            let other_space = space_node_id(&db, NWS).await;
+            hide(&db, NW, ZONE, visibility).await;
+
+            for level in [space, list] {
+                assert_eq!(
+                    custom_fields(&db, level).await,
+                    (vec![BETA.to_string()], vec![ZONE.to_string()]),
+                    "{visibility:?} on {level}"
+                );
+            }
+            assert_eq!(
+                custom_fields(&db, other_space).await,
+                (vec![BETA.to_string(), ZONE.to_string()], vec![]),
+                "{visibility:?} elsewhere"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn a_field_hidden_only_in_the_detail_is_still_offered() {
+        let (_dir, db) = two_spaces().await;
+        let space = space_node_id(&db, NW).await;
+        hide(&db, NW, ZONE, FieldVisibility::HiddenInDetail).await;
+
+        assert_eq!(
+            custom_fields(&db, space).await,
+            (vec![BETA.to_string(), ZONE.to_string()], vec![])
+        );
+    }
+
+    #[tokio::test]
+    async fn everything_offers_a_field_unless_every_tracked_space_hides_it() {
+        let (_dir, db) = two_spaces().await;
+        let everything = node_id(&db, "everything").await;
+
+        hide(&db, NW, ZONE, FieldVisibility::Hidden).await;
+        assert_eq!(
+            custom_fields(&db, everything).await,
+            (vec![BETA.to_string(), ZONE.to_string()], vec![])
+        );
+
+        hide(&db, NWS, ZONE, FieldVisibility::HiddenInList).await;
+        assert_eq!(
+            custom_fields(&db, everything).await,
+            (vec![BETA.to_string()], vec![ZONE.to_string()])
+        );
+    }
+}
+
+mod status_category_follows_the_spaces_status_types {
+    use super::*;
+    use taskboard_lib::status_style::{Style, status_style_set};
+
+    const REVIEW: &str = "s1";
+    const SHIPPED: &str = "s3";
+
+    /// Two tracked Spaces whose issues share statuses: Review queue (Jira: in progress, NW-1 and NWS-1),
+    /// Waiting (to do, NW-2 and NWS-2) and Shipped (done, NW-3 and NWS-3).
+    async fn two_spaces() -> (TempDir, Db) {
+        let (dir, db) = tracked_lab().await;
+        track_project(&db, NWS.into(), true).await.unwrap();
+        execute(
+            &db,
+            "INSERT INTO cache.status (id, name, category) VALUES
+               ('s1', 'Review queue', 'indeterminate'), ('s2', 'Waiting', 'new'), ('s3', 'Shipped', 'done');
+             INSERT INTO cache.issue (id, key, project_id, summary, issue_type, status_id,
+               status_category, created_at, updated_at, synced_at) VALUES
+               ('1', 'NW-1', '10001', 'One', 'Task', 's1', 'indeterminate', '2026-10-20T09:00:00.000Z',
+                '2026-10-20T09:00:00.000Z', '2026-10-20T09:00:00.000Z'),
+               ('2', 'NW-2', '10001', 'Two', 'Task', 's2', 'new', '2026-10-20T09:00:00.000Z',
+                '2026-10-20T09:00:00.000Z', '2026-10-20T09:00:00.000Z'),
+               ('3', 'NW-3', '10001', 'Three', 'Task', 's3', 'done', '2026-10-20T09:00:00.000Z',
+                '2026-10-20T09:00:00.000Z', '2026-10-20T09:00:00.000Z'),
+               ('4', 'NWS-1', '10002', 'Four', 'Task', 's1', 'indeterminate', '2026-10-20T09:00:00.000Z',
+                '2026-10-20T09:00:00.000Z', '2026-10-20T09:00:00.000Z'),
+               ('5', 'NWS-2', '10002', 'Five', 'Task', 's2', 'new', '2026-10-20T09:00:00.000Z',
+                '2026-10-20T09:00:00.000Z', '2026-10-20T09:00:00.000Z'),
+               ('6', 'NWS-3', '10002', 'Six', 'Task', 's3', 'done', '2026-10-20T09:00:00.000Z',
+                '2026-10-20T09:00:00.000Z', '2026-10-20T09:00:00.000Z')",
+        )
+        .await;
+        (dir, db)
+    }
+
+    async fn style(db: &Db, project: &str, status: &str, style: Style) {
+        status_style_set(db, project.into(), status.into(), Some(style))
+            .await
+            .unwrap();
+    }
+
+    async fn matching(db: &Db, op: Op, category: &str) -> MatchCount {
+        let everything = node_id(db, "everything").await;
+        let draft = filter(vec![Condition::new(
+            Field::StatusCategory,
+            op,
+            Some(Value::One(category.into())),
+        )]);
+        list_match_count(db, viewer(None), everything, draft, false)
+            .await
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn without_an_owner_choice_jiras_category_applies() {
+        let (_dir, db) = two_spaces().await;
+
+        assert_eq!(
+            matching(&db, Op::Is, "done").await,
+            MatchCount { open: 0, total: 2 }
+        );
+        assert_eq!(
+            matching(&db, Op::Is, "indeterminate").await,
+            MatchCount { open: 2, total: 2 }
+        );
+        assert_eq!(
+            matching(&db, Op::IsNot, "done").await,
+            MatchCount { open: 4, total: 4 }
+        );
+    }
+
+    #[tokio::test]
+    async fn a_status_set_to_done_in_a_space_is_done_there_but_not_in_other_spaces() {
+        let (_dir, db) = two_spaces().await;
+        style(&db, NW, REVIEW, Style::Done).await;
+
+        assert_eq!(
+            matching(&db, Op::IsNot, "done").await,
+            MatchCount { open: 3, total: 3 }
+        );
+        assert_eq!(
+            matching(&db, Op::Is, "done").await,
+            MatchCount { open: 0, total: 3 }
+        );
+        assert_eq!(
+            matching(&db, Op::Is, "indeterminate").await,
+            MatchCount { open: 1, total: 1 }
+        );
+    }
+
+    #[tokio::test]
+    async fn a_status_set_to_to_do_in_a_space_is_new_there_and_keeps_jiras_category_elsewhere() {
+        let (_dir, db) = two_spaces().await;
+        style(&db, NW, SHIPPED, Style::Todo).await;
+
+        assert_eq!(
+            matching(&db, Op::Is, "new").await,
+            MatchCount { open: 3, total: 3 }
+        );
+        assert_eq!(
+            matching(&db, Op::Is, "done").await,
+            MatchCount { open: 0, total: 1 }
+        );
+    }
+
+    #[tokio::test]
+    async fn progress_review_and_blocked_count_as_in_progress() {
+        for style_name in [Style::Progress, Style::Review, Style::Blocked] {
+            let (_dir, db) = two_spaces().await;
+            style(&db, NW, "s2", style_name).await;
+
+            assert_eq!(
+                matching(&db, Op::Is, "indeterminate").await,
+                MatchCount { open: 3, total: 3 },
+                "{style_name:?}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn the_sidebar_does_not_count_issues_in_a_status_the_space_set_to_done() {
+        let (_dir, db) = two_spaces().await;
+        let before = sidebar_tree(&db, viewer(None), false).await.unwrap();
+        style(&db, NW, REVIEW, Style::Done).await;
+
+        let after = sidebar_tree(&db, viewer(None), false).await.unwrap();
+
+        assert_eq!(find_space(&before, "NW").open_count, 2);
+        assert_eq!(find_space(&after, "NW").open_count, 1);
+        assert_eq!(find_space(&after, "NWS").open_count, 2);
+        assert_eq!(before.everything.count, Some(4));
+        assert_eq!(after.everything.count, Some(3));
     }
 }
 

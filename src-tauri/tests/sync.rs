@@ -443,7 +443,7 @@ mod the_full_sync {
             .map(|c| c.id)
             .filter(custom)
             .collect();
-        let filters: Vec<String> = filter_options(&rig.ctx.db)
+        let filters: Vec<String> = filter_options(&rig.ctx.db, everything(&rig.ctx.db).await)
             .await
             .unwrap()
             .fields

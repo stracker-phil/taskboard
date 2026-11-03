@@ -45,7 +45,7 @@ describe("createQueryClient", () => {
   it("shows no toast when a query without a failure message fails", async () => {
     mocked.filterOptions.mockRejectedValue(DISK_FULL);
 
-    const { result } = renderHook(() => useQuery({ queryKey: ["plain"], queryFn: () => api.filterOptions() }), { wrapper });
+    const { result } = renderHook(() => useQuery({ queryKey: ["plain"], queryFn: () => api.filterOptions(1) }), { wrapper });
 
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(toasts()).toEqual([]);

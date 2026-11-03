@@ -100,4 +100,5 @@ export const useListConditions = (listId: number, viewId: number) =>
   useQuery({ queryKey: listConditionsKey(listId, viewId), queryFn: () => api.listConditions(listId, viewId) });
 
 export const FILTER_OPTIONS_KEY = ["filterOptions"] as const;
-export const useFilterOptions = () => useQuery({ queryKey: FILTER_OPTIONS_KEY, queryFn: api.filterOptions });
+export const useFilterOptions = (listId: number) =>
+  useQuery({ queryKey: [...FILTER_OPTIONS_KEY, listId], queryFn: () => api.filterOptions(listId) });

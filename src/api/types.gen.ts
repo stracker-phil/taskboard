@@ -331,7 +331,15 @@ id: string, name: string, kind: ValueKind, };
 /**
  * Everything the Filter popover's selects offer, from the cache.
  */
-export type FilterOptions = { fields: Array<FilterField>, statuses: Array<Choice>, types: Array<Choice>, users: Array<Choice>, priorities: Array<Choice>, epics: Array<Choice>, releases: Array<Choice>, sprints: Array<Choice>, labels: Array<Choice>, projects: Array<Choice>, };
+export type FilterOptions = { 
+/**
+ * The standard fields, then the custom fields the level's Space shows in its list.
+ */
+fields: Array<FilterField>, 
+/**
+ * The custom fields the Space keeps out of the list: only conditions already on one name it.
+ */
+hiddenFields: Array<FilterField>, statuses: Array<Choice>, types: Array<Choice>, users: Array<Choice>, priorities: Array<Choice>, epics: Array<Choice>, releases: Array<Choice>, sprints: Array<Choice>, labels: Array<Choice>, projects: Array<Choice>, };
 
 export type Group = { key: string, label: string, mark: GroupMark | null, count: number, collapsedByDefault: boolean, rowIds: Array<string>, };
 

@@ -10,6 +10,7 @@ use super::nodes::{Kind, Node, all_nodes, node, own_conditions};
 use crate::db::Db;
 use crate::error::{AppError, AppResult};
 use crate::filter::{Condition, Field, Names, Parts, RELEVANT_FIELD, parts};
+use crate::space_config::hidden_columns;
 use crate::views::{read_view, view_conditions};
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
@@ -180,7 +181,10 @@ pub struct Choice {
 #[ts(export, export_to = "src/api/types.gen.ts")]
 #[serde(rename_all = "camelCase")]
 pub struct FilterOptions {
+    /// The standard fields, then the custom fields the level's Space shows in its list.
     pub fields: Vec<FilterField>,
+    /// The custom fields the Space keeps out of the list: only conditions already on one name it.
+    pub hidden_fields: Vec<FilterField>,
     pub statuses: Vec<Choice>,
     pub types: Vec<Choice>,
     pub users: Vec<Choice>,
@@ -220,8 +224,8 @@ const STANDARD_FIELDS: &[(Field, &str, ValueKind)] = &[
     (Field::Text, "Text", ValueKind::Search),
 ];
 
-pub async fn filter_options(db: &Db) -> AppResult<FilterOptions> {
-    db.read(options).await
+pub async fn filter_options(db: &Db, list_id: i64) -> AppResult<FilterOptions> {
+    db.read(move |conn| options(conn, list_id)).await
 }
 
 fn choices(conn: &Connection, sql: &str) -> AppResult<Vec<Choice>> {
@@ -235,8 +239,8 @@ fn choices(conn: &Connection, sql: &str) -> AppResult<Vec<Choice>> {
     Ok(rows.collect::<Result<_, _>>()?)
 }
 
-/// The standard fields, then the site's custom fields a condition can use.
-fn fields(conn: &Connection) -> AppResult<Vec<FilterField>> {
+/// The standard fields, then every custom field a condition can use, hidden or not.
+fn all_fields(conn: &Connection) -> AppResult<Vec<FilterField>> {
     let mut fields: Vec<FilterField> = STANDARD_FIELDS
         .iter()
         .map(|(field, name, kind)| FilterField {
@@ -288,10 +292,15 @@ fn sprints(conn: &Connection) -> AppResult<Vec<Choice>> {
     Ok(states.chain(named).collect())
 }
 
-fn options(conn: &Connection) -> AppResult<FilterOptions> {
+fn options(conn: &Connection, list_id: i64) -> AppResult<FilterOptions> {
     let tracked = "SELECT project_id FROM space WHERE tracked = 1";
+    let hidden = hidden_columns(conn, list_id)?;
+    let (hidden_fields, fields) = all_fields(conn)?
+        .into_iter()
+        .partition(|field| hidden.contains(&field.id));
     Ok(FilterOptions {
-        fields: fields(conn)?,
+        fields,
+        hidden_fields,
         statuses: choices(
             conn,
             &format!(

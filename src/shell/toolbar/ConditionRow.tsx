@@ -13,10 +13,18 @@ interface Props {
   ops?: Op[];
 }
 
+/** The condition's field, also when the Space hides it or Jira no longer has it. */
+function fieldOf(condition: Condition, options: FilterOptions): FilterField {
+  const find = (fields: FilterField[]) => fields.find((f) => f.id === condition.field);
+  return find(options.fields) ?? find(options.hiddenFields) ?? { id: condition.field, name: condition.field, kind: "text" };
+}
+
 /** One own condition as field / operator / value, with a remove button unless it is fixed. */
 export function ConditionRow({ condition, options, onChange, onRemove, ops: fixedOps }: Props) {
   const id = useId();
-  const field: FilterField = options.fields.find((f) => f.id === condition.field) ?? { id: condition.field, name: condition.field, kind: "text" };
+  const field = fieldOf(condition, options);
+  // A condition on a field the Space hides keeps it; new conditions can't pick it.
+  const listed = options.fields.includes(field) ? options.fields : [...options.fields, field];
   const ops = fixedOps ?? opsFor(field.kind);
 
   const setField = (fieldId: string) => {
@@ -41,7 +49,7 @@ export function ConditionRow({ condition, options, onChange, onRemove, ops: fixe
         Field
       </label>
       <select id={`${id}-field`} className="condition-row__field" value={field.id} disabled={!onRemove} onChange={(e) => setField(e.target.value)}>
-        {options.fields.map((f) => (
+        {listed.map((f) => (
           <option key={f.id} value={f.id}>
             {f.name}
           </option>

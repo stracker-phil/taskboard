@@ -150,7 +150,7 @@ export const api = {
   /** A level's locked conditions (with display names), a filter list's own ones and the view's own ones. */
   listConditions: (id: number, viewId: number | null) => invoke<ListConditions>("list_conditions", { id, viewId }),
   /** The fields and cached values the Filter popover's selects offer. */
-  filterOptions: () => invoke<FilterOptions>("filter_options"),
+  filterOptions: (listId: number) => invoke<FilterOptions>("filter_options", { listId }),
   /** `me`: only the connected account's issues, like the Me chip. */
   listMatchCount: (id: number, filter: Filter, me: boolean) => invoke<MatchCount>("list_match_count", { id, filter, me }),
   spaceMove: (projectId: string, position: number) => invoke<void>("space_move", { projectId, position }),

@@ -844,7 +844,8 @@ no separate Settings design; owner, 2026-10-28). Its colors are the `--settings-
     statuses this Space's issues are in, under a section per Jira category, with a search field; a row: the pill,
     "N issues", and a button (the style's square and "Automatic · X" or the style's name) with a menu of
     Automatic and the six styles, the chosen one checked. *Custom fields*: a row per field with a menu of
-    Visible, Hidden in list (no column choice), Hidden in detail (not in the Issue view) and Hidden everywhere.
+    Visible, Hidden in list (no column choice and no filter field), Hidden in detail (not in the Issue view) and
+    Hidden everywhere. Outside a Space a field drops out of the list only when every tracked Space hides it.
     *Team* (`spaces/SpaceTeam`): how many people are on the Space's team and how many have activity there, with
     Edit Team… (`app:settings:team`).
     Each field saves on its own with Rust's field error under it. The header's tile opens `LookPopover`.
