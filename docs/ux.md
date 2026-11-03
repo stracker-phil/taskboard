@@ -350,8 +350,8 @@ open preview follows the click at once. A Board always opens the Issue view.
   read or unread, Bookmark (with bookmarks), Copy as Markdown, Open in Jira (`ExternalLink`), Full view, Close. They
   sit at 0.65 opacity behind a transparent border and fade to full with a border and tint on hover; Close is always
   at full strength. Copy as Markdown (`issue_markdown`, also the `issue.copyMarkdown` command, unbound by default)
-  copies front matter (source URL, status, assignee, priority), the title, every filled content field as a `##`
-  section, the web links and the comments, oldest first.
+  copies front matter (source URL, pull requests, status, assignee, Developer, priority), the title, every other
+  filled content field as a `##` section, the other web links and the comments, oldest first.
 - Body: title 22/750, one line of chips (status pill `peek`, epic chip, release outline chip, priority,
   assignee), the sanitized description, web links, the latest three activity items with "All activity".
 - Footer 36: the keys.

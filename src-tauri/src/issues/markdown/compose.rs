@@ -39,7 +39,9 @@ pub struct MarkdownIssue {
     pub description: Option<Content>,
     /// Field name and content, in the Issue view's order.
     pub fields: Vec<(String, Content)>,
-    /// Title and address; a blank title shows the address.
+    /// Pull request addresses, listed in the front matter.
+    pub pull_requests: Vec<String>,
+    /// The other web links: title and address; a blank title shows the address.
     pub web_links: Vec<(String, String)>,
     /// In any order: they are written oldest first.
     pub comments: Vec<MarkdownComment>,
@@ -55,7 +57,9 @@ pub fn compose(issue: &MarkdownIssue, tz: Tz) -> String {
     };
     section("Description", issue.description.as_ref().and_then(markdown));
     for (name, content) in &issue.fields {
-        section(name, markdown(content));
+        if !is_front_matter_field(name, content) {
+            section(name, markdown(content));
+        }
     }
     section("Weblinks", web_links(&issue.web_links));
     section("Comments", comments(&issue.comments, tz));
@@ -63,18 +67,54 @@ pub fn compose(issue: &MarkdownIssue, tz: Tz) -> String {
 }
 
 fn front_matter(issue: &MarkdownIssue) -> String {
-    let mut front = vec!["---".to_string()];
-    let mut meta = |key: &str, value: Option<&str>| {
-        if let Some(value) = value.and_then(non_blank) {
-            front.push(format!("{key}: {}", yaml(value)));
-        }
+    let pull_requests: Vec<&str> = issue
+        .pull_requests
+        .iter()
+        .filter_map(|url| non_blank(url))
+        .collect();
+    let pr = match pull_requests.as_slice() {
+        [] => None,
+        [one] => meta("pr", Some(one)),
+        several => Some(
+            std::iter::once("pr:".to_string())
+                .chain(several.iter().map(|url| format!("  - {}", yaml(url))))
+                .collect::<Vec<_>>()
+                .join("\n"),
+        ),
     };
-    meta("source", issue.source.as_deref());
-    meta("status", Some(&issue.status));
-    meta("assignee", Some(&issue.assignees.join(", ")));
-    meta("priority", issue.priority.as_deref());
+    let developer = issue
+        .fields
+        .iter()
+        .find_map(|(name, content)| match content {
+            Content::Plain(value) if is_front_matter_field(name, content) => {
+                meta("developer", Some(value))
+            }
+            _ => None,
+        });
+    let lines = [
+        meta("source", issue.source.as_deref()),
+        pr,
+        meta("status", Some(&issue.status)),
+        meta("assignee", Some(&issue.assignees.join(", "))),
+        developer,
+        meta("priority", issue.priority.as_deref()),
+    ];
+    let mut front = vec!["---".to_string()];
+    front.extend(lines.into_iter().flatten());
     front.push("---".to_string());
     front.join("\n")
+}
+
+/// `key: value`; `None` for a blank value.
+fn meta(key: &str, value: Option<&str>) -> Option<String> {
+    value
+        .and_then(non_blank)
+        .map(|value| format!("{key}: {}", yaml(value)))
+}
+
+/// The Developer field, a person, goes in the front matter next to the assignee instead of a section.
+fn is_front_matter_field(name: &str, content: &Content) -> bool {
+    matches!(content, Content::Plain(_)) && name.trim().eq_ignore_ascii_case("developer")
 }
 
 /// `<site>/browse/<key>`, as the page builds it; `None` without a site.
@@ -192,6 +232,7 @@ mod tests {
             priority: None,
             description: None,
             fields: Vec::new(),
+            pull_requests: Vec::new(),
             web_links: Vec::new(),
             comments: Vec::new(),
         }
@@ -336,6 +377,129 @@ mod tests {
             compose(&linked, Tz::UTC),
             "---\n---\n\n# Fix checkout\n\n## Weblinks\n\n- [Docs](https://example.com/docs)\n\
              - [https://example.com/x](https://example.com/x)\n"
+        );
+    }
+
+    #[test]
+    fn one_pull_request_is_a_pr_line_right_after_the_source() {
+        let reviewed = MarkdownIssue {
+            source: Some("https://example.com/browse/NW-1".into()),
+            status: "In Review".into(),
+            pull_requests: vec!["https://github.com/example/shop/pull/481".into()],
+            ..issue()
+        };
+        assert_eq!(
+            compose(&reviewed, Tz::UTC),
+            "---\nsource: https://example.com/browse/NW-1\n\
+             pr: https://github.com/example/shop/pull/481\nstatus: In Review\n---\n\n# Fix checkout\n"
+        );
+    }
+
+    #[test]
+    fn several_pull_requests_are_a_pr_list_in_order_before_the_status() {
+        let reviewed = MarkdownIssue {
+            source: Some("https://example.com/browse/NW-1".into()),
+            status: "In Review".into(),
+            pull_requests: vec![
+                "https://github.com/example/shop/pull/481".into(),
+                "  ".into(),
+                "https://github.com/example/shop/pull/377".into(),
+            ],
+            ..issue()
+        };
+        assert_eq!(
+            compose(&reviewed, Tz::UTC),
+            "---\nsource: https://example.com/browse/NW-1\npr:\n\
+             \x20 - https://github.com/example/shop/pull/481\n\
+             \x20 - https://github.com/example/shop/pull/377\nstatus: In Review\n---\n\n# Fix checkout\n"
+        );
+    }
+
+    #[test]
+    fn blank_pull_requests_leave_no_pr_line() {
+        for pull_requests in [vec![], vec![String::new(), "  ".into()]] {
+            let blank = MarkdownIssue {
+                status: "Open".into(),
+                pull_requests: pull_requests.clone(),
+                ..issue()
+            };
+            assert_eq!(
+                compose(&blank, Tz::UTC),
+                "---\nstatus: Open\n---\n\n# Fix checkout\n",
+                "{pull_requests:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_plain_developer_field_is_front_matter_between_assignee_and_priority() {
+        for name in ["Developer", "  developer ", "DEVELOPER"] {
+            let developed = MarkdownIssue {
+                status: "Open".into(),
+                assignees: vec!["Ann Example".into()],
+                priority: Some("High".into()),
+                fields: vec![(name.into(), plain("Bob Demo"))],
+                ..issue()
+            };
+            assert_eq!(
+                compose(&developed, Tz::UTC),
+                "---\nstatus: Open\nassignee: Ann Example\ndeveloper: Bob Demo\npriority: High\n---\n\n\
+                 # Fix checkout\n",
+                "{name:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_developer_field_that_is_not_plain_stays_a_section() {
+        let doc = json!({ "type": "doc", "version": 1, "content": [
+            { "type": "paragraph", "content": [{ "type": "text", "text": "Bob Demo" }] }
+        ]});
+        let developed = MarkdownIssue {
+            fields: vec![("Developer".into(), Content::Adf(doc))],
+            ..issue()
+        };
+        assert_eq!(
+            compose(&developed, Tz::UTC),
+            "---\n---\n\n# Fix checkout\n\n## Developer\n\nBob Demo\n"
+        );
+    }
+
+    #[test]
+    fn other_plain_fields_stay_sections_beside_the_developer() {
+        let developed = MarkdownIssue {
+            fields: vec![
+                ("Reviewer".into(), plain("Cy Sample")),
+                ("Developer".into(), plain("Bob Demo")),
+            ],
+            ..issue()
+        };
+        assert_eq!(
+            compose(&developed, Tz::UTC),
+            "---\ndeveloper: Bob Demo\n---\n\n# Fix checkout\n\n## Reviewer\n\nCy Sample\n"
+        );
+    }
+
+    #[test]
+    fn pull_requests_alone_make_no_weblinks_section() {
+        let reviewed = MarkdownIssue {
+            pull_requests: vec!["https://github.com/example/shop/pull/481".into()],
+            ..issue()
+        };
+        assert!(!compose(&reviewed, Tz::UTC).contains("## Weblinks"));
+    }
+
+    #[test]
+    fn weblinks_list_only_the_links_that_are_not_pull_requests() {
+        let linked = MarkdownIssue {
+            pull_requests: vec!["https://github.com/example/shop/pull/481".into()],
+            web_links: vec![("Docs".into(), "https://example.com/docs".into())],
+            ..issue()
+        };
+        assert_eq!(
+            compose(&linked, Tz::UTC),
+            "---\npr: https://github.com/example/shop/pull/481\n---\n\n# Fix checkout\n\n\
+             ## Weblinks\n\n- [Docs](https://example.com/docs)\n"
         );
     }
 

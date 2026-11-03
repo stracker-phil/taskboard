@@ -163,9 +163,11 @@ ADF or it isn't a document. Search text still comes from the HTML (`text::html_t
 
 **Copy as Markdown** (`issue_markdown`, `issues/markdown/`): `mod.rs` reads the issue from the cache (the
 description, the custom fields the Issue view shows via `detail::read_detail`, the cached web links, the
-comments) and `compose.rs` `compose` writes it: YAML front matter (`source` from `browse_url`, `status`,
-`assignee`, `priority`; a line without a value is left out, values are quoted only where YAML needs it), `# summary`,
-then a `##` section per text with content (Description, each field, Weblinks, Comments, oldest first, each under
+comments) and `compose.rs` `compose` writes it: YAML front matter (`source` from `browse_url`, `pr` with the
+web links `classify` marks as pull requests (a list when there are several), `status`, `assignee`, `developer` from
+the Developer field, `priority`; a line without a value is left out, values are quoted only where YAML needs it),
+`# summary`, then a `##` section per text with content (Description, each other field, Weblinks for the other links,
+Comments, oldest first, each under
 `### author · YYYY-MM-DD HH:MM` in the owner's time zone). `adf::to_markdown` (`adf/markdown/`) renders ADF as
 Markdown: headings two levels lower (h1 → `###`), tight nested lists, task lists `- [ ]`/`- [x]`, fenced code with
 its language, quotes and panels as `>`, pipe tables (the first row is the header), media as `[attachment: name]`;

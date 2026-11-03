@@ -8,7 +8,7 @@ use rusqlite::Connection;
 use serde_json::Value;
 
 use super::detail::{CustomField, IssueDetail, read_detail};
-use super::web_links::issue_web_links;
+use super::web_links::{WebLinkKind, issue_web_links};
 use crate::db::Db;
 use crate::error::AppResult;
 use crate::lists::Viewer;
@@ -24,7 +24,11 @@ pub async fn issue_markdown(
     let links = issue_web_links(db, id.clone()).await?;
     let tz = viewer.tz();
     let mut issue = db.read(move |conn| read(conn, &viewer, &id)).await?;
-    issue.web_links = links.into_iter().map(|l| (l.title, l.url)).collect();
+    let (pull_requests, others): (Vec<_>, Vec<_>) = links
+        .into_iter()
+        .partition(|link| link.kind == WebLinkKind::PullRequest);
+    issue.pull_requests = pull_requests.into_iter().map(|l| l.url).collect();
+    issue.web_links = others.into_iter().map(|l| (l.title, l.url)).collect();
     issue.source = issue.source.and_then(|key| browse_url(&site_url, &key));
     Ok(compose(&issue, tz))
 }
@@ -52,6 +56,7 @@ fn read(conn: &Connection, viewer: &Viewer, id: &str) -> AppResult<MarkdownIssue
             .into_iter()
             .filter_map(|field| field_content(field, &body.custom))
             .collect(),
+        pull_requests: Vec::new(),
         web_links: Vec::new(),
         comments: comments(conn, id)?,
     })
