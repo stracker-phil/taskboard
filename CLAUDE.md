@@ -54,7 +54,8 @@ Document by file and symbol, never by line number.
 Test, lint and format-check commands run through the `ci` agent, never in the main context.
 - `bun run test`: Vitest and Rust unit tests
 - `bun run lint`: IPC types drift check, tsc, ESLint and clippy on production code (warnings are errors)
-- `bun run release`: release `.app` and `.dmg`, signed, then installed (`scripts/install.sh`)
+- `bun run release`: release `.app` and `.dmg`, signed, then installed (`scripts/install.sh`); every release
+  gets a new, meaningfully bumped version first (ADR 0054)
 - `bun run build:app` + `scripts/dev/launch.sh`: debug build, restarted next to the terminal without stealing focus
 - `scripts/dev/js.sh` / `scripts/dev/screenshot.sh`: drive (store: `window.taskboard`) and capture the running
   debug window in the background

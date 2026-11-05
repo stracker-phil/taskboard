@@ -84,7 +84,7 @@ keep typing in the terminal. They are macOS-only (zsh, Swift, `screencapture`, `
 | `scripts/dev/screenshot.sh out.png [--overlay]` | captures the debug app's largest window, also in the background |
 | `scripts/dev/screenshot-looks.sh <dir>` | captures the window in the current macOS mode's palette ([ux.md](ux.md#palette-checks)) |
 | `scripts/dev/screens.sh [dir]` | captures the README screenshots (default `docs/screens/`, `<name>-light.png` or `<name>-dark.png`) from the debug build on a fresh demo seed: moves the debug data folder aside, drives the window with the `taskboard` CLI (`go`, `open`, `views`, `dev drift`) and `js.sh` (the Appearance setting, Subtasks, a Filter draft, a context menu, the palette) and restores the folder afterwards; macOS's own appearance stays as it is |
-| `bun run release` | builds the release `.app` and `.dmg`, then `scripts/install.sh`: signs it, links `~/Applications/Taskboard.app` and `~/.local/bin/taskboard`, restarts a running Taskboard on it |
+| `bun run release` | builds the release `.app` and `.dmg`, then `scripts/install.sh`: signs it, links `~/Applications/Taskboard.app` and `~/.local/bin/taskboard`, restarts a running Taskboard on it. Bump the version first; each release has its own ([ADR 0054](adr/0054-every-release-build-gets-a-new-version.md)) |
 
 Never use `bun run app`, `open` or AppleScript clicks and keystrokes to drive the app: they take focus.
 
