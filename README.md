@@ -72,7 +72,7 @@ All screenshots show made-up demo data from the debug build.
 ```sh
 bun install
 scripts/create-signing-cert.sh   # once per Mac, only without an Apple Development certificate
-bun run release
+bun run tauri build && scripts/install.sh
 ```
 
 This builds `Taskboard.app`, links it into `~/Applications` and the `taskboard` command into `~/.local/bin`.

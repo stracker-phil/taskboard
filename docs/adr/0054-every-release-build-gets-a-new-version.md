@@ -2,28 +2,24 @@
 
 ## Status
 
-Accepted (2026-11-05). Owner's decision.
+Accepted (2026-11-05). Owner's decision; taken over from TimeTracker's ADR 0043 and its `scripts/release.sh`.
 
 ## Context
 
-`bun run release` installs a build over the running app. When two builds carry the same version, they cannot
-be told apart, and it is unclear which commit the installed app runs.
+`bun run release` rebuilt and installed the app under an unchanged version, so installs could not be told
+apart and it was unclear which commit the installed app runs.
 
 ## Decision
 
-Every release build gets a new version; the same version is never built twice. Before `bun run release`, the
-version is bumped by what changed since the last release (semantic versioning):
+`bun run release major|minor|patch|X.Y.Z` (`scripts/release.sh`) is the only way to release. It needs a clean
+working tree, moves the version forward in `package.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`
+and `src-tauri/Cargo.lock`, builds and installs (`scripts/install.sh`), then commits "Release X.Y.Z" and tags
+`vX.Y.Z` locally. A failed build puts the version files back; a tagged version is never built again.
 
-- patch (`1.0.1` → `1.0.2`): fixes and small polish, nothing new to learn;
-- minor (`1.0.1` → `1.1.0`): a new feature, command, setting or visible behavior;
-- major (`1.0.1` → `2.0.0`): a change that breaks stored data, the CLI or links without migration, or a
-  redesign.
-
-The version lives in `package.json`, `src-tauri/Cargo.toml` (with `src-tauri/Cargo.lock`) and
-`src-tauri/tauri.conf.json`; all four change together in their own commit, "Set the version to X.Y.Z", after
-the step's commit and before the build.
+The bump is chosen from `git log v<last>..HEAD`: major if existing use breaks (CLI, links, stored data
+without migration, a removed feature), minor for new features or visible behavior, patch otherwise.
 
 ## Consequences
 
-- The installed app's version names one commit.
-- A release without code changes since the last one is not built.
+- The installed app's version names one commit, and `git log vA..vB` lists what a release brought.
+- Every release adds a commit and a tag; a wrong bump is fixed by the next release, never by moving a tag.

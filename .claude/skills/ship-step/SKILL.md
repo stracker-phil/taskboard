@@ -22,11 +22,11 @@ description: Finish a development step in Taskboard - clean up and review the co
    a new decision. Check that no real data slipped into code, docs or screenshots (`.claude/rules/demo-data.md`).
 6. Stage the step's files by path (check `git status` for stray files), then commit following
    `.claude/rules/commits.md`. Never push.
-7. Bump the version by what changed since the last release (patch: fixes; minor: a new feature or visible
-   behavior; major: breaking; ADR 0054) in `package.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock` and
-   `src-tauri/tauri.conf.json`, and commit it as "Set the version to X.Y.Z". Never build the same version twice.
-8. `bun run release` (in the background; it takes minutes): `scripts/install.sh` installs the release build
-   as `~/Applications/Taskboard.app` and `taskboard`, and restarts the running app on it, so the user's app
-   always matches the last commit.
-9. Report to the user: what changed, the `ci` summary, open review questions, and that the release app was
+7. Choose the bump from `git log v<last>..HEAD` (`git describe --tags --abbrev=0` names the last; with no
+   tag yet, from the commit "Set the version to 1.0.1") per ADR 0054: major if existing use breaks, minor for
+   new features or visible behavior, patch otherwise. Run `bun run release major|minor|patch` (in the
+   background; it takes minutes): `scripts/install.sh` installs the release build as
+   `~/Applications/Taskboard.app` and `taskboard`, and restarts the running app on it, so the user's app
+   always matches the last commit; then the script commits "Release X.Y.Z" and tags `vX.Y.Z` (never pushed).
+8. Report to the user: what changed, the `ci` summary, open review questions, and that the release app was
    installed with its new version.
