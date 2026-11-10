@@ -34,7 +34,7 @@ pub(super) fn children(parent: &Value) -> String {
 pub(super) fn node(inline: &Value, out: &mut String) {
     let attrs = &inline["attrs"];
     match inline["type"].as_str().unwrap_or_default() {
-        "hardBreak" => out.push_str("\\\n"),
+        "hardBreak" => out.push('\n'),
         "mention" => {
             out.push('@');
             out.push_str(mention_name(attrs));

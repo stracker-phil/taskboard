@@ -230,7 +230,34 @@ fn an_attachment_is_a_text_placeholder_with_its_name() {
 }
 
 #[test]
-fn a_hard_break_ends_the_line_with_a_backslash() {
+fn a_hard_break_is_a_plain_newline() {
     let line = para(json!([text("a"), { "type": "hardBreak" }, text("b")]));
-    assert_eq!(md(json!([line])), "a\\\nb");
+    assert_eq!(md(json!([line])), "a\nb");
+}
+
+#[test]
+fn a_hard_break_at_the_end_of_a_paragraph_leaves_nothing_trailing() {
+    let first = para(json!([text("a"), { "type": "hardBreak" }]));
+    assert_eq!(md(json!([first, p("b")])), "a\n\nb");
+}
+
+#[test]
+fn a_hard_break_in_a_list_item_keeps_the_next_line_under_the_item_text() {
+    let line = para(json!([text("a"), { "type": "hardBreak" }, text("b")]));
+    let list = json!({ "type": "bulletList", "content": [item(json!([line]))] });
+    assert_eq!(md(json!([list])), "- a\n  b");
+}
+
+#[test]
+fn a_hard_break_in_a_table_cell_becomes_a_br_tag() {
+    let broken = para(json!([text("a"), { "type": "hardBreak" }, text("b")]));
+    let table = json!({ "type": "table", "content": [
+        { "type": "tableRow", "content": [
+            { "type": "tableHeader", "content": [p("Note")] },
+        ]},
+        { "type": "tableRow", "content": [
+            { "type": "tableCell", "content": [broken] },
+        ]},
+    ]});
+    assert_eq!(md(json!([table])), "| Note |\n| --- |\n| a<br>b |");
 }

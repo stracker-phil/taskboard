@@ -34,7 +34,6 @@ pub(super) fn render(node: &Value) -> String {
 fn cell(node: &Value) -> String {
     super::blocks(node)
         .join("\n")
-        .replace("\\\n", "\n")
         .lines()
         .map(str::trim)
         .filter(|line| !line.is_empty())
