@@ -92,20 +92,25 @@ interface BarButtonProps {
   run: (at: HTMLElement) => void;
 }
 
-/** A button that opens a bulk menu; pressed while its choices load. Switched off, it stays in its slot, greyed. */
+/** Opens a bulk menu; a same-size spinner takes the icon's place while its choices load. Switched off, it stays in
+ *  its slot, greyed. */
 function BarButton({ menu, icon, label, title, enabled, busy, run }: BarButtonProps) {
+  const loading = busy === menu;
+  let tooltip = title;
+  if (loading) tooltip = `${label}: asking Jira…`;
+  else if (!enabled) tooltip = `${label}: switched off in Settings → Connection`;
   return (
     <button
       type="button"
-      className={busy === menu ? "toolbar-btn toolbar-btn--active" : "toolbar-btn"}
+      className={loading ? "toolbar-btn toolbar-btn--active bulk-bar__loading" : "toolbar-btn"}
       data-bulk-menu={menu}
       aria-haspopup="menu"
-      aria-busy={busy === menu}
-      title={enabled ? title : `${label}: switched off in Settings → Connection`}
+      aria-busy={loading}
+      title={tooltip}
       disabled={!enabled || busy !== null}
       onClick={(e) => run(e.currentTarget)}
     >
-      {icon}
+      {loading ? <span className="bulk-bar__spinner" role="progressbar" aria-label={`Loading ${label.toLowerCase()} choices`} /> : icon}
       {label}
     </button>
   );

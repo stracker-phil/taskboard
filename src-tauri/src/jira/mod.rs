@@ -9,6 +9,7 @@ pub mod gateway;
 pub mod jql;
 pub mod limiter;
 pub mod paging;
+pub mod parallel;
 pub mod retry;
 pub mod site;
 
@@ -17,4 +18,5 @@ pub use client::JiraClient;
 pub use gateway::BULK_FETCH_MAX;
 pub use limiter::Limiter;
 pub use paging::{SearchPages, SearchRequest};
+pub use parallel::{ask_all, run_all};
 pub use site::{Site, TokenKind};

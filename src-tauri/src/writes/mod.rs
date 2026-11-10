@@ -5,6 +5,7 @@ mod bulk;
 pub mod commands;
 mod comment;
 mod drop;
+mod offers;
 mod pending;
 mod priority;
 pub mod sent;
@@ -23,6 +24,7 @@ pub use bulk::{
 };
 pub use comment::{MAX_COMMENT_CHARS, add_comment};
 pub use drop::{DropOutcome, DropTarget, DropTargets, ViewGroup, arrange, drop_on, drop_targets};
+pub use offers::Offers;
 pub use pending::{forget_all, overlay};
 pub use priority::{Priorities, priorities};
 pub use transition::{TransitionOption, transitions};
@@ -119,21 +121,31 @@ fn me_of(settings: &Settings) -> AppResult<Me> {
 pub async fn apply(
     db: &Db,
     source: &dyn Source,
+    offers: &Offers,
     settings: &Settings,
     issue_id: String,
     change: Change,
 ) -> AppResult<WriteOutcome> {
     ensure_allowed(settings, change.capability())?;
-    match change {
+    let id = issue_id.clone();
+    let is_transition = matches!(change, Change::Transition { .. });
+    let outcome = match change {
         Change::Assign { account_id } => {
             assign::assign(db, source, me_of(settings)?, issue_id, account_id).await
         }
         Change::Transition { transition_id } => {
-            transition::transition(db, source, issue_id, transition_id).await
+            transition::transition(db, source, offers, issue_id, transition_id).await
         }
-        Change::Priority { name } => priority::set_priority(db, source, issue_id, name).await,
+        Change::Priority { name } => {
+            priority::set_priority(db, source, offers, issue_id, name).await
+        }
         Change::Title { text } => title::set_title(db, source, issue_id, text).await,
+    };
+    // A successful move already asked for the moves from its new status, for its reverse.
+    if outcome.is_err() || !is_transition {
+        offers.forget_issue(&id);
     }
+    outcome
 }
 
 /// Changes to Jira are on, and this kind of change isn't switched off.

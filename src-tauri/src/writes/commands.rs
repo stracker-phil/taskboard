@@ -19,7 +19,15 @@ pub async fn issue_write(
 ) -> AppResult<WriteOutcome> {
     let settings = state.settings.get();
     let source = crate::sync::source_for(&state.jira, &settings.connection)?;
-    super::apply(&state.db, source.as_ref(), &settings, id, change).await
+    super::apply(
+        &state.db,
+        source.as_ref(),
+        &state.offers,
+        &settings,
+        id,
+        change,
+    )
+    .await
 }
 
 /// Assigns the issue to me, or unassigns it when it is mine.
@@ -27,7 +35,7 @@ pub async fn issue_write(
 pub async fn issue_toggle_mine(state: State<'_, AppState>, id: String) -> AppResult<WriteOutcome> {
     let settings = state.settings.get();
     let source = crate::sync::source_for(&state.jira, &settings.connection)?;
-    super::toggle_mine(&state.db, source.as_ref(), &settings, id).await
+    super::toggle_mine(&state.db, source.as_ref(), &state.offers, &settings, id).await
 }
 
 /// The moves Jira offers from the issue's status.
@@ -38,7 +46,7 @@ pub async fn issue_transitions(
 ) -> AppResult<Vec<TransitionOption>> {
     let settings = state.settings.get();
     let source = crate::sync::source_for(&state.jira, &settings.connection)?;
-    super::transitions(&state.db, source.as_ref(), id).await
+    super::transitions(&state.db, source.as_ref(), &state.offers, id).await
 }
 
 /// The priorities Jira offers for the issue.
@@ -46,7 +54,7 @@ pub async fn issue_transitions(
 pub async fn issue_priorities(state: State<'_, AppState>, id: String) -> AppResult<Priorities> {
     let settings = state.settings.get();
     let source = crate::sync::source_for(&state.jira, &settings.connection)?;
-    super::priorities(&state.db, source.as_ref(), id).await
+    super::priorities(&state.db, source.as_ref(), &state.offers, id).await
 }
 
 /// Adds a comment, typed as plain text.
@@ -85,7 +93,15 @@ pub async fn issue_drop_targets(
 ) -> AppResult<DropTargets> {
     let settings = state.settings.get();
     let source = crate::sync::source_for(&state.jira, &settings.connection)?;
-    let found = super::drop_targets(&state.db, source.as_ref(), &settings, id, group_by).await?;
+    let found = super::drop_targets(
+        &state.db,
+        source.as_ref(),
+        &state.offers,
+        &settings,
+        id,
+        group_by,
+    )
+    .await?;
     Ok(super::arrange(found, &from_key, &groups))
 }
 
@@ -99,7 +115,16 @@ pub async fn issue_drop(
 ) -> AppResult<DropOutcome> {
     let settings = state.settings.get();
     let source = crate::sync::source_for(&state.jira, &settings.connection)?;
-    super::drop_on(&state.db, source.as_ref(), &settings, id, group_by, key).await
+    super::drop_on(
+        &state.db,
+        source.as_ref(),
+        &state.offers,
+        &settings,
+        id,
+        group_by,
+        key,
+    )
+    .await
 }
 
 /// Who the issue may be assigned to.
@@ -117,7 +142,7 @@ pub async fn issues_bulk_statuses(
 ) -> AppResult<Vec<BulkStatus>> {
     let settings = state.settings.get();
     let source = crate::sync::source_for(&state.jira, &settings.connection)?;
-    super::bulk_statuses(&state.db, source.as_ref(), ids).await
+    super::bulk_statuses(&state.db, source.as_ref(), &state.offers, ids).await
 }
 
 /// The priorities every picked issue's edit screen offers.
@@ -128,7 +153,7 @@ pub async fn issues_bulk_priorities(
 ) -> AppResult<Vec<Priority>> {
     let settings = state.settings.get();
     let source = crate::sync::source_for(&state.jira, &settings.connection)?;
-    super::bulk_priorities(source.as_ref(), ids).await
+    super::bulk_priorities(&state.db, source.as_ref(), &state.offers, ids).await
 }
 
 /// Who may be assigned all the picked issues.
@@ -150,5 +175,14 @@ pub async fn issues_write_many(
 ) -> AppResult<BulkOutcome> {
     let settings = state.settings.get();
     let source = crate::sync::source_for(&state.jira, &settings.connection)?;
-    super::apply_many(&state.db, source.as_ref(), &settings, changes, what, total).await
+    super::apply_many(
+        &state.db,
+        source.as_ref(),
+        &state.offers,
+        &settings,
+        changes,
+        what,
+        total,
+    )
+    .await
 }

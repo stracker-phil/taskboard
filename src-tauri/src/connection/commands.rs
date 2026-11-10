@@ -20,11 +20,13 @@ pub async fn connection_change_permissions(
     state: State<'_, AppState>,
 ) -> AppResult<Vec<super::permissions::ChangeNotAllowed>> {
     let client = state.jira.client(&state.settings.get().connection)?;
-    let mut granted = Vec::new();
-    for key in super::projects::tracked_keys(&state.db).await? {
+    let keys = super::projects::tracked_keys(&state.db).await?;
+    let client = &client;
+    let granted = crate::jira::ask_all(keys, |key| async move {
         let have = client.my_permissions(&key).await?;
-        granted.push((key, have));
-    }
+        Ok((key, have))
+    })
+    .await?;
     Ok(super::permissions::not_allowed(&granted))
 }
 
@@ -43,6 +45,7 @@ pub async fn connection_save(
     token: Option<String>,
 ) -> AppResult<ConnectionView> {
     let saved = super::save(&state.settings, &state.jira, input, token, today()).await?;
+    state.offers.clear();
     sync.connection_changed();
     announce_settings(&app, &state.settings.get());
     log::info!("Jira connection saved");

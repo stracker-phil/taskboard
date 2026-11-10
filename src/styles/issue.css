@@ -224,3 +224,12 @@ body.is-dragging-issue, body.is-dragging-issue * { cursor: grabbing !important; 
 .bulk-bar--leaving, body.is-dragging-issue .bulk-bar { opacity: 0; pointer-events: none; }
 .bulk-bar__count { padding: 0 8px 0 6px; font-size: 13px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
 .bulk-bar__divider { width: 1px; height: 18px; margin: 0 4px; background: var(--hairline); }
+.bulk-bar__loading { cursor: progress; }
+/* In the icon's 15px slot while a menu's choices load. */
+.bulk-bar__spinner {
+  width: 15px; height: 15px; box-sizing: border-box; flex: none; border: 2px solid var(--spinner-track);
+  border-top-color: var(--accent); border-radius: 50%; animation: spin 0.9s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bulk-bar__spinner { animation-duration: 2.4s; }
+}

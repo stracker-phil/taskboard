@@ -17,6 +17,7 @@ use crate::store::modes::ModesStore;
 use crate::store::places::PlaceStore;
 use crate::store::settings::SettingsStore;
 use crate::store::ui_state::UiStateStore;
+use crate::writes::Offers;
 
 pub struct AppState {
     pub settings: SettingsStore,
@@ -30,6 +31,8 @@ pub struct AppState {
     pub nav: NavStore,
     pub places: PlaceStore,
     pub inbox: InboxSession,
+    /// Jira's answers on what issues allow, kept for a while.
+    pub offers: Offers,
 }
 
 impl AppState {
@@ -48,6 +51,7 @@ impl AppState {
             nav: NavStore::open(config_dir),
             places: PlaceStore::open(config_dir),
             inbox: InboxSession::default(),
+            offers: Offers::default(),
         })
     }
 }

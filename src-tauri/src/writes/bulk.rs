@@ -1,13 +1,15 @@
-//! Changes to several picked issues at once: what every one of them allows, then one write after another through
+//! Changes to several picked issues at once: what every one of them allows, then the writes side by side through
 //! `apply`, so each is checked, recorded and settled like a single change.
 
 use rusqlite::OptionalExtension;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
-use super::{Change, WriteOutcome, apply, issue_key, issue_project, me_of, transitions};
+use super::offers::one_per_kind;
+use super::{Change, Offers, WriteOutcome, apply, issue_key, issue_project, me_of, transitions};
 use crate::db::Db;
 use crate::error::AppResult;
+use crate::jira::{ask_all, run_all};
 use crate::status_style::Style;
 use crate::store::settings::Settings;
 use crate::sync::source::Source;
@@ -54,19 +56,20 @@ pub struct BulkOutcome {
 pub async fn bulk_statuses(
     db: &Db,
     source: &dyn Source,
+    offers: &Offers,
     ids: Vec<String>,
 ) -> AppResult<Vec<BulkStatus>> {
-    let mut issues = Vec::new();
-    for id in ids {
-        let moves: Vec<_> = transitions(db, source, id.clone())
+    let issues = ask_all(ids, |id| async move {
+        let moves: Vec<_> = transitions(db, source, offers, id.clone())
             .await?
             .into_iter()
             .filter(|m| !m.opens_jira)
             .collect();
         let lookup = id.clone();
         let current = db.read(move |conn| status_name(conn, &lookup)).await?;
-        issues.push((id, current, moves));
-    }
+        Ok((id, current, moves))
+    })
+    .await?;
     let mut names: Vec<(String, Style)> = Vec::new();
     for (_, _, moves) in &issues {
         for m in moves {
@@ -100,11 +103,19 @@ pub async fn bulk_statuses(
         .collect())
 }
 
-/// The priorities every issue's edit screen offers, in the first issue's order.
-pub async fn bulk_priorities(source: &dyn Source, ids: Vec<String>) -> AppResult<Vec<Priority>> {
+/// The priorities every issue's edit screen offers, in the first issue's order; asked once per kind of issue.
+pub async fn bulk_priorities(
+    db: &Db,
+    source: &dyn Source,
+    offers: &Offers,
+    ids: Vec<String>,
+) -> AppResult<Vec<Priority>> {
+    let answers = ask_all(one_per_kind(db, ids).await?, |id| async move {
+        offers.priorities(db, source, &id).await
+    })
+    .await?;
     let mut offered: Option<Vec<String>> = None;
-    for id in ids {
-        let names = source.priorities(&id).await?;
+    for names in answers {
         offered = Some(match offered {
             None => names,
             Some(kept) => kept
@@ -151,20 +162,26 @@ pub async fn bulk_assignees(
     .await
 }
 
-/// Sends the changes one after another; a refusal doesn't stop the rest. `what` names the change for the toast
+/// Sends the changes side by side; a refusal doesn't stop the rest. `what` names the change for the toast
 /// ("Moved to Done"); `total` counts the picked issues, also those that needed no change.
 pub async fn apply_many(
     db: &Db,
     source: &dyn Source,
+    offers: &Offers,
     settings: &Settings,
     changes: Vec<IssueChange>,
     what: String,
     total: usize,
 ) -> AppResult<BulkOutcome> {
+    let answers = run_all(changes, |IssueChange { issue_id, change }| async move {
+        let answer = apply(db, source, offers, settings, issue_id.clone(), change).await;
+        (issue_id, answer)
+    })
+    .await;
     let mut reverse = Vec::new();
     let mut refusals: Vec<String> = Vec::new();
-    for IssueChange { issue_id, change } in changes {
-        match apply(db, source, settings, issue_id.clone(), change).await {
+    for (issue_id, answer) in answers {
+        match answer {
             Ok(WriteOutcome { reverse: back, .. }) => {
                 if let Some(back) = back {
                     reverse.push(IssueChange {

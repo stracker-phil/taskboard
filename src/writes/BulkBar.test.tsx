@@ -338,15 +338,82 @@ describe("BulkBar", () => {
 
       await userEvent.click(await enabled("Status"));
 
-      expect(screen.getByRole("button", { name: "Status" })).toHaveAttribute("aria-busy", "true");
+      expect(screen.getByRole("button", { name: /Status$/ })).toHaveAttribute("aria-busy", "true");
       expect(screen.getByRole("button", { name: "Assign" })).toHaveAttribute("aria-busy", "false");
-      for (const name of ["Status", "Assign", "Priority"]) expect(screen.getByRole("button", { name })).toBeDisabled();
+      for (const name of [/Status$/, "Assign", "Priority"]) expect(screen.getByRole("button", { name })).toBeDisabled();
 
       await act(async () => arrive([DONE]));
 
       expect(await screen.findByRole("menu", { name: "Status of the picked issues" })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Status" })).toHaveAttribute("aria-busy", "false");
       expect(screen.getByRole("button", { name: "Assign" })).toBeEnabled();
+    });
+
+    describe("spinner", () => {
+      const pending = <T,>() => {
+        let resolve: (value: T) => void = () => {};
+        let reject: (reason: unknown) => void = () => {};
+        const promise = new Promise<T>((res, rej) => {
+          resolve = res;
+          reject = rej;
+        });
+        return { promise, resolve: (value: T) => resolve(value), reject: (reason: unknown) => reject(reason) };
+      };
+      const statusButton = () => screen.getByRole("button", { name: /Status$/ });
+
+      it("holds a progressbar in the Status button, which keeps its label and says it asks Jira", async () => {
+        const load = pending<BulkStatus[]>();
+        mocked.issuesBulkStatuses.mockReturnValue(load.promise);
+        renderBar();
+
+        await userEvent.click(await enabled("Status"));
+
+        const button = statusButton();
+        expect(within(button).getByRole("progressbar", { name: "Loading status choices" })).toBeInTheDocument();
+        expect(button).toHaveTextContent("Status");
+        expect(button).toHaveAttribute("title", "Status: asking Jira…");
+      });
+
+      it("goes and leaves the opened menu once the choices arrive", async () => {
+        const load = pending<BulkStatus[]>();
+        mocked.issuesBulkStatuses.mockReturnValue(load.promise);
+        renderBar();
+        await userEvent.click(await enabled("Status"));
+
+        await act(async () => load.resolve([DONE]));
+
+        expect(await screen.findByRole("menu", { name: "Status of the picked issues" })).toBeInTheDocument();
+        expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Status" })).not.toHaveAttribute("title", "Status: asking Jira…");
+      });
+
+      it("goes and frees the button again when the choices cannot be loaded", async () => {
+        const load = pending<BulkStatus[]>();
+        mocked.issuesBulkStatuses.mockReturnValue(load.promise);
+        renderBar();
+        await userEvent.click(await enabled("Status"));
+
+        await act(async () => load.reject({ kind: "io", message: "Network is down", code: null }));
+
+        await waitFor(() => expect(screen.queryByRole("progressbar")).not.toBeInTheDocument());
+        expect(screen.getByRole("button", { name: "Status" })).toBeEnabled();
+        expect(toasts()).toEqual([["error", "Could not load the statuses: Network is down"]]);
+      });
+
+      it("shows the Priority button's own progressbar and none on the other buttons", async () => {
+        const load = pending<{ name: string; level: number }[]>();
+        mocked.issuesBulkPriorities.mockReturnValue(load.promise);
+        renderBar();
+
+        await userEvent.click(await enabled("Priority"));
+
+        const bar = screen.getByRole("toolbar", { name: "Picked issues" });
+        const bars = within(bar).getAllByRole("progressbar");
+        expect(bars).toHaveLength(1);
+        expect(bars[0]).toHaveAccessibleName("Loading priority choices");
+        expect(screen.getByRole("button", { name: /Priority$/ })).toContainElement(bars[0]);
+        expect(screen.getByRole("button", { name: /Priority$/ })).toHaveAttribute("title", "Priority: asking Jira…");
+      });
     });
   });
 

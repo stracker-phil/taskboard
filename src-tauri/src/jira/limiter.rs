@@ -5,6 +5,9 @@ use std::time::Duration;
 
 use tokio::time::Instant;
 
+/// How many requests may go out at once before they are spaced.
+pub const BURST: usize = 5;
+
 pub struct Limiter {
     interval: Duration,
     burst: u32,
@@ -14,7 +17,7 @@ pub struct Limiter {
 
 impl Default for Limiter {
     fn default() -> Self {
-        Self::new(5, 5)
+        Self::new(5, BURST as u32)
     }
 }
 

@@ -52,17 +52,29 @@ Assigning to the current assignee, or moving to the current status, sends nothin
 
 ## Status changes
 
-Jira's workflow decides which statuses an issue can move to, so `issue_transitions(id)` asks Jira each time the
-status menu opens (`GET issue/{id}/transitions`) and lists the moves by target status
+Jira's workflow decides which statuses an issue can move to, so `issue_transitions(id)` asks Jira
+(`GET issue/{id}/transitions`) through [Offers](#offers) and lists the moves by target status
 (`TransitionOption { id, statusName, style, opensJira }`, in Jira's order). A move with `hasScreen` needs fields
 Taskboard doesn't show: the menu marks it "Opens Jira" and opens the issue in the browser, and `apply` refuses it.
-`apply` asks for the moves again before it writes, so a move Jira no longer offers fails with a reason. The row
+`apply` checks the move against the same offers before it writes, so a move Jira doesn't offer fails with a
+reason, and one Jira dropped since it was asked is refused by Jira. The row
 shows the target status (and its category) at once; the pending row holds the status id. The reverse is the move
 back to the old status when Jira offers one without a screen ("Change back to In Progress"); otherwise none.
 
-A priority is set by name to one the issue's edit screen offers (`GET issue/{id}/editmeta`, asked again before
-each write; no priority field there means it can't be changed). The pending row holds the name; the reverse sets
+A priority is set by name to one the issue's edit screen offers (`GET issue/{id}/editmeta` through
+[Offers](#offers), also checked before each write; no priority field there means it can't be changed). The pending row holds the name; the reverse sets
 the old one ("Change back to Medium"), none when the issue had no priority.
+## Offers
+
+`writes::Offers` (in `AppState`, cleared when the connection is saved) keeps what Jira offers, so menus, drags and
+the check before a write don't ask again:
+
+- **Moves** per issue and the status it had when asked, for a minute: a workflow's conditions may look at the
+  issue (its assignee, say). Another status asks again; so does any change Taskboard makes to the issue other than
+  a move, and a refused one. A move asks for the moves from the new status for its reverse and keeps them.
+- **Priorities** per kind of issue (project, issue type and status, from `cache.issue`), for ten minutes: issues of
+  one kind share an edit screen. An issue the cache doesn't know is asked for itself, uncached.
+
 ## Drag and drop
 
 A List row or a Board card dragged onto a group changes the field the view groups by (`writes/drop.rs`,
@@ -142,11 +154,12 @@ the Issue view. The sent title shows until Jira's answer replaces it; a refusal 
 
 ## Several issues at once
 
-`writes::bulk` serves the bulk bar ([ux.md](ux.md#picking-issues)). The menus ask once per picked issue (a
-`transitions` or `editmeta` request each, within the rate limit) and keep what all of them allow: a status by name,
+`writes::bulk` serves the bulk bar ([ux.md](ux.md#picking-issues)). The menus ask side by side
+(`jira::ask_all`, the rate limit's burst at a time) through [Offers](#offers): the moves of every picked issue,
+the priorities of one issue per kind (`offers::one_per_kind`). They keep what all of them allow: a status by name,
 since workflows differ between projects, leaving out moves that need Jira's own screen and issues already in it; the
 priorities in the first issue's order; me and the people on every picked issue's Space's team. `apply_many` sends the
-changes one after another through `apply`, so each is checked against the switches, recorded and settled like a
+changes side by side (`jira::run_all`) through `apply`, so each is checked against the switches, recorded and settled like a
 single change, and a refusal doesn't stop the rest. Its `BulkOutcome` words the toast, counts what changed and what
 Jira refused, and carries each changed issue's reverse for **Change back**, itself a bulk change.
 
@@ -183,7 +196,7 @@ A change refused before it is sent (changes off, a switched-off kind) records no
 | `issues_bulk_statuses(ids)` | the statuses every picked issue can move to (or is in), with each issue's move |
 | `issues_bulk_priorities(ids)` | the priorities every picked issue's edit screen offers |
 | `issues_bulk_assignees(ids)` | me and whoever is on the team of every picked issue's Space |
-| `issues_write_many(changes, what, total)` | sends the changes one after another through `apply`; one outcome for the toast, with the reverses |
+| `issues_write_many(changes, what, total)` | sends the changes side by side through `apply`; one outcome for the toast, with the reverses |
 | `issue_priorities(id)` | the priorities the issue's edit screen offers, and the one it has |
 | `issue_comment(id, text)` | adds a plain-text comment |
 | `issue_add_web_link(id, url, title)` | adds a web link; `title` null names it after its pull request or address |

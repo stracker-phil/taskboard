@@ -18,7 +18,7 @@ use taskboard_lib::test_support::demo::ME_EMAIL;
 use taskboard_lib::test_support::fake_jira::{DEMO_TOKEN, FakeJira};
 use taskboard_lib::test_support::{FakeSecrets, temp_config_dir};
 use taskboard_lib::writes::sent::{SentChange, sent_changes};
-use taskboard_lib::writes::{Change, add_comment, add_web_link, apply};
+use taskboard_lib::writes::{Change, Offers, add_comment, add_web_link, apply};
 
 const PROJECT_IDS: [&str; 5] = ["10001", "10002", "10003", "10004", "10005"];
 const ALEX: &str = "712020:5a1e0c3f-8d2b-4f61-9c7e-1b2a3c4d5e01";
@@ -34,6 +34,7 @@ struct Rig {
     fake: FakeJira,
     _dir: TempDir,
     ctx: SyncContext,
+    offers: Offers,
 }
 
 impl Rig {
@@ -82,6 +83,7 @@ impl Rig {
             fake,
             _dir: dir,
             ctx,
+            offers: Offers::default(),
         }
     }
 
@@ -94,6 +96,7 @@ impl Rig {
         apply(
             &self.ctx.db,
             &*source,
+            &self.offers,
             &self.ctx.settings.get(),
             issue_id.into(),
             change,

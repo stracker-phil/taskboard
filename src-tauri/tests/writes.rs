@@ -27,9 +27,9 @@ use taskboard_lib::test_support::fake_jira::{DEMO_TOKEN, FakeJira};
 use taskboard_lib::test_support::{FakeSecrets, temp_config_dir};
 use taskboard_lib::views::GroupBy;
 use taskboard_lib::writes::{
-    Assignees, Change, DropOutcome, DropTargets, MAX_COMMENT_CHARS, Reverse, TransitionOption,
-    WriteOutcome, add_comment, add_web_link, apply, assignees, drop_on, drop_targets, forget_all,
-    priorities, toggle_mine, transitions,
+    Assignees, Change, DropOutcome, DropTargets, MAX_COMMENT_CHARS, Offers, Reverse,
+    TransitionOption, WriteOutcome, add_comment, add_web_link, apply, assignees, drop_on,
+    drop_targets, forget_all, priorities, toggle_mine, transitions,
 };
 
 const PROJECT_IDS: [&str; 5] = ["10001", "10002", "10003", "10004", "10005"];
@@ -66,6 +66,7 @@ struct Rig {
     fake: FakeJira,
     _dir: TempDir,
     ctx: SyncContext,
+    offers: Offers,
 }
 
 impl Rig {
@@ -107,6 +108,7 @@ impl Rig {
             fake,
             _dir: dir,
             ctx,
+            offers: Offers::default(),
         };
         rig.sync().await;
         rig.ctx
@@ -142,6 +144,7 @@ impl Rig {
         apply(
             &self.ctx.db,
             &*source,
+            &self.offers,
             &self.settings(),
             issue_id.into(),
             change,
@@ -151,9 +154,15 @@ impl Rig {
 
     async fn toggle(&self, issue_id: &str) -> WriteOutcome {
         let source = self.ctx.source().unwrap();
-        toggle_mine(&self.ctx.db, &*source, &self.settings(), issue_id.into())
-            .await
-            .unwrap()
+        toggle_mine(
+            &self.ctx.db,
+            &*source,
+            &self.offers,
+            &self.settings(),
+            issue_id.into(),
+        )
+        .await
+        .unwrap()
     }
 
     /// What the cache shows as the assignee.
@@ -306,6 +315,7 @@ impl Rig {
         apply(
             &self.ctx.db,
             &*source,
+            &self.offers,
             &self.settings(),
             issue_id.into(),
             Change::Transition {
@@ -317,7 +327,7 @@ impl Rig {
 
     async fn moves(&self, issue_id: &str) -> Vec<TransitionOption> {
         let source = self.ctx.source().unwrap();
-        transitions(&self.ctx.db, &*source, issue_id.into())
+        transitions(&self.ctx.db, &*source, &self.offers, issue_id.into())
             .await
             .unwrap()
     }
@@ -510,6 +520,7 @@ impl Rig {
         apply(
             &self.ctx.db,
             &*source,
+            &self.offers,
             &self.settings(),
             issue_id.into(),
             Change::Priority { name: name.into() },
@@ -577,6 +588,244 @@ fn outcome(done: &str, label: &str, back_to: Option<&str>) -> WriteOutcome {
                 account_id: back_to.map(String::from),
             },
         }),
+    }
+}
+
+impl Rig {
+    /// Edit screens (`editmeta`) the fake was asked for.
+    fn editmetas_asked(&self) -> usize {
+        self.fake
+            .requests()
+            .iter()
+            .filter(|r| r.method == "GET" && r.path.ends_with("/editmeta"))
+            .count()
+    }
+
+    /// Lists of moves (`transitions`) the fake was asked for.
+    fn transitions_asked(&self) -> usize {
+        self.fake
+            .requests()
+            .iter()
+            .filter(|r| r.method == "GET" && r.path.ends_with("/transitions"))
+            .count()
+    }
+
+    /// Two issues of the same Space, type and status, which share an edit screen.
+    async fn two_of_one_kind(&self) -> (String, String) {
+        self.ctx
+            .db
+            .read(|conn| {
+                Ok(conn.query_row(
+                    "SELECT a.id, b.id FROM cache.issue a JOIN cache.issue b
+                       ON a.project_id = b.project_id AND a.issue_type = b.issue_type
+                      AND a.status_id = b.status_id AND a.id < b.id
+                     WHERE a.gone = 0 AND b.gone = 0 ORDER BY a.id, b.id LIMIT 1",
+                    [],
+                    |row| Ok((row.get(0)?, row.get(1)?)),
+                )?)
+            })
+            .await
+            .unwrap()
+    }
+
+    async fn priority_names(&self, issue_id: &str) -> Vec<String> {
+        let source = self.ctx.source().unwrap();
+        let menu = priorities(&self.ctx.db, &*source, &self.offers, issue_id.into())
+            .await
+            .unwrap();
+        serde_json::to_value(menu).unwrap()["options"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|option| option["name"].as_str().unwrap().to_string())
+            .collect()
+    }
+
+    /// The cache shows the issue in another status, as a sync would leave it.
+    async fn show_in_status(&self, issue_id: &'static str, status_id: &'static str) {
+        self.ctx
+            .db
+            .write(move |tx, _| {
+                tx.execute(
+                    "UPDATE cache.issue SET status_id = ?2 WHERE id = ?1",
+                    [issue_id, status_id],
+                )?;
+                Ok(())
+            })
+            .await
+            .unwrap();
+    }
+}
+
+/// Lets `by` pass for what Taskboard keeps, without the loopback fake's connections seeing a paused clock.
+async fn let_time_pass(by: std::time::Duration) {
+    tokio::time::pause();
+    tokio::time::advance(by).await;
+    tokio::time::resume();
+}
+
+mod what_jira_offers_is_kept {
+    use super::*;
+    use std::time::Duration;
+
+    const MINUTE: Duration = Duration::from_secs(60);
+
+    #[tokio::test]
+    async fn the_status_menu_of_an_issue_asks_jira_once() {
+        let rig = Rig::synced().await;
+        let asked = rig.transitions_asked();
+
+        let first = rig.moves(NW_1042).await;
+        let second = rig.moves(NW_1042).await;
+
+        assert_eq!(first, second);
+        assert_eq!(rig.transitions_asked() - asked, 1);
+    }
+
+    #[tokio::test]
+    async fn the_moves_of_each_issue_are_asked_on_their_own() {
+        let rig = Rig::synced().await;
+        let asked = rig.transitions_asked();
+
+        rig.moves(NW_1042).await;
+        rig.moves(NW_1049).await;
+
+        assert_eq!(rig.transitions_asked() - asked, 2);
+    }
+
+    #[tokio::test]
+    async fn the_moves_are_asked_again_after_a_minute() {
+        let rig = Rig::synced().await;
+        let asked = rig.transitions_asked();
+        rig.moves(NW_1042).await;
+
+        let_time_pass(MINUTE - Duration::from_secs(1)).await;
+        rig.moves(NW_1042).await;
+        assert_eq!(rig.transitions_asked() - asked, 1);
+
+        let_time_pass(Duration::from_secs(2)).await;
+        rig.moves(NW_1042).await;
+        assert_eq!(rig.transitions_asked() - asked, 2);
+    }
+
+    #[tokio::test]
+    async fn the_moves_are_asked_again_once_the_issue_is_in_another_status() {
+        let rig = Rig::synced().await;
+        let asked = rig.transitions_asked();
+        rig.moves(NW_1042).await;
+        rig.show_in_status(NW_1042, IN_REVIEW).await;
+
+        rig.moves(NW_1042).await;
+
+        assert_eq!(rig.transitions_asked() - asked, 2);
+    }
+
+    #[tokio::test]
+    async fn the_moves_are_asked_again_after_a_change_that_is_not_a_move() {
+        let rig = Rig::synced().await;
+        let asked = rig.transitions_asked();
+        rig.moves(NW_1042).await;
+
+        rig.apply(NW_1042, Some(MARTA)).await;
+        rig.moves(NW_1042).await;
+
+        assert_eq!(rig.transitions_asked() - asked, 2);
+    }
+
+    #[tokio::test]
+    async fn the_moves_are_asked_again_after_a_change_that_failed() {
+        let rig = Rig::synced().await;
+        let asked = rig.transitions_asked();
+        rig.moves(NW_1042).await;
+        rig.fake
+            .answer_next_write(400, json!({ "errorMessages": ["Not allowed"] }));
+
+        rig.try_apply(NW_1042, Some(MARTA)).await.unwrap_err();
+        rig.moves(NW_1042).await;
+
+        assert_eq!(rig.transitions_asked() - asked, 2);
+    }
+
+    #[tokio::test]
+    async fn after_a_move_the_menu_offers_the_moves_from_the_new_status() {
+        let rig = Rig::synced().await;
+        let asked = rig.transitions_asked();
+        rig.moves(NW_1042).await;
+
+        rig.move_to(NW_1042, DONE).await;
+        let moves = rig.moves(NW_1042).await;
+
+        let ids: Vec<&str> = moves.iter().map(|m| m.id.as_str()).collect();
+        assert_eq!(ids, [TO_DO, IN_PROGRESS, IN_REVIEW, BLOCKED]);
+        assert_eq!(rig.transitions_asked() - asked, 2);
+    }
+
+    #[tokio::test]
+    async fn issues_of_one_kind_share_one_priority_answer() {
+        let rig = Rig::synced().await;
+        let (first, second) = rig.two_of_one_kind().await;
+        let asked = rig.editmetas_asked();
+
+        let names = rig.priority_names(&first).await;
+        let again = rig.priority_names(&second).await;
+
+        assert_eq!(names, ["Highest", "High", "Medium", "Low", "Lowest"]);
+        assert_eq!(again, names);
+        assert_eq!(rig.editmetas_asked() - asked, 1);
+    }
+
+    #[tokio::test]
+    async fn issues_of_different_kinds_ask_for_their_priorities_on_their_own() {
+        let rig = Rig::synced().await;
+        let asked = rig.editmetas_asked();
+
+        rig.priority_names(NW_1042).await;
+        rig.priority_names(NW_1044).await;
+
+        assert_eq!(rig.editmetas_asked() - asked, 2);
+    }
+
+    #[tokio::test]
+    async fn an_issue_in_another_status_is_a_new_kind_for_priorities() {
+        let rig = Rig::synced().await;
+        let asked = rig.editmetas_asked();
+        rig.priority_names(NW_1042).await;
+        rig.show_in_status(NW_1042, IN_REVIEW).await;
+
+        rig.priority_names(NW_1042).await;
+
+        assert_eq!(rig.editmetas_asked() - asked, 2);
+    }
+
+    #[tokio::test]
+    async fn the_priorities_are_asked_again_after_ten_minutes() {
+        let rig = Rig::synced().await;
+        let asked = rig.editmetas_asked();
+        rig.priority_names(NW_1042).await;
+
+        let_time_pass(9 * MINUTE).await;
+        rig.priority_names(NW_1042).await;
+        assert_eq!(rig.editmetas_asked() - asked, 1);
+
+        let_time_pass(2 * MINUTE).await;
+        rig.priority_names(NW_1042).await;
+        assert_eq!(rig.editmetas_asked() - asked, 2);
+    }
+
+    #[tokio::test]
+    async fn clearing_drops_every_kept_answer() {
+        let rig = Rig::synced().await;
+        let moves_asked = rig.transitions_asked();
+        let screens_asked = rig.editmetas_asked();
+        rig.moves(NW_1042).await;
+        rig.priority_names(NW_1042).await;
+
+        rig.offers.clear();
+        rig.moves(NW_1042).await;
+        rig.priority_names(NW_1042).await;
+
+        assert_eq!(rig.transitions_asked() - moves_asked, 2);
+        assert_eq!(rig.editmetas_asked() - screens_asked, 2);
     }
 }
 
@@ -911,6 +1160,7 @@ mod refusals {
         let err = apply(
             &rig.ctx.db,
             &*source,
+            &rig.offers,
             &settings,
             NW_1044.into(),
             Change::Assign {
@@ -1954,7 +2204,7 @@ mod the_priority_menu {
 
     async fn menu(rig: &Rig) -> AppResult<Value> {
         let source = rig.ctx.source().unwrap();
-        priorities(&rig.ctx.db, &*source, NW_1042.into())
+        priorities(&rig.ctx.db, &*source, &rig.offers, NW_1042.into())
             .await
             .map(|menu| serde_json::to_value(menu).unwrap())
     }
@@ -2060,6 +2310,7 @@ mod renaming {
             apply(
                 &self.ctx.db,
                 &*source,
+                &self.offers,
                 &self.settings(),
                 issue_id.into(),
                 Change::Title { text: text.into() },
@@ -2798,6 +3049,7 @@ mod dropping {
         drop_targets(
             &rig.ctx.db,
             &*source,
+            &rig.offers,
             &rig.settings(),
             NW_1042.into(),
             group_by,
@@ -2815,6 +3067,7 @@ mod dropping {
         drop_on(
             &rig.ctx.db,
             &*source,
+            &rig.offers,
             &rig.settings(),
             NW_1042.into(),
             group_by,
@@ -2930,6 +3183,7 @@ mod dropping {
         );
 
         rig.fake.require_screen(BLOCKED);
+        rig.offers.clear();
 
         assert_eq!(
             targets(&rig, GroupBy::Status).await,
@@ -2957,6 +3211,7 @@ mod dropping {
         );
 
         rig.fake.require_screen(BLOCKED);
+        rig.offers.clear();
         assert_eq!(
             targets(&rig, GroupBy::StatusType).await,
             offering(vec![
@@ -3358,6 +3613,7 @@ mod a_kind_of_change_switched_off {
         drop_on(
             &rig.ctx.db,
             &*source,
+            &rig.offers,
             &rig.settings(),
             NW_1042.into(),
             group_by,
@@ -3371,6 +3627,7 @@ mod a_kind_of_change_switched_off {
         drop_targets(
             &rig.ctx.db,
             &*source,
+            &rig.offers,
             &rig.settings(),
             NW_1042.into(),
             group_by,
@@ -3399,8 +3656,16 @@ mod a_kind_of_change_switched_off {
         switch_off(&rig, Capability::Assign).await;
         let source = rig.ctx.source().unwrap();
 
-        let message =
-            refused(toggle_mine(&rig.ctx.db, &*source, &rig.settings(), NW_1044.into()).await);
+        let message = refused(
+            toggle_mine(
+                &rig.ctx.db,
+                &*source,
+                &rig.offers,
+                &rig.settings(),
+                NW_1044.into(),
+            )
+            .await,
+        );
 
         assert_eq!(message, off_message("Change the assignee"));
         assert_eq!(rig.assignments_sent(), 0);
@@ -3637,14 +3902,16 @@ mod bulk {
 
     async fn statuses(rig: &Rig, issues: &[&str]) -> Vec<BulkStatus> {
         let source = rig.ctx.source().unwrap();
-        bulk_statuses(&rig.ctx.db, &*source, ids(issues))
+        bulk_statuses(&rig.ctx.db, &*source, &rig.offers, ids(issues))
             .await
             .unwrap()
     }
 
     async fn priorities_of(rig: &Rig, issues: &[&str]) -> Value {
         let source = rig.ctx.source().unwrap();
-        let found = bulk_priorities(&*source, ids(issues)).await.unwrap();
+        let found = bulk_priorities(&rig.ctx.db, &*source, &rig.offers, ids(issues))
+            .await
+            .unwrap();
         serde_json::to_value(found).unwrap()
     }
 
@@ -3658,6 +3925,7 @@ mod bulk {
         apply_many(
             &rig.ctx.db,
             &*source,
+            &rig.offers,
             &rig.settings(),
             changes,
             what.into(),
@@ -3829,12 +4097,21 @@ mod bulk {
                     names.iter().map(|name| json!({ "name": name })).collect();
                 json!({ "fields": { "priority": { "allowedValues": allowed } } })
             };
-            rig.fake
-                .answer_next(200, edit_screen(&["Highest", "High", "Medium", "Low"]));
-            rig.fake
-                .answer_next(200, edit_screen(&["Lowest", "Low", "High"]));
+            let source = rig.ctx.source().unwrap();
+            for (issue, names) in [
+                (NW_1042, &["Highest", "High", "Medium", "Low"][..]),
+                (NW_1044, &["Lowest", "Low", "High"][..]),
+            ] {
+                rig.fake.answer_next(200, edit_screen(names));
+                rig.offers
+                    .priorities(&rig.ctx.db, &*source, issue)
+                    .await
+                    .unwrap();
+            }
+            let asked = rig.editmetas_asked();
 
-            let found = priorities_of(&rig, &[NW_1042, NW_1049]).await;
+            let found = priorities_of(&rig, &[NW_1042, NW_1044]).await;
+            let reversed = priorities_of(&rig, &[NW_1044, NW_1042]).await;
 
             assert_eq!(
                 found,
@@ -3843,6 +4120,48 @@ mod bulk {
                     { "name": "Low", "level": 4 },
                 ])
             );
+            assert_eq!(
+                reversed,
+                json!([
+                    { "name": "Low", "level": 4 },
+                    { "name": "High", "level": 2 },
+                ])
+            );
+            assert_eq!(rig.editmetas_asked(), asked);
+        }
+
+        #[tokio::test]
+        async fn ask_jira_once_for_issues_of_one_kind() {
+            let rig = Rig::synced().await;
+            let (first, second) = rig.two_of_one_kind().await;
+            let asked = rig.editmetas_asked();
+
+            let found = priorities_of(&rig, &[first.as_str(), second.as_str()]).await;
+
+            assert_eq!(found.as_array().unwrap().len(), 5);
+            assert_eq!(rig.editmetas_asked() - asked, 1);
+        }
+
+        #[tokio::test]
+        async fn ask_jira_once_for_each_kind_of_issue() {
+            let rig = Rig::synced().await;
+            let asked = rig.editmetas_asked();
+
+            priorities_of(&rig, &[NW_1042, NW_1044]).await;
+
+            assert_eq!(rig.editmetas_asked() - asked, 2);
+        }
+
+        #[tokio::test]
+        async fn a_second_menu_for_the_same_kinds_does_not_ask_jira_again() {
+            let rig = Rig::synced().await;
+            let asked = rig.editmetas_asked();
+
+            let first = priorities_of(&rig, &[NW_1042, NW_1044]).await;
+            let second = priorities_of(&rig, &[NW_1044, NW_1042]).await;
+
+            assert_eq!(first, second);
+            assert_eq!(rig.editmetas_asked() - asked, 2);
         }
 
         #[tokio::test]
@@ -3979,28 +4298,126 @@ mod bulk {
 
             let outcome = move_all(&rig, "Done", &[NW_1042, NW_1049]).await;
 
+            let (refused, key, applied) = if rig.jira_status(NW_1042).await == IN_PROGRESS {
+                (NW_1042, "NW-1042", NW_1049)
+            } else {
+                (NW_1049, "NW-1049", NW_1042)
+            };
             assert_eq!(
                 outcome,
                 BulkOutcome {
-                    done: "Moved to Done: 1 of 2 issues. NW-1042: Jira refused the change: Not allowed"
-                        .into(),
+                    done: format!(
+                        "Moved to Done: 1 of 2 issues. {key}: Jira refused the change: Not allowed"
+                    ),
                     changed: 1,
                     refused: 1,
-                    reverse: Some(vec![transition(NW_1049, IN_PROGRESS)]),
+                    reverse: Some(vec![transition(applied, IN_PROGRESS)]),
                 }
             );
-            assert_eq!(rig.jira_status(NW_1042).await, IN_PROGRESS);
-            assert_eq!(rig.jira_status(NW_1049).await, DONE);
+            assert_eq!(rig.jira_status(refused).await, IN_PROGRESS);
+            assert_eq!(rig.jira_status(applied).await, DONE);
             assert_eq!(
-                rig.cached_status(NW_1042).await,
+                rig.cached_status(refused).await,
                 (IN_PROGRESS.to_string(), "indeterminate".to_string())
             );
             assert_eq!(
-                rig.cached_status(NW_1049).await,
+                rig.cached_status(applied).await,
                 (DONE.to_string(), "done".to_string())
             );
             assert_eq!(rig.pending_writes().await, 0);
             assert_eq!(rig.transitions_posted(), 2);
+        }
+
+        #[tokio::test]
+        async fn the_toast_names_the_first_refusal_in_the_picks_order_and_the_others_still_apply() {
+            let rig = Rig::synced().await;
+
+            let outcome = run(
+                &rig,
+                vec![
+                    transition(NW_1049, "99999"),
+                    priority_of(NW_1042, "Low"),
+                    transition(NW_1044, "99999"),
+                ],
+                "Changed",
+                3,
+            )
+            .await;
+
+            assert_eq!(
+                outcome,
+                BulkOutcome {
+                    done: "Changed: 1 of 3 issues. NW-1049: Jira no longer offers this move; the issue may have changed"
+                        .into(),
+                    changed: 1,
+                    refused: 2,
+                    reverse: Some(vec![priority_of(NW_1042, "High")]),
+                }
+            );
+            assert_eq!(rig.jira_priority(NW_1042).await.as_deref(), Some("Low"));
+            assert_eq!(rig.cached_priority(NW_1042).await.as_deref(), Some("Low"));
+            assert_eq!(rig.transitions_posted(), 0);
+        }
+
+        #[tokio::test]
+        async fn jiras_refusals_of_every_change_name_the_first_pick() {
+            let rig = Rig::synced().await;
+            for _ in 0..2 {
+                rig.fake
+                    .answer_next_write(400, json!({ "errorMessages": ["Not allowed"] }));
+            }
+
+            let outcome = run(
+                &rig,
+                vec![transition(NW_1049, DONE), transition(NW_1042, DONE)],
+                "Moved to Done",
+                2,
+            )
+            .await;
+
+            assert_eq!(
+                outcome,
+                BulkOutcome {
+                    done: "Moved to Done: 0 of 2 issues. NW-1049: Jira refused the change: Not allowed"
+                        .into(),
+                    changed: 0,
+                    refused: 2,
+                    reverse: None,
+                }
+            );
+            assert_eq!(rig.jira_status(NW_1042).await, IN_PROGRESS);
+            assert_eq!(rig.jira_status(NW_1049).await, IN_PROGRESS);
+        }
+
+        #[tokio::test]
+        async fn a_change_right_after_the_status_menu_asks_for_each_issues_moves_only_to_offer_the_way_back()
+         {
+            let rig = Rig::synced().await;
+            let offered = statuses(&rig, &[NW_1042, NW_1049]).await;
+            let done = offered
+                .into_iter()
+                .find(|s| s.status_name == "Done")
+                .unwrap();
+            let seen = rig.fake.requests().len();
+
+            run(&rig, done.changes, "Moved to Done", 2).await;
+
+            let since: Vec<_> = rig.fake.requests().into_iter().skip(seen).collect();
+            for id in [NW_1042, NW_1049] {
+                let own: Vec<&str> = since
+                    .iter()
+                    .filter(|r| r.path.contains(id) && r.path.ends_with("/transitions"))
+                    .map(|r| r.method.as_str())
+                    .collect();
+                assert_eq!(own, ["POST", "GET"], "{id}");
+            }
+            assert_eq!(
+                since
+                    .iter()
+                    .filter(|r| r.path.ends_with("/transitions"))
+                    .count(),
+                4
+            );
         }
 
         #[tokio::test]

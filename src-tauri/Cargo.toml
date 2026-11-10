@@ -39,6 +39,8 @@ security-framework = "3"
 zeroize = "1"
 chrono-tz = "0.10"
 fastrand = "2"
+# Ordered, bounded parallel requests (`jira::parallel`).
+futures-util = { version = "0.3", default-features = false, features = ["alloc"] }
 base64 = "0.22"
 unicode-normalization = "0.1.26"
 

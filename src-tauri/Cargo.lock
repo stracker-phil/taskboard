@@ -4249,6 +4249,7 @@ dependencies = [
  "chrono-tz",
  "clap",
  "fastrand",
+ "futures-util",
  "libc",
  "log",
  "objc2",

@@ -6,7 +6,7 @@ use serde::Serialize;
 use ts_rs::TS;
 
 use super::{
-    Begun, Change, Field, Me, Reverse, WriteOutcome, apply, ensure_allowed, issue_key,
+    Begun, Change, Field, Me, Offers, Reverse, WriteOutcome, apply, ensure_allowed, issue_key,
     issue_project, me_of, pending, remember_me, send,
 };
 use crate::db::Db;
@@ -21,6 +21,7 @@ use crate::views::rows::Person;
 pub async fn toggle_mine(
     db: &Db,
     source: &dyn Source,
+    offers: &Offers,
     settings: &Settings,
     issue_id: String,
 ) -> AppResult<WriteOutcome> {
@@ -32,7 +33,7 @@ pub async fn toggle_mine(
     let already_mine = current.as_deref() == Some(me.account_id.as_str());
     let target = (!already_mine).then_some(me.account_id);
     let change = Change::Assign { account_id: target };
-    apply(db, source, settings, issue_id, change).await
+    apply(db, source, offers, settings, issue_id, change).await
 }
 
 pub(super) async fn assign(

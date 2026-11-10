@@ -5,7 +5,7 @@ use rusqlite::{Connection, OptionalExtension};
 use serde::Serialize;
 use ts_rs::TS;
 
-use super::{Begun, Change, Field, Reverse, WriteOutcome, issue_key, pending, send};
+use super::{Begun, Change, Field, Offers, Reverse, WriteOutcome, issue_key, pending, send};
 use crate::db::Db;
 use crate::error::{AppError, AppResult};
 use crate::sync::source::Source;
@@ -21,8 +21,13 @@ pub struct Priorities {
     pub current: Option<String>,
 }
 
-pub async fn priorities(db: &Db, source: &dyn Source, issue_id: String) -> AppResult<Priorities> {
-    let names = source.priorities(&issue_id).await?;
+pub async fn priorities(
+    db: &Db,
+    source: &dyn Source,
+    offers: &Offers,
+    issue_id: String,
+) -> AppResult<Priorities> {
+    let names = offers.priorities(db, source, &issue_id).await?;
     let current = db
         .read(move |conn| current_priority(conn, &issue_id))
         .await?;
@@ -35,10 +40,15 @@ pub async fn priorities(db: &Db, source: &dyn Source, issue_id: String) -> AppRe
 pub(super) async fn set_priority(
     db: &Db,
     source: &dyn Source,
+    offers: &Offers,
     issue_id: String,
     name: String,
 ) -> AppResult<WriteOutcome> {
-    if !source.priorities(&issue_id).await?.contains(&name) {
+    if !offers
+        .priorities(db, source, &issue_id)
+        .await?
+        .contains(&name)
+    {
         return Err(AppError::InvalidInput(format!(
             "Jira doesn't offer the priority {name} for this issue"
         )));

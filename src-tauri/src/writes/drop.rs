@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 use super::transition::{TransitionOption, transitions};
-use super::{Change, WriteOutcome, apply, issue_project};
+use super::{Change, Offers, WriteOutcome, apply, issue_project};
 use crate::db::Db;
 use crate::error::{AppError, AppResult};
 use crate::jira::capability::Capability;
@@ -66,6 +66,7 @@ pub enum DropOutcome {
 pub async fn drop_targets(
     db: &Db,
     source: &dyn Source,
+    offers: &Offers,
     settings: &Settings,
     issue_id: String,
     group_by: GroupBy,
@@ -76,13 +77,15 @@ pub async fn drop_targets(
         return Ok(DropTargets::noted(&why));
     }
     let targets = match group_by {
-        GroupBy::Status => status_targets(&free_moves(db, source, issue_id).await?),
-        GroupBy::StatusType => status_type_targets(&free_moves(db, source, issue_id).await?),
+        GroupBy::Status => status_targets(&free_moves(db, source, offers, issue_id).await?),
+        GroupBy::StatusType => {
+            status_type_targets(&free_moves(db, source, offers, issue_id).await?)
+        }
         GroupBy::Assignee => {
             assignee_targets(db, issue_id, crate::team::Me::of(&settings.connection)).await?
         }
-        GroupBy::Priority => source
-            .priorities(&issue_id)
+        GroupBy::Priority => offers
+            .priorities(db, source, &issue_id)
             .await?
             .into_iter()
             .map(priority_target)
@@ -227,6 +230,7 @@ fn status_type_key(style: Style) -> String {
 pub async fn drop_on(
     db: &Db,
     source: &dyn Source,
+    offers: &Offers,
     settings: &Settings,
     issue_id: String,
     group_by: GroupBy,
@@ -238,7 +242,7 @@ pub async fn drop_on(
         },
         GroupBy::Priority => Change::Priority { name: key },
         GroupBy::Status => {
-            let moves = free_moves(db, source, issue_id.clone()).await?;
+            let moves = free_moves(db, source, offers, issue_id.clone()).await?;
             let Some(chosen) = moves.into_iter().find(|m| m.status_id == key) else {
                 return Err(not_allowed());
             };
@@ -247,7 +251,7 @@ pub async fn drop_on(
             }
         }
         GroupBy::StatusType => {
-            let mut moves: Vec<TransitionOption> = free_moves(db, source, issue_id.clone())
+            let mut moves: Vec<TransitionOption> = free_moves(db, source, offers, issue_id.clone())
                 .await?
                 .into_iter()
                 .filter(|m| status_type_key(m.style) == key)
@@ -266,7 +270,7 @@ pub async fn drop_on(
             ));
         }
     };
-    let outcome = apply(db, source, settings, issue_id, change).await?;
+    let outcome = apply(db, source, offers, settings, issue_id, change).await?;
     Ok(DropOutcome::Done { outcome })
 }
 
@@ -274,9 +278,10 @@ pub async fn drop_on(
 async fn free_moves(
     db: &Db,
     source: &dyn Source,
+    offers: &Offers,
     issue_id: String,
 ) -> AppResult<Vec<TransitionOption>> {
-    Ok(transitions(db, source, issue_id)
+    Ok(transitions(db, source, offers, issue_id)
         .await?
         .into_iter()
         .filter(|m| !m.opens_jira)

@@ -1,12 +1,12 @@
-//! Moving an issue along its workflow. Jira decides which moves exist, so they are asked for each time; a move
-//! that needs Jira's own screen (more fields) opens the issue in Jira instead.
+//! Moving an issue along its workflow. Jira decides which moves exist, so they are asked for through `Offers`. A
+//! move that needs Jira's own screen (more fields) opens the issue in Jira instead.
 
 use chrono::Utc;
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::Serialize;
 use ts_rs::TS;
 
-use super::{Begun, Change, Field, Reverse, WriteOutcome, issue_key, pending, send};
+use super::{Begun, Change, Field, Offers, Reverse, WriteOutcome, issue_key, pending, send};
 use crate::db::Db;
 use crate::error::{AppError, AppResult};
 use crate::jira::dto::{Status, Transition};
@@ -31,9 +31,10 @@ pub struct TransitionOption {
 pub async fn transitions(
     db: &Db,
     source: &dyn Source,
+    offers: &Offers,
     issue_id: String,
 ) -> AppResult<Vec<TransitionOption>> {
-    let moves = source.transitions(&issue_id).await?;
+    let moves = offers.moves(db, source, &issue_id).await?;
     db.read(move |conn| {
         let project_id = project_of(conn, &issue_id)?;
         let styles = Styles::load(conn)?;
@@ -54,10 +55,11 @@ pub async fn transitions(
 pub(super) async fn transition(
     db: &Db,
     source: &dyn Source,
+    offers: &Offers,
     issue_id: String,
     transition_id: String,
 ) -> AppResult<WriteOutcome> {
-    let chosen = chosen_move(source, &issue_id, &transition_id).await?;
+    let chosen = chosen_move(db, source, offers, &issue_id, &transition_id).await?;
     let id = issue_id.clone();
     let target = chosen.clone();
     let now = format_utc(Utc::now());
@@ -83,21 +85,23 @@ pub(super) async fn transition(
     let write = source.transition(&issue_id, &transition_id);
     let change = format!("Status: {}", chosen.to.name);
     send(db, source, &issue_id, Field::Status, change, write).await?;
-    let back = reverse_of(source, &issue_id, &moved).await;
+    let back = reverse_of(db, source, offers, &issue_id, &moved).await;
     Ok(WriteOutcome {
         done: format!("Moved {} to {}", moved.key, chosen.to.name),
         reverse: back,
     })
 }
 
-/// The move as Jira offers it now; one it no longer lists, or one that needs its screen, is refused.
+/// The move as Jira offers it (`Offers`); one it doesn't list, or one that needs its screen, is refused.
 async fn chosen_move(
+    db: &Db,
     source: &dyn Source,
+    offers: &Offers,
     issue_id: &str,
     transition_id: &str,
 ) -> AppResult<Transition> {
-    let chosen = source
-        .transitions(issue_id)
+    let chosen = offers
+        .moves(db, source, issue_id)
         .await?
         .into_iter()
         .find(|t| t.id == transition_id)
@@ -148,8 +152,14 @@ fn remember_status(conn: &Connection, status: &Status) -> AppResult<()> {
 }
 
 /// The move back to the old status, when the workflow offers one without a screen.
-async fn reverse_of(source: &dyn Source, issue_id: &str, moved: &Moved) -> Option<Reverse> {
-    let moves = match source.transitions(issue_id).await {
+async fn reverse_of(
+    db: &Db,
+    source: &dyn Source,
+    offers: &Offers,
+    issue_id: &str,
+    moved: &Moved,
+) -> Option<Reverse> {
+    let moves = match offers.moves(db, source, issue_id).await {
         Ok(moves) => moves,
         Err(e) => {
             log::info!("The moves back for issue {issue_id} weren't fetched: {e}");
