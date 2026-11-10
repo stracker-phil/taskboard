@@ -342,7 +342,7 @@ and slides out when closed. When the narrowing (text filter, Me, a filter draft)
 results, the preview closes; the row stays selected for when it comes back.
 
 What a click opens is the view's choice (Columns → Open issues in: Default, Preview, Full view; `view.open_with`,
-null for Default) or else Settings → General → Open issues in (`behaviour.openIssuesIn`, Preview unless changed;
+null for Default) or else Settings → Behavior → Open issues in (`behaviour.openIssuesIn`, Preview unless changed;
 `useIssueOpening`). Full view opens the Issue view at once, the row still selected. A double-click on a List or Table row
 always opens the Issue view, and only it: a click selects the row at once, but a closed preview waits out the
 system's double-click interval (`useRowClicks`, the `double_click_ms` command) and a double-click cancels it. An
@@ -378,7 +378,7 @@ unread (`src-tauri/src/changes/`). The UI says read and unread; the code says se
   view adds Mark as read.
 - Activity after the last look (`fresh`, decided in Rust) sits under a "New since yesterday" divider
   (`--accent-text`, `--changed-border` lines); new comments and changes have `--changed-bg`.
-- An issue open in the preview or the Issue view for the owner's delay (Settings → General → Behavior, 0–10 s,
+- An issue open in the preview or the Issue view for the owner's delay (Settings → Behavior, 0–10 s,
   default 2) counts as read (`useSeenAfter`); leaving sooner doesn't. Mark as read, Mark all as read and M
   clear it at once.
 - Mark as unread (row toolbar, the Issue view header, M on a read issue) makes the issue unread
@@ -433,7 +433,7 @@ and views can be bookmarked; a filter list's bookmark puts it under Home.
 
 - `PinButton` (the `Bookmark` icon) in the preview and Issue view headers ("Bookmark this issue") and on each
   comment (on hover) opens `PinPopover` (340px): "Keep bookmarked for" chips (Today, 2 days, 1 week, Until
-  removed; the owner's default from Settings → General preselected, Until removed unless changed; the chosen one
+  removed; the owner's default from Settings → Behavior preselected, Until removed unless changed; the chosen one
   `--button-primary-bg`), an optional one-line reason, Cancel and Bookmark; ↩ bookmarks. ⌥-click bookmarks at
   once with the default; a bookmarked target's button is amber and removes the bookmark on click.
 - The row toolbar's Bookmark and P toggle the issue's bookmark (with the default duration) without the popover;
@@ -684,7 +684,7 @@ button, Escape and a press outside close it, focus goes back to the button).
   it (`view.me_rules`, [ADR 0051](adr/0051-each-views-me-mode-has-its-own-rules.md)); while Me holds only through
   "All views" they change the app's set (`behaviour.meRules`, which a view starts from). *Applies to*: "Only this view" (the
   saved `view.only_mine`; a click changes it as a draft) or "All views" (`modes.json` `meEverywhere`: on in
-  every view, a ring around the avatar, until Me is turned off). Its "Fields…" opens Settings → General → Me
+  every view, a ring around the avatar, until Me is turned off). Its "Fields…" opens Settings → Behavior → Me
   Mode. The text is never saved.
 - **Person** chip (`PersonChip.tsx`, beside Me, the same pill; a people icon and "Person", or the picked person's
   avatar and first name in the active style): a [menu](#menus) "Issues assigned to" with Anyone, me, and whoever
@@ -843,15 +843,20 @@ no separate Settings design; owner, 2026-10-28). Its colors are the `--settings-
   field (`invalid_input` with `field`) in red under it; `Segmented` and `ControlRow` (a form's buttons and its
   result line) in `controls.tsx`. A destructive action (`.btn-danger`) asks first in a sheet
   (`components/Modal.tsx`, an `alertdialog` over `--scrim`). Other failures are error toasts.
-- Pages register in `registry/settingsPages.ts`, in groups: **Jira** first, then **System**.
+- Pages register in `registry/settingsPages.ts`, in groups: **Jira** (what Taskboard reads, and how), then
+  **Workspace** (how the owner works with it), then **System** (the app itself).
   - **Connection** (`components/settings/jira/`): *Jira site* (site URL, email, the API token as a password
     field that never shows a saved token, Classic or Scoped token kind, the cloud ID for Scoped; Save and
     Test Connection, with "Connected as …" or the error below), *Token* (the expiry date and how soon it
     runs out), *Changes* (Allow changes to Jira, then a switch per kind of change, dimmed while changes are off)
-    and *What Taskboard reads* (the reads, label and detail, no control). Each row ends with the token scope it
-    needs as Jira names it (`read:jira-work`; monospaced, selectable); the reads' group says which scopes a scoped
-    token requires, the changes' group which one is optional. Both lists come from Rust (`jira_capabilities`),
-    named by the requests the gateway sends.
+    Each row ends with the token scope it needs as Jira names it (`read:jira-work`; monospaced, selectable); the
+    group says which one is optional for a scoped token. The list comes from Rust (`jira_capabilities`), named by
+    the requests the gateway sends.
+  - **Privacy & Data** (`components/settings/privacy/`): *Jira data* (`StorageGroup`): Keep Jira data in memory
+    only first, then the cache's size with Reset Cache (in memory: "Jira data in memory" with Refetch from Jira,
+    both confirmed in a sheet), in file mode Keep history you've read and Clear the cache when Taskboard quits,
+    and Show Data Folder. *What Taskboard reads* (`ReadsGroup`): the reads, label, detail and token scope, no
+    control; the group says which scopes a scoped token requires.
   - **Projects**: Refresh after a successful test, "N of M tracked", a filter field (every word in the name or
     key, ignoring case) and a Track switch per project.
   - **Spaces** (`SpacesPage`): the tracked Spaces in sidebar order, each a row with its tile, name, key and
@@ -892,19 +897,21 @@ no separate Settings design; owner, 2026-10-28). Its colors are the `--settings-
     scrolls; rows keep their order while boxes are ticked. The team is who Assign to… and assignee drops offer, always
     after me: I can be picked in every Space, on its team or not.
   - **Sync**: *Scope* (the effective JQL in a monospaced field; Validate, Save, Reset to Default), *Intervals*
-    (minutes in front and in the background, days to keep done issues) and *Cache* (the sync state line with
-    Sync Now, one row per tracked project with its key, last full sync and "N issues · M open", then Reset
-    Cache, confirmed in a sheet). It stays as the diagnostics view of the cache.
-  - **General** (System): *Behavior* (read delay, where a click opens issues, default bookmark duration), *Me
-    Mode* (the Me popover's switches, plus "Add Field…" for a user field from `cache.field`, `me_user_fields`;
-    a field rule can be removed) and *About* (version, log folder).
+    (minutes in front and in the background, days to keep done issues) and *Synced* (the sync state line with
+    Sync Now, one row per tracked project with its key, last full sync and "N issues · M open"; while an emptied
+    cache refills, the last rows stay).
+  - **Behavior** (Workspace): *Behavior* (read delay, where a click opens issues, default bookmark duration,
+    notifications), *Me Mode* (the Me popover's switches, plus "Add Field…" for a user field from `cache.field`,
+    `me_user_fields`; a field rule can be removed).
   - **Appearance**: Automatic, Light or Dark. **Shortcuts**: every command and its key, rebindable.
   - **Status** (`components/settings/status/`, Daybook's Status page): `diagnostics_get` reports groups of
     rows, each a value with a tone icon (ok, warning, error, info) and maybe a bus command as a button: *Jira*
     (site, account, API token and its expiry), *Sync* (state, tracked projects, last full sync, cached
-    issues, cache size with Compact), *Changes Sent to Jira* (the newest 50, refused ones in red, with
+    issues, cache size with Compact; in memory mode "Jira data": the size and whether a `cache.sqlite` is on disk,
+    with Show), *Changes Sent to Jira* (the newest 50, refused ones in red, with
     Export…) and *This Mac* (version, data and log folders with Show, the command-line tool's path). It reads
     again when the window comes to the front and after a sync.
+  - **About** (System): version, Show Data Folder, Open Log Folder.
 
 ## Keys
 
@@ -919,7 +926,7 @@ global shortcuts.
 
 - **Menus** (`src-tauri/src/menu/`), in the Mac order: Taskboard, File, Edit, Go, List, Issue, View, Window, Help.
   File holds the core actions (New Filter List ⌘N, New View ⌘T; Refresh ⌘R, Full Sync ⇧⌘R; Reset Cache…,
-  which opens Settings → Sync → Cache to confirm; Close Window ⌘W). Go moves around (Command Palette ⌘K,
+  which opens Settings → Privacy & Data → Jira data to confirm; Close Window ⌘W). Go moves around (Command Palette ⌘K,
   Everything ⇧⌘E, Recently Viewed ⌘Y, Bookmarks ⇧⌘P, Back ⌘[, Forward ⌘], Previous/Next Space ⌥⌘↑/↓, Previous/Next List ⌥⌘[/] (within the
   Space, or among the levels outside the Spaces, wrapping), Previous/Next View ⌃⇧⇥/⌃⇥, then the level's views by
   name with ⌘1–⌘9, the shown one checked). List acts on the shown issues (Group and Sort… ⌥⌘G, Columns… ⌥⌘C, Edit

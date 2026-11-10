@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -174,35 +174,12 @@ describe("SyncPage", () => {
     });
   });
 
-  describe("Cache", () => {
-    it("asks before resetting and says what stays", async () => {
+  describe("Synced", () => {
+    it("shows the Sync Now button after the intervals", async () => {
       await renderPage();
 
-      await userEvent.click(screen.getByRole("button", { name: "Reset Cache" }));
-
-      const dialog = screen.getByRole("alertdialog", { name: "Reset the cache?" });
-      expect(dialog).toHaveTextContent("Spaces, filter lists, views, bookmarks and what you've read stay");
-      expect(mocked.cacheReset).not.toHaveBeenCalled();
-    });
-
-    it("closes without resetting when canceled", async () => {
-      await renderPage();
-      await userEvent.click(screen.getByRole("button", { name: "Reset Cache" }));
-
-      await userEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Cancel" }));
-
-      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
-      expect(mocked.cacheReset).not.toHaveBeenCalled();
-    });
-
-    it("resets the cache when confirmed", async () => {
-      await renderPage();
-      await userEvent.click(screen.getByRole("button", { name: "Reset Cache" }));
-
-      await userEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Reset Cache" }));
-
-      expect(mocked.cacheReset).toHaveBeenCalled();
-      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+      expect(await screen.findByRole("button", { name: "Sync Now" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Reset Cache" })).not.toBeInTheDocument();
     });
   });
 });

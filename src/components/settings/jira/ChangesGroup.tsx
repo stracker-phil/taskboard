@@ -3,8 +3,10 @@ import { useCapabilities, useChangePermissions, useSettings } from "../../../que
 import { attempt } from "../../../state/requests";
 import { Group, Row, Switch, SwitchInput } from "../controls";
 
-/** Changes to Jira on or off, then each kind of change on its own, then what Taskboard reads, each with the token
- *  scope it needs. The list comes from the gateway's own requests (`jira::capability`), so it is what the app does. */
+const scopes = (rows: CapabilityRow[]) => [...new Set(rows.map((row) => row.scope))];
+
+/** Changes to Jira on or off, then each kind of change on its own, each with the token scope it needs. The list
+ *  comes from the gateway's own requests (`jira::capability`), so it is what the app does. */
 export function ChangesGroup() {
   const { data: settings } = useSettings();
   const { data: capabilities = [] } = useCapabilities();
@@ -16,52 +18,57 @@ export function ChangesGroup() {
   const setChange = (row: CapabilityRow, enabled: boolean) =>
     void attempt(api.jiraCapabilitySet(row.capability, enabled), `Could not change “${row.label}”`);
   const changes = capabilities.filter((row) => row.change);
-  const reads = capabilities.filter((row) => !row.change);
   const notAllowedIn = (row: CapabilityRow) =>
     behaviour.allowJiraChanges ? (notAllowed.find((n) => n.capability === row.capability)?.projects ?? []) : [];
-  const scopes = (rows: CapabilityRow[]) => [...new Set(rows.map((row) => row.scope))];
   return (
-    <>
-      <Group
-        title="Changes"
-        anchor="changes"
-        description={
-          <>
-            Each change is sent to Jira once. Optional for a scoped token: <ScopeNames scopes={scopes(changes)} />, only while changes are on.
-          </>
-        }
-      >
-        <Switch label="Allow changes to Jira" checked={behaviour.allowJiraChanges} onChange={setAllowJiraChanges} />
-        {changes.map((row) => (
-          <Row
-            key={row.capability}
-            label={row.label}
-            description={<Described row={row} notAllowedIn={notAllowedIn(row)} />}
+    <Group
+      title="Changes"
+      anchor="changes"
+      description={
+        <>
+          Each change is sent to Jira once. Optional for a scoped token: <ScopeNames scopes={scopes(changes)} />, only while changes are on.
+        </>
+      }
+    >
+      <Switch label="Allow changes to Jira" checked={behaviour.allowJiraChanges} onChange={setAllowJiraChanges} />
+      {changes.map((row) => (
+        <Row
+          key={row.capability}
+          label={row.label}
+          description={<Described row={row} notAllowedIn={notAllowedIn(row)} />}
+          disabled={!behaviour.allowJiraChanges}
+        >
+          <SwitchInput
+            aria-label={row.label}
+            checked={!behaviour.disabledChanges.includes(row.capability)}
             disabled={!behaviour.allowJiraChanges}
-          >
-            <SwitchInput
-              aria-label={row.label}
-              checked={!behaviour.disabledChanges.includes(row.capability)}
-              disabled={!behaviour.allowJiraChanges}
-              onChange={(enabled) => setChange(row, enabled)}
-            />
-          </Row>
-        ))}
-      </Group>
-      <Group
-        title="What Taskboard reads"
-        anchor="reads"
-        description={
-          <>
-            Always on: Taskboard reads only these from Jira. Required for a scoped token: <ScopeNames scopes={scopes(reads)} />.
-          </>
-        }
-      >
-        {reads.map((row) => (
-          <Row key={row.capability} label={row.label} description={<Described row={row} />} />
-        ))}
-      </Group>
-    </>
+            onChange={(enabled) => setChange(row, enabled)}
+          />
+        </Row>
+      ))}
+    </Group>
+  );
+}
+
+/** Read-only capabilities, each with the token scope it needs; no switches. */
+export function ReadsGroup() {
+  const { data: capabilities } = useCapabilities();
+  if (!capabilities) return null;
+  const reads = capabilities.filter((row) => !row.change);
+  return (
+    <Group
+      title="What Taskboard reads"
+      anchor="reads"
+      description={
+        <>
+          Always on: Taskboard reads only these from Jira. Required for a scoped token: <ScopeNames scopes={scopes(reads)} />.
+        </>
+      }
+    >
+      {reads.map((row) => (
+        <Row key={row.capability} label={row.label} description={<Described row={row} />} />
+      ))}
+    </Group>
   );
 }
 

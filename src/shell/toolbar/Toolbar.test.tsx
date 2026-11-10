@@ -907,7 +907,7 @@ describe("Toolbar Me mode", () => {
 
       await userEvent.click((await popover()).getByRole("button", { name: "Fields…" }));
 
-      expect(mocked.runCommand).toHaveBeenCalledWith("app:settings:general:meMode");
+      expect(mocked.runCommand).toHaveBeenCalledWith("app:settings:meMode");
     });
   });
 

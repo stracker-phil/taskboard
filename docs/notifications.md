@@ -11,7 +11,7 @@
 
 ## What (`notify::notices`)
 
-Settings → General → **Notify me about** (`behaviour.notifyAbout`):
+Settings → Behavior → **Notify me about** (`behaviour.notifyAbout`):
 
 | Value | Announces |
 |---|---|

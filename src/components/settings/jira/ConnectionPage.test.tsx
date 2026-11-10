@@ -230,6 +230,14 @@ describe("ConnectionPage", () => {
 
       expect(await screen.findByRole("switch", { name: "Allow changes to Jira" })).not.toBeChecked();
     });
+
+    it("does not list what Taskboard reads; that lives on the Privacy & Data page", async () => {
+      await renderPage();
+
+      await screen.findByRole("switch", { name: "Allow changes to Jira" });
+
+      expect(screen.queryByText("What Taskboard reads")).not.toBeInTheDocument();
+    });
   });
 
   describe("Projects", () => {

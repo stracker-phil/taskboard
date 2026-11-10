@@ -3,29 +3,36 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
 
 import { registerCoreSettingsPages } from "../components/settings/pages";
-import { hasSection, resolveSettingsPage, settingsPages } from "./settingsPages";
+import { hasSection, resolveSettingsPage, settingsGroups, settingsPages } from "./settingsPages";
 
 beforeAll(() => {
   registerCoreSettingsPages();
 });
 
 describe("core settings pages", () => {
-  it("has an app-wide Statuses page in the Jira group after Team", () => {
-    const pages = settingsPages();
-    const ids = pages.map((p) => p.id);
-
-    expect(pages.find((p) => p.id === "statuses")?.group).toBe("Jira");
-    expect(ids.indexOf("statuses")).toBe(ids.indexOf("team") + 1);
+  it("lists the nav groups in the order Jira, Workspace, System", () => {
+    expect(settingsGroups("").map((g) => g.group)).toEqual(["Jira", "Workspace", "System"]);
   });
 
-  it("has an app-wide Custom fields page in the Jira group between Statuses and Sync", () => {
-    const pages = settingsPages();
-    const ids = pages.map((p) => p.id);
+  it.each([
+    ["Jira", ["connection", "privacy", "projects", "sync"]],
+    ["Workspace", ["spaces", "team", "statuses", "fields", "behavior"]],
+    ["System", ["appearance", "shortcuts", "status", "about"]],
+  ])("lists the %s pages in order", (group, ids) => {
+    const entry = settingsGroups("").find((g) => g.group === group);
 
-    expect(pages.find((p) => p.id === "fields")?.label).toBe("Custom fields");
-    expect(pages.find((p) => p.id === "fields")?.group).toBe("Jira");
-    expect(ids.indexOf("fields")).toBe(ids.indexOf("statuses") + 1);
-    expect(ids.indexOf("sync")).toBe(ids.indexOf("fields") + 1);
+    expect(entry?.pages.map((p) => p.page.id)).toEqual(ids);
+  });
+
+  it("labels the Privacy & Data page and the Behavior page", () => {
+    expect(resolveSettingsPage("privacy")?.label).toBe("Privacy & Data");
+    expect(resolveSettingsPage("behavior")?.label).toBe("Behavior");
+  });
+
+  it("finds the Privacy & Data page by the title of its Jira data section", () => {
+    const hits = settingsGroups("Jira data").flatMap((g) => g.pages);
+
+    expect(hits.map((h) => [h.page.id, h.section?.id])).toEqual([["privacy", "cache"]]);
   });
 
   it("registers the Space groups as sections of the Spaces page", () => {
@@ -39,6 +46,18 @@ describe("core settings pages", () => {
 describe("resolveSettingsPage", () => {
   it("resolves a Space target to the Spaces page", () => {
     expect(resolveSettingsPage("space:10001")?.id).toBe("spaces");
+  });
+
+  it.each(["cache", "reads"])("resolves the %s section to the Privacy & Data page", (section) => {
+    expect(resolveSettingsPage(section)?.id).toBe("privacy");
+  });
+
+  it("resolves the synced section to the Sync page", () => {
+    expect(resolveSettingsPage("synced")?.id).toBe("sync");
+  });
+
+  it("resolves the meMode section to the Behavior page", () => {
+    expect(resolveSettingsPage("meMode")?.id).toBe("behavior");
   });
 
   it("resolves the layouts section to the Spaces page", () => {

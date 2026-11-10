@@ -1,8 +1,10 @@
 /** The core settings pages. Modules register their own pages from their install function. */
-import { Activity, CircleDot, FolderKanban, Keyboard, LayoutGrid, Palette, PlugZap, RefreshCw, SlidersHorizontal, TextCursorInput, Users } from "lucide-react";
+import { Activity, CircleDot, FolderKanban, Info, Keyboard, LayoutGrid, Palette, PlugZap, RefreshCw, ShieldCheck, SlidersHorizontal, TextCursorInput, Users } from "lucide-react";
 import { registerSettingsPage } from "../../registry/settingsPages";
 import { AppearancePage } from "./AppearancePage";
-import { GeneralPage } from "./GeneralPage";
+import { AboutPage } from "./AboutPage";
+import { BehaviorPage } from "./BehaviorPage";
+import { PrivacyPage } from "./privacy/PrivacyPage";
 import { ShortcutsPage } from "./ShortcutsPage";
 import { ConnectionPage } from "./jira/ConnectionPage";
 import { ProjectsPage } from "./jira/ProjectsPage";
@@ -25,25 +27,36 @@ export function registerCoreSettingsPages() {
       { id: "site", title: "Jira site" },
       { id: "token", title: "Token" },
       { id: "changes", title: "Changes" },
-      { id: "reads", title: "What Taskboard reads" },
     ],
     Body: ConnectionPage,
+  });
+  registerSettingsPage({
+    id: "privacy",
+    group: "Jira",
+    label: "Privacy & Data",
+    icon: ShieldCheck,
+    order: 1,
+    sections: [
+      { id: "cache", title: "Jira data" },
+      { id: "reads", title: "What Taskboard reads" },
+    ],
+    Body: PrivacyPage,
   });
   registerSettingsPage({
     id: "projects",
     group: "Jira",
     label: "Projects",
     icon: FolderKanban,
-    order: 1,
+    order: 2,
     sections: [{ id: "projects", title: "Projects" }],
     Body: ProjectsPage,
   });
   registerSettingsPage({
     id: "spaces",
-    group: "Jira",
+    group: "Workspace",
     label: "Spaces",
     icon: LayoutGrid,
-    order: 2,
+    order: 0,
     // A Space's own settings open from its row; these titles let the search find them.
     sections: [
       { id: "spaces", title: "Spaces" },
@@ -55,28 +68,28 @@ export function registerCoreSettingsPages() {
   });
   registerSettingsPage({
     id: "team",
-    group: "Jira",
+    group: "Workspace",
     label: "Team",
     icon: Users,
-    order: 2.5,
+    order: 1,
     sections: [{ id: "team", title: "Team" }],
     Body: TeamPage,
   });
   registerSettingsPage({
     id: "statuses",
-    group: "Jira",
+    group: "Workspace",
     label: "Statuses",
     icon: CircleDot,
-    order: 2.6,
+    order: 2,
     sections: [{ id: "statuses", title: "Statuses" }],
     Body: StatusesPage,
   });
   registerSettingsPage({
     id: "fields",
-    group: "Jira",
+    group: "Workspace",
     label: "Custom fields",
     icon: TextCursorInput,
-    order: 2.7,
+    order: 3,
     sections: [{ id: "fields", title: "Custom fields" }],
     Body: CustomFieldsPage,
   });
@@ -89,12 +102,13 @@ export function registerCoreSettingsPages() {
     sections: [
       { id: "scope", title: "Scope" },
       { id: "intervals", title: "Intervals" },
-      { id: "cache", title: "Cache" },
+      { id: "synced", title: "Synced" },
     ],
     Body: SyncPage,
   });
-  registerSettingsPage({ id: "general", group: "System", label: "General", icon: SlidersHorizontal, order: 0, sections: [{ id: "behaviour", title: "Behavior" }, { id: "meMode", title: "Me Mode" }, { id: "about", title: "About" }], Body: GeneralPage });
+  registerSettingsPage({ id: "behavior", group: "Workspace", label: "Behavior", icon: SlidersHorizontal, order: 4, sections: [{ id: "behaviour", title: "Behavior" }, { id: "meMode", title: "Me Mode" }], Body: BehaviorPage });
   registerSettingsPage({ id: "appearance", group: "System", label: "Appearance", icon: Palette, order: 1, sections: [{ id: "appearance", title: "Appearance" }], Body: AppearancePage });
   registerSettingsPage({ id: "shortcuts", group: "System", label: "Shortcuts", icon: Keyboard, order: 2, sections: [{ id: "shortcuts", title: "Shortcuts" }], Body: ShortcutsPage });
   registerSettingsPage({ id: "status", group: "System", label: "Status", icon: Activity, order: 3, sections: [{ id: "status", title: "Status" }], Body: StatusPage });
+  registerSettingsPage({ id: "about", group: "System", label: "About", icon: Info, order: 4, sections: [{ id: "about", title: "About" }], Body: AboutPage });
 }

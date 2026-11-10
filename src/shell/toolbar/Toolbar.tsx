@@ -168,7 +168,7 @@ export function Toolbar({ level, view }: { level: Level; view: View }) {
           onRule={me.setRule}
           everywhere={me.everywhere}
           onScope={me.setScope}
-          onAddFields={() => void attempt(api.runCommand("app:settings:general:meMode"), "Could not open the Me Mode settings")}
+          onAddFields={() => void attempt(api.runCommand("app:settings:meMode"), "Could not open the Me Mode settings")}
           anchor={anchor}
           onClose={close}
         />

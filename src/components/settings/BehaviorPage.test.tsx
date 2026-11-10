@@ -9,7 +9,7 @@ import { api, type Behaviour, type PinDuration } from "../../api";
 import { createQueryClient } from "../../queries/queryClient";
 import { resetStore, useStore } from "../../state/store";
 import { behaviour, settings } from "../../test/settings";
-import { GeneralPage } from "./GeneralPage";
+import { BehaviorPage } from "./BehaviorPage";
 
 const mocked = vi.mocked(api, true);
 
@@ -17,7 +17,7 @@ async function renderPage(current: Behaviour = behaviour()) {
   mocked.getSettings.mockResolvedValue(settings({ behaviour: current }));
   render(
     <QueryClientProvider client={createQueryClient()}>
-      <GeneralPage />
+      <BehaviorPage />
     </QueryClientProvider>,
   );
   return screen.findByLabelText("Count an issue as read after");
@@ -30,7 +30,7 @@ beforeEach(() => {
   mocked.behaviourSet.mockImplementation(async (b) => settings({ behaviour: b }));
 });
 
-describe("GeneralPage", () => {
+describe("BehaviorPage", () => {
   describe("Behavior", () => {
     it("shows the seconds before an issue counts as read", async () => {
       const field = await renderPage(behaviour({ seenAfterSeconds: 4 }));

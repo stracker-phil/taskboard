@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -9,17 +9,16 @@ import { api } from "../../../api";
 import { formatLocalTime } from "../../../lib/time";
 import { createQueryClient } from "../../../queries/queryClient";
 import { SYNC_KEY } from "../../../queries/sync";
-import { resetStore, useStore } from "../../../state/store";
+import { resetStore } from "../../../state/store";
 import { projectCounts, syncOverview } from "../../../test/jira";
-import { defaultSync, settings } from "../../../test/settings";
-import { CacheGroup } from "./CacheGroup";
+import { SyncedGroup } from "./SyncedGroup";
 
 const mocked = vi.mocked(api, true);
 
 function renderGroup() {
   render(
     <QueryClientProvider client={createQueryClient()}>
-      <CacheGroup />
+      <SyncedGroup />
     </QueryClientProvider>,
   );
 }
@@ -28,10 +27,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
   mocked.syncOverview.mockResolvedValue(syncOverview());
-  mocked.getSettings.mockResolvedValue(settings());
 });
 
-describe("CacheGroup", () => {
+describe("SyncedGroup", () => {
   describe("sync state", () => {
     it("says the cache was never synced", async () => {
       renderGroup();
@@ -73,161 +71,6 @@ describe("CacheGroup", () => {
 
       expect(await screen.findByText("Syncing…")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Sync Now" })).toBeDisabled();
-    });
-  });
-
-  describe("clearing the cache on quit", () => {
-    const switchName = "Clear the cache when Taskboard quits";
-
-    it("shows the switch off when the setting is off", async () => {
-      renderGroup();
-
-      expect(await screen.findByRole("switch", { name: switchName })).not.toBeChecked();
-    });
-
-    it("shows the switch on when the setting is saved on", async () => {
-      mocked.getSettings.mockResolvedValue(settings({ sync: { ...defaultSync(), clearCacheOnQuit: true } }));
-
-      renderGroup();
-
-      expect(await screen.findByRole("switch", { name: switchName })).toBeChecked();
-    });
-
-    it("saves the whole sync settings with the flag turned on and shows the saved result", async () => {
-      renderGroup();
-
-      await userEvent.click(await screen.findByRole("switch", { name: switchName }));
-
-      await waitFor(() => expect(mocked.syncSave).toHaveBeenCalledWith({ ...defaultSync(), clearCacheOnQuit: true }));
-      await waitFor(() => expect(screen.getByRole("switch", { name: switchName })).toBeChecked());
-    });
-
-    it("saves the flag turned off when it was on", async () => {
-      mocked.getSettings.mockResolvedValue(settings({ sync: { ...defaultSync(), keepDoneDays: 30, clearCacheOnQuit: true } }));
-      renderGroup();
-
-      await userEvent.click(await screen.findByRole("switch", { name: switchName }));
-
-      await waitFor(() => expect(mocked.syncSave).toHaveBeenCalledWith({ ...defaultSync(), keepDoneDays: 30, clearCacheOnQuit: false }));
-      await waitFor(() => expect(screen.getByRole("switch", { name: switchName })).not.toBeChecked());
-    });
-
-    it("keeps the switch as saved when saving fails", async () => {
-      mocked.syncSave.mockRejectedValueOnce({ kind: "io", message: "Disk full", code: null });
-      renderGroup();
-
-      await userEvent.click(await screen.findByRole("switch", { name: switchName }));
-
-      await waitFor(() => expect(mocked.syncSave).toHaveBeenCalled());
-      expect(screen.getByRole("switch", { name: switchName })).not.toBeChecked();
-    });
-  });
-
-  describe("keeping Jira data in memory only", () => {
-    const switchName = "Keep Jira data in memory only";
-    const clearOnQuit = "Clear the cache when Taskboard quits";
-    const toasts = () => useStore.getState().toasts.map((t) => t.message);
-
-    it("describes what the switch does", async () => {
-      renderGroup();
-
-      await screen.findByRole("switch", { name: switchName });
-
-      expect(screen.getByText("Nothing from Jira is written to disk. Each launch syncs again.")).toBeInTheDocument();
-    });
-
-    it("shows the switch off when the setting is off", async () => {
-      renderGroup();
-
-      expect(await screen.findByRole("switch", { name: switchName })).not.toBeChecked();
-    });
-
-    it("shows the switch on when the setting is saved on", async () => {
-      mocked.getSettings.mockResolvedValue(settings({ sync: { ...defaultSync(), memoryOnly: true } }));
-
-      renderGroup();
-
-      expect(await screen.findByRole("switch", { name: switchName })).toBeChecked();
-    });
-
-    it("saves the whole sync settings with memory-only turned on and tells that the cache is empty", async () => {
-      renderGroup();
-
-      await userEvent.click(await screen.findByRole("switch", { name: switchName }));
-
-      await waitFor(() => expect(mocked.syncSave).toHaveBeenCalledWith({ ...defaultSync(), memoryOnly: true }));
-      await waitFor(() => expect(screen.getByRole("switch", { name: switchName })).toBeChecked());
-      expect(toasts()).toContain("The cache is empty; Taskboard fetches your issues again.");
-    });
-
-    it("shows no success toast and keeps the switch as saved when saving fails", async () => {
-      mocked.syncSave.mockRejectedValueOnce({ kind: "io", message: "Disk full", code: null });
-      renderGroup();
-
-      await userEvent.click(await screen.findByRole("switch", { name: switchName }));
-
-      await waitFor(() => expect(mocked.syncSave).toHaveBeenCalled());
-      await waitFor(() => expect(toasts()).toContain("Could not save the setting: Disk full"));
-      expect(toasts()).not.toContain("The cache is empty; Taskboard fetches your issues again.");
-      expect(screen.getByRole("switch", { name: switchName })).not.toBeChecked();
-    });
-
-    it("offers clearing the cache on quit while memory-only is off", async () => {
-      renderGroup();
-
-      expect(await screen.findByRole("switch", { name: clearOnQuit })).toBeInTheDocument();
-    });
-
-    it("hides clearing the cache on quit while memory-only is on", async () => {
-      mocked.getSettings.mockResolvedValue(settings({ sync: { ...defaultSync(), memoryOnly: true } }));
-
-      renderGroup();
-
-      await screen.findByRole("switch", { name: switchName });
-      expect(screen.queryByRole("switch", { name: clearOnQuit })).not.toBeInTheDocument();
-    });
-  });
-
-  describe("keeping read history", () => {
-    const groupName = "Keep history you've read";
-    const pressed = () =>
-      within(screen.getByRole("group", { name: groupName }))
-        .getAllByRole("button")
-        .filter((b) => b.getAttribute("aria-pressed") === "true")
-        .map((b) => b.textContent);
-
-    it("presses the option matching the saved number of days", async () => {
-      renderGroup();
-      await screen.findByRole("group", { name: groupName });
-
-      expect(pressed()).toEqual(["90 days"]);
-    });
-
-    it("presses none when the saved number of days is not an option", async () => {
-      mocked.getSettings.mockResolvedValue(settings({ sync: { ...defaultSync(), keepHistoryDays: 45 } }));
-      renderGroup();
-      await screen.findByRole("group", { name: groupName });
-
-      expect(pressed()).toEqual([]);
-    });
-
-    it("saves the whole sync settings with the chosen days and presses the saved option", async () => {
-      renderGroup();
-
-      await userEvent.click(await screen.findByRole("button", { name: "180 days" }));
-
-      await waitFor(() => expect(mocked.syncSave).toHaveBeenCalledWith({ ...defaultSync(), keepHistoryDays: 180 }));
-      await waitFor(() => expect(pressed()).toEqual(["180 days"]));
-    });
-  });
-
-  describe("reset confirmation", () => {
-    it("says that what you've read stays", async () => {
-      renderGroup();
-
-      await userEvent.click(await screen.findByRole("button", { name: "Reset Cache" }));
-
-      expect(screen.getByRole("alertdialog")).toHaveTextContent("bookmarks and what you've read stay");
     });
   });
 
@@ -275,7 +118,7 @@ describe("CacheGroup", () => {
       const client = createQueryClient();
       render(
         <QueryClientProvider client={client}>
-          <CacheGroup />
+          <SyncedGroup />
         </QueryClientProvider>,
       );
       expect(await screen.findByText("Northwind website")).toBeInTheDocument();

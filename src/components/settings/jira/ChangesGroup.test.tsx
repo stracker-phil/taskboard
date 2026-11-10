@@ -157,29 +157,22 @@ describe("ChangesGroup", () => {
     });
   });
 
-  describe("what Taskboard reads", () => {
-    it("lists the read rows with their detail and no switch", async () => {
-      await renderGroup(true);
-
-      expect(await screen.findByText("Your account")).toBeInTheDocument();
-      expect(screen.getByText(/Reads the issues of the projects you track\./)).toBeInTheDocument();
-      expect(screen.queryByRole("switch", { name: "Your account" })).not.toBeInTheDocument();
-      expect(screen.queryByRole("switch", { name: "Issues" })).not.toBeInTheDocument();
-    });
-
-    it("keeps the reads out of the change switches", async () => {
+  describe("what is not a change", () => {
+    it("keeps the reads out of the Changes group", async () => {
       await renderGroup(true);
 
       await screen.findByRole("switch", { name: "Assign issues" });
 
       expect(screen.getAllByRole("switch")).toHaveLength(7);
+      expect(screen.queryByText("Your account")).not.toBeInTheDocument();
+      expect(screen.queryByText("What Taskboard reads")).not.toBeInTheDocument();
     });
   });
 
   describe("token scopes", () => {
     const rows = capabilityRows();
 
-    it.each(rows.map((row) => [row.label, row.detail, row.scope]))("shows the scope of “%s” after its detail", async (_label, detail, scope) => {
+    it.each(rows.filter((row) => row.change).map((row) => [row.label, row.detail, row.scope]))("shows the scope of “%s” after its detail", async (_label, detail, scope) => {
       await renderGroup(true);
 
       const description = await screen.findByText(new RegExp(`^${detail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
@@ -195,25 +188,15 @@ describe("ChangesGroup", () => {
       );
     });
 
-    it("lists the required scopes of the reads once each, in row order, in the reads description", async () => {
-      await renderGroup(true);
-
-      expect(await screen.findByText(/Required for a scoped token:/)).toHaveTextContent(
-        "Always on: Taskboard reads only these from Jira. Required for a scoped token: read:jira-user, read:jira-work.",
-      );
-    });
-
-    it("derives both descriptions from the scopes of the rows", async () => {
+    it("derives the description from the scopes of the change rows", async () => {
       mocked.jiraCapabilities.mockResolvedValue([
         { ...rows[0], scope: "read:example-first" },
-        { ...rows[1], scope: "read:example-second" },
         { ...rows[5], scope: "write:example-one" },
         { ...rows[6], scope: "write:example-two" },
       ]);
       await renderGroup(true);
 
       expect(await screen.findByText(/Optional for a scoped token:/)).toHaveTextContent("write:example-one, write:example-two, only while");
-      expect(screen.getByText(/Required for a scoped token:/)).toHaveTextContent("read:example-first, read:example-second.");
     });
   });
 });

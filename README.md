@@ -40,7 +40,7 @@ support. To build it or port it, point a coding agent at [AGENTS.md](AGENTS.md).
   old value comes back. The confirmation offers the opposite change ("Change back to Jamie Doe"), which is a
   second change in Jira, not an undo.
 - **Notifications:** after a sync, while Taskboard isn't in front, macOS notifications for mentions of you and
-  issues assigned to you (or every change of your issues, or none: Settings → General), with a button that opens
+  issues assigned to you (or every change of your issues, or none: Settings → Behavior), with a button that opens
   the issue.
 - **Keyboard first:** ⌘K finds issues by key or text and runs any command (`>` commands, `#` issues, `/` Spaces
   and lists), J/K move, every action has a menu item and a rebindable key, right-click menus offer the rest,
@@ -64,7 +64,7 @@ All screenshots show made-up demo data from the debug build.
   and only while you allow changes to Jira. Profile pictures come from Atlassian's avatar host,
   without credentials.
 - The cache stays on your Mac (`~/Library/Application Support/com.philippstracker.taskboard/`). Settings →
-  Sync → Cache, File → Reset Cache… or `taskboard reset-cache --yes` empties it; with "Clear the cache when
+  Privacy & Data, File → Reset Cache… or `taskboard reset-cache --yes` empties it; with "Clear the cache when
   Taskboard quits" on, no copy of your issues stays on the Mac after quitting; with "Keep Jira data in memory
   only" on, none is written to disk at all.
 

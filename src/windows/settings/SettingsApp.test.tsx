@@ -33,13 +33,29 @@ afterEach(() => {
 });
 
 describe("SettingsApp", () => {
-  it("lists the Jira pages before General and opens on Connection", async () => {
+  it("lists the Jira, Workspace and System pages in order and opens on Connection", async () => {
     await renderSettings();
 
     const nav = screen.getByRole("navigation", { name: "Settings pages" });
     const entries = within(nav).getAllByRole("button").map((b) => b.textContent?.trim());
-    expect(entries).toEqual(["Connection", "Projects", "Spaces", "Team", "Statuses", "Custom fields", "Sync", "General", "Appearance", "Shortcuts", "Status"]);
-    expect(nav.textContent).toMatch(/Jira.*Connection.*Projects.*Spaces.*Team.*Statuses.*Custom fields.*Sync.*System.*General.*Appearance.*Shortcuts.*Status/);
+    expect(entries).toEqual([
+      "Connection",
+      "Privacy & Data",
+      "Projects",
+      "Sync",
+      "Spaces",
+      "Team",
+      "Statuses",
+      "Custom fields",
+      "Behavior",
+      "Appearance",
+      "Shortcuts",
+      "Status",
+      "About",
+    ]);
+    expect(nav.textContent).toMatch(
+      /Jira.*Connection.*Privacy & Data.*Projects.*Sync.*Workspace.*Spaces.*Team.*Statuses.*Custom fields.*Behavior.*System.*Appearance.*Shortcuts.*Status.*About/,
+    );
     expect(screen.getByRole("heading", { name: "Connection" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Connection/ })).toHaveAttribute("aria-current", "page");
   });
@@ -50,7 +66,17 @@ describe("SettingsApp", () => {
     await userEvent.click(screen.getByRole("button", { name: /Sync/ }));
 
     expect(screen.getByRole("heading", { name: "Sync" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Sync Now" })).toBeInTheDocument();
+  });
+
+  it("shows the Privacy & Data page with the cache reset when chosen in the page list", async () => {
+    await renderSettings();
+
+    await userEvent.click(screen.getByRole("button", { name: /Privacy & Data/ }));
+
+    expect(screen.getByRole("heading", { name: "Privacy & Data" })).toBeInTheDocument();
     expect(await screen.findByRole("button", { name: "Reset Cache" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "What Taskboard reads" })).toBeInTheDocument();
   });
 
   describe("search", () => {
@@ -91,33 +117,47 @@ describe("SettingsApp", () => {
       await userEvent.type(screen.getByRole("searchbox", { name: "Search Settings" }), "zzz");
 
       expect(screen.getByText("No Results")).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: /General/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /Behavior/ })).not.toBeInTheDocument();
     });
 
-    it("keeps General when the text matches part of its label", async () => {
+    it("keeps Behavior when the text matches part of its label", async () => {
       await renderSettings();
 
-      await userEvent.type(screen.getByRole("searchbox", { name: "Search Settings" }), "gen");
+      await userEvent.type(screen.getByRole("searchbox", { name: "Search Settings" }), "beh");
 
-      expect(screen.getByRole("button", { name: /General/ })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Behavior/ })).toBeInTheDocument();
       expect(screen.queryByText("No Results")).not.toBeInTheDocument();
+    });
+
+    it("finds the Privacy & Data page by its What Taskboard reads section", async () => {
+      await renderSettings();
+
+      await userEvent.type(screen.getByRole("searchbox", { name: "Search Settings" }), "What Taskboard reads");
+
+      const nav = screen.getByRole("navigation", { name: "Settings pages" });
+      expect(within(nav).getAllByRole("button").map((b) => b.textContent?.trim())).toEqual([expect.stringContaining("Privacy & Data")]);
     });
   });
 
-  describe("General page", () => {
+  describe("Behavior page", () => {
     beforeEach(() => {
-      window.history.replaceState({}, "", "/?page=general");
+      window.history.replaceState({}, "", "/?page=behavior");
     });
 
-    it("shows the Behavior group before the About group", async () => {
+    it("shows the behavior settings without an About group", async () => {
       await renderSettings();
 
-      const behaviour = await screen.findByText("Count an issue as read after");
-      const about = await screen.findByText("Version 4.5.6");
-      expect(behaviour.compareDocumentPosition(about) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(await screen.findByText("Count an issue as read after")).toBeInTheDocument();
+      expect(screen.queryByText("Version 4.5.6")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("About page", () => {
+    beforeEach(() => {
+      window.history.replaceState({}, "", "/?page=about");
     });
 
-    it("shows the app version in the About group", async () => {
+    it("shows the app version", async () => {
       await renderSettings();
 
       expect(await screen.findByText("Version 4.5.6")).toBeInTheDocument();
@@ -187,13 +227,23 @@ describe("SettingsApp", () => {
       expect(screen.getByRole("heading", { name: "Demo Extras" })).toBeInTheDocument();
     });
 
-    it("shows General on the open_settings event with general", async () => {
+    it("shows Behavior on the open_settings event with behavior", async () => {
       window.history.replaceState({}, "", "/?page=extras");
       await renderSettings();
 
-      act(() => emitEvent(api, "open_settings", "general"));
+      act(() => emitEvent(api, "open_settings", "behavior"));
 
-      expect(screen.getByRole("heading", { name: "General" })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Behavior", level: 2 })).toBeInTheDocument();
+      expect(screen.queryByText("Extras body")).not.toBeInTheDocument();
+    });
+
+    it.each(["cache", "reads"])("shows Privacy & Data on the open_settings event with the %s section", async (section) => {
+      window.history.replaceState({}, "", "/?page=extras");
+      await renderSettings();
+
+      act(() => emitEvent(api, "open_settings", section));
+
+      expect(screen.getByRole("heading", { name: "Privacy & Data", level: 2 })).toBeInTheDocument();
       expect(screen.queryByText("Extras body")).not.toBeInTheDocument();
     });
   });
