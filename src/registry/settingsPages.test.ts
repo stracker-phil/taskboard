@@ -10,8 +10,12 @@ beforeAll(() => {
 });
 
 describe("core settings pages", () => {
-  it("has no app-wide Statuses page, statuses being per Space", () => {
-    expect(settingsPages().map((p) => p.id)).not.toContain("statuses");
+  it("has an app-wide Statuses page in the Jira group after Team", () => {
+    const pages = settingsPages();
+    const ids = pages.map((p) => p.id);
+
+    expect(pages.find((p) => p.id === "statuses")?.group).toBe("Jira");
+    expect(ids.indexOf("statuses")).toBe(ids.indexOf("team") + 1);
   });
 
   it("registers the Space groups as sections of the Spaces page", () => {
@@ -27,8 +31,12 @@ describe("resolveSettingsPage", () => {
     expect(resolveSettingsPage("space:10001")?.id).toBe("spaces");
   });
 
-  it.each([["layouts"], ["statuses"], ["fields"]])("resolves the %s section to the Spaces page", (section) => {
+  it.each([["layouts"], ["fields"]])("resolves the %s section to the Spaces page", (section) => {
     expect(resolveSettingsPage(section)?.id).toBe("spaces");
+  });
+
+  it("resolves statuses to the Statuses page, not the Spaces page that also has a Statuses section", () => {
+    expect(resolveSettingsPage("statuses")?.id).toBe("statuses");
   });
 
   it("falls back to the first page for an unknown id", () => {

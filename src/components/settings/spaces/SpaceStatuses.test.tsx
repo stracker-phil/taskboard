@@ -57,19 +57,38 @@ describe("SpaceStatuses", () => {
     expect(screen.getByText("Statuses appear after the first sync.")).toBeInTheDocument();
   });
 
-  it("groups the statuses under their Jira category in the order To do, In progress, Done", async () => {
-    await renderStatuses([DONE, IN_PROGRESS, TO_DO]);
+  it("groups the statuses by the style they show, in the order In progress, In review, Blocked, To do, Backlog, Done", async () => {
+    const backlog = statusStyle({ id: "2", name: "Icebox", detected: "backlog" });
+    await renderStatuses([DONE, backlog, TO_DO, IN_REVIEW, statusStyle({ id: "8", name: "Peer Review", detected: "review" }), IN_PROGRESS]);
 
     await screen.findByRole("region", { name: "Done" });
+    const order = ["In progress", "In review", "Blocked", "To do", "Backlog", "Done"];
     const names = screen.getAllByRole("region").map((r) => r.getAttribute("aria-label"));
-    expect(names.filter((n) => n === "To do" || n === "In progress" || n === "Done")).toEqual(["To do", "In progress", "Done"]);
+    expect(names.filter((n) => order.includes(n ?? ""))).toEqual(order);
     expect(within(screen.getByRole("region", { name: "Done" })).getByText("Shipped")).toBeInTheDocument();
     expect(within(screen.getByRole("region", { name: "In progress" })).getByText("In Progress")).toBeInTheDocument();
     expect(within(screen.getByRole("region", { name: "To do" })).getByText("Backlog")).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "In review" })).getByText("Peer Review")).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "Blocked" })).getByText("Code Review")).toBeInTheDocument();
     expect(screen.queryByText("Statuses appear after the first sync.")).not.toBeInTheDocument();
   });
 
-  it("leaves out a category without statuses", async () => {
+  it("puts a status without a choice of this Space in the section of the app-wide style", async () => {
+    await renderStatuses([statusStyle({ id: "6", name: "Waiting for QA", detected: "todo", app: "review" })]);
+
+    const review = await screen.findByRole("region", { name: "In review" });
+    expect(within(review).getByText("Waiting for QA")).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "To do" })).not.toBeInTheDocument();
+  });
+
+  it("puts a status the Space chose a style for in that section, whatever the app-wide style is", async () => {
+    await renderStatuses([statusStyle({ id: "6", name: "Waiting for QA", detected: "todo", app: "review", chosen: "done" })]);
+
+    expect(within(await screen.findByRole("region", { name: "Done" })).getByText("Waiting for QA")).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "In review" })).not.toBeInTheDocument();
+  });
+
+  it("leaves out a style without statuses", async () => {
     await renderStatuses([IN_PROGRESS]);
 
     await screen.findByRole("region", { name: "In progress" });
@@ -87,11 +106,17 @@ describe("SpaceStatuses", () => {
     expect(await screen.findByText(text)).toBeInTheDocument();
   });
 
-  it("labels the button with the detected style without a choice and with the chosen style's name otherwise", async () => {
+  it("labels the button Default with the app-wide style without a choice and with the chosen style's name otherwise", async () => {
     await renderStatuses([IN_PROGRESS, IN_REVIEW]);
 
-    expect(await screen.findByRole("button", { name: "Style of In Progress" })).toHaveTextContent("Automatic · In progress");
+    expect(await screen.findByRole("button", { name: "Style of In Progress" })).toHaveTextContent("Default · In progress");
     expect(screen.getByRole("button", { name: "Style of Code Review" })).toHaveTextContent(/^Blocked$/);
+  });
+
+  it("labels the button with the app-wide style rather than the detected one when the app chose one", async () => {
+    await renderStatuses([statusStyle({ detected: "progress", app: "review" })]);
+
+    expect(await screen.findByRole("button", { name: "Style of In Progress" })).toHaveTextContent("Default · In review");
   });
 
   describe("search", () => {
@@ -121,13 +146,13 @@ describe("SpaceStatuses", () => {
     });
   });
 
-  it("offers Automatic with the detected style, then the six styles starting with Backlog", async () => {
-    await renderStatuses([IN_REVIEW]);
+  it("offers Default with the app-wide style, then the six styles starting with Backlog", async () => {
+    await renderStatuses([statusStyle({ id: "4", name: "Code Review", detected: "todo", app: "review" })]);
 
     const menu = await openStyleMenu("Code Review");
 
     expect(within(menu).getAllByRole("menuitemradio").map((r) => r.textContent)).toEqual([
-      "Automatic (In review)",
+      "Default (In review)",
       "Backlog",
       "To do",
       "In progress",
@@ -143,15 +168,15 @@ describe("SpaceStatuses", () => {
     const menu = await openStyleMenu("Code Review");
 
     expect(within(menu).getByRole("menuitemradio", { name: "Blocked" })).toHaveAttribute("aria-checked", "true");
-    expect(within(menu).getByRole("menuitemradio", { name: "Automatic (In review)" })).toHaveAttribute("aria-checked", "false");
+    expect(within(menu).getByRole("menuitemradio", { name: "Default (In review)" })).toHaveAttribute("aria-checked", "false");
   });
 
-  it("checks Automatic in the menu while no style is chosen", async () => {
+  it("checks Default in the menu while no style is chosen", async () => {
     await renderStatuses([IN_PROGRESS]);
 
     const menu = await openStyleMenu("In Progress");
 
-    expect(within(menu).getByRole("menuitemradio", { name: /^Automatic/ })).toHaveAttribute("aria-checked", "true");
+    expect(within(menu).getByRole("menuitemradio", { name: /^Default/ })).toHaveAttribute("aria-checked", "true");
     expect(within(menu).getAllByRole("menuitemradio", { checked: true })).toHaveLength(1);
   });
 
@@ -164,17 +189,21 @@ describe("SpaceStatuses", () => {
 
     expect(mocked.statusStyleSet).toHaveBeenCalledWith("10002", "3", "blocked");
     expect(await screen.findByRole("button", { name: "Style of In Progress" })).toHaveTextContent("Blocked");
+    expect(within(screen.getByRole("region", { name: "Blocked" })).getByText("In Progress")).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "In progress" })).not.toBeInTheDocument();
   });
 
-  it("goes back to Automatic by sending no style", async () => {
-    await renderStatuses([IN_REVIEW]);
-    mocked.statusStyleSet.mockResolvedValue([{ ...IN_REVIEW, chosen: null }]);
+  it("goes back to Default by sending no style and moves the row to the app-wide style's section", async () => {
+    const row = { ...IN_REVIEW, app: "todo" as const };
+    await renderStatuses([row]);
+    mocked.statusStyleSet.mockResolvedValue([{ ...row, chosen: null }]);
     const menu = await openStyleMenu("Code Review");
 
-    await choose(menu, "Automatic (In review)");
+    await choose(menu, "Default (To do)");
 
     expect(mocked.statusStyleSet).toHaveBeenCalledWith("10001", "4", null);
-    expect(await screen.findByRole("button", { name: "Style of Code Review" })).toHaveTextContent("Automatic · In review");
+    expect(await screen.findByRole("button", { name: "Style of Code Review" })).toHaveTextContent("Default · To do");
+    expect(within(screen.getByRole("region", { name: "To do" })).getByText("Code Review")).toBeInTheDocument();
   });
 
   it("reports a failed change and keeps the old choice", async () => {
@@ -185,6 +214,6 @@ describe("SpaceStatuses", () => {
     await choose(menu, "Done");
 
     expect(await screen.findByText(/Could not change In Progress/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Style of In Progress" })).toHaveTextContent("Automatic");
+    expect(screen.getByRole("button", { name: "Style of In Progress" })).toHaveTextContent("Default · In progress");
   });
 });

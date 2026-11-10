@@ -242,6 +242,8 @@ export function createApiMock(): Api {
     columnsCatalogue: vi.fn().mockResolvedValue([]),
     statusStylesList: vi.fn().mockResolvedValue([]),
     statusStyleSet: vi.fn().mockResolvedValue([]),
+    statusStylesAll: vi.fn().mockResolvedValue([]),
+    statusStyleSetApp: vi.fn().mockResolvedValue([]),
     syncOverview: vi.fn(async (): Promise<SyncOverview> => ({ state: { state: "idle", lastOk: null }, lastFullAt: null, projects: [] })),
     syncRun: done(),
     diagnosticsGet: vi.fn(async (): Promise<Diagnostics> => ({ groups: [] })),

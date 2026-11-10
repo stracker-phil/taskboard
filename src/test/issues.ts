@@ -1,4 +1,4 @@
-import type { ActivityItem, Attachment, Column, Group, IssueDetail, Person, Related, RelatedIssue, Row, StatusStyleRow, ViewData } from "../api/types";
+import type { ActivityItem, AppStatusRow,Attachment, Column, Group, IssueDetail, Person, Related, RelatedIssue, Row, StatusStyleRow, ViewData } from "../api/types";
 
 export const ALEX: Person = { accountId: "demo-account-1", name: "Alex Morgan", initials: "AM", color: 1 };
 export const SAM: Person = { accountId: "demo-account-2", name: "Sam Lee", initials: "SL", color: 2 };
@@ -131,6 +131,10 @@ export const COLUMNS: Column[] = [
   { id: "customfield_10071", name: "Reviewer", custom: true },
 ];
 
+export function appStatus(patch: Partial<AppStatusRow> = {}): AppStatusRow {
+  return { id: "3", name: "In Progress", category: "indeterminate", detected: "progress", chosen: null, ...patch };
+}
+
 export function statusStyle(patch: Partial<StatusStyleRow> = {}): StatusStyleRow {
-  return { id: "3", name: "In Progress", category: "indeterminate", detected: "progress", chosen: null, issues: 0, ...patch };
+  return { id: "3", name: "In Progress", category: "indeterminate", detected: "progress", app: null, chosen: null, issues: 0, ...patch };
 }

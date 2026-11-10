@@ -2,7 +2,7 @@ import { act, renderHook } from "@testing-library/react";
 import { useLayoutEffect } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { startMotionTimers, stubMotion } from "../test/motion";
-import { motionMs, useFlash, useGlide, useHeightGlide, usePresence } from "./motion";
+import { motionMs, useFlash, useGlide, useHeightGlide, useListGlide, usePresence } from "./motion";
 
 let spy: { mockRestore(): void } | undefined;
 
@@ -128,6 +128,81 @@ describe("useGlide", () => {
     lefts.b = 80;
 
     rerender({ scope: "view-1" });
+
+    expect(animate).not.toHaveBeenCalled();
+  });
+});
+
+describe("useListGlide", () => {
+  const animate = vi.fn();
+  let tops: Record<string, number>;
+  let list: HTMLElement;
+
+  function addRow(key: string) {
+    const element = document.createElement("div");
+    element.dataset.glide = key;
+    element.getBoundingClientRect = () => ({ top: tops[key] }) as DOMRect;
+    element.animate = animate;
+    list.append(element);
+  }
+
+  const renderList = () => renderHook(() => useListGlide({ current: list }));
+
+  beforeEach(() => {
+    animate.mockClear();
+    tops = { a: 0, b: 40 };
+    list = document.createElement("div");
+    list.getBoundingClientRect = () => ({ top: 0 }) as DOMRect;
+    addRow("a");
+    addRow("b");
+    spy = stubMotion({ "--motion-slow": "200ms" });
+  });
+
+  it("glides a row from its old place to its new one when the same rows show", () => {
+    const { rerender } = renderList();
+    tops.b = 120;
+
+    rerender();
+
+    expect(animate).toHaveBeenCalledTimes(1);
+    expect(animate).toHaveBeenCalledWith([{ transform: "translateY(-80px)" }, { transform: "none" }], expect.objectContaining({ duration: 200 }));
+  });
+
+  it("does not animate rows that stayed in place", () => {
+    const { rerender } = renderList();
+
+    rerender();
+
+    expect(animate).not.toHaveBeenCalled();
+  });
+
+  it("moves rows at once when a row is added", () => {
+    const { rerender } = renderList();
+    tops.c = 80;
+    tops.b = 120;
+    addRow("c");
+
+    rerender();
+
+    expect(animate).not.toHaveBeenCalled();
+  });
+
+  it("moves rows at once when a row is removed", () => {
+    const { rerender } = renderList();
+    list.firstElementChild?.remove();
+    tops.b = 0;
+
+    rerender();
+
+    expect(animate).not.toHaveBeenCalled();
+  });
+
+  it("moves rows at once when the motion time is 0", () => {
+    spy?.mockRestore();
+    const { rerender } = renderList();
+    tops.b = 120;
+
+    rerender();
 
     expect(animate).not.toHaveBeenCalled();
   });

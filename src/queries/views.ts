@@ -74,6 +74,10 @@ export const useColumnsCatalogue = (listId: number) =>
 
 export const useStatusStyles = (projectId: string) =>
   useQuery({ queryKey: [...STATUS_STYLES_KEY, projectId], queryFn: () => api.statusStylesList(projectId) });
+
+/** Under `STATUS_STYLES_KEY`, so the events that refresh a Space's statuses refresh these too. */
+export const APP_STATUS_STYLES_KEY = [...STATUS_STYLES_KEY, "app"] as const;
+export const useAppStatusStyles = () => useQuery({ queryKey: APP_STATUS_STYLES_KEY, queryFn: () => api.statusStylesAll() });
 export const SPACE_CONFIG_KEY = ["spaceConfig"] as const;
 export const useSpaceConfig = (projectId: string) =>
   useQuery({ queryKey: [...SPACE_CONFIG_KEY, projectId], queryFn: () => api.spaceConfig(projectId) });

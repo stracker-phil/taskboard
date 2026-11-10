@@ -31,6 +31,7 @@ pub const LOCAL: &[&str] = &[
     include_str!("../../migrations/local/0023_view_me_rules.sql"),
     include_str!("../../migrations/local/0024_issue_activity.sql"),
     include_str!("../../migrations/local/0025_recently_viewed.sql"),
+    include_str!("../../migrations/local/0026_status_style.sql"),
 ];
 pub const CACHE: &[&str] = &[
     include_str!("../../migrations/cache/0001_init.sql"),
@@ -110,6 +111,79 @@ mod tests {
     const COMMENT: &str = "INSERT INTO comment (id, issue_id, created_at, updated_at) \
         VALUES ('30001', '20001', '2026-01-05T09:00:00Z', '2026-01-05T09:00:00Z')";
 
+    fn space_styles(conn: &Connection) -> Vec<(String, String, String)> {
+        let mut query = conn
+            .prepare("SELECT project_id, status_id, style FROM space_status_style ORDER BY 1, 2")
+            .unwrap();
+        query
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect()
+    }
+
+    fn app_styles(conn: &Connection) -> Vec<(String, String)> {
+        let mut query = conn
+            .prepare("SELECT status_id, style FROM status_style ORDER BY 1")
+            .unwrap();
+        query
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect()
+    }
+
+    fn triples(rows: &[(&str, &str, &str)]) -> Vec<(String, String, String)> {
+        rows.iter()
+            .map(|(a, b, c)| (a.to_string(), b.to_string(), c.to_string()))
+            .collect()
+    }
+
+    fn before_app_wide_styles() -> Connection {
+        let mut conn = Connection::open_in_memory().unwrap();
+        migrate(&mut conn, "local", &LOCAL[..25]).unwrap();
+        conn
+    }
+
+    #[test]
+    fn spaces_agreeing_on_a_status_style_make_it_app_wide() {
+        let mut conn = before_app_wide_styles();
+        conn.execute_batch(
+            "INSERT INTO space (project_id) VALUES ('10001'), ('10002');
+             INSERT INTO space_status_style (project_id, status_id, style) VALUES
+               ('10001', 's1', 'blocked'), ('10002', 's1', 'blocked'), ('10001', 's2', 'done');",
+        )
+        .unwrap();
+
+        migrate(&mut conn, "local", LOCAL).unwrap();
+
+        assert_eq!(
+            app_styles(&conn),
+            [("s1", "blocked"), ("s2", "done")].map(|(a, b)| (a.to_string(), b.to_string()))
+        );
+        assert_eq!(space_styles(&conn), triples(&[]));
+    }
+
+    #[test]
+    fn spaces_disagreeing_on_a_status_style_keep_their_own_and_set_none_app_wide() {
+        let mut conn = before_app_wide_styles();
+        conn.execute_batch(
+            "INSERT INTO space (project_id) VALUES ('10001'), ('10002');
+             INSERT INTO space_status_style (project_id, status_id, style) VALUES
+               ('10001', 's1', 'blocked'), ('10002', 's1', 'review'),
+               ('10001', 's2', 'done'), ('10002', 's2', 'done');",
+        )
+        .unwrap();
+
+        migrate(&mut conn, "local", LOCAL).unwrap();
+
+        assert_eq!(app_styles(&conn), [("s2".to_string(), "done".to_string())]);
+        assert_eq!(
+            space_styles(&conn),
+            triples(&[("10001", "s1", "blocked"), ("10002", "s1", "review")])
+        );
+    }
+
     #[test]
     fn app_wide_status_styles_become_every_spaces_override_when_space_settings_arrive() {
         let mut conn = Connection::open_in_memory().unwrap();
@@ -120,16 +194,9 @@ mod tests {
         )
         .unwrap();
 
-        migrate(&mut conn, "local", LOCAL).unwrap();
+        migrate(&mut conn, "local", &LOCAL[..7]).unwrap();
 
-        let mut query = conn
-            .prepare("SELECT project_id, status_id, style FROM space_status_style ORDER BY 1, 2")
-            .unwrap();
-        let rows: Vec<(String, String, String)> = query
-            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
-            .unwrap()
-            .map(Result::unwrap)
-            .collect();
+        let rows = space_styles(&conn);
         let expected: Vec<(String, String, String)> = [
             ("10001", "s1", "blocked"),
             ("10001", "s2", "done"),

@@ -11,7 +11,7 @@ use crate::changes::UNSEEN;
 use crate::db::Db;
 use crate::error::AppResult;
 use crate::lists::Viewer;
-use crate::status_style::{Style, Styles, detect};
+use crate::status_style::{Style, Styles};
 use crate::views::rows::{self, Person};
 
 /// One issue as the Child issues and Links sections list it.
@@ -155,6 +155,7 @@ fn links(conn: &Connection, id: &str, me: Option<&str>) -> AppResult<Vec<IssueLi
         .collect();
     let keys: Vec<&str> = sides.iter().map(|(_, key, _)| *key).collect();
     let cached = related_by_keys(conn, &keys, me)?;
+    let styles = Styles::load(conn)?;
     let links = sides
         .into_iter()
         .map(|(side, key, relation)| IssueLink {
@@ -162,24 +163,24 @@ fn links(conn: &Connection, id: &str, me: Option<&str>) -> AppResult<Vec<IssueLi
             issue: cached
                 .get(&key.to_ascii_uppercase())
                 .cloned()
-                .unwrap_or_else(|| uncached(side, key)),
+                .unwrap_or_else(|| uncached(side, key, &styles)),
         })
         .collect();
     Ok(links)
 }
 
 /// A linked issue the cache doesn't hold, as the link describes it.
-fn uncached(side: &Value, key: &str) -> RelatedIssue {
+fn uncached(side: &Value, key: &str, styles: &Styles) -> RelatedIssue {
     let fields = &side["fields"];
+    let status = &fields["status"];
     RelatedIssue {
         id: None,
         key: key.to_string(),
         summary: fields["summary"].as_str().unwrap_or_default().to_string(),
-        style: detect(
-            fields["status"]["statusCategory"]["key"]
-                .as_str()
-                .unwrap_or_default(),
-            fields["status"]["name"].as_str().unwrap_or_default(),
+        style: styles.app_of(
+            status["id"].as_str().unwrap_or_default(),
+            status["statusCategory"]["key"].as_str().unwrap_or_default(),
+            status["name"].as_str().unwrap_or_default(),
         ),
         issue_type: fields["issuetype"]["name"]
             .as_str()

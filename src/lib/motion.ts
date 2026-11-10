@@ -10,6 +10,11 @@ export function motionMs(token: MotionToken): number {
   return value.endsWith("ms") ? ms : ms * 1000;
 }
 
+/** The stylesheet's `--ease-out` curve. */
+function easeOut(): string {
+  return getComputedStyle(document.documentElement).getPropertyValue("--ease-out").trim() || "ease-out";
+}
+
 export type Presence = "open" | "leaving";
 
 /** Keeps something mounted while it fades out: `mounted` stays true for the exit time after `shown` turns
@@ -51,7 +56,7 @@ export function useGlide(row: RefObject<HTMLElement | null>, scope?: unknown) {
     const previous = before.current;
     const ms = motionMs("--motion-slow");
     const animates = !switched && previous !== null && previous.width === now.width && ms > 0;
-    const easing = getComputedStyle(document.documentElement).getPropertyValue("--ease-out").trim() || "ease-out";
+    const easing = easeOut();
     for (const child of element.children) {
       if (!(child instanceof HTMLElement)) continue;
       const left = child.offsetLeft;
@@ -81,7 +86,7 @@ export function useHeightGlide(row: RefObject<HTMLElement | null>, state: unknow
     const element = row.current;
     const ms = motionMs("--motion-slow");
     if (!was || !element || ms === 0) return;
-    const easing = getComputedStyle(document.documentElement).getPropertyValue("--ease-out").trim() || "ease-out";
+    const easing = easeOut();
     for (const child of element.children) {
       if (!(child instanceof HTMLElement) || typeof child.animate !== "function") continue;
       child.getAnimations().forEach((animation) => animation.cancel());
@@ -120,4 +125,29 @@ export function useFlash(value: string): boolean {
     return () => clearTimeout(timer);
   }, [value]);
   return flashing;
+}
+
+/** Rows inside `list` marked `data-glide="<key>"` glide to a new place, also into another section, instead of
+ *  jumping. Only while the same keys show: a search that hides or adds rows shows the result at once. */
+export function useListGlide(list: RefObject<HTMLElement | null>) {
+  const before = useRef<Map<string, number> | null>(null);
+  useLayoutEffect(() => {
+    const element = list.current;
+    if (!element) return;
+    const origin = element.getBoundingClientRect().top;
+    const rows = [...element.querySelectorAll<HTMLElement>("[data-glide]")].map((row) => ({ row, key: row.dataset.glide ?? "" }));
+    const now = new Map(rows.map(({ row, key }) => [key, row.getBoundingClientRect().top - origin]));
+    const previous = before.current;
+    before.current = now;
+    const ms = motionMs("--motion-slow");
+    const sameKeys = previous !== null && previous.size === now.size && [...now.keys()].every((key) => previous.has(key));
+    if (!previous || !sameKeys || ms === 0) return;
+    const easing = easeOut();
+    for (const { row, key } of rows) {
+      const was = previous.get(key);
+      const top = now.get(key);
+      if (was === undefined || top === undefined || was === top || typeof row.animate !== "function") continue;
+      row.animate([{ transform: `translateY(${was - top}px)` }, { transform: "none" }], { duration: ms, easing });
+    }
+  });
 }

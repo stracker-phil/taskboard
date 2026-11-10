@@ -22,13 +22,16 @@ pub const RELEVANT_FIELD: &str = "(used = 1 OR shown = 1
     OR id IN (SELECT c.value FROM view v, json_each(v.columns) c)
     OR id IN (SELECT json_extract(c.value, '$.field') FROM filter_list l, json_each(l.filter, '$.conditions') c))";
 
-/// An issue's status category as its Space sees it: from the status type the owner picked there
-/// (`status_style`), else Jira's.
+/// An issue's status category as its Space sees it: from the style the owner picked there
+/// (`space_status_style`), else app-wide (`status_style`), else Jira's.
 macro_rules! status_category {
     () => {
-        "COALESCE((SELECT CASE o.style WHEN 'done' THEN 'done' WHEN 'todo' THEN 'new' WHEN 'backlog' THEN 'new'
+        "COALESCE((SELECT CASE style WHEN 'done' THEN 'done' WHEN 'todo' THEN 'new' WHEN 'backlog' THEN 'new'
              ELSE 'indeterminate' END
-           FROM space_status_style o WHERE o.project_id = i.project_id AND o.status_id = i.status_id),
+           FROM (SELECT o.style, 0 AS rank FROM space_status_style o
+                   WHERE o.project_id = i.project_id AND o.status_id = i.status_id
+                 UNION ALL SELECT a.style, 1 FROM status_style a WHERE a.status_id = i.status_id)
+           ORDER BY rank LIMIT 1),
          i.status_category)"
     };
 }

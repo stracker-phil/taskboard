@@ -23,7 +23,7 @@ use taskboard_lib::issues::{
 use taskboard_lib::jira::{Limiter, TokenKind};
 use taskboard_lib::lists::Viewer;
 use taskboard_lib::space_config::{FieldVisibility, space_set_field};
-use taskboard_lib::status_style::{Style, status_style_set};
+use taskboard_lib::status_style::{Style, status_style_set, status_style_set_app};
 use taskboard_lib::store::settings::SettingsStore;
 use taskboard_lib::sync::{Emit, SyncContext, full_sync, source_for};
 use taskboard_lib::test_support::demo::{self, DEMO_NOW, ME_EMAIL, REVIEWER};
@@ -1412,6 +1412,23 @@ async fn a_linked_issue_the_cache_does_not_hold_shows_the_links_own_fields() {
             },
         }]
     );
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn a_linked_issue_the_cache_does_not_hold_shows_its_statuss_app_wide_style() {
+    let site = Site::new().await;
+    let status = site.status_of("NW-1051").await;
+    site.execute("UPDATE cache.issue SET gone = 1 WHERE key = 'NW-1051'")
+        .await;
+    status_style_set_app(site.db(), status, Some(Style::Blocked))
+        .await
+        .unwrap();
+
+    let links = site.related("NW-1042").await.links;
+
+    assert_eq!(links[0].issue.id, None);
+    assert_eq!(links[0].issue.style, Style::Blocked);
 }
 
 #[tokio::test]

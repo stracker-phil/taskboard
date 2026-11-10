@@ -143,6 +143,8 @@ pub fn handlers() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
         views::columns_catalogue,
         crate::status_style::commands::status_styles_list,
         crate::status_style::commands::status_style_set,
+        crate::status_style::commands::status_styles_all,
+        crate::status_style::commands::status_style_set_app,
         crate::space_config::commands::space_config,
         crate::space_config::commands::space_set_layouts,
         crate::space_config::commands::space_set_field,

@@ -1175,7 +1175,7 @@ mod filter_fields_per_level {
 
 mod status_category_follows_the_spaces_status_types {
     use super::*;
-    use taskboard_lib::status_style::{Style, status_style_set};
+    use taskboard_lib::status_style::{Style, status_style_set, status_style_set_app};
 
     const REVIEW: &str = "s1";
     const SHIPPED: &str = "s3";
@@ -1276,6 +1276,61 @@ mod status_category_follows_the_spaces_status_types {
             matching(&db, Op::Is, "done").await,
             MatchCount { open: 0, total: 1 }
         );
+    }
+
+    #[tokio::test]
+    async fn a_status_set_to_done_app_wide_is_done_in_every_space() {
+        let (_dir, db) = two_spaces().await;
+        status_style_set_app(&db, REVIEW.into(), Some(Style::Done))
+            .await
+            .unwrap();
+
+        assert_eq!(
+            matching(&db, Op::Is, "done").await,
+            MatchCount { open: 0, total: 4 }
+        );
+        assert_eq!(
+            matching(&db, Op::Is, "indeterminate").await,
+            MatchCount { open: 0, total: 0 }
+        );
+    }
+
+    #[tokio::test]
+    async fn a_space_choice_overrides_the_app_wide_style_for_that_space_only() {
+        let (_dir, db) = two_spaces().await;
+        status_style_set_app(&db, REVIEW.into(), Some(Style::Done))
+            .await
+            .unwrap();
+        style(&db, NW, REVIEW, Style::Progress).await;
+
+        assert_eq!(
+            matching(&db, Op::Is, "indeterminate").await,
+            MatchCount { open: 1, total: 1 }
+        );
+        assert_eq!(
+            matching(&db, Op::Is, "done").await,
+            MatchCount { open: 0, total: 3 }
+        );
+    }
+
+    #[tokio::test]
+    async fn the_sidebar_does_not_count_issues_in_a_status_set_to_done_app_wide() {
+        let (_dir, db) = two_spaces().await;
+        status_style_set_app(&db, REVIEW.into(), Some(Style::Done))
+            .await
+            .unwrap();
+
+        let tree = sidebar_tree(&db, viewer(None), false).await.unwrap();
+
+        assert_eq!(find_space(&tree, "NW").open_count, 1);
+        assert_eq!(find_space(&tree, "NWS").open_count, 1);
+        assert_eq!(tree.everything.count, Some(2));
+
+        style(&db, NW, REVIEW, Style::Progress).await;
+        let tree = sidebar_tree(&db, viewer(None), false).await.unwrap();
+
+        assert_eq!(find_space(&tree, "NW").open_count, 2);
+        assert_eq!(find_space(&tree, "NWS").open_count, 1);
     }
 
     #[tokio::test]

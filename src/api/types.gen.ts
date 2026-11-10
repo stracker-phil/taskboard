@@ -51,6 +51,16 @@ field?: AppErrorField, };
  */
 export type AppErrorField = { path: string, message: string, };
 
+export type AppStatusRow = { id: string, name: string, 
+/**
+ * Jira's status category: `new`, `indeterminate` or `done`.
+ */
+category: string, detected: Style, 
+/**
+ * The owner's app-wide choice; none = detected.
+ */
+chosen: Style | null, };
+
 /**
  * Light or dark: following macOS (the default) or fixed.
  */
@@ -931,9 +941,13 @@ export type StatusStyleRow = { id: string, name: string,
  */
 category: string, detected: Style, 
 /**
- * The owner's choice in this Space; none = Automatic.
+ * The owner's choice in this Space; none = the app-wide style.
  */
 chosen: Style | null, 
+/**
+ * The owner's app-wide choice; none = detected.
+ */
+app: Style | null, 
 /**
  * The Space's issues in this status.
  */

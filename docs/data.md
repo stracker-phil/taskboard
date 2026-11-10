@@ -87,7 +87,8 @@ unique across sources (Jira's numeric ids; another source prefixes its own):
 | `view` | HOW to show a list: one tab; layout, columns, grouping, sort; `filter` (`local/0012`): its own conditions, ANDed with its list's ([ADR 0033](adr/0033-views-can-hold-their-own-filter.md)); `subtasks` (`local/0013`): how subtasks show ([ADR 0037](adr/0037-views-choose-how-subtasks-show.md)); `only_mine` (`local/0014`): the saved Me chip ([ADR 0038](adr/0038-filter-changes-are-drafts-until-the-view-is-saved.md)); `person` (`local/0020`): the saved person chip |
 | `pin` | bookmarked issues, comments, filter lists and views (Bookmarks in the UI; `target_kind` `issue`, `comment`, `filter_list`, `view`), with an optional reason and expiry, an own `title` and the owner's order (`position`, `local/0019`; a new one goes last); active while not removed and not expired (`pins::active`); ended bookmarks stay in Recently removed for 7 days |
 | `write_log` | every change sent to Jira with Jira's refusal, if any, for 180 days (`writes::sent`, `local/0021`, [writes.md](writes.md#record-of-changes)) |
-| `space_status_style` | overrides the detected style of a status in one Space (`local/0007`; the old app-wide `status_style` rows were copied to every Space) |
+| `status_style` | the owner's style of a status in every Space (`local/0026`, [ADR 0055](adr/0055-status-styles-are-chosen-app-wide-a-space-overrides.md)); no row = detected |
+| `space_status_style` | overrides the app-wide style of a status in one Space (`local/0007`; `local/0026` lifted the choices every Space agreed on to `status_style`) |
 | `space_field` | how a custom field shows in one Space: `hiddenInList`, `hiddenInDetail` or `hidden`; no row = visible (`space_config`) |
 | `space_member` | the owner's choice who is on a Space's team (`active` 0/1); no row = the default: on for anyone ever assigned one of its issues, off for everyone else (`team`, `local/0017`, which replaced `space_member_off`) |
 | `issue_seen` | when the owner last looked at an issue: changes after it are unseen (`changes::UNSEEN`); `unread`: marked unread by the owner, unread until read again. In the local file since `local/0015`, so a cache reset keeps it (`db::connection::carry_over_seen` copied the cache's rows once); no foreign key to `cache.issue`, `sync::store::forget_issue` deletes the row with its issue |
@@ -109,7 +110,7 @@ JSON; no condition is stored as null:
 ```
 
 - `field`: `status` (id), `statusCategory` (`new`, `indeterminate`, `done`; the category of the status type the
-  owner picked in the issue's Space, else Jira's: `filter::STATUS_CATEGORY`, also the sidebar's open counts), `type` (name), `assignee`,
+  owner picked in the issue's Space, else app-wide, else Jira's: `filter::STATUS_CATEGORY`, also the sidebar's open counts), `type` (name), `assignee`,
   `reporter` (account id or `me`), `priority` (name), `epic` (the parent's issue id), `issueKey` and `parentKey`
   (issue keys, the issue's own or its parent's; `filter::parse_keys` checks and uppercases them, and `not in`
   keeps issues without a parent), `release` (fix version id),
@@ -192,7 +193,7 @@ last interactions sort last either way; ties keep the
 issue id order. Columns are standard ids (`statusType`, `assignee`, `epic`, `release`, `priority`, `labels`, `sprint`,
 `due`, `lastView`, `lastInteraction`: the time today, "Yesterday", else the day) or a Jira custom field id (`columns_catalogue` lists them; Jira's internal `any` fields and the sprint
 field are left out). `view.widths` (migration `local/0003`) holds the Table layout's column widths by column id; `view.wrap_titles` (`local/0004`, default on) whether the List wraps long titles; `view.inline_labels` (`local/0011`, default on) whether labels show as tags after the title while the view has no Labels column; `view.open_with` (`local/0009`, `preview`, `full` or null for Settings → General) what a click on an issue opens; `filter_list.icon` (`local/0006`) and `filter_list.color`, `view.icon`, `view.color` (`local/0010`) the tile look (`look.rs`: a letter, digit or emoji, or a line icon name, on tile color 1–12; no icon shows the folder or the layout's tile, no color the plain icon); `view.collapsed` (`local/0005`) a Board's collapsed or expanded columns by group key (a status id when grouped by status; the rest keep their default, Done collapsed). `view_board` returns one column per group of the view's `group_by`: by status (also for `none`) in the Board order (Backlog, To do, In progress, Blocked, In review, Done, then Jira's status order), by status type in that style order, otherwise the List's groups (`views::groups::group`) in their order. `read_view` and `list_views` fit a view to its Space (`space_config`): a layout the Space switched off shows as its default layout, `View.layouts` lists the offered ones, and columns of fields the Space hides from lists are left out; `columns_catalogue(list_id)` leaves them out too (outside the Spaces only fields every Space hides).
-`space_status_style` holds the owner's style per Space and status (`status_style_set`); `status_style::Styles::of` resolves an issue's style with its own Space's choice.
+`status_style` holds the owner's app-wide style per status (`status_styles_all`, `status_style_set_app`), `space_status_style` a Space's override (`status_styles_list`, `status_style_set`); `status_style::Styles::of` resolves an issue's style as its own Space's choice, else the app's, else detected.
 
 ## Rules
 

@@ -5,6 +5,7 @@ import type {
   ActivityItem,
   AppError,
   AppInfo,
+  AppStatusRow,
   Assignees,
   Accent,
   Appearance,
@@ -308,9 +309,13 @@ export const api = {
   /** Every column a view can show: the standard ones, then the site's custom fields. */
   columnsCatalogue: (listId: number) => invoke<Column[]>("columns_catalogue", { listId }),
   statusStylesList: (projectId: string) => invoke<StatusStyleRow[]>("status_styles_list", { projectId }),
-  /** `style` null: back to the detected style. */
+  /** `style` null: back to the app-wide style. */
   statusStyleSet: (projectId: string, statusId: string, style: Style | null) =>
     invoke<StatusStyleRow[]>("status_style_set", { projectId, statusId, style }),
+  /** Every status of the tracked projects with its app-wide style. */
+  statusStylesAll: () => invoke<AppStatusRow[]>("status_styles_all"),
+  /** `style` null: back to the detected style. */
+  statusStyleSetApp: (statusId: string, style: Style | null) => invoke<AppStatusRow[]>("status_style_set_app", { statusId, style }),
   spaceConfig: (projectId: string) => invoke<SpaceConfig>("space_config", { projectId }),
   spaceSetLayouts: (projectId: string, layouts: SpaceLayouts) => invoke<SpaceConfig>("space_set_layouts", { projectId, layouts }),
   spaceSetField: (projectId: string, fieldId: string, visibility: FieldVisibility) =>

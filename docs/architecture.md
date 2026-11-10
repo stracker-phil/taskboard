@@ -145,7 +145,7 @@ src-tauri/
                              rich text as data URLs), history (fetched.rs: how often details are fetched), markdown/: the
                              issue as Markdown for the clipboard
   src/quicklook.rs           macOS only: the Quick Look panel on one file (ADR 0035)
-  src/status_style/          the six status styles (status types): detection and the owner's overrides per Space
+  src/status_style/          the six status styles (status types): detection, the owner's app-wide choice and a Space's override
   src/space_config/          a Space's own settings: offered layouts, new views' layout and grouping, field visibility
                              (types.rs the settings, read.rs what views and the Issue view read, edit.rs the changes)
   src/me_mode/               which issues are mine in Me mode: the assignee plus the owner's rules (ADR 0045)

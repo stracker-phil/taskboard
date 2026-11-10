@@ -33,7 +33,8 @@ The owner's rule (2026-10-30), for every control, list and popover:
   neighbors don't move (Settings → Shortcuts). New controls appear where the row has free room, not where they
   push others aside (Revert and Save View in the toolbar's middle).
 - **Nothing jumps; things move.** A control that appears fades in, and controls that change position glide to
-  the new one (`useGlide` in `lib/motion.ts`: the toolbar, the view tabs, the Board's columns). Rows that grow or
+  the new one (`useGlide` in `lib/motion.ts`: the toolbar, the view tabs, the Board's columns; `useListGlide` for rows that move to another
+  section, e.g. Settings → Statuses). Rows that grow or
   shrink animate their height (a group reveals or hides its rows from the bottom). A window resize may move
   things at once.
 - **Folding follows the width only.** The toolbar folds items into "…" when the window narrows, never because
@@ -202,8 +203,9 @@ One language for every Jira status (`src-tauri/src/status_style/`): six styles (
 To do, In progress, In review, Blocked and Done. Jira's category decides To do (`new`; Backlog when the name
 contains "backlog") and Done (`done`); otherwise a name containing "review" is In review, one containing
 "block" is Blocked, everything else In progress. The Group menu and the Columns popover also offer Status type:
-one group, Board column or pill per style, whatever the status is called; the Board orders them Backlog first. A Space's settings
-(Settings → Spaces → the Space → Statuses) override it per status for that Space only.
+one group, Board column or pill per style, whatever the status is called; the Board orders them Backlog first. Settings → Statuses
+chooses a status's style for every Space; a Space's settings (Settings → Spaces → the Space → Statuses) override
+it for that Space only.
 
 - **StatusSquare** (`components/issue/StatusSquare.tsx`): the only status marker, a filled 10 × 10 square,
   radius 3, in `--status-*-square` (To do gray, Backlog lighter). No rings or outlines anywhere. In List and
@@ -859,9 +861,8 @@ no separate Settings design; owner, 2026-10-28). Its colors are the `--settings-
     the same settings. *General*: its fields (`SpaceFields` in `components/SpaceEditor.tsx`): Name
     (empty uses the project's), Icon and color (the look editor; a Space always has a color) and Client (empty means internal). *Layouts*: a switch per layout
     its views offer (one stays on), the default layout of new views and their grouping. *Statuses*: only the
-    statuses this Space's issues are in, under a section per Jira category, with a search field; a row: the pill,
-    "N issues", and a button (the style's square and "Automatic · X" or the style's name) with a menu of
-    Automatic and the six styles, the chosen one checked. *Custom fields*: a row per field with a menu of
+    statuses this Space's issues are in, like Settings → Statuses, with "N issues" after the pill and Default (the
+    app-wide style) in place of Automatic. *Custom fields*: a row per field with a menu of
     Visible, Hidden in list (no column choice and no filter field), Hidden in detail (not in the Issue view) and
     Hidden everywhere. Outside a Space a field drops out of the list only when every tracked Space hides it.
     *Team* (`spaces/SpaceTeam`): how many people are on the Space's team and how many have activity there, with
@@ -871,6 +872,11 @@ no separate Settings design; owner, 2026-10-28). Its colors are the `--settings-
     "Track projects under Projects to get Spaces." when none is tracked. The sidebar's "Client label…" item
     opens `SpacePopover` (300px, 12px radius, `--shadow-popover`, at the top left of the content panel) with the
     Client field; Esc, Done or a click outside close it.
+  - **Statuses** (`jira/StatusesPage`, `StatusStyleGroups`): every status the tracked projects use, in a section
+    per style it shows (in the list's group order, the style's square in the heading), with a search field; a
+    row: the pill and a button (the style's square and "Automatic · X" or the style's name) with a menu of
+    Automatic and the six styles, the chosen one checked. A status whose style changes glides into its new
+    section (`useListGlide`); the menu closed with the click, so nothing under the cursor moved.
   - **Team** (`jira/TeamPage`): one grid of everyone with activity in a tracked Space (rows, by name, with a
     search field) against the tracked Spaces (columns in sidebar order: tile and key, the name as tooltip); a
     checkbox per cell puts the person on that Space's team (`space_set_member`). By default everyone ever assigned

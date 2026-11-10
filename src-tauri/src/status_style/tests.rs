@@ -62,17 +62,24 @@ fn each_style_has_a_readable_name() {
 }
 
 #[test]
-fn a_chosen_style_wins_over_the_detected_one() {
-    let row = |chosen| StatusStyleRow {
+fn a_spaces_choice_wins_over_the_app_style_and_that_over_the_detected_one() {
+    let row = |chosen, app| StatusStyleRow {
         id: "10001".into(),
         name: "In Review".into(),
         category: "indeterminate".into(),
         detected: Style::Review,
         chosen,
+        app,
         issues: 0,
     };
-    assert_eq!(row(Some(Style::Blocked)).style(), Style::Blocked);
-    assert_eq!(row(None).style(), Style::Review);
+    for (chosen, app, expected) in [
+        (Some(Style::Blocked), Some(Style::Done), Style::Blocked),
+        (Some(Style::Blocked), None, Style::Blocked),
+        (None, Some(Style::Done), Style::Done),
+        (None, None, Style::Review),
+    ] {
+        assert_eq!(row(chosen, app).style(), expected, "{chosen:?} / {app:?}");
+    }
 }
 
 fn issue(id: u32, project: &str, status: &str, category: &str, gone: bool) -> String {
@@ -282,6 +289,197 @@ async fn the_same_status_can_be_styled_differently_in_two_spaces_and_reset_on_it
     let styles = db.read(Styles::load).await.unwrap();
     assert_eq!(styles.of("10001", "s1", "new", "To Do"), Style::Todo);
     assert_eq!(styles.of("10002", "s1", "new", "To Do"), Style::Review);
+}
+
+fn app_row_names(rows: &[AppStatusRow]) -> Vec<&str> {
+    rows.iter().map(|r| r.name.as_str()).collect()
+}
+
+#[tokio::test]
+async fn a_space_row_reports_the_app_choice_while_chosen_stays_the_spaces() {
+    let (_dir, db) = lab().await;
+    status_style_set_app(&db, "s1".into(), Some(Style::Done))
+        .await
+        .unwrap();
+    status_style_set(&db, "10001".into(), "s3".into(), Some(Style::Blocked))
+        .await
+        .unwrap();
+
+    let rows = status_styles_list(&db, "10001".into()).await.unwrap();
+
+    let pair = |id: &str| {
+        let row = rows.iter().find(|r| r.id == id).unwrap();
+        (row.chosen, row.app, row.style())
+    };
+    assert_eq!(pair("s1"), (None, Some(Style::Done), Style::Done));
+    assert_eq!(pair("s3"), (Some(Style::Blocked), None, Style::Blocked));
+    assert_eq!(pair("s2"), (None, None, Style::Progress));
+}
+
+#[tokio::test]
+async fn the_app_list_holds_the_statuses_of_tracked_projects_by_name_ignoring_case() {
+    let (_dir, db) = lab().await;
+
+    let rows = status_styles_all(&db).await.unwrap();
+
+    assert_eq!(
+        app_row_names(&rows),
+        ["Backlog", "Done", "in review", "Testing", "To Do"]
+    );
+    assert!(rows.iter().all(|r| r.chosen.is_none()));
+}
+
+#[tokio::test]
+async fn a_status_only_an_untracked_project_uses_is_not_in_the_app_list() {
+    let (_dir, db) = lab().await;
+
+    let rows = status_styles_all(&db).await.unwrap();
+
+    assert!(
+        rows.iter().all(|r| r.id != "s6" && r.id != "s7"),
+        "{rows:?}"
+    );
+}
+
+#[tokio::test]
+async fn a_status_only_gone_issues_use_is_not_in_the_app_list() {
+    let (_dir, db) = lab().await;
+
+    let rows = status_styles_all(&db).await.unwrap();
+
+    assert!(rows.iter().all(|r| r.id != "s8"), "{rows:?}");
+}
+
+#[tokio::test]
+async fn the_app_list_shows_each_statuss_category_detection_and_choice() {
+    let (_dir, db) = lab().await;
+    status_style_set_app(&db, "s3".into(), Some(Style::Blocked))
+        .await
+        .unwrap();
+
+    let rows = status_styles_all(&db).await.unwrap();
+
+    let review = rows.iter().find(|r| r.id == "s3").unwrap();
+    assert_eq!(
+        review,
+        &AppStatusRow {
+            id: "s3".into(),
+            name: "in review".into(),
+            category: "indeterminate".into(),
+            detected: Style::Review,
+            chosen: Some(Style::Blocked),
+        }
+    );
+}
+
+#[tokio::test]
+async fn an_app_wide_style_can_be_set_changed_and_cleared() {
+    let (_dir, db) = lab().await;
+    let chosen = |rows: &[AppStatusRow]| {
+        rows.iter()
+            .filter(|r| r.chosen.is_some())
+            .map(|r| (r.id.clone(), r.chosen))
+            .collect::<Vec<_>>()
+    };
+
+    let set = status_style_set_app(&db, "s1".into(), Some(Style::Done))
+        .await
+        .unwrap();
+    assert_eq!(chosen(&set), [("s1".to_string(), Some(Style::Done))]);
+
+    let changed = status_style_set_app(&db, "s1".into(), Some(Style::Review))
+        .await
+        .unwrap();
+    assert_eq!(chosen(&changed), [("s1".to_string(), Some(Style::Review))]);
+
+    let cleared = status_style_set_app(&db, "s1".into(), None).await.unwrap();
+    assert!(chosen(&cleared).is_empty());
+    assert_eq!(status_styles_all(&db).await.unwrap(), cleared);
+}
+
+#[tokio::test]
+async fn setting_the_app_style_leaves_a_spaces_override_in_place() {
+    let (_dir, db) = lab().await;
+    status_style_set(&db, "10001".into(), "s1".into(), Some(Style::Blocked))
+        .await
+        .unwrap();
+
+    status_style_set_app(&db, "s1".into(), Some(Style::Done))
+        .await
+        .unwrap();
+    status_style_set_app(&db, "s1".into(), None).await.unwrap();
+
+    let rows = status_styles_list(&db, "10001".into()).await.unwrap();
+    let todo = rows.iter().find(|r| r.id == "s1").unwrap();
+    assert_eq!((todo.chosen, todo.app), (Some(Style::Blocked), None));
+}
+
+#[tokio::test]
+async fn app_styling_an_unknown_status_is_not_found() {
+    let (_dir, db) = lab().await;
+
+    let err = status_style_set_app(&db, "nope".into(), Some(Style::Done))
+        .await
+        .unwrap_err();
+
+    assert_eq!(err.kind(), crate::error::ErrorKind::NotFound);
+}
+
+#[tokio::test]
+async fn a_spaces_override_beats_the_app_style_which_beats_detection() {
+    let (_dir, db) = lab().await;
+    status_style_set_app(&db, "s1".into(), Some(Style::Backlog))
+        .await
+        .unwrap();
+    status_style_set(&db, "10001".into(), "s1".into(), Some(Style::Blocked))
+        .await
+        .unwrap();
+    status_style_set_app(&db, "s2".into(), Some(Style::Done))
+        .await
+        .unwrap();
+
+    let styles = db.read(Styles::load).await.unwrap();
+
+    assert_eq!(styles.of("10001", "s1", "new", "To Do"), Style::Blocked);
+    assert_eq!(
+        styles.of("10001", "s2", "indeterminate", "Testing"),
+        Style::Done
+    );
+    assert_eq!(
+        styles.of("10001", "s3", "indeterminate", "in review"),
+        Style::Review
+    );
+}
+
+#[tokio::test]
+async fn a_space_override_does_not_apply_in_another_space_where_the_app_style_does() {
+    let (_dir, db) = lab().await;
+    status_style_set_app(&db, "s1".into(), Some(Style::Backlog))
+        .await
+        .unwrap();
+    status_style_set(&db, "10001".into(), "s1".into(), Some(Style::Blocked))
+        .await
+        .unwrap();
+
+    let styles = db.read(Styles::load).await.unwrap();
+
+    assert_eq!(styles.of("10002", "s1", "new", "To Do"), Style::Backlog);
+}
+
+#[tokio::test]
+async fn the_app_style_lookup_ignores_space_overrides() {
+    let (_dir, db) = lab().await;
+    status_style_set(&db, "10001".into(), "s1".into(), Some(Style::Blocked))
+        .await
+        .unwrap();
+    status_style_set_app(&db, "s2".into(), Some(Style::Done))
+        .await
+        .unwrap();
+
+    let styles = db.read(Styles::load).await.unwrap();
+
+    assert_eq!(styles.app_of("s1", "new", "To Do"), Style::Todo);
+    assert_eq!(styles.app_of("s2", "indeterminate", "Testing"), Style::Done);
 }
 
 #[tokio::test]
