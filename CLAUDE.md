@@ -55,7 +55,8 @@ Test, lint and format-check commands run through the `ci` agent, never in the ma
 - `bun run test`: Vitest and Rust unit tests
 - `bun run lint`: IPC types drift check, tsc, ESLint and clippy on production code (warnings are errors)
 - `bun run release major|minor|patch`: bumps the version, builds the signed release `.app` and `.dmg`, installs
-  it (`scripts/install.sh`), commits "Release X.Y.Z" and tags it (`scripts/release.sh`, ADR 0054)
+  it (`scripts/install.sh`), commits "Release X.Y.Z", tags it and cleans the build folder (`scripts/release.sh`,
+  `scripts/clean-build.sh`, ADR 0054)
 - `bun run build:app` + `scripts/dev/launch.sh`: debug build, restarted next to the terminal without stealing focus
 - `scripts/dev/js.sh` / `scripts/dev/screenshot.sh`: drive (store: `window.taskboard`) and capture the running
   debug window in the background
