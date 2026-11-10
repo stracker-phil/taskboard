@@ -3,7 +3,8 @@
 use chrono::{DateTime, Duration, Utc};
 
 use super::full::{current_scope, full_sync, refresh_fields, search_fields};
-use super::store::{last_delta_at, recently_updated, record_delta, store_page};
+use super::own::{drop_own_changes, newest_change};
+use super::store::{Pass, last_delta_at, recently_updated, record_delta, store_page};
 use super::{Job, SyncContext, SyncEvent, SyncProgress};
 use crate::error::{AppError, AppResult};
 use crate::issues::issue_sync_comments;
@@ -29,6 +30,7 @@ pub async fn delta_sync(
     }
     let connection = ctx.settings.get().connection;
     let source = ctx.source()?;
+    let after = ctx.db.read(newest_change).await?;
     let ids = refresh_fields(&ctx.db, source.as_ref()).await?;
     let since = DateTime::parse_from_rfc3339(&cursor)
         .map_err(|e| AppError::Internal(format!("The delta cursor {cursor} isn't a time: {e}")))?
@@ -57,11 +59,13 @@ pub async fn delta_sync(
     while let Some(page) = pages.next_page().await {
         let issues = page?.issues;
         let ids = ids.clone();
+        let me = connection.account_id.clone();
         let now = format_utc(Utc::now());
         let (page_newest, changed) = ctx
             .db
             .write(move |tx, changes| {
-                let newest = store_page(tx, changes, &issues, &ids, false, &now)?;
+                let newest =
+                    store_page(tx, changes, &issues, &ids, Pass::Later, me.as_deref(), &now)?;
                 Ok((newest, changes.issues.len() as u32))
             })
             .await?;
@@ -73,6 +77,13 @@ pub async fn delta_sync(
     ctx.db
         .write(move |tx, _| record_delta(tx, newest.as_deref()))
         .await?;
+    drop_own_changes(
+        &ctx.db,
+        source.as_ref(),
+        connection.account_id.as_deref(),
+        after,
+    )
+    .await;
     prefetch_comments(ctx).await;
     Ok(())
 }

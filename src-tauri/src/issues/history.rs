@@ -3,14 +3,13 @@
 
 use chrono::{DateTime, Utc};
 use rusqlite::{Connection, params};
-use serde_json::Value;
 
 use super::fetched::{self, Detail};
-use crate::db::Db;
+use crate::db::{Changes, Db};
 use crate::error::AppResult;
 use crate::jira::dto::Changelog;
 use crate::sync::source::Source;
-use crate::time::utc;
+use crate::time::utc_text;
 
 /// Fetches the issue's changelog and replaces the cached history, unless it was fetched within `FRESH_FOR` of
 /// `now`. Returns whether it changed; the cache emits `issue_details_changed` for the issue when it did. On a
@@ -29,15 +28,26 @@ pub async fn issue_sync_history(
         .await
         .inspect_err(|e| log::info!("History of issue {id} not fetched: {e}"))?;
     let source_name = source.kind().as_str();
-    db.write(move |tx, changes| {
-        let changed = store(tx, &id, &entries, source_name)?;
-        fetched::mark_fetched(tx, &id, Detail::History, now)?;
-        if changed {
-            changes.detail_changed(&id);
-        }
-        Ok(changed)
-    })
-    .await
+    db.write(move |tx, changes| store_history(tx, changes, &id, &entries, source_name, now))
+        .await
+}
+
+/// Replaces the issue's cached history with `entries`, fetched at `now`. Returns whether it changed; the cache
+/// emits `issue_details_changed` for the issue when it did.
+pub fn store_history(
+    conn: &Connection,
+    changes: &mut Changes,
+    id: &str,
+    entries: &[Changelog],
+    source: &str,
+    now: DateTime<Utc>,
+) -> AppResult<bool> {
+    let changed = store(conn, id, entries, source)?;
+    fetched::mark_fetched(conn, id, Detail::History, now)?;
+    if changed {
+        changes.detail_changed(id);
+    }
+    Ok(changed)
 }
 
 /// One field's change, as stored.
@@ -81,7 +91,7 @@ pub(super) fn rows(conn: &Connection, id: &str) -> AppResult<Vec<HistoryRow>> {
 fn store(conn: &Connection, id: &str, entries: &[Changelog], source: &str) -> AppResult<bool> {
     let mut incoming = Vec::new();
     for entry in entries {
-        let Some(changed_at) = utc(&Value::from(entry.created.as_str())) else {
+        let Some(changed_at) = utc_text(&entry.created) else {
             continue;
         };
         if let Some(author) = entry.author.as_ref().filter(|a| !a.display_name.is_empty()) {

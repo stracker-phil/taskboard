@@ -10,7 +10,7 @@ use crate::error::AppResult;
 use crate::jira::dto::Comment;
 use crate::sync::source::Source;
 use crate::text::html_to_text;
-use crate::time::{format_utc, utc};
+use crate::time::{format_utc, utc_text};
 
 /// Fetches the issue's comments unless they were fetched in full after its last update. Returns whether it
 /// fetched; the cache emits `issues_changed` for the issue when the comments or their authors changed.
@@ -71,8 +71,11 @@ fn store(conn: &Connection, id: &str, comments: &[Comment], now: &str) -> AppRes
             texts.push(stored.text);
         }
     }
+    // A comment on its way still counts, so the fetch that brings it records no new comment.
     conn.execute(
-        "UPDATE cache.issue SET comments_synced_at = ?2, comment_count = ?3 WHERE id = ?1",
+        "UPDATE cache.issue SET comments_synced_at = ?2,
+           comment_count = ?3 + (SELECT COUNT(*) FROM cache.comment WHERE issue_id = ?1 AND id LIKE 'pending:%')
+         WHERE id = ?1",
         params![id, now, comments.len() as i64],
     )?;
     conn.execute(
@@ -94,8 +97,8 @@ pub fn store_comment(
     issue_id: &str,
     comment: &Comment,
 ) -> AppResult<Option<StoredComment>> {
-    let stamp = |text: &str| utc(&Value::from(text));
-    let (Some(created), Some(updated)) = (stamp(&comment.created), stamp(&comment.updated)) else {
+    let (Some(created), Some(updated)) = (utc_text(&comment.created), utc_text(&comment.updated))
+    else {
         return Ok(None);
     };
     let text = comment

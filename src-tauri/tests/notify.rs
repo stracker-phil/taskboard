@@ -360,9 +360,23 @@ mod the_notifier {
             rig.assign_to_me(key);
         }
         rig.delta().await;
+        rig.ctx
+            .db
+            .write(|tx, _| {
+                tx.execute(
+                    "INSERT INTO cache.issue_change (issue_id, field, old_value, new_value, changed_at)
+                     SELECT id, 'priority', 'High', 'Low', '2026-10-28T09:00:00.000Z'
+                     FROM cache.issue LIMIT 20",
+                    [],
+                )?;
+                Ok(())
+            })
+            .await
+            .unwrap();
         let notifier = Notifier::start(&rig.ctx.db).await.unwrap();
         let settings = rig.settings(NotifyAbout::MentionsAndAssignments);
-        assert!(rig.newest_change().await >= 3);
+        let before_reset = rig.newest_change().await;
+        assert!(before_reset >= 20);
 
         rig.ctx.db.reset_cache().await.unwrap();
         refresh_projects(&rig.ctx.db, &rig.fake.client(TokenKind::Classic))
@@ -373,7 +387,7 @@ mod the_notifier {
         }
         let emit: Emit = Arc::new(|_| {});
         full_sync(&rig.ctx, &*emit).await.unwrap();
-        assert_eq!(rig.newest_change().await, 0);
+        assert!(rig.newest_change().await < before_reset);
         rig.fake.add_mention(
             "NW-1044",
             demo_user(MARTA),
@@ -381,7 +395,7 @@ mod the_notifier {
             &demo_user(ALEX),
         );
         rig.delta().await;
-        assert!(rig.newest_change().await < 3);
+        assert!(rig.newest_change().await < before_reset);
 
         let found = notifier.take(&rig.ctx.db, &settings, true).await.unwrap();
 

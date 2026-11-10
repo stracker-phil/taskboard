@@ -7,6 +7,7 @@ use chrono::{DateTime, NaiveDate, Utc};
 use serde_json::{Value, json};
 use tempfile::TempDir;
 
+use taskboard_lib::changes::{UNSEEN, mark_unread};
 use taskboard_lib::connection::{
     ConnectionInput, JiraAccess, refresh_projects, save, track_project,
 };
@@ -19,7 +20,7 @@ use taskboard_lib::jira::capability::Capability;
 use taskboard_lib::jira::{Limiter, TokenKind};
 use taskboard_lib::status_style::{Style, status_style_set};
 use taskboard_lib::store::settings::{Settings, SettingsStore};
-use taskboard_lib::sync::{Emit, SyncContext, SyncEvent, full_sync};
+use taskboard_lib::sync::{Emit, Job, SyncContext, SyncEvent, full_sync, refetch_issue, run_job};
 use taskboard_lib::team::{Me, space_set_member};
 use taskboard_lib::test_support::demo::{self, DEMO_NOW, ME_EMAIL};
 use taskboard_lib::test_support::fake_jira::{DEMO_TOKEN, FakeJira};
@@ -432,6 +433,21 @@ impl Rig {
             .iter()
             .filter(|r| r.method == "POST" && r.path.ends_with("/comment"))
             .count()
+    }
+
+    /// The cached comments count as possibly behind, so the next comment sync fetches.
+    async fn make_comments_stale(&self, issue_id: &'static str) {
+        self.ctx
+            .db
+            .write(move |tx, _| {
+                tx.execute(
+                    "UPDATE cache.issue SET comments_synced_at = NULL WHERE id = ?1",
+                    [issue_id],
+                )?;
+                Ok(())
+            })
+            .await
+            .unwrap();
     }
 
     /// A comment on its way, as `writes::add_comment` leaves it: shown, counted, not yet in Jira.
@@ -1549,6 +1565,189 @@ mod the_comment_syncs_with_a_comment_on_its_way {
         assert!(fetched);
         assert_eq!(rig.pending_comments(NW_1042).await, 1);
         assert_eq!(rig.cached_comments(NW_1042).await, COMMENTS_ON_NW_1042);
+    }
+
+    #[tokio::test]
+    async fn fetching_an_issues_comments_keeps_the_pending_one_in_the_count() {
+        let rig = Rig::synced().await;
+        rig.start_pending_comment(NW_1042).await;
+        rig.make_comments_stale(NW_1042).await;
+        let source = rig.ctx.source().unwrap();
+
+        issue_sync_comments(&rig.ctx.db, &*source, NW_1042.into())
+            .await
+            .unwrap();
+
+        assert_eq!(
+            rig.shown_comment_count(NW_1042).await,
+            COMMENTS_ON_NW_1042 + 1
+        );
+    }
+
+    #[tokio::test]
+    async fn a_comment_that_settles_after_such_a_fetch_records_no_new_comment() {
+        let rig = Rig::synced().await;
+        rig.start_pending_comment(NW_1042).await;
+        rig.make_comments_stale(NW_1042).await;
+        let source = rig.ctx.source().unwrap();
+        issue_sync_comments(&rig.ctx.db, &*source, NW_1042.into())
+            .await
+            .unwrap();
+        rig.fake.set_now(demo_now() + chrono::Duration::hours(2));
+        rig.fake
+            .add_comment("NW-1042", demo_user(ALEX), "On its way");
+
+        refetch_issue(&rig.ctx.db, &*source, NW_1042, |tx| {
+            tx.execute("DELETE FROM cache.comment WHERE id LIKE 'pending:%'", [])?;
+            Ok(())
+        })
+        .await
+        .unwrap();
+
+        assert_eq!(rig.pending_comments(NW_1042).await, 0);
+        assert_eq!(
+            rig.shown_comment_count(NW_1042).await,
+            COMMENTS_ON_NW_1042 + 1
+        );
+        assert_eq!(rig.recorded_changes().await, 0);
+    }
+}
+
+mod my_own_writes_are_not_news {
+    use super::*;
+
+    const LONG_AGO: &str = "2026-10-28T08:00:00.000Z";
+
+    impl Rig {
+        /// Seen long ago, with no change recorded: `updated` is what the write moves it up to.
+        async fn seen_long_ago(&self, issue_id: &'static str) {
+            self.ctx
+                .db
+                .write(move |tx, _| {
+                    tx.execute(
+                        "INSERT INTO issue_seen (issue_id, seen_at) VALUES (?1, ?2)
+                         ON CONFLICT (issue_id) DO UPDATE SET seen_at = excluded.seen_at",
+                        rusqlite::params![issue_id, LONG_AGO],
+                    )?;
+                    Ok(())
+                })
+                .await
+                .unwrap();
+        }
+
+        /// `(seen_at, updated_at)` of the issue.
+        async fn seen_and_updated(&self, issue_id: &str) -> (String, String) {
+            let id = issue_id.to_string();
+            self.ctx
+                .db
+                .read(move |conn| {
+                    Ok(conn.query_row(
+                        "SELECT s.seen_at, i.updated_at FROM issue_seen s
+                         JOIN cache.issue i ON i.id = s.issue_id WHERE i.id = ?1",
+                        [id],
+                        |row| Ok((row.get(0)?, row.get(1)?)),
+                    )?)
+                })
+                .await
+                .unwrap()
+        }
+
+        async fn is_unread(&self, issue_id: &str) -> bool {
+            let id = issue_id.to_string();
+            self.ctx
+                .db
+                .read(move |conn| {
+                    Ok(conn.query_row(
+                        &format!(
+                            "SELECT EXISTS (SELECT 1 FROM cache.issue i WHERE i.id = ?1 AND {UNSEEN})"
+                        ),
+                        [id],
+                        |row| row.get(0),
+                    )?)
+                })
+                .await
+                .unwrap()
+        }
+
+        async fn delta(&self) {
+            let emit = emit();
+            run_job(&self.ctx, Job::Delta, &*emit, None).await;
+        }
+
+        /// After the write the issue is read, seen up to Jira's `updated`, and stays read after a delta sync.
+        async fn assert_read_up_to_updated(&self, issue_id: &str) {
+            let (seen, updated) = self.seen_and_updated(issue_id).await;
+            assert_eq!(seen, updated);
+            assert_ne!(seen, LONG_AGO);
+            assert!(!self.is_unread(issue_id).await);
+
+            self.delta().await;
+
+            assert!(!self.is_unread(issue_id).await);
+        }
+    }
+
+    #[tokio::test]
+    async fn a_status_change_leaves_the_issue_read() {
+        let rig = Rig::synced().await;
+        rig.seen_long_ago(NW_1042).await;
+
+        rig.move_to(NW_1042, DONE).await;
+
+        rig.assert_read_up_to_updated(NW_1042).await;
+    }
+
+    #[tokio::test]
+    async fn an_assignment_leaves_the_issue_read() {
+        let rig = Rig::synced().await;
+        rig.seen_long_ago(NW_1044).await;
+
+        rig.apply(NW_1044, Some(ALEX)).await;
+
+        rig.assert_read_up_to_updated(NW_1044).await;
+    }
+
+    #[tokio::test]
+    async fn a_comment_leaves_the_issue_read() {
+        let rig = Rig::synced().await;
+        rig.seen_long_ago(NW_1042).await;
+
+        rig.comment(NW_1042, "Checked on staging").await.unwrap();
+
+        rig.assert_read_up_to_updated(NW_1042).await;
+    }
+
+    #[tokio::test]
+    async fn an_issue_marked_unread_by_hand_stays_unread_after_a_write() {
+        let rig = Rig::synced().await;
+        mark_unread(&rig.ctx.db, NW_1042.into(), None)
+            .await
+            .unwrap();
+
+        rig.move_to(NW_1042, DONE).await;
+
+        assert!(rig.is_unread(NW_1042).await);
+    }
+
+    #[tokio::test]
+    async fn a_write_never_moves_the_seen_time_back() {
+        let rig = Rig::synced().await;
+        let far_ahead = "2999-01-01T00:00:00.000Z";
+        rig.ctx
+            .db
+            .write(move |tx, _| {
+                tx.execute(
+                    "UPDATE issue_seen SET seen_at = ?2 WHERE issue_id = ?1",
+                    rusqlite::params![NW_1042, far_ahead],
+                )?;
+                Ok(())
+            })
+            .await
+            .unwrap();
+
+        rig.move_to(NW_1042, DONE).await;
+
+        assert_eq!(rig.seen_and_updated(NW_1042).await.0, far_ahead);
     }
 }
 

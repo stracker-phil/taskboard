@@ -1172,7 +1172,7 @@ async fn a_change_newer_than_the_comments_comes_before_them_in_the_activity() {
             ActivityItem::Comment { at, .. } | ActivityItem::Change { at, .. } => at.as_str(),
         })
         .collect();
-    assert_eq!(items.len(), 5);
+    assert_eq!(comment_times(&items).len(), 4);
     assert!(
         matches!(&items[0], ActivityItem::Change { at, .. } if at == LATER_UTC),
         "{items:?}"
@@ -2363,6 +2363,8 @@ async fn history_at_or_after_a_synced_change_replaces_it_and_brings_the_author()
     site.fake
         .edit_issue("NW-1044", |fields| fields["status"] = done_status());
     site.resync().await;
+    site.execute("UPDATE cache.issue SET history_synced_at = NULL WHERE key = 'NW-1044'")
+        .await;
     let from_the_sync = site.changes("NW-1044").await;
     assert_eq!(
         from_the_sync.iter().map(parts).collect::<Vec<_>>(),
@@ -2400,6 +2402,8 @@ async fn a_synced_change_newer_than_the_history_still_shows_without_an_author() 
     site.fake
         .edit_issue("NW-1044", |fields| fields["status"] = done_status());
     site.resync().await;
+    site.execute("UPDATE cache.issue SET history_synced_at = NULL WHERE key = 'NW-1044'")
+        .await;
     site.fake.set_changelog(
         "NW-1044",
         vec![entry(

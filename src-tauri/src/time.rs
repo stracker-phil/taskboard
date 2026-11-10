@@ -7,7 +7,12 @@ use crate::jira::dto::parse_jira_time;
 
 /// A Jira time as stored text; `None` when `value` isn't one.
 pub fn utc(value: &Value) -> Option<String> {
-    let at = parse_jira_time(value.as_str()?)?;
+    utc_text(value.as_str()?)
+}
+
+/// `utc` for a time that is already text.
+pub fn utc_text(text: &str) -> Option<String> {
+    let at = parse_jira_time(text)?;
     Some(format_utc(at.with_timezone(&Utc)))
 }
 

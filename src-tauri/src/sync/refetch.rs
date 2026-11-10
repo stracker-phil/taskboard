@@ -5,13 +5,15 @@ use rusqlite::Transaction;
 
 use super::full::{refresh_fields, search_fields};
 use super::source::Source;
-use super::store::store_page;
+use super::store::{Pass, store_page};
+use crate::changes::seen_until_updated;
 use crate::db::Db;
 use crate::error::AppResult;
 use crate::time::format_utc;
 
-/// Fetches the issue with the sync's fields and stores it like a sync page, then runs `then` in the same
-/// transaction. A missing issue stores nothing.
+/// Fetches the issue with the sync's fields, stores it like a sync page and runs `then`, all in one transaction.
+/// Everything Jira changed with the owner's write is the owner's, so the issue ends seen up to its new `updated`
+/// rather than having each change told apart. A missing issue stores nothing.
 pub async fn refetch_issue(
     db: &Db,
     source: &dyn Source,
@@ -22,9 +24,19 @@ pub async fn refetch_issue(
     let fields = search_fields(db, &field_ids).await?;
     let found = source.fetch(&[id.to_string()], &fields).await?;
     let now = format_utc(Utc::now());
+    let id = id.to_string();
     db.write(move |tx, changes| {
-        store_page(tx, changes, &found.issues, &field_ids, false, &now)?;
-        then(tx)
+        store_page(
+            tx,
+            changes,
+            &found.issues,
+            &field_ids,
+            Pass::Later,
+            None,
+            &now,
+        )?;
+        then(tx)?;
+        seen_until_updated(tx, changes, &id)
     })
     .await
 }

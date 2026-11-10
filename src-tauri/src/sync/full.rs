@@ -3,10 +3,11 @@
 use chrono::Utc;
 
 use super::map::FieldIds;
+use super::own::{drop_own_changes, newest_change};
 use super::source::Source;
 use super::store::{
-    fetched_fields, has_project_sync, record_project_sync, record_scope_sync, store_fields,
-    store_page, store_statuses, store_versions,
+    Pass, fetched_fields, has_project_sync, page_pass, record_project_sync, record_scope_sync,
+    store_fields, store_page, store_statuses, store_versions,
 };
 use super::{Job, SyncContext, SyncEvent, SyncProgress};
 use crate::connection::{ProjectRow, effective_scope, store_spaces, tracked_projects};
@@ -46,6 +47,8 @@ struct Run<'a> {
     scope: String,
     fields: Vec<String>,
     ids: FieldIds,
+    /// The connected account, whose own changes aren't news.
+    me: Option<String>,
     emit: &'a (dyn Fn(SyncEvent) + Send + Sync),
 }
 
@@ -62,12 +65,15 @@ pub async fn full_sync(
         return Ok(());
     }
     let fields = search_fields(&ctx.db, &ids).await?;
+    let after = ctx.db.read(newest_change).await?;
     let run = Run {
         ctx,
         source,
         scope,
         fields,
         ids,
+        // Read again: `sync_metadata` just stored the account `/myself` named.
+        me: ctx.settings.get().connection.account_id,
         emit,
     };
     let mut newest: Option<String> = None;
@@ -75,10 +81,12 @@ pub async fn full_sync(
         newest = newest.max(sync_project(&run, project).await?);
     }
     let now = format_utc(Utc::now());
-    let scope = run.scope;
+    let scope = run.scope.clone();
     ctx.db
         .write(move |tx, _| record_scope_sync(tx, &scope, &now, newest.as_deref()))
-        .await
+        .await?;
+    drop_own_changes(&ctx.db, run.source.as_ref(), run.me.as_deref(), after).await;
+    Ok(())
 }
 
 /// The mapped fields, the sprint and epic color fields, and the custom fields `fetched_fields` returns.
@@ -177,14 +185,21 @@ async fn sync_project(run: &Run<'_>, project: &ProjectRow) -> AppResult<Option<S
         expand: Some("renderedFields".into()),
     });
     let mut newest: Option<String> = None;
+    let mut pass = (!first).then_some(Pass::Later);
     while let Some(page) = pages.next_page().await {
         let issues = page?.issues;
         let count = issues.len() as u32;
         let ids = run.ids.clone();
+        let me = run.me.clone();
         let now = format_utc(Utc::now());
-        let page_newest = db
-            .write(move |tx, changes| store_page(tx, changes, &issues, &ids, first, &now))
+        let (page_newest, page_pass) = db
+            .write(move |tx, changes| {
+                let pass = page_pass(tx, pass, &issues)?;
+                let newest = store_page(tx, changes, &issues, &ids, pass, me.as_deref(), &now)?;
+                Ok((newest, pass))
+            })
             .await?;
+        pass = Some(page_pass);
         newest = newest.max(page_newest);
         progress.pages_done += 1;
         progress.fetched += count;

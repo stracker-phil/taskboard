@@ -34,11 +34,14 @@ sent once and never retried.
 2. The write goes to Jira through `Source` (`assign`, `transition`, `set_priority`).
 3. Refused: the row gets `base` back (`pending::roll_back`) and the error reaches the page, which toasts it.
 4. Accepted: `sync::refetch_issue` fetches the issue with the sync's fields and stores it like a sync page;
-   the pending row goes in the same transaction (`pending::settle`). If that fetch fails the row goes anyway.
+   the pending row goes in the same transaction (`pending::settle`), and the issue counts as seen up to its new
+   `updated` (`changes::seen_until_updated`; never backwards, not while marked unread). If that fetch fails the
+   row goes anyway.
 
 While a row is pending, `sync::store` keeps its value over what a sync page brings (`writes::overlay`) and
 stores Jira's value as `base`. A page whose `updated` is older than the cached issue's is skipped. Own changes
-record no `issue_change`, so they never show in Unread. At launch `writes::forget_all` drops rows a quit cut off.
+record no `issue_change` (a pending comment counts in `comment_count`, also for the detail comment sync), and what
+Jira changed along with them is seen, so they never show in Unread. At launch `writes::forget_all` drops rows a quit cut off.
 
 ## Outcome
 

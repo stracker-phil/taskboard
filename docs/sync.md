@@ -74,6 +74,22 @@ hourly, a delta every `focused_minutes` while the main window has focus (5 by de
 a sync is failing, only a delta runs, at the failure's `retryAt` or after a wake. ⌘R (`sync:refresh`, also the
 sync chip and `taskboard sync`) queues a delta, ⌘⇧R (`sync:full`, `taskboard sync --full`) a full sync.
 
+## Own changes
+
+The owner's own changes aren't news (`sync::own`, `sync::store`), once Test Connection knows the account:
+
+- A page records no `created` for an issue the owner reported, and no `comment_added` or `mention` for new
+  comments that are all the owner's; the issue is then seen up to its `updated` (`changes::catch_up`) unless other
+  changes are unseen.
+- After a delta or full sync, the 50 most recently updated issues with a recorded status, assignee, priority, due
+  date or `updated` change get Jira's changelog (`Source::changelog`), kept as their history. A field change whose
+  last changelog entry is the owner's goes; an `updated` row goes when every entry since `seen_at` is the owner's.
+  A failure keeps the changes as recorded.
+
+A project's first sync (`store::Pass`): with no issue read yet (a new Space) every issue counts as seen. Once the
+owner read some (a fresh cache: a reset, memory mode after a restart), an issue updated after `issue_seen.seen_at`
+records `updated` ("Updated" in Unread) and one never seen records `created`.
+
 ## Storing a page
 
 `map/` turns an issue's JSON into rows (pure): the issue with every column `docs/data.md` lists and the search
@@ -89,7 +105,7 @@ the cached ones is skipped, so a sync without changes announces nothing; the kep
 relative rendered dates and keeps each comment's edit time, so an edited comment still counts. Otherwise `diff.rs` compares the tracked fields with the cached row and writes
 `issue_change` rows (`status`, `assignee`, `due_date`, `priority`, `comment_added`, `created`), stamped with the
 new `updated`, and a `mention` row for each account an ADF `mention` node of a comment the cache hadn't seen
-names (`sync::mentions`, `adf::mentions`). A project's first sync records no changes and marks every issue seen. When the search returned
+names (`sync::mentions`, `adf::mentions`). A project's first sync compares with nothing ([Own changes](#own-changes)). When the search returned
 all of an issue's comments, they replace the cached ones.
 
 ## Events

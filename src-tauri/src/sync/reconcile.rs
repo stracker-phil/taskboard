@@ -9,7 +9,7 @@ use chrono::{Duration, Utc};
 
 use super::full::{current_scope, refresh_fields, search_fields};
 use super::retention::{live_issues, mark_gone, mark_left_scope, prune_seen_changes, purge_gone};
-use super::store::{record_reconcile, store_page};
+use super::store::{Pass, record_reconcile, store_page};
 use super::{SyncContext, SyncEvent};
 use crate::error::AppResult;
 use crate::jira::{BULK_FETCH_MAX, SearchRequest};
@@ -70,11 +70,20 @@ pub async fn reconcile(
                 .cloned()
                 .partition(|id| found.issues.iter().any(|issue| issue.id == *id));
             let ids = ids.clone();
+            let me = ctx.settings.get().connection.account_id;
             let now = format_utc(Utc::now());
             // Returned but out of scope: stored as Jira has it, so views drop it, and not asked for hourly.
             ctx.db
                 .write(move |tx, changes| {
-                    store_page(tx, changes, &found.issues, &ids, false, &now)?;
+                    store_page(
+                        tx,
+                        changes,
+                        &found.issues,
+                        &ids,
+                        Pass::Later,
+                        me.as_deref(),
+                        &now,
+                    )?;
                     mark_left_scope(tx, &returned, Some(&now))?;
                     mark_gone(tx, changes, &gone, &now)
                 })

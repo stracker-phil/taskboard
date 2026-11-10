@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 use chrono::{DateTime, NaiveDate, Utc};
 use tempfile::TempDir;
 
-use taskboard_lib::changes::{Since, mark_all_seen, mark_seen, mark_unread};
+use taskboard_lib::changes::{Since, UNSEEN, mark_all_seen, mark_seen, mark_unread};
 use taskboard_lib::connection::{
     ConnectionInput, JiraAccess, fetch_versions, refresh_projects, save, track_project,
 };
@@ -319,6 +319,75 @@ fn sorted_keys(data: &ViewData) -> Vec<String> {
 
 fn state(row: &Row) -> (bool, Option<&str>) {
     (row.changed, row.change_note.as_deref())
+}
+
+impl Site {
+    async fn delta_sync(&self) {
+        let emit: Emit = Arc::new(|_| {});
+        run_job(&self.ctx, Job::Delta, &*emit, None).await;
+    }
+
+    /// Everything counts as read at 10:00 and Jira's clock moves on to the delta's time.
+    async fn quiet_until_the_delta(&self) {
+        self.run(format!("UPDATE issue_seen SET seen_at = '{TEN}'"))
+            .await;
+        self.fake
+            .set_now(DELTA_AT.parse::<DateTime<Utc>>().unwrap());
+    }
+
+    /// The cache is thrown away and filled by a full sync again, as after a reset or a restart in memory mode;
+    /// what the owner has read stays.
+    async fn refill_cache(&self) {
+        self.db().reset_cache().await.unwrap();
+        refresh_projects(self.db(), &self.fake.client(TokenKind::Classic))
+            .await
+            .unwrap();
+        for id in PROJECT_IDS {
+            track_project(self.db(), id.into(), true).await.unwrap();
+        }
+        let emit: Emit = Arc::new(|_| {});
+        full_sync(&self.ctx, &*emit).await.unwrap();
+    }
+
+    async fn strings(&self, sql: String) -> Vec<String> {
+        self.db()
+            .read(move |conn| {
+                let mut query = conn.prepare(&sql)?;
+                let found = query
+                    .query_map([], |r| r.get::<_, String>(0))?
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(found)
+            })
+            .await
+            .unwrap()
+    }
+
+    async fn number(&self, sql: &str) -> i64 {
+        self.text(format!("SELECT CAST(({sql}) AS TEXT)"))
+            .await
+            .parse()
+            .unwrap()
+    }
+
+    /// The fields of the changes recorded for the issue, oldest first.
+    async fn recorded_fields(&self, key: &str) -> Vec<String> {
+        self.strings(format!(
+            "SELECT c.field FROM cache.issue_change c JOIN cache.issue i ON i.id = c.issue_id
+             WHERE i.key = '{key}' ORDER BY c.id"
+        ))
+        .await
+    }
+
+    /// The keys of the issues with unseen changes or marked unread, sorted.
+    async fn unread_keys(&self) -> Vec<String> {
+        let mut keys = self
+            .strings(format!(
+                "SELECT i.key FROM cache.issue i WHERE i.gone = 0 AND {UNSEEN}"
+            ))
+            .await;
+        keys.sort();
+        keys
+    }
 }
 
 mod rows {
@@ -1418,7 +1487,7 @@ mod after_a_delta_sync {
             .set_now(DELTA_AT.parse::<DateTime<Utc>>().unwrap());
         site.fake.add_comment(
             "NW-1042",
-            demo::demo().users[0].clone(),
+            demo::demo().users[1].clone(),
             "Postcode rules for Liechtenstein are merged.",
         );
         let done = demo::demo()
@@ -1515,7 +1584,7 @@ mod after_a_delta_sync {
         mention_then_delta(
             &site,
             "NW-1049",
-            ME_ACCOUNT_ID,
+            "712020:5a1e0c3f-8d2b-4f61-9c7e-1b2a3c4d5e02",
             "712020:5a1e0c3f-8d2b-4f61-9c7e-1b2a3c4d5e03",
         )
         .await;
@@ -1524,6 +1593,560 @@ mod after_a_delta_sync {
         assert_eq!(
             state(row_of(&data, "NW-1049")),
             (true, Some("1 new comment"))
+        );
+    }
+}
+
+const JONAS_ACCOUNT_ID: &str = "712020:5a1e0c3f-8d2b-4f61-9c7e-1b2a3c4d5e02";
+const MARTA_ACCOUNT_ID: &str = "712020:5a1e0c3f-8d2b-4f61-9c7e-1b2a3c4d5e03";
+
+fn person(account_id: &str) -> serde_json::Value {
+    demo::demo()
+        .users
+        .into_iter()
+        .find(|user| user["accountId"] == account_id)
+        .unwrap()
+}
+
+fn done_status() -> serde_json::Value {
+    demo::demo()
+        .statuses
+        .into_iter()
+        .find(|status| status["name"] == "Done")
+        .unwrap()
+}
+
+/// A changelog entry by `author` that changed `field` at `at` (a UTC time like `TEN`).
+fn changelog_entry(author: &str, field: &str, at: &str) -> serde_json::Value {
+    serde_json::json!({
+        "id": format!("{author}/{field}/{at}"),
+        "author": person(author),
+        "created": at.replace('Z', "+0000"),
+        "items": [{
+            "field": field,
+            "fieldId": field,
+            "fieldtype": "jira",
+            "from": null,
+            "fromString": null,
+            "to": null,
+            "toString": null
+        }]
+    })
+}
+
+mod own_changes_made_in_jira {
+    use super::*;
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn every_kind_of_change_i_made_in_jira_is_read_after_a_delta() {
+        let site = Site::new().await;
+        site.quiet_until_the_delta().await;
+        site.fake
+            .edit_issue("NW-1044", |fields| fields["status"] = done_status());
+        site.fake.edit_issue("NW-1049", |fields| {
+            fields["priority"] = serde_json::json!({ "id": "4", "name": "Low" });
+        });
+        site.fake.edit_issue("NW-1055", |fields| {
+            fields["assignee"] = person(MARTA_ACCOUNT_ID);
+        });
+        site.fake.edit_issue("NW-1042", |fields| {
+            fields["duedate"] = serde_json::json!("2026-11-15");
+        });
+        let edited = [
+            ("NW-1044", "status"),
+            ("NW-1049", "priority"),
+            ("NW-1055", "assignee"),
+            ("NW-1042", "duedate"),
+        ];
+        for (key, field) in edited {
+            site.fake
+                .set_changelog(key, vec![changelog_entry(ME_ACCOUNT_ID, field, DELTA_AT)]);
+        }
+
+        site.delta_sync().await;
+
+        for (key, field) in edited {
+            assert_eq!(
+                site.recorded_fields(key).await,
+                Vec::<String>::new(),
+                "{key} {field}"
+            );
+            assert_eq!(site.seen_at(key).await, DELTA_AT, "{key} {field}");
+        }
+        assert_eq!(site.unread_keys().await, Vec::<String>::new());
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn the_same_change_by_someone_else_is_unread() {
+        let site = Site::new().await;
+        site.quiet_until_the_delta().await;
+        site.fake
+            .edit_issue("NW-1044", |fields| fields["status"] = done_status());
+        site.fake.set_changelog(
+            "NW-1044",
+            vec![changelog_entry(MARTA_ACCOUNT_ID, "status", DELTA_AT)],
+        );
+
+        site.delta_sync().await;
+
+        let data = site.nw_data().await;
+        assert_eq!(
+            state(row_of(&data, "NW-1044")),
+            (true, Some("Moved to Done"))
+        );
+        assert_eq!(site.recorded_fields("NW-1044").await, ["status"]);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn of_a_status_by_me_and_an_assignee_by_someone_else_only_the_assignee_is_left() {
+        let site = Site::new().await;
+        site.quiet_until_the_delta().await;
+        site.fake.edit_issue("NW-1044", |fields| {
+            fields["status"] = done_status();
+            fields["assignee"] = person(JONAS_ACCOUNT_ID);
+        });
+        site.fake.set_changelog(
+            "NW-1044",
+            vec![
+                changelog_entry(ME_ACCOUNT_ID, "status", DELTA_AT),
+                changelog_entry(MARTA_ACCOUNT_ID, "assignee", DELTA_AT),
+            ],
+        );
+
+        site.delta_sync().await;
+
+        let data = site.nw_data().await;
+        assert_eq!(state(row_of(&data, "NW-1044")), (true, Some("Reassigned")));
+        assert_eq!(site.recorded_fields("NW-1044").await, ["assignee"]);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn a_change_stays_when_someone_else_changed_the_field_after_me() {
+        let site = Site::new().await;
+        site.quiet_until_the_delta().await;
+        site.fake
+            .edit_issue("NW-1044", |fields| fields["status"] = done_status());
+        site.fake.set_changelog(
+            "NW-1044",
+            vec![
+                changelog_entry(ME_ACCOUNT_ID, "status", LATER),
+                changelog_entry(MARTA_ACCOUNT_ID, "status", AHEAD),
+            ],
+        );
+
+        site.delta_sync().await;
+
+        assert_eq!(site.recorded_fields("NW-1044").await, ["status"]);
+        assert_eq!(site.unread_keys().await, ["NW-1044"]);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn the_fetched_changelog_is_kept_as_the_issues_history() {
+        let site = Site::new().await;
+        site.quiet_until_the_delta().await;
+        site.fake
+            .edit_issue("NW-1044", |fields| fields["status"] = done_status());
+        site.fake.set_changelog(
+            "NW-1044",
+            vec![changelog_entry(ME_ACCOUNT_ID, "status", DELTA_AT)],
+        );
+
+        site.delta_sync().await;
+
+        let items = issue_activity(site.db(), viewer(), site.id_of("NW-1044").await)
+            .await
+            .unwrap();
+        let history: Vec<(&str, Option<String>)> = items
+            .iter()
+            .filter_map(|item| match item {
+                ActivityItem::Change { field, author, .. } => Some((
+                    field.as_str(),
+                    author.as_ref().map(|a| a.account_id.clone()),
+                )),
+                ActivityItem::Comment { .. } => None,
+            })
+            .collect();
+        assert_eq!(history, [("status", Some(ME_ACCOUNT_ID.to_string()))]);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn an_issue_i_created_in_jira_is_read_and_one_by_someone_else_is_unread_as_new() {
+        let site = Site::new().await;
+        site.quiet_until_the_delta().await;
+        let mine =
+            site.fake
+                .add_issue("NW-1055", "NW", "Order confirmation email: shipping notice");
+        site.fake
+            .edit_issue(&mine, |fields| fields["reporter"] = person(ME_ACCOUNT_ID));
+        let theirs = site.fake.add_issue("NW-1055", "NW", "Packing slip layout");
+        site.fake.edit_issue(&theirs, |fields| {
+            fields["reporter"] = person(MARTA_ACCOUNT_ID);
+        });
+
+        site.delta_sync().await;
+
+        let data = site.nw_data().await;
+        assert_eq!(state(row_of(&data, &mine)), (false, None));
+        assert_eq!(state(row_of(&data, &theirs)), (true, Some("New")));
+        assert_eq!(site.recorded_fields(&mine).await, Vec::<String>::new());
+        assert_eq!(site.recorded_fields(&theirs).await, ["created"]);
+        assert_eq!(site.seen_at(&mine).await, DELTA_AT);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn a_comment_by_me_is_read_and_one_by_someone_else_is_a_new_comment() {
+        let site = Site::new().await;
+        site.quiet_until_the_delta().await;
+        site.fake.add_comment(
+            "NW-1049",
+            person(ME_ACCOUNT_ID),
+            "Merged into the release branch.",
+        );
+        site.fake
+            .add_comment("NW-1042", person(MARTA_ACCOUNT_ID), "Copy is final.");
+
+        site.delta_sync().await;
+
+        let data = site.nw_data().await;
+        assert_eq!(state(row_of(&data, "NW-1049")), (false, None));
+        assert_eq!(
+            state(row_of(&data, "NW-1042")),
+            (true, Some("1 new comment"))
+        );
+        assert_eq!(site.recorded_fields("NW-1049").await, Vec::<String>::new());
+        assert_eq!(site.recorded_fields("NW-1042").await, ["comment_added"]);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn comments_by_me_and_by_someone_else_together_are_all_new_comments() {
+        let site = Site::new().await;
+        site.quiet_until_the_delta().await;
+        site.fake.add_comment(
+            "NW-1049",
+            person(ME_ACCOUNT_ID),
+            "Merged into the release branch.",
+        );
+        site.fake
+            .add_comment("NW-1049", person(MARTA_ACCOUNT_ID), "Thanks, checking now.");
+
+        site.delta_sync().await;
+
+        let data = site.nw_data().await;
+        assert_eq!(
+            state(row_of(&data, "NW-1049")),
+            (true, Some("2 new comments"))
+        );
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn a_comment_by_me_that_mentions_someone_records_no_mention() {
+        let site = Site::new().await;
+        site.quiet_until_the_delta().await;
+        site.fake.add_mention(
+            "NW-1049",
+            person(ME_ACCOUNT_ID),
+            "Please check the Alpine",
+            &person(MARTA_ACCOUNT_ID),
+        );
+
+        site.delta_sync().await;
+
+        assert_eq!(site.recorded_fields("NW-1049").await, Vec::<String>::new());
+        let data = site.nw_data().await;
+        assert_eq!(state(row_of(&data, "NW-1049")), (false, None));
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn without_a_connected_account_nothing_is_dropped() {
+        let site = Site::new().await;
+        site.ctx
+            .settings
+            .edit(|settings| settings.connection.account_id = None)
+            .await
+            .unwrap();
+        site.quiet_until_the_delta().await;
+        site.fake
+            .edit_issue("NW-1044", |fields| fields["status"] = done_status());
+        site.fake.set_changelog(
+            "NW-1044",
+            vec![changelog_entry(ME_ACCOUNT_ID, "status", DELTA_AT)],
+        );
+        let mine =
+            site.fake
+                .add_issue("NW-1055", "NW", "Order confirmation email: shipping notice");
+        site.fake
+            .edit_issue(&mine, |fields| fields["reporter"] = person(ME_ACCOUNT_ID));
+        site.fake
+            .add_comment("NW-1042", person(ME_ACCOUNT_ID), "Copy is final.");
+
+        site.delta_sync().await;
+
+        let data = site.nw_data().await;
+        assert_eq!(
+            state(row_of(&data, "NW-1044")),
+            (true, Some("Moved to Done"))
+        );
+        assert_eq!(state(row_of(&data, &mine)), (true, Some("New")));
+        assert_eq!(
+            state(row_of(&data, "NW-1042")),
+            (true, Some("1 new comment"))
+        );
+        assert_eq!(
+            site.number("SELECT COUNT(*) FROM cache.issue WHERE history_synced_at IS NOT NULL")
+                .await,
+            0
+        );
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn only_the_fifty_most_recently_updated_issues_are_checked() {
+        const EDITED: i64 = 55;
+        const CHECKED: usize = 50;
+        let site = Site::new().await;
+        site.quiet_until_the_delta().await;
+        let keys = site
+            .strings(format!(
+                "SELECT key FROM cache.issue WHERE gone = 0 ORDER BY id LIMIT {EDITED}"
+            ))
+            .await;
+        assert_eq!(keys.len() as i64, EDITED);
+        let first = DELTA_AT.parse::<DateTime<Utc>>().unwrap();
+        for (minutes, key) in (0..).zip(&keys) {
+            let at = first + chrono::Duration::minutes(minutes);
+            site.fake.set_now(at);
+            site.fake.edit_issue(key, |fields| {
+                fields["duedate"] = serde_json::json!("2030-01-01");
+            });
+            let stamp = at.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string();
+            site.fake
+                .set_changelog(key, vec![changelog_entry(ME_ACCOUNT_ID, "duedate", &stamp)]);
+        }
+        let (oldest, newest) = keys.split_at(keys.len() - CHECKED);
+
+        site.delta_sync().await;
+
+        let mut left_unread = oldest.to_vec();
+        left_unread.sort();
+        assert_eq!(site.unread_keys().await, left_unread);
+        let mut with_history = newest.to_vec();
+        with_history.sort();
+        assert_eq!(
+            site.strings(
+                "SELECT key FROM cache.issue WHERE history_synced_at IS NOT NULL ORDER BY key"
+                    .into()
+            )
+            .await,
+            with_history
+        );
+    }
+}
+
+mod after_a_restart {
+    use super::*;
+
+    const END_OF_DAY: &str = "2026-10-29T00:00:00.000Z";
+
+    /// Everything read after the day's last change.
+    async fn all_read(site: &Site) {
+        site.run(format!("UPDATE issue_seen SET seen_at = '{END_OF_DAY}'"))
+            .await;
+    }
+
+    /// Jira stamps the issue `updated` at `at`.
+    fn touch(site: &Site, key: &str, at: &str) {
+        site.fake.set_now(at.parse::<DateTime<Utc>>().unwrap());
+        site.fake.edit_issue(key, |_| {});
+    }
+
+    /// NW-1042 seen at 09:00 and updated at 10:00 by someone else, with no other change.
+    async fn updated_by_someone_else(site: &Site) {
+        all_read(site).await;
+        site.set_seen("NW-1042", NINE).await;
+        touch(site, "NW-1042", TEN);
+        site.fake.set_changelog(
+            "NW-1042",
+            vec![changelog_entry(MARTA_ACCOUNT_ID, "labels", TEN)],
+        );
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn an_issue_updated_after_it_was_seen_is_unread_as_updated() {
+        let site = Site::new().await;
+        updated_by_someone_else(&site).await;
+
+        site.refill_cache().await;
+
+        let data = site.nw_data().await;
+        assert_eq!(state(row_of(&data, "NW-1042")), (true, Some("Updated")));
+        assert_eq!(site.unread_keys().await, ["NW-1042"]);
+        assert_eq!(
+            site.detail_since("NW-1042").await,
+            Some(Since {
+                label: "Since yesterday".into(),
+                text: "updated.".into(),
+            })
+        );
+        assert_eq!(site.recorded_fields("NW-1042").await, ["updated"]);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn an_issue_not_updated_after_it_was_seen_stays_read() {
+        let site = Site::new().await;
+        all_read(&site).await;
+        for key in ["NW-1044", "NW-1049"] {
+            site.set_seen(key, NINE).await;
+        }
+        touch(&site, "NW-1044", NINE);
+        touch(&site, "NW-1049", EIGHT);
+
+        site.refill_cache().await;
+
+        let data = site.nw_data().await;
+        assert_eq!(state(row_of(&data, "NW-1044")), (false, None));
+        assert_eq!(state(row_of(&data, "NW-1049")), (false, None));
+        assert_eq!(site.unread_keys().await, Vec::<String>::new());
+        assert_eq!(
+            site.number(
+                "SELECT COUNT(*) FROM cache.issue_change WHERE field IN ('updated', 'created')"
+            )
+            .await,
+            0
+        );
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn an_update_after_a_restart_that_only_i_made_is_read() {
+        let site = Site::new().await;
+        all_read(&site).await;
+        site.set_seen("NW-1042", NINE).await;
+        touch(&site, "NW-1042", TEN);
+        site.fake.set_changelog(
+            "NW-1042",
+            vec![changelog_entry(ME_ACCOUNT_ID, "labels", TEN)],
+        );
+
+        site.refill_cache().await;
+
+        let data = site.nw_data().await;
+        assert_eq!(state(row_of(&data, "NW-1042")), (false, None));
+        assert_eq!(site.seen_at("NW-1042").await, TEN);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn an_update_the_changelog_cannot_tell_the_author_of_stays_unread() {
+        let site = Site::new().await;
+        all_read(&site).await;
+        site.set_seen("NW-1042", NINE).await;
+        touch(&site, "NW-1042", TEN);
+        site.fake.set_changelog("NW-1042", vec![]);
+
+        site.refill_cache().await;
+
+        let data = site.nw_data().await;
+        assert_eq!(state(row_of(&data, "NW-1042")), (true, Some("Updated")));
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn an_issue_never_seen_in_a_known_project_is_unread_as_new() {
+        let site = Site::new().await;
+        all_read(&site).await;
+        site.forget_seen("NW-1049").await;
+
+        site.refill_cache().await;
+
+        let data = site.nw_data().await;
+        assert_eq!(state(row_of(&data, "NW-1049")), (true, Some("New")));
+        assert_eq!(site.unread_keys().await, ["NW-1049"]);
+        assert_eq!(site.recorded_fields("NW-1049").await, ["created"]);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn an_issue_i_reported_and_never_saw_in_a_known_project_is_read() {
+        let site = Site::new().await;
+        all_read(&site).await;
+        site.forget_seen("NW-1060").await;
+
+        site.refill_cache().await;
+
+        let data = site.nw_data().await;
+        assert_eq!(state(row_of(&data, "NW-1060")), (false, None));
+        assert_eq!(
+            site.seen_at("NW-1060").await,
+            site.text("SELECT updated_at FROM cache.issue WHERE key = 'NW-1060'".into())
+                .await
+        );
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn a_project_with_no_issue_read_yet_marks_everything_read() {
+        let site = Site::new().await;
+        all_read(&site).await;
+        site.run(
+            "DELETE FROM issue_seen WHERE issue_id IN
+               (SELECT i.id FROM cache.issue i JOIN cache.space p ON p.id = i.project_id WHERE p.key = 'LUM')"
+                .into(),
+        )
+        .await;
+        touch(&site, "LUM-318", TEN);
+
+        site.refill_cache().await;
+
+        assert_eq!(site.unread_keys().await, Vec::<String>::new());
+        assert_eq!(
+            site.number(
+                "SELECT COUNT(*) FROM cache.issue i JOIN cache.space p ON p.id = i.project_id
+                 LEFT JOIN issue_seen s ON s.issue_id = i.id
+                 WHERE p.key = 'LUM' AND s.issue_id IS NULL"
+            )
+            .await,
+            0
+        );
+        assert_eq!(
+            site.number(
+                "SELECT COUNT(*) FROM cache.issue_change WHERE field IN ('updated', 'created')"
+            )
+            .await,
+            0
+        );
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn the_activity_leaves_out_the_updated_record() {
+        let site = Site::new().await;
+        updated_by_someone_else(&site).await;
+        site.fake.set_changelog("NW-1042", vec![]);
+
+        site.refill_cache().await;
+
+        assert_eq!(site.recorded_fields("NW-1042").await, ["updated"]);
+        let items = issue_activity(site.db(), viewer(), site.id_of("NW-1042").await)
+            .await
+            .unwrap();
+        assert!(!items.is_empty());
+        assert!(
+            items
+                .iter()
+                .all(|item| matches!(item, ActivityItem::Comment { .. })),
+            "{items:?}"
         );
     }
 }

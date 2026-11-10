@@ -67,5 +67,6 @@ stands in Taskboard. The numbers in this table are Taskboard's.
 | [0055](0055-status-styles-are-chosen-app-wide-a-space-overrides.md) | Status styles are chosen app-wide; a Space overrides them | Accepted (2026-11-10) |
 | [0056](0056-custom-fields-are-opted-in-app-wide-a-space-opts-out.md) | Custom fields are opted in app-wide; a Space opts out | Accepted (2026-11-10) |
 | [0057](0057-jira-data-can-live-in-memory-only.md) | Jira data can live in memory only (opt-in) | Accepted (2026-11-10) |
+| [0058](0058-own-changes-are-not-news.md) | The owner's own changes aren't news | Accepted (2026-11-10) |
 
 Open: integrations with Daybook and TimeTracker.

@@ -16,7 +16,7 @@ use taskboard_lib::db::Db;
 use taskboard_lib::jira::dto::{Field, Issue, Project, Status, Version};
 use taskboard_lib::lists::{Viewer, sidebar_tree};
 use taskboard_lib::search::palette_query;
-use taskboard_lib::sync::store::{store_fields, store_page, store_statuses, store_versions};
+use taskboard_lib::sync::store::{Pass, store_fields, store_page, store_statuses, store_versions};
 use taskboard_lib::test_support::demo::{DEMO_NOW, synthetic};
 use taskboard_lib::test_support::temp_config_dir;
 use taskboard_lib::time::format_utc;
@@ -87,7 +87,15 @@ async fn synthetic_site() -> (TempDir, Db) {
                 store_versions(tx, &project.id, list)?;
             }
         }
-        store_page(tx, changes, &issues, &ids, true, &now)?;
+        store_page(
+            tx,
+            changes,
+            &issues,
+            &ids,
+            Pass::FirstOfNewProject,
+            None,
+            &now,
+        )?;
         Ok(())
     })
     .await

@@ -19,7 +19,7 @@ pub(crate) use activity::{status_names, user_names};
 pub use attachments::{Attachment, attachments_of, is_on_site, keep_site_urls};
 pub use comments::{issue_sync_comments, store_comment};
 pub use detail::{CustomField, IssueDetail, issue_forget, issue_get};
-pub use history::issue_sync_history;
+pub use history::{issue_sync_history, store_history};
 pub use inline_image::{
     INLINE_IMAGE_SCHEME, InlineImage, MAX_INLINE_IMAGE_BYTES, attachment_image, image_path,
     image_response,

@@ -8,7 +8,7 @@ use url::Url;
 
 use crate::adf;
 use crate::jira::dto;
-use crate::time::utc;
+use crate::time::utc_text;
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
 #[ts(export, export_to = "src/api/types.gen.ts")]
@@ -41,10 +41,7 @@ pub fn attachments_of(raw: &str) -> Vec<Attachment> {
         .map(|a| Attachment {
             badge: badge(&a.filename),
             size: a.size.map(human_size),
-            created_at: a
-                .created
-                .as_ref()
-                .and_then(|c| utc(&Value::from(c.as_str()))),
+            created_at: a.created.as_ref().and_then(|c| utc_text(c)),
             author_name: a.author.and_then(|p| p.display_name),
             url: a.content,
             mime_type: a.mime_type,

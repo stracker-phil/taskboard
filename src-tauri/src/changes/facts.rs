@@ -19,6 +19,8 @@ pub enum Fact {
     /// To this account id; none when unassigned.
     Assigned(Option<String>),
     Due,
+    /// Updated after the owner last looked, while the cache didn't hold the issue (`issue_change` `updated`).
+    Updated,
 }
 
 /// A new comment's mention of an account.
@@ -98,6 +100,9 @@ pub fn facts(changes: &[Change]) -> Vec<Fact> {
     if of("due_date").next().is_some() {
         facts.push(Fact::Due);
     }
+    if of("updated").next().is_some() {
+        facts.push(Fact::Updated);
+    }
     facts
 }
 
@@ -152,6 +157,7 @@ pub fn chip(facts: &[Fact], names: &Names) -> Option<String> {
         Fact::Assigned(Some(_)) => "Reassigned".into(),
         Fact::Assigned(None) => "Unassigned".into(),
         Fact::Due => "Due date changed".into(),
+        Fact::Updated => "Updated".into(),
     };
     Some(match facts.len() {
         1 => text,
@@ -179,6 +185,7 @@ pub fn sentence(facts: &[Fact], names: &Names) -> Option<String> {
             }
             Fact::Assigned(None) => "unassigned".into(),
             Fact::Due => "due date changed".into(),
+            Fact::Updated => "updated".into(),
         })
         .collect();
     (!clauses.is_empty()).then(|| format!("{}.", clauses.join(", ")))
@@ -507,6 +514,34 @@ mod tests {
         assert_eq!(
             sentence(&facts, &names(None, &none, &none)).as_deref(),
             Some("1 new comment.")
+        );
+    }
+
+    #[test]
+    fn an_updated_record_is_the_updated_fact_with_a_chip_and_a_clause() {
+        let changes = [change("updated", None, None)];
+
+        assert_eq!(facts(&changes), [Fact::Updated]);
+        assert_eq!(chip_of(&changes).as_deref(), Some("Updated"));
+        assert_eq!(sentence_of(&changes).as_deref(), Some("updated."));
+    }
+
+    #[test]
+    fn updated_comes_last_in_the_chip_count_and_the_sentence() {
+        let changes = [
+            change("updated", None, None),
+            change("status", Some("10002"), Some("10003")),
+            change("due_date", None, Some("2026-11-02")),
+        ];
+
+        assert_eq!(
+            facts(&changes),
+            [Fact::Moved("10003".into()), Fact::Due, Fact::Updated]
+        );
+        assert_eq!(chip_of(&changes).as_deref(), Some("Moved to In Review +2"));
+        assert_eq!(
+            sentence_of(&changes).as_deref(),
+            Some("moved to In Review, due date changed, updated.")
         );
     }
 

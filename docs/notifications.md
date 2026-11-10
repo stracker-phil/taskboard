@@ -7,7 +7,11 @@
 - After a **change sync** (delta) finishes, while the main window **doesn't have the focus** (in front, the
   unread rows already show them). A full sync, a reconciliation or a launch announces nothing; their changes are passed by.
 - `Notifier` keeps the newest `cache.issue_change` row it has looked at (`rowid`) in memory; it starts after the
-  rows cached at launch. Changes made with Taskboard record no rows ([writes.md](writes.md)), so they never notify.
+  rows cached at launch.
+- The owner's own changes never notify. Taskboard's writes are seen up to Jira's answer ([writes.md](writes.md)). The
+  sync records no `created` for an issue the owner reported, no `comment_added` or `mention` for the owner's own
+  comments, and drops field changes Jira's changelog says the owner made ([sync.md](sync.md#own-changes)), all
+  before the notifier looks.
 
 ## What (`notify::notices`)
 

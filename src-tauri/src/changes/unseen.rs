@@ -72,16 +72,18 @@ pub fn changes_after(conn: &Connection, id: &str, after: &str) -> AppResult<Vec<
 
 /// Where new activity starts while the issue has unseen changes: the last look, or "" when never seen.
 pub fn unseen_since(conn: &Connection, id: &str) -> AppResult<Option<String>> {
-    let unseen: bool = conn.query_row(
-        &format!("SELECT EXISTS (SELECT 1 FROM cache.issue i WHERE i.id = ?1 AND {UNSEEN})"),
-        [id],
-        |r| r.get(0),
-    )?;
-    Ok(if unseen {
+    Ok(if is_unseen(conn, id)? {
         Some(seen_at(conn, id)?.unwrap_or_default())
     } else {
         None
     })
+}
+
+pub fn is_unseen(conn: &Connection, id: &str) -> AppResult<bool> {
+    let mut query = conn.prepare_cached(&format!(
+        "SELECT EXISTS (SELECT 1 FROM cache.issue i WHERE i.id = ?1 AND {UNSEEN})"
+    ))?;
+    Ok(query.query_row([id], |r| r.get(0))?)
 }
 
 /// When the owner last saw the issue; none when never.

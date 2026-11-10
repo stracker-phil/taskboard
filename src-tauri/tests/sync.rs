@@ -665,7 +665,7 @@ mod the_full_sync {
         });
         rig.fake.add_comment(
             "NW-1042",
-            demo::demo().users[0].clone(),
+            demo::demo().users[1].clone(),
             "Postcode rules for Liechtenstein are merged.",
         );
         let new_key =

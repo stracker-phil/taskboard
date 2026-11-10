@@ -4,9 +4,11 @@ use rusqlite::{Connection, OptionalExtension, params};
 
 pub use super::fields::{fetched_fields, store_fields};
 
-use super::diff::{Snapshot, diff};
+use super::diff::Snapshot;
 use super::map::{FieldIds, IssueRow, Mapped, map_issue};
 use super::mentions::record_mentions;
+use super::news::{Arrival, new_comment_authors, record_news};
+pub use super::news::{Pass, page_pass};
 use crate::db::Changes;
 use crate::error::AppResult;
 use crate::jira::dto::{Issue, Status, Version};
@@ -182,14 +184,14 @@ pub fn record_scope_sync(
 }
 
 /// Upserts a page of issues and returns the newest `updated` on it. Unchanged issues are skipped, so they
-/// announce nothing. On a project's first sync (`first`) changes aren't recorded and every issue counts as
-/// seen at `now`.
+/// announce nothing. Changes by `me` (the connected account) that the page shows aren't news.
 pub fn store_page(
     conn: &Connection,
     changes: &mut Changes,
     issues: &[Issue],
     ids: &FieldIds,
-    first: bool,
+    pass: Pass,
+    me: Option<&str>,
     now: &str,
 ) -> AppResult<Option<String>> {
     let mut newest: Option<String> = None;
@@ -204,7 +206,7 @@ pub fn store_page(
         if newest.as_deref() < Some(mapped.issue.updated_at.as_str()) {
             newest = Some(mapped.issue.updated_at.clone());
         }
-        if store_issue(conn, &mapped, first, now)? {
+        if store_issue(conn, changes, &mapped, pass, me, now)? {
             changes.issue_changed(&mapped.issue.id);
         }
     }
@@ -246,7 +248,14 @@ fn cached_issue(conn: &Connection, id: &str) -> AppResult<Option<CachedIssue>> {
 }
 
 /// `false` when the cache already holds this version or a newer one.
-fn store_issue(conn: &Connection, mapped: &Mapped, first: bool, now: &str) -> AppResult<bool> {
+fn store_issue(
+    conn: &Connection,
+    changes: &mut Changes,
+    mapped: &Mapped,
+    pass: Pass,
+    me: Option<&str>,
+    now: &str,
+) -> AppResult<bool> {
     let cached = cached_issue(conn, &mapped.issue.id)?;
     if cached.as_ref().is_some_and(|c| {
         let same =
@@ -257,23 +266,28 @@ fn store_issue(conn: &Connection, mapped: &Mapped, first: bool, now: &str) -> Ap
     }
     let mut row = mapped.issue.clone();
     writes::overlay(conn, &mut row)?;
+    // Before the page's comments are stored, which would make them all known.
+    let new_comments = new_comment_authors(conn, mapped)?;
     upsert_issue(conn, &row, now)?;
     upsert_body(conn, &row)?;
     store_users(conn, mapped)?;
-    if !first {
-        record_mentions(conn, mapped)?;
+    if pass.records_news() {
+        record_mentions(conn, mapped, me)?;
     }
     store_comments(conn, mapped, now)?;
     replace_search_doc(conn, mapped)?;
-    if first {
-        conn.execute(
-            "INSERT INTO issue_seen (issue_id, seen_at) VALUES (?1, ?2)
-             ON CONFLICT (issue_id) DO NOTHING",
-            params![row.id, now],
-        )?;
-    } else {
-        record_changes(conn, cached.as_ref().map(|c| &c.snapshot), &row)?;
-    }
+    record_news(
+        conn,
+        changes,
+        Arrival {
+            row: &row,
+            previous: cached.as_ref().map(|c| &c.snapshot),
+            new_comments: &new_comments,
+            pass,
+            me,
+            now,
+        },
+    )?;
     Ok(true)
 }
 
@@ -399,23 +413,6 @@ fn replace_search_doc(conn: &Connection, mapped: &Mapped) -> AppResult<()> {
             doc.comments
         ],
     )?;
-    Ok(())
-}
-
-fn record_changes(conn: &Connection, cached: Option<&Snapshot>, row: &IssueRow) -> AppResult<()> {
-    for change in diff(cached, row) {
-        conn.execute(
-            "INSERT INTO cache.issue_change (issue_id, field, old_value, new_value, changed_at)
-             VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![
-                row.id,
-                change.field,
-                change.old_value,
-                change.new_value,
-                change.changed_at
-            ],
-        )?;
-    }
     Ok(())
 }
 

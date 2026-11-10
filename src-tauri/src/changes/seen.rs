@@ -3,7 +3,7 @@
 use chrono::{DateTime, Duration};
 use rusqlite::{Connection, params};
 
-use super::UNSEEN;
+use super::unseen::is_unseen;
 use crate::db::{Changes, Db};
 use crate::error::{AppError, AppResult};
 use crate::time::format_utc;
@@ -20,17 +20,37 @@ fn mark(conn: &Connection, changes: &mut Changes, ids: &[String], now: &str) -> 
          FROM cache.issue i WHERE i.id = ?1
          ON CONFLICT (issue_id) DO UPDATE SET seen_at = MAX(seen_at, excluded.seen_at), unread = 0",
     )?;
-    let mut unseen = conn.prepare(&format!(
-        "SELECT EXISTS (SELECT 1 FROM cache.issue i WHERE i.id = ?1 AND {UNSEEN})"
-    ))?;
     for id in ids {
-        let was_unseen: bool = unseen.query_row([id], |r| r.get(0))?;
+        let was_unseen = is_unseen(conn, id)?;
         insert.execute(params![id, now])?;
         if was_unseen {
             changes.issue_changed(id);
         }
     }
     Ok(())
+}
+
+/// Seen up to the issue's `updated`, only forward; an issue marked unread by hand keeps its mark and time.
+pub fn seen_until_updated(conn: &Connection, changes: &mut Changes, id: &str) -> AppResult<()> {
+    let moved = conn.execute(
+        "INSERT INTO issue_seen (issue_id, seen_at)
+         SELECT id, updated_at FROM cache.issue WHERE id = ?1
+         ON CONFLICT (issue_id) DO UPDATE SET seen_at = excluded.seen_at
+         WHERE unread = 0 AND seen_at < excluded.seen_at",
+        [id],
+    )?;
+    if moved > 0 {
+        changes.issue_changed(id);
+    }
+    Ok(())
+}
+
+/// `seen_until_updated` for an issue without unseen changes, so a later look at `updated` alone finds it read.
+pub fn catch_up(conn: &Connection, changes: &mut Changes, id: &str) -> AppResult<()> {
+    if is_unseen(conn, id)? {
+        return Ok(());
+    }
+    seen_until_updated(conn, changes, id)
 }
 
 pub async fn mark_seen(db: &Db, ids: Vec<String>, now: String) -> AppResult<()> {

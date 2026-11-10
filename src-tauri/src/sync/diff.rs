@@ -14,12 +14,23 @@ pub struct Snapshot {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ChangeRow {
-    /// `status`, `assignee`, `due_date`, `priority`, `comment_added` or `created`.
+    /// `status`, `assignee`, `due_date`, `priority`, `comment_added`, `created` or `updated`.
     pub field: &'static str,
     pub old_value: Option<String>,
     pub new_value: Option<String>,
     /// The new version's `updated`.
     pub changed_at: String,
+}
+
+impl ChangeRow {
+    /// How many comments a `comment_added` row counts; 0 for any other.
+    pub fn added_comments(&self) -> i64 {
+        let count = |v: &Option<String>| v.as_deref().and_then(|n| n.parse::<i64>().ok());
+        match (self.field, count(&self.old_value), count(&self.new_value)) {
+            ("comment_added", Some(old), Some(new)) => new - old,
+            _ => 0,
+        }
+    }
 }
 
 /// `old` is `None` for an issue new to the cache.
