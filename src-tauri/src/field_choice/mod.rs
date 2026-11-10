@@ -2,6 +2,7 @@
 //! choice), in the Issue view, or nowhere. A Space only narrows this (`space_config`).
 
 pub mod commands;
+mod forget;
 
 use std::collections::HashSet;
 
@@ -14,6 +15,7 @@ use crate::error::{AppError, AppResult};
 use crate::space_config::Place;
 use crate::sync::store::fetched_fields;
 use crate::views::columns::SHOWABLE;
+use forget::forget_values;
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
 #[ts(export, export_to = "src/api/types.gen.ts")]
@@ -58,7 +60,8 @@ pub struct ChoiceSaved {
     pub newly_fetched: bool,
 }
 
-/// Unticking both places deletes the row, the default: the field shows nowhere.
+/// Unticking both places deletes the row, the default: the field shows nowhere. A field no longer fetched loses
+/// its cached values.
 pub async fn field_choice_set(
     db: &Db,
     field_id: String,
@@ -69,11 +72,15 @@ pub async fn field_choice_set(
         ensure_showable(tx, &field_id)?;
         let was_fetched = fetched_fields(tx)?.contains(&field_id);
         store_choice(tx, &field_id, in_list, in_detail)?;
+        let is_fetched = fetched_fields(tx)?.contains(&field_id);
+        if was_fetched && !is_fetched {
+            forget_values(tx, changes, &field_id)?;
+        }
         changes.local_changed(LocalPart::Views);
         changes.local_changed(LocalPart::Spaces);
         Ok(ChoiceSaved {
             rows: choice_rows(tx)?,
-            newly_fetched: !was_fetched && (in_list || in_detail),
+            newly_fetched: !was_fetched && is_fetched,
         })
     })
     .await
@@ -405,6 +412,225 @@ mod tests {
             not_in_detail,
             ids(&[ZONE, NOTES, "customfield_10019", "customfield_10020"])
         );
+    }
+
+    async fn lab_with_issues() -> (tempfile::TempDir, Db) {
+        let (dir, db) = lab().await;
+        db.write(|tx, _| {
+            tx.execute_batch(
+                r#"INSERT INTO cache.space (id, key, name, raw) VALUES ('10001', 'NW', 'Website relaunch', '{}');
+                   INSERT INTO cache.status (id, name, category) VALUES ('s1', 'To Do', 'new');
+                   INSERT INTO cache.issue (id, key, project_id, summary, issue_type, status_id, status_category,
+                     custom, created_at, updated_at, synced_at) VALUES
+                     ('1', 'NW-1', '10001', 'One', 'Task', 's1', 'new',
+                      '{"customfield_10001":"Berlin","customfield_10002":{"accountId":"acc-1"}}',
+                      '2026-10-20T09:00:00.000Z', '2026-10-20T09:00:00.000Z', '2026-10-20T09:00:00.000Z'),
+                     ('2', 'NW-2', '10001', 'Two', 'Task', 's1', 'new',
+                      '{"customfield_10001":"Paris"}',
+                      '2026-10-20T09:00:00.000Z', '2026-10-20T09:00:00.000Z', '2026-10-20T09:00:00.000Z'),
+                     ('3', 'NW-3', '10001', 'Three', 'Task', 's1', 'new',
+                      '{"customfield_10002":{"accountId":"acc-2"}}',
+                      '2026-10-20T09:00:00.000Z', '2026-10-20T09:00:00.000Z', '2026-10-20T09:00:00.000Z');
+                   INSERT INTO cache.issue_body (issue_id, raw) VALUES
+                     ('1', '{"id":"1","renderedFields":{"customfield_10001":"<p>Berlin</p>","customfield_10002":"<p>Ann</p>"}}'),
+                     ('2', '{"id":"2","renderedFields":{"customfield_10001":"<p>Paris</p>"}}'),
+                     ('3', '{"id":"3","renderedFields":{"customfield_10002":"<p>Bo</p>"}}')"#,
+            )?;
+            Ok(())
+        })
+        .await
+        .unwrap();
+        (dir, db)
+    }
+
+    async fn custom_of(db: &Db, id: &'static str) -> Option<serde_json::Value> {
+        let text: Option<String> = db
+            .read(move |conn| {
+                Ok(
+                    conn.query_row("SELECT custom FROM cache.issue WHERE id = ?1", [id], |r| {
+                        r.get(0)
+                    })?,
+                )
+            })
+            .await
+            .unwrap();
+        text.map(|t| serde_json::from_str(&t).unwrap())
+    }
+
+    async fn raw_of(db: &Db, id: &'static str) -> serde_json::Value {
+        let text: String = db
+            .read(move |conn| {
+                Ok(conn.query_row(
+                    "SELECT raw FROM cache.issue_body WHERE issue_id = ?1",
+                    [id],
+                    |r| r.get(0),
+                )?)
+            })
+            .await
+            .unwrap();
+        serde_json::from_str(&text).unwrap()
+    }
+
+    fn announced_issues(db: &Db) -> std::sync::Arc<std::sync::Mutex<Vec<crate::db::Changes>>> {
+        let sink = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let writer = std::sync::Arc::clone(&sink);
+        db.set_notifier(Box::new(move |changes| {
+            writer.lock().unwrap().push(changes.clone());
+        }));
+        sink
+    }
+
+    #[tokio::test]
+    async fn unticking_a_fetched_field_strips_its_values_and_keeps_the_other_fields() {
+        let (_dir, db) = lab_with_issues().await;
+        field_choice_set(&db, ZONE.into(), true, true)
+            .await
+            .unwrap();
+
+        field_choice_set(&db, ZONE.into(), false, false)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            custom_of(&db, "1").await,
+            Some(serde_json::json!({ ALPHA: { "accountId": "acc-1" } }))
+        );
+        assert_eq!(
+            custom_of(&db, "3").await,
+            Some(serde_json::json!({ ALPHA: { "accountId": "acc-2" } }))
+        );
+        assert_eq!(
+            raw_of(&db, "1").await,
+            serde_json::json!({ "id": "1", "renderedFields": { ALPHA: "<p>Ann</p>" } })
+        );
+        assert_eq!(
+            raw_of(&db, "3").await,
+            serde_json::json!({ "id": "3", "renderedFields": { ALPHA: "<p>Bo</p>" } })
+        );
+    }
+
+    #[tokio::test]
+    async fn an_issue_whose_only_custom_value_was_the_field_ends_with_no_custom_values() {
+        let (_dir, db) = lab_with_issues().await;
+        field_choice_set(&db, ZONE.into(), true, true)
+            .await
+            .unwrap();
+
+        field_choice_set(&db, ZONE.into(), false, false)
+            .await
+            .unwrap();
+
+        assert_eq!(custom_of(&db, "2").await, None);
+        assert_eq!(
+            raw_of(&db, "2").await,
+            serde_json::json!({ "id": "2", "renderedFields": {} })
+        );
+    }
+
+    #[tokio::test]
+    async fn the_write_announces_exactly_the_issues_that_lost_a_value() {
+        let (_dir, db) = lab_with_issues().await;
+        field_choice_set(&db, ZONE.into(), true, true)
+            .await
+            .unwrap();
+        let sink = announced_issues(&db);
+
+        field_choice_set(&db, ZONE.into(), false, false)
+            .await
+            .unwrap();
+
+        let announced = sink.lock().unwrap();
+        assert_eq!(announced.len(), 1);
+        assert_eq!(
+            announced[0].issues,
+            ["1", "2"].into_iter().map(String::from).collect()
+        );
+    }
+
+    #[tokio::test]
+    async fn a_field_a_filter_or_a_view_column_still_uses_keeps_its_values() {
+        for (name, setup) in [
+            (
+                "filter",
+                r#"INSERT INTO filter_list (id, kind, name, filter) VALUES
+                     (900, 'list', 'Open work', '{"conditions":[{"field":"customfield_10001","op":"is","value":"x"}]}')"#,
+            ),
+            (
+                "view column",
+                r#"INSERT INTO filter_list (id, kind, name) VALUES (900, 'list', 'Open work');
+                   INSERT INTO view (list_id, name, layout, columns, group_by, sort_by, sort_order) VALUES
+                     (900, 'Table', 'table', '["status","customfield_10001"]', 'none', 'updated', 0)"#,
+            ),
+        ] {
+            let (_dir, db) = lab_with_issues().await;
+            db.write(move |tx, _| {
+                tx.execute_batch(setup)?;
+                Ok(())
+            })
+            .await
+            .unwrap();
+            field_choice_set(&db, ZONE.into(), true, true)
+                .await
+                .unwrap();
+            let sink = announced_issues(&db);
+
+            field_choice_set(&db, ZONE.into(), false, false)
+                .await
+                .unwrap();
+
+            assert_eq!(
+                custom_of(&db, "2").await,
+                Some(serde_json::json!({ ZONE: "Paris" })),
+                "{name}"
+            );
+            assert_eq!(
+                raw_of(&db, "2").await,
+                serde_json::json!({ "id": "2", "renderedFields": { ZONE: "<p>Paris</p>" } }),
+                "{name}"
+            );
+            assert!(sink.lock().unwrap()[0].issues.is_empty(), "{name}");
+        }
+    }
+
+    #[tokio::test]
+    async fn unticking_one_place_of_two_keeps_the_values() {
+        let (_dir, db) = lab_with_issues().await;
+        field_choice_set(&db, ZONE.into(), true, true)
+            .await
+            .unwrap();
+
+        field_choice_set(&db, ZONE.into(), false, true)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            custom_of(&db, "2").await,
+            Some(serde_json::json!({ ZONE: "Paris" }))
+        );
+        assert_eq!(
+            raw_of(&db, "1").await,
+            serde_json::json!({
+                "id": "1",
+                "renderedFields": { ZONE: "<p>Berlin</p>", ALPHA: "<p>Ann</p>" }
+            })
+        );
+    }
+
+    #[tokio::test]
+    async fn ticking_a_forgotten_field_again_asks_for_a_full_sync() {
+        let (_dir, db) = lab_with_issues().await;
+        field_choice_set(&db, ZONE.into(), true, true)
+            .await
+            .unwrap();
+        field_choice_set(&db, ZONE.into(), false, false)
+            .await
+            .unwrap();
+
+        let saved = field_choice_set(&db, ZONE.into(), false, true)
+            .await
+            .unwrap();
+
+        assert!(saved.newly_fetched);
     }
 
     #[test]

@@ -33,7 +33,8 @@ directly. The engine passes each result through `backoff.rs` `Failures`: `since`
 2. Per tracked project, in Space order: Jira's approximate count of `(<scope>) AND project = KEY`, then that
    query `ORDER BY updated ASC` with `expand=renderedFields` and `SEARCH_FIELDS` plus the sprint, epic color
    and the custom fields opted in (`field_choice`) or used by a view's column or a filter (`fetched_fields`); no
-   other custom field is downloaded ([ADR 0056](adr/0056-custom-fields-are-opted-in-app-wide-a-space-opts-out.md)). Every page is stored in one transaction and announced as `sync_progress`.
+   other custom field is downloaded ([ADR 0056](adr/0056-custom-fields-are-opted-in-app-wide-a-space-opts-out.md)),
+   and unticking one forgets its cached values. Every page is stored in one transaction and announced as `sync_progress`.
 3. A `sync_state` row `full:<project id>` after each project; the `scope` row (`last_full_at`, and
    `last_delta_at` = the newest `updated` stored) after all of them. A failed page ends the job before its
    cursors move; the next run repeats it.
