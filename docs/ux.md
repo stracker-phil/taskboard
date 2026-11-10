@@ -871,7 +871,7 @@ no separate Settings design; owner, 2026-10-28). Its colors are the `--settings-
     the list only when every tracked Space hides it.
     *Team* (`spaces/SpaceTeam`): how many people are on the Space's team and how many have activity there, with
     Edit Team… (`app:settings:team`), then the team read-only: avatar and name by name, "(you)" on the connected
-    account, scrolling inside after about nine people.
+    account, as long as the team (its own tab, so the page scrolls).
     Each field saves on its own with Rust's field error under it. The header's tile opens `LookPopover`.
     "Track projects under Projects to get Spaces." when none is tracked. The sidebar's "Client label…" item
     opens `SpacePopover` (300px, 12px radius, `--shadow-popover`, at the top left of the content panel) with the
