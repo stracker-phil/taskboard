@@ -29,7 +29,15 @@ pub fn seed_field_choices(local: &Connection, dir: &Path) -> AppResult<()> {
     Ok(())
 }
 
-/// A field the tracked projects fill, the owner shows or uses gets the places at least one tracked Space shows.
+/// The tracked Spaces whose fields the owner set up (one hidden field is enough): every field showed in a Space
+/// by default, so one left alone says nothing. Without any, every tracked Space.
+const CHOOSING_SPACES: &str = "SELECT s.project_id FROM main.space s WHERE s.tracked = 1
+    AND (EXISTS (SELECT 1 FROM main.space_field x WHERE x.project_id = s.project_id)
+      OR NOT EXISTS (SELECT 1 FROM main.space_field x JOIN main.space t ON t.project_id = x.project_id
+                     WHERE t.tracked = 1))";
+
+/// A field the tracked projects fill, the owner shows or uses gets the places a Space that set up its fields
+/// shows; one a view or filter uses is in the list.
 fn seed_choices(conn: &Connection) -> AppResult<()> {
     let has = |column: &str| -> AppResult<bool> {
         Ok(conn.query_row(
@@ -47,7 +55,7 @@ fn seed_choices(conn: &Connection) -> AppResult<()> {
     let shown = if has("shown")? { "shown = 1" } else { "0" };
     let shows_in = |hidden: &str| {
         format!(
-            "EXISTS (SELECT 1 FROM main.space s WHERE s.tracked = 1 AND NOT EXISTS (
+            "EXISTS (SELECT 1 FROM ({CHOOSING_SPACES}) s WHERE NOT EXISTS (
                SELECT 1 FROM main.space_field sf
                WHERE sf.project_id = s.project_id AND sf.field_id = cache.field.id
                  AND sf.visibility IN ('{hidden}', 'hidden')))"
@@ -56,7 +64,7 @@ fn seed_choices(conn: &Connection) -> AppResult<()> {
     conn.execute_batch(&format!(
         "INSERT INTO main.field_choice (field_id, in_list, in_detail)
          SELECT id, in_list, in_detail FROM (
-           SELECT id, {} AS in_list, {} AS in_detail FROM cache.field
+           SELECT id, {} OR id IN ({FIELDS_IN_USE}) AS in_list, {} AS in_detail FROM cache.field
            WHERE {SHOWABLE} AND ({used} OR {shown} OR id IN ({FIELDS_IN_USE}))
          ) WHERE in_list OR in_detail;",
         shows_in("hiddenInList"),
@@ -196,7 +204,22 @@ mod tests {
     }
 
     #[test]
-    fn a_field_one_tracked_space_still_showed_is_opted_in_for_both_places() {
+    fn a_field_a_space_that_set_up_its_fields_kept_is_opted_in_for_both_places() {
+        let lab = lab();
+        lab.space(A, 1);
+        lab.space(B, 1);
+        lab.field(ZONE, "string", 0, 1);
+        lab.field(ALPHA, "string", 0, 1);
+        lab.hide(A, ALPHA, "hidden");
+
+        lab.seed();
+
+        assert_eq!(lab.choices(), [choice(ZONE, true, true)]);
+        assert_eq!(lab.space_fields(), []);
+    }
+
+    #[test]
+    fn a_space_that_never_hid_a_field_says_nothing_once_another_space_set_up_its_fields() {
         let lab = lab();
         lab.space(A, 1);
         lab.space(B, 1);
@@ -205,7 +228,40 @@ mod tests {
 
         lab.seed();
 
+        assert_eq!(lab.choices(), []);
+    }
+
+    #[test]
+    fn without_any_set_up_space_every_tracked_space_counts() {
+        let lab = lab();
+        lab.space(A, 1);
+        lab.space(B, 1);
+        lab.field(ZONE, "string", 0, 1);
+
+        lab.seed();
+
         assert_eq!(lab.choices(), [choice(ZONE, true, true)]);
+    }
+
+    #[test]
+    fn a_field_hidden_in_the_set_up_space_but_used_by_a_view_column_keeps_its_list_box_only() {
+        let lab = lab();
+        lab.space(A, 1);
+        lab.space(B, 1);
+        lab.field(ZONE, "string", 0, 1);
+        lab.hide(A, ZONE, "hidden");
+        lab.local
+            .execute_batch(&format!(
+                r#"INSERT INTO filter_list (id, kind, name) VALUES (900, 'list', 'Open work');
+                   INSERT INTO view (list_id, name, layout, columns, group_by, sort_by, sort_order) VALUES
+                     (900, 'Table', 'table', '["status","{ZONE}"]', 'none', 'updated', 0)"#
+            ))
+            .unwrap();
+
+        lab.seed();
+
+        assert_eq!(lab.choices(), [choice(ZONE, true, false)]);
+        assert_eq!(lab.space_fields(), [row(A, ZONE, "hidden")]);
     }
 
     #[test]

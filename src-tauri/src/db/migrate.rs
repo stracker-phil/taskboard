@@ -33,6 +33,7 @@ pub const LOCAL: &[&str] = &[
     include_str!("../../migrations/local/0025_recently_viewed.sql"),
     include_str!("../../migrations/local/0026_status_style.sql"),
     include_str!("../../migrations/local/0027_field_choice.sql"),
+    include_str!("../../migrations/local/0028_field_choice_from_set_up_spaces.sql"),
 ];
 pub const CACHE: &[&str] = &[
     include_str!("../../migrations/cache/0001_init.sql"),
@@ -145,6 +146,152 @@ mod tests {
         let mut conn = Connection::open_in_memory().unwrap();
         migrate(&mut conn, "local", &LOCAL[..25]).unwrap();
         conn
+    }
+
+    fn before_set_up_spaces() -> Connection {
+        let mut conn = Connection::open_in_memory().unwrap();
+        migrate(&mut conn, "local", &LOCAL[..27]).unwrap();
+        conn
+    }
+
+    fn field_choices(conn: &Connection) -> Vec<(String, bool, bool)> {
+        let mut query = conn
+            .prepare("SELECT field_id, in_list, in_detail FROM field_choice ORDER BY field_id")
+            .unwrap();
+        query
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect()
+    }
+
+    fn space_fields(conn: &Connection) -> Vec<(String, String, String)> {
+        let mut query = conn
+            .prepare("SELECT project_id, field_id, visibility FROM space_field ORDER BY 1, 2")
+            .unwrap();
+        query
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect()
+    }
+
+    fn choice(id: &str, in_list: bool, in_detail: bool) -> (String, bool, bool) {
+        (id.to_string(), in_list, in_detail)
+    }
+
+    #[test]
+    fn a_field_only_an_untouched_space_showed_loses_its_boxes() {
+        let mut conn = before_set_up_spaces();
+        conn.execute_batch(
+            "INSERT INTO space (project_id, tracked) VALUES ('10001', 1), ('10002', 1);
+             INSERT INTO space_field (project_id, field_id, visibility)
+               VALUES ('10001', 'customfield_10001', 'hidden');
+             INSERT INTO field_choice (field_id, in_list, in_detail) VALUES
+               ('customfield_10001', 1, 1), ('customfield_10002', 1, 1)",
+        )
+        .unwrap();
+
+        migrate(&mut conn, "local", LOCAL).unwrap();
+
+        assert_eq!(
+            field_choices(&conn),
+            [choice("customfield_10002", true, true)]
+        );
+        assert_eq!(space_fields(&conn), []);
+    }
+
+    #[test]
+    fn a_place_stays_only_where_a_set_up_space_shows_the_field() {
+        let mut conn = before_set_up_spaces();
+        conn.execute_batch(
+            "INSERT INTO space (project_id, tracked) VALUES ('10001', 1), ('10002', 1);
+             INSERT INTO space_field (project_id, field_id, visibility) VALUES
+               ('10001', 'customfield_10001', 'hiddenInList'),
+               ('10001', 'customfield_10002', 'hiddenInDetail'),
+               ('10001', 'customfield_10004', 'hidden');
+             INSERT INTO field_choice (field_id, in_list, in_detail) VALUES
+               ('customfield_10001', 1, 1), ('customfield_10002', 1, 1), ('customfield_10003', 1, 1),
+               ('customfield_10004', 1, 0)",
+        )
+        .unwrap();
+
+        migrate(&mut conn, "local", LOCAL).unwrap();
+
+        assert_eq!(
+            field_choices(&conn),
+            [
+                choice("customfield_10001", false, true),
+                choice("customfield_10002", true, false),
+                choice("customfield_10003", true, true),
+            ]
+        );
+        assert_eq!(space_fields(&conn), []);
+    }
+
+    #[test]
+    fn a_field_a_view_or_filter_uses_keeps_its_list_box_and_the_space_rows_that_narrow_it() {
+        let mut conn = before_set_up_spaces();
+        conn.execute_batch(
+            r#"INSERT INTO space (project_id, tracked) VALUES ('10001', 1), ('10002', 1);
+               INSERT INTO space_field (project_id, field_id, visibility) VALUES
+                 ('10001', 'customfield_10001', 'hidden'),
+                 ('10001', 'customfield_10002', 'hidden'),
+                 ('10001', 'customfield_10003', 'hidden');
+               INSERT INTO field_choice (field_id, in_list, in_detail) VALUES
+                 ('customfield_10001', 1, 1), ('customfield_10002', 1, 1), ('customfield_10003', 1, 1);
+               INSERT INTO filter_list (id, kind, name, filter) VALUES
+                 (900, 'list', 'Open work',
+                  '{"conditions":[{"field":"customfield_10002","op":"is","value":"x"}]}');
+               INSERT INTO view (list_id, name, layout, columns, group_by, sort_by, sort_order, filter) VALUES
+                 (900, 'Table', 'table', '["status","customfield_10001"]', 'none', 'updated', 0,
+                  '{"conditions":[{"field":"customfield_10003","op":"is","value":"x"}]}')"#,
+        )
+        .unwrap();
+
+        migrate(&mut conn, "local", LOCAL).unwrap();
+
+        assert_eq!(
+            field_choices(&conn),
+            [
+                choice("customfield_10001", true, false),
+                choice("customfield_10002", true, false),
+                choice("customfield_10003", true, false),
+            ]
+        );
+        assert_eq!(space_fields(&conn).len(), 3);
+    }
+
+    #[test]
+    fn nothing_changes_while_no_tracked_space_has_set_up_its_fields() {
+        let mut conn = before_set_up_spaces();
+        conn.execute_batch(
+            "INSERT INTO space (project_id, tracked) VALUES ('10001', 1), ('10002', 1), ('10003', 0);
+             INSERT INTO space_field (project_id, field_id, visibility)
+               VALUES ('10003', 'customfield_10001', 'hidden');
+             INSERT INTO field_choice (field_id, in_list, in_detail) VALUES
+               ('customfield_10001', 1, 1), ('customfield_10002', 1, 0), ('customfield_10003', 0, 1)",
+        )
+        .unwrap();
+
+        migrate(&mut conn, "local", LOCAL).unwrap();
+
+        assert_eq!(
+            field_choices(&conn),
+            [
+                choice("customfield_10001", true, true),
+                choice("customfield_10002", true, false),
+                choice("customfield_10003", false, true),
+            ]
+        );
+        assert_eq!(
+            space_fields(&conn),
+            [(
+                "10003".to_string(),
+                "customfield_10001".to_string(),
+                "hidden".to_string()
+            )]
+        );
     }
 
     #[test]
