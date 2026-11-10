@@ -145,6 +145,42 @@ describe("CommentBox", () => {
     expect(input).toBeEnabled();
   });
 
+  describe("height", () => {
+    const stubContentHeight = (el: HTMLElement, height: number) =>
+      Object.defineProperty(el, "scrollHeight", { configurable: true, get: () => height });
+
+    it("starts as two rows when empty", async () => {
+      renderBox();
+
+      expect(await box()).toHaveAttribute("rows", "2");
+    });
+
+    it("grows to the height of the typed lines", async () => {
+      renderBox();
+      const input = await box();
+      stubContentHeight(input, 120);
+
+      await userEvent.type(input, "First line{Shift>}{Enter}{/Shift}Second line{Shift>}{Enter}{/Shift}Third line");
+
+      expect(input.style.height).toBe("120px");
+    });
+
+    it("shrinks back to the empty content height after a comment is sent with ⌘↩", async () => {
+      mocked.issueComment.mockResolvedValue({ done: "Commented on NW-1042", reverse: null });
+      renderBox();
+      const input = await box();
+      stubContentHeight(input, 120);
+      await userEvent.type(input, "First line{Shift>}{Enter}{/Shift}Second line");
+      expect(input.style.height).toBe("120px");
+
+      stubContentHeight(input, 64);
+      await userEvent.keyboard("{Meta>}{Enter}{/Meta}");
+
+      await vi.waitFor(() => expect(input).toHaveValue(""));
+      expect(input.style.height).toBe("64px");
+    });
+  });
+
   describe("keys", () => {
     it("keeps typed keys and ⌘↩ from reaching the page's shortcuts", async () => {
       const page = vi.fn();

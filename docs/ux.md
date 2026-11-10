@@ -523,7 +523,7 @@ view with its place intact).
   `ui_state.json` `activityWidth` for every issue, `useActivityWidth`; `--panel-subtle-bg`): All / Comments / Changes
   (⌥1 / ⌥2 / ⌥3, `commands/activityKeys.ts`; the choice is saved in `ui_state.json` `activityFilter` and every issue
   opens with it), comment cards and change lines (status
-  changes as activity pills; a change line shows who changed what on its first line and from → to on a second, each line truncating instead of wrapping), newest first; the comment box waits for writes. Opening an issue fetches its
+  changes as activity pills; a change line shows who changed what on its first line and from → to on a second, each line truncating instead of wrapping), newest first; the comment box waits for writes. It is two lines tall when empty and grows with the text (no resize corner; `useAutoGrow`), up to 60% of the window, then scrolls inside; it snaps back after sending. Opening an issue fetches its
   comments when the cached ones may be behind (`issue_sync_comments`). Change lines come from Jira's changelog
   ([ADR 0031](adr/0031-issue-history-comes-from-the-changelog-on-demand.md)) and the sync's own records: "<Author>
   changed priority Medium → High", "Changed description" for long text without values, other fields by their

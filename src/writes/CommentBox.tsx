@@ -1,6 +1,7 @@
 import { useRef, useState, type KeyboardEvent } from "react";
 import { flushSync } from "react-dom";
 import { api } from "../api";
+import { useAutoGrow } from "../lib/useAutoGrow";
 import { attempt } from "../state/requests";
 import { useStore } from "../state/store";
 import { useJiraChange } from "./useJiraChanges";
@@ -11,6 +12,7 @@ export function CommentBox({ issueId }: { issueId: string }) {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const input = useRef<HTMLTextAreaElement>(null);
+  useAutoGrow(input, text);
   if (!jiraChanges) return null;
   const empty = text.trim() === "";
   const send = () => {
@@ -50,7 +52,7 @@ export function CommentBox({ issueId }: { issueId: string }) {
         className="comment-box__input"
         aria-label="Add a comment"
         placeholder="Add a comment…"
-        rows={3}
+        rows={2}
         value={text}
         disabled={sending}
         onChange={(e) => setText(e.target.value)}

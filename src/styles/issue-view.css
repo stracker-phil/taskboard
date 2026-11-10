@@ -238,7 +238,8 @@ button.web-link:hover { background: var(--row-hover-bg); }
 /* Add a comment (writes on), above the activity. */
 .comment-box { display: flex; flex: none; flex-direction: column; gap: 8px; padding: 4px 16px 12px; }
 .comment-box__input {
-  min-height: 64px; max-height: 240px; padding: 10px 12px; box-sizing: border-box; resize: vertical;
+  /* min-height is two lines; useAutoGrow sets the height in between. */
+  min-height: 64px; max-height: 60vh; padding: 10px 12px; box-sizing: border-box; resize: none; overflow-y: auto;
   border: 1px solid var(--card-border); border-radius: 10px; background: var(--panel-bg); color: inherit;
   font: inherit; font-size: 14px; line-height: 1.5;
 }
