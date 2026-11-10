@@ -464,10 +464,15 @@ and views can be bookmarked; a filter list's bookmark puts it under Home.
 - **Loading a view** (`BodySkeleton`, at launch only; later the previous view stays until the next is ready):
   eight rows at the List's or Table's row height, or three Board columns of cards, with pulsing text bars (still
   under reduced motion). It fades in after 250 ms, so a quick load shows nothing.
-- **Empty level** (`EmptyLevel`, List, Board and Table): the funnel tile, "Nothing in <name>", the conditions
-  in words plus what narrows the view (Me mode, the person chip, the text, Unread only), "Edit filter" on a
-  filter list (opens the toolbar's Filter), then one button per narrowing: "Clear search", "Clear Me filter",
-  "Show anyone", "Turn off Unread only". They wrap and stay centered.
+- **Empty level** (`EmptyLevel`, List, Board and Table): the funnel tile and a title that says why in few words
+  (`useEmptyReason`): "Nothing in <name> for you" when only Me mode empties it (the same query without Me has
+  issues, `list_match_count`; "for <first name>" with the person chip), else "Nothing in <name> → <view>" when
+  the view has its own conditions, else "Nothing in <name>". The suffix fades in once known; while the text,
+  epic or Unread only narrows too, Me's part can't be told apart and the title skips it. Below, "Looks like
+  everything is done here." when anything narrows the view, else "No issues here yet."; no filter values in
+  words. Then "Edit filter" on a filter list or a view with its own conditions (opens the toolbar's Filter), and
+  one button per narrowing: "Clear search", "Clear Me Mode", "Show anyone", "Turn off Unread only". They wrap and
+  stay centered.
 - **Gone issue** (`GoneNotice`, preview and Issue view): the title struck through in `--text-muted`, the notice
   on `--notice-neutral-*` ("Deleted in Jira or you lost access. Last synced <day>. This is the cached copy."),
   Remove from cache (`issue_forget`, gone issues only) and Remove bookmark while bookmarked.

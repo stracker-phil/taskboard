@@ -26,6 +26,7 @@
 }
 .empty-level__icon { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 14px; background: var(--fill-subtle); color: var(--text-muted); }
 .empty-level__title { margin: 0; font-size: 16px; font-weight: 700; color: var(--text); }
+.empty-level__reason { animation: fade-in var(--motion-base) var(--ease-out); }
 .empty-level__text { max-width: 300px; margin: 0; font-size: 13px; line-height: 1.5; color: var(--text-tertiary); }
 .empty-level__actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; max-width: 420px; }
 .empty-level__ghost {
