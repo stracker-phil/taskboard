@@ -1,6 +1,6 @@
 [package]
 name = "taskboard"
-version = "1.4.0"
+version = "1.5.0"
 description = "A local-first Jira Cloud client for macOS"
 authors = ["Philipp Stracker <info@philippstracker.com>"]
 edition = "2024"
