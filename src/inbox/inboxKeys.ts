@@ -6,6 +6,8 @@ export interface InboxHandlers {
   toggleRead: () => void;
   open: (inNewTab: boolean) => void;
   markAllRead: () => void;
+  togglePreview: () => void;
+  /** Closes the preview, or the inbox when none shows. */
   close: () => void;
 }
 
@@ -40,5 +42,6 @@ export const INBOX_KEY_COMMANDS: Command[] = [
   key("inbox.openIssue", "Open the issue", "Enter", (h) => h.open(false)),
   key("inbox.openInNewTab", "Open the issue in a new tab", "Mod+Enter", (h) => h.open(true)),
   key("inbox.markAllRead", "Mark all as read", "Mod+Shift+A", (h) => h.markAllRead()),
+  key("inbox.preview", "Preview the issue", "Space", (h) => h.togglePreview()),
   key("inbox.close", "Close notifications", "Escape", (h) => h.close()),
 ];

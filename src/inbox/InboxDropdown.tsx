@@ -1,14 +1,16 @@
 import { useEffect, useRef, type RefObject } from "react";
 import { api } from "../api";
-import { StatusSquare } from "../components/issue/StatusSquare";
-import { timeAgo } from "../lib/relativeTime";
+import { holdUnread } from "../issue/useSeenAfter";
 import { useNav } from "../queries/sidebar";
 import { useOpenIssueInTab } from "../shell/openInTab";
 import { attempt } from "../state/requests";
 import { useStore } from "../state/store";
+import { InboxPreview } from "./InboxPreview";
+import { InboxRow } from "./InboxRow";
 import { onInboxKeys } from "./inboxKeys";
 import { useInboxState } from "./inboxState";
 import { useInboxRows } from "./queries";
+import { useDismiss } from "./useDismiss";
 
 interface Props {
   bell: RefObject<HTMLButtonElement | null>;
@@ -19,8 +21,7 @@ interface Props {
  *  it closes. Not a menu: the list's keys move through it (`inboxKeys`). */
 export function InboxDropdown({ bell, onClose }: Props) {
   const { rows, unread } = useInboxRows();
-  const selected = useInboxState((s) => s.selected);
-  const select = useInboxState((s) => s.select);
+  const { selected, select, previewing, setPreviewing } = useInboxState();
   const ref = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
   const { data: nav } = useNav();
@@ -29,8 +30,11 @@ export function InboxDropdown({ bell, onClose }: Props) {
 
   const index = Math.min(selected, rows.length - 1);
   const current = rows[index];
-  const toggleRead = (id: string, unreadNow: boolean) =>
+  const toggleRead = (id: string, unreadNow: boolean) => {
+    // Marked unread while previewed, it stays unread until previewed again.
+    if (!unreadNow) holdUnread(id);
     void attempt(unreadNow ? api.issuesMarkSeen([id]) : api.issueMarkUnread(id), "Could not change the read state");
+  };
   const markAllRead = () => void attempt(api.inboxMarkAllSeen(), "Could not mark the notifications as read");
   const open = (at: number, inNewTab: boolean) => {
     const row = rows[at];
@@ -41,47 +45,17 @@ export function InboxDropdown({ bell, onClose }: Props) {
     else useStore.getState().openIssue(row.id, origin);
   };
 
-  const latest = useRef({ rows, selected, index, current, open, toggleRead, markAllRead, onClose });
-  useEffect(() => {
-    latest.current = { rows, selected, index, current, open, toggleRead, markAllRead, onClose };
+  useInboxKeys({
+    move: (step) => {
+      if (rows.length > 0) select(Math.max(0, Math.min(rows.length - 1, selected + step)));
+    },
+    toggleRead: () => current && toggleRead(current.id, current.unread),
+    open: (inNewTab) => open(index, inNewTab),
+    markAllRead,
+    togglePreview: () => setPreviewing(!previewing),
+    close: () => (previewing ? setPreviewing(false) : onClose()),
   });
-  useEffect(
-    () =>
-      onInboxKeys({
-        move: (step) => {
-          const last = latest.current.rows.length - 1;
-          if (last >= 0) select(Math.max(0, Math.min(last, latest.current.selected + step)));
-        },
-        toggleRead: () => {
-          const row = latest.current.current;
-          if (row) latest.current.toggleRead(row.id, row.unread);
-        },
-        open: (inNewTab) => latest.current.open(latest.current.index, inNewTab),
-        markAllRead: () => latest.current.markAllRead(),
-        close: () => latest.current.onClose(),
-      }),
-    [select],
-  );
-
-  useEffect(() => {
-    const panel = ref.current;
-    panel?.focus();
-    const opener = bell.current;
-    return () => {
-      const active = document.activeElement;
-      if (!active || active === document.body || panel?.contains(active)) opener?.focus();
-    };
-  }, [bell]);
-
-  useEffect(() => {
-    const onPress = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (ref.current?.contains(target) || bell.current?.contains(target)) return;
-      latest.current.onClose();
-    };
-    window.addEventListener("mousedown", onPress, true);
-    return () => window.removeEventListener("mousedown", onPress, true);
-  }, [bell]);
+  useDismiss(ref, bell, onClose, ".hover-peek--interactive");
 
   useEffect(() => {
     listRef.current?.querySelector(".inbox__row--selected")?.scrollIntoView?.({ block: "nearest" });
@@ -92,12 +66,7 @@ export function InboxDropdown({ bell, onClose }: Props) {
       <div className="popover__header">
         <span className="popover__title">Notifications</span>
         <span className="inbox__count">{unread === 0 ? "" : `${unread} unread`}</span>
-        <button
-          type="button"
-          className="inbox__mark-all"
-          disabled={unread === 0}
-          onClick={markAllRead}
-        >
+        <button type="button" className="inbox__mark-all" disabled={unread === 0} onClick={markAllRead}>
           Mark all as read
         </button>
       </div>
@@ -106,26 +75,31 @@ export function InboxDropdown({ bell, onClose }: Props) {
       ) : (
         <ul ref={listRef} className="inbox__rows" aria-label="Unread issues">
           {rows.map((row, at) => (
-            <li
-              key={row.id}
-              className={["inbox__row", at === index && "inbox__row--selected", !row.unread && "inbox__row--read"].filter(Boolean).join(" ")}
-              aria-current={at === index ? "true" : undefined}
-              onMouseEnter={() => select(at)}
-              onClick={(e) => open(at, e.metaKey)}
-            >
-              <span className="inbox__line">
-                <StatusSquare style={row.style} />
-                <span className="inbox__key">{row.key}</span>
-                <span className="inbox__summary">{row.summary}</span>
-              </span>
-              <span className="inbox__note">
-                <span className="inbox__note-text">{row.note}</span>
-                <span className="inbox__time">{timeAgo(row.changedAt)}</span>
-              </span>
-            </li>
+            <InboxRow key={row.id} row={row} selected={at === index} onHover={() => select(at)} onOpen={(inNewTab) => open(at, inNewTab)} />
           ))}
         </ul>
       )}
+      {previewing && current && <InboxPreview key={current.id} id={current.id} unread={current.unread} beside={ref} />}
     </div>
+  );
+}
+
+/** Hands the inbox's keys the latest handlers while it is open. */
+function useInboxKeys(handlers: Parameters<typeof onInboxKeys>[0]) {
+  const latest = useRef(handlers);
+  useEffect(() => {
+    latest.current = handlers;
+  });
+  useEffect(
+    () =>
+      onInboxKeys({
+        move: (step) => latest.current.move(step),
+        toggleRead: () => latest.current.toggleRead(),
+        open: (inNewTab) => latest.current.open(inNewTab),
+        markAllRead: () => latest.current.markAllRead(),
+        togglePreview: () => latest.current.togglePreview(),
+        close: () => latest.current.close(),
+      }),
+    [],
   );
 }

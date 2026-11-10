@@ -11,3 +11,6 @@
 .hover-peek__chip { display: inline-flex; align-items: center; gap: 5px; color: var(--text-secondary); }
 .hover-peek__description { min-height: 0; overflow: hidden; font-size: 13px; line-height: 1.5; mask-image: linear-gradient(to bottom, var(--panel-bg) 75%, transparent); }
 .hover-peek__empty { margin: 0; color: var(--text-muted); font-size: 13px; }
+/* The inbox's preview: the same card, but it scrolls and takes the pointer. */
+.hover-peek--interactive { pointer-events: auto; overflow-y: auto; }
+.hover-peek--interactive .hover-peek__description { overflow: visible; mask-image: none; }

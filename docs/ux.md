@@ -395,8 +395,13 @@ The one place that lists unread issues ([ADR 0059](adr/0059-the-inbox-replaces-u
 - Opening takes a snapshot: rows read while it is open stay, dimmed, in place; order and positions never change
   while it is open. The next open lists only what is unread then.
 - Keys (`inbox` scope, which shadows the window's while open; `inboxKeys.ts`): J/K and ↓/↑ select, M marks read or
-  unread, ↵ opens the issue in this tab and closes, ⌘↵ opens it in a new tab, ⇧⌘A marks all read, ⎋ closes. A
+  unread, ␣ previews, ↵ opens the issue in this tab and closes, ⌘↵ opens it in a new tab, ⇧⌘A marks all read, ⎋ closes. A
   press outside or the bell closes it too; focus moves in and back to the bell.
+- **Preview**: ␣ shows the selected issue's ⌥-hover card (`issue/hoverPeek/PeekCard.tsx`, shared, 380 × 360) to the
+  left of the dropdown, top-aligned (`InboxPreview.tsx`); without room on the left it covers the left part of the
+  window, never off-screen. Unlike the hover card it scrolls and takes the pointer. It follows J/K; ␣ or ⎋ closes it
+  first, a second ⎋ closes the inbox, ↵ closes both. Previewed for the read delay, the issue counts as read and its
+  row dims in place.
 
 ## Command palette
 
