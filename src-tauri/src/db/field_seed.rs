@@ -5,7 +5,7 @@ use std::path::Path;
 
 use rusqlite::Connection;
 
-use super::connection::{attach_cache, cache_path, detach_cache};
+use super::connection::{attach_cache_file, cache_path, detach_cache};
 use crate::error::AppResult;
 use crate::filter::FIELDS_IN_USE;
 use crate::views::columns::SHOWABLE;
@@ -20,7 +20,7 @@ pub fn seed_field_choices(local: &Connection, dir: &Path) -> AppResult<()> {
         return Ok(());
     }
     if cache_path(dir).exists() {
-        attach_cache(local, dir)?;
+        attach_cache_file(local, dir)?;
         let seeded = seed_choices(local).and_then(|()| prune_space_fields(local));
         detach_cache(local)?;
         seeded?;
@@ -89,7 +89,7 @@ mod tests {
     use tempfile::TempDir;
 
     use super::*;
-    use crate::db::connection::{local_path, prepare};
+    use crate::db::connection::{CacheKind, local_path, prepare};
     use crate::db::migrate::{CACHE, LOCAL, migrate};
     use crate::test_support::temp_config_dir;
 
@@ -432,7 +432,7 @@ mod tests {
         lab.field(ZONE, "string", 0, 1);
         lab.field(ALPHA, "string", 0, 1);
 
-        prepare(lab.dir.path()).unwrap();
+        prepare(lab.dir.path(), CacheKind::File).unwrap();
 
         assert_eq!(
             lab.choices(),
@@ -442,7 +442,7 @@ mod tests {
             .execute("DELETE FROM field_choice WHERE field_id = ?1", [ALPHA])
             .unwrap();
 
-        prepare(lab.dir.path()).unwrap();
+        prepare(lab.dir.path(), CacheKind::File).unwrap();
 
         assert_eq!(lab.choices(), [choice(ZONE, true, true)]);
     }

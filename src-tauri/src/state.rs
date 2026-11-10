@@ -32,13 +32,15 @@ pub struct AppState {
 
 impl AppState {
     pub fn open(config_dir: &Path) -> AppResult<Self> {
+        let settings = SettingsStore::open(config_dir);
+        let cache = settings.get().sync.cache_kind();
         Ok(Self {
-            settings: SettingsStore::open(config_dir),
+            settings,
             keybindings: KeybindingsStore::open(config_dir),
             ui_state: UiStateStore::open(config_dir),
             modes: ModesStore::open(config_dir),
             launches: LaunchQueue::default(),
-            db: Db::open(config_dir)?,
+            db: Db::open_with(config_dir, cache)?,
             jira: JiraAccess::new(secret_store(), Arc::new(Limiter::default())),
             avatars: AvatarClient::default(),
             nav: NavStore::open(config_dir),

@@ -76,7 +76,7 @@ loads as defaults, unknown keys are ignored and a file that cannot be parsed is 
 
 Taskboard's data is two SQLite files ([data.md](data.md), [ADR 0019](adr/0019-two-sqlite-files-through-rusqlite.md)):
 `local.sqlite` holds the owner's setup (Spaces, filter lists, views, bookmarks), `cache.sqlite` the Jira mirror,
-attached as `cache`. Every change goes through `Db::write`, which emits `issues_changed`,
+attached as `cache` (with `sync.memoryOnly` an in-memory database instead, [ADR 0057](adr/0057-jira-data-can-live-in-memory-only.md)). Every change goes through `Db::write`, which emits `issues_changed`,
 `issue_details_changed` or `local_changed` after the commit, at most every 500 ms during a burst. Reset cache deletes only the cache file.
 
 Jira is reached only through `jira/gateway/` ([jira.md](jira.md)): one `JiraClient` per connection, whose

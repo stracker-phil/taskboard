@@ -139,7 +139,7 @@ describe("SyncPage", () => {
       await userEvent.tab();
 
       await waitFor(() =>
-        expect(mocked.syncSave).toHaveBeenCalledWith({ scopeOverride: null, focusedMinutes: 10, backgroundMinutes: 15, keepDoneDays: 90, keepHistoryDays: 90, clearCacheOnQuit: false }),
+        expect(mocked.syncSave).toHaveBeenCalledWith({ scopeOverride: null, focusedMinutes: 10, backgroundMinutes: 15, keepDoneDays: 90, keepHistoryDays: 90, clearCacheOnQuit: false, memoryOnly: false }),
       );
     });
 

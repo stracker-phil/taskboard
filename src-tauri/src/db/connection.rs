@@ -46,14 +46,64 @@ fn make_private(path: &Path) -> AppResult<()> {
     Ok(())
 }
 
-/// Creates or migrates both files. Runs before any connection attaches the cache.
-pub fn prepare(dir: &Path) -> AppResult<()> {
+/// Where the Jira mirror lives (ADR 0057).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CacheKind {
+    /// `cache.sqlite` beside the local file.
+    File,
+    /// An in-memory database that is gone when Taskboard quits.
+    Memory,
+}
+
+/// The attached mirror. A memory cache is shared by name between the connections of one `Db` and freed once
+/// nothing holds it open, so it keeps its own connection for as long as it is in use.
+pub enum Cache {
+    File(PathBuf),
+    Memory { uri: String, _keeper: Connection },
+}
+
+impl Cache {
+    /// Creates or migrates the cache of `kind`. A memory cache starts empty and deletes the cache file.
+    pub fn create(dir: &Path, kind: CacheKind) -> AppResult<Self> {
+        match kind {
+            CacheKind::File => {
+                let path = cache_path(dir);
+                migrate::migrate(&mut open_file(&path)?, "cache", CACHE)?;
+                Ok(Self::File(path))
+            }
+            CacheKind::Memory => {
+                remove_cache_files(dir)?;
+                let uri = format!(
+                    "file:/taskboard-cache-{}?vfs=memdb",
+                    uuid::Uuid::new_v4().simple()
+                );
+                let mut keeper = Connection::open(&uri)?;
+                keeper.busy_timeout(BUSY_TIMEOUT)?;
+                migrate::migrate(&mut keeper, "cache", CACHE)?;
+                Ok(Self::Memory {
+                    uri,
+                    _keeper: keeper,
+                })
+            }
+        }
+    }
+
+    pub fn kind(&self) -> CacheKind {
+        match self {
+            Self::File(_) => CacheKind::File,
+            Self::Memory { .. } => CacheKind::Memory,
+        }
+    }
+}
+
+/// Migrates the local file, then creates the cache. Runs before any connection attaches the cache.
+pub fn prepare(dir: &Path, kind: CacheKind) -> AppResult<Cache> {
     let mut local = open_file(&local_path(dir))?;
     require_fts5(&local)?;
     migrate::migrate(&mut local, "local", LOCAL)?;
     carry_over_seen(&local, dir)?;
     seed_field_choices(&local, dir)?;
-    prepare_cache(dir)
+    Cache::create(dir, kind)
 }
 
 /// Copies the seen marks of a cache from before `local/0015` into the local file, before the cache's own
@@ -62,7 +112,7 @@ fn carry_over_seen(local: &Connection, dir: &Path) -> AppResult<()> {
     if !cache_path(dir).exists() {
         return Ok(());
     }
-    attach_cache(local, dir)?;
+    attach_cache_file(local, dir)?;
     let copied = copy_seen(local);
     detach_cache(local)?;
     copied
@@ -84,20 +134,41 @@ fn copy_seen(local: &Connection) -> AppResult<()> {
     Ok(())
 }
 
-pub fn prepare_cache(dir: &Path) -> AppResult<()> {
-    let mut cache = open_file(&cache_path(dir))?;
-    migrate::migrate(&mut cache, "cache", CACHE)
+pub fn remove_cache_files(dir: &Path) -> AppResult<()> {
+    for suffix in ["", "-wal", "-shm"] {
+        let path = dir.join(format!("{CACHE_FILE}{suffix}"));
+        match std::fs::remove_file(&path) {
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => return Err(e.into()),
+        }
+    }
+    Ok(())
 }
 
-/// A connection to the local file with the cache attached as `cache`.
-pub fn open(dir: &Path) -> AppResult<Connection> {
+/// A connection to the local file with `cache` attached.
+pub fn open(dir: &Path, cache: &Cache) -> AppResult<Connection> {
     let conn = open_file(&local_path(dir))?;
-    attach_cache(&conn, dir)?;
+    attach_cache(&conn, cache)?;
     Ok(conn)
 }
 
-pub fn attach_cache(conn: &Connection, dir: &Path) -> AppResult<()> {
-    let path = cache_path(dir);
+pub fn attach_cache(conn: &Connection, cache: &Cache) -> AppResult<()> {
+    match cache {
+        Cache::File(path) => attach_file(conn, path),
+        Cache::Memory { uri, .. } => {
+            conn.execute("ATTACH DATABASE ?1 AS cache", [uri])?;
+            Ok(())
+        }
+    }
+}
+
+/// Attaches `cache.sqlite` in `dir`, whichever kind of cache the app uses.
+pub fn attach_cache_file(conn: &Connection, dir: &Path) -> AppResult<()> {
+    attach_file(conn, &cache_path(dir))
+}
+
+fn attach_file(conn: &Connection, path: &Path) -> AppResult<()> {
     let path = path
         .to_str()
         .ok_or_else(|| AppError::Db(format!("{} is not a UTF-8 path", path.display())))?;
@@ -115,7 +186,7 @@ fn tune(conn: &Connection, schema: &str) -> AppResult<()> {
     Ok(())
 }
 
-pub fn ensure_attached(conn: &Connection, dir: &Path) -> AppResult<()> {
+pub fn ensure_attached(conn: &Connection, cache: &Cache) -> AppResult<()> {
     let attached: bool = conn.query_row(
         "SELECT EXISTS (SELECT 1 FROM pragma_database_list WHERE name = 'cache')",
         [],
@@ -124,7 +195,7 @@ pub fn ensure_attached(conn: &Connection, dir: &Path) -> AppResult<()> {
     if attached {
         Ok(())
     } else {
-        attach_cache(conn, dir)
+        attach_cache(conn, cache)
     }
 }
 
@@ -198,7 +269,7 @@ mod tests {
                ('20002', '2026-01-06T10:30:00.000Z', 1)",
         );
 
-        prepare(dir.path()).unwrap();
+        prepare(dir.path(), CacheKind::File).unwrap();
 
         assert_eq!(
             read_seen(&local_path(dir.path())),
@@ -230,7 +301,7 @@ mod tests {
             .unwrap();
         drop(local);
 
-        prepare(dir.path()).unwrap();
+        prepare(dir.path(), CacheKind::File).unwrap();
 
         assert_eq!(
             read_seen(&local_path(dir.path())),
@@ -245,7 +316,7 @@ mod tests {
     fn a_fresh_folder_prepares_both_files_with_the_seen_table_only_in_the_local_one() {
         let dir = temp_config_dir();
 
-        prepare(dir.path()).unwrap();
+        prepare(dir.path(), CacheKind::File).unwrap();
 
         assert_eq!(read_seen(&local_path(dir.path())), Vec::<SeenRow>::new());
         assert!(!has_table(&cache_path(dir.path()), "issue_seen"));
@@ -258,9 +329,9 @@ mod tests {
             dir.path(),
             "INSERT INTO issue_seen (issue_id, seen_at) VALUES ('20001', '2026-01-05T09:00:00.000Z')",
         );
-        prepare(dir.path()).unwrap();
+        prepare(dir.path(), CacheKind::File).unwrap();
 
-        prepare(dir.path()).unwrap();
+        prepare(dir.path(), CacheKind::File).unwrap();
 
         assert_eq!(
             read_seen(&local_path(dir.path())),

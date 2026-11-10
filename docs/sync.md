@@ -104,7 +104,9 @@ all of an issue's comments, they replace the cached ones.
 
 - Settings → Sync → Cache: the state, Sync Now, and per tracked project the cached and open issues and the last
   full sync (`sync_overview`, `sync_run`); Reset Cache, and the switch that clears the cache at every quit
-  (`sync.clearCacheOnQuit`; also at launch, for a session that didn't quit cleanly). Read marks stay.
+  (`sync.clearCacheOnQuit`; also at launch, for a session that didn't quit cleanly). Read marks stay. The switch
+  "Keep Jira data in memory only" (`sync.memoryOnly`) empties the cache, keeps it in memory and syncs again; while
+  it is on, the clear-on-quit switch is hidden.
 - `taskboard status [--json]`: the same overview; `taskboard sync [--full]` queues a sync and returns;
   `taskboard reset-cache --yes` empties the cache and queues a full sync.
 - The main window shows "Loading your Jira issues" with per-project progress while the first sync runs.

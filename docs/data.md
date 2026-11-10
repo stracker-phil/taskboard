@@ -11,7 +11,7 @@ All in the config dir (`~/Library/Application Support/com.philippstracker.taskbo
 | File | Holds | Reset cache |
 |---|---|---|
 | `local.sqlite` | The owner's setup: Spaces, filter lists, views, bookmarks (`pin`), status style overrides, read and unread marks (`issue_seen`), last views and interactions (`issue_activity`) | kept |
-| `cache.sqlite` | The tracker mirror (Jira today): spaces, issues, comments, people, versions, fields, change log, sync state, search index | deleted and recreated empty; with `sync.clearCacheOnQuit` also at every quit and launch |
+| `cache.sqlite` | The tracker mirror (Jira today): spaces, issues, comments, people, versions, fields, change log, sync state, search index. With `sync.memoryOnly` there is no file: the mirror is an in-memory database ([ADR 0057](adr/0057-jira-data-can-live-in-memory-only.md)) | deleted and recreated empty; with `sync.clearCacheOnQuit` also at every quit and launch |
 | `settings.json`, `keybindings.json`, `ui_state.json`, `modes.json`, `places.json` | Settings, key overrides, window layout (the hidden sidebar, the activity column's width), the app-wide modes Rust applies to every view (`store/modes.rs`: Me mode in all views, Unread only, the bookmarks bar), each view's remembered place (`store/`; no longer the Me chip or the text filter, [ADR 0038](adr/0038-filter-changes-are-drafts-until-the-view-is-saved.md): an old `onlyMine` seeds `view.only_mine` once at startup, `text` is ignored) | kept |
 | `nav.json` | The main window's place: the open level and view, the open tabs and the active one, the last closed tabs' places, each level's last view, the expanded Spaces (`nav/`, `nav/tabs.rs`; a file without tabs is one tab); per tab the issue its Issue view shows and its Back and Forward steps, 100 each way (`nav/history.rs`, ADR 0052). A place that no longer exists falls back to the level's default view, then to Everything | kept |
 
@@ -29,15 +29,17 @@ The Jira token is in the Keychain only, never in a file or a log.
 |---|---|---|
 | `connection` | site URL (normalized), email, token kind, token expiry date, cloud id, and what Test Connection found: account id, display name, time zone. Never the token (Keychain, service `APP_NAME`, account = email) | `connection_save`, `connection_test` |
 | `behaviour` | the read delay, the default bookmark duration, what a click opens, `notifyAbout` ([notifications.md](notifications.md)), `allowJiraChanges` (Settings → Connection → Changes; off by default, [writes.md](writes.md)) | `behaviour_set` |
-| `sync` | scope override (JQL or none), delta interval in front (1–60 min) and in the background (5–120 min), days to keep done issues (7–365), `clearCacheOnQuit` (empty the cache at quit and at launch, `app::clear_cache_if_asked`) | `scope_save`, `sync_save` |
+| `sync` | scope override (JQL or none), delta interval in front (1–60 min) and in the background (5–120 min), days to keep done issues (7–365), `clearCacheOnQuit` (empty the cache at quit and at launch, `app::clear_cache_if_asked`; not in memory mode), `memoryOnly` (keep the cache in memory; changing it replaces the cache and queues a full sync in `sync_save`) | `scope_save`, `sync_save` |
 
 `update_settings` replaces only what the page owns; `connection` and `sync` change through their own
 commands, which validate them. Tracking a project writes `local.space`, not the settings.
 
 ## Access (`src-tauri/src/db/`)
 
-- `Db::open` creates or migrates both files, then opens one writer and two readers. Each connection opens
-  `local.sqlite` and attaches `cache.sqlite` as `cache`, so cache tables are written `cache.issue`.
+- `Db::open_with(dir, kind)` creates or migrates both databases, then opens one writer and two readers. Each
+  connection opens `local.sqlite` and attaches the cache as `cache`, so cache tables are written `cache.issue`.
+  The cache (`connection::Cache`) is `cache.sqlite` or, with `CacheKind::Memory`, a memdb database shared by
+  name and held open by a keeper connection; creating one deletes `cache.sqlite`.
 - `Db::read(|conn| …)` runs a query on a reader; `Db::write(|tx, changes| …)` is the only way to change data.
   The closure records what it changed (`changes.issue_changed(id)`, `changes.detail_changed(id)` when only the
   issue's detail changed, `changes.local_changed(LocalPart::Views)`); after the commit the app emits
@@ -48,12 +50,12 @@ commands, which validate them. Tracking a project writes `local.space`, not the 
   rows, the sidebar, the bookmarks, the counts and those issues' detail; with `all` everything an issue shows
   up in; `issue_details_changed` only those issues' detail.
 - Every connection keeps a 16 MB page cache and memory-maps up to 256 MB per file (`connection::tune`).
-- `Db::reset_cache` detaches the cache everywhere, deletes it, creates an empty one and emits
-  `issues_changed { all: true }`.
+- `Db::switch_cache(kind)` detaches the cache everywhere, deletes the cache files, creates an empty cache of
+  `kind` and emits `issues_changed { all: true }`; `Db::reset_cache` does it with the current kind.
 - Upkeep (`db/upkeep.rs`): `Db::optimize` (`PRAGMA optimize`) runs at quit; after every full sync
   `Db::tidy_cache` compacts the cache (`VACUUM cache`) when more than a quarter of it is free pages, else only
   trims its write-ahead log, then optimizes. Settings → Status shows the cache size (`Db::cache_size`) with
-  Compact (`app:compactCache`, `Db::compact_cache`).
+  Compact (`app:compactCache`, `Db::compact_cache`). In memory mode only `optimize` runs and there is no size.
 
 ## Tables
 

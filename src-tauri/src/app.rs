@@ -112,9 +112,10 @@ pub fn start(
 }
 
 /// With `sync.clearCacheOnQuit` no copy of the Jira issues outlives a session: it runs at quit, and at launch
-/// for a session that didn't quit cleanly.
+/// for a session that didn't quit cleanly. A cache in memory never outlives one.
 fn clear_cache_if_asked(state: &AppState) {
-    if !state.settings.get().sync.clear_cache_on_quit {
+    let sync = state.settings.get().sync;
+    if !sync.clear_cache_on_quit || sync.memory_only {
         return;
     }
     match tauri::async_runtime::block_on(state.db.reset_cache()) {

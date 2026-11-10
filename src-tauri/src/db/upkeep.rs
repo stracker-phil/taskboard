@@ -1,5 +1,5 @@
 //! Keeps the files lean: the query planner's statistics fresh, the write-ahead log short, and the cache compacted
-//! once deletions left much of it empty.
+//! once deletions left much of it empty. A cache in memory has no file to keep lean.
 
 use std::sync::Arc;
 
@@ -7,7 +7,7 @@ use rusqlite::Connection;
 use serde::Serialize;
 use ts_rs::TS;
 
-use super::{Db, blocking};
+use super::{CacheKind, Db, blocking};
 use crate::error::AppResult;
 use crate::lock::MutexExt;
 
@@ -31,21 +31,33 @@ impl Db {
             .await
     }
 
-    pub async fn cache_size(&self) -> AppResult<CacheSize> {
-        self.read(cache_size).await
+    /// `None` here and in `compact_cache` while the cache is in memory.
+    pub async fn cache_size(&self) -> AppResult<Option<CacheSize>> {
+        if !self.has_cache_file() {
+            return Ok(None);
+        }
+        self.read(cache_size).await.map(Some)
     }
 
     /// Rewrites the cache without its empty pages and empties its write-ahead log; returns the size after.
-    pub async fn compact_cache(&self) -> AppResult<CacheSize> {
+    pub async fn compact_cache(&self) -> AppResult<Option<CacheSize>> {
+        if !self.has_cache_file() {
+            return Ok(None);
+        }
         self.on_writer(|conn| {
             compact(conn)?;
             cache_size(conn)
         })
         .await
+        .map(Some)
     }
 
-    /// After a full sync: compacts the cache when much of it is empty, else only trims its write-ahead log.
+    /// After a full sync: compacts the cache when much of it is empty, else only trims its write-ahead log. A
+    /// memory cache only gets its planner statistics refreshed.
     pub async fn tidy_cache(&self) -> AppResult<()> {
+        if !self.has_cache_file() {
+            return self.optimize().await;
+        }
         self.on_writer(|conn| {
             if cache_size(conn)?.free > COMPACT_ABOVE {
                 compact(conn)
@@ -55,6 +67,10 @@ impl Db {
         })
         .await?;
         self.optimize().await
+    }
+
+    fn has_cache_file(&self) -> bool {
+        self.cache_kind() == CacheKind::File
     }
 
     /// Runs `f` on the writer outside a transaction, which `VACUUM` needs. Only for upkeep that changes no rows:
@@ -148,7 +164,7 @@ mod tests {
     async fn a_fresh_cache_has_almost_no_free_pages() {
         let (_dir, db) = open_db();
 
-        let size = db.cache_size().await.unwrap();
+        let size = db.cache_size().await.unwrap().unwrap();
 
         assert!(size.bytes > 0);
         assert!(size.free < 0.1, "{size:?}");
@@ -158,7 +174,7 @@ mod tests {
     async fn deleting_most_rows_leaves_the_cache_mostly_free() {
         let (_dir, db) = db_with_mostly_deleted_issues().await;
 
-        let size = db.cache_size().await.unwrap();
+        let size = db.cache_size().await.unwrap().unwrap();
 
         assert!(size.free > COMPACT_ABOVE, "{size:?}");
     }
@@ -166,24 +182,24 @@ mod tests {
     #[tokio::test]
     async fn compacting_shrinks_the_cache_and_keeps_its_rows() {
         let (_dir, db) = db_with_mostly_deleted_issues().await;
-        let before = db.cache_size().await.unwrap();
+        let before = db.cache_size().await.unwrap().unwrap();
 
-        let after = db.compact_cache().await.unwrap();
+        let after = db.compact_cache().await.unwrap().unwrap();
 
         assert!(after.bytes < before.bytes, "{before:?} -> {after:?}");
         assert!(after.free < 0.05, "{after:?}");
-        assert_eq!(db.cache_size().await.unwrap(), after);
+        assert_eq!(db.cache_size().await.unwrap().unwrap(), after);
         assert_eq!(kept_keys(&db).await, ["NW-1", "NW-2", "NW-3"]);
     }
 
     #[tokio::test]
     async fn tidying_compacts_a_cache_that_is_mostly_free() {
         let (_dir, db) = db_with_mostly_deleted_issues().await;
-        let before = db.cache_size().await.unwrap();
+        let before = db.cache_size().await.unwrap().unwrap();
 
         db.tidy_cache().await.unwrap();
 
-        let after = db.cache_size().await.unwrap();
+        let after = db.cache_size().await.unwrap().unwrap();
         assert!(after.bytes < before.bytes, "{before:?} -> {after:?}");
         assert!(after.free < 0.05, "{after:?}");
         assert_eq!(kept_keys(&db).await, ["NW-1", "NW-2", "NW-3"]);
@@ -194,11 +210,11 @@ mod tests {
         let (_dir, db) = open_db();
         exec(&db, PROJECT).await;
         exec(&db, MANY_ISSUES).await;
-        let before = db.cache_size().await.unwrap();
+        let before = db.cache_size().await.unwrap().unwrap();
 
         db.tidy_cache().await.unwrap();
 
-        let after = db.cache_size().await.unwrap();
+        let after = db.cache_size().await.unwrap().unwrap();
         assert!(after.bytes >= before.bytes, "{before:?} -> {after:?}");
         assert_eq!(kept_keys(&db).await.len(), 1500);
     }
@@ -209,6 +225,20 @@ mod tests {
 
         db.optimize().await.unwrap();
 
+        assert_eq!(kept_keys(&db).await, ["NW-1", "NW-2", "NW-3"]);
+    }
+
+    #[tokio::test]
+    async fn a_memory_cache_has_no_size_and_nothing_to_compact_but_tidying_succeeds() {
+        let dir = temp_config_dir();
+        let db = Db::open_with(dir.path(), CacheKind::Memory).unwrap();
+        exec(&db, PROJECT).await;
+        exec(&db, MANY_ISSUES).await;
+        exec(&db, KEEP_FIRST_THREE).await;
+
+        assert_eq!(db.cache_size().await.unwrap(), None);
+        assert_eq!(db.compact_cache().await.unwrap(), None);
+        db.tidy_cache().await.unwrap();
         assert_eq!(kept_keys(&db).await, ["NW-1", "NW-2", "NW-3"]);
     }
 

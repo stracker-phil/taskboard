@@ -130,7 +130,8 @@ pub struct SyncFacts {
     pub last_full: Option<String>,
     pub tracked: usize,
     pub cached: u32,
-    pub cache_bytes: u64,
+    /// `None` while the cache is in memory.
+    pub cache_bytes: Option<u64>,
 }
 
 pub fn sync_group(facts: &SyncFacts) -> DiagnosticGroup {
@@ -163,9 +164,13 @@ pub fn sync_group(facts: &SyncFacts) -> DiagnosticGroup {
     )
     .offering("sync:full", "Full Sync");
     let cached = row("Cached issues", facts.cached.to_string(), Info);
-    let size = row("Cache size", megabytes(facts.cache_bytes), Info)
-        .offering("app:compactCache", "Compact");
-    group("Sync", vec![state, projects, last_full, cached, size])
+    let mut rows = vec![state, projects, last_full, cached];
+    if let Some(bytes) = facts.cache_bytes {
+        rows.push(
+            row("Cache size", megabytes(bytes), Info).offering("app:compactCache", "Compact"),
+        );
+    }
+    group("Sync", rows)
 }
 
 /// "0.4 MB", "12.5 MB".
@@ -228,7 +233,7 @@ mod tests {
             last_full: Some("Mon 09:00".into()),
             tracked: 2,
             cached: 120,
-            cache_bytes: 12_500_000,
+            cache_bytes: Some(12_500_000),
         };
         overrides(&mut facts);
         facts
@@ -547,7 +552,7 @@ mod tests {
             (12_500_000, "12.5 MB"),
             (1_234_000_000, "1234.0 MB"),
         ] {
-            let group = sync_group(&sync(|f| f.cache_bytes = bytes));
+            let group = sync_group(&sync(|f| f.cache_bytes = Some(bytes)));
             assert_eq!(
                 group.rows.last().unwrap(),
                 &expected(
@@ -559,6 +564,14 @@ mod tests {
                 "{bytes}"
             );
         }
+    }
+
+    #[test]
+    fn a_memory_cache_has_no_cache_size_row() {
+        let group = sync_group(&sync(|f| f.cache_bytes = None));
+
+        assert_eq!(group.rows.len(), 4);
+        assert!(group.rows.iter().all(|row| row.label != "Cache size"));
     }
 
     #[test]

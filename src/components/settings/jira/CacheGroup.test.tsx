@@ -8,7 +8,8 @@ vi.mock("../../../api", async (orig) => ({ ...(await orig<object>()), api: (awai
 import { api } from "../../../api";
 import { formatLocalTime } from "../../../lib/time";
 import { createQueryClient } from "../../../queries/queryClient";
-import { resetStore } from "../../../state/store";
+import { SYNC_KEY } from "../../../queries/sync";
+import { resetStore, useStore } from "../../../state/store";
 import { projectCounts, syncOverview } from "../../../test/jira";
 import { defaultSync, settings } from "../../../test/settings";
 import { CacheGroup } from "./CacheGroup";
@@ -122,6 +123,71 @@ describe("CacheGroup", () => {
     });
   });
 
+  describe("keeping Jira data in memory only", () => {
+    const switchName = "Keep Jira data in memory only";
+    const clearOnQuit = "Clear the cache when Taskboard quits";
+    const toasts = () => useStore.getState().toasts.map((t) => t.message);
+
+    it("describes what the switch does", async () => {
+      renderGroup();
+
+      await screen.findByRole("switch", { name: switchName });
+
+      expect(screen.getByText("Nothing from Jira is written to disk. Each launch syncs again.")).toBeInTheDocument();
+    });
+
+    it("shows the switch off when the setting is off", async () => {
+      renderGroup();
+
+      expect(await screen.findByRole("switch", { name: switchName })).not.toBeChecked();
+    });
+
+    it("shows the switch on when the setting is saved on", async () => {
+      mocked.getSettings.mockResolvedValue(settings({ sync: { ...defaultSync(), memoryOnly: true } }));
+
+      renderGroup();
+
+      expect(await screen.findByRole("switch", { name: switchName })).toBeChecked();
+    });
+
+    it("saves the whole sync settings with memory-only turned on and tells that the cache is empty", async () => {
+      renderGroup();
+
+      await userEvent.click(await screen.findByRole("switch", { name: switchName }));
+
+      await waitFor(() => expect(mocked.syncSave).toHaveBeenCalledWith({ ...defaultSync(), memoryOnly: true }));
+      await waitFor(() => expect(screen.getByRole("switch", { name: switchName })).toBeChecked());
+      expect(toasts()).toContain("The cache is empty; Taskboard fetches your issues again.");
+    });
+
+    it("shows no success toast and keeps the switch as saved when saving fails", async () => {
+      mocked.syncSave.mockRejectedValueOnce({ kind: "io", message: "Disk full", code: null });
+      renderGroup();
+
+      await userEvent.click(await screen.findByRole("switch", { name: switchName }));
+
+      await waitFor(() => expect(mocked.syncSave).toHaveBeenCalled());
+      await waitFor(() => expect(toasts()).toContain("Could not save the setting: Disk full"));
+      expect(toasts()).not.toContain("The cache is empty; Taskboard fetches your issues again.");
+      expect(screen.getByRole("switch", { name: switchName })).not.toBeChecked();
+    });
+
+    it("offers clearing the cache on quit while memory-only is off", async () => {
+      renderGroup();
+
+      expect(await screen.findByRole("switch", { name: clearOnQuit })).toBeInTheDocument();
+    });
+
+    it("hides clearing the cache on quit while memory-only is on", async () => {
+      mocked.getSettings.mockResolvedValue(settings({ sync: { ...defaultSync(), memoryOnly: true } }));
+
+      renderGroup();
+
+      await screen.findByRole("switch", { name: switchName });
+      expect(screen.queryByRole("switch", { name: clearOnQuit })).not.toBeInTheDocument();
+    });
+  });
+
   describe("keeping read history", () => {
     const groupName = "Keep history you've read";
     const pressed = () =>
@@ -202,6 +268,25 @@ describe("CacheGroup", () => {
       renderGroup();
 
       expect(await screen.findByText("Track projects on the Connection page.")).toBeInTheDocument();
+    });
+
+    it("keeps the earlier rows and no empty-state text when a refetched overview lists no projects", async () => {
+      mocked.syncOverview.mockResolvedValueOnce(syncOverview({ projects: [projectCounts({ name: "Northwind website" })] }));
+      const client = createQueryClient();
+      render(
+        <QueryClientProvider client={client}>
+          <CacheGroup />
+        </QueryClientProvider>,
+      );
+      expect(await screen.findByText("Northwind website")).toBeInTheDocument();
+
+      mocked.syncOverview.mockResolvedValue(syncOverview({ projects: [] }));
+      await client.invalidateQueries({ queryKey: SYNC_KEY });
+
+      await waitFor(() => expect(mocked.syncOverview).toHaveBeenCalledTimes(2));
+      expect(screen.getByText("Northwind website")).toBeInTheDocument();
+      expect(screen.getByText("NW")).toBeInTheDocument();
+      expect(screen.queryByText("Track projects on the Connection page.")).not.toBeInTheDocument();
     });
   });
 });

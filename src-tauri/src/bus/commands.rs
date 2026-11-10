@@ -99,8 +99,9 @@ pub fn register(bus: &mut Bus) {
             .help("Rewrite the Jira cache without the space that deleted issues left")
             .run(|app: AppHandle| async move {
                 let db = &app.state::<crate::state::AppState>().db;
-                let size = db.compact_cache().await?;
-                log::info!("Compacted the cache to {} bytes", size.bytes);
+                if let Some(size) = db.compact_cache().await? {
+                    log::info!("Compacted the cache to {} bytes", size.bytes);
+                }
                 Ok(())
             }),
     );

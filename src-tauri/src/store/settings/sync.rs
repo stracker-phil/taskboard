@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
+use crate::db::CacheKind;
 use crate::error::{AppError, AppResult};
 
 const FOCUSED_MINUTES: (u32, u32) = (1, 60);
@@ -25,6 +26,8 @@ pub struct SyncSettings {
     pub keep_history_days: u32,
     /// Empties the cache when Taskboard quits, and at launch in case it didn't quit cleanly.
     pub clear_cache_on_quit: bool,
+    /// Keeps the Jira mirror in memory instead of `cache.sqlite` (ADR 0057).
+    pub memory_only: bool,
 }
 
 impl Default for SyncSettings {
@@ -36,11 +39,20 @@ impl Default for SyncSettings {
             keep_done_days: 90,
             keep_history_days: 90,
             clear_cache_on_quit: false,
+            memory_only: false,
         }
     }
 }
 
 impl SyncSettings {
+    pub fn cache_kind(&self) -> CacheKind {
+        if self.memory_only {
+            CacheKind::Memory
+        } else {
+            CacheKind::File
+        }
+    }
+
     pub fn validate(&self) -> AppResult<()> {
         check("sync.focusedMinutes", self.focused_minutes, FOCUSED_MINUTES)?;
         check(
@@ -217,8 +229,29 @@ mod tests {
                 "keepDoneDays": 90,
                 "keepHistoryDays": 90,
                 "clearCacheOnQuit": false,
+                "memoryOnly": false,
             })
         );
+    }
+
+    #[test]
+    fn the_cache_lives_in_a_file_by_default() {
+        let settings = SyncSettings::default();
+        assert!(!settings.memory_only);
+        assert_eq!(settings.cache_kind(), CacheKind::File);
+    }
+
+    #[test]
+    fn the_memory_only_key_reads_from_camel_case_and_selects_the_memory_cache() {
+        let read: SyncSettings = serde_json::from_value(json!({ "memoryOnly": true })).unwrap();
+        assert!(read.memory_only);
+        assert_eq!(read.cache_kind(), CacheKind::Memory);
+    }
+
+    #[test]
+    fn a_file_without_the_memory_only_key_keeps_the_cache_in_a_file() {
+        let read: SyncSettings = serde_json::from_value(json!({ "focusedMinutes": 10 })).unwrap();
+        assert_eq!(read.cache_kind(), CacheKind::File);
     }
 
     #[test]

@@ -65,7 +65,8 @@ All screenshots show made-up demo data from the debug build.
   without credentials.
 - The cache stays on your Mac (`~/Library/Application Support/com.philippstracker.taskboard/`). Settings →
   Sync → Cache, File → Reset Cache… or `taskboard reset-cache --yes` empties it; with "Clear the cache when
-  Taskboard quits" on, no copy of your issues stays on the Mac after quitting.
+  Taskboard quits" on, no copy of your issues stays on the Mac after quitting; with "Keep Jira data in memory
+  only" on, none is written to disk at all.
 
 ## Install
 

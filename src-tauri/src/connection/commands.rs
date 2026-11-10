@@ -8,7 +8,7 @@ use crate::error::AppResult;
 use crate::events::announce_settings;
 use crate::state::AppState;
 use crate::store::settings::SyncSettings;
-use crate::sync::SyncEngine;
+use crate::sync::{Job, SyncEngine};
 
 fn today() -> NaiveDate {
     Local::now().date_naive()
@@ -87,7 +87,7 @@ pub async fn project_track(
     super::track_project(&state.db, project_id, tracked).await?;
     // A change sync only fetches what changed; a project tracked (again) needs all its issues.
     if tracked {
-        sync.queue(crate::sync::Job::Full);
+        sync.queue(Job::Full);
     }
     Ok(())
 }
@@ -117,14 +117,23 @@ pub async fn scope_save(
     super::scope_view(&state.db, &sync).await
 }
 
+/// Saves the sync settings; turning `memoryOnly` on or off replaces the cache with an empty one of the other
+/// kind and fetches everything again.
 #[tauri::command]
 pub async fn sync_save(
     app: AppHandle,
     state: State<'_, AppState>,
+    engine: State<'_, SyncEngine>,
     sync: SyncSettings,
 ) -> AppResult<SyncSettings> {
     let saved = super::save_intervals(&state.settings, sync).await?;
     announce_settings(&app, &state.settings.get());
+    let kind = saved.cache_kind();
+    if kind != state.db.cache_kind() {
+        state.db.switch_cache(kind).await?;
+        log::info!("Cache switched to {kind:?}");
+        engine.queue(Job::Full);
+    }
     Ok(saved)
 }
 
