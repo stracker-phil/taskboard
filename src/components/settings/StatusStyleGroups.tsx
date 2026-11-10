@@ -8,9 +8,6 @@ import { STYLE_NAMES, STYLE_ORDER } from "../issue/styleNames";
 import { openMenu } from "../menu";
 import { SearchField } from "./SearchField";
 
-/** Progress first, done last, like a list's status groups (`STYLE_ORDER` follows the way work moves). */
-const GROUP_ORDER: Style[] = ["progress", "review", "blocked", "todo", "backlog", "done"];
-
 export interface StyledStatus {
   id: string;
   name: string;
@@ -30,7 +27,7 @@ export function StatusStyleGroups({ statuses, choose }: { statuses: StyledStatus
   useListGlide(list);
   const needle = search.trim().toLowerCase();
   const shown = statuses.filter((status) => !needle || status.name.toLowerCase().includes(needle));
-  const sections = GROUP_ORDER.map((style) => ({ style, rows: shown.filter((s) => s.style === style) })).filter((s) => s.rows.length > 0);
+  const sections = STYLE_ORDER.map((style) => ({ style, rows: shown.filter((s) => s.style === style) })).filter((s) => s.rows.length > 0);
 
   const pickStyle = (status: StyledStatus, button: HTMLElement) =>
     openMenu(

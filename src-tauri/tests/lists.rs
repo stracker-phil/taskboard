@@ -1096,6 +1096,140 @@ mod filter_fields_per_level {
         (dir, db)
     }
 
+mod filter_value_choices_per_level {
+    use super::*;
+    use taskboard_lib::lists::FilterOptions;
+
+    /// Two tracked Spaces whose issues use different statuses, types, priorities, releases and epics.
+    /// NW-1 sits under the support epic NWS-5; NWS-6 parents nothing.
+    async fn two_spaces() -> (TempDir, Db) {
+        let (dir, db) = tracked_lab().await;
+        track_project(&db, NWS.into(), true).await.unwrap();
+        execute(
+            &db,
+            "INSERT INTO cache.status (id, name, category) VALUES
+               ('s1', 'To Do', 'new'), ('s2', 'Done', 'done'), ('s3', 'Archived', 'done');
+             INSERT INTO cache.version (id, project_id, name, release_date, released) VALUES
+               ('v1', '10001', '2.4.0', '2026-11-15', 0), ('v2', '10002', '1.0.0', '2026-11-20', 0);
+             INSERT INTO cache.issue (id, key, project_id, summary, issue_type, is_epic, parent_id,
+               status_id, status_category, priority, created_at, updated_at, synced_at) VALUES
+               ('1', 'NW-1', '10001', 'Pick the colors', 'Task', 0, '5', 's1', 'new', 'High',
+                '2026-10-20T09:00:00.000Z', '2026-10-20T09:00:00.000Z', '2026-10-20T09:00:00.000Z'),
+               ('2', 'NW-2', '10001', 'Fix the footer', 'Bug', 0, NULL, 's2', 'done', 'Medium',
+                '2026-10-20T09:00:00.000Z', '2026-10-20T09:00:00.000Z', '2026-10-20T09:00:00.000Z'),
+               ('3', 'NW-3', '10001', 'Checkout', 'Epic', 1, NULL, 's1', 'new', NULL,
+                '2026-10-20T09:00:00.000Z', '2026-10-20T09:00:00.000Z', '2026-10-20T09:00:00.000Z'),
+               ('4', 'NWS-1', '10002', 'Reset a password', 'Story', 0, NULL, 's3', 'done', 'Lowest',
+                '2026-10-20T09:00:00.000Z', '2026-10-20T09:00:00.000Z', '2026-10-20T09:00:00.000Z'),
+               ('5', 'NWS-5', '10002', 'Support portal', 'Epic', 1, NULL, 's3', 'done', NULL,
+                '2026-10-20T09:00:00.000Z', '2026-10-20T09:00:00.000Z', '2026-10-20T09:00:00.000Z'),
+               ('6', 'NWS-6', '10002', 'Unrelated epic', 'Epic', 1, NULL, 's3', 'done', NULL,
+                '2026-10-20T09:00:00.000Z', '2026-10-20T09:00:00.000Z', '2026-10-20T09:00:00.000Z')",
+        )
+        .await;
+        (dir, db)
+    }
+
+    fn names(choices: &[taskboard_lib::lists::Choice]) -> Vec<&str> {
+        choices.iter().map(|c| c.name.as_str()).collect()
+    }
+
+    /// Statuses, types, priorities, releases and epics, by name.
+    fn values(o: &FilterOptions) -> [Vec<&str>; 5] {
+        [
+            names(&o.statuses),
+            names(&o.types),
+            names(&o.priorities),
+            names(&o.releases),
+            names(&o.epics),
+        ]
+    }
+
+    #[tokio::test]
+    async fn a_space_offers_only_the_values_its_own_issues_and_versions_use() {
+        let (_dir, db) = two_spaces().await;
+
+        let nw = filter_options(&db, space_node_id(&db, NW).await)
+            .await
+            .unwrap();
+        let nws = filter_options(&db, space_node_id(&db, NWS).await)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            values(&nw),
+            [
+                vec!["Done", "To Do"],
+                vec!["Bug", "Epic", "Task"],
+                vec!["High", "Medium"],
+                vec!["NW · 2.4.0"],
+                vec!["NW-3 · Checkout", "NWS-5 · Support portal"],
+            ]
+        );
+        assert_eq!(
+            values(&nws),
+            [
+                vec!["Archived"],
+                vec!["Epic", "Story"],
+                vec!["Lowest"],
+                vec!["NWS · 1.0.0"],
+                vec!["NWS-5 · Support portal", "NWS-6 · Unrelated epic"],
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn a_filter_list_under_a_space_is_scoped_like_its_space() {
+        let (_dir, db) = two_spaces().await;
+        let space = space_node_id(&db, NW).await;
+        let list = list_create(&db, viewer(None), space, "Bugs".into(), Some(bugs()))
+            .await
+            .unwrap();
+
+        let in_space = filter_options(&db, space).await.unwrap();
+        let in_list = filter_options(&db, list).await.unwrap();
+
+        assert_eq!(values(&in_list), values(&in_space));
+        assert!(!names(&in_list.statuses).contains(&"Archived"));
+    }
+
+    #[tokio::test]
+    async fn everything_offers_the_values_of_every_tracked_space() {
+        let (_dir, db) = two_spaces().await;
+
+        let options = filter_options(&db, node_id(&db, "everything").await)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            values(&options),
+            [
+                vec!["Archived", "Done", "To Do"],
+                vec!["Bug", "Epic", "Story", "Task"],
+                vec!["High", "Medium", "Lowest"],
+                vec!["NW · 2.4.0", "NWS · 1.0.0"],
+                vec![
+                    "NW-3 · Checkout",
+                    "NWS-5 · Support portal",
+                    "NWS-6 · Unrelated epic"
+                ],
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn an_epic_of_another_project_is_offered_only_when_it_parents_one_of_the_spaces_issues() {
+        let (_dir, db) = two_spaces().await;
+        let nw = space_node_id(&db, NW).await;
+
+        let options = filter_options(&db, nw).await.unwrap();
+
+        let epics = names(&options.epics);
+        assert!(epics.contains(&"NWS-5 · Support portal"));
+        assert!(!epics.contains(&"NWS-6 · Unrelated epic"));
+    }
+}
+
     async fn hide(db: &Db, project: &str, field: &str, visibility: FieldVisibility) {
         space_set_field(db, project.into(), field.into(), visibility)
             .await

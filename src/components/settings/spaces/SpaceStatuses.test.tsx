@@ -57,12 +57,12 @@ describe("SpaceStatuses", () => {
     expect(screen.getByText("Statuses appear after the first sync.")).toBeInTheDocument();
   });
 
-  it("groups the statuses by the style they show, in the order In progress, In review, Blocked, To do, Backlog, Done", async () => {
+  it("groups the statuses by the style they show, in the order Backlog, To do, In progress, In review, Blocked, Done", async () => {
     const backlog = statusStyle({ id: "2", name: "Icebox", detected: "backlog" });
     await renderStatuses([DONE, backlog, TO_DO, IN_REVIEW, statusStyle({ id: "8", name: "Peer Review", detected: "review" }), IN_PROGRESS]);
 
     await screen.findByRole("region", { name: "Done" });
-    const order = ["In progress", "In review", "Blocked", "To do", "Backlog", "Done"];
+    const order = ["Backlog", "To do", "In progress", "In review", "Blocked", "Done"];
     const names = screen.getAllByRole("region").map((r) => r.getAttribute("aria-label"));
     expect(names.filter((n) => order.includes(n ?? ""))).toEqual(order);
     expect(within(screen.getByRole("region", { name: "Done" })).getByText("Shipped")).toBeInTheDocument();

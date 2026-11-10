@@ -1,7 +1,7 @@
 //! What the Filter popover shows: a level's and a view's conditions with display names, and the values its
 //! pickers offer.
 
-use rusqlite::Connection;
+use rusqlite::{Connection, Params};
 use serde::Serialize;
 use ts_rs::TS;
 
@@ -10,7 +10,7 @@ use super::nodes::{Kind, Node, all_nodes, node, own_conditions};
 use crate::db::Db;
 use crate::error::{AppError, AppResult};
 use crate::filter::{Condition, Field, Names, Parts, RELEVANT_FIELD, parts};
-use crate::space_config::hidden_columns;
+use crate::space_config::{hidden_columns, project_of_level};
 use crate::views::{read_view, view_conditions};
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
@@ -235,8 +235,12 @@ pub async fn filter_options(db: &Db, list_id: i64) -> AppResult<FilterOptions> {
 }
 
 fn choices(conn: &Connection, sql: &str) -> AppResult<Vec<Choice>> {
+    choices_with(conn, sql, [])
+}
+
+fn choices_with(conn: &Connection, sql: &str, params: impl Params) -> AppResult<Vec<Choice>> {
     let mut query = conn.prepare(sql)?;
-    let rows = query.query_map([], |row| {
+    let rows = query.query_map(params, |row| {
         Ok(Choice {
             id: row.get(0)?,
             name: row.get(1)?,
@@ -298,8 +302,13 @@ fn sprints(conn: &Connection) -> AppResult<Vec<Choice>> {
     Ok(states.chain(named).collect())
 }
 
+/// The projects whose values the pickers offer: the level's Space (`?1`), or every tracked one outside the Spaces.
+const PROJECTS: &str =
+    "SELECT project_id FROM space WHERE tracked = 1 AND (?1 IS NULL OR project_id = ?1)";
+
+/// A level in a Space offers only what its Space's issues use; outside the Spaces, every tracked project's.
 fn options(conn: &Connection, list_id: i64) -> AppResult<FilterOptions> {
-    let tracked = "SELECT project_id FROM space WHERE tracked = 1";
+    let space = [project_of_level(conn, list_id)?];
     let hidden = hidden_columns(conn, list_id)?;
     let (hidden_fields, fields) = all_fields(conn)?
         .into_iter()
@@ -307,56 +316,69 @@ fn options(conn: &Connection, list_id: i64) -> AppResult<FilterOptions> {
     Ok(FilterOptions {
         fields,
         hidden_fields,
-        statuses: choices(
+        statuses: choices_with(
             conn,
             &format!(
                 "SELECT id, name FROM cache.status
-                 WHERE id IN (SELECT status_id FROM cache.issue WHERE gone = 0 AND project_id IN ({tracked}))
+                 WHERE id IN (SELECT status_id FROM cache.issue WHERE gone = 0 AND project_id IN ({PROJECTS}))
                  ORDER BY name COLLATE NOCASE"
             ),
+            space.clone(),
         )?,
-        types: choices(
+        types: choices_with(
             conn,
             &format!(
-                "SELECT DISTINCT issue_type, issue_type FROM cache.issue WHERE project_id IN ({tracked})
+                "SELECT DISTINCT issue_type, issue_type FROM cache.issue WHERE project_id IN ({PROJECTS})
                  ORDER BY 1 COLLATE NOCASE"
             ),
+            space.clone(),
         )?,
         users: choices(conn, "SELECT account_id, name FROM cache.user ORDER BY name COLLATE NOCASE")?,
-        priorities: choices(
-            conn,
-            "SELECT DISTINCT priority, priority FROM cache.issue WHERE priority IS NOT NULL
-             ORDER BY CASE lower(priority) WHEN 'highest' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3
-               WHEN 'low' THEN 4 WHEN 'lowest' THEN 5 ELSE 3 END, 1",
-        )?,
-        epics: choices(
+        priorities: choices_with(
             conn,
             &format!(
+                "SELECT DISTINCT priority, priority FROM cache.issue
+                 WHERE priority IS NOT NULL AND project_id IN ({PROJECTS})
+                 ORDER BY CASE lower(priority) WHEN 'highest' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3
+                   WHEN 'low' THEN 4 WHEN 'lowest' THEN 5 ELSE 3 END, 1"
+            ),
+            space.clone(),
+        )?,
+        epics: choices_with(
+            conn,
+            &format!(
+                // An epic in another project still groups this Space's issues it parents.
                 "SELECT i.id, i.key || ' · ' || i.summary FROM cache.issue i JOIN cache.space p ON p.id = i.project_id
-                 WHERE i.is_epic = 1 AND i.gone = 0 AND i.project_id IN ({tracked})
+                 WHERE i.is_epic = 1 AND i.gone = 0
+                   AND (i.project_id IN ({PROJECTS})
+                     OR i.id IN (SELECT parent_id FROM cache.issue WHERE gone = 0 AND project_id IN ({PROJECTS})))
                  ORDER BY p.key, i.summary COLLATE NOCASE"
             ),
+            space.clone(),
         )?,
-        releases: choices(
+        releases: choices_with(
             conn,
             &format!(
                 "SELECT v.id, p.key || ' · ' || v.name FROM cache.version v JOIN cache.space p ON p.id = v.project_id
-                 WHERE v.project_id IN ({tracked}) ORDER BY p.key, v.released, v.release_date, v.name"
+                 WHERE v.project_id IN ({PROJECTS}) ORDER BY p.key, v.released, v.release_date, v.name"
             ),
+            space.clone(),
         )?,
         sprints: sprints(conn)?,
-        labels: choices(
+        labels: choices_with(
             conn,
             &format!(
                 "SELECT DISTINCT l.value, l.value FROM cache.issue i, json_each(i.labels) l
-                 WHERE i.project_id IN ({tracked}) ORDER BY 1 COLLATE NOCASE"
+                 WHERE i.project_id IN ({PROJECTS}) ORDER BY 1 COLLATE NOCASE"
             ),
+            space.clone(),
         )?,
-        projects: choices(
+        projects: choices_with(
             conn,
             &format!(
-                "SELECT p.id, p.key || ' · ' || p.name FROM cache.space p WHERE p.id IN ({tracked}) ORDER BY p.key"
+                "SELECT p.id, p.key || ' · ' || p.name FROM cache.space p WHERE p.id IN ({PROJECTS}) ORDER BY p.key"
             ),
+            space.clone(),
         )?,
     })
 }

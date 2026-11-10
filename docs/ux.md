@@ -661,7 +661,8 @@ button, Escape and a press outside close it, focus goes back to the button).
   "This page": its Last view condition with the field fixed, only "in last (hours)" and "in last" (days) to pick,
   and no ×, its empty × slot keeping the value as wide as below; a change is saved at once
   (`list_set_window`), not drafted. Each holds conditions as
-  field / operator / value selects (value pickers from the cache, dates, days, text) with × and its own
+  field / operator / value selects (value pickers from the cache: in a Space only the statuses, types,
+  priorities, epics and releases its issues use; dates, days, text) with × and its own
   "+ Add condition". Inside a Space the Project field isn't offered (`projectFixed`). Changes apply to the rows
   at once as drafts and are not saved ([ADR 0038](adr/0038-filter-changes-are-drafts-until-the-view-is-saved.md)):
   the footer says "Changes show until you leave this view.", and while something differs from what's saved "Not
@@ -873,7 +874,7 @@ no separate Settings design; owner, 2026-10-28). Its colors are the `--settings-
     opens `SpacePopover` (300px, 12px radius, `--shadow-popover`, at the top left of the content panel) with the
     Client field; Esc, Done or a click outside close it.
   - **Statuses** (`jira/StatusesPage`, `StatusStyleGroups`): every status the tracked projects use, in a section
-    per style it shows (in the list's group order, the style's square in the heading), with a search field; a
+    per style it shows (Backlog, To do, In progress, In review, Blocked, Done, the style's square in the heading), with a search field; a
     row: the pill and a button (the style's square and "Automatic · X" or the style's name) with a menu of
     Automatic and the six styles, the chosen one checked. A status whose style changes glides into its new
     section (`useListGlide`); the menu closed with the click, so nothing under the cursor moved.

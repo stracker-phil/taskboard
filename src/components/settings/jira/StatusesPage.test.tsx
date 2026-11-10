@@ -62,13 +62,13 @@ describe("StatusesPage", () => {
     expect(screen.queryByRole("region", { name: "To do" })).not.toBeInTheDocument();
   });
 
-  it("orders the sections In progress, In review, Blocked, To do, Backlog, Done", async () => {
+  it("orders the sections Backlog, To do, In progress, In review, Blocked, Done", async () => {
     const todo = appStatus({ id: "7", name: "Ready", detected: "todo" });
     const done = appStatus({ id: "5", name: "Shipped", detected: "done" });
     await renderPage([done, BACKLOG, todo, WAITING, IN_REVIEW, IN_PROGRESS]);
 
     await screen.findByRole("region", { name: "Done" });
-    const order = ["In progress", "In review", "Blocked", "To do", "Backlog", "Done"];
+    const order = ["Backlog", "To do", "In progress", "In review", "Blocked", "Done"];
     const names = screen.getAllByRole("region").map((r) => r.getAttribute("aria-label"));
     expect(names.filter((n) => order.includes(n ?? ""))).toEqual(order);
   });
