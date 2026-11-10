@@ -780,6 +780,7 @@ bundled fonts. Weights 400, 500, 600, 700, 750 (titles) and 800 (tile letters).
 | Meta | 12 / 400 (600 for headers) | counts, column headers, timestamps |
 | Status pill | 12 / 700 caps, 0.03em (11 and 10 in smaller pills) | status pills |
 | Key | mono 12 (11 on cards) | issue keys |
+| Key in the header | mono 15 / 600 | the issue key in the Issue view's breadcrumbs and the preview's header |
 | Chip, badge | 11 / 600–700 | change chips, counts badges |
 
 ## Metrics

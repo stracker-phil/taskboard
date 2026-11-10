@@ -20,7 +20,8 @@
 }
 .issue-header__copy:hover { background: var(--hover-bg); color: var(--text); }
 .issue-header__sep { color: var(--text-faint); }
-.issue-header__key { font-family: var(--font-mono); color: var(--text); }
+.issue-header__crumbs > .issue-header__key { flex: none; overflow: visible; }
+.issue-header__key { font-family: var(--font-mono); font-size: 15px; font-weight: 600; color: var(--text); }
 .issue-header__spacer { flex: 1; }
 
 /* The issue actions of the Issue view's and the preview's headers (issue/IssueActions.tsx): dimmed and borderless

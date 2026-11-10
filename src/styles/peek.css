@@ -17,7 +17,7 @@
   display: flex; flex: none; align-items: center; gap: 8px; height: 50px; padding: 0 14px 0 20px; box-sizing: border-box;
   border-bottom: 1px solid var(--hairline); font-size: 13px; color: var(--text-tertiary); white-space: nowrap;
 }
-.peek__key { font-family: var(--font-mono); color: var(--text); }
+.peek__key { font-family: var(--font-mono); font-size: 15px; font-weight: 600; color: var(--text); }
 .peek__dot { color: var(--text-faint); }
 .peek__spacer { flex: 1; }
 .peek__body { display: flex; flex: 1; flex-direction: column; gap: 16px; min-height: 0; overflow: auto; padding: 20px 24px; }
