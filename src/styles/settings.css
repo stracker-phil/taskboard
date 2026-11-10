@@ -181,6 +181,12 @@
 .settings-row:has(.diagnostic-value) .settings-row-text { flex: none; }
 
 /* Settings → Team: people against Spaces; the header row and the name column stay while the grid scrolls. */
+.space-team {
+  max-height: 296px; overflow: auto; margin: 0; padding: 4px 0 12px; list-style: none;
+  border-top: 1px solid var(--settings-hairline);
+}
+.space-team__person { display: flex; align-items: center; gap: 8px; height: 32px; }
+.space-team__you { color: var(--settings-text-tertiary); }
 .team-matrix { max-height: 520px; overflow: auto; background: var(--settings-bg); }
 .team-matrix table { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; }
 .team-matrix th, .team-matrix td {

@@ -45,7 +45,7 @@ export function SpaceStatuses({ projectId }: { projectId: string }) {
   const sections = CATEGORY_ORDER.map((category) => ({ category, rows: shown.filter((s) => s.category === category) })).filter((s) => s.rows.length > 0);
 
   return (
-    <Group title="Statuses" description="The statuses this Space's issues are in, in the style each one shows in here. Automatic picks a style from the Jira category and the name.">
+    <Group title="Statuses" anchor="statuses" description="The statuses this Space's issues are in, in the style each one shows in here. Automatic picks a style from the Jira category and the name.">
       {statuses.length === 0 ? (
         <div className="settings-row">
           <span className="settings-empty">Statuses appear after the first sync.</span>
