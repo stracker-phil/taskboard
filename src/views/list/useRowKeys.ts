@@ -2,7 +2,7 @@ import { type RefObject, useEffect, useRef } from "react";
 import type { Group, ViewData, ViewPlace } from "../../api";
 import { onIssueKeys } from "../../commands/issueKeys";
 import { type Item, itemGroupKey } from "./flatten";
-import { extendPick, toggleBox } from "./picking";
+import { extendPick, toggleBox, viewOrder } from "./picking";
 import type { RowActionHandlers } from "./RowActions";
 import { explainWritesOff } from "../../writes/runWrite";
 import { assignMenuAnchor } from "../../writes/assignMenu";
@@ -64,8 +64,8 @@ export function useRowKeys(current: RowKeyState): RefObject<RowKeyState> {
         scrollToIndex(items.findIndex((item) => item.kind === "row" && item.row.id === next.selected));
       },
       togglePick: () => {
-        const { rowIds, picked, selected, setPicked } = state.current;
-        if (selected) setPicked(toggleBox(rowIds, picked, selected));
+        const { data, picked, selected, setPicked } = state.current;
+        if (selected) setPicked(toggleBox(viewOrder(data.groups, data.rows), picked, selected));
       },
       pickAll: () => state.current.setPicked(state.current.rowIds),
       clearPicks: () => state.current.setPicked([]),

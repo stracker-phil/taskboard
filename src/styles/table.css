@@ -31,7 +31,11 @@
 .table-item--group .status-pill--tab { height: 22px; padding: 0 10px; border-radius: 6px 6px 0 0; font-size: 11px; }
 .table-item--group .status-pill--tab.status-pill--closed { border-radius: 6px; }
 .table-item--group .list-group__count { padding-bottom: 4px; }
-.table-item--group .list-group__chevron { top: 7px; left: -32px; }
+/* The inset holds the group's box over the rows' boxes (5px in, on the tab's line); the chevron, narrowed to 16,
+   sits between it and the tab. */
+.table-item--group .list-group__pick { position: absolute; left: -31px; top: 19px; transform: translateY(-50%); }
+.table-item--group .list-group__chevron { top: 11px; left: -16px; width: 16px; height: 16px; border-radius: 4px; }
+.table-item--group:hover .group-box { opacity: 1; }
 
 .table-row {
   display: flex; align-items: center; height: 30px; box-sizing: border-box;
@@ -43,11 +47,14 @@
 .table-row::before { content: none; }
 .table-row__pick { display: grid; flex: none; place-items: center; width: 24px; height: 100%; }
 .table-row:hover .pick-box { opacity: 1; }
+/* An ungrouped table's header holds the box that picks every row, in the same inset. */
+.table-header--picks::before { content: none; }
+.table-header:hover .group-box { opacity: 1; }
 .table-row--selected, .table-row--selected:hover { background: var(--selection-bg); }
 .table-row--picked:not(.table-row--selected) { background: var(--picked-bg); }
 .table-row__cell { display: flex; flex: none; align-items: center; gap: 7px; min-width: 0; box-sizing: border-box; padding-right: 12px; overflow: hidden; }
 /* The key keeps 12px from the inset, like every cell from the next. */
-.table-row__key, .table-header__cell:first-child { padding-left: 12px; }
+.table-row__key, .table-header__cell:first-of-type { padding-left: 12px; }
 .table-row__key { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); white-space: nowrap; }
 .table-row__summary { flex: 1; min-width: 240px; font-size: 13px; white-space: nowrap; }
 .table-row__title { min-width: 0; overflow: hidden; text-overflow: ellipsis; }

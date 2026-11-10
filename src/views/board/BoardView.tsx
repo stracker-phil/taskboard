@@ -9,6 +9,8 @@ import { attempt } from "../../state/requests";
 import { narrowingKey } from "../../state/slices/narrowing";
 import { useStore } from "../../state/store";
 import { Mark } from "../list/GroupHeader";
+import { groupPicks } from "../list/picking";
+import { GroupBox } from "../list/PickBox";
 import { useIssueActions } from "../list/useIssueActions";
 import { usePinnedIssues } from "../list/usePinnedIssues";
 import { BoardColumnCards } from "./BoardColumnCards";
@@ -107,6 +109,7 @@ function Board({ view, data }: { view: View; data: BoardData }) {
               <ColumnTitle column={column} />
               <span className="board-column__count">{column.ids.length}</span>
               <span className="board-card__spacer" />
+              <GroupBox group={column.name} picks={groupPicks(column.ids, picks.pickedIds)} onToggle={() => picks.onToggleColumn(column.ids)} className="board-column__pick" />
               <button type="button" className="board-column__collapse" aria-label="Collapse column" title="Collapse column" onClick={() => setCollapsed(column, true)}>
                 <ChevronLeft size={15} strokeWidth={2} aria-hidden="true" />
               </button>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extendPick, pickRange, toggleBox, togglePick } from "./picking";
+import { extendPick, groupPicks, groupRowIds, pickRange, toggleBox, toggleGroup, togglePick, viewOrder } from "./picking";
 
 const ROWS = ["1", "2", "3", "4", "5"];
 
@@ -52,6 +52,86 @@ describe("toggleBox (checkbox)", () => {
 
   it("picks nothing in an empty list", () => {
     expect(toggleBox([], [], "2")).toEqual([]);
+  });
+});
+
+describe("toggleGroup (a group's checkbox)", () => {
+  it("picks every row of the group when nothing is picked", () => {
+    expect(toggleGroup(ROWS, [], ["2", "3"])).toEqual(["2", "3"]);
+  });
+
+  it("picks every row of the group when only some of it is picked", () => {
+    expect(toggleGroup(ROWS, ["2"], ["2", "3"])).toEqual(["2", "3"]);
+  });
+
+  it("unpicks every row of the group when all of it is picked", () => {
+    expect(toggleGroup(ROWS, ["2", "3"], ["2", "3"])).toEqual([]);
+  });
+
+  it("keeps the picks of other groups when picking", () => {
+    expect(toggleGroup(ROWS, ["5"], ["2", "3"])).toEqual(["2", "3", "5"]);
+  });
+
+  it("keeps the picks of other groups when unpicking", () => {
+    expect(toggleGroup(ROWS, ["1", "2", "3"], ["2", "3"])).toEqual(["1"]);
+  });
+
+  it("returns the picks in the view's order whatever the order of the group's ids", () => {
+    expect(toggleGroup(ROWS, ["5"], ["4", "2"])).toEqual(["2", "4", "5"]);
+  });
+
+  it("changes nothing for an empty group", () => {
+    expect(toggleGroup(ROWS, ["1"], [])).toEqual(["1"]);
+  });
+});
+
+describe("groupPicks", () => {
+  it.each([
+    { expected: "all", picked: ["2", "3", "5"] },
+    { expected: "some", picked: ["3", "5"] },
+    { expected: "none", picked: ["1", "5"] },
+  ] as const)("returns $expected for the group [2, 3] when $picked are picked", ({ expected, picked }) => {
+    expect(groupPicks(["2", "3"], new Set<string>(picked))).toBe(expected);
+  });
+
+  it("returns none for an empty group", () => {
+    expect(groupPicks([], new Set(["1"]))).toBe("none");
+  });
+});
+
+describe("viewOrder", () => {
+  const rows = Object.fromEntries(ROWS.map((id) => [id, {}]));
+
+  it("lists the rows of every group in order, those of a collapsed group or subtree included", () => {
+    const groups = [{ rowIds: ["1", "2", "3"] }, { rowIds: ["4", "5"] }];
+
+    expect(viewOrder(groups, rows)).toEqual(["1", "2", "3", "4", "5"]);
+  });
+
+  it("lists an issue once when it sits in several groups", () => {
+    const groups = [{ rowIds: ["1", "2"] }, { rowIds: ["2", "3"] }];
+
+    expect(viewOrder(groups, rows)).toEqual(["1", "2", "3"]);
+  });
+
+  it("skips ids that have no row", () => {
+    expect(viewOrder([{ rowIds: ["1", "99", "2"] }], rows)).toEqual(["1", "2"]);
+  });
+
+  it("is empty without groups", () => {
+    expect(viewOrder([], rows)).toEqual([]);
+  });
+});
+
+describe("groupRowIds", () => {
+  const rows = Object.fromEntries(ROWS.map((id) => [id, {}]));
+
+  it("returns all of the group's ids that have a row", () => {
+    expect(groupRowIds({ rowIds: ["3", "1", "2"] }, rows)).toEqual(["3", "1", "2"]);
+  });
+
+  it("skips ids missing from the rows", () => {
+    expect(groupRowIds({ rowIds: ["1", "99", "2"] }, rows)).toEqual(["1", "2"]);
   });
 });
 

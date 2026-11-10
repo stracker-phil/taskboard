@@ -466,11 +466,96 @@ describe("BoardView", () => {
       screen
         .getAllByRole("checkbox")
         .filter((b) => (b as HTMLInputElement).checked)
-        .map((b) => b.getAttribute("aria-label")?.replace("Pick ", ""));
+        .map((b) => b.getAttribute("aria-label") ?? "")
+        .filter((label) => !label.startsWith("Pick all "))
+        .map((label) => label.replace("Pick ", ""));
     const press = (id: string) => act(async () => void (await getCommand(id)?.run()));
 
     beforeEach(() => {
       installCommands("main");
+    });
+
+    describe("a column's box", () => {
+      const columnBox = (name: string) => screen.getByRole<HTMLInputElement>("checkbox", { name: `Pick all in ${name}` });
+      const box = (key: string) => screen.getByRole("checkbox", { name: `Pick ${key}` });
+      const count = async (picked: string) => within(await screen.findByRole("toolbar", { name: "Picked issues" })).getByText(picked);
+
+      it("picks all cards of its column and shows their count in the bulk bar", async () => {
+        await renderBoard(BOARD_DATA);
+
+        await userEvent.click(columnBox("To Do"));
+
+        expect(pickedKeys()).toEqual(["NW-101", "NW-102", "NW-103"]);
+        expect(columnBox("To Do")).toBeChecked();
+        expect(await count("3 picked")).toBeInTheDocument();
+        expect(useStore.getState().issueView).toBeNull();
+      });
+
+      it("unpicks them again when clicked a second time", async () => {
+        await renderBoard(BOARD_DATA);
+        await userEvent.click(columnBox("To Do"));
+
+        await userEvent.click(columnBox("To Do"));
+
+        expect(pickedKeys()).toEqual([]);
+        expect(columnBox("To Do")).not.toBeChecked();
+      });
+
+      it("shows a dash while only some of the column's cards are picked", async () => {
+        await renderBoard(BOARD_DATA);
+
+        await userEvent.click(box("NW-102"));
+
+        expect(columnBox("To Do").indeterminate).toBe(true);
+        expect(columnBox("To Do")).not.toBeChecked();
+        expect(columnBox("In Progress").indeterminate).toBe(false);
+      });
+
+      it("picks the rest of the column when some of it is picked", async () => {
+        await renderBoard(BOARD_DATA);
+        await userEvent.click(box("NW-102"));
+
+        await userEvent.click(columnBox("To Do"));
+
+        expect(pickedKeys()).toEqual(["NW-101", "NW-102", "NW-103"]);
+        expect(columnBox("To Do").indeterminate).toBe(false);
+      });
+
+      it("leaves the column open", async () => {
+        await renderBoard(BOARD_DATA);
+
+        await userEvent.click(columnBox("To Do"));
+
+        expect(screen.queryByRole("button", { name: /^Expand To Do/ })).not.toBeInTheDocument();
+        expect(card("Draft the sitemap")).toBeInTheDocument();
+      });
+
+      it("keeps the picks of another column when picking", async () => {
+        await renderBoard(BOARD_DATA);
+        await userEvent.click(box("NW-104"));
+
+        await userEvent.click(columnBox("To Do"));
+
+        expect(pickedKeys()).toEqual(["NW-101", "NW-102", "NW-103", "NW-104"]);
+        expect(columnBox("In Progress").indeterminate).toBe(true);
+      });
+
+      it("keeps the picks of another column when unpicking", async () => {
+        await renderBoard(BOARD_DATA);
+        await userEvent.click(box("NW-104"));
+        await userEvent.click(columnBox("To Do"));
+
+        await userEvent.click(columnBox("To Do"));
+
+        expect(pickedKeys()).toEqual(["NW-104"]);
+      });
+
+      it("is offered by open columns only, not by a collapsed one", async () => {
+        await renderBoard(BOARD_DATA);
+
+        expect(screen.getByRole("checkbox", { name: "Pick all in Done" })).toBeInTheDocument();
+        expect(screen.queryByRole("checkbox", { name: "Pick all in In Review" })).not.toBeInTheDocument();
+      });
     });
 
     it("picks a ⌘-clicked card without opening the Issue view", async () => {

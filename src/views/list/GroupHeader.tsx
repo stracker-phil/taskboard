@@ -3,6 +3,8 @@ import type { Group, GroupMark } from "../../api";
 import { Avatar } from "../../components/issue/Avatar";
 import { PriorityFlag } from "../../components/issue/PriorityFlag";
 import { Tile } from "../../components/look/Tile";
+import type { GroupPicks } from "./picking";
+import { GroupBox } from "./PickBox";
 
 interface Props {
   group: Group;
@@ -15,13 +17,18 @@ interface Props {
   namesColumns: boolean;
   headers: string[];
   onToggle: () => void;
+  /** How many of the group's rows are picked; its checkbox picks or unpicks them all. */
+  picks: GroupPicks;
+  onTogglePicks: () => void;
 }
 
-/** The row above a group's card: the tab with the count, then the column headers on the shared grid. */
-export function GroupHeader({ group, open, tab, active, namesColumns, headers, onToggle }: Props) {
+/** The row above a group's card: its checkbox in the rows' checkbox column, the tab with the count, then the column
+ *  headers on the shared grid. */
+export function GroupHeader({ group, open, tab, active, namesColumns, headers, onToggle, picks, onTogglePicks }: Props) {
   const className = ["list-group", active && "list-group--active"].filter(Boolean).join(" ");
   return (
     <div className={className} role="row">
+      <GroupBox group={tab ? group.label : null} picks={picks} onToggle={onTogglePicks} className="list-group__pick" />
       {tab && (
         <button
           type="button"

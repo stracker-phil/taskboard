@@ -1132,7 +1132,9 @@ describe("ListView", () => {
       screen
         .getAllByRole("checkbox")
         .filter((b) => (b as HTMLInputElement).checked)
-        .map((b) => b.getAttribute("aria-label")?.replace("Pick ", ""));
+        .map((b) => b.getAttribute("aria-label") ?? "")
+        .filter((label) => !label.startsWith("Pick all "))
+        .map((label) => label.replace("Pick ", ""));
     const text = (summary: string) => screen.findByText(summary);
 
     beforeEach(() => {
@@ -1292,6 +1294,118 @@ describe("ListView", () => {
       await userEvent.dblClick(await screen.findByRole("checkbox", { name: "Pick NW-1003" }));
 
       expect(useStore.getState().issueView).toBeNull();
+    });
+
+    describe("a group's box", () => {
+      const LATER = row({ id: "4", key: "NW-1004", summary: "Review the copy" });
+      const alpha = () => groupOf([OPEN, SECOND], { key: "a", label: "Alpha" });
+      const beta = (patch: Parameters<typeof groupOf>[1] = {}) => groupOf([DONE, LATER], { key: "b", label: "Beta", ...patch });
+      const grouped = (second = beta()) => viewData([alpha(), second], [OPEN, DONE, SECOND, LATER]);
+      const renderGrouped = async (second = beta()) => {
+        await renderList(grouped(second), "preview");
+        await screen.findByRole("row", { name: /NW-1042/ });
+      };
+      const groupBox = (name: string) => screen.getByRole<HTMLInputElement>("checkbox", { name: `Pick all in ${name}` });
+      const count = async (picked: string) => within(await screen.findByRole("toolbar", { name: "Picked issues" })).getByText(picked);
+
+      it("picks all issues of its group and shows their count in the bulk bar", async () => {
+        await renderGrouped();
+
+        await userEvent.click(groupBox("Alpha"));
+
+        expect(pickedKeys()).toEqual(["NW-1042", "NW-1003"]);
+        expect(groupBox("Alpha")).toBeChecked();
+        expect(await count("2 picked")).toBeInTheDocument();
+      });
+
+      it("unpicks them again when clicked a second time", async () => {
+        await renderGrouped();
+        await userEvent.click(groupBox("Alpha"));
+
+        await userEvent.click(groupBox("Alpha"));
+
+        expect(pickedKeys()).toEqual([]);
+        expect(groupBox("Alpha")).not.toBeChecked();
+      });
+
+      it("shows a dash while only some of the group's issues are picked", async () => {
+        await renderGrouped();
+
+        await userEvent.click(box("NW-1042"));
+
+        expect(groupBox("Alpha").indeterminate).toBe(true);
+        expect(groupBox("Alpha")).not.toBeChecked();
+        expect(groupBox("Beta").indeterminate).toBe(false);
+      });
+
+      it("shows no dash once all of the group's issues are picked", async () => {
+        await renderGrouped();
+        await userEvent.click(box("NW-1042"));
+
+        await userEvent.click(box("NW-1003"));
+
+        expect(groupBox("Alpha").indeterminate).toBe(false);
+        expect(groupBox("Alpha")).toBeChecked();
+      });
+
+      it("picks the rest of the group when some of it is picked", async () => {
+        await renderGrouped();
+        await userEvent.click(box("NW-1042"));
+
+        await userEvent.click(groupBox("Alpha"));
+
+        expect(pickedKeys()).toEqual(["NW-1042", "NW-1003"]);
+        expect(groupBox("Alpha").indeterminate).toBe(false);
+      });
+
+      it("leaves the group open", async () => {
+        await renderGrouped();
+
+        await userEvent.click(groupBox("Alpha"));
+
+        expect(screen.getByRole("button", { name: "Collapse Alpha" })).toHaveAttribute("aria-expanded", "true");
+        expect(screen.getByText("Redesign the pricing page")).toBeInTheDocument();
+      });
+
+      it("leaves a collapsed group collapsed", async () => {
+        await renderGrouped(beta({ collapsedByDefault: true }));
+
+        await userEvent.click(groupBox("Beta"));
+
+        expect(screen.getByRole("button", { name: "Expand Beta" })).toHaveAttribute("aria-expanded", "false");
+        expect(screen.queryByText("Publish the launch notes")).not.toBeInTheDocument();
+      });
+
+      it("picks the hidden rows of a collapsed group", async () => {
+        await renderGrouped(beta({ collapsedByDefault: true }));
+
+        await userEvent.click(groupBox("Beta"));
+        expect(await count("2 picked")).toBeInTheDocument();
+        await userEvent.click(screen.getByRole("button", { name: "Expand Beta" }));
+
+        expect(await screen.findByRole("checkbox", { name: "Pick NW-1001" })).toBeChecked();
+        expect(pickedKeys()).toEqual(["NW-1001", "NW-1004"]);
+      });
+
+      it("keeps the picks of another group when picking", async () => {
+        await renderGrouped();
+        await userEvent.click(box("NW-1001"));
+
+        await userEvent.click(groupBox("Alpha"));
+
+        expect(pickedKeys()).toEqual(["NW-1042", "NW-1003", "NW-1001"]);
+        expect(groupBox("Beta").indeterminate).toBe(true);
+      });
+
+      it("keeps the picks of another group when unpicking", async () => {
+        await renderGrouped();
+        await userEvent.click(box("NW-1001"));
+        await userEvent.click(groupBox("Alpha"));
+
+        await userEvent.click(groupBox("Alpha"));
+
+        expect(pickedKeys()).toEqual(["NW-1001"]);
+      });
     });
 
     describe("a ⌘-double-click", () => {

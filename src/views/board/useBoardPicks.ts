@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { BoardData } from "../../api";
 import { useStore } from "../../state/store";
-import { pickRange, toggleBox, togglePick } from "../list/picking";
+import { pickRange, toggleBox, toggleGroup, togglePick } from "../list/picking";
 import type { PickKeys } from "../list/useRowClicks";
 
 const NO_PICKS: string[] = [];
@@ -62,6 +62,8 @@ export function useBoardPicks(
     [setPicked, setSelected, openInTab],
   );
   const onToggleBox = useCallback((id: string) => setPicked(toggleBox(latest.current.order, latest.current.picked, id)), [setPicked]);
+  /** A column's checkbox: picks or unpicks all of its cards. */
+  const onToggleColumn = useCallback((ids: string[]) => setPicked(toggleGroup(latest.current.order, latest.current.picked, ids)), [setPicked]);
   const pickedIds = useMemo(() => new Set(picked), [picked]);
-  return { picked, pickedIds, setPicked, onCard, onToggleBox, onOpenInTab, pickAll: () => setPicked(order) };
+  return { picked, pickedIds, setPicked, onCard, onToggleBox, onToggleColumn, onOpenInTab, pickAll: () => setPicked(order) };
 }

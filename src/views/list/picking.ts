@@ -38,3 +38,34 @@ export function extendPick(rowIds: string[], picked: string[], selected: string 
   ids.add(next);
   return { picked: inOrder(rowIds, ids), selected: next };
 }
+
+/** A group's checkbox: unpicks the group's rows when every one is picked, otherwise picks them all; other picks
+ *  stay. */
+export function toggleGroup(rowIds: string[], picked: string[], groupIds: string[]): string[] {
+  const next = new Set(picked);
+  const all = groupIds.length > 0 && groupIds.every((id) => next.has(id));
+  for (const id of groupIds) {
+    if (all) next.delete(id);
+    else next.add(id);
+  }
+  return inOrder(rowIds, next);
+}
+
+/** How many of a group's rows are picked, as its checkbox shows it. */
+export type GroupPicks = "all" | "some" | "none";
+
+export function groupPicks(groupIds: string[], picked: ReadonlySet<string>): GroupPicks {
+  const count = groupIds.filter((id) => picked.has(id)).length;
+  if (count === 0) return "none";
+  return count === groupIds.length ? "all" : "some";
+}
+
+/** Every row of a List or Table in its order, the rows of collapsed groups and subtrees included, each once. */
+export function viewOrder(groups: { rowIds: string[] }[], rows: Record<string, unknown>): string[] {
+  return [...new Set(groups.flatMap((group) => group.rowIds))].filter((id) => id in rows);
+}
+
+/** The rows a group's checkbox picks: all of the group's, those of a collapsed group or subtree included. */
+export function groupRowIds(group: { rowIds: string[] }, rows: Record<string, unknown>): string[] {
+  return group.rowIds.filter((id) => id in rows);
+}

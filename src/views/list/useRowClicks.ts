@@ -1,7 +1,7 @@
 import { type RefObject, useCallback, useEffect, useRef } from "react";
 import type { IssueOpening } from "../../api";
 import { useDoubleClickMs } from "../../queries/useDoubleClickMs";
-import { pickRange, toggleBox, togglePick } from "./picking";
+import { pickRange, toggleBox, toggleGroup, togglePick, viewOrder } from "./picking";
 import type { RowKeyState } from "./useRowKeys";
 
 /** The modifier keys of a row click that pick rows: ⌘ adds or removes one, ⇧ picks a range. */
@@ -34,10 +34,10 @@ export function useRowClicks(keys: RefObject<RowKeyState>, opening: IssueOpening
   const onSelect = useCallback(
     (id: string, mods?: PickKeys) => {
       clearTimeout(pendingPreview.current);
-      const { select, open, peekOpen, rowIds, picked, selected, setPicked } = keys.current;
+      const { select, open, peekOpen, rowIds, picked, selected, setPicked, data } = keys.current;
       if (mods?.metaKey) {
         if ((mods.detail ?? 1) <= 1) beforeMetaClick.current = { picked, selected, peekOpen };
-        setPicked(togglePick(rowIds, picked, id, selected));
+        setPicked(togglePick(viewOrder(data.groups, data.rows), picked, id, selected));
         select(id, false);
         return;
       }
@@ -87,14 +87,24 @@ export function useRowClicks(keys: RefObject<RowKeyState>, opening: IssueOpening
     },
     [keys],
   );
+  // The picks of collapsed groups and subtrees stay, so these keep to the view's whole order.
   /** A row's checkbox: picks or unpicks that row alone. */
   const onToggleBox = useCallback(
     (id: string) => {
       clearTimeout(pendingPreview.current);
-      const { rowIds, picked, setPicked } = keys.current;
-      setPicked(toggleBox(rowIds, picked, id));
+      const { data, picked, setPicked } = keys.current;
+      setPicked(toggleBox(viewOrder(data.groups, data.rows), picked, id));
     },
     [keys],
   );
-  return { onSelect, onOpen, onPick, onToggleBox };
+  /** A group's checkbox: picks or unpicks all of `ids`, the group's rows. */
+  const onToggleGroup = useCallback(
+    (ids: string[]) => {
+      clearTimeout(pendingPreview.current);
+      const { data, picked, setPicked } = keys.current;
+      setPicked(toggleGroup(viewOrder(data.groups, data.rows), picked, ids));
+    },
+    [keys],
+  );
+  return { onSelect, onOpen, onPick, onToggleBox, onToggleGroup };
 }

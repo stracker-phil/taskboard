@@ -6,6 +6,7 @@ import { useStore } from "../../state/store";
 import { EmptyLevel } from "../../shell/EmptyLevel";
 import { flatten, itemKey, type Item } from "../list/flatten";
 import { GroupHeader } from "../list/GroupHeader";
+import { groupPicks, groupRowIds } from "../list/picking";
 import { useGroupMotion } from "../list/useGroupMotion";
 import { useIssueActions } from "../list/useIssueActions";
 import { useOpenIssueInTab } from "../../shell/openInTab";
@@ -139,7 +140,11 @@ function Table({ view, data }: { view: View; data: ViewData }) {
   const keys = useRowKeys({ ...place, items, rowIds, data, select, toggle, actions, scrollToIndex: sticky.reveal, open, openInTab });
 
   // Stable, so rows that didn't change skip re-rendering.
-  const { onSelect, onOpen, onPick, onToggleBox } = useRowClicks(keys, opening);
+  const { onSelect, onOpen, onPick, onToggleBox, onToggleGroup } = useRowClicks(keys, opening);
+  const groupBox = (group: Group) => {
+    const ids = groupRowIds(group, data.rows);
+    return { picks: groupPicks(ids, pickedIds), onTogglePicks: () => onToggleGroup(ids) };
+  };
   const onToggleSubtasks = useCallback((id: string) => keys.current.setSubtasksOpen(id, !keys.current.subtasksOpen(id)), [keys]);
 
   const dragFrom = (item: Item) =>
@@ -160,6 +165,7 @@ function Table({ view, data }: { view: View; data: ViewData }) {
         namesColumns={false}
         headers={NO_HEADERS}
         onToggle={() => toggle(item.group)}
+        {...groupBox(item.group)}
       />
     ) : (
       <TableRow
@@ -193,6 +199,7 @@ function Table({ view, data }: { view: View; data: ViewData }) {
           onSort={(by) => void settings.setSort(nextSort(view.sort, by))}
           onResizeStart={resize.start}
           tree={tree}
+          pickAll={data.groupBy === "none" && data.groups[0] ? groupBox(data.groups[0]) : undefined}
         />
         <div className="table-space" style={{ height: virtualizer.getTotalSize() }}>
           {virtualizer.getVirtualItems().map((virtual) => {

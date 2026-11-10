@@ -145,11 +145,16 @@
   content: ""; position: absolute; left: 3.5px; top: 0.5px; width: 4px; height: 7.5px; box-sizing: border-box;
   border: solid var(--pick-check); border-width: 0 1.5px 1.5px 0; transform: rotate(45deg);
 }
+/* A group's box while only some of its issues are picked: the fill with a dash. */
+.pick-box:indeterminate { border-color: var(--pick-fill); background: var(--pick-fill); }
+.pick-box:indeterminate::after { content: ""; position: absolute; left: 2.5px; top: 4.75px; width: 6px; border-top: 1.5px solid var(--pick-check); }
 .pick-box:focus-visible { box-shadow: 0 0 0 3px var(--settings-focus-ring); }
-.pick-box:checked, .pick-box:focus-visible, .list-item:hover > .pick-box { opacity: 1; }
+.pick-box:checked, .pick-box:indeterminate, .pick-box:focus-visible, .list-item:hover > .pick-box, .list-item:hover .group-box { opacity: 1; }
 /* In the gutter just left of a top-level row's caret, centered on the caret. */
 .list-pick { position: absolute; left: -42px; top: 22px; transform: translateY(-50%); z-index: 1; }
 .list-pick--wrap { top: 12px; transform: none; }
+/* A group's box (GroupBox) in the same gutter column, on the line of the group's chevron. */
+.list-group__pick { position: absolute; left: -42px; top: 16px; transform: translateY(-50%); z-index: 1; }
 /* The gutter belongs to the row, so the pointer keeps the checkbox while it travels to it. */
 .list-item::before { content: ""; position: absolute; top: 0; bottom: 0; left: -52px; width: 52px; }
 .list-row--picked:not(.list-row--selected) { background: var(--picked-bg); }

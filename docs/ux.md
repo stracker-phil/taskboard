@@ -304,6 +304,17 @@ Board's `views/board/useBoardPicks.ts`):
   centered on the subtask caret's line, and the whole gutter counts as the row's, so the pointer keeps the box on
   its way there; in the Table in the row's 24px left inset (the spacer it replaces); on a Board card at the end of
   the title's first line, in room the title always keeps free.
+- **The group box** (`GroupBox`, beside `PickBox`) picks all of a group's issues, or drops them when all are
+  picked; the other picks stay. It is the same box, ticked when all are picked and a dash (`indeterminate`) when
+  some are, and its clicks never reach the header, so the group doesn't collapse. It covers every row of the group,
+  those of a collapsed group and the subtasks under a parent in Hierarchy too (`toggleGroup`, `groupRowIds` in
+  `picking.ts`; the picks keep the view's whole order, `viewOrder`, so a collapsed group's picks survive the next
+  click). It shows like a row's box: while its header has the pointer, or once ticked or dashed. In the List it sits
+  in the header's gutter at the rows' boxes' x (42 left), on the chevron's line; in the Table in the heading's 24px
+  inset at the rows' boxes' x, on the tab's line, with the chevron narrowed to 16 between it and the tab. An
+  ungrouped List has it in its column-header row, an ungrouped Table in its sticky header's inset, and there it
+  picks every row. A Board column has it in its title, just before the collapse button (the cards' boxes sit where
+  that button is). It is always laid out, invisible until it shows, so nothing moves.
 - Picked rows and cards get the neutral `--picked-bg` (a picked card also `--border-strong`), apart from the
   accent's selection; the current row keeps its selection highlight, picked or not. Picking closes the
   preview, which shows one issue. A ⌘ or ⇧ click or double-click opens nothing, and a narrowing that hides a picked
@@ -759,7 +770,8 @@ leaves the caret's room before its title (`table-row--tree`), so titles line up 
 not, and the Summary header lines up with them; each level indents one caret's room (23) further.
 - **Edges**: rows and the header run from the panel's left edge to its right, so hover and selection reach both
   sides; a 24px inset inside each row (spacers) and every cell's 12px keep the text off the edges (the key at
-  36). A group heading's tab starts where the keys do; its chevron sits in the left inset, as in the List.
+  36). A group heading's tab starts where the keys do; its checkbox sits in the left inset over the rows' boxes, and
+  its chevron (16 wide) between that and the tab.
 
 ## Tokens
 

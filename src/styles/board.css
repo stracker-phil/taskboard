@@ -48,6 +48,8 @@
 /* The checkbox (list.css → picking) sits at the end of the title's first line, in room the title keeps free. */
 .board-card__pick { position: absolute; top: 16px; right: 14px; }
 .board-card:hover .pick-box { opacity: 1; }
+/* A column's box sits just before its collapse button, the nearest free room to the cards' boxes. */
+.board-column__header:hover .group-box { opacity: 1; }
 .board-card__title > .status-square { margin: 6px 8px 0 0; vertical-align: top; }
 .board-card__tags { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
 .board-card__tags > .epic-chip { max-width: 100%; }

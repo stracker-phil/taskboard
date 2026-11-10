@@ -6,6 +6,7 @@ import { useStore } from "../../state/store";
 import { columnDef } from "./columns";
 import { flatten, GROUP_HEIGHT, type Item, itemGroupKey, itemHeight, itemKey } from "./flatten";
 import { GroupHeader } from "./GroupHeader";
+import { groupPicks, groupRowIds } from "./picking";
 import { IssueRow } from "./IssueRow";
 import { canvasMeasure, columnWidths, fittingColumns, gridTemplate } from "./measure";
 import { useElementWidth } from "./useElementWidth";
@@ -144,7 +145,11 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
   const keys = useRowKeys({ ...place, items, rowIds, data, select, toggle, actions, scrollToIndex: sticky.reveal, open, openInTab });
 
   // Stable, so rows that didn't change skip re-rendering.
-  const { onSelect, onOpen, onPick, onToggleBox } = useRowClicks(keys, opening);
+  const { onSelect, onOpen, onPick, onToggleBox, onToggleGroup } = useRowClicks(keys, opening);
+  const groupBox = (group: Group) => {
+    const ids = groupRowIds(group, data.rows);
+    return { picks: groupPicks(ids, pickedIds), onTogglePicks: () => onToggleGroup(ids) };
+  };
   const onToggleSubtasks = useCallback((id: string) => keys.current.setSubtasksOpen(id, !keys.current.subtasksOpen(id)), [keys]);
 
   const dragFrom = (item: Item) =>
@@ -165,6 +170,7 @@ function Rows({ listId, viewId, data, wrapTitles, opening, inlineLabels }: RowsP
         namesColumns
         headers={shownHeaders}
         onToggle={() => toggle(item.group)}
+        {...groupBox(item.group)}
       />
     ) : (
       <IssueRow
