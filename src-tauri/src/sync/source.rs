@@ -3,7 +3,6 @@
 //!
 //! The few writes (`writes/`) go through it too. The answers keep Jira's shapes (`jira::dto`), which `map` turns into cache rows.
 
-use std::collections::BTreeSet;
 use std::future::Future;
 use std::pin::Pin;
 
@@ -66,8 +65,6 @@ pub trait Source: Send + Sync {
     fn changelog<'a>(&'a self, issue_id: &'a str) -> Answer<'a, Vec<Changelog>>;
     /// An attachment's bytes, by its id.
     fn attachment_content<'a>(&'a self, attachment_id: &'a str) -> Answer<'a, Vec<u8>>;
-    /// The custom fields a space's recent issues fill.
-    fn used_custom_fields<'a>(&'a self, space_key: &'a str) -> Answer<'a, BTreeSet<String>>;
     /// The moves the workflow allows from the issue's status, by its id.
     fn transitions<'a>(&'a self, issue_id: &'a str) -> Answer<'a, Vec<Transition>>;
     /// Write: adds a comment (an ADF document) to the issue (by id).

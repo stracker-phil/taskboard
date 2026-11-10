@@ -81,7 +81,7 @@ mod tests {
     use tempfile::TempDir;
 
     use super::*;
-    use crate::db::connection::{local_path, prepare, prepare_cache};
+    use crate::db::connection::{local_path, prepare};
     use crate::db::migrate::{CACHE, LOCAL, migrate};
     use crate::test_support::temp_config_dir;
 
@@ -113,10 +113,12 @@ mod tests {
         Lab { dir, local }
     }
 
-    /// A folder as an older Taskboard left it: both files migrated, `field_choice` still to be seeded.
+    /// A folder as an older Taskboard left it: the cache still has `field.used` and `field.shown`, and
+    /// `field_choice` is still to be seeded.
     fn lab() -> Lab {
         let lab = local_only();
-        prepare_cache(lab.dir.path()).unwrap();
+        let mut cache = Connection::open(cache_path(lab.dir.path())).unwrap();
+        migrate(&mut cache, "cache", &CACHE[..14]).unwrap();
         lab
     }
 
@@ -407,5 +409,30 @@ mod tests {
         lab.seed();
 
         assert_eq!(lab.choices(), [choice(ZONE, true, true)]);
+    }
+
+    #[test]
+    fn a_cache_without_the_usage_marks_seeds_only_the_fields_a_view_or_filter_uses() {
+        let lab = local_only();
+        let mut cache = Connection::open(cache_path(lab.dir.path())).unwrap();
+        migrate(&mut cache, "cache", CACHE).unwrap();
+        cache
+            .execute_batch(&format!(
+                "INSERT INTO field (id, name, type) VALUES
+                   ('{ZONE}', 'Zone', 'string'), ('{ALPHA}', 'Alpha', 'string')"
+            ))
+            .unwrap();
+        drop(cache);
+        lab.space(A, 1);
+        lab.local
+            .execute_batch(&format!(
+                r#"INSERT INTO filter_list (id, kind, name, filter) VALUES
+                     (900, 'list', 'Open work', '{{"conditions":[{{"field":"{ALPHA}","op":"is","value":"x"}}]}}')"#
+            ))
+            .unwrap();
+
+        lab.seed();
+
+        assert_eq!(lab.choices(), [choice(ALPHA, true, true)]);
     }
 }

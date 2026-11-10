@@ -1,6 +1,5 @@
 //! The Jira source: every call the sync makes goes through the Jira client and its gateway (ADR 0025).
 
-use std::collections::BTreeSet;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -86,10 +85,6 @@ impl Source for JiraSource {
 
     fn attachment_content<'a>(&'a self, attachment_id: &'a str) -> Answer<'a, Vec<u8>> {
         Box::pin(self.client.attachment_content(attachment_id))
-    }
-
-    fn used_custom_fields<'a>(&'a self, space_key: &'a str) -> Answer<'a, BTreeSet<String>> {
-        Box::pin(self.client.used_custom_fields(space_key))
     }
 
     fn add_comment<'a>(&'a self, issue_id: &'a str, body: Value) -> Answer<'a, Comment> {

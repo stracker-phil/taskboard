@@ -395,12 +395,14 @@ impl Site {
         )
     }
 
+    /// Opts the fields in for both places and syncs again: values are downloaded only for chosen fields.
     async fn opt_in(&self, fields: &[&str]) {
         for id in fields {
             field_choice_set(self.db(), id.to_string(), true, true)
                 .await
                 .unwrap();
         }
+        self.resync().await;
     }
 
     async fn show_reviewer_column(&self) {
@@ -2008,6 +2010,7 @@ async fn a_filled_custom_field_is_not_listed_until_it_is_opted_in_for_the_issue_
     field_choice_set(site.db(), REVIEWER.into(), true, false)
         .await
         .unwrap();
+    site.resync().await;
     assert_eq!(site.detail("NW-1042").await.custom, []);
 
     field_choice_set(site.db(), REVIEWER.into(), false, true)

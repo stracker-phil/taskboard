@@ -113,10 +113,10 @@ mod tests {
             tx.execute_batch(
                 "INSERT INTO cache.space (id, key, name, raw) VALUES
                    ('10001', 'NW', 'Website relaunch', '{}'), ('10002', 'NWS', 'Northwind support', '{}');
-                 INSERT INTO cache.field (id, name, type, used) VALUES
-                   ('customfield_10001', 'Zone', 'string', 1),
-                   ('customfield_10003', 'Beta', 'string', 1),
-                   ('customfield_10019', 'Rank', 'any', 1)",
+                 INSERT INTO cache.field (id, name, type) VALUES
+                   ('customfield_10001', 'Zone', 'string'),
+                   ('customfield_10003', 'Beta', 'string'),
+                   ('customfield_10019', 'Rank', 'any')",
             )?;
             Ok(())
         })

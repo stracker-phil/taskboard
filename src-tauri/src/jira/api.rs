@@ -3,8 +3,8 @@
 use super::client::JiraClient;
 use super::dto::{
     ApproximateCount, BulkFetch, Changelog, ChangelogPage, Comment, CommentPage, CreatedRemoteLink,
-    EditMeta, Field, Issue, MyPermissions, Myself, ParsedQueries, Project, ProjectPage, RemoteLink,
-    SearchPage, Status, TenantInfo, Transition, Transitions, Version,
+    EditMeta, Field, MyPermissions, Myself, ParsedQueries, Project, ProjectPage, RemoteLink,
+    Status, TenantInfo, Transition, Transitions, Version,
 };
 use super::gateway::{
     AccountId, AttachmentId, Endpoint, FieldIds, IssueRef, IssueRefs, IssueTitle, Jql, LinkTitle,
@@ -154,16 +154,6 @@ impl JiraClient {
             .await
     }
 
-    /// The custom fields the project's most recently updated issues have a value in.
-    pub async fn used_custom_fields(&self, project_key: &str) -> AppResult<BTreeSet<String>> {
-        let project = ProjectKey::parse(project_key)?;
-        let page: SearchPage = self
-            .gateway()
-            .send(Endpoint::FieldUsage { project })
-            .await?;
-        Ok(filled_custom_fields(&page.issues))
-    }
-
     /// Assigns the issue to the account, or unassigns it. A write: sent once, never retried.
     pub async fn assign(&self, issue_id: &str, account_id: Option<&str>) -> AppResult<()> {
         let endpoint = Endpoint::AssignIssue {
@@ -256,17 +246,6 @@ impl JiraClient {
             .map(|query| query.errors)
             .unwrap_or_default())
     }
-}
-
-/// Custom field ids with a value (not null, not an empty list or text) in any of the issues.
-fn filled_custom_fields(issues: &[Issue]) -> BTreeSet<String> {
-    issues
-        .iter()
-        .filter_map(|issue| issue.fields.as_object())
-        .flatten()
-        .filter(|(id, value)| id.starts_with("customfield_") && is_filled(value))
-        .map(|(id, _)| id.clone())
-        .collect()
 }
 
 /// A value worth showing: not null, and not an empty text, list or object.

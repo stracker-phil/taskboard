@@ -1,14 +1,12 @@
 //! The full sync: metadata first, then the scope per tracked project (ADR 0023), page by page.
 
-use std::collections::BTreeSet;
-
 use chrono::Utc;
 
 use super::map::FieldIds;
 use super::source::Source;
 use super::store::{
-    fetched_fields, has_project_sync, record_project_sync, record_scope_sync, store_field_usage,
-    store_fields, store_page, store_statuses, store_versions,
+    fetched_fields, has_project_sync, record_project_sync, record_scope_sync, store_fields,
+    store_page, store_statuses, store_versions,
 };
 use super::{Job, SyncContext, SyncEvent, SyncProgress};
 use crate::connection::{ProjectRow, effective_scope, store_spaces, tracked_projects};
@@ -63,8 +61,6 @@ pub async fn full_sync(
     if scope.is_empty() || tracked.is_empty() {
         return Ok(());
     }
-    // First, so this run already fetches the fields the projects fill.
-    refresh_field_usage(ctx, source.as_ref(), &tracked).await?;
     let fields = search_fields(&ctx.db, &ids).await?;
     let run = Run {
         ctx,
@@ -85,8 +81,7 @@ pub async fn full_sync(
         .await
 }
 
-/// What a search asks for: the mapped fields, the site's sprint and epic color fields, and the custom fields
-/// shown in the field grid or as a column or filled by the tracked projects (the Issue view shows those).
+/// The mapped fields, the sprint and epic color fields, and the custom fields `fetched_fields` returns.
 pub(super) async fn search_fields(db: &Db, ids: &FieldIds) -> AppResult<Vec<String>> {
     let mut fields: Vec<String> = SEARCH_FIELDS.iter().map(|f| f.to_string()).collect();
     fields.extend(ids.sprint.iter().chain(&ids.epic_color).cloned());
@@ -142,27 +137,6 @@ async fn sync_metadata(
         ids.epic_color.as_deref().unwrap_or("none")
     );
     Ok((ids, tracked))
-}
-
-/// Which custom fields the tracked projects fill; when a project can't be sampled, the last answer stays.
-async fn refresh_field_usage(
-    ctx: &SyncContext,
-    source: &dyn Source,
-    tracked: &[ProjectRow],
-) -> AppResult<()> {
-    let mut used = BTreeSet::new();
-    for project in tracked {
-        match source.used_custom_fields(&project.key).await {
-            Ok(ids) => used.extend(ids),
-            Err(e) => {
-                log::warn!("Could not sample the fields of {}: {e}", project.key);
-                return Ok(());
-            }
-        }
-    }
-    ctx.db
-        .write(move |tx, _| store_field_usage(tx, &used))
-        .await
 }
 
 /// Kept only if the connection wasn't changed while Jira answered.

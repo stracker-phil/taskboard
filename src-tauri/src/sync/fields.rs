@@ -1,7 +1,4 @@
-//! The custom fields the sync stores and asks for: the site's field list, which ones the tracked projects fill,
-//! and which ones the owner opted in or uses.
-
-use std::collections::BTreeSet;
+//! The custom fields the sync stores and asks for: the site's field list, and the ones the owner opted in or uses.
 
 use rusqlite::{Connection, params};
 
@@ -31,26 +28,11 @@ pub fn store_fields(conn: &Connection, fields: &[Field]) -> AppResult<FieldIds> 
     Ok(ids)
 }
 
-/// Marks which custom fields the tracked projects' issues fill; the rest drop out of pickers (`filter::RELEVANT_FIELD`).
-pub fn store_field_usage(conn: &Connection, used: &BTreeSet<String>) -> AppResult<()> {
-    let used = serde_json::to_string(used)?;
-    conn.execute(
-        "UPDATE cache.field SET used = (id IN (SELECT value FROM json_each(?1)))
-         WHERE id LIKE 'customfield\\_%' ESCAPE '\\'",
-        [used],
-    )?;
-    Ok(())
-}
-
-/// Custom fields fetched with every issue: those opted in app-wide, those a view or filter uses, and the ones
-/// the tracked projects fill (once a sample has marked some unused; before that `used` is 1 for every field).
+/// Custom fields fetched with every issue: those opted in app-wide and those a view or filter uses.
 pub fn fetched_fields(conn: &Connection) -> AppResult<Vec<String>> {
     let mut query = conn.prepare(&format!(
         "SELECT field_id FROM field_choice
          UNION SELECT value FROM ({FIELDS_IN_USE}) WHERE value LIKE 'customfield\\_%' ESCAPE '\\'
-         UNION SELECT id FROM cache.field
-         WHERE used = 1 AND id LIKE 'customfield\\_%' ESCAPE '\\'
-           AND EXISTS (SELECT 1 FROM cache.field WHERE used = 0)
          ORDER BY 1"
     ))?;
     let ids = query.query_map([], |row| row.get(0))?;

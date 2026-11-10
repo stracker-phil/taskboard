@@ -27,7 +27,7 @@ No scope covers profile pictures: they come from Atlassian's public avatar host 
 Reads the issues and everything around them. Every request of the sync and of an opened issue
 ([sync.md](sync.md), [jira.md](jira.md#endpoints)):
 
-- **Issues:** `POST search/jql` (full and change syncs, field usage), `POST issue/bulkfetch` (reconciliation and
+- **Issues:** `POST search/jql` (full and change syncs), `POST issue/bulkfetch` (reconciliation and
   the fetch after a change), `POST search/approximate-count` (sync progress).
 - **Around them:** `GET field` (custom fields, the sprint and epic color fields), `GET status`,
   `GET project/search` (Settings → Projects), `GET project/{key}/versions` (releases).

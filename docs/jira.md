@@ -56,7 +56,7 @@ header for every request from it and sends `Authorization: Basic base64(email:to
    authenticated. Path segments are pushed one by one, so a value can't add a segment, a query or a fragment.
 2. `params.rs` validates every value first: `ProjectKey` (`[A-Z][A-Z0-9_]*`), `IssueRef` (digits, or a key),
    `IssueRefs` (1 to `BULK_FETCH_MAX`), `Jql` (non-empty, at most 10,000 characters, body only), `FieldIds`
-   (explicit ids, never `*all`; only `FieldUsage` asks for `*all`, from a fixed list in `endpoint.rs`), `Expand` (`renderedFields`), `PageToken`. A refused value fails as
+   (explicit ids, never `*all`), `Expand` (`renderedFields`), `PageToken`. A refused value fails as
    `invalid_input` and nothing is sent.
 3. `guard.rs` `check` compares the planned request with `RULES` (method, path under the REST base, allowed
    query keys, read or write) and the unauthenticated `GET /_edge/tenant_info`. Anything else, a fragment,
@@ -113,7 +113,6 @@ One method on `JiraClient` each (`jira/api.rs`), one `Endpoint` each; the answer
 | `priorities` | `GET issue/{id}/editmeta` | the names of the priority field's allowed values; empty without the field |
 | `set_priority` (write) | `PUT issue/{id}` with `{"fields": {"priority": {"name": …}}}` (`PriorityName`: not blank, no control characters, up to 255) | nothing (`204`) |
 | `assign` (write) | `PUT issue/{id}/assignee` with `{"accountId": …}` (`AccountId`: letters, digits, `:`, `_`, `-`, up to 128; null unassigns) | nothing (`204`) |
-| `used_custom_fields` | `POST search/jql`: `project = "KEY" ORDER BY updated DESC`, one page of 100, `*all` without the large system fields | the custom field ids with a value |
 
 `Issue.fields` stays untyped JSON (the cache keeps part of it, `sync::raw`); accessors read what the sync needs
 (`summary`, `project_id`, `status_id`, `updated`). Searches ask for explicit fields (`sync/full.rs`

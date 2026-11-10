@@ -1,14 +1,12 @@
-//! Which custom fields the pickers offer and the sync fetches: the marks `store_field_usage` writes, the
-//! owner's opt-ins (`field_choice`), and the fields a view or filter already uses.
-
-use std::collections::BTreeSet;
+//! Which custom fields the pickers offer and the sync fetches: the owner's opt-ins (`field_choice`) and the
+//! fields a view or filter already uses; never what the issues happen to fill.
 
 use tempfile::TempDir;
 
 use taskboard_lib::db::Db;
 use taskboard_lib::field_choice::field_choice_set;
 use taskboard_lib::lists::filter_options;
-use taskboard_lib::sync::store::{fetched_fields, store_field_usage};
+use taskboard_lib::sync::store::fetched_fields;
 use taskboard_lib::test_support::temp_config_dir;
 use taskboard_lib::views::columns_catalogue;
 
@@ -26,7 +24,7 @@ async fn execute(db: &Db, sql: &'static str) {
     .unwrap();
 }
 
-/// A database with the demo site's fields, all still unsampled, and one filter list with a view.
+/// A database with the demo site's fields and one filter list with a view; nothing opted in.
 async fn lab() -> (TempDir, Db) {
     let dir = temp_config_dir();
     let db = Db::open(dir.path()).unwrap();
@@ -52,32 +50,6 @@ async fn opt_in(db: &Db, id: &str, in_list: bool, in_detail: bool) {
     field_choice_set(db, id.into(), in_list, in_detail)
         .await
         .unwrap();
-}
-
-async fn mark_used(db: &Db, used: &[&str]) {
-    let used: BTreeSet<String> = used.iter().map(|id| id.to_string()).collect();
-    db.write(move |tx, _| store_field_usage(tx, &used))
-        .await
-        .unwrap();
-}
-
-async fn marks(db: &Db) -> Vec<(String, i64)> {
-    db.read(|conn| {
-        let mut query = conn.prepare("SELECT id, used FROM cache.field ORDER BY id")?;
-        let found = query
-            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(found)
-    })
-    .await
-    .unwrap()
-}
-
-fn marked(items: &[(&str, i64)]) -> Vec<(String, i64)> {
-    items
-        .iter()
-        .map(|(id, used)| (id.to_string(), *used))
-        .collect()
 }
 
 async fn everything(db: &Db) -> i64 {
@@ -119,70 +91,27 @@ async fn assert_offered(db: &Db, expected: &[&str]) {
     assert_eq!(filters, expected, "filter fields");
 }
 
-mod the_marks {
+mod the_cache {
     use super::*;
 
     #[tokio::test]
-    async fn the_given_custom_fields_are_used_and_the_other_custom_fields_are_not() {
+    async fn keeps_no_usage_marks_on_its_fields() {
         let (_dir, db) = lab().await;
 
-        mark_used(&db, &[STORY_POINTS, REVIEWER]).await;
-
-        assert_eq!(
-            marks(&db).await,
-            marked(&[
-                ("customfield_10016", 1),
-                ("customfield_10019", 0),
-                ("customfield_10071", 1),
-                ("customfield_10090", 0),
-                ("customfield_10091", 0),
-                ("summary", 1),
-            ])
-        );
-    }
-
-    #[tokio::test]
-    async fn a_later_sample_replaces_the_earlier_one() {
-        let (_dir, db) = lab().await;
-        mark_used(&db, &[STORY_POINTS, REVIEWER]).await;
-
-        mark_used(&db, &[COST_CENTER]).await;
-
-        assert_eq!(
-            marks(&db).await,
-            marked(&[
-                ("customfield_10016", 0),
-                ("customfield_10019", 0),
-                ("customfield_10071", 0),
-                ("customfield_10090", 1),
-                ("customfield_10091", 0),
-                ("summary", 1),
-            ])
-        );
-    }
-
-    #[tokio::test]
-    async fn an_empty_sample_marks_every_custom_field_unused_and_leaves_system_fields() {
-        let (_dir, db) = lab().await;
-
-        mark_used(&db, &[]).await;
-
-        let used: Vec<String> = marks(&db)
+        let columns: Vec<String> = db
+            .read(|conn| {
+                let mut query =
+                    conn.prepare("SELECT name FROM pragma_table_info('field', 'cache')")?;
+                let names = query.query_map([], |row| row.get(0))?;
+                Ok(names.collect::<Result<_, _>>()?)
+            })
             .await
-            .into_iter()
-            .filter(|(_, used)| *used == 1)
-            .map(|(id, _)| id)
-            .collect();
-        assert_eq!(used, ["summary"]);
-    }
+            .unwrap();
 
-    #[tokio::test]
-    async fn an_id_the_site_does_not_have_adds_no_row() {
-        let (_dir, db) = lab().await;
-
-        mark_used(&db, &["customfield_99999"]).await;
-
-        assert_eq!(marks(&db).await.len(), 6);
+        for dropped in ["used", "shown"] {
+            assert!(!columns.contains(&dropped.to_string()), "{dropped}");
+        }
+        assert_eq!(columns, ["id", "name", "type"]);
     }
 }
 
@@ -200,7 +129,14 @@ mod the_fetched_fields {
     }
 
     #[tokio::test]
-    async fn the_opted_in_fields_are_fetched_before_any_sampling_whatever_the_place() {
+    async fn nothing_is_fetched_when_nothing_is_opted_in_or_used() {
+        let (_dir, db) = lab().await;
+
+        assert_eq!(fetched(&db).await, Vec::<String>::new());
+    }
+
+    #[tokio::test]
+    async fn the_opted_in_fields_are_fetched_whatever_the_place() {
         let (_dir, db) = lab().await;
         opt_in(&db, COST_CENTER, true, false).await;
         opt_in(&db, REVIEWER, false, true).await;
@@ -209,16 +145,8 @@ mod the_fetched_fields {
     }
 
     #[tokio::test]
-    async fn nothing_is_fetched_before_any_sampling_when_nothing_is_opted_in() {
+    async fn the_opted_in_fields_and_the_view_columns_are_fetched_together() {
         let (_dir, db) = lab().await;
-
-        assert_eq!(fetched(&db).await, Vec::<String>::new());
-    }
-
-    #[tokio::test]
-    async fn the_sampled_used_fields_are_fetched_with_the_opted_in_ones_and_the_view_columns() {
-        let (_dir, db) = lab().await;
-        mark_used(&db, &[STORY_POINTS, REVIEWER]).await;
         opt_in(&db, COST_CENTER, true, true).await;
         execute(
             &db,
@@ -226,10 +154,7 @@ mod the_fetched_fields {
         )
         .await;
 
-        assert_eq!(
-            fetched(&db).await,
-            ids(&[STORY_POINTS, REVIEWER, COST_CENTER, LEGAL_APPROVAL])
-        );
+        assert_eq!(fetched(&db).await, ids(&[COST_CENTER, LEGAL_APPROVAL]));
     }
 
     #[tokio::test]
@@ -249,16 +174,40 @@ mod the_fetched_fields {
     #[tokio::test]
     async fn a_field_that_is_opted_in_and_used_is_fetched_once() {
         let (_dir, db) = lab().await;
-        mark_used(&db, &[REVIEWER]).await;
+        opt_in(&db, REVIEWER, true, true).await;
+        execute(
+            &db,
+            "UPDATE view SET columns = '[\"status\",\"customfield_10071\"]'",
+        )
+        .await;
+
+        assert_eq!(fetched(&db).await, ids(&[REVIEWER]));
+    }
+
+    #[tokio::test]
+    async fn a_field_the_issues_fill_is_not_fetched_unless_it_is_chosen() {
+        let (_dir, db) = lab().await;
+        execute(
+            &db,
+            "INSERT INTO cache.space (id, key, name, raw) VALUES ('10001', 'NW', 'Website relaunch', '{}');
+             INSERT INTO cache.status (id, name, category) VALUES ('s1', 'To Do', 'new');
+             INSERT INTO cache.issue (id, key, project_id, summary, issue_type, status_id, status_category,
+               custom, created_at, updated_at, synced_at)
+             VALUES ('1', 'NW-1', '10001', 'One', 'Task', 's1', 'new',
+               '{\"customfield_10016\":5,\"customfield_10071\":{\"accountId\":\"acc-1\"}}',
+               '2026-10-20T09:00:00.000Z', '2026-10-20T09:00:00.000Z', '2026-10-20T09:00:00.000Z')",
+        )
+        .await;
         opt_in(&db, REVIEWER, true, true).await;
 
         assert_eq!(fetched(&db).await, ids(&[REVIEWER]));
     }
 
     #[tokio::test]
-    async fn system_fields_and_unused_fields_are_not_added() {
+    async fn system_fields_are_not_added() {
         let (_dir, db) = lab().await;
-        mark_used(&db, &[COST_CENTER]).await;
+        opt_in(&db, COST_CENTER, true, true).await;
+        execute(&db, "UPDATE view SET columns = '[\"status\",\"summary\"]'").await;
 
         assert_eq!(fetched(&db).await, ids(&[COST_CENTER]));
     }
@@ -303,15 +252,6 @@ mod the_pickers {
 
         assert_offered(&db, &[]).await;
         assert_eq!(hidden_filter_fields(&db).await, [REVIEWER]);
-    }
-
-    #[tokio::test]
-    async fn sampling_which_fields_the_issues_fill_does_not_offer_them() {
-        let (_dir, db) = lab().await;
-
-        mark_used(&db, &[STORY_POINTS, REVIEWER]).await;
-
-        assert_offered(&db, &[]).await;
     }
 
     #[tokio::test]

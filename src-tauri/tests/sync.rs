@@ -350,17 +350,9 @@ fn expected_progress(page_size: u32) -> Vec<SyncProgress> {
     all
 }
 
-/// The per-project field-usage sample, as opposed to a page of the sync's own search.
-fn is_field_sample(body: &Value) -> bool {
-    body["jql"]
-        .as_str()
-        .is_some_and(|jql| jql.ends_with("ORDER BY updated DESC"))
-}
-
-/// Runs `act` as soon as a full sync that started at the call has sent its samples (one per tracked project)
-/// and one search page after them.
+/// Runs `act` as soon as a full sync that started at the call has sent its first search page.
 async fn after_the_first_page_request(rig: &Rig, act: impl FnOnce()) {
-    let first_page = rig.searches() + COUNTS.len();
+    let first_page = rig.searches();
     tokio::time::timeout(Duration::from_secs(30), async {
         while rig.searches() <= first_page {
             tokio::time::sleep(Duration::from_millis(1)).await;
@@ -755,8 +747,7 @@ mod the_full_sync {
         assert_eq!(result, Ok(()));
         assert_eq!(issues_per_project(&rig.ctx.db).await, expected_counts());
         let pages: u32 = COUNTS.iter().map(|(_, c)| c.div_ceil(PAGE)).sum();
-        let samples = COUNTS.len() as u32;
-        assert_eq!(rig.searches() as u32, pages + 1 + samples);
+        assert_eq!(rig.searches() as u32, pages + 1);
     }
 
     #[tokio::test]
@@ -789,43 +780,88 @@ mod the_full_sync {
             .requests()
             .into_iter()
             .filter(|request| request.path == SEARCH_PATH)
-            .filter(|request| !is_field_sample(&request.body))
             .map(|request| request.body["maxResults"].clone())
             .collect();
         assert_eq!(asked, vec![json!(100); 10]);
     }
 
-    #[tokio::test]
-    async fn samples_the_fields_of_each_tracked_project_once_before_its_pages() {
-        let rig = Rig::connected().await;
-
-        rig.full_sync().await;
-
-        let requests = rig.fake.requests();
-        let samples: Vec<String> = requests
-            .iter()
-            .filter(|r| r.path == SEARCH_PATH && is_field_sample(&r.body))
-            .map(|r| r.body["jql"].as_str().unwrap().to_string())
-            .collect();
-        let expected: Vec<String> = COUNTS
-            .iter()
-            .map(|(key, _)| format!("project = \"{key}\" ORDER BY updated DESC"))
-            .collect();
-        assert_eq!(samples, expected);
-        let last_sample = requests
-            .iter()
-            .rposition(|r| r.path == SEARCH_PATH && is_field_sample(&r.body))
-            .unwrap();
-        let first_page = requests
-            .iter()
-            .position(|r| r.path == SEARCH_PATH && !is_field_sample(&r.body))
-            .unwrap();
-        assert!(last_sample < first_page);
+    /// The `fields` of every search the fake received since `skip` requests.
+    fn searched_fields_since(rig: &Rig, skip: usize) -> Vec<Vec<String>> {
+        rig.fake
+            .requests()
+            .into_iter()
+            .skip(skip)
+            .filter(|r| r.path == SEARCH_PATH)
+            .map(|r| {
+                r.body["fields"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|f| f.as_str().unwrap().to_string())
+                    .collect()
+            })
+            .collect()
     }
 
     #[tokio::test]
-    async fn the_first_sync_already_stores_the_rich_text_fields_the_bugs_fill() {
+    async fn searches_ask_for_the_base_fields_plus_exactly_the_chosen_custom_fields() {
         let rig = Rig::connected().await;
+        rig.full_sync().await;
+        let baseline = searched_fields_since(&rig, 0).remove(0);
+        assert!(baseline.iter().all(|f| !f.starts_with('*')), "{baseline:?}");
+        field_choice_set(&rig.ctx.db, "customfield_10071".into(), true, false)
+            .await
+            .unwrap();
+        rig.ctx
+            .db
+            .write(|tx, _| {
+                tx.execute_batch(
+                    r#"UPDATE view SET columns = '["status","customfield_10091"]'
+                         WHERE id = (SELECT MIN(id) FROM view);
+                       UPDATE filter_list SET filter =
+                         '{"conditions":[{"field":"customfield_10090","op":"is","value":"CC-100"}]}'
+                         WHERE kind = 'everything'"#,
+                )?;
+                Ok(())
+            })
+            .await
+            .unwrap();
+        let before = rig.fake.requests().len();
+
+        rig.full_sync().await;
+
+        let mut expected = baseline.clone();
+        expected.extend(
+            [
+                "customfield_10071",
+                "customfield_10090",
+                "customfield_10091",
+            ]
+            .map(String::from),
+        );
+        let searches = searched_fields_since(&rig, before);
+        assert!(!searches.is_empty());
+        for fields in searches {
+            assert_eq!(fields, expected);
+        }
+        for unchosen in [
+            "customfield_10016",
+            "customfield_10080",
+            "customfield_10081",
+        ] {
+            assert!(!expected.contains(&unchosen.to_string()), "{unchosen}");
+        }
+    }
+
+    #[tokio::test]
+    async fn the_sync_after_opting_in_stores_the_rich_text_fields_the_bugs_fill() {
+        let rig = Rig::connected().await;
+        rig.full_sync().await;
+        for id in ["customfield_10080", "customfield_10081"] {
+            field_choice_set(&rig.ctx.db, id.into(), true, true)
+                .await
+                .unwrap();
+        }
 
         rig.full_sync().await;
 
@@ -866,56 +902,6 @@ mod the_full_sync {
                 "{id}"
             );
         }
-    }
-
-    #[tokio::test]
-    async fn a_failed_field_sample_still_ends_the_sync_ok_and_keeps_the_previous_marks() {
-        let rig = Rig::connected().await;
-        rig.fake.set_page_size(PAGE as usize);
-        rig.full_sync().await;
-        rig.ctx
-            .db
-            .write(|tx, _| {
-                tx.execute(
-                    "UPDATE cache.field SET used = 1 WHERE id = 'customfield_10090'",
-                    [],
-                )?;
-                Ok(())
-            })
-            .await
-            .unwrap();
-        rig.fake.set_latency(Duration::from_millis(30));
-        let samples_so_far = || {
-            rig.fake
-                .requests()
-                .iter()
-                .filter(|r| r.path == SEARCH_PATH && is_field_sample(&r.body))
-                .count()
-        };
-        let first_run_samples = samples_so_far();
-        let emit = rig.emit();
-
-        // The run starts with its samples, so the failure hits the second one.
-        let (result, ()) = tokio::join!(full_sync(&rig.ctx, &*emit), async {
-            tokio::time::timeout(Duration::from_secs(30), async {
-                while samples_so_far() == first_run_samples {
-                    tokio::time::sleep(Duration::from_millis(1)).await;
-                }
-            })
-            .await
-            .expect("the sync never sampled the fields");
-            rig.fake.fail_next(1, 500, None);
-        });
-
-        assert_eq!(result, Ok(()));
-        assert_eq!(
-            count(
-                &rig.ctx.db,
-                "SELECT used FROM cache.field WHERE id = 'customfield_10090'"
-            )
-            .await,
-            1
-        );
     }
 
     #[tokio::test]

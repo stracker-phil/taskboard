@@ -12,6 +12,7 @@ use ts_rs::TS;
 use crate::db::{Db, LocalPart};
 use crate::error::{AppError, AppResult};
 use crate::space_config::Place;
+use crate::sync::store::fetched_fields;
 use crate::views::columns::SHOWABLE;
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
@@ -50,19 +51,30 @@ pub async fn field_choices(db: &Db) -> AppResult<Vec<FieldChoiceRow>> {
     db.read(choice_rows).await
 }
 
+/// The rows after a choice, and whether the field is downloaded now and wasn't before: then only a full sync
+/// fetches its values for every issue.
+pub struct ChoiceSaved {
+    pub rows: Vec<FieldChoiceRow>,
+    pub newly_fetched: bool,
+}
+
 /// Unticking both places deletes the row, the default: the field shows nowhere.
 pub async fn field_choice_set(
     db: &Db,
     field_id: String,
     in_list: bool,
     in_detail: bool,
-) -> AppResult<Vec<FieldChoiceRow>> {
+) -> AppResult<ChoiceSaved> {
     db.write(move |tx, changes| {
         ensure_showable(tx, &field_id)?;
+        let was_fetched = fetched_fields(tx)?.contains(&field_id);
         store_choice(tx, &field_id, in_list, in_detail)?;
         changes.local_changed(LocalPart::Views);
         changes.local_changed(LocalPart::Spaces);
-        choice_rows(tx)
+        Ok(ChoiceSaved {
+            rows: choice_rows(tx)?,
+            newly_fetched: !was_fetched && (in_list || in_detail),
+        })
     })
     .await
 }
@@ -200,26 +212,103 @@ mod tests {
     async fn a_choice_is_stored_changed_and_cleared_when_both_boxes_are_unticked() {
         let (_dir, db) = lab().await;
 
-        let rows = field_choice_set(&db, ZONE.into(), true, false)
+        let saved = field_choice_set(&db, ZONE.into(), true, false)
             .await
             .unwrap();
 
-        assert_eq!(rows[2], row(ZONE, "Zone", "string", true, false));
+        assert_eq!(saved.rows[2], row(ZONE, "Zone", "string", true, false));
         assert_eq!(stored(&db).await, [(ZONE.to_string(), true, false)]);
 
-        let rows = field_choice_set(&db, ZONE.into(), false, true)
+        let saved = field_choice_set(&db, ZONE.into(), false, true)
             .await
             .unwrap();
 
-        assert_eq!(rows[2], row(ZONE, "Zone", "string", false, true));
+        assert_eq!(saved.rows[2], row(ZONE, "Zone", "string", false, true));
         assert_eq!(stored(&db).await, [(ZONE.to_string(), false, true)]);
 
-        let rows = field_choice_set(&db, ZONE.into(), false, false)
+        let saved = field_choice_set(&db, ZONE.into(), false, false)
             .await
             .unwrap();
 
-        assert_eq!(rows[2], row(ZONE, "Zone", "string", false, false));
+        assert_eq!(saved.rows[2], row(ZONE, "Zone", "string", false, false));
         assert_eq!(stored(&db).await, []);
+    }
+
+    #[tokio::test]
+    async fn the_first_box_on_a_never_fetched_field_asks_for_a_full_sync() {
+        let (_dir, db) = lab().await;
+
+        let saved = field_choice_set(&db, ZONE.into(), false, true)
+            .await
+            .unwrap();
+
+        assert!(saved.newly_fetched);
+    }
+
+    #[tokio::test]
+    async fn a_further_box_on_an_already_fetched_field_does_not() {
+        let (_dir, db) = lab().await;
+        field_choice_set(&db, ZONE.into(), true, false)
+            .await
+            .unwrap();
+
+        let more = field_choice_set(&db, ZONE.into(), true, true)
+            .await
+            .unwrap();
+        let moved = field_choice_set(&db, ZONE.into(), false, true)
+            .await
+            .unwrap();
+
+        assert!(!more.newly_fetched);
+        assert!(!moved.newly_fetched);
+    }
+
+    #[tokio::test]
+    async fn a_field_a_view_column_or_a_filter_already_uses_is_not_newly_fetched() {
+        let (_dir, db) = lab().await;
+        db.write(|tx, _| {
+            tx.execute_batch(
+                r#"INSERT INTO filter_list (id, kind, name, filter) VALUES
+                     (900, 'list', 'Open work', '{"conditions":[{"field":"customfield_10002","op":"is","value":"x"}]}');
+                   INSERT INTO view (list_id, name, layout, columns, group_by, sort_by, sort_order) VALUES
+                     (900, 'Table', 'table', '["status","customfield_10001"]', 'none', 'updated', 0)"#,
+            )?;
+            Ok(())
+        })
+        .await
+        .unwrap();
+
+        let by_column = field_choice_set(&db, ZONE.into(), true, true)
+            .await
+            .unwrap();
+        let by_filter = field_choice_set(&db, ALPHA.into(), true, true)
+            .await
+            .unwrap();
+        let unused = field_choice_set(&db, NOTES.into(), true, true)
+            .await
+            .unwrap();
+
+        assert!(!by_column.newly_fetched);
+        assert!(!by_filter.newly_fetched);
+        assert!(unused.newly_fetched);
+    }
+
+    #[tokio::test]
+    async fn unticking_both_boxes_never_asks_for_a_sync() {
+        let (_dir, db) = lab().await;
+
+        let unchosen = field_choice_set(&db, ZONE.into(), false, false)
+            .await
+            .unwrap();
+        field_choice_set(&db, ALPHA.into(), true, true)
+            .await
+            .unwrap();
+        let cleared = field_choice_set(&db, ALPHA.into(), false, false)
+            .await
+            .unwrap();
+
+        assert!(!unchosen.newly_fetched);
+        assert!(!cleared.newly_fetched);
     }
 
     #[tokio::test]
@@ -229,12 +318,12 @@ mod tests {
             .await
             .unwrap();
 
-        let rows = field_choice_set(&db, ALPHA.into(), true, false)
+        let saved = field_choice_set(&db, ALPHA.into(), true, false)
             .await
             .unwrap();
 
         assert_eq!(
-            rows,
+            saved.rows,
             [
                 row(ALPHA, "alpha", "user", true, false),
                 row(NOTES, "Notes", "", false, false),
@@ -255,7 +344,8 @@ mod tests {
         ] {
             let err = field_choice_set(&db, id.into(), true, true)
                 .await
-                .unwrap_err();
+                .err()
+                .unwrap();
 
             assert_eq!(err.kind(), ErrorKind::NotFound, "{id}");
         }

@@ -1242,9 +1242,9 @@ mod filter_fields_per_level {
         track_project(&db, NWS.into(), true).await.unwrap();
         execute(
             &db,
-            "INSERT INTO cache.field (id, name, type, used) VALUES
-               ('customfield_10001', 'Zone', 'string', 1),
-               ('customfield_10003', 'Beta', 'string', 1)",
+            "INSERT INTO cache.field (id, name, type) VALUES
+               ('customfield_10001', 'Zone', 'string'),
+               ('customfield_10003', 'Beta', 'string')",
         )
         .await;
         for id in [ZONE, BETA] {

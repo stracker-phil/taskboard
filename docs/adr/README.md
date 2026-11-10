@@ -65,5 +65,6 @@ stands in Taskboard. The numbers in this table are Taskboard's.
 | [0053](0053-builds-are-signed-with-an-apple-development-certificate.md) | Builds are signed with an Apple Development certificate | Accepted (2026-11-03) |
 | [0054](0054-every-release-build-gets-a-new-version.md) | Every release build gets a new version | Accepted (2026-11-05) |
 | [0055](0055-status-styles-are-chosen-app-wide-a-space-overrides.md) | Status styles are chosen app-wide; a Space overrides them | Accepted (2026-11-10) |
+| [0056](0056-custom-fields-are-opted-in-app-wide-a-space-opts-out.md) | Custom fields are opted in app-wide; a Space opts out | Accepted (2026-11-10) |
 
 Open: integrations with Daybook and TimeTracker.

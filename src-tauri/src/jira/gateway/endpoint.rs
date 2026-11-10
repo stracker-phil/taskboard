@@ -16,18 +16,6 @@ use crate::jira::site::Site;
 pub const PAGE_SIZE: u32 = 100;
 const PROJECT_PAGE_SIZE: u32 = 50;
 
-/// What a field-usage sample reads: every field but the large ones no custom field lives in.
-const USAGE_FIELDS: &[&str] = &[
-    "*all",
-    "-description",
-    "-comment",
-    "-attachment",
-    "-worklog",
-    "-issuelinks",
-    "-subtasks",
-    "-environment",
-];
-
 /// Reads may be retried; writes never are.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Access {
@@ -92,10 +80,6 @@ pub enum Endpoint {
     /// Strict validation of a query.
     JqlParse {
         jql: Jql,
-    },
-    /// The project's most recently updated issues with all their fields, to see which custom fields it fills.
-    FieldUsage {
-        project: ProjectKey,
     },
     /// The workflow's moves from the issue's status, with their target statuses.
     IssueTransitions {
@@ -170,8 +154,7 @@ impl Endpoint {
             | Self::Statuses
             | Self::ProjectSearch { .. }
             | Self::ProjectVersions { .. }
-            | Self::MyPermissions { .. }
-            | Self::FieldUsage { .. } => Capability::Projects,
+            | Self::MyPermissions { .. } => Capability::Projects,
             Self::SearchJql { .. } | Self::BulkFetch { .. } | Self::ApproximateCount { .. } => {
                 Capability::Issues
             }
@@ -259,16 +242,6 @@ impl Endpoint {
                     .query("redirect", "false")
                     .plan(site)
             }
-            Self::FieldUsage { project } => Rest::read_post(
-                &["search", "jql"],
-                json!({
-                    "jql": format!("project = \"{}\" ORDER BY updated DESC", project.as_str()),
-                    "maxResults": PAGE_SIZE,
-                    "fields": USAGE_FIELDS,
-                }),
-            )
-            .jql_errors()
-            .plan(site),
             Self::IssueTransitions { issue } => {
                 Rest::get(&["issue", issue.as_str(), "transitions"]).plan(site)
             }

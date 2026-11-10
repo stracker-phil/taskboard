@@ -114,11 +114,11 @@ impl Site {
                 )?;
             }
             tx.execute(
-                "INSERT INTO cache.field (id, name, type, shown) VALUES
-                    ('customfield_10071', 'Reviewer', 'user', 1),
-                    ('customfield_10072', 'Approver', 'user', 1),
-                    ('customfield_10073', 'Notes', 'string', 1),
-                    ('summary', 'Summary', 'user', 1)",
+                "INSERT INTO cache.field (id, name, type) VALUES
+                    ('customfield_10071', 'Reviewer', 'user'),
+                    ('customfield_10072', 'Approver', 'user'),
+                    ('customfield_10073', 'Notes', 'string'),
+                    ('summary', 'Summary', 'user')",
                 [],
             )?;
             Ok(())
