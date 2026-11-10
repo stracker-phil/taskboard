@@ -1,5 +1,4 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { Search } from "lucide-react";
 import { useState } from "react";
 import { api, type SpaceNode, type TeamCell, type TeamRow } from "../../../api";
 import { useSpaces } from "../../../queries/sidebar";
@@ -8,6 +7,8 @@ import { fail } from "../../../state/store";
 import { Avatar } from "../../issue/Avatar";
 import { SpaceTile } from "../../SpaceTile";
 import { Group } from "../controls";
+import { SearchField } from "../SearchField";
+import { type MatrixCell, type MatrixColumn, type MatrixRow, SettingsMatrix } from "../SettingsMatrix";
 
 /** Every person with activity in a tracked Space against every Space: who is on which team. Rows keep their order
  *  while boxes are ticked. */
@@ -26,6 +27,33 @@ export function TeamPage() {
       (e: unknown) => fail(e, `Could not change ${row.person.name} in ${space.name}`),
     );
 
+  const matrixColumns: MatrixColumn[] = columns.map((space) => ({
+    key: space.projectId,
+    title: space.name,
+    header: (
+      <>
+        <SpaceTile space={space} size={20} />
+        <span className="mono">{space.key}</span>
+      </>
+    ),
+  }));
+  const cellIndex = columns.map((space) => matrix?.spaces.indexOf(space.projectId) ?? -1);
+  const matrixRows: MatrixRow[] = people.map((row) => ({
+    key: row.person.accountId,
+    header: (
+      <>
+        <Avatar person={row.person} size={20} />
+        <span className="team-row__name">{row.person.name}</span>
+      </>
+    ),
+    cells: columns.map((space, i) => teamCell(row, space, row.cells[cellIndex[i]])),
+  }));
+  const toggle = (accountId: string, projectId: string, active: boolean) => {
+    const row = people.find((r) => r.person.accountId === accountId);
+    const space = columns.find((c) => c.projectId === projectId);
+    if (row && space) set(row, space, active);
+  };
+
   return (
     <Group
       title="Team"
@@ -37,12 +65,7 @@ export function TeamPage() {
           <span className="settings-empty">People appear after the first sync.</span>
         </div>
       ) : (
-        <div className="settings-row status-search">
-          <label className="columns-popover__search status-search__field">
-            <Search size={13} strokeWidth={2} aria-hidden="true" />
-            <input aria-label="Search people" placeholder="Search people" value={search} onChange={(e) => setSearch(e.target.value)} />
-          </label>
-        </div>
+        <SearchField label="Search people" value={search} onChange={setSearch} />
       )}
       {needle && people.length === 0 && (
         <div className="settings-row">
@@ -50,52 +73,14 @@ export function TeamPage() {
         </div>
       )}
       {people.length > 0 && (
-        <div className="team-matrix scroller">
-          <table>
-            <thead>
-              <tr>
-                <th scope="col" className="team-matrix__person">
-                  Person
-                </th>
-                {columns.map((space) => (
-                  <th key={space.projectId} scope="col" title={space.name} className="team-matrix__space">
-                    <SpaceTile space={space} size={20} />
-                    <span className="mono">{space.key}</span>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {people.map((row) => (
-                <tr key={row.person.accountId}>
-                  <th scope="row" className="team-matrix__person">
-                    <span className="team-matrix__name">
-                      <Avatar person={row.person} size={20} />
-                      <span className="team-row__name">{row.person.name}</span>
-                    </span>
-                  </th>
-                  {columns.map((space) => {
-                    const cell = row.cells[matrix?.spaces.indexOf(space.projectId) ?? -1];
-                    return (
-                      <td key={space.projectId} className={cell?.involved ? "team-matrix__cell team-matrix__cell--involved" : "team-matrix__cell"} title={cellHint(cell)}>
-                        <input
-                          type="checkbox"
-                          className="team-matrix__check"
-                          aria-label={`${row.person.name} on the ${space.name} team`}
-                          checked={cell?.active ?? false}
-                          onChange={(e) => set(row, space, e.target.checked)}
-                        />
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <SettingsMatrix corner="Person" columns={matrixColumns} rows={matrixRows} onToggle={toggle} />
       )}
     </Group>
   );
+}
+
+function teamCell(row: TeamRow, space: SpaceNode, cell: TeamCell | undefined): MatrixCell {
+  return { checked: cell?.active ?? false, label: `${row.person.name} on the ${space.name} team`, hint: cellHint(cell), quiet: !cell?.involved };
 }
 
 function cellHint(cell: TeamCell | undefined): string {

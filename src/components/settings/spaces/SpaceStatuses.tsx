@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { ChevronsUpDown, Search } from "lucide-react";
+import { ChevronsUpDown } from "lucide-react";
 import { useState } from "react";
 import { api, type StatusStyleRow, type Style } from "../../../api";
 import { STATUS_STYLES_KEY, useStatusStyles } from "../../../queries/views";
@@ -8,6 +8,7 @@ import { StatusPill } from "../../issue/StatusPill";
 import { STYLE_NAMES, STYLE_ORDER } from "../../issue/styleNames";
 import { openMenu } from "../../menu";
 import { Group } from "../controls";
+import { SearchField } from "../SearchField";
 
 const CATEGORY_NAMES: Record<string, string> = { new: "To do", indeterminate: "In progress", done: "Done" };
 const CATEGORY_ORDER = ["new", "indeterminate", "done"];
@@ -51,12 +52,7 @@ export function SpaceStatuses({ projectId }: { projectId: string }) {
           <span className="settings-empty">Statuses appear after the first sync.</span>
         </div>
       ) : (
-        <div className="settings-row status-search">
-          <label className="columns-popover__search status-search__field">
-            <Search size={13} strokeWidth={2} aria-hidden="true" />
-            <input aria-label="Search statuses" placeholder="Search statuses" value={search} onChange={(e) => setSearch(e.target.value)} />
-          </label>
-        </div>
+        <SearchField label="Search statuses" value={search} onChange={setSearch} />
       )}
       {needle && shown.length === 0 && (
         <div className="settings-row">
