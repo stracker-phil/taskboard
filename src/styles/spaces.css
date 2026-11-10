@@ -55,3 +55,6 @@
 .space-settings-back { gap: 2px; padding-left: 6px; }
 .space-settings-head__tile { display: flex; flex: none; padding: 0; border: none; border-radius: 6px; background: none; }
 .space-settings-head__name { margin: 0; font-size: 15px; font-weight: 600; }
+/* A Space's settings in tabs; the chosen tab's groups fade in. */
+.space-settings-tabs { display: flex; justify-content: center; margin: 0 0 16px; }
+.space-settings-tab { animation: fade-in var(--motion-base) var(--ease-out); }

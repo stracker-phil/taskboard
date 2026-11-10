@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useContext, useState } from "react";
 import { ChevronLeft, ChevronsUpDown } from "lucide-react";
 import { api, type GroupBy, type Layout, type SpaceConfig, type SpaceLayouts, type SpaceNode } from "../../../api";
 import { SPACE_CONFIG_KEY, useSpaceConfig } from "../../../queries/views";
@@ -8,7 +8,8 @@ import { fail } from "../../../state/store";
 import { SpaceFields } from "../../SpaceEditor";
 import { openMenu } from "../../menu";
 import { SpaceLookButton } from "../../SpaceLookButton";
-import { Group, Row, Segmented, SwitchInput } from "../controls";
+import { SegmentedControl } from "../../SegmentedControl";
+import { Group, Row, SectionTarget, Segmented, SwitchInput } from "../controls";
 import { useSettings } from "../../../queries/settings";
 import { attempt } from "../../../state/requests";
 import { AccentPicker } from "../AccentPicker";
@@ -19,11 +20,25 @@ import { SpaceTeam } from "./SpaceTeam";
 const LAYOUTS: Layout[] = ["list", "board", "table"];
 const LAYOUT_NAMES: Record<Layout, string> = { list: "List", board: "Board", table: "Table" };
 const GROUPS: GroupBy[] = ["status", "statusType", "assignee", "priority", "epic", "release", "due", "none"];
+const TABS = ["general", "team", "statuses", "fields"] as const;
+type Tab = (typeof TABS)[number];
+const TAB_NAMES: Record<Tab, string> = { general: "General", team: "Team", statuses: "Statuses", fields: "Custom Fields" };
+
+/** The tab holding the section a link or the settings search asked for. */
+const tabOf = (section: string | undefined): Tab => TABS.find((tab) => tab === section) ?? "general";
+
 /** One Space's settings page: in Settings → Spaces with a way back to the list, or alone in the main window's
  *  sheet (the sidebar's Space Settings…), without one. */
 export function SpaceSettings({ space, onBack }: { space: SpaceNode; onBack?: () => void }) {
   const { data: config } = useSpaceConfig(space.projectId);
   const [editingLook, setEditingLook] = useState(false);
+  const target = useContext(SectionTarget);
+  const [tab, setTab] = useState(() => tabOf(target));
+  const [shownTarget, setShownTarget] = useState(target);
+  if (target !== shownTarget) {
+    setShownTarget(target);
+    setTab(tabOf(target));
+  }
   return (
     <>
       <div className="space-settings-head">
@@ -37,14 +52,23 @@ export function SpaceSettings({ space, onBack }: { space: SpaceNode; onBack?: ()
         <h3 className="space-settings-head__name">{space.name}</h3>
         <span className="mono settings-row-desc">{space.key}</span>
       </div>
-      <Group title="General">
-        <SpaceFields space={space} />
-        <SpaceAccent space={space} />
-      </Group>
-      {config && <LayoutsGroup config={config} />}
-      <SpaceStatuses projectId={space.projectId} />
-      <SpaceTeam projectId={space.projectId} />
-      {config && <SpaceCustomFields config={config} />}
+      <div className="space-settings-tabs">
+        <SegmentedControl label="Space settings" options={TABS} labels={TAB_NAMES} value={tab} onChange={setTab} />
+      </div>
+      <div key={tab} className="space-settings-tab">
+        {tab === "general" && (
+          <>
+            <Group title="General">
+              <SpaceFields space={space} />
+              <SpaceAccent space={space} />
+            </Group>
+            {config && <LayoutsGroup config={config} />}
+          </>
+        )}
+        {tab === "team" && <SpaceTeam projectId={space.projectId} />}
+        {tab === "statuses" && <SpaceStatuses projectId={space.projectId} />}
+        {tab === "fields" && config && <SpaceCustomFields config={config} />}
+      </div>
     </>
   );
 }

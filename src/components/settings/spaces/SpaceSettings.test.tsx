@@ -13,13 +13,17 @@ import { fieldSetting, space, spaceConfig } from "../../../test/spaces";
 import { teamCell, teamMatrix } from "../../../test/team";
 import { MenuHost } from "../../menu";
 import { Toasts } from "../../Toasts";
+import { SectionTarget } from "../controls";
 import { SpaceSettings } from "./SpaceSettings";
 
 const mocked = vi.mocked(api, true);
 
 const layouts = (patch: Partial<SpaceLayouts> = {}): SpaceLayouts => ({ layouts: ["list", "board", "table"], defaultLayout: "list", defaultGroup: "status", ...patch });
 
-async function renderSettings(config: SpaceConfig = spaceConfig(), onBack = vi.fn()) {
+const tabButton = (name: string) => within(screen.getByRole("group", { name: "Space settings" })).getByRole("button", { name });
+
+async function renderSettings(config: SpaceConfig = spaceConfig(), tab?: string) {
+  const onBack = vi.fn();
   mocked.spaceConfig.mockResolvedValue(config);
   render(
     <QueryClientProvider client={createQueryClient()}>
@@ -29,8 +33,31 @@ async function renderSettings(config: SpaceConfig = spaceConfig(), onBack = vi.f
     </QueryClientProvider>,
   );
   await screen.findByRole("region", { name: "Layouts" });
+  if (tab) await userEvent.click(tabButton(tab));
   return onBack;
 }
+
+const client = createQueryClient();
+const atTarget = (target: string | undefined) => (
+  <QueryClientProvider client={client}>
+    <SectionTarget.Provider value={target}>
+      <SpaceSettings space={space()} />
+    </SectionTarget.Provider>
+  </QueryClientProvider>
+);
+function renderAtTarget(target: string | undefined) {
+  mocked.spaceConfig.mockResolvedValue(spaceConfig());
+  client.clear();
+  return render(atTarget(target));
+}
+
+const GROUPS = ["General", "Layouts", "Team", "Statuses", "Custom fields"];
+const expectOnlyGroups = (shown: string[]) => {
+  for (const name of GROUPS) {
+    if (shown.includes(name)) expect(screen.getByRole("region", { name })).toBeInTheDocument();
+    else expect(screen.queryByRole("region", { name })).not.toBeInTheDocument();
+  }
+};
 
 const openMenuOf = async (buttonName: string) => {
   await userEvent.click(screen.getByRole("button", { name: buttonName }));
@@ -45,13 +72,86 @@ beforeEach(() => {
 });
 
 describe("SpaceSettings", () => {
-  it("shows the Space's name and the General, Layouts, Statuses, Team and Custom fields groups", async () => {
-    await renderSettings();
+  describe("tabs", () => {
+    it("opens on General showing the General and Layouts groups only", async () => {
+      await renderSettings();
 
-    expect(screen.getByRole("heading", { name: "Website relaunch" })).toBeInTheDocument();
-    for (const name of ["General", "Layouts", "Statuses", "Team", "Custom fields"]) expect(await screen.findByRole("region", { name })).toBeInTheDocument();
-    expect(mocked.spaceConfig).toHaveBeenCalledWith("10001");
-    expect(mocked.statusStylesList).toHaveBeenCalledWith("10001");
+      expect(screen.getByRole("heading", { name: "Website relaunch" })).toBeInTheDocument();
+      expect(tabButton("General")).toHaveAttribute("aria-pressed", "true");
+      expect(mocked.spaceConfig).toHaveBeenCalledWith("10001");
+      expectOnlyGroups(["General", "Layouts"]);
+    });
+
+    it.each([
+      ["Team", "Team"],
+      ["Statuses", "Statuses"],
+      ["Custom Fields", "Custom fields"],
+    ])("shows only its group when the %s tab is chosen", async (tab, group) => {
+      await renderSettings();
+
+      await userEvent.click(tabButton(tab));
+
+      expect(await screen.findByRole("region", { name: group })).toBeInTheDocument();
+      expect(tabButton(tab)).toHaveAttribute("aria-pressed", "true");
+      expect(tabButton("General")).toHaveAttribute("aria-pressed", "false");
+      expectOnlyGroups([group]);
+    });
+
+    it("loads the Space's statuses when the Statuses tab is chosen", async () => {
+      await renderSettings(spaceConfig(), "Statuses");
+
+      expect(await screen.findByRole("region", { name: "Statuses" })).toBeInTheDocument();
+      expect(mocked.statusStylesList).toHaveBeenCalledWith("10001");
+    });
+
+    it("returns to the General groups when the General tab is chosen again", async () => {
+      await renderSettings(spaceConfig(), "Team");
+
+      await userEvent.click(tabButton("General"));
+
+      expectOnlyGroups(["General", "Layouts"]);
+    });
+
+    it("keeps the tab when the pressed tab is clicked again", async () => {
+      await renderSettings(spaceConfig(), "Team");
+
+      await userEvent.click(tabButton("Team"));
+
+      expect(tabButton("Team")).toHaveAttribute("aria-pressed", "true");
+      expect(screen.getByRole("region", { name: "Team" })).toBeInTheDocument();
+    });
+
+    describe("requested section", () => {
+      it.each([
+        ["team", "Team", "Team"],
+        ["statuses", "Statuses", "Statuses"],
+        ["fields", "Custom Fields", "Custom fields"],
+      ])("opens the %s section on its tab", async (target, tab, group) => {
+        renderAtTarget(target);
+
+        expect(await screen.findByRole("region", { name: group })).toBeInTheDocument();
+        expect(tabButton(tab)).toHaveAttribute("aria-pressed", "true");
+        expectOnlyGroups([group]);
+      });
+
+      it.each(["layouts", "unknown"])("opens General for the %s section", async (target) => {
+        renderAtTarget(target);
+
+        expect(await screen.findByRole("region", { name: "Layouts" })).toBeInTheDocument();
+        expect(tabButton("General")).toHaveAttribute("aria-pressed", "true");
+        expectOnlyGroups(["General", "Layouts"]);
+      });
+
+      it("follows a new target", async () => {
+        const { rerender } = renderAtTarget("team");
+        await screen.findByRole("region", { name: "Team" });
+
+        rerender(atTarget("fields"));
+
+        expect(await screen.findByRole("region", { name: "Custom fields" })).toBeInTheDocument();
+        expect(tabButton("Custom Fields")).toHaveAttribute("aria-pressed", "true");
+      });
+    });
   });
 
   it("opens the look popover from the header tile and saves the chosen color", async () => {
@@ -231,7 +331,7 @@ describe("SpaceSettings", () => {
   describe("team", () => {
     it("counts the people on the team and those with activity in this Space", async () => {
       mocked.teamMatrix.mockResolvedValue(teamMatrix());
-      await renderSettings();
+      await renderSettings(undefined, "Team");
 
       expect(await screen.findByText("1 person on the team")).toBeInTheDocument();
       expect(screen.getByText("2 with activity in this Space")).toBeInTheDocument();
@@ -241,7 +341,7 @@ describe("SpaceSettings", () => {
       const matrix = teamMatrix();
       matrix.people[1].cells[0] = teamCell({ active: true, involved: true });
       mocked.teamMatrix.mockResolvedValue(matrix);
-      await renderSettings();
+      await renderSettings(undefined, "Team");
 
       expect(await screen.findByText("2 people on the team")).toBeInTheDocument();
       expect(screen.getByText("2 with activity in this Space")).toBeInTheDocument();
@@ -249,14 +349,14 @@ describe("SpaceSettings", () => {
 
     it("shows nobody on the team before the matrix has this Space", async () => {
       mocked.teamMatrix.mockResolvedValue({ spaces: [], people: [] });
-      await renderSettings();
+      await renderSettings(undefined, "Team");
 
       expect(await screen.findByText("0 people on the team")).toBeInTheDocument();
       expect(screen.getByText("0 with activity in this Space")).toBeInTheDocument();
     });
 
     it("opens the Team settings when Edit Team… is clicked", async () => {
-      await renderSettings();
+      await renderSettings(undefined, "Team");
 
       await userEvent.click(screen.getByRole("button", { name: "Edit Team…" }));
 
@@ -269,7 +369,7 @@ describe("SpaceSettings", () => {
     const points = fieldSetting({ id: "customfield_10072", name: "Story points", appDetail: false, inDetail: false });
 
     it("points to the app-wide Custom fields settings when no field is picked", async () => {
-      await renderSettings(spaceConfig({ fields: [] }));
+      await renderSettings(spaceConfig({ fields: [] }), "Custom Fields");
 
       expect(screen.getByText("No fields are shown. Pick fields in Settings → Custom fields.")).toBeInTheDocument();
 
@@ -279,7 +379,7 @@ describe("SpaceSettings", () => {
     });
 
     it("shows a box per place the app shows the field, ticked as the Space has it", async () => {
-      await renderSettings(spaceConfig({ fields: [reviewer, { ...points, inList: false }] }));
+      await renderSettings(spaceConfig({ fields: [reviewer, { ...points, inList: false }] }), "Custom Fields");
 
       expect(screen.getByRole("checkbox", { name: "Reviewer in this Space's lists" })).toBeChecked();
       expect(screen.getByRole("checkbox", { name: "Reviewer in this Space's Issue view" })).toBeChecked();
@@ -287,7 +387,7 @@ describe("SpaceSettings", () => {
     });
 
     it("shows no box for a place the app does not show the field", async () => {
-      await renderSettings(spaceConfig({ fields: [points] }));
+      await renderSettings(spaceConfig({ fields: [points] }), "Custom Fields");
 
       expect(screen.queryByRole("checkbox", { name: "Story points in this Space's Issue view" })).not.toBeInTheDocument();
     });
@@ -297,7 +397,7 @@ describe("SpaceSettings", () => {
       ["Issue view", "Reviewer in this Space's Issue view", true, false],
     ])("unticking the %s box sends it off and keeps the other place", async (_place, name, inList, inDetail) => {
       mocked.spaceSetField.mockResolvedValue(spaceConfig({ fields: [fieldSetting({ inList, inDetail })] }));
-      await renderSettings(spaceConfig({ fields: [reviewer] }));
+      await renderSettings(spaceConfig({ fields: [reviewer] }), "Custom Fields");
 
       await userEvent.click(screen.getByRole("checkbox", { name }));
 
@@ -307,7 +407,7 @@ describe("SpaceSettings", () => {
 
     it("shows an error toast when the field cannot be changed", async () => {
       mocked.spaceSetField.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
-      await renderSettings(spaceConfig({ fields: [reviewer] }));
+      await renderSettings(spaceConfig({ fields: [reviewer] }), "Custom Fields");
 
       await userEvent.click(screen.getByRole("checkbox", { name: "Reviewer in this Space's lists" }));
 

@@ -859,7 +859,8 @@ no separate Settings design; owner, 2026-10-28). Its colors are the `--settings-
     ClickUp's Space settings; also `app:settings:space:<projectId>`), with "‹ Spaces" back to the list. The
     sidebar menu's Space Settings… shows the same page in a sheet over the main window (`shell/SpaceSheet.tsx`,
     640 wide, scrolling inside, in the Settings window's look, without "‹ Spaces"; Done or esc closes it); both edit
-    the same settings. *General*: its fields (`SpaceFields` in `components/SpaceEditor.tsx`): Name
+    the same settings. Under the header a segmented control picks one tab (General, Team, Statuses, Custom
+    Fields; a link to a section opens its tab), and only that tab's groups show, fading in. *General*: its fields (`SpaceFields` in `components/SpaceEditor.tsx`): Name
     (empty uses the project's), Icon and color (the look editor; a Space always has a color) and Client (empty means internal). *Layouts*: a switch per layout
     its views offer (one stays on), the default layout of new views and their grouping. *Statuses*: only the
     statuses this Space's issues are in, like Settings → Statuses, with "N issues" after the pill and Default (the
