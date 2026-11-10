@@ -199,6 +199,7 @@
 .settings-matrix thead .settings-matrix__row { z-index: 3; }
 .settings-matrix__name { display: flex; align-items: center; gap: 8px; max-width: 240px; }
 .settings-matrix__check { accent-color: var(--accent); }
+.settings-matrix__kind { flex: none; font-size: 11px; color: var(--settings-text-tertiary); }
 .settings-matrix__cell--quiet .settings-matrix__check:not(:checked) { opacity: 0.45; }
 /* A change Jira's permissions block in some tracked projects: its own line under the row's detail. */
 .settings-not-allowed { display: block; margin-top: 2px; color: var(--banner-warn-text); animation: fade-in var(--motion-base) var(--ease-out); }

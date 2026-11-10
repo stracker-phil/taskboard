@@ -17,7 +17,8 @@ export interface MatrixCell {
 export interface MatrixRow {
   key: string;
   header: ReactNode;
-  cells: MatrixCell[];
+  /** By column; none leaves that cell empty. */
+  cells: (MatrixCell | undefined)[];
 }
 
 /** A table of checkboxes with a sticky header row and first column. Rows render in the order given, so a caller

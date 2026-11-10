@@ -1,7 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { ChevronLeft, ChevronsUpDown } from "lucide-react";
-import { api, type FieldSetting, type FieldVisibility, type GroupBy, type Layout, type SpaceConfig, type SpaceLayouts, type SpaceNode } from "../../../api";
+import { api, type GroupBy, type Layout, type SpaceConfig, type SpaceLayouts, type SpaceNode } from "../../../api";
 import { SPACE_CONFIG_KEY, useSpaceConfig } from "../../../queries/views";
 import { GROUP_NAMES } from "../../../shell/toolbar/groupMenu";
 import { fail } from "../../../state/store";
@@ -12,26 +12,13 @@ import { Group, Row, Segmented, SwitchInput } from "../controls";
 import { useSettings } from "../../../queries/settings";
 import { attempt } from "../../../state/requests";
 import { AccentPicker } from "../AccentPicker";
+import { SpaceCustomFields } from "./SpaceCustomFields";
 import { SpaceStatuses } from "./SpaceStatuses";
 import { SpaceTeam } from "./SpaceTeam";
 
 const LAYOUTS: Layout[] = ["list", "board", "table"];
 const LAYOUT_NAMES: Record<Layout, string> = { list: "List", board: "Board", table: "Table" };
 const GROUPS: GroupBy[] = ["status", "statusType", "assignee", "priority", "epic", "release", "due", "none"];
-const VISIBILITY_NAMES: Record<FieldVisibility, string> = {
-  visible: "Visible",
-  hiddenInList: "Hidden in list",
-  hiddenInDetail: "Hidden in detail",
-  hidden: "Hidden everywhere",
-};
-const VISIBILITY_HELP: Record<FieldVisibility, string> = {
-  visible: "A column choice, and shown in the Issue view when filled",
-  hiddenInList: "Shown in the Issue view, never offered as a column",
-  hiddenInDetail: "A column choice, left out of the Issue view",
-  hidden: "Neither a column nor in the Issue view",
-};
-const VISIBILITIES = Object.keys(VISIBILITY_NAMES) as FieldVisibility[];
-
 /** One Space's settings page: in Settings → Spaces with a way back to the list, or alone in the main window's
  *  sheet (the sidebar's Space Settings…), without one. */
 export function SpaceSettings({ space, onBack }: { space: SpaceNode; onBack?: () => void }) {
@@ -57,7 +44,7 @@ export function SpaceSettings({ space, onBack }: { space: SpaceNode; onBack?: ()
       {config && <LayoutsGroup config={config} />}
       <SpaceStatuses projectId={space.projectId} />
       <SpaceTeam projectId={space.projectId} />
-      {config && <FieldsGroup config={config} />}
+      {config && <SpaceCustomFields config={config} />}
     </>
   );
 }
@@ -128,38 +115,6 @@ function LayoutsGroup({ config }: { config: SpaceConfig }) {
           <ChevronsUpDown size={12} aria-hidden="true" />
         </button>
       </Row>
-    </Group>
-  );
-}
-
-function FieldsGroup({ config }: { config: SpaceConfig }) {
-  const save = useSave(config.projectId);
-  const choose = (field: FieldSetting, button: HTMLElement) =>
-    openMenu(
-      VISIBILITIES.map((visibility) => ({
-        text: VISIBILITY_NAMES[visibility],
-        checked: visibility === field.visibility,
-        run: () => save(api.spaceSetField(config.projectId, field.id, visibility), `Could not change ${field.name}`),
-      })),
-      button,
-      `Visibility of ${field.name}`,
-    );
-
-  return (
-    <Group title="Custom fields" anchor="fields" description="Where each custom field shows in this Space: as a column choice in its views, in the Issue view, both or neither.">
-      {config.fields.length === 0 && (
-        <div className="settings-row">
-          <span className="settings-empty">Custom fields appear after the first sync.</span>
-        </div>
-      )}
-      {config.fields.map((field) => (
-        <Row key={field.id} label={field.name} description={VISIBILITY_HELP[field.visibility]}>
-          <button type="button" className="btn status-row__style" aria-label={`Visibility of ${field.name}`} aria-haspopup="menu" onClick={(e) => choose(field, e.currentTarget)}>
-            {VISIBILITY_NAMES[field.visibility]}
-            <ChevronsUpDown size={12} aria-hidden="true" />
-          </button>
-        </Row>
-      ))}
     </Group>
   );
 }

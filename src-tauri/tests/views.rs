@@ -13,6 +13,7 @@ use taskboard_lib::connection::{
 };
 use taskboard_lib::db::Db;
 use taskboard_lib::error::ErrorKind;
+use taskboard_lib::field_choice::field_choice_set;
 use taskboard_lib::filter::{Condition, Field, Filter, Op, Value};
 use taskboard_lib::jira::{Limiter, TokenKind};
 use taskboard_lib::lists::{
@@ -39,6 +40,14 @@ const REVIEWER: &str = "customfield_10071";
 const STORY_POINTS: &str = "customfield_10016";
 const PROJECT_IDS: [&str; 5] = ["10001", "10002", "10003", "10004", "10005"];
 const NW: &str = "10001";
+
+async fn opt_in(db: &Db, fields: &[&str]) {
+    for id in fields {
+        field_choice_set(db, id.to_string(), true, true)
+            .await
+            .unwrap();
+    }
+}
 
 fn viewer() -> Viewer {
     Viewer {
@@ -1091,6 +1100,7 @@ mod custom_columns {
     async fn a_user_field_is_a_person_cell_and_a_number_field_is_text() {
         let site = Site::new().await;
         let (space, view) = site.nw().await;
+        opt_in(site.db(), &[REVIEWER, STORY_POINTS]).await;
         view_set_columns(
             site.db(),
             view,
@@ -1130,6 +1140,7 @@ mod custom_columns {
     async fn a_field_without_a_value_has_no_cell() {
         let site = Site::new().await;
         let (space, view) = site.nw().await;
+        opt_in(site.db(), &[REVIEWER, STORY_POINTS]).await;
         view_set_columns(site.db(), view, vec![REVIEWER.into(), STORY_POINTS.into()])
             .await
             .unwrap();
@@ -1140,6 +1151,22 @@ mod custom_columns {
         let row = row_of(&data, "NW-1049");
         assert!(!row.custom.contains_key(REVIEWER));
         assert!(row.custom.contains_key(STORY_POINTS));
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn a_custom_column_the_owner_has_not_opted_in_is_dropped_from_the_view() {
+        let site = Site::new().await;
+        let (space, view) = site.nw().await;
+        view_set_columns(site.db(), view, vec!["assignee".into(), REVIEWER.into()])
+            .await
+            .unwrap();
+        site.sync().await;
+
+        let data = site.data(space, view, Narrowing::default()).await;
+
+        assert_eq!(data.columns, ["assignee"]);
+        assert!(data.rows.values().all(|row| row.custom.is_empty()));
     }
 
     #[tokio::test]
@@ -1592,6 +1619,7 @@ mod board {
     async fn card_fields_follow_the_views_columns() {
         let site = Site::new().await;
         let (space, view) = site.nw().await;
+        opt_in(site.db(), &[REVIEWER]).await;
 
         let default = site.board(space, view, Narrowing::default()).await;
         let list_columns = site.data(space, view, Narrowing::default()).await.columns;
@@ -3263,8 +3291,9 @@ mod catalog {
 
     #[tokio::test]
     #[ignore = "syncs the demo site into a temp database"]
-    async fn the_standard_columns_come_first_then_the_custom_fields() {
+    async fn the_standard_columns_come_first_then_the_opted_in_custom_fields() {
         let site = Site::new().await;
+        opt_in(site.db(), &[REVIEWER, STORY_POINTS]).await;
 
         let columns = columns_catalogue(site.db(), site.everything().await)
             .await
@@ -3294,6 +3323,19 @@ mod catalog {
         assert_eq!(reviewer.name, "Reviewer");
         assert!(reviewer.custom);
         assert!(ids.contains(&STORY_POINTS));
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn without_an_opt_in_only_the_standard_columns_are_offered() {
+        let site = Site::new().await;
+
+        let columns = columns_catalogue(site.db(), site.everything().await)
+            .await
+            .unwrap();
+
+        assert_eq!(columns.len(), 11);
+        assert!(columns.iter().all(|c| !c.custom));
     }
 
     #[tokio::test]

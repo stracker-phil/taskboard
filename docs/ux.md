@@ -509,8 +509,8 @@ view with its place intact).
   that loads later and the next issue (J/K). WebKit paints highlights only on selectable text, so the columns turn
   selectable while a find is active. esc clears the field, then leaves it, then goes back.
 - Main column: type badge · key · comment count (· attachment count, when there are any), the 30/750 title, the field grid (Status, Assignee, Epic chip
-  that opens the epic here, Release, Priority, Sprint, then the custom fields shown as columns or marked shown,
-  then every other custom field the issue fills, by name), links ("blocks", "is blocked by"), the description,
+  that opens the epic here, Release, Priority, Sprint, then the custom fields opted in for the Issue view that the issue
+  fills, by name), links ("blocks", "is blocked by"), the description,
   then each rich text custom field with content (acceptance criteria, steps to reproduce) as its own section
   under its Jira name (`RichFields`; the preview shows them under its description too), Web links when there are
   any (`WebLinks`, also in the preview: a pull request icon and `repo#481` for GitHub, GitLab and Bitbucket pull or
@@ -863,9 +863,11 @@ no separate Settings design; owner, 2026-10-28). Its colors are the `--settings-
     (empty uses the project's), Icon and color (the look editor; a Space always has a color) and Client (empty means internal). *Layouts*: a switch per layout
     its views offer (one stays on), the default layout of new views and their grouping. *Statuses*: only the
     statuses this Space's issues are in, like Settings → Statuses, with "N issues" after the pill and Default (the
-    app-wide style) in place of Automatic. *Custom fields*: a row per field with a menu of
-    Visible, Hidden in list (no column choice and no filter field), Hidden in detail (not in the Issue view) and
-    Hidden everywhere. Outside a Space a field drops out of the list only when every tracked Space hides it.
+    app-wide style) in place of Automatic. *Custom fields* (`spaces/SpaceCustomFields`): the fields opted in
+    under Settings → Custom fields in the same grid, with a box only where the app shows the field; unticking hides
+    it in this Space (no column choice and no filter field, or not in the Issue view). None opted in: "No fields
+    are shown. Pick fields in Settings → Custom fields." with Custom Fields…. Outside a Space a field drops out of
+    the list only when every tracked Space hides it.
     *Team* (`spaces/SpaceTeam`): how many people are on the Space's team and how many have activity there, with
     Edit Team… (`app:settings:team`), then the team read-only: avatar and name by name, "(you)" on the connected
     account, scrolling inside after about nine people.
@@ -878,6 +880,9 @@ no separate Settings design; owner, 2026-10-28). Its colors are the `--settings-
     row: the pill and a button (the style's square and "Automatic · X" or the style's name) with a menu of
     Automatic and the six styles, the chosen one checked. A status whose style changes glides into its new
     section (`useListGlide`); the menu closed with the click, so nothing under the cursor moved.
+  - **Custom fields** (`jira/CustomFieldsPage`): every custom field of the site (name, Jira type in tertiary
+    text, a search field) against List (a column and filter choice) and Detail (the Issue view), in the Team grid
+    (`SettingsMatrix`). A field without a box is hidden everywhere; rows keep their order while boxes are ticked.
   - **Team** (`jira/TeamPage`): one grid of everyone with activity in a tracked Space (rows, by name, with a
     search field) against the tracked Spaces (columns in sidebar order: tile and key, the name as tooltip); a
     checkbox per cell puts the person on that Space's team (`space_set_member`). By default everyone ever assigned

@@ -14,6 +14,7 @@ use taskboard_lib::connection::{
 };
 use taskboard_lib::db::{Changes, Db};
 use taskboard_lib::error::ErrorKind;
+use taskboard_lib::field_choice::field_choice_set;
 use taskboard_lib::jira::jql::{date_literal, default_scope};
 use taskboard_lib::jira::{Limiter, TokenKind};
 use taskboard_lib::lists::{Viewer, filter_options, sidebar_tree};
@@ -430,27 +431,48 @@ mod the_full_sync {
     }
 
     #[tokio::test]
-    async fn leaves_the_custom_fields_no_tracked_issue_fills_out_of_the_pickers() {
+    async fn offers_no_custom_field_in_the_pickers_until_the_owner_opts_it_in() {
         let rig = Rig::connected().await;
         let custom = |id: &String| id.starts_with("customfield_");
 
         rig.full_sync().await;
 
-        let columns: Vec<String> = columns_catalogue(&rig.ctx.db, everything(&rig.ctx.db).await)
-            .await
-            .unwrap()
-            .into_iter()
-            .map(|c| c.id)
-            .filter(custom)
-            .collect();
-        let filters: Vec<String> = filter_options(&rig.ctx.db, everything(&rig.ctx.db).await)
-            .await
-            .unwrap()
-            .fields
-            .into_iter()
-            .map(|f| f.id)
-            .filter(custom)
-            .collect();
+        let offered = |rig: &Rig| {
+            let db = rig.ctx.db.clone();
+            async move {
+                let columns: Vec<String> = columns_catalogue(&db, everything(&db).await)
+                    .await
+                    .unwrap()
+                    .into_iter()
+                    .map(|c| c.id)
+                    .filter(custom)
+                    .collect();
+                let filters: Vec<String> = filter_options(&db, everything(&db).await)
+                    .await
+                    .unwrap()
+                    .fields
+                    .into_iter()
+                    .map(|f| f.id)
+                    .filter(custom)
+                    .collect();
+                (columns, filters)
+            }
+        };
+        let (columns, filters) = offered(&rig).await;
+        assert_eq!((columns, filters), (vec![], vec![]));
+
+        for id in [
+            "customfield_10081",
+            "customfield_10071",
+            "customfield_10080",
+            "customfield_10016",
+        ] {
+            field_choice_set(&rig.ctx.db, id.into(), true, true)
+                .await
+                .unwrap();
+        }
+
+        let (columns, filters) = offered(&rig).await;
         assert_eq!(
             columns,
             [
@@ -464,7 +486,7 @@ mod the_full_sync {
     }
 
     #[tokio::test]
-    async fn keeps_an_unused_field_the_owner_shows_as_a_column() {
+    async fn fetches_and_offers_an_unused_field_the_owner_opts_in() {
         let rig = Rig::connected().await;
         rig.full_sync().await;
         let offered = |columns: Vec<taskboard_lib::views::Column>, id: &str| {
@@ -476,15 +498,7 @@ mod the_full_sync {
             "customfield_10090"
         ));
 
-        rig.ctx
-            .db
-            .write(|tx, _| {
-                tx.execute(
-                    "UPDATE cache.field SET shown = 1 WHERE id = 'customfield_10090'",
-                    [],
-                )?;
-                Ok(())
-            })
+        field_choice_set(&rig.ctx.db, "customfield_10090".into(), true, true)
             .await
             .unwrap();
         rig.full_sync().await;

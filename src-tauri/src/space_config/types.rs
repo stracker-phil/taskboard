@@ -7,7 +7,7 @@ use crate::views::{GroupBy, Layout};
 
 pub const ALL_LAYOUTS: [Layout; 3] = [Layout::List, Layout::Board, Layout::Table];
 
-/// Where a custom field shows in a Space; `Visible` is the default.
+/// Where a custom field opted in app-wide shows in a Space; `Visible` (as app-wide) is the default.
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Default, TS)]
 #[ts(export, export_to = "src/api/types.gen.ts")]
 #[serde(rename_all = "camelCase")]
@@ -29,6 +29,15 @@ impl FieldVisibility {
 
     pub fn in_detail(self) -> bool {
         matches!(self, Self::Visible | Self::HiddenInList)
+    }
+
+    pub fn from_places(in_list: bool, in_detail: bool) -> Self {
+        match (in_list, in_detail) {
+            (true, true) => Self::Visible,
+            (false, true) => Self::HiddenInList,
+            (true, false) => Self::HiddenInDetail,
+            (false, false) => Self::Hidden,
+        }
     }
 }
 
@@ -71,7 +80,11 @@ impl SpaceLayouts {
 pub struct FieldSetting {
     pub id: String,
     pub name: String,
-    pub visibility: FieldVisibility,
+    /// Opted in app-wide for the list; `in_list` is the Space's own say, which only narrows it.
+    pub app_list: bool,
+    pub app_detail: bool,
+    pub in_list: bool,
+    pub in_detail: bool,
 }
 
 /// A Space's settings page, apart from its name and look (`SpaceUpdate`) and its statuses.
@@ -81,7 +94,7 @@ pub struct FieldSetting {
 pub struct SpaceConfig {
     pub project_id: String,
     pub layouts: SpaceLayouts,
-    /// The custom fields worth a setting (`RELEVANT_FIELD`), by name.
+    /// The custom fields opted in app-wide, by name.
     pub fields: Vec<FieldSetting>,
 }
 

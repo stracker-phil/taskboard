@@ -163,6 +163,9 @@ mod tests {
                 .await
                 .unwrap();
         }
+        crate::field_choice::field_choice_set(&db, ZONE.into(), true, true)
+            .await
+            .unwrap();
         (dir, db)
     }
 
@@ -323,6 +326,29 @@ mod tests {
             let found = view_named(&db, space, "All issues").await;
 
             assert_eq!(found.columns, columns, "{visibility:?}");
+        }
+    }
+
+    #[tokio::test]
+    async fn a_view_drops_a_custom_column_that_is_not_opted_in_for_lists() {
+        let (_dir, db) = lab().await;
+        let space = space(&db, A).await;
+        let view = view_named(&db, space, "All issues").await;
+        view_set_columns(&db, view.id, vec!["status".into(), ZONE.into()])
+            .await
+            .unwrap();
+
+        for (in_list, in_detail, columns) in [
+            (false, true, vec!["status"]),
+            (true, false, vec!["status", ZONE]),
+        ] {
+            crate::field_choice::field_choice_set(&db, ZONE.into(), in_list, in_detail)
+                .await
+                .unwrap();
+
+            let found = view_named(&db, space, "All issues").await;
+
+            assert_eq!(found.columns, columns, "list {in_list}, detail {in_detail}");
         }
     }
 

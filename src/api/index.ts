@@ -28,7 +28,7 @@ import type {
   Filter,
   Op,
   GroupBy,
-  FieldVisibility,
+  FieldChoiceRow,
   Keybindings,
   LaunchEvent,
   LinkTarget,
@@ -318,8 +318,13 @@ export const api = {
   statusStyleSetApp: (statusId: string, style: Style | null) => invoke<AppStatusRow[]>("status_style_set_app", { statusId, style }),
   spaceConfig: (projectId: string) => invoke<SpaceConfig>("space_config", { projectId }),
   spaceSetLayouts: (projectId: string, layouts: SpaceLayouts) => invoke<SpaceConfig>("space_set_layouts", { projectId, layouts }),
-  spaceSetField: (projectId: string, fieldId: string, visibility: FieldVisibility) =>
-    invoke<SpaceConfig>("space_set_field", { projectId, fieldId, visibility }),
+  /** Where the Space shows a field opted in app-wide; it can't show one where the app doesn't. */
+  spaceSetField: (projectId: string, fieldId: string, inList: boolean, inDetail: boolean) =>
+    invoke<SpaceConfig>("space_set_field", { projectId, fieldId, inList, inDetail }),
+  /** Every custom field of the site with where it shows app-wide. */
+  fieldChoices: () => invoke<FieldChoiceRow[]>("field_choices"),
+  /** Neither place hides the field everywhere, and the sync stops downloading it. */
+  fieldChoiceSet: (fieldId: string, inList: boolean, inDetail: boolean) => invoke<FieldChoiceRow[]>("field_choice_set", { fieldId, inList, inDetail }),
   /** Reporter and the custom user fields Me mode may count (Settings → General → Me Mode). */
   meUserFields: () => invoke<UserField[]>("me_user_fields"),
   meRuleEdit: (edit: MeRuleEdit) => invoke<Settings>("me_rule_edit", { edit }),

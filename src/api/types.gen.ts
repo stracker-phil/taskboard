@@ -328,10 +328,20 @@ export type ErrorKind = "io" | "invalid_input" | "not_found" | "not_connected" |
  */
 export type Field = string;
 
-export type FieldSetting = { id: string, name: string, visibility: FieldVisibility, };
+export type FieldChoiceRow = { id: string, name: string, 
+/**
+ * Jira's schema type: `user`, `option`, `string`, `number`, `date`, …
+ */
+kind: string, inList: boolean, inDetail: boolean, };
+
+export type FieldSetting = { id: string, name: string, 
+/**
+ * Opted in app-wide for the list; `in_list` is the Space's own say, which only narrows it.
+ */
+appList: boolean, appDetail: boolean, inList: boolean, inDetail: boolean, };
 
 /**
- * Where a custom field shows in a Space; `Visible` is the default.
+ * Where a custom field opted in app-wide shows in a Space; `Visible` (as app-wide) is the default.
  */
 export type FieldVisibility = "visible" | "hiddenInList" | "hiddenInDetail" | "hidden";
 
@@ -404,7 +414,7 @@ gone: boolean,
  */
 syncedAt: string, 
 /**
- * The custom fields the owner shows (marked shown or used as a view column), with their value if any.
+ * The custom fields opted in for the Issue view that the issue fills.
  */
 custom: Array<CustomField>, 
 /**
@@ -883,7 +893,7 @@ export type SortBy = "updated" | "created" | "priority" | "due" | "key" | "summa
  */
 export type SpaceConfig = { projectId: string, layouts: SpaceLayouts, 
 /**
- * The custom fields worth a setting (`RELEVANT_FIELD`), by name.
+ * The custom fields opted in app-wide, by name.
  */
 fields: Array<FieldSetting>, };
 

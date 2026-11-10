@@ -658,10 +658,18 @@ mod the_tree_on_the_demo_site {
         assert_eq!(
             number(
                 site.db(),
-                format!("SELECT shown FROM cache.field WHERE id = '{REVIEWER}'")
+                format!("SELECT in_list FROM field_choice WHERE field_id = '{REVIEWER}'")
             )
             .await,
             1
+        );
+        assert_eq!(
+            number(
+                site.db(),
+                format!("SELECT in_detail FROM field_choice WHERE field_id = '{REVIEWER}'")
+            )
+            .await,
+            0
         );
     }
 
@@ -933,9 +941,21 @@ mod the_tree_on_the_demo_site {
 
     #[tokio::test]
     #[ignore = "syncs the demo site into a temp database"]
-    async fn the_filter_fields_are_the_standard_ones_then_the_custom_fields_worth_filtering() {
+    async fn the_filter_fields_are_the_standard_ones_then_the_opted_in_custom_fields() {
         let site = Synced::new().await;
         let everything = node_id(site.db(), "everything").await;
+        let before = filter_options(site.db(), everything).await.unwrap();
+        assert!(
+            before
+                .fields
+                .iter()
+                .all(|f| !f.id.starts_with("customfield_"))
+        );
+        for id in [REVIEWER, "customfield_10016"] {
+            taskboard_lib::field_choice::field_choice_set(site.db(), id.into(), true, true)
+                .await
+                .unwrap();
+        }
 
         let options = filter_options(site.db(), everything).await.unwrap();
 
@@ -1076,26 +1096,6 @@ mod filter_status_choices {
     }
 }
 
-mod filter_fields_per_level {
-    use super::*;
-    use taskboard_lib::space_config::{FieldVisibility, space_set_field};
-
-    const ZONE: &str = "customfield_10001";
-    const BETA: &str = "customfield_10003";
-
-    async fn two_spaces() -> (TempDir, Db) {
-        let (dir, db) = tracked_lab().await;
-        track_project(&db, NWS.into(), true).await.unwrap();
-        execute(
-            &db,
-            "INSERT INTO cache.field (id, name, type, used) VALUES
-               ('customfield_10001', 'Zone', 'string', 1),
-               ('customfield_10003', 'Beta', 'string', 1)",
-        )
-        .await;
-        (dir, db)
-    }
-
 mod filter_value_choices_per_level {
     use super::*;
     use taskboard_lib::lists::FilterOptions;
@@ -1230,6 +1230,31 @@ mod filter_value_choices_per_level {
     }
 }
 
+mod filter_fields_per_level {
+    use super::*;
+    use taskboard_lib::space_config::{FieldVisibility, space_set_field};
+
+    const ZONE: &str = "customfield_10001";
+    const BETA: &str = "customfield_10003";
+
+    async fn two_spaces() -> (TempDir, Db) {
+        let (dir, db) = tracked_lab().await;
+        track_project(&db, NWS.into(), true).await.unwrap();
+        execute(
+            &db,
+            "INSERT INTO cache.field (id, name, type, used) VALUES
+               ('customfield_10001', 'Zone', 'string', 1),
+               ('customfield_10003', 'Beta', 'string', 1)",
+        )
+        .await;
+        for id in [ZONE, BETA] {
+            taskboard_lib::field_choice::field_choice_set(&db, id.into(), true, true)
+                .await
+                .unwrap();
+        }
+        (dir, db)
+    }
+
     async fn hide(db: &Db, project: &str, field: &str, visibility: FieldVisibility) {
         space_set_field(db, project.into(), field.into(), visibility)
             .await
@@ -1272,6 +1297,44 @@ mod filter_value_choices_per_level {
                 custom_fields(&db, other_space).await,
                 (vec![BETA.to_string(), ZONE.to_string()], vec![]),
                 "{visibility:?} elsewhere"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn a_field_not_opted_in_for_the_list_is_never_offered_but_one_in_use_stays_listed_as_hidden()
+     {
+        let (_dir, db) = two_spaces().await;
+        let space = space_node_id(&db, NW).await;
+        let everything = node_id(&db, "everything").await;
+        taskboard_lib::field_choice::field_choice_set(&db, ZONE.into(), false, true)
+            .await
+            .unwrap();
+        assert_eq!(
+            custom_fields(&db, space).await,
+            (vec![BETA.to_string()], vec![ZONE.to_string()])
+        );
+
+        taskboard_lib::field_choice::field_choice_set(&db, ZONE.into(), false, false)
+            .await
+            .unwrap();
+        assert_eq!(
+            custom_fields(&db, space).await,
+            (vec![BETA.to_string()], vec![])
+        );
+
+        execute(
+            &db,
+            r#"INSERT INTO filter_list (kind, name, filter) VALUES
+                 ('list', 'Zone work', '{"conditions":[{"field":"customfield_10001","op":"is","value":"North"}]}')"#,
+        )
+        .await;
+
+        for level in [space, everything] {
+            assert_eq!(
+                custom_fields(&db, level).await,
+                (vec![BETA.to_string()], vec![ZONE.to_string()]),
+                "level {level}"
             );
         }
     }
@@ -2688,7 +2751,8 @@ mod editing_views {
     }
 
     #[tokio::test]
-    async fn a_custom_field_used_in_a_view_filter_is_marked_shown() {
+    async fn a_custom_field_used_in_a_view_filter_is_ticked_for_the_list_and_keeps_its_detail_box()
+    {
         let (_dir, db) = tracked_lab().await;
         db.write(|tx, _| {
             tx.execute(
@@ -2699,6 +2763,9 @@ mod editing_views {
         })
         .await
         .unwrap();
+        taskboard_lib::field_choice::field_choice_set(&db, REVIEWER.into(), false, true)
+            .await
+            .unwrap();
         let epics = list_id(&db, "Epics").await;
         let view = views_of(&db, epics).await.unwrap()[0].id;
 
@@ -2711,14 +2778,47 @@ mod editing_views {
         .await
         .unwrap();
 
-        assert_eq!(
-            number(
-                &db,
-                format!("SELECT shown FROM cache.field WHERE id = '{REVIEWER}'")
-            )
-            .await,
-            1
-        );
+        for (column, expected) in [("in_list", 1), ("in_detail", 1)] {
+            assert_eq!(
+                number(
+                    &db,
+                    format!("SELECT {column} FROM field_choice WHERE field_id = '{REVIEWER}'")
+                )
+                .await,
+                expected,
+                "{column}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn a_filter_list_condition_on_a_custom_field_ticks_its_list_box() {
+        let (_dir, db) = tracked_lab().await;
+        db.write(|tx, _| {
+            tx.execute(
+                "INSERT INTO cache.field (id, name, type) VALUES (?1, 'Reviewer', 'user')",
+                [REVIEWER],
+            )?;
+            Ok(())
+        })
+        .await
+        .unwrap();
+        let epics = list_id(&db, "Epics").await;
+
+        list_set_filter(
+            &db,
+            viewer(Some(ME_ACCOUNT_ID)),
+            epics,
+            filter(vec![Condition::is(Field::Custom(REVIEWER.into()), "me")]),
+        )
+        .await
+        .unwrap();
+
+        let rows = taskboard_lib::field_choice::field_choices(&db)
+            .await
+            .unwrap();
+        let reviewer = rows.iter().find(|r| r.id == REVIEWER).unwrap();
+        assert_eq!((reviewer.in_list, reviewer.in_detail), (true, false));
     }
 
     #[tokio::test]

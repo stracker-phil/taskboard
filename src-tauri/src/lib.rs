@@ -16,6 +16,7 @@ mod dev;
 pub mod diagnostics;
 pub mod error;
 pub mod events;
+pub mod field_choice;
 pub mod filter;
 mod handlers;
 mod instance;

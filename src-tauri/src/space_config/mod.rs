@@ -1,5 +1,5 @@
-//! A Space's own settings: the layouts its views offer, the layout and grouping of its new views, and how
-//! each custom field shows (`space` columns, `space_field`). Status styles per Space live in `status_style`.
+//! A Space's own settings: the layouts its views offer, the layout and grouping of its new views, and where it
+//! hides a custom field opted in app-wide (`space` columns, `space_field`). Status styles live in `status_style`.
 
 pub mod commands;
 mod edit;

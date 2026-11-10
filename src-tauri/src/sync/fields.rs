@@ -1,5 +1,5 @@
 //! The custom fields the sync stores and asks for: the site's field list, which ones the tracked projects fill,
-//! and which ones the owner shows.
+//! and which ones the owner opted in or uses.
 
 use std::collections::BTreeSet;
 
@@ -7,12 +7,13 @@ use rusqlite::{Connection, params};
 
 use super::map::FieldIds;
 use crate::error::AppResult;
+use crate::filter::FIELDS_IN_USE;
 use crate::jira::dto::Field;
 
 const SPRINT_TYPE: &str = "com.pyxis.greenhopper.jira:gh-sprint";
 const EPIC_COLOR_TYPE: &str = "com.pyxis.greenhopper.jira:gh-epic-color";
 
-/// Stores the field list and finds the site's Sprint and Epic Color fields. `shown` stays as the owner set it.
+/// Stores the field list and finds the site's Sprint and Epic Color fields.
 pub fn store_fields(conn: &Connection, fields: &[Field]) -> AppResult<FieldIds> {
     let mut ids = FieldIds::default();
     for field in fields {
@@ -41,34 +42,17 @@ pub fn store_field_usage(conn: &Connection, used: &BTreeSet<String>) -> AppResul
     Ok(())
 }
 
-/// Custom fields fetched with every issue: the `shown_fields`, and the ones the tracked projects fill (once a
-/// sample has marked some unused; before that `used` is 1 for every field of the site).
+/// Custom fields fetched with every issue: those opted in app-wide, those a view or filter uses, and the ones
+/// the tracked projects fill (once a sample has marked some unused; before that `used` is 1 for every field).
 pub fn fetched_fields(conn: &Connection) -> AppResult<Vec<String>> {
-    let mut query = conn.prepare(
-        "SELECT id FROM cache.field
+    let mut query = conn.prepare(&format!(
+        "SELECT field_id FROM field_choice
+         UNION SELECT value FROM ({FIELDS_IN_USE}) WHERE value LIKE 'customfield\\_%' ESCAPE '\\'
+         UNION SELECT id FROM cache.field
          WHERE used = 1 AND id LIKE 'customfield\\_%' ESCAPE '\\'
-           AND EXISTS (SELECT 1 FROM cache.field WHERE used = 0)",
-    )?;
-    let used = query.query_map([], |row| row.get::<_, String>(0))?;
-    let mut ids = shown_fields(conn)?;
-    for id in used {
-        let id = id?;
-        if !ids.contains(&id) {
-            ids.push(id);
-        }
-    }
-    Ok(ids)
-}
-
-/// Custom fields shown with every issue: those the owner marked `shown` and those a view shows as a column.
-pub fn shown_fields(conn: &Connection) -> AppResult<Vec<String>> {
-    let mut query = conn.prepare(
-        "SELECT id FROM cache.field WHERE shown = 1
-         UNION
-         SELECT DISTINCT c.value FROM view v, json_each(v.columns) c
-         WHERE c.value LIKE 'customfield\\_%' ESCAPE '\\'
-         ORDER BY 1",
-    )?;
+           AND EXISTS (SELECT 1 FROM cache.field WHERE used = 0)
+         ORDER BY 1"
+    ))?;
     let ids = query.query_map([], |row| row.get(0))?;
     Ok(ids.collect::<Result<_, _>>()?)
 }

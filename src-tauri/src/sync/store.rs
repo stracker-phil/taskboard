@@ -2,7 +2,7 @@
 
 use rusqlite::{Connection, OptionalExtension, params};
 
-pub use super::fields::{fetched_fields, shown_fields, store_field_usage, store_fields};
+pub use super::fields::{fetched_fields, store_field_usage, store_fields};
 
 use super::diff::{Snapshot, diff};
 use super::map::{FieldIds, IssueRow, Mapped, map_issue};

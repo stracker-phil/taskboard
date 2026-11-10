@@ -38,8 +38,8 @@ describe("SettingsApp", () => {
 
     const nav = screen.getByRole("navigation", { name: "Settings pages" });
     const entries = within(nav).getAllByRole("button").map((b) => b.textContent?.trim());
-    expect(entries).toEqual(["Connection", "Projects", "Spaces", "Team", "Statuses", "Sync", "General", "Appearance", "Shortcuts", "Status"]);
-    expect(nav.textContent).toMatch(/Jira.*Connection.*Projects.*Spaces.*Team.*Statuses.*Sync.*System.*General.*Appearance.*Shortcuts.*Status/);
+    expect(entries).toEqual(["Connection", "Projects", "Spaces", "Team", "Statuses", "Custom fields", "Sync", "General", "Appearance", "Shortcuts", "Status"]);
+    expect(nav.textContent).toMatch(/Jira.*Connection.*Projects.*Spaces.*Team.*Statuses.*Custom fields.*Sync.*System.*General.*Appearance.*Shortcuts.*Status/);
     expect(screen.getByRole("heading", { name: "Connection" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Connection/ })).toHaveAttribute("aria-current", "page");
   });
@@ -54,13 +54,24 @@ describe("SettingsApp", () => {
   });
 
   describe("search", () => {
-    it.each(["Custom fields", "Layouts"])("finds the Spaces page by its %s section", async (text) => {
+    it("finds the Spaces page by its Layouts section", async () => {
       await renderSettings();
 
-      await userEvent.type(screen.getByRole("searchbox", { name: "Search Settings" }), text);
+      await userEvent.type(screen.getByRole("searchbox", { name: "Search Settings" }), "Layouts");
 
       const nav = screen.getByRole("navigation", { name: "Settings pages" });
       expect(within(nav).getAllByRole("button").map((b) => b.textContent?.trim())).toEqual([expect.stringContaining("Spaces")]);
+    });
+
+    it("finds both the Spaces page by its Custom fields section and the Custom fields page", async () => {
+      await renderSettings();
+
+      await userEvent.type(screen.getByRole("searchbox", { name: "Search Settings" }), "Custom fields");
+
+      const nav = screen.getByRole("navigation", { name: "Settings pages" });
+      const entries = within(nav).getAllByRole("button").map((b) => b.textContent?.trim());
+      expect(entries).toEqual([expect.stringContaining("Spaces"), "Custom fields"]);
+      expect(entries[0]).toContain("Custom fields");
     });
 
     it("finds both the Spaces page by its Statuses section and the Statuses page", async () => {

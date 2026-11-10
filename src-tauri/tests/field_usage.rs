@@ -1,11 +1,12 @@
-//! Which custom fields the pickers offer: the marks `store_field_usage` writes, and the Columns catalog and
-//! the filter editor's field list that leave unused fields out unless the owner already uses them.
+//! Which custom fields the pickers offer and the sync fetches: the marks `store_field_usage` writes, the
+//! owner's opt-ins (`field_choice`), and the fields a view or filter already uses.
 
 use std::collections::BTreeSet;
 
 use tempfile::TempDir;
 
 use taskboard_lib::db::Db;
+use taskboard_lib::field_choice::field_choice_set;
 use taskboard_lib::lists::filter_options;
 use taskboard_lib::sync::store::{fetched_fields, store_field_usage};
 use taskboard_lib::test_support::temp_config_dir;
@@ -45,6 +46,12 @@ async fn lab() -> (TempDir, Db) {
     )
     .await;
     (dir, db)
+}
+
+async fn opt_in(db: &Db, id: &str, in_list: bool, in_detail: bool) {
+    field_choice_set(db, id.into(), in_list, in_detail)
+        .await
+        .unwrap();
 }
 
 async fn mark_used(db: &Db, used: &[&str]) {
@@ -193,32 +200,29 @@ mod the_fetched_fields {
     }
 
     #[tokio::test]
-    async fn only_the_shown_fields_are_fetched_before_any_sampling() {
+    async fn the_opted_in_fields_are_fetched_before_any_sampling_whatever_the_place() {
         let (_dir, db) = lab().await;
-        execute(
-            &db,
-            "UPDATE cache.field SET shown = 1 WHERE id = 'customfield_10090'",
-        )
-        .await;
+        opt_in(&db, COST_CENTER, true, false).await;
+        opt_in(&db, REVIEWER, false, true).await;
 
-        assert_eq!(fetched(&db).await, ids(&[COST_CENTER]));
+        assert_eq!(fetched(&db).await, ids(&[REVIEWER, COST_CENTER]));
     }
 
     #[tokio::test]
-    async fn nothing_is_fetched_before_any_sampling_when_nothing_is_shown() {
+    async fn nothing_is_fetched_before_any_sampling_when_nothing_is_opted_in() {
         let (_dir, db) = lab().await;
 
         assert_eq!(fetched(&db).await, Vec::<String>::new());
     }
 
     #[tokio::test]
-    async fn the_sampled_used_fields_are_fetched_with_the_shown_ones_and_the_view_columns() {
+    async fn the_sampled_used_fields_are_fetched_with_the_opted_in_ones_and_the_view_columns() {
         let (_dir, db) = lab().await;
         mark_used(&db, &[STORY_POINTS, REVIEWER]).await;
+        opt_in(&db, COST_CENTER, true, true).await;
         execute(
             &db,
-            "UPDATE cache.field SET shown = 1 WHERE id = 'customfield_10090';
-             UPDATE view SET columns = '[\"status\",\"customfield_10091\"]'",
+            "UPDATE view SET columns = '[\"status\",\"customfield_10091\"]'",
         )
         .await;
 
@@ -229,14 +233,24 @@ mod the_fetched_fields {
     }
 
     #[tokio::test]
-    async fn a_field_that_is_shown_and_used_is_fetched_once() {
+    async fn a_field_a_filter_list_has_a_condition_on_is_fetched() {
         let (_dir, db) = lab().await;
-        mark_used(&db, &[REVIEWER]).await;
         execute(
             &db,
-            "UPDATE cache.field SET shown = 1 WHERE id = 'customfield_10071'",
+            "UPDATE filter_list SET filter = '{\"conditions\":[
+               {\"field\":\"type\",\"op\":\"is\",\"value\":\"Bug\"},
+               {\"field\":\"customfield_10090\",\"op\":\"is\",\"value\":\"CC-100\"}]}'",
         )
         .await;
+
+        assert_eq!(fetched(&db).await, ids(&[COST_CENTER]));
+    }
+
+    #[tokio::test]
+    async fn a_field_that_is_opted_in_and_used_is_fetched_once() {
+        let (_dir, db) = lab().await;
+        mark_used(&db, &[REVIEWER]).await;
+        opt_in(&db, REVIEWER, true, true).await;
 
         assert_eq!(fetched(&db).await, ids(&[REVIEWER]));
     }
@@ -253,55 +267,74 @@ mod the_fetched_fields {
 mod the_pickers {
     use super::*;
 
-    #[tokio::test]
-    async fn every_custom_field_is_offered_before_any_sampling() {
-        let (_dir, db) = lab().await;
-
-        assert_offered(&db, &[COST_CENTER, LEGAL_APPROVAL, REVIEWER, STORY_POINTS]).await;
+    /// The custom fields the filter editor keeps out as hidden (not opted in for the list).
+    async fn hidden_filter_fields(db: &Db) -> Vec<String> {
+        filter_options(db, everything(db).await)
+            .await
+            .unwrap()
+            .hidden_fields
+            .into_iter()
+            .filter(|f| f.id.starts_with("customfield_"))
+            .map(|f| f.id)
+            .collect()
     }
 
     #[tokio::test]
-    async fn a_field_no_tracked_issue_fills_is_left_out() {
+    async fn no_custom_field_is_offered_before_the_owner_opts_one_in() {
+        let (_dir, db) = lab().await;
+
+        assert_offered(&db, &[]).await;
+        assert_eq!(hidden_filter_fields(&db).await, Vec::<String>::new());
+    }
+
+    #[tokio::test]
+    async fn the_opted_in_fields_are_offered_by_name() {
+        let (_dir, db) = lab().await;
+        opt_in(&db, STORY_POINTS, true, true).await;
+        opt_in(&db, COST_CENTER, true, false).await;
+
+        assert_offered(&db, &[COST_CENTER, STORY_POINTS]).await;
+    }
+
+    #[tokio::test]
+    async fn a_field_opted_in_for_the_issue_view_only_is_not_a_list_choice() {
+        let (_dir, db) = lab().await;
+        opt_in(&db, REVIEWER, false, true).await;
+
+        assert_offered(&db, &[]).await;
+        assert_eq!(hidden_filter_fields(&db).await, [REVIEWER]);
+    }
+
+    #[tokio::test]
+    async fn sampling_which_fields_the_issues_fill_does_not_offer_them() {
         let (_dir, db) = lab().await;
 
         mark_used(&db, &[STORY_POINTS, REVIEWER]).await;
 
-        assert_offered(&db, &[REVIEWER, STORY_POINTS]).await;
+        assert_offered(&db, &[]).await;
     }
 
     #[tokio::test]
-    async fn a_field_no_tracked_issue_fills_stays_when_it_is_shown_in_the_field_grid() {
+    async fn a_field_a_view_has_as_a_column_is_listed_as_hidden_until_it_is_opted_in() {
         let (_dir, db) = lab().await;
-        mark_used(&db, &[STORY_POINTS, REVIEWER]).await;
-
-        execute(
-            &db,
-            "UPDATE cache.field SET shown = 1 WHERE id = 'customfield_10090'",
-        )
-        .await;
-
-        assert_offered(&db, &[COST_CENTER, REVIEWER, STORY_POINTS]).await;
-    }
-
-    #[tokio::test]
-    async fn a_field_no_tracked_issue_fills_stays_when_a_view_has_it_as_a_column() {
-        let (_dir, db) = lab().await;
-        mark_used(&db, &[STORY_POINTS, REVIEWER]).await;
-
         execute(
             &db,
             "UPDATE view SET columns = '[\"status\",\"customfield_10091\"]'",
         )
         .await;
 
-        assert_offered(&db, &[LEGAL_APPROVAL, REVIEWER, STORY_POINTS]).await;
+        assert_offered(&db, &[]).await;
+        assert_eq!(hidden_filter_fields(&db).await, [LEGAL_APPROVAL]);
+
+        opt_in(&db, LEGAL_APPROVAL, true, false).await;
+
+        assert_offered(&db, &[LEGAL_APPROVAL]).await;
+        assert_eq!(hidden_filter_fields(&db).await, Vec::<String>::new());
     }
 
     #[tokio::test]
-    async fn a_field_no_tracked_issue_fills_stays_when_a_filter_list_has_a_condition_on_it() {
+    async fn a_field_a_filter_list_has_a_condition_on_is_listed_as_hidden_until_it_is_opted_in() {
         let (_dir, db) = lab().await;
-        mark_used(&db, &[STORY_POINTS, REVIEWER]).await;
-
         execute(
             &db,
             "UPDATE filter_list SET filter = '{\"conditions\":[
@@ -310,23 +343,27 @@ mod the_pickers {
         )
         .await;
 
-        assert_offered(&db, &[COST_CENTER, REVIEWER, STORY_POINTS]).await;
+        assert_offered(&db, &[]).await;
+        assert_eq!(hidden_filter_fields(&db).await, [COST_CENTER]);
     }
 
     #[tokio::test]
     async fn a_view_without_columns_and_a_list_without_a_filter_keep_nothing_alive() {
         let (_dir, db) = lab().await;
-        mark_used(&db, &[STORY_POINTS]).await;
+        opt_in(&db, STORY_POINTS, true, true).await;
         execute(&db, "UPDATE view SET columns = NULL").await;
 
         assert_offered(&db, &[STORY_POINTS]).await;
+        assert_eq!(hidden_filter_fields(&db).await, Vec::<String>::new());
     }
 
     #[tokio::test]
     async fn internal_fields_stay_out_even_when_a_view_shows_them() {
         let (_dir, db) = lab().await;
+        opt_in(&db, STORY_POINTS, true, true).await;
         execute(&db, "UPDATE view SET columns = '[\"customfield_10019\"]'").await;
 
-        assert_offered(&db, &[COST_CENTER, LEGAL_APPROVAL, REVIEWER, STORY_POINTS]).await;
+        assert_offered(&db, &[STORY_POINTS]).await;
+        assert_eq!(hidden_filter_fields(&db).await, Vec::<String>::new());
     }
 }

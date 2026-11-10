@@ -14,6 +14,7 @@ use taskboard_lib::connection::{
 };
 use taskboard_lib::db::{Changes, Db};
 use taskboard_lib::error::{AppResult, ErrorKind};
+use taskboard_lib::field_choice::field_choice_set;
 use taskboard_lib::issues::{
     ActivityItem, ChangeValue, CustomField, InlineImage, IssueDetail, IssueLink,
     MAX_INLINE_IMAGE_BYTES, RelatedIssue, WebLink, WebLinkKind, attachment_file, attachment_image,
@@ -394,7 +395,16 @@ impl Site {
         )
     }
 
+    async fn opt_in(&self, fields: &[&str]) {
+        for id in fields {
+            field_choice_set(self.db(), id.to_string(), true, true)
+                .await
+                .unwrap();
+        }
+    }
+
     async fn show_reviewer_column(&self) {
+        self.opt_in(&[REVIEWER]).await;
         let space = self
             .db()
             .read(|conn| {
@@ -1990,8 +2000,34 @@ async fn forgetting_an_issue_drops_its_web_links() {
 
 #[tokio::test]
 #[ignore = "syncs the demo site into a temp database"]
-async fn the_custom_fields_an_issue_fills_are_listed_by_name_without_being_shown() {
+async fn a_filled_custom_field_is_not_listed_until_it_is_opted_in_for_the_issue_view() {
     let site = Site::new().await;
+
+    assert_eq!(site.detail("NW-1042").await.custom, []);
+
+    field_choice_set(site.db(), REVIEWER.into(), true, false)
+        .await
+        .unwrap();
+    assert_eq!(site.detail("NW-1042").await.custom, []);
+
+    field_choice_set(site.db(), REVIEWER.into(), false, true)
+        .await
+        .unwrap();
+    let ids: Vec<String> = site
+        .detail("NW-1042")
+        .await
+        .custom
+        .into_iter()
+        .map(|f| f.id)
+        .collect();
+    assert_eq!(ids, [REVIEWER]);
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn the_opted_in_custom_fields_an_issue_fills_are_listed_by_name() {
+    let site = Site::new().await;
+    site.opt_in(&[REVIEWER, "customfield_10016"]).await;
 
     let detail = site.detail("NW-1042").await;
 
@@ -2014,6 +2050,7 @@ async fn the_custom_fields_an_issue_fills_are_listed_by_name_without_being_shown
 #[ignore = "syncs the demo site into a temp database"]
 async fn a_field_the_space_hides_from_the_detail_is_left_out_of_its_issues() {
     let site = Site::new().await;
+    site.opt_in(&[REVIEWER, "customfield_10016"]).await;
 
     for (visibility, listed) in [
         (FieldVisibility::HiddenInDetail, false),
@@ -2041,8 +2078,9 @@ async fn a_field_the_space_hides_from_the_detail_is_left_out_of_its_issues() {
 
 #[tokio::test]
 #[ignore = "syncs the demo site into a temp database"]
-async fn an_issue_that_fills_no_custom_field_lists_none_until_one_is_shown() {
+async fn an_issue_that_fills_no_custom_field_lists_none_even_with_fields_opted_in() {
     let site = Site::new().await;
+    site.opt_in(&[REVIEWER, "customfield_10016"]).await;
 
     assert_eq!(site.detail("NW-1056").await.custom, []);
 }
@@ -2051,6 +2089,8 @@ async fn an_issue_that_fills_no_custom_field_lists_none_until_one_is_shown() {
 #[ignore = "syncs the demo site into a temp database"]
 async fn a_bug_lists_its_template_rich_text_fields_with_html_rendered_from_their_adf() {
     let site = Site::new().await;
+    site.opt_in(&["customfield_10080", "customfield_10081"])
+        .await;
     let custom: serde_json::Value = serde_json::from_str(
         &site
             .db()
@@ -2613,21 +2653,13 @@ fn fresh_flags(items: &[ActivityItem]) -> Vec<bool> {
 
 #[tokio::test]
 #[ignore = "syncs the demo site into a temp database"]
-async fn a_custom_field_without_a_value_is_listed_with_no_value() {
+async fn a_custom_field_the_issue_leaves_empty_is_not_listed() {
     let site = Site::new().await;
     site.show_reviewer_column().await;
 
     let detail = site.detail("NW-1049").await;
 
-    assert_eq!(
-        detail.custom[0],
-        CustomField {
-            id: REVIEWER.into(),
-            name: "Reviewer".into(),
-            value: None,
-            html: None,
-        }
-    );
+    assert!(detail.custom.iter().all(|f| f.id != REVIEWER));
 }
 
 const LISTED_PDF_BYTES: usize = 1_240_000;

@@ -6,6 +6,7 @@ use std::time::Duration;
 
 use rusqlite::Connection;
 
+use super::field_seed::seed_field_choices;
 use super::migrate::{self, CACHE, LOCAL};
 use crate::error::{AppError, AppResult};
 
@@ -51,6 +52,7 @@ pub fn prepare(dir: &Path) -> AppResult<()> {
     require_fts5(&local)?;
     migrate::migrate(&mut local, "local", LOCAL)?;
     carry_over_seen(&local, dir)?;
+    seed_field_choices(&local, dir)?;
     prepare_cache(dir)
 }
 

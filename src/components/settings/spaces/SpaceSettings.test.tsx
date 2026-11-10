@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -9,7 +9,7 @@ import { api, type Accent, type SpaceConfig, type SpaceLayouts } from "../../../
 import { createQueryClient } from "../../../queries/queryClient";
 import { resetStore } from "../../../state/store";
 import { settings } from "../../../test/settings";
-import { space, spaceConfig } from "../../../test/spaces";
+import { fieldSetting, space, spaceConfig } from "../../../test/spaces";
 import { teamCell, teamMatrix } from "../../../test/team";
 import { MenuHost } from "../../menu";
 import { Toasts } from "../../Toasts";
@@ -265,57 +265,54 @@ describe("SpaceSettings", () => {
   });
 
   describe("custom fields", () => {
-    const fields = [
-      { id: "customfield_10071", name: "Reviewer", visibility: "visible" as const },
-      { id: "customfield_10072", name: "Story points", visibility: "hidden" as const },
-    ];
+    const reviewer = fieldSetting();
+    const points = fieldSetting({ id: "customfield_10072", name: "Story points", appDetail: false, inDetail: false });
 
-    it("says fields appear after the first sync when there are none", async () => {
+    it("points to the app-wide Custom fields settings when no field is picked", async () => {
       await renderSettings(spaceConfig({ fields: [] }));
 
-      expect(screen.getByText("Custom fields appear after the first sync.")).toBeInTheDocument();
+      expect(screen.getByText("No fields are shown. Pick fields in Settings → Custom fields.")).toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole("button", { name: "Custom Fields…" }));
+
+      expect(mocked.runCommand).toHaveBeenCalledWith("app:settings:fields");
     });
 
-    it("shows a row per field with its visibility", async () => {
-      await renderSettings(spaceConfig({ fields }));
+    it("shows a box per place the app shows the field, ticked as the Space has it", async () => {
+      await renderSettings(spaceConfig({ fields: [reviewer, { ...points, inList: false }] }));
 
-      expect(screen.getByRole("button", { name: "Visibility of Reviewer" })).toHaveTextContent("Visible");
-      expect(screen.getByRole("button", { name: "Visibility of Story points" })).toHaveTextContent("Hidden everywhere");
+      expect(screen.getByRole("checkbox", { name: "Reviewer in this Space's lists" })).toBeChecked();
+      expect(screen.getByRole("checkbox", { name: "Reviewer in this Space's Issue view" })).toBeChecked();
+      expect(screen.getByRole("checkbox", { name: "Story points in this Space's lists" })).not.toBeChecked();
     });
 
-    it("offers the four visibilities with the current one checked", async () => {
-      await renderSettings(spaceConfig({ fields }));
+    it("shows no box for a place the app does not show the field", async () => {
+      await renderSettings(spaceConfig({ fields: [points] }));
 
-      const menu = await openMenuOf("Visibility of Reviewer");
-
-      expect(rowsOf(menu).map((r) => [r.textContent, r.getAttribute("aria-checked")])).toEqual([
-        ["Visible", "true"],
-        ["Hidden in list", "false"],
-        ["Hidden in detail", "false"],
-        ["Hidden everywhere", "false"],
-      ]);
+      expect(screen.queryByRole("checkbox", { name: "Story points in this Space's Issue view" })).not.toBeInTheDocument();
     });
 
-    it("saves the chosen visibility and shows the config Rust returns", async () => {
-      mocked.spaceSetField.mockResolvedValue(spaceConfig({ fields: [{ ...fields[0], visibility: "hiddenInList" }, fields[1]] }));
-      await renderSettings(spaceConfig({ fields }));
-      const menu = await openMenuOf("Visibility of Reviewer");
+    it.each([
+      ["lists", "Reviewer in this Space's lists", false, true],
+      ["Issue view", "Reviewer in this Space's Issue view", true, false],
+    ])("unticking the %s box sends it off and keeps the other place", async (_place, name, inList, inDetail) => {
+      mocked.spaceSetField.mockResolvedValue(spaceConfig({ fields: [fieldSetting({ inList, inDetail })] }));
+      await renderSettings(spaceConfig({ fields: [reviewer] }));
 
-      await choose(menu, "Hidden in list");
+      await userEvent.click(screen.getByRole("checkbox", { name }));
 
-      expect(mocked.spaceSetField).toHaveBeenCalledWith("10001", "customfield_10071", "hiddenInList");
-      expect(await screen.findByRole("button", { name: "Visibility of Reviewer" })).toHaveTextContent("Hidden in list");
+      expect(mocked.spaceSetField).toHaveBeenCalledWith("10001", "customfield_10071", inList, inDetail);
+      await waitFor(() => expect(screen.getByRole("checkbox", { name })).not.toBeChecked());
     });
 
-    it("shows an error toast when the visibility cannot be saved", async () => {
+    it("shows an error toast when the field cannot be changed", async () => {
       mocked.spaceSetField.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
-      await renderSettings(spaceConfig({ fields }));
-      const menu = await openMenuOf("Visibility of Reviewer");
+      await renderSettings(spaceConfig({ fields: [reviewer] }));
 
-      await choose(menu, "Hidden in detail");
+      await userEvent.click(screen.getByRole("checkbox", { name: "Reviewer in this Space's lists" }));
 
       expect(await screen.findByRole("alert")).toHaveTextContent("Could not change Reviewer: Disk full");
-      expect(screen.getByRole("button", { name: "Visibility of Reviewer" })).toHaveTextContent("Visible");
+      expect(screen.getByRole("checkbox", { name: "Reviewer in this Space's lists" })).toBeChecked();
     });
   });
 });

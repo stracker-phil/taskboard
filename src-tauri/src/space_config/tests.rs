@@ -36,6 +36,11 @@ async fn lab() -> (tempfile::TempDir, Db) {
             .await
             .unwrap();
     }
+    for id in [ZONE, ALPHA, BETA] {
+        crate::field_choice::field_choice_set(&db, id.into(), true, true)
+            .await
+            .unwrap();
+    }
     (dir, db)
 }
 
@@ -155,20 +160,89 @@ async fn a_space_without_settings_offers_every_layout_and_every_field() {
 
     assert_eq!(config.project_id, A);
     assert_eq!(config.layouts, SpaceLayouts::default());
-    let fields: Vec<(&str, &str, FieldVisibility)> = config
+    let fields: Vec<(&str, &str, bool, bool, bool, bool)> = config
         .fields
         .iter()
-        .map(|f| (f.id.as_str(), f.name.as_str(), f.visibility))
+        .map(|f| {
+            (
+                f.id.as_str(),
+                f.name.as_str(),
+                f.app_list,
+                f.app_detail,
+                f.in_list,
+                f.in_detail,
+            )
+        })
         .collect();
     assert_eq!(
         fields,
         [
-            (ALPHA, "alpha", FieldVisibility::Visible),
-            (BETA, "Beta", FieldVisibility::Visible),
-            (ZONE, "Zone", FieldVisibility::Visible),
+            (ALPHA, "alpha", true, true, true, true),
+            (BETA, "Beta", true, true, true, true),
+            (ZONE, "Zone", true, true, true, true),
         ]
     );
     assert!(config.fields.iter().all(|f| f.id != STALE));
+}
+
+#[tokio::test]
+async fn the_settings_page_lists_only_the_fields_opted_in_app_wide() {
+    let (_dir, db) = lab().await;
+    crate::field_choice::field_choice_set(&db, BETA.into(), false, false)
+        .await
+        .unwrap();
+    crate::field_choice::field_choice_set(&db, ZONE.into(), false, true)
+        .await
+        .unwrap();
+
+    let config = space_config(&db, A.into()).await.unwrap();
+
+    let fields: Vec<(&str, bool, bool)> = config
+        .fields
+        .iter()
+        .map(|f| (f.id.as_str(), f.app_list, f.app_detail))
+        .collect();
+    assert_eq!(fields, [(ALPHA, true, true), (ZONE, false, true)]);
+}
+
+#[test]
+fn a_field_setting_serializes_for_the_page_in_camel_case() {
+    let setting = FieldSetting {
+        id: ZONE.into(),
+        name: "Zone".into(),
+        app_list: true,
+        app_detail: false,
+        in_list: false,
+        in_detail: true,
+    };
+
+    assert_eq!(
+        serde_json::to_value(&setting).unwrap(),
+        serde_json::json!({
+            "id": ZONE,
+            "name": "Zone",
+            "appList": true,
+            "appDetail": false,
+            "inList": false,
+            "inDetail": true,
+        })
+    );
+}
+
+#[test]
+fn the_places_a_space_keeps_a_field_in_map_to_its_visibility() {
+    for (in_list, in_detail, expected) in [
+        (true, true, FieldVisibility::Visible),
+        (false, true, FieldVisibility::HiddenInList),
+        (true, false, FieldVisibility::HiddenInDetail),
+        (false, false, FieldVisibility::Hidden),
+    ] {
+        assert_eq!(
+            FieldVisibility::from_places(in_list, in_detail),
+            expected,
+            "list {in_list}, detail {in_detail}"
+        );
+    }
 }
 
 #[tokio::test]
@@ -273,12 +347,8 @@ async fn an_unknown_field_is_not_found() {
 async fn a_fields_visibility_round_trips_per_space_and_visible_deletes_the_row() {
     let (_dir, db) = lab().await;
     let visibility_in = |config: &SpaceConfig, id: &str| {
-        config
-            .fields
-            .iter()
-            .find(|f| f.id == id)
-            .unwrap()
-            .visibility
+        let field = config.fields.iter().find(|f| f.id == id).unwrap();
+        FieldVisibility::from_places(field.in_list, field.in_detail)
     };
 
     for visibility in [
@@ -378,9 +448,38 @@ async fn the_fields_a_space_hides_depend_on_the_place() {
         .await
         .unwrap();
 
-    assert_eq!(list, ids(&[ZONE, BETA]));
-    assert_eq!(detail, ids(&[ALPHA, BETA]));
-    assert_eq!(other, ids(&[ALPHA]));
+    assert_eq!(list, ids(&[ZONE, BETA, STALE]));
+    assert_eq!(detail, ids(&[ALPHA, BETA, STALE]));
+    assert_eq!(other, ids(&[ALPHA, STALE]));
+}
+
+#[tokio::test]
+async fn a_field_not_opted_in_for_a_place_is_hidden_there_in_every_space() {
+    let (_dir, db) = lab().await;
+    crate::field_choice::field_choice_set(&db, ZONE.into(), false, true)
+        .await
+        .unwrap();
+    crate::field_choice::field_choice_set(&db, ALPHA.into(), true, false)
+        .await
+        .unwrap();
+    hide(&db, A, BETA, FieldVisibility::HiddenInDetail).await;
+
+    let (list_a, detail_a, list_b, detail_b) = db
+        .read(|conn| {
+            Ok((
+                hidden_fields(conn, A, Place::List)?,
+                hidden_fields(conn, A, Place::Detail)?,
+                hidden_fields(conn, B, Place::List)?,
+                hidden_fields(conn, B, Place::Detail)?,
+            ))
+        })
+        .await
+        .unwrap();
+
+    assert_eq!(list_a, ids(&[ZONE, STALE]));
+    assert_eq!(detail_a, ids(&[ALPHA, BETA, STALE]));
+    assert_eq!(list_b, ids(&[ZONE, STALE]));
+    assert_eq!(detail_b, ids(&[ALPHA, STALE]));
 }
 
 #[tokio::test]
@@ -405,13 +504,36 @@ async fn outside_the_spaces_a_column_is_hidden_only_when_every_tracked_space_hid
         .await
         .unwrap();
 
-    assert_eq!(every, ids(&[ZONE]));
-    assert_eq!(in_everything, ids(&[ZONE]));
-    assert_eq!(in_a, ids(&[ZONE, ALPHA]));
+    assert_eq!(every, ids(&[ZONE, STALE]));
+    assert_eq!(in_everything, ids(&[ZONE, STALE]));
+    assert_eq!(in_a, ids(&[ZONE, ALPHA, STALE]));
 }
 
 #[tokio::test]
-async fn without_tracked_spaces_no_column_is_hidden() {
+async fn without_tracked_spaces_only_the_fields_not_opted_in_are_hidden() {
+    let dir = crate::test_support::temp_config_dir();
+    let db = Db::open(dir.path()).unwrap();
+    db.write(|tx, _| {
+        tx.execute_batch(
+            "INSERT INTO cache.field (id, name, type, used) VALUES
+               ('customfield_10001', 'Zone', 'string', 1),
+               ('customfield_10002', 'alpha', 'string', 1)",
+        )?;
+        Ok(())
+    })
+    .await
+    .unwrap();
+    crate::field_choice::field_choice_set(&db, ZONE.into(), true, false)
+        .await
+        .unwrap();
+
+    let hidden = db.read(hidden_in_every_space).await.unwrap();
+
+    assert_eq!(hidden, ids(&[ALPHA]));
+}
+
+#[tokio::test]
+async fn without_tracked_spaces_and_fields_no_column_is_hidden() {
     let dir = crate::test_support::temp_config_dir();
     let db = Db::open(dir.path()).unwrap();
 

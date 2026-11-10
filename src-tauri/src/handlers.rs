@@ -145,6 +145,8 @@ pub fn handlers() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
         crate::status_style::commands::status_style_set,
         crate::status_style::commands::status_styles_all,
         crate::status_style::commands::status_style_set_app,
+        crate::field_choice::commands::field_choices,
+        crate::field_choice::commands::field_choice_set,
         crate::space_config::commands::space_config,
         crate::space_config::commands::space_set_layouts,
         crate::space_config::commands::space_set_field,

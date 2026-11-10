@@ -76,6 +76,16 @@ describe("SettingsMatrix", () => {
     expect(screen.queryByRole("checkbox", { name: "Ada writes" })).not.toBeInTheDocument();
   });
 
+  it("renders an empty cell without a box for an undefined cell", () => {
+    const gap: MatrixRow[] = [{ key: "ada", header: "Ada Example", cells: [undefined, cell("Ada writes")] }];
+    render(<SettingsMatrix corner="Person" columns={columns} rows={gap} onToggle={onToggle} />);
+
+    const row = screen.getByRole("row", { name: /Ada Example/ });
+    expect(within(row).getAllByRole("cell")).toHaveLength(2);
+    expect(within(row).getAllByRole("checkbox").map((c) => c.getAttribute("aria-label"))).toEqual(["Ada writes"]);
+    expect(screen.queryByRole("checkbox", { name: "Ada reads" })).not.toBeInTheDocument();
+  });
+
   it("shows the hint as the title of the cell", () => {
     const hinted: MatrixRow[] = [{ key: "ada", header: "Ada Example", cells: [cell("Ada reads", { hint: "Inherited from the team" }), cell("Ada writes")] }];
     render(<SettingsMatrix corner="Person" columns={columns} rows={hinted} onToggle={onToggle} />);

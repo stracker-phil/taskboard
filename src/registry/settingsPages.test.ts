@@ -18,6 +18,16 @@ describe("core settings pages", () => {
     expect(ids.indexOf("statuses")).toBe(ids.indexOf("team") + 1);
   });
 
+  it("has an app-wide Custom fields page in the Jira group between Statuses and Sync", () => {
+    const pages = settingsPages();
+    const ids = pages.map((p) => p.id);
+
+    expect(pages.find((p) => p.id === "fields")?.label).toBe("Custom fields");
+    expect(pages.find((p) => p.id === "fields")?.group).toBe("Jira");
+    expect(ids.indexOf("fields")).toBe(ids.indexOf("statuses") + 1);
+    expect(ids.indexOf("sync")).toBe(ids.indexOf("fields") + 1);
+  });
+
   it("registers the Space groups as sections of the Spaces page", () => {
     const spaces = resolveSettingsPage("spaces")!;
 
@@ -31,8 +41,12 @@ describe("resolveSettingsPage", () => {
     expect(resolveSettingsPage("space:10001")?.id).toBe("spaces");
   });
 
-  it.each([["layouts"], ["fields"]])("resolves the %s section to the Spaces page", (section) => {
-    expect(resolveSettingsPage(section)?.id).toBe("spaces");
+  it("resolves the layouts section to the Spaces page", () => {
+    expect(resolveSettingsPage("layouts")?.id).toBe("spaces");
+  });
+
+  it("resolves fields to the Custom fields page, not the Spaces page that also has a Custom fields section", () => {
+    expect(resolveSettingsPage("fields")?.id).toBe("fields");
   });
 
   it("resolves statuses to the Statuses page, not the Spaces page that also has a Statuses section", () => {

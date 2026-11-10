@@ -17,7 +17,7 @@ use crate::jira::is_filled;
 use crate::lists::Viewer;
 use crate::space_config::{Place, hidden_fields};
 use crate::status_style::{Style, Styles};
-use crate::sync::store::{forget_issue, shown_fields};
+use crate::sync::store::forget_issue;
 use crate::views::columns::custom_columns;
 use crate::views::rows::{self, Cell, EpicChip, Label, Person, Priority};
 
@@ -53,7 +53,7 @@ pub struct IssueDetail {
     pub gone: bool,
     /// When the sync last stored this issue (UTC, RFC 3339): the gone notice's "Last synced".
     pub synced_at: String,
-    /// The custom fields the owner shows (marked shown or used as a view column), with their value if any.
+    /// The custom fields opted in for the Issue view that the issue fills.
     pub custom: Vec<CustomField>,
     /// The banner over an issue with unseen changes.
     pub since: Option<Since>,
@@ -220,8 +220,7 @@ fn with_custom_values(raw: &str, custom: Option<&str>) -> String {
     raw.to_string()
 }
 
-/// The custom fields the owner shows (always, empty or not), then every other one the issue fills, by name;
-/// none its Space hides from the Issue view.
+/// The custom fields opted in for the Issue view that the issue fills, by name; none its Space hides.
 fn custom_fields(
     conn: &Connection,
     project_id: &str,
@@ -231,17 +230,12 @@ fn custom_fields(
 ) -> AppResult<Vec<CustomField>> {
     let raw: serde_json::Value = serde_json::from_str(raw).unwrap_or_default();
     let hidden = hidden_fields(conn, project_id, Place::Detail)?;
-    let mut shown = shown_fields(conn)?;
-    shown.retain(|id| !hidden.contains(id));
     let filled: Vec<String> = raw["fields"]
         .as_object()
         .into_iter()
         .flatten()
         .filter(|(id, value)| {
-            id.starts_with("customfield_")
-                && !shown.contains(id)
-                && !hidden.contains(id.as_str())
-                && is_filled(value)
+            id.starts_with("customfield_") && !hidden.contains(id.as_str()) && is_filled(value)
         })
         .map(|(id, _)| id.clone())
         .collect();
@@ -270,18 +264,13 @@ fn custom_fields(
         })
     };
     let mut fields = Vec::new();
-    for column in custom_columns(conn, &shown)? {
-        fields.push(field(column.id, &column.kind)?);
-    }
-    let mut extra = Vec::new();
     for column in custom_columns(conn, &filled)? {
         let found = field(column.id, &column.kind)?;
         if found.value.is_some() || found.html.is_some() {
-            extra.push(found);
+            fields.push(found);
         }
     }
-    extra.sort_by_key(|f| f.name.to_lowercase());
-    fields.extend(extra);
+    fields.sort_by_key(|f| f.name.to_lowercase());
     Ok(fields)
 }
 
@@ -351,16 +340,16 @@ mod tests {
         })
         .await
         .unwrap();
+        for id in [ZONE, ALPHA, NOTES] {
+            opt_in(&db, id, true, true).await;
+        }
         (dir, db)
     }
 
-    async fn show(db: &Db, id: &'static str) {
-        db.write(move |tx, _| {
-            tx.execute("UPDATE cache.field SET shown = 1 WHERE id = ?1", [id])?;
-            Ok(())
-        })
-        .await
-        .unwrap();
+    async fn opt_in(db: &Db, id: &str, in_list: bool, in_detail: bool) {
+        crate::field_choice::field_choice_set(db, id.into(), in_list, in_detail)
+            .await
+            .unwrap();
     }
 
     async fn custom(db: &Db, raw: Value) -> Vec<CustomField> {
@@ -378,21 +367,12 @@ mod tests {
         }
     }
 
-    fn empty(id: &str, name: &str) -> CustomField {
-        CustomField {
-            id: id.into(),
-            name: name.into(),
-            value: None,
-            html: None,
-        }
-    }
-
     fn doc() -> Value {
         json!({ "type": "doc", "version": 1, "content": [] })
     }
 
     #[tokio::test]
-    async fn an_unshown_field_the_issue_fills_is_listed() {
+    async fn an_opted_in_field_the_issue_fills_is_listed() {
         let (_dir, db) = lab().await;
 
         let found = custom(&db, json!({ "fields": { ZONE: "North" } })).await;
@@ -401,7 +381,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn an_unshown_field_the_issue_leaves_empty_is_not_listed() {
+    async fn an_opted_in_field_the_issue_leaves_empty_is_not_listed() {
         let (_dir, db) = lab().await;
 
         let found = custom(
@@ -414,13 +394,25 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_shown_field_is_listed_even_when_the_issue_leaves_it_empty() {
+    async fn a_filled_field_not_opted_in_for_the_issue_view_is_not_listed() {
         let (_dir, db) = lab().await;
-        show(&db, ZONE).await;
+        opt_in(&db, ZONE, true, false).await;
+        opt_in(&db, NOTES, false, false).await;
+        let raw = json!({ "fields": { ZONE: "North", NOTES: "Late", ALPHA: "First" } });
 
-        let found = custom(&db, json!({ "fields": { ZONE: null } })).await;
+        let found = custom(&db, raw).await;
 
-        assert_eq!(found, [empty(ZONE, "Zone")]);
+        assert_eq!(found, [text(ALPHA, "alpha", "First")]);
+    }
+
+    #[tokio::test]
+    async fn a_field_opted_in_for_the_issue_view_only_is_listed() {
+        let (_dir, db) = lab().await;
+        opt_in(&db, ZONE, false, true).await;
+
+        let found = custom(&db, json!({ "fields": { ZONE: "North" } })).await;
+
+        assert_eq!(found, [text(ZONE, "Zone", "North")]);
     }
 
     fn doc_with(content: Value) -> Value {
@@ -497,7 +489,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn an_unshown_rich_text_field_with_no_content_is_left_out_whatever_jira_rendered() {
+    async fn a_rich_text_field_with_no_content_is_left_out_whatever_jira_rendered() {
         let (_dir, db) = lab().await;
 
         for rendered in [
@@ -512,21 +504,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_shown_rich_text_field_with_no_content_is_listed_without_value_or_html() {
+    async fn the_fields_come_by_name_ignoring_case() {
         let (_dir, db) = lab().await;
-        show(&db, NOTES).await;
-        let raw =
-            json!({ "fields": { NOTES: doc() }, "renderedFields": { NOTES: "<p>Stale</p>" } });
-
-        let found = custom(&db, raw).await;
-
-        assert_eq!(found, [empty(NOTES, "Notes")]);
-    }
-
-    #[tokio::test]
-    async fn the_shown_fields_come_first_then_the_others_by_name_ignoring_case() {
-        let (_dir, db) = lab().await;
-        show(&db, ZONE).await;
         let raw = json!({ "fields": { ZONE: "North", NOTES: "Late", ALPHA: "First" } });
 
         let found = custom(&db, raw).await;
@@ -534,9 +513,9 @@ mod tests {
         assert_eq!(
             found,
             [
-                text(ZONE, "Zone", "North"),
                 text(ALPHA, "alpha", "First"),
                 text(NOTES, "Notes", "Late"),
+                text(ZONE, "Zone", "North"),
             ]
         );
     }
@@ -571,25 +550,24 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn fields_the_space_hides_from_the_detail_are_left_out_filled_or_shown() {
+    async fn fields_the_space_hides_from_the_detail_are_left_out() {
         for (visibility, listed) in [
             ("hiddenInDetail", false),
             ("hidden", false),
             ("hiddenInList", true),
         ] {
             let (_dir, db) = lab().await;
-            show(&db, ZONE).await;
             set_visibility(&db, PROJECT, ZONE, visibility).await;
             set_visibility(&db, PROJECT, NOTES, visibility).await;
-            let raw = json!({ "fields": { ZONE: null, NOTES: "Late", ALPHA: "First" } });
+            let raw = json!({ "fields": { ZONE: "North", NOTES: "Late", ALPHA: "First" } });
 
             let found = custom(&db, raw).await;
 
             let expected = if listed {
                 vec![
-                    empty(ZONE, "Zone"),
                     text(ALPHA, "alpha", "First"),
                     text(NOTES, "Notes", "Late"),
+                    text(ZONE, "Zone", "North"),
                 ]
             } else {
                 vec![text(ALPHA, "alpha", "First")]

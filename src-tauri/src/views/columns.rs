@@ -127,6 +127,11 @@ mod tests {
                 .await
                 .unwrap();
         }
+        for id in [ZONE, BETA] {
+            crate::field_choice::field_choice_set(&db, id.into(), true, true)
+                .await
+                .unwrap();
+        }
         (dir, db)
     }
 
@@ -226,6 +231,32 @@ mod tests {
         assert_eq!(custom_ids(&db, space_a).await, [BETA]);
         assert_eq!(custom_ids(&db, list_in_a).await, [BETA]);
         assert_eq!(custom_ids(&db, space_b).await, [BETA, ZONE]);
+    }
+
+    #[tokio::test]
+    async fn a_field_nobody_opted_in_is_not_a_column_choice() {
+        let (_dir, db) = lab().await;
+        let everything = level(&db, "kind = 'everything'").await;
+        let space_a = level(&db, "kind = 'space' AND project_id = '10001'").await;
+
+        crate::field_choice::field_choice_set(&db, ZONE.into(), false, false)
+            .await
+            .unwrap();
+
+        assert_eq!(custom_ids(&db, everything).await, [BETA]);
+        assert_eq!(custom_ids(&db, space_a).await, [BETA]);
+    }
+
+    #[tokio::test]
+    async fn a_field_opted_in_for_the_issue_view_only_is_not_a_column_choice() {
+        let (_dir, db) = lab().await;
+        let space_a = level(&db, "kind = 'space' AND project_id = '10001'").await;
+
+        crate::field_choice::field_choice_set(&db, ZONE.into(), false, true)
+            .await
+            .unwrap();
+
+        assert_eq!(custom_ids(&db, space_a).await, [BETA]);
     }
 
     #[tokio::test]

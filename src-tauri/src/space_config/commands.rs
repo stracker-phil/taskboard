@@ -23,12 +23,15 @@ pub async fn space_set_layouts(
     super::space_set_layouts(&state.db, project_id, layouts).await
 }
 
+/// Where the Space shows a field opted in app-wide; a place the app leaves out stays out either way.
 #[tauri::command]
 pub async fn space_set_field(
     state: State<'_, AppState>,
     project_id: String,
     field_id: String,
-    visibility: FieldVisibility,
+    in_list: bool,
+    in_detail: bool,
 ) -> AppResult<SpaceConfig> {
+    let visibility = FieldVisibility::from_places(in_list, in_detail);
     super::space_set_field(&state.db, project_id, field_id, visibility).await
 }

@@ -79,6 +79,8 @@ export const useStatusStyles = (projectId: string) =>
 export const APP_STATUS_STYLES_KEY = [...STATUS_STYLES_KEY, "app"] as const;
 export const useAppStatusStyles = () => useQuery({ queryKey: APP_STATUS_STYLES_KEY, queryFn: () => api.statusStylesAll() });
 export const SPACE_CONFIG_KEY = ["spaceConfig"] as const;
+export const FIELD_CHOICES_KEY = ["fieldChoices"] as const;
+export const useFieldChoices = () => useQuery({ queryKey: FIELD_CHOICES_KEY, queryFn: () => api.fieldChoices() });
 export const useSpaceConfig = (projectId: string) =>
   useQuery({ queryKey: [...SPACE_CONFIG_KEY, projectId], queryFn: () => api.spaceConfig(projectId) });
 

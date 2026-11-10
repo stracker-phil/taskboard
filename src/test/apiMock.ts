@@ -142,6 +142,8 @@ export function createApiMock(): Api {
     spaceConfig: vi.fn(async (projectId: string): Promise<SpaceConfig> => spaceConfig({ projectId })),
     spaceSetLayouts: vi.fn(),
     spaceSetField: vi.fn(),
+    fieldChoices: vi.fn().mockResolvedValue([]),
+    fieldChoiceSet: vi.fn().mockResolvedValue([]),
     teamMatrix: vi.fn(async (): Promise<TeamMatrix> => ({ spaces: [], people: [] })),
     spaceSetMember: vi.fn(async (): Promise<TeamMatrix> => ({ spaces: [], people: [] })),
     navCurrent: vi.fn(async (): Promise<Nav> => nav(null)),

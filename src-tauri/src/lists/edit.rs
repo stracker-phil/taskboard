@@ -10,6 +10,7 @@ use super::defaults::{ensure_space, insert_list, list_siblings};
 use super::nodes::{Kind, Node, all_nodes, node, scope_of};
 use crate::db::{Changes, Db, LocalPart};
 use crate::error::{AppError, AppResult};
+use crate::field_choice::show_in_list;
 use crate::filter::{Condition, Field, Filter, OPEN_ISSUES, Op, Value, compile};
 use crate::look::Accent;
 use crate::look::{clean_color, clean_icon};
@@ -46,11 +47,11 @@ fn check_filter(
     Ok(())
 }
 
-/// The next sync fetches the custom fields a filter uses.
+/// A custom field a filter uses joins the list, so the next sync fetches it.
 pub fn mark_fields_shown(conn: &Connection, filter: &Filter) -> AppResult<()> {
     for condition in &filter.conditions {
         if let Field::Custom(id) = &condition.field {
-            conn.execute("UPDATE cache.field SET shown = 1 WHERE id = ?1", [id])?;
+            show_in_list(conn, id)?;
         }
     }
     Ok(())

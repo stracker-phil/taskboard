@@ -7,7 +7,7 @@ use rusqlite::{Connection, OptionalExtension};
 use super::types::{ALL_LAYOUTS, FieldSetting, FieldVisibility, Place, SpaceConfig, SpaceLayouts};
 use crate::db::Db;
 use crate::error::{AppError, AppResult};
-use crate::filter::RELEVANT_FIELD;
+use crate::field_choice::not_chosen;
 use crate::lists::{Kind, node};
 use crate::views::columns::SHOWABLE;
 use crate::views::model::from_text;
@@ -78,7 +78,7 @@ fn visibility(text: &str) -> FieldVisibility {
     serde_json::from_value(serde_json::Value::String(text.to_string())).unwrap_or_default()
 }
 
-/// The fields a Space keeps out of `place`.
+/// The fields a Space keeps out of `place`: those not opted in app-wide, and its own opt-outs.
 pub fn hidden_fields(
     conn: &Connection,
     project_id: &str,
@@ -89,7 +89,7 @@ pub fn hidden_fields(
     let rows = query.query_map([project_id], |r| {
         Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?))
     })?;
-    let mut hidden = HashSet::new();
+    let mut hidden = not_chosen(conn, place)?;
     for row in rows {
         let (id, text) = row?;
         let shown = match place {
@@ -104,7 +104,7 @@ pub fn hidden_fields(
 }
 
 /// The fields every tracked Space keeps out of the list: a level outside the Spaces offers a field as a
-/// column while one Space shows it.
+/// column while one Space shows it. Without a tracked Space, the fields not opted in.
 pub fn hidden_in_every_space(conn: &Connection) -> AppResult<HashSet<String>> {
     let mut query = conn.prepare("SELECT project_id FROM space WHERE tracked = 1")?;
     let spaces: Vec<String> = query
@@ -118,7 +118,10 @@ pub fn hidden_in_every_space(conn: &Connection) -> AppResult<HashSet<String>> {
             None => here,
         });
     }
-    Ok(hidden.unwrap_or_default())
+    match hidden {
+        Some(hidden) => Ok(hidden),
+        None => not_chosen(conn, Place::List),
+    }
 }
 
 /// The custom fields a level's views leave out as columns.
@@ -142,21 +145,26 @@ pub(super) fn config(conn: &Connection, project_id: &str) -> AppResult<SpaceConf
         )));
     }
     let mut query = conn.prepare(&format!(
-        "SELECT id, name, sf.visibility FROM cache.field
+        "SELECT id, name, c.in_list, c.in_detail, sf.visibility
+         FROM field_choice c JOIN cache.field ON id = c.field_id
          LEFT JOIN space_field sf ON sf.field_id = id AND sf.project_id = ?1
-         WHERE {SHOWABLE} AND {RELEVANT_FIELD}
+         WHERE {SHOWABLE}
          ORDER BY name COLLATE NOCASE, id"
     ))?;
     let fields = query
         .query_map([project_id], |r| {
+            let here = r
+                .get::<_, Option<String>>(4)?
+                .as_deref()
+                .map(visibility)
+                .unwrap_or_default();
             Ok(FieldSetting {
                 id: r.get(0)?,
                 name: r.get(1)?,
-                visibility: r
-                    .get::<_, Option<String>>(2)?
-                    .as_deref()
-                    .map(visibility)
-                    .unwrap_or_default(),
+                app_list: r.get(2)?,
+                app_detail: r.get(3)?,
+                in_list: here.in_list(),
+                in_detail: here.in_detail(),
             })
         })?
         .collect::<Result<_, _>>()?;

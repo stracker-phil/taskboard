@@ -5,6 +5,7 @@
 mod changes;
 mod coalesce;
 mod connection;
+mod field_seed;
 mod migrate;
 mod upkeep;
 
