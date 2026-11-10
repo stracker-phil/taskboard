@@ -170,13 +170,20 @@
 .status-row__style { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
 
 /* Settings → Status: a value with its tone icon. */
-.diagnostic-value { display: inline-flex; align-items: center; gap: 6px; min-width: 0; font-size: 12px; }
+.diagnostic-value {
+  display: inline-flex; align-items: center; gap: 6px; min-width: 0; font: inherit; font-size: 12px;
+  padding: 0; border: 0; background: none; color: inherit; cursor: pointer; text-align: right;
+}
 .diagnostic-value .settings-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .diagnostic-value svg { flex: none; }
 .diagnostic-value[data-tone="ok"] svg { color: var(--sync-ok); }
 .diagnostic-value[data-tone="warn"] svg { color: var(--banner-warn-dot); }
 .diagnostic-value[data-tone="error"] svg { color: var(--banner-error-dot); }
-.diagnostic-value[data-tone="info"] svg { color: var(--settings-text-tertiary); }
+/* The clipboard icon shows while a click would copy, in the tone icon's place; the value is right-aligned, so
+   an icon appearing on its left moves nothing. */
+.diagnostic-value .diagnostic-value__copy { display: none; color: var(--settings-text-tertiary); }
+.diagnostic-value:is(:hover, :focus-visible) .diagnostic-value__copy { display: block; }
+.diagnostic-value:is(:hover, :focus-visible) .diagnostic-value__tone { display: none; }
 .settings-row-control:has(.diagnostic-value) { flex: 0 1 auto; min-width: 0; margin-left: auto; }
 .settings-row:has(.diagnostic-value) .settings-row-text { flex: none; }
 

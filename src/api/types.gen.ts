@@ -285,7 +285,11 @@ export type DiagnosticRow = { label: string, value: string, tone: DiagnosticTone
 /**
  * A bus command the page offers as a button.
  */
-command: string | null, commandLabel: string | null, };
+command: string | null, commandLabel: string | null, 
+/**
+ * What a click copies when it differs from `value`: the full path behind a shortened one.
+ */
+copyText: string | null, };
 
 export type DiagnosticTone = "ok" | "warn" | "error" | "info";
 

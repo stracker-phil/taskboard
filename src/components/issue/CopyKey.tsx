@@ -1,5 +1,5 @@
 import type { SyntheticEvent } from "react";
-import { copyWithToast } from "../../views/list/useIssueActions";
+import { copyWithToast } from "../../lib/clipboard";
 
 const stop = (e: SyntheticEvent) => e.stopPropagation();
 

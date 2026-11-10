@@ -9,7 +9,8 @@ use chrono::{DateTime, Local};
 use tauri::{AppHandle, Manager, State};
 
 use groups::{
-    CacheFacts, Diagnostics, JiraFacts, LocalFacts, SyncFacts, jira_group, local_group, sync_group,
+    CacheFacts, Diagnostics, JiraFacts, LocalFacts, ShownPath, SyncFacts, jira_group, local_group,
+    sync_group,
 };
 
 use crate::connection;
@@ -70,8 +71,16 @@ pub async fn diagnostics_get(
     };
     let paths = app.path();
     let home = paths.home_dir().ok();
-    let shown =
-        |dir: Result<PathBuf, String>| dir.map_or_else(|e| e, |dir| tilde(&dir, home.as_deref()));
+    let shown = |dir: Result<PathBuf, String>| match dir {
+        Ok(dir) => ShownPath {
+            shown: tilde(&dir, home.as_deref()),
+            full: dir.display().to_string(),
+        },
+        Err(e) => ShownPath {
+            shown: e.clone(),
+            full: e,
+        },
+    };
     let local_facts = LocalFacts {
         data_dir: shown(paths.app_config_dir().map_err(|e| e.to_string())),
         log_dir: shown(paths.app_log_dir().map_err(|e| e.to_string())),
@@ -86,8 +95,8 @@ pub async fn diagnostics_get(
         groups: vec![
             jira_group(&jira),
             sync_group(&sync_facts),
-            sent::sent_group(&sent_changes, local),
             local_group(&local_facts),
+            sent::sent_group(&sent_changes, local),
         ],
     })
 }

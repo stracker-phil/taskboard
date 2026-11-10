@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CircleAlert, CircleCheck, CircleX, Info, type LucideIcon } from "lucide-react";
+import { CircleAlert, CircleCheck, CircleX, Copy, type LucideIcon } from "lucide-react";
 import { api, type DiagnosticRow } from "../../../api";
+import { copyWithToast } from "../../../lib/clipboard";
 import { SYNC_KEY } from "../../../queries/sync";
 import { attempt } from "../../../state/requests";
 import { Group, Row } from "../controls";
@@ -8,15 +9,16 @@ import { Group, Row } from "../controls";
 /** Under the sync's key, so a sync state change reads it again. */
 const DIAGNOSTICS_KEY = [...SYNC_KEY, "diagnostics"] as const;
 
-const TONES: Record<DiagnosticRow["tone"], { icon: LucideIcon; label: string }> = {
+/** Only tones that tell something get an icon; an info value has none. */
+const TONES: Partial<Record<DiagnosticRow["tone"], { icon: LucideIcon; label: string }>> = {
   ok: { icon: CircleCheck, label: "OK" },
   warn: { icon: CircleAlert, label: "Warning" },
   error: { icon: CircleX, label: "Error" },
-  info: { icon: Info, label: "Info" },
 };
 
+/** A click copies the value; the clipboard icon shows on hover, in the tone icon's place. */
 function DiagnosticValue({ row, onRan }: { row: DiagnosticRow; onRan: () => void }) {
-  const { icon: Icon, label } = TONES[row.tone];
+  const tone = TONES[row.tone];
   const { command, commandLabel } = row;
   const run = async (id: string) => {
     await attempt(api.runCommand(id), `Could not run ${commandLabel}`);
@@ -24,10 +26,17 @@ function DiagnosticValue({ row, onRan }: { row: DiagnosticRow; onRan: () => void
   };
   return (
     <>
-      <span className="diagnostic-value" data-tone={row.tone}>
-        <Icon size={14} role="img" aria-label={label} />
+      <button
+        type="button"
+        className="diagnostic-value"
+        data-tone={row.tone}
+        title="Click to copy"
+        onClick={() => copyWithToast(row.copyText ?? row.value, `Copied ${row.label}`)}
+      >
+        {tone && <tone.icon className="diagnostic-value__tone" size={14} role="img" aria-label={tone.label} />}
+        <Copy className="diagnostic-value__copy" size={14} aria-hidden="true" />
         <span className="settings-value">{row.value}</span>
-      </span>
+      </button>
       {command && commandLabel && (
         <button type="button" className="btn" onClick={() => void run(command)}>
           {commandLabel}

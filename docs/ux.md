@@ -905,12 +905,15 @@ no separate Settings design; owner, 2026-10-28). Its colors are the `--settings-
     `me_user_fields`; a field rule can be removed).
   - **Appearance**: Automatic, Light or Dark. **Shortcuts**: every command and its key, rebindable.
   - **Status** (`components/settings/status/`, Daybook's Status page): `diagnostics_get` reports groups of
-    rows, each a value with a tone icon (ok, warning, error, info) and maybe a bus command as a button: *Jira*
-    (site, account, API token and its expiry), *Sync* (state, tracked projects, last full sync, cached
-    issues, cache size with Compact; in memory mode "Jira data": the size and whether a `cache.sqlite` is on disk,
-    with Show), *Changes Sent to Jira* (the newest 50, refused ones in red, with
-    Export…) and *This Mac* (version, data and log folders with Show, the command-line tool's path). It reads
-    again when the window comes to the front and after a sync.
+    rows, each a value and maybe a bus command as a button: *Jira* (site, account, API token and its expiry),
+    *Sync* (state, tracked projects, last full sync, cached issues, cache size with Compact; in memory mode "Jira
+    data": the size and whether a `cache.sqlite` is on disk, with Show), *This Mac* (version, data and log folders
+    with Show, the command-line tool's path) and, last because it is long, *Changes Sent to Jira* (the newest 50,
+    refused ones in red, with Export…). Only ok, warning and error values carry an icon; info values have none.
+    Every value is a button that copies it (`lib/clipboard.ts` `copyWithToast`, "Copied Data folder"; a path
+    copies in full, `DiagnosticRow.copy_text`): on hover or focus a clipboard icon takes the tone icon's place, or
+    appears left of an info value, so it shows whenever a click would copy. It reads again when the window comes
+    to the front and after a sync.
   - **About** (System): version, Show Data Folder, Open Log Folder.
 
 ## Keys

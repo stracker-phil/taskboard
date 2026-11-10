@@ -41,6 +41,8 @@ pub struct DiagnosticRow {
     /// A bus command the page offers as a button.
     pub command: Option<String>,
     pub command_label: Option<String>,
+    /// What a click copies when it differs from `value`: the full path behind a shortened one.
+    pub copy_text: Option<String>,
 }
 
 pub(super) fn row(label: &str, value: impl Into<String>, tone: DiagnosticTone) -> DiagnosticRow {
@@ -50,6 +52,7 @@ pub(super) fn row(label: &str, value: impl Into<String>, tone: DiagnosticTone) -
         tone,
         command: None,
         command_label: None,
+        copy_text: None,
     }
 }
 
@@ -57,6 +60,13 @@ impl DiagnosticRow {
     pub(super) fn offering(mut self, command: &str, label: &str) -> Self {
         self.command = Some(command.into());
         self.command_label = Some(label.into());
+        self
+    }
+
+    fn copying(mut self, text: &str) -> Self {
+        if text != self.value {
+            self.copy_text = Some(text.into());
+        }
         self
     }
 }
@@ -205,11 +215,21 @@ fn running(job: Job) -> &'static str {
 }
 
 pub struct LocalFacts {
-    pub data_dir: String,
-    pub log_dir: String,
+    pub data_dir: ShownPath,
+    pub log_dir: ShownPath,
     /// The binary `taskboard` CLI calls run.
-    pub cli_path: String,
+    pub cli_path: ShownPath,
     pub version: String,
+}
+
+/// A path as the page shows it (`~/…`) and in full, which a click copies.
+pub struct ShownPath {
+    pub shown: String,
+    pub full: String,
+}
+
+fn path_row(label: &str, path: &ShownPath) -> DiagnosticRow {
+    row(label, path.shown.clone(), DiagnosticTone::Info).copying(&path.full)
 }
 
 pub fn local_group(facts: &LocalFacts) -> DiagnosticGroup {
@@ -218,9 +238,9 @@ pub fn local_group(facts: &LocalFacts) -> DiagnosticGroup {
         "This Mac",
         vec![
             row("Version", facts.version.clone(), Info),
-            row("Data folder", facts.data_dir.clone(), Info).offering("app:data", "Show"),
-            row("Log folder", facts.log_dir.clone(), Info).offering("app:logs", "Show"),
-            row("Command-line tool", facts.cli_path.clone(), Info),
+            path_row("Data folder", &facts.data_dir).offering("app:data", "Show"),
+            path_row("Log folder", &facts.log_dir).offering("app:logs", "Show"),
+            path_row("Command-line tool", &facts.cli_path),
         ],
     )
 }
@@ -273,6 +293,14 @@ mod tests {
             tone,
             command: offer.map(|(command, _)| command.into()),
             command_label: offer.map(|(_, label)| label.into()),
+            copy_text: None,
+        }
+    }
+
+    fn same_path(path: &str) -> ShownPath {
+        ShownPath {
+            shown: path.into(),
+            full: path.into(),
         }
     }
 
@@ -629,9 +657,9 @@ mod tests {
     #[test]
     fn the_local_group_lists_four_rows_with_show_commands_for_the_folders() {
         let group = local_group(&LocalFacts {
-            data_dir: "/Users/example/Library/Application Support/Taskboard".into(),
-            log_dir: "/Users/example/Library/Logs/Taskboard".into(),
-            cli_path: "/Applications/Taskboard.app/Contents/MacOS/taskboard".into(),
+            data_dir: same_path("/Users/example/Library/Application Support/Taskboard"),
+            log_dir: same_path("/Users/example/Library/Logs/Taskboard"),
+            cli_path: same_path("/Applications/Taskboard.app/Contents/MacOS/taskboard"),
             version: "1.2.3".into(),
         });
 
@@ -663,6 +691,72 @@ mod tests {
     }
 
     #[test]
+    fn a_shortened_path_shows_short_and_copies_the_full_path() {
+        let group = local_group(&LocalFacts {
+            data_dir: ShownPath {
+                shown: "~/Library/Application Support/Taskboard".into(),
+                full: "/Users/example/Library/Application Support/Taskboard".into(),
+            },
+            log_dir: ShownPath {
+                shown: "~/Library/Logs/Taskboard".into(),
+                full: "/Users/example/Library/Logs/Taskboard".into(),
+            },
+            cli_path: same_path("/Applications/Taskboard.app/Contents/MacOS/taskboard"),
+            version: "1.2.3".into(),
+        });
+
+        let copied: Vec<(&str, &str, Option<&str>)> = group
+            .rows
+            .iter()
+            .map(|r| (r.label.as_str(), r.value.as_str(), r.copy_text.as_deref()))
+            .collect();
+        assert_eq!(
+            copied,
+            [
+                ("Version", "1.2.3", None),
+                (
+                    "Data folder",
+                    "~/Library/Application Support/Taskboard",
+                    Some("/Users/example/Library/Application Support/Taskboard")
+                ),
+                (
+                    "Log folder",
+                    "~/Library/Logs/Taskboard",
+                    Some("/Users/example/Library/Logs/Taskboard")
+                ),
+                (
+                    "Command-line tool",
+                    "/Applications/Taskboard.app/Contents/MacOS/taskboard",
+                    None
+                ),
+            ]
+        );
+    }
+
+    #[test]
+    fn other_groups_have_rows_without_copy_text() {
+        let groups = [jira_group(&jira(|_| {})), sync_group(&sync(|_| {}))];
+
+        for group in groups {
+            assert!(
+                group.rows.iter().all(|r| r.copy_text.is_none()),
+                "{}",
+                group.title
+            );
+        }
+    }
+
+    #[test]
+    fn a_row_with_copy_text_serializes_it_as_copy_text_camel_case() {
+        let copying = row("Data folder", "~/Taskboard", DiagnosticTone::Info)
+            .copying("/Users/example/Taskboard");
+
+        let json = serde_json::to_value(&copying).unwrap();
+
+        assert_eq!(json["copyText"], "/Users/example/Taskboard");
+    }
+
+    #[test]
     fn diagnostics_serialize_with_camel_case_fields_and_lowercase_tones() {
         let diagnostics = Diagnostics {
             groups: vec![group(
@@ -684,7 +778,8 @@ mod tests {
                         "value": "Not set up",
                         "tone": "warn",
                         "command": "sync:full",
-                        "commandLabel": "Sync Now"
+                        "commandLabel": "Sync Now",
+                        "copyText": null
                     }]
                 }]
             })

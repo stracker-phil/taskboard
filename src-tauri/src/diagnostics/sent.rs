@@ -106,6 +106,7 @@ mod tests {
             tone: DiagnosticTone::Info,
             command: Some("app:exportChanges".into()),
             command_label: Some("Export…".into()),
+            copy_text: None,
         }
     }
 
@@ -152,6 +153,7 @@ mod tests {
                 tone: DiagnosticTone::Ok,
                 command: None,
                 command_label: None,
+                copy_text: None,
             }
         );
     }
@@ -176,6 +178,7 @@ mod tests {
                 tone: DiagnosticTone::Error,
                 command: None,
                 command_label: None,
+                copy_text: None,
             }
         );
     }

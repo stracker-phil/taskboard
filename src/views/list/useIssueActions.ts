@@ -1,22 +1,15 @@
 import { useMemo } from "react";
 import { api, type LinkTarget } from "../../api";
+import { copyWithToast } from "../../lib/clipboard";
 import { browseUrl } from "../../lib/jiraLinks";
 import { useConnection } from "../../queries/settings";
 import { attempt } from "../../state/requests";
-import { useStore } from "../../state/store";
 import type { MenuAt } from "../../components/menu";
 import { runWrite } from "../../writes/runWrite";
 import { useJiraChange } from "../../writes/useJiraChanges";
 import { openStatusMenu } from "../../writes/statusMenu";
 import { openAssignMenu } from "../../writes/assignMenu";
 import { openPriorityMenu } from "../../writes/priorityMenu";
-
-/** Copies the text and confirms with a toast; subscribes to nothing, so every row can use it. */
-export function copyWithToast(text: string, done: string) {
-  void attempt(api.copyText(text), "Could not copy").then((copied) => {
-    if (copied !== null) useStore.getState().toast("success", done);
-  });
-}
 
 /** Copies the `taskboard://` link to an issue or a sidebar level. */
 export function copyAppLink(target: LinkTarget, done: string) {

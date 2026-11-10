@@ -20,6 +20,7 @@ const row = (patch: Partial<DiagnosticRow> = {}): DiagnosticRow => ({
   tone: "ok",
   command: null,
   commandLabel: null,
+  copyText: null,
   ...patch,
 });
 
@@ -104,12 +105,57 @@ describe("StatusPage", () => {
     ["ok", "OK"],
     ["warn", "Warning"],
     ["error", "Error"],
-    ["info", "Info"],
   ] as const)("marks a %s row with the %s icon", async (tone, name) => {
     renderPage({ groups: [{ title: "Jira", rows: [row({ tone })] }] });
 
     const group = await screen.findByRole("region", { name: "Jira" });
     expect(within(group).getByRole("img", { name })).toBeInTheDocument();
+  });
+
+  it("shows no icon on an info row", async () => {
+    renderPage({ groups: [{ title: "Jira", rows: [row({ tone: "info" })] }] });
+
+    const group = await screen.findByRole("region", { name: "Jira" });
+    expect(within(group).queryByRole("img")).not.toBeInTheDocument();
+  });
+
+  describe("copying a value", () => {
+    it("copies the row's copy text and toasts the label when it differs from the shown value", async () => {
+      renderPage({
+        groups: [
+          {
+            title: "This Mac",
+            rows: [row({ label: "Command-line tool", value: "Installed", tone: "info", copyText: "/usr/local/bin/taskboard" })],
+          },
+        ],
+      });
+
+      await userEvent.click(await screen.findByRole("button", { name: "Installed" }));
+
+      expect(mocked.copyText).toHaveBeenCalledWith("/usr/local/bin/taskboard");
+      expect(await screen.findByText("Copied Command-line tool")).toBeInTheDocument();
+    });
+
+    it("copies the shown value when the row has no copy text", async () => {
+      const value = "In memory · 39.1 MB · no cache file";
+      renderPage({ groups: [{ title: "Jira", rows: [row({ label: "Jira data", value, tone: "info" })] }] });
+
+      await userEvent.click(await screen.findByRole("button", { name: value }));
+
+      expect(mocked.copyText).toHaveBeenCalledWith(value);
+      expect(await screen.findByText("Copied Jira data")).toBeInTheDocument();
+    });
+
+    it("does not copy when the row's command button is pressed", async () => {
+      renderPage({
+        groups: [{ title: "Jira", rows: [row({ label: "Cache", value: "12 MB", tone: "info", command: "cache:compact", commandLabel: "Compact" })] }],
+      });
+
+      await userEvent.click(await screen.findByRole("button", { name: "Compact" }));
+
+      expect(mocked.runCommand).toHaveBeenCalledWith("cache:compact");
+      expect(mocked.copyText).not.toHaveBeenCalled();
+    });
   });
 
   describe("command button", () => {
@@ -151,7 +197,7 @@ describe("StatusPage", () => {
       renderPage({ groups: [{ title: "Jira", rows: [row(patch)] }] });
 
       await screen.findByRole("region", { name: "Jira" });
-      expect(screen.queryByRole("button")).not.toBeInTheDocument();
+      expect(screen.getAllByRole("button").map((b) => b.title)).toEqual(["Click to copy"]);
     });
   });
 
