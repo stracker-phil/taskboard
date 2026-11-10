@@ -104,6 +104,11 @@ enum Shape {
         expr: Sql,
         timestamp: bool,
     },
+    /// Issue keys; `presence` answers "is empty" where the field can be.
+    Keys {
+        key: Sql,
+        presence: Option<Sql>,
+    },
     /// Matched through the full-text index.
     FullText,
 }
@@ -165,6 +170,14 @@ fn shape(field: &Field, ctx: &Ctx) -> AppResult<Shape> {
         Field::Priority => scalar("i.priority", ScalarKind::Id),
         Field::Project => scalar("i.project_id", ScalarKind::Id),
         Field::Epic => scalar("i.parent_id", ScalarKind::Id),
+        Field::IssueKey => Shape::Keys {
+            key: Sql::column("i.key"),
+            presence: None,
+        },
+        Field::ParentKey => Shape::Keys {
+            key: Sql::column("(SELECT p.key FROM cache.issue p WHERE p.id = i.parent_id)"),
+            presence: Some(Sql::column("i.parent_id")),
+        },
         Field::Assignee => scalar("i.assignee_id", ScalarKind::User),
         Field::Reporter => scalar("i.reporter_id", ScalarKind::User),
         Field::Release => Shape::List {
@@ -249,6 +262,7 @@ fn compile_one(condition: &Condition, ctx: &Ctx) -> AppResult<Compiled> {
         Shape::List { array, text } => ops::list(condition, &array, text),
         Shape::Sprint => ops::sprint(condition),
         Shape::Date { expr, timestamp } => ops::date(condition, &expr, timestamp, ctx),
+        Shape::Keys { key, presence } => ops::keys(condition, &key, presence.as_ref()),
         Shape::FullText => ops::full_text(condition),
     }
 }

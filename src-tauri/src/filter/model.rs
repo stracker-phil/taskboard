@@ -64,6 +64,10 @@ pub enum Field {
     Priority,
     /// The parent epic's issue id.
     Epic,
+    /// The issue's own key; values are keys (`parse_keys`).
+    IssueKey,
+    /// The parent's key; values are keys (`parse_keys`).
+    ParentKey,
     /// A fix version id.
     Release,
     /// `active`, `future`, `closed` or a sprint id.
@@ -82,7 +86,7 @@ pub enum Field {
     Custom(String),
 }
 
-const SYSTEM_FIELDS: [(Field, &str); 17] = [
+const SYSTEM_FIELDS: [(Field, &str); 19] = [
     (Field::Status, "status"),
     (Field::StatusCategory, "statusCategory"),
     (Field::Type, "type"),
@@ -90,6 +94,8 @@ const SYSTEM_FIELDS: [(Field, &str); 17] = [
     (Field::Reporter, "reporter"),
     (Field::Priority, "priority"),
     (Field::Epic, "epic"),
+    (Field::IssueKey, "issueKey"),
+    (Field::ParentKey, "parentKey"),
     (Field::Release, "release"),
     (Field::Sprint, "sprint"),
     (Field::Labels, "labels"),
@@ -170,6 +176,39 @@ impl Op {
     }
 }
 
+/// Issue keys typed as a list: split on commas and whitespace, uppercased, duplicates dropped, in order.
+/// A word that isn't a key (`NW-123`) is invalid input naming it.
+pub fn parse_keys(text: &str) -> AppResult<Vec<String>> {
+    let mut keys: Vec<String> = Vec::new();
+    for word in text
+        .split(|c: char| c == ',' || c.is_whitespace())
+        .filter(|w| !w.is_empty())
+    {
+        let key = word.to_uppercase();
+        if !is_key(&key) {
+            return Err(AppError::InvalidInput(format!(
+                "“{word}” isn't an issue key"
+            )));
+        }
+        if !keys.contains(&key) {
+            keys.push(key);
+        }
+    }
+    Ok(keys)
+}
+
+/// `^[A-Z][A-Z0-9_]*-[0-9]+$`
+fn is_key(key: &str) -> bool {
+    let Some((project, number)) = key.split_once('-') else {
+        return false;
+    };
+    let mut letters = project.chars();
+    letters.next().is_some_and(|c| c.is_ascii_uppercase())
+        && letters.all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_')
+        && !number.is_empty()
+        && number.chars().all(|c| c.is_ascii_digit())
+}
+
 /// `me` as a user field's value is the connected account.
 pub const ME: &str = "me";
 
@@ -231,6 +270,8 @@ mod tests {
             ("reporter", Field::Reporter),
             ("priority", Field::Priority),
             ("epic", Field::Epic),
+            ("issueKey", Field::IssueKey),
+            ("parentKey", Field::ParentKey),
             ("release", Field::Release),
             ("sprint", Field::Sprint),
             ("labels", Field::Labels),
@@ -248,6 +289,61 @@ mod tests {
         ] {
             assert_eq!(Field::from(name.to_string()), field, "{name}");
             assert_eq!(String::from(field), name, "{name}");
+        }
+    }
+
+    fn keys(text: &str) -> Vec<String> {
+        parse_keys(text).unwrap()
+    }
+
+    #[test]
+    fn keys_split_on_commas_and_whitespace() {
+        for (text, expected) in [
+            ("NW-1", vec!["NW-1"]),
+            ("NW-1, NW-2", vec!["NW-1", "NW-2"]),
+            ("NW-1,NW-2", vec!["NW-1", "NW-2"]),
+            (
+                "NW-1 NW-2\nOPS-7\t NW-3",
+                vec!["NW-1", "NW-2", "OPS-7", "NW-3"],
+            ),
+            (" , NW-1 ,, OPS-7 , ", vec!["NW-1", "OPS-7"]),
+            ("web2_app-15", vec!["WEB2_APP-15"]),
+        ] {
+            assert_eq!(keys(text), expected, "{text:?}");
+        }
+    }
+
+    #[test]
+    fn keys_are_uppercased() {
+        assert_eq!(keys("nw-1, Ops-7"), ["NW-1", "OPS-7"]);
+    }
+
+    #[test]
+    fn duplicate_keys_are_dropped_keeping_the_first_position() {
+        assert_eq!(
+            keys("NW-2, NW-1, nw-2, NW-1, OPS-7"),
+            ["NW-2", "NW-1", "OPS-7"]
+        );
+    }
+
+    #[test]
+    fn no_keys_in_blank_text_is_an_empty_list() {
+        for text in ["", "   ", " , ,\n"] {
+            assert!(keys(text).is_empty(), "{text:?}");
+        }
+    }
+
+    #[test]
+    fn a_word_that_is_not_a_key_is_invalid_input_naming_it() {
+        for word in [
+            "NW", "NW-", "-12", "NW-1a", "1W-5", "_W-5", "NW_1", "NW-1-2", "N W-1",
+        ] {
+            let first_bad = word.split_whitespace().next().unwrap();
+            let err = parse_keys(&format!("NW-1, {word}")).unwrap_err();
+            assert!(
+                matches!(&err, AppError::InvalidInput(message) if message.contains(first_bad)),
+                "{word}: {err:?}"
+            );
         }
     }
 

@@ -23,6 +23,8 @@ const OPS: Record<ValueKind, Op[]> = {
   user: PICKED,
   priority: PICKED,
   epic: PICKED,
+  issueKeys: ["is", "isNot"],
+  parentKeys: PICKED,
   release: PICKED,
   sprint: PICKED,
   label: PICKED,
@@ -41,6 +43,13 @@ const STATUS_CATEGORIES: Choice[] = [
 ];
 
 export const opsFor = (kind: ValueKind): Op[] => OPS[kind];
+
+export const takesKeys = (kind: ValueKind) => kind === "issueKeys" || kind === "parentKeys";
+
+/** The value is a list of picked or typed values, which `withValues` shapes. */
+export function takesList(kind: ValueKind, options: FilterOptions): boolean {
+  return takesKeys(kind) || choicesFor(kind, options) !== null;
+}
 
 export const takesNoValue = (op: Op) => op === "isEmpty" || op === "isNotEmpty";
 export const DEFAULT_DAYS = 7;

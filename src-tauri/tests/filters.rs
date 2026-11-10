@@ -1080,6 +1080,178 @@ async fn custom_date_and_datetime_fields_compare_the_day_as_written() {
     .await;
 }
 
+impl Fixture {
+    /// Gives the parent ids `e1` and `e2` the issues `NW-20` and `NW-21`, in an untracked project so they
+    /// stay out of every result.
+    async fn add_parents(&self) {
+        let sql: String = [("e1", "NW-20"), ("e2", "NW-21")]
+            .iter()
+            .map(|(id, key)| {
+                issue(key, &[("project_id", "'p2'")]).replacen(
+                    &format!("VALUES ('{key}', '{key}'"),
+                    &format!("VALUES ('{id}', '{key}'"),
+                    1,
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        self.db
+            .write(move |tx, _| {
+                tx.execute_batch(&sql)?;
+                Ok(())
+            })
+            .await
+            .unwrap();
+    }
+}
+
+#[tokio::test]
+async fn issue_id_conditions_match_the_issue_key() {
+    let fx = Fixture::new().await;
+    fx.check(
+        None,
+        vec![
+            case(
+                Field::IssueKey,
+                Op::In,
+                many(&["NW-2", "NW-4"]),
+                &["NW-2", "NW-4"],
+            ),
+            case(Field::IssueKey, Op::In, one("NW-3"), &["NW-3"]),
+            case(
+                Field::IssueKey,
+                Op::In,
+                many(&["nw-1", "Nw-5"]),
+                &["NW-1", "NW-5"],
+            ),
+            case(
+                Field::IssueKey,
+                Op::In,
+                many(&["NW-1, NW-2 nw-3"]),
+                &["NW-1", "NW-2", "NW-3"],
+            ),
+            case(Field::IssueKey, Op::In, many(&["NW-404"]), &[]),
+            case(Field::IssueKey, Op::In, many(&["OLD-1"]), &[]),
+            case(Field::IssueKey, Op::In, many(&[]), &[]),
+            case(Field::IssueKey, Op::Is, one("NW-3"), &["NW-3"]),
+            case(Field::IssueKey, Op::Is, one("nw-3"), &["NW-3"]),
+            case(
+                Field::IssueKey,
+                Op::Is,
+                many(&["NW-1", "NW-2"]),
+                &["NW-1", "NW-2"],
+            ),
+            case(
+                Field::IssueKey,
+                Op::IsNot,
+                one("NW-3"),
+                &["NW-1", "NW-2", "NW-4", "NW-5"],
+            ),
+            case(
+                Field::IssueKey,
+                Op::IsNot,
+                many(&["NW-1", "nw-2"]),
+                &["NW-3", "NW-4", "NW-5"],
+            ),
+            case(
+                Field::IssueKey,
+                Op::NotIn,
+                many(&["NW-2", "nw-4"]),
+                &["NW-1", "NW-3", "NW-5"],
+            ),
+            case(Field::IssueKey, Op::NotIn, many(&[]), &ALL),
+        ],
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn parent_id_conditions_match_the_key_of_the_parent_issue() {
+    let fx = Fixture::new().await;
+    fx.add_parents().await;
+    fx.check(
+        None,
+        vec![
+            case(
+                Field::ParentKey,
+                Op::In,
+                many(&["NW-20"]),
+                &["NW-1", "NW-5"],
+            ),
+            case(Field::ParentKey, Op::In, one("NW-21"), &["NW-2"]),
+            case(
+                Field::ParentKey,
+                Op::In,
+                many(&["NW-20", "NW-21"]),
+                &["NW-1", "NW-2", "NW-5"],
+            ),
+            case(Field::ParentKey, Op::In, many(&["nw-21"]), &["NW-2"]),
+            case(Field::ParentKey, Op::In, many(&["NW-1"]), &[]),
+            case(Field::ParentKey, Op::Is, one("NW-20"), &["NW-1", "NW-5"]),
+            case(Field::ParentKey, Op::Is, one("nw-21"), &["NW-2"]),
+            case(
+                Field::ParentKey,
+                Op::Is,
+                many(&["NW-20", "NW-21"]),
+                &["NW-1", "NW-2", "NW-5"],
+            ),
+            case(
+                Field::ParentKey,
+                Op::IsNot,
+                one("NW-20"),
+                &["NW-2", "NW-3", "NW-4"],
+            ),
+            case(
+                Field::ParentKey,
+                Op::IsNot,
+                many(&["NW-20", "NW-21"]),
+                &["NW-3", "NW-4"],
+            ),
+            case(
+                Field::ParentKey,
+                Op::NotIn,
+                many(&["NW-20"]),
+                &["NW-2", "NW-3", "NW-4"],
+            ),
+            case(
+                Field::ParentKey,
+                Op::NotIn,
+                many(&["NW-20", "NW-21"]),
+                &["NW-3", "NW-4"],
+            ),
+            case(Field::ParentKey, Op::NotIn, many(&[]), &ALL),
+            case(Field::ParentKey, Op::IsEmpty, None, &["NW-3", "NW-4"]),
+            case(
+                Field::ParentKey,
+                Op::IsNotEmpty,
+                None,
+                &["NW-1", "NW-2", "NW-5"],
+            ),
+        ],
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn key_conditions_refuse_what_does_not_apply_and_bad_keys() {
+    let fx = Fixture::new().await;
+    fx.assert_refused(
+        [
+            (Field::IssueKey, Op::IsEmpty, None),
+            (Field::IssueKey, Op::IsNotEmpty, None),
+            (Field::IssueKey, Op::Contains, one("NW")),
+            (Field::ParentKey, Op::Contains, one("NW")),
+            (Field::IssueKey, Op::In, many(&["NW-1", "nope"])),
+            (Field::ParentKey, Op::NotIn, many(&["x' OR 1=1 --"])),
+            (Field::IssueKey, Op::In, None),
+            (Field::IssueKey, Op::In, days(3)),
+        ]
+        .into_iter()
+        .map(|(field, op, value)| Condition::new(field, op, value))
+        .collect(),
+    );
+}
+
 #[tokio::test]
 async fn several_conditions_are_anded_with_their_parameters_in_order() {
     let fx = Fixture::new().await;

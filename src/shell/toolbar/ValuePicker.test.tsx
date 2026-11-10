@@ -186,6 +186,18 @@ describe("ValuePicker", () => {
       expect(optionNames()).toEqual(["In Progress"]);
     });
 
+    it("finds an epic by the key in its label", async () => {
+      const { field } = setup([], [
+        { id: "NW-1020", name: "NW-1020 · Payment page" },
+        { id: "NW-1021", name: "NW-1021 · Search" },
+      ]);
+      await userEvent.click(field);
+
+      await userEvent.type(screen.getByLabelText("Search values"), "nw-1020");
+
+      expect(optionNames()).toEqual(["NW-1020 · Payment page"]);
+    });
+
     it("says so when no value matches", async () => {
       const { field } = setup();
       await userEvent.click(field);

@@ -662,7 +662,11 @@ button, Escape and a press outside close it, focus goes back to the button).
   the text filter, a search) and counts every matching issue, like the sidebar. On Everything and a Space "Save as filter list" turns the view's (drafted)
   conditions into a new list and opens it. A picked field's value opens a
   list with a search box and a checkbox per value (`ValuePicker`); every tick applies at once, and several values
-  are stored as `in` / `not in` (shown as "is" / "is not").
+  are stored as `in` / `not in` (shown as "is" / "is not"). Epics are listed as "key · title", so the search
+  finds one by key. Issue ID and Parent ID take keys typed as a list ("NW-123, NW-124", `KeysInput`): the text
+  applies on Enter or when the field loses focus, as Rust checked it (`filter_parse_keys`, uppercased, duplicates
+  dropped); a word that isn't a key shows its error under the row. Issue ID offers only "is" / "is not"; with
+  the view's subtasks on Hierarchy it shows the issue with everything under it.
 - **Me** chip (`MeChip.tsx`, one pill in two halves; on: `--accent-soft-*` with the `--avatar-1` avatar) and
   **Filter this view** (190 wide, filters by key or summary as you type; esc clears it). A click on "Me" toggles
   Me mode ([ADR 0045](adr/0045-me-mode-is-a-set-of-rules-in-a-scope.md)): the issues assigned to me, plus what

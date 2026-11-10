@@ -6,7 +6,7 @@ use rusqlite::types::Value as SqlValue;
 
 use super::{Compiled, Ctx, ScalarKind, Sql};
 use crate::error::{AppError, AppResult};
-use crate::filter::model::{Condition, ME, Op, Value};
+use crate::filter::model::{Condition, ME, Op, Value, parse_keys};
 use crate::search::{TEXT_MATCH, match_expression};
 use crate::time::format_utc;
 
@@ -221,6 +221,34 @@ pub(super) fn full_text(c: &Condition) -> AppResult<Compiled> {
             params: vec![SqlValue::Text(expression)],
         },
         None => constant(true),
+    })
+}
+
+/// One key or several: `is` reads as `in`. Keys are uppercase in the cache, as `parse_keys` returns them.
+/// `not in` keeps issues without a value.
+pub(super) fn keys(c: &Condition, key: &Sql, presence: Option<&Sql>) -> AppResult<Compiled> {
+    Ok(match c.op {
+        Op::Is | Op::In | Op::IsNot | Op::NotIn => {
+            let parsed = parse_keys(&many(c)?.join(","))?;
+            let matching = matches!(c.op, Op::Is | Op::In);
+            if parsed.is_empty() {
+                return Ok(constant(!matching));
+            }
+            let marks = marks(parsed.len());
+            let template = if matching {
+                format!("{{}} IN ({marks})")
+            } else {
+                format!("{{}} IS NULL OR {{}} NOT IN ({marks})")
+            };
+            key.fill(&template, parsed.into_iter().map(SqlValue::Text).collect())
+        }
+        Op::IsEmpty => presence
+            .ok_or_else(|| not_applicable(c))?
+            .fill("{} IS NULL", vec![]),
+        Op::IsNotEmpty => presence
+            .ok_or_else(|| not_applicable(c))?
+            .fill("{} IS NOT NULL", vec![]),
+        _ => return Err(not_applicable(c)),
     })
 }
 

@@ -2815,6 +2815,53 @@ mod subtasks {
 
         #[tokio::test]
         #[ignore = "syncs the demo site into a temp database"]
+        async fn a_view_filtered_to_one_issue_id_shows_that_epic_with_its_children_beneath_it() {
+            let site = Site::new().await;
+            let (space, view) = nw_view(&site, SubtaskMode::Hierarchy).await;
+            sort_by_key(&site, view, false).await;
+            view_set_filter(
+                site.db(),
+                viewer(),
+                view,
+                only(Condition::new(
+                    Field::IssueKey,
+                    Op::In,
+                    Some(Value::Many(vec!["nw-1020".into()])),
+                )),
+            )
+            .await
+            .unwrap();
+
+            let data = site.data(space, view, Narrowing::default()).await;
+
+            assert_eq!(row_of(&data, "NW-1020").depth, 0);
+            assert_eq!(
+                subtree(&data, "NW-1020"),
+                nested(&[
+                    ("NW-1021", 1),
+                    ("NW-1024", 1),
+                    ("NW-1026", 1),
+                    ("NW-1031", 1),
+                    ("NW-1035", 1),
+                    ("NW-1038", 1),
+                    ("NW-1063", 2),
+                    ("NW-1042", 1),
+                    ("NW-1043", 2),
+                    ("NW-1045", 2),
+                    ("NW-1059", 2),
+                    ("NW-1060", 2),
+                    ("NW-1047", 1),
+                    ("NW-1061", 2),
+                    ("NW-1062", 2),
+                    ("NW-1051", 1),
+                ])
+            );
+            assert_eq!(data.rows.len(), 17);
+            assert_each_issue_once(&data);
+        }
+
+        #[tokio::test]
+        #[ignore = "syncs the demo site into a temp database"]
         async fn the_descendants_take_the_group_of_their_root_and_the_count_is_roots_only() {
             let site = Site::new().await;
             let (list, view) = epics_view(&site, SubtaskMode::Hierarchy).await;

@@ -18,7 +18,12 @@ import { FilterPopover } from "./FilterPopover";
 const mocked = vi.mocked(api, true);
 
 const OPTIONS = filterOptions({
-  fields: [...filterOptions().fields, { id: "customfield_10071", name: "Review notes", kind: "text" }],
+  fields: [
+    ...filterOptions().fields,
+    { id: "customfield_10071", name: "Review notes", kind: "text" },
+    { id: "issueKey", name: "Issue ID", kind: "issueKeys" },
+    { id: "parentKey", name: "Parent ID", kind: "parentKeys" },
+  ],
   statuses: [
     { id: "3", name: "In Progress" },
     { id: "4", name: "Done" },
@@ -300,6 +305,91 @@ describe("FilterPopover", () => {
       await swapPriority(popover);
 
       await waitFor(() => expect(mocked.listMatchCount).toHaveBeenLastCalledWith(21, { conditions: [LOW_PRIORITY] }, false));
+    });
+  });
+
+  describe("a keys field", () => {
+    const operatorNames = (popover: HTMLElement) => within(within(popover).getByLabelText("Operator")).getAllByRole("option").map((o) => o.textContent);
+
+    async function pickField(name: string) {
+      const popover = await openFilter(FILTER_LIST);
+      await userEvent.selectOptions(within(popover).getByLabelText("Field"), name);
+      return popover;
+    }
+
+    it("takes typed text for Issue ID and offers only is and is not", async () => {
+      const popover = await pickField("Issue ID");
+
+      expect(within(popover).getByLabelText("Value")).toHaveAttribute("placeholder", "NW-123, NW-124");
+      expect(within(popover).getByLabelText("Value")).toHaveAttribute("type", "text");
+      expect(operatorNames(popover)).toEqual(["is", "is not"]);
+    });
+
+    it("offers is empty and is set for Parent ID besides is and is not", async () => {
+      const popover = await pickField("Parent ID");
+
+      expect(operatorNames(popover)).toEqual(["is", "is not", "is empty", "is set"]);
+    });
+
+    it("drafts several typed keys as in, and shows them normalized, on Enter", async () => {
+      mocked.filterParseKeys.mockResolvedValue(["NW-1", "NW-2"]);
+      const popover = await pickField("Issue ID");
+
+      await userEvent.type(within(popover).getByLabelText("Value"), "nw-1, nw-2{Enter}");
+
+      expect(mocked.filterParseKeys).toHaveBeenCalledWith("nw-1, nw-2");
+      await waitFor(() => expect(draft()?.list).toEqual([{ field: "issueKey", op: "in", value: ["NW-1", "NW-2"] }]));
+      expect(within(popover).getByLabelText("Value")).toHaveValue("NW-1, NW-2");
+    });
+
+    it("drafts one typed key as is with a single value when the field loses focus", async () => {
+      mocked.filterParseKeys.mockResolvedValue(["NW-1"]);
+      const popover = await pickField("Issue ID");
+
+      await userEvent.type(within(popover).getByLabelText("Value"), "nw-1");
+      await userEvent.tab();
+
+      await waitFor(() => expect(draft()?.list).toEqual([{ field: "issueKey", op: "is", value: "NW-1" }]));
+    });
+
+    it("keeps is not when new keys are typed into a negated condition", async () => {
+      mocked.filterParseKeys.mockResolvedValue(["NW-3", "NW-4"]);
+      const popover = await openFilter(listConditions({ kind: "list", own: [{ field: "parentKey", op: "isNot", value: "NW-1" }] }));
+      const input = within(popover).getByLabelText("Value");
+      expect(input).toHaveValue("NW-1");
+
+      await userEvent.clear(input);
+      await userEvent.type(input, "NW-3, NW-4{Enter}");
+
+      await waitFor(() => expect(draft()?.list).toEqual([{ field: "parentKey", op: "notIn", value: ["NW-3", "NW-4"] }]));
+    });
+
+    it("shows the stored keys of an in condition joined by commas", async () => {
+      const popover = await openFilter(listConditions({ kind: "list", own: [{ field: "issueKey", op: "in", value: ["NW-1", "NW-2"] }] }));
+
+      expect(within(popover).getByLabelText("Value")).toHaveValue("NW-1, NW-2");
+    });
+
+    it("shows why the keys are refused and keeps the condition", async () => {
+      mocked.filterParseKeys.mockRejectedValue({ kind: "invalid_input", message: "“nw 1” is not an issue key" });
+      const popover = await pickField("Issue ID");
+
+      await userEvent.type(within(popover).getByLabelText("Value"), "nw 1{Enter}");
+
+      expect(await within(popover).findByText("“nw 1” is not an issue key")).toBeInTheDocument();
+      expect(within(popover).getByLabelText("Value")).toHaveValue("nw 1");
+      expect(draft()?.list ?? []).not.toContainEqual(expect.objectContaining({ op: "in" }));
+    });
+
+    it("clears the message when the field changes", async () => {
+      mocked.filterParseKeys.mockRejectedValue({ kind: "invalid_input", message: "“nw 1” is not an issue key" });
+      const popover = await pickField("Issue ID");
+      await userEvent.type(within(popover).getByLabelText("Value"), "nw 1{Enter}");
+      await within(popover).findByText("“nw 1” is not an issue key");
+
+      await userEvent.selectOptions(within(popover).getByLabelText("Field"), "Parent ID");
+
+      expect(within(popover).queryByText("“nw 1” is not an issue key")).not.toBeInTheDocument();
     });
   });
 

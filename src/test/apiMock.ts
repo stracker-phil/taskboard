@@ -134,6 +134,7 @@ export function createApiMock(): Api {
     listSetWindow: done(),
     filterOptions: vi.fn(async (): Promise<FilterOptions> => filterOptions()),
     listMatchCount: vi.fn(),
+    filterParseKeys: vi.fn(),
     spaceMove: done(),
     spaceUpdate: done(),
     spaceSetAccent: done(),

@@ -1,7 +1,8 @@
 import { X } from "lucide-react";
-import { useId } from "react";
+import { useId, useState } from "react";
 import type { Condition, FilterField, FilterOptions, Op } from "../../api";
-import { choicesFor, DEFAULT_DAYS, newCondition, OP_NAMES, opsFor, pickedValues, shownOp, startValue, takesDays, takesNoValue, withValues } from "./conditionEditing";
+import { choicesFor, DEFAULT_DAYS, newCondition, OP_NAMES, opsFor, pickedValues, shownOp, startValue, takesDays, takesKeys, takesList, takesNoValue, withValues } from "./conditionEditing";
+import { KeysInput } from "./KeysInput";
 import { ValuePicker } from "./ValuePicker";
 
 interface Props {
@@ -26,14 +27,18 @@ export function ConditionRow({ condition, options, onChange, onRemove, ops: fixe
   // A condition on a field the Space hides keeps it; new conditions can't pick it.
   const listed = options.fields.includes(field) ? options.fields : [...options.fields, field];
   const ops = fixedOps ?? opsFor(field.kind);
+  // Why typed keys were refused; shown under the row.
+  const [error, setError] = useState<string | null>(null);
 
   const setField = (fieldId: string) => {
     const next = options.fields.find((f) => f.id === fieldId);
-    if (next) onChange(newCondition(next, options));
+    if (!next) return;
+    setError(null);
+    onChange(newCondition(next, options));
   };
   const setOp = (op: Op) => {
     // Picked values survive switching between "is" and "is not".
-    if ((op === "is" || op === "isNot") && choicesFor(field.kind, options) && !takesNoValue(condition.op)) {
+    if ((op === "is" || op === "isNot") && takesList(field.kind, options) && !takesNoValue(condition.op)) {
       onChange(withValues({ ...condition, op }, pickedValues(condition)));
       return;
     }
@@ -44,37 +49,40 @@ export function ConditionRow({ condition, options, onChange, onRemove, ops: fixe
   };
 
   return (
-    <div className="condition-row">
-      <label className="visually-hidden" htmlFor={`${id}-field`}>
-        Field
-      </label>
-      <select id={`${id}-field`} className="condition-row__field" value={field.id} disabled={!onRemove} onChange={(e) => setField(e.target.value)}>
-        {listed.map((f) => (
-          <option key={f.id} value={f.id}>
-            {f.name}
-          </option>
-        ))}
-      </select>
-      <label className="visually-hidden" htmlFor={`${id}-op`}>
-        Operator
-      </label>
-      <select id={`${id}-op`} className="condition-row__op" value={shownOp(condition.op)} onChange={(e) => setOp(e.target.value as Op)}>
-        {ops.map((op) => (
-          <option key={op} value={op}>
-            {OP_NAMES[op]}
-          </option>
-        ))}
-      </select>
-      <ValueEditor id={`${id}-value`} condition={condition} field={field} options={options} onChange={onChange} />
-      {onRemove ? (
-        <button type="button" className="condition-row__remove" aria-label="Remove condition" onClick={onRemove}>
-          <X size={14} aria-hidden="true" />
-        </button>
-      ) : (
-        // Keeps the value as wide as in the other rows.
-        <span className="condition-row__remove" aria-hidden="true" />
-      )}
-    </div>
+    <>
+      <div className="condition-row">
+        <label className="visually-hidden" htmlFor={`${id}-field`}>
+          Field
+        </label>
+        <select id={`${id}-field`} className="condition-row__field" value={field.id} disabled={!onRemove} onChange={(e) => setField(e.target.value)}>
+          {listed.map((f) => (
+            <option key={f.id} value={f.id}>
+              {f.name}
+            </option>
+          ))}
+        </select>
+        <label className="visually-hidden" htmlFor={`${id}-op`}>
+          Operator
+        </label>
+        <select id={`${id}-op`} className="condition-row__op" value={shownOp(condition.op)} onChange={(e) => setOp(e.target.value as Op)}>
+          {ops.map((op) => (
+            <option key={op} value={op}>
+              {OP_NAMES[op]}
+            </option>
+          ))}
+        </select>
+        <ValueEditor id={`${id}-value`} condition={condition} field={field} options={options} onChange={onChange} onError={setError} />
+        {onRemove ? (
+          <button type="button" className="condition-row__remove" aria-label="Remove condition" onClick={onRemove}>
+            <X size={14} aria-hidden="true" />
+          </button>
+        ) : (
+          // Keeps the value as wide as in the other rows.
+          <span className="condition-row__remove" aria-hidden="true" />
+        )}
+      </div>
+      {error && !takesNoValue(condition.op) && <p className="condition-row__error">{error}</p>}
+    </>
   );
 }
 
@@ -88,7 +96,16 @@ function countIn(op: Op, condition: Condition): Condition["value"] {
   return count;
 }
 
-function ValueEditor({ id, condition, field, options, onChange }: { id: string; condition: Condition; field: FilterField; options: FilterOptions; onChange: (c: Condition) => void }) {
+interface ValueEditorProps {
+  id: string;
+  condition: Condition;
+  field: FilterField;
+  options: FilterOptions;
+  onChange: (c: Condition) => void;
+  onError: (message: string | null) => void;
+}
+
+function ValueEditor({ id, condition, field, options, onChange, onError }: ValueEditorProps) {
   const label = (
     <label className="visually-hidden" htmlFor={id}>
       Value
@@ -100,6 +117,14 @@ function ValueEditor({ id, condition, field, options, onChange }: { id: string; 
       <>
         {label}
         <input id={id} className="condition-row__value" type="number" min={1} value={typeof condition.value === "number" ? condition.value : DEFAULT_DAYS} onChange={(e) => onChange({ ...condition, value: Number(e.target.value) })} />
+      </>
+    );
+  }
+  if (takesKeys(field.kind)) {
+    return (
+      <>
+        {label}
+        <KeysInput id={id} condition={condition} onChange={onChange} onError={onError} />
       </>
     );
   }

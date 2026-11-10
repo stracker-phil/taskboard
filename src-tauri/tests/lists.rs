@@ -941,7 +941,7 @@ mod the_tree_on_the_demo_site {
 
         let ids: Vec<&str> = options.fields.iter().map(|f| f.id.as_str()).collect();
         assert_eq!(
-            ids[..17],
+            ids[..19],
             [
                 "status",
                 "statusCategory",
@@ -950,6 +950,8 @@ mod the_tree_on_the_demo_site {
                 "reporter",
                 "priority",
                 "epic",
+                "issueKey",
+                "parentKey",
                 "release",
                 "sprint",
                 "labels",
@@ -967,6 +969,14 @@ mod the_tree_on_the_demo_site {
             assert_eq!(kind_of(id), Some(ValueKind::Timestamp), "{id}");
         }
         assert_eq!(kind_of("text"), Some(ValueKind::Search));
+        for (id, name, kind) in [
+            ("issueKey", "Issue ID", ValueKind::IssueKeys),
+            ("parentKey", "Parent ID", ValueKind::ParentKeys),
+        ] {
+            let field = options.fields.iter().find(|f| f.id == id).unwrap();
+            assert_eq!(field.kind, kind, "{id}");
+            assert_eq!(field.name, name, "{id}");
+        }
         assert_eq!(
             options
                 .fields
@@ -1011,7 +1021,17 @@ mod the_tree_on_the_demo_site {
         )
         .await;
         assert_eq!(options.epics.len() as i64, tracked_epics);
-        assert!(options.epics.iter().any(|c| c.name == "NW · Checkout"));
+        let checkout_key = text(
+            site.db(),
+            "SELECT key FROM cache.issue WHERE is_epic = 1 AND summary = 'Checkout' AND key LIKE 'NW-%'",
+        )
+        .await;
+        assert!(
+            options
+                .epics
+                .iter()
+                .any(|c| c.name == format!("{checkout_key} · Checkout"))
+        );
         assert!(options.releases.iter().any(|c| c.name == "NW · 2.4.0"));
         let mut labels: Vec<&str> = options.labels.iter().map(|c| c.id.as_str()).collect();
         let total = labels.len();

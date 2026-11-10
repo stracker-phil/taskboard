@@ -5,7 +5,7 @@ use tauri::State;
 
 use super::{FilterOptions, ListConditions, MatchCount, SidebarTree, SpaceUpdate, Viewer};
 use crate::error::AppResult;
-use crate::filter::{Filter, Op};
+use crate::filter::{Filter, Op, parse_keys};
 use crate::look::Accent;
 use crate::state::AppState;
 
@@ -84,6 +84,12 @@ pub async fn list_match_count(
     me: bool,
 ) -> AppResult<MatchCount> {
     super::list_match_count(&state.db, viewer(&state), id, filter, me).await
+}
+
+/// Issue keys as typed into a key condition, checked and in the form conditions store them.
+#[tauri::command]
+pub fn filter_parse_keys(text: String) -> AppResult<Vec<String>> {
+    parse_keys(&text)
 }
 
 #[tauri::command]

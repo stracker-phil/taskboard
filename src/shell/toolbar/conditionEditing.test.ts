@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Condition, FilterField, FilterOptions, Op, ValueKind } from "../../api";
-import { OP_NAMES, choicesFor, isComplete, newCondition, opsFor, pickedValues, shownOp, startValue, takesDays, takesNoValue, withValues } from "./conditionEditing";
+import { OP_NAMES, choicesFor, isComplete, newCondition, opsFor, pickedValues, shownOp, startValue, takesDays, takesKeys, takesList, takesNoValue, withValues } from "./conditionEditing";
 
 const OPTIONS: FilterOptions = {
   fields: [],
@@ -31,8 +31,34 @@ describe("opsFor", () => {
     ["text", ["contains", "is", "isEmpty", "isNotEmpty"]],
     ["search", ["contains"]],
     ["number", ["is", "isNot", "isEmpty", "isNotEmpty"]],
+    ["parentKeys", ["is", "isNot", "isEmpty", "isNotEmpty"]],
+    ["issueKeys", ["is", "isNot"]],
   ])("offers the operators of a %s field", (kind, ops) => {
     expect(opsFor(kind)).toEqual(ops);
+  });
+});
+
+describe("takesKeys", () => {
+  it.each<[ValueKind, boolean]>([
+    ["issueKeys", true],
+    ["parentKeys", true],
+    ["epic", false],
+    ["text", false],
+  ])("judges a %s field: %s", (kind, expected) => {
+    expect(takesKeys(kind)).toBe(expected);
+  });
+});
+
+describe("takesList", () => {
+  it.each<[ValueKind, boolean]>([
+    ["issueKeys", true],
+    ["parentKeys", true],
+    ["status", true],
+    ["epic", true],
+    ["text", false],
+    ["date", false],
+  ])("judges a %s field: %s", (kind, expected) => {
+    expect(takesList(kind, OPTIONS)).toBe(expected);
   });
 });
 

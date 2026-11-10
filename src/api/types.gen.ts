@@ -1072,7 +1072,7 @@ export type Value = number | string | Array<string>;
 /**
  * How a field's value is picked.
  */
-export type ValueKind = "status" | "statusCategory" | "type" | "user" | "priority" | "epic" | "release" | "sprint" | "label" | "project" | "date" | "timestamp" | "text" | "number" | "search";
+export type ValueKind = "status" | "statusCategory" | "type" | "user" | "priority" | "epic" | "issueKeys" | "parentKeys" | "release" | "sprint" | "label" | "project" | "date" | "timestamp" | "text" | "number" | "search";
 
 export type View = { id: number, listId: number, name: string, layout: Layout, 
 /**

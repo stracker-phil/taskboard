@@ -146,6 +146,10 @@ pub enum ValueKind {
     User,
     Priority,
     Epic,
+    /// Issue keys typed as a list (`NW-123, NW-124`); every issue has one.
+    IssueKeys,
+    /// Parent keys typed as a list; an issue may have no parent.
+    ParentKeys,
     Release,
     Sprint,
     Label,
@@ -208,6 +212,8 @@ const STANDARD_FIELDS: &[(Field, &str, ValueKind)] = &[
     (Field::Reporter, "Reporter", ValueKind::User),
     (Field::Priority, "Priority", ValueKind::Priority),
     (Field::Epic, "Epic", ValueKind::Epic),
+    (Field::IssueKey, "Issue ID", ValueKind::IssueKeys),
+    (Field::ParentKey, "Parent ID", ValueKind::ParentKeys),
     (Field::Release, "Release", ValueKind::Release),
     (Field::Sprint, "Sprint", ValueKind::Sprint),
     (Field::Labels, "Labels", ValueKind::Label),
@@ -326,7 +332,7 @@ fn options(conn: &Connection, list_id: i64) -> AppResult<FilterOptions> {
         epics: choices(
             conn,
             &format!(
-                "SELECT i.id, p.key || ' · ' || i.summary FROM cache.issue i JOIN cache.space p ON p.id = i.project_id
+                "SELECT i.id, i.key || ' · ' || i.summary FROM cache.issue i JOIN cache.space p ON p.id = i.project_id
                  WHERE i.is_epic = 1 AND i.gone = 0 AND i.project_id IN ({tracked})
                  ORDER BY p.key, i.summary COLLATE NOCASE"
             ),
