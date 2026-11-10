@@ -29,6 +29,10 @@ pub struct SyncOverview {
     pub state: SyncState,
     pub last_full_at: Option<String>,
     pub projects: Vec<ProjectCounts>,
+    /// The cache's size, on disk or in memory.
+    #[serde(default)]
+    #[ts(type = "number")]
+    pub cache_bytes: u64,
 }
 
 pub async fn overview(db: &Db, state: SyncState) -> AppResult<SyncOverview> {
@@ -39,6 +43,7 @@ pub async fn overview(db: &Db, state: SyncState) -> AppResult<SyncOverview> {
         state,
         last_full_at,
         projects,
+        cache_bytes: db.cache_size().await?.bytes,
     })
 }
 
@@ -63,4 +68,51 @@ fn project_counts(conn: &Connection) -> AppResult<Vec<ProjectCounts>> {
         })
     })?;
     Ok(rows.collect::<Result<_, _>>()?)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_support::temp_config_dir;
+
+    #[tokio::test]
+    async fn the_overview_reports_the_size_of_a_fresh_cache() {
+        let dir = temp_config_dir();
+        let db = Db::open(dir.path()).unwrap();
+
+        let overview = overview(&db, SyncState::Idle { last_ok: None })
+            .await
+            .unwrap();
+
+        assert!(overview.cache_bytes > 0);
+        assert_eq!(overview.cache_bytes, db.cache_size().await.unwrap().bytes);
+    }
+
+    #[test]
+    fn an_overview_without_cache_bytes_reads_as_zero() {
+        let json = serde_json::json!({
+            "state": { "state": "idle", "lastOk": null },
+            "lastFullAt": null,
+            "projects": [],
+        });
+
+        let overview: SyncOverview = serde_json::from_value(json).unwrap();
+
+        assert_eq!(overview.cache_bytes, 0);
+    }
+
+    #[test]
+    fn the_overview_serializes_the_cache_size_as_cache_bytes() {
+        let overview = SyncOverview {
+            state: SyncState::Idle { last_ok: None },
+            last_full_at: None,
+            projects: vec![],
+            cache_bytes: 8192,
+        };
+
+        assert_eq!(
+            serde_json::to_value(&overview).unwrap()["cacheBytes"],
+            serde_json::json!(8192)
+        );
+    }
 }

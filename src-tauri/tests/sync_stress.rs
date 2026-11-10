@@ -251,7 +251,7 @@ async fn a_site_of_5000_issues_syncs_changes_loses_issues_and_compacts() {
         })
         .await
         .unwrap();
-    let before = site.ctx.db.cache_size().await.unwrap().unwrap();
+    let before = site.ctx.db.cache_size().await.unwrap();
 
     let after = site.ctx.db.compact_cache().await.unwrap().unwrap();
 

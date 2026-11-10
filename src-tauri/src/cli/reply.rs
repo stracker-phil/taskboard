@@ -106,6 +106,7 @@ mod tests {
         SyncOverview {
             state,
             last_full_at: last_full_at.map(String::from),
+            cache_bytes: 0,
             projects,
         }
     }
@@ -366,7 +367,8 @@ mod tests {
                         "cached": 33,
                         "open": 21,
                         "lastFullAt": SYNCED_AT
-                    }]
+                    }],
+                    "cacheBytes": 0
                 }
             })
         );

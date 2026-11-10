@@ -973,7 +973,11 @@ export type Style = "progress" | "review" | "blocked" | "todo" | "backlog" | "do
  */
 export type SubtaskMode = "hidden" | "hierarchy" | "list";
 
-export type SyncOverview = { state: SyncState, lastFullAt: string | null, projects: Array<ProjectCounts>, };
+export type SyncOverview = { state: SyncState, lastFullAt: string | null, projects: Array<ProjectCounts>, 
+/**
+ * The cache's size, on disk or in memory.
+ */
+cacheBytes: number, };
 
 /**
  * After every page of a full or delta sync; a delta counts changed issues in `fetched` and has no project.

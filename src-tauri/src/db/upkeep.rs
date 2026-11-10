@@ -7,7 +7,7 @@ use rusqlite::Connection;
 use serde::Serialize;
 use ts_rs::TS;
 
-use super::{CacheKind, Db, blocking};
+use super::{CACHE_FILE, CacheKind, Db, blocking};
 use crate::error::AppResult;
 use crate::lock::MutexExt;
 
@@ -31,15 +31,17 @@ impl Db {
             .await
     }
 
-    /// `None` here and in `compact_cache` while the cache is in memory.
-    pub async fn cache_size(&self) -> AppResult<Option<CacheSize>> {
-        if !self.has_cache_file() {
-            return Ok(None);
-        }
-        self.read(cache_size).await.map(Some)
+    pub async fn cache_size(&self) -> AppResult<CacheSize> {
+        self.read(cache_size).await
     }
 
-    /// Rewrites the cache without its empty pages and empties its write-ahead log; returns the size after.
+    /// Whether `cache.sqlite` is on disk; in memory mode it must not be.
+    pub fn cache_file_exists(&self) -> bool {
+        self.inner.dir.join(CACHE_FILE).exists()
+    }
+
+    /// Rewrites the cache without its empty pages and empties its write-ahead log; returns the size after, or
+    /// `None` for a cache in memory.
     pub async fn compact_cache(&self) -> AppResult<Option<CacheSize>> {
         if !self.has_cache_file() {
             return Ok(None);
@@ -164,7 +166,7 @@ mod tests {
     async fn a_fresh_cache_has_almost_no_free_pages() {
         let (_dir, db) = open_db();
 
-        let size = db.cache_size().await.unwrap().unwrap();
+        let size = db.cache_size().await.unwrap();
 
         assert!(size.bytes > 0);
         assert!(size.free < 0.1, "{size:?}");
@@ -174,7 +176,7 @@ mod tests {
     async fn deleting_most_rows_leaves_the_cache_mostly_free() {
         let (_dir, db) = db_with_mostly_deleted_issues().await;
 
-        let size = db.cache_size().await.unwrap().unwrap();
+        let size = db.cache_size().await.unwrap();
 
         assert!(size.free > COMPACT_ABOVE, "{size:?}");
     }
@@ -182,24 +184,24 @@ mod tests {
     #[tokio::test]
     async fn compacting_shrinks_the_cache_and_keeps_its_rows() {
         let (_dir, db) = db_with_mostly_deleted_issues().await;
-        let before = db.cache_size().await.unwrap().unwrap();
+        let before = db.cache_size().await.unwrap();
 
         let after = db.compact_cache().await.unwrap().unwrap();
 
         assert!(after.bytes < before.bytes, "{before:?} -> {after:?}");
         assert!(after.free < 0.05, "{after:?}");
-        assert_eq!(db.cache_size().await.unwrap().unwrap(), after);
+        assert_eq!(db.cache_size().await.unwrap(), after);
         assert_eq!(kept_keys(&db).await, ["NW-1", "NW-2", "NW-3"]);
     }
 
     #[tokio::test]
     async fn tidying_compacts_a_cache_that_is_mostly_free() {
         let (_dir, db) = db_with_mostly_deleted_issues().await;
-        let before = db.cache_size().await.unwrap().unwrap();
+        let before = db.cache_size().await.unwrap();
 
         db.tidy_cache().await.unwrap();
 
-        let after = db.cache_size().await.unwrap().unwrap();
+        let after = db.cache_size().await.unwrap();
         assert!(after.bytes < before.bytes, "{before:?} -> {after:?}");
         assert!(after.free < 0.05, "{after:?}");
         assert_eq!(kept_keys(&db).await, ["NW-1", "NW-2", "NW-3"]);
@@ -210,11 +212,11 @@ mod tests {
         let (_dir, db) = open_db();
         exec(&db, PROJECT).await;
         exec(&db, MANY_ISSUES).await;
-        let before = db.cache_size().await.unwrap().unwrap();
+        let before = db.cache_size().await.unwrap();
 
         db.tidy_cache().await.unwrap();
 
-        let after = db.cache_size().await.unwrap().unwrap();
+        let after = db.cache_size().await.unwrap();
         assert!(after.bytes >= before.bytes, "{before:?} -> {after:?}");
         assert_eq!(kept_keys(&db).await.len(), 1500);
     }
@@ -229,17 +231,30 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_memory_cache_has_no_size_and_nothing_to_compact_but_tidying_succeeds() {
+    async fn a_memory_cache_has_a_growing_size_and_nothing_to_compact_but_tidying_succeeds() {
         let dir = temp_config_dir();
         let db = Db::open_with(dir.path(), CacheKind::Memory).unwrap();
+        let empty = db.cache_size().await.unwrap();
         exec(&db, PROJECT).await;
         exec(&db, MANY_ISSUES).await;
+        let filled = db.cache_size().await.unwrap();
         exec(&db, KEEP_FIRST_THREE).await;
 
-        assert_eq!(db.cache_size().await.unwrap(), None);
+        assert!(empty.bytes > 0, "{empty:?}");
+        assert!(filled.bytes > empty.bytes, "{empty:?} -> {filled:?}");
         assert_eq!(db.compact_cache().await.unwrap(), None);
         db.tidy_cache().await.unwrap();
         assert_eq!(kept_keys(&db).await, ["NW-1", "NW-2", "NW-3"]);
+    }
+
+    #[tokio::test]
+    async fn the_cache_file_exists_in_file_mode_and_not_in_memory_mode() {
+        let (_dir, file_db) = open_db();
+        let memory_dir = temp_config_dir();
+        let memory_db = Db::open_with(memory_dir.path(), CacheKind::Memory).unwrap();
+
+        assert!(file_db.cache_file_exists());
+        assert!(!memory_db.cache_file_exists());
     }
 
     #[test]

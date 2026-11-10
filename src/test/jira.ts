@@ -26,7 +26,7 @@ export function projectCounts(patch: Partial<ProjectCounts> = {}): ProjectCounts
 
 /** An idle, never-synced overview with no tracked projects; override per test. */
 export function syncOverview(patch: Partial<SyncOverview> = {}): SyncOverview {
-  return { state: { state: "idle", lastOk: null }, lastFullAt: null, projects: [], ...patch };
+  return { state: { state: "idle", lastOk: null }, lastFullAt: null, projects: [], cacheBytes: 0, ...patch };
 }
 
 export const PROJECTS:ProjectRow[] = [

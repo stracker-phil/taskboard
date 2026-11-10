@@ -130,8 +130,14 @@ pub struct SyncFacts {
     pub last_full: Option<String>,
     pub tracked: usize,
     pub cached: u32,
-    /// `None` while the cache is in memory.
-    pub cache_bytes: Option<u64>,
+    pub cache: CacheFacts,
+}
+
+pub struct CacheFacts {
+    pub bytes: u64,
+    pub in_memory: bool,
+    /// Whether `cache.sqlite` is on disk.
+    pub file_exists: bool,
 }
 
 pub fn sync_group(facts: &SyncFacts) -> DiagnosticGroup {
@@ -164,13 +170,25 @@ pub fn sync_group(facts: &SyncFacts) -> DiagnosticGroup {
     )
     .offering("sync:full", "Full Sync");
     let cached = row("Cached issues", facts.cached.to_string(), Info);
-    let mut rows = vec![state, projects, last_full, cached];
-    if let Some(bytes) = facts.cache_bytes {
-        rows.push(
-            row("Cache size", megabytes(bytes), Info).offering("app:compactCache", "Compact"),
-        );
+    group(
+        "Sync",
+        vec![state, projects, last_full, cached, cache_row(&facts.cache)],
+    )
+}
+
+/// An in-memory cache has no file to compact, so it offers the data folder, where no cache file should be.
+fn cache_row(cache: &CacheFacts) -> DiagnosticRow {
+    use DiagnosticTone::*;
+    let size = megabytes(cache.bytes);
+    if !cache.in_memory {
+        return row("Cache size", size, Info).offering("app:compactCache", "Compact");
     }
-    group("Sync", rows)
+    let (tone, file) = if cache.file_exists {
+        (Warn, "a cache file is on disk")
+    } else {
+        (Ok, "no cache file")
+    };
+    row("Jira data", format!("In memory · {size} · {file}"), tone).offering("app:data", "Show")
 }
 
 /// "0.4 MB", "12.5 MB".
@@ -233,7 +251,11 @@ mod tests {
             last_full: Some("Mon 09:00".into()),
             tracked: 2,
             cached: 120,
-            cache_bytes: Some(12_500_000),
+            cache: CacheFacts {
+                bytes: 12_500_000,
+                in_memory: false,
+                file_exists: true,
+            },
         };
         overrides(&mut facts);
         facts
@@ -552,7 +574,7 @@ mod tests {
             (12_500_000, "12.5 MB"),
             (1_234_000_000, "1234.0 MB"),
         ] {
-            let group = sync_group(&sync(|f| f.cache_bytes = Some(bytes)));
+            let group = sync_group(&sync(|f| f.cache.bytes = bytes));
             assert_eq!(
                 group.rows.last().unwrap(),
                 &expected(
@@ -567,11 +589,41 @@ mod tests {
     }
 
     #[test]
-    fn a_memory_cache_has_no_cache_size_row() {
-        let group = sync_group(&sync(|f| f.cache_bytes = None));
+    fn a_memory_cache_without_a_file_is_an_ok_jira_data_row_offering_the_data_folder() {
+        let group = sync_group(&sync(|f| {
+            f.cache.in_memory = true;
+            f.cache.file_exists = false;
+        }));
 
-        assert_eq!(group.rows.len(), 4);
-        assert!(group.rows.iter().all(|row| row.label != "Cache size"));
+        assert_eq!(group.rows.len(), 5);
+        assert_eq!(
+            group.rows.last().unwrap(),
+            &expected(
+                "Jira data",
+                "In memory · 12.5 MB · no cache file",
+                DiagnosticTone::Ok,
+                Some(("app:data", "Show"))
+            )
+        );
+    }
+
+    #[test]
+    fn a_memory_cache_with_a_file_on_disk_warns_and_offers_the_data_folder() {
+        let group = sync_group(&sync(|f| {
+            f.cache.in_memory = true;
+            f.cache.file_exists = true;
+        }));
+
+        assert_eq!(group.rows.len(), 5);
+        assert_eq!(
+            group.rows.last().unwrap(),
+            &expected(
+                "Jira data",
+                "In memory · 12.5 MB · a cache file is on disk",
+                DiagnosticTone::Warn,
+                Some(("app:data", "Show"))
+            )
+        );
     }
 
     #[test]

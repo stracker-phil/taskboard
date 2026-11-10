@@ -246,7 +246,7 @@ export function createApiMock(): Api {
     statusStyleSet: vi.fn().mockResolvedValue([]),
     statusStylesAll: vi.fn().mockResolvedValue([]),
     statusStyleSetApp: vi.fn().mockResolvedValue([]),
-    syncOverview: vi.fn(async (): Promise<SyncOverview> => ({ state: { state: "idle", lastOk: null }, lastFullAt: null, projects: [] })),
+    syncOverview: vi.fn(async (): Promise<SyncOverview> => ({ state: { state: "idle", lastOk: null }, lastFullAt: null, projects: [], cacheBytes: 0 })),
     syncRun: done(),
     diagnosticsGet: vi.fn(async (): Promise<Diagnostics> => ({ groups: [] })),
     appInfo: vi.fn().mockResolvedValue({ name: "Taskboard", version: "1.2.3" }),

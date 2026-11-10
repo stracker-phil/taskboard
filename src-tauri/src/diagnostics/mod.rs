@@ -8,9 +8,12 @@ use std::path::{Path, PathBuf};
 use chrono::{DateTime, Local};
 use tauri::{AppHandle, Manager, State};
 
-use groups::{Diagnostics, JiraFacts, LocalFacts, SyncFacts, jira_group, local_group, sync_group};
+use groups::{
+    CacheFacts, Diagnostics, JiraFacts, LocalFacts, SyncFacts, jira_group, local_group, sync_group,
+};
 
 use crate::connection;
+use crate::db::CacheKind;
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 use crate::sync::{SyncEngine, SyncState, overview};
@@ -59,7 +62,11 @@ pub async fn diagnostics_get(
         last_full: counts.last_full_at.as_deref().map(local),
         tracked: counts.projects.len(),
         cached: counts.projects.iter().map(|p| p.cached).sum(),
-        cache_bytes: state.db.cache_size().await?.map(|size| size.bytes),
+        cache: CacheFacts {
+            bytes: state.db.cache_size().await?.bytes,
+            in_memory: state.db.cache_kind() == CacheKind::Memory,
+            file_exists: state.db.cache_file_exists(),
+        },
     };
     let paths = app.path();
     let home = paths.home_dir().ok();
