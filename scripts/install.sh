@@ -1,7 +1,7 @@
 #!/bin/zsh
 # Installs the release build as the one Taskboard of this machine: ~/Applications/Taskboard.app links to
-# it and the `taskboard` command links through that app. A running Taskboard (any build) restarts on it,
-# its window shown or hidden as before.
+# it and the `taskboard` command links through that app. A running release app restarts on it, its window
+# shown or hidden as before; a running debug app is left alone.
 # `bun run release` ends here; debug builds are never installed (scripts/dev/launch.sh runs them by path).
 # A ~/.local/bin/taskboard that isn't this script's link stays unless
 # `scripts/install.sh --replace-cli`.
@@ -15,7 +15,8 @@ LINK="$HOME/Applications/Taskboard.app"
 BIN="$LINK/Contents/MacOS/taskboard"
 CLI="$HOME/.local/bin/taskboard"
 
-running() { pgrep -f 'Taskboard( \(Debug\))?\.app/Contents/MacOS/taskboard( --hidden)?$' >/dev/null; }
+source "$ROOT/scripts/app-pids.sh"
+running() { app_pids "$APP/Contents/MacOS/taskboard" >/dev/null; }
 # Re-signing a running app's files can get it killed, so it quits first; a hidden window stays hidden.
 if running; then
   WAS_RUNNING=1

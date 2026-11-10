@@ -14,7 +14,7 @@ own name, identifier, data, socket and URL scheme
 | What | Release | Debug | Where |
 |---|---|---|---|
 | Product name | `Taskboard` | `Taskboard (Debug)` | `tauri.conf.json` `productName` and window `title`; `tauri.debug.conf.json`; `lib.rs` `APP_NAME`, which is also the Keychain service (`secrets.rs`); `index.html` |
-| Bundle | `Taskboard.app` | `Taskboard (Debug).app` | `scripts/install.sh`, `scripts/stop-app.sh`, `scripts/dev/launch.sh`; the window owner in `scripts/dev/screenshot.sh` |
+| Bundle | `Taskboard.app` | `Taskboard (Debug).app` | `scripts/install.sh`, `scripts/app-pids.sh`, `scripts/dev/launch.sh`; the window owner in `scripts/dev/screenshot.sh` |
 | Bundle identifier | `com.philippstracker.taskboard` | `com.philippstracker.taskboard.debug` | both Tauri configs; `lib.rs` `IDENTIFIER` (tested against both); `scripts/install.sh`, `scripts/dev/launch.sh`; the socket path in `scripts/dev/js.sh`. It names the config dir and logs |
 | Binary and CLI | `taskboard` | the same name inside the debug bundle, run by path | Cargo package `name` (also the self dev-dependency); `cli/`; the scripts |
 | Installed links | `~/Applications/Taskboard.app`, `~/.local/bin/taskboard` | none | `scripts/install.sh` |
