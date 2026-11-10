@@ -1,7 +1,6 @@
 import { type CSSProperties, Fragment, memo } from "react";
 import type { Row } from "../../api";
 import { CopyKey } from "../../components/issue/CopyKey";
-import { ChangeChip } from "../../components/issue/ChangeChip";
 import { CommentCount } from "../../components/issue/CommentCount";
 import { CellValue, cellEditProps } from "./cellEdits";
 import { columnDef } from "./columns";
@@ -55,14 +54,13 @@ export const IssueRow = memo(function IssueRow(props: Props) {
   const { nesting = null, subtasksOpen = true, onToggleSubtasks, childChip = false, pinned = false, guides } = props;
   const nested = (nesting?.depth ?? 0) > 0;
   const flashing = useFlash(row.updatedAt);
-  const className = ["list-row", `list-row--${position}`, wrap && "list-row--wrap", nested && "list-row--child", row.changed && "list-row--changed", flashing && "flash", selected && "list-row--selected", picked && "list-row--picked"]
+  const className = ["list-row", `list-row--${position}`, wrap && "list-row--wrap", nested && "list-row--child", flashing && "flash", selected && "list-row--selected", picked && "list-row--picked"]
     .filter(Boolean)
     .join(" ");
   // A wrapping title takes the chips into its flow, each after a space that vanishes at a line start; on one
   // line they follow the title and the summary is cut first.
   const chips = [
     childChip && <ChildCount key="children" count={row.childCount} />,
-    row.changeNote && <ChangeChip key="change" note={row.changeNote} />,
     <CommentCount key="comments" count={row.commentCount} />,
   ];
   const flowingChips = chips.map((chip) => chip && <Fragment key={chip.key}> {chip}</Fragment>);
@@ -93,7 +91,7 @@ export const IssueRow = memo(function IssueRow(props: Props) {
             {wrap && flowingChips}
           </span>
           {!wrap && chips}
-          <RowActions issueId={row.id} issueKey={row.key} changed={row.changed} actions={actions} pinned={pinned} />
+          <RowActions issueId={row.id} issueKey={row.key} actions={actions} pinned={pinned} />
         </span>
         {columns.map((id) => {
           const editing = cellEditProps(id, row, actions, onPick);

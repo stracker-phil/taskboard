@@ -88,9 +88,6 @@
   /* Changed since the owner last looked */
   --changed-bg: color-mix(in srgb, var(--accent) 7%, var(--panel-bg));
   --changed-border: var(--accent-soft-border);
-  --changed-chip-bg: color-mix(in srgb, var(--accent) 16%, var(--panel-bg));
-  --changed-chip-text: var(--accent-text);
-  --changed-dot: var(--accent);
 
   /* Status styles: pill fill, pill text, pill border, row square, board tint, board count; To do has its own List tab, Backlog a dashed border */
   --status-backlog-bg: #fafafa;

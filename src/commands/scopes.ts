@@ -5,6 +5,8 @@ interface ScopeDef {
   /** Shown in Settings → Shortcuts. */
   label: string;
   isActive(): boolean;
+  /** Takes its parent's keys over while active (an open overlay); a shared key is no clash. */
+  shadows?: boolean;
 }
 
 const scopes = new Map<string, ScopeDef>();
@@ -35,6 +37,14 @@ function ancestors(scope: string): string[] {
 
 export function isAncestor(ancestor: string, scope: string): boolean {
   return ancestors(scope).includes(ancestor);
+}
+
+/** `scope` or one of its ancestors below `ancestor` shadows its parent's keys. */
+export function shadowsAncestor(scope: string, ancestor: string): boolean {
+  for (let at: string | null = scope; at && at !== ancestor; at = scopes.get(at)?.parent ?? null) {
+    if (scopes.get(at)?.shadows) return true;
+  }
+  return false;
 }
 
 /** Depth in the parent chain: the root is 0, its children 1, and so on. */

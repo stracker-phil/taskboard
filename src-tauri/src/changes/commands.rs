@@ -1,19 +1,21 @@
-//! The Tauri commands for marking issues read (seen) and unread. Unread keeps what the owner reads there
-//! until they leave, so the read ones are noted before the write announces the change.
+//! The Tauri commands for marking issues read (seen) and unread.
 
 use chrono::Utc;
 use tauri::State;
 
 use crate::error::AppResult;
-use crate::lists::Viewer;
 use crate::state::AppState;
 use crate::time::format_utc;
-use crate::views::{Narrowing, ViewAt};
 
 #[tauri::command]
 pub async fn issues_mark_seen(state: State<'_, AppState>, ids: Vec<String>) -> AppResult<()> {
-    state.nav.keep_read(&ids);
     super::mark_seen(&state.db, ids, format_utc(Utc::now())).await
+}
+
+/// The M key on a row: read when it is unread, else unread again.
+#[tauri::command]
+pub async fn issue_toggle_seen(state: State<'_, AppState>, id: String) -> AppResult<()> {
+    super::toggle_seen(&state.db, id, format_utc(Utc::now())).await
 }
 
 /// Unread again: from the activity item at `from` on, or the whole issue.
@@ -24,38 +26,4 @@ pub async fn issue_mark_unread(
     from: Option<String>,
 ) -> AppResult<()> {
     super::mark_unread(&state.db, id, from).await
-}
-
-/// Marks the unseen issues the view shows seen; without a view, every unseen issue of the filter list.
-#[tauri::command]
-pub async fn list_mark_all_seen(
-    state: State<'_, AppState>,
-    list_id: i64,
-    view_id: Option<i64>,
-    narrowing: Option<Narrowing>,
-) -> AppResult<()> {
-    let settings = state.settings.get();
-    let viewer = Viewer::of(&settings.connection, Utc::now());
-    let now = format_utc(viewer.now);
-    let nav = state.nav.clone();
-    let view = view_id.map(|view_id| ViewAt {
-        view_id,
-        narrowing: {
-            let narrowing = narrowing.unwrap_or_default();
-            let modes = state.modes.get();
-            Narrowing {
-                me_rules: narrowing.resolve_me_rules(&settings.behaviour.me_rules),
-                me: narrowing.me || modes.me_everywhere,
-                unread: modes.unread_only,
-                ..narrowing
-            }
-        },
-    });
-    let unseen = move |conn: &_| {
-        let ids = crate::views::unseen_ids(conn, &viewer, list_id, view.as_ref())?;
-        nav.keep_read(&ids);
-        Ok(ids)
-    };
-    super::mark_all_seen(&state.db, unseen, now).await?;
-    Ok(())
 }

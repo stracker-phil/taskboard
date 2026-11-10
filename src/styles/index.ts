@@ -27,3 +27,4 @@ import "./states.css";
 import "./overlays.css";
 import "./settings.css";
 import "./spaces.css";
+import "./inbox.css";

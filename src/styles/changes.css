@@ -1,4 +1,4 @@
-/* Change tracking (docs/ux.md → Change tracking): the Since-yesterday banner, new activity and changed issues. */
+/* Change tracking (docs/ux.md → Change tracking): the Since-yesterday banner, new activity and changed related issues. */
 .since-banner {
   display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-radius: 9px;
   background: var(--banner-info-bg); color: var(--banner-info-text); font-size: 13px; line-height: 1.4;

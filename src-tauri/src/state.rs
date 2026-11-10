@@ -6,6 +6,7 @@ use std::sync::Arc;
 use crate::connection::JiraAccess;
 use crate::db::Db;
 use crate::error::AppResult;
+use crate::inbox::InboxSession;
 use crate::jira::Limiter;
 use crate::jira::gateway::AvatarClient;
 use crate::launch::LaunchQueue;
@@ -28,6 +29,7 @@ pub struct AppState {
     pub avatars: AvatarClient,
     pub nav: NavStore,
     pub places: PlaceStore,
+    pub inbox: InboxSession,
 }
 
 impl AppState {
@@ -45,6 +47,7 @@ impl AppState {
             avatars: AvatarClient::default(),
             nav: NavStore::open(config_dir),
             places: PlaceStore::open(config_dir),
+            inbox: InboxSession::default(),
         })
     }
 }

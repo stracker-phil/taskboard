@@ -96,11 +96,8 @@ describe.each(SCHEMES)("%s palette contrast", (scheme) => {
       expect(accentRatio("--selection-text", "--selection-bg")).toBeGreaterThanOrEqual(4.5);
     });
 
-    it.each([
-      ["--changed-chip-text", "--changed-chip-bg"],
-      ["--text-on-accent", "--accent"],
-    ])("%s reads at 4.5:1 on %s", (fg, bg) => {
-      expect(accentRatio(fg, bg)).toBeGreaterThanOrEqual(4.5);
+    it("--text-on-accent reads at 4.5:1 on --accent", () => {
+      expect(accentRatio("--text-on-accent", "--accent")).toBeGreaterThanOrEqual(4.5);
     });
   });
 

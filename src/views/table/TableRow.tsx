@@ -71,7 +71,7 @@ export const TableRow = memo(function TableRow(props: Props) {
   const { row, columns, inlineLabels = false, selected, picked, onSelect, onToggleBox, onPick, onOpen, edits } = props;
   const { tree = false, nesting = null, subtasksOpen = true, onToggleSubtasks, childChip = false, guides } = props;
   const flashing = useFlash(row.updatedAt);
-  const className = ["table-row", tree && "table-row--tree", nesting?.parent && "table-row--parent", nesting && nesting.depth > 0 && "table-row--child", row.changed && "table-row--changed", flashing && "flash", selected && "table-row--selected", picked && "table-row--picked"].filter(Boolean).join(" ");
+  const className = ["table-row", tree && "table-row--tree", nesting?.parent && "table-row--parent", nesting && nesting.depth > 0 && "table-row--child", flashing && "flash", selected && "table-row--selected", picked && "table-row--picked"].filter(Boolean).join(" ");
   return (
     <div className={className} style={{ "--depth": nesting?.depth ?? 0 } as CSSProperties} role="row" aria-selected={selected || picked} data-issue-id={row.id} onMouseDown={keepTextUnselected} onClick={(e) => onSelect(row.id, e)} onDoubleClick={(e) => opensIssue(e) && onOpen(row.id, e)}>
       {guides && <TreeGuides guides={guides} />}

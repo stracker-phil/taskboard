@@ -105,41 +105,22 @@ describe("useIssueActions", () => {
     });
   });
 
-  describe("markUnread", () => {
-    it("marks the whole issue unread", async () => {
+  describe("toggleRead", () => {
+    it("asks Rust to toggle the issue's read state", async () => {
       const actions = await renderActions("");
 
-      actions.current.markUnread("10042");
+      actions.current.toggleRead("10042");
 
-      expect(mocked.issueMarkUnread).toHaveBeenCalledWith("10042");
+      expect(mocked.issueToggleSeen).toHaveBeenCalledWith("10042");
     });
 
-    it("shows an error when marking fails", async () => {
-      mocked.issueMarkUnread.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
+    it("shows an error when toggling fails", async () => {
+      mocked.issueToggleSeen.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
       const actions = await renderActions("");
 
-      actions.current.markUnread("10042");
+      actions.current.toggleRead("10042");
 
-      await waitFor(() => expect(toasts()).toEqual([["error", "Could not mark it unread: Disk full"]]));
-    });
-  });
-
-  describe("markSeen", () => {
-    it("marks the issue read", async () => {
-      const actions = await renderActions("");
-
-      actions.current.markSeen("10042");
-
-      expect(mocked.issuesMarkSeen).toHaveBeenCalledWith(["10042"]);
-    });
-
-    it("shows an error when marking fails", async () => {
-      mocked.issuesMarkSeen.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
-      const actions = await renderActions("");
-
-      actions.current.markSeen("10042");
-
-      await waitFor(() => expect(toasts()).toEqual([["error", "Could not mark it read: Disk full"]]));
+      await waitFor(() => expect(toasts()).toEqual([["error", "Could not change the read state: Disk full"]]));
     });
   });
 

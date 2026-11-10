@@ -383,6 +383,33 @@ export type GroupMark = { "kind": "status", style: Style, } | { "kind": "space",
  */
 initial: string, color: string | null, } | { "kind": "person", person: Person, } | { "kind": "epic", color: number, } | { "kind": "priority", level: number, };
 
+export type Inbox = { 
+/**
+ * Newest change first, in the order of the snapshot.
+ */
+rows: Array<InboxRow>, 
+/**
+ * How many of them are unread.
+ */
+unread: number, };
+
+/**
+ * One unread issue, as the inbox lists it.
+ */
+export type InboxRow = { id: string, key: string, summary: string, projectId: string, style: Style, statusName: string, 
+/**
+ * What changed, when the inbox opened: "Moved to Review, 1 new comment."
+ */
+note: string, 
+/**
+ * The newest unseen change (UTC); the issue's `updated` when it is only marked unread.
+ */
+changedAt: string, 
+/**
+ * Still unread; a row read while the inbox is open stays, read.
+ */
+unread: boolean, };
+
 /**
  * A change to one of the picked issues.
  */
@@ -533,8 +560,7 @@ export type ListKind = "everything" | "space" | "list" | "pinned" | "viewed";
 
 export type ListNode = { id: number, kind: ListKind, name: string, 
 /**
- * Open issues, or unread ones under Unread only; for Bookmarks its active pins; none for a filter that can't
- * be compiled.
+ * Open issues; for Bookmarks its active pins; none for a filter that can't be compiled.
  */
 count: number | null, 
 /**
@@ -606,17 +632,13 @@ accelerator: string | null,
  */
 checked: boolean, };
 
-export type Mode = "meEverywhere" | "unreadOnly" | "bookmarksBar";
+export type Mode = "meEverywhere" | "bookmarksBar";
 
 export type Modes = { 
 /**
  * Me mode is on in every view (the Me popup's "All views").
  */
 meEverywhere: boolean, 
-/**
- * Every view and every sidebar count shows only unread issues.
- */
-unreadOnly: boolean, 
 /**
  * The bookmarks show in a bar above the content instead of in the sidebar.
  */
@@ -791,17 +813,9 @@ label: string, change: Change, };
 
 export type Row = { id: string, key: string, summary: string, style: Style, statusName: string, commentCount: number, 
 /**
- * Changed since the owner last looked.
- */
-changed: boolean, 
-/**
  * When Jira last changed the issue (UTC); a row whose time moves while shown flashes once.
  */
-updatedAt: string, 
-/**
- * The change chip's text ("2 new comments").
- */
-changeNote: string | null, assignees: Array<Person>, epic: EpicChip | null, release: string | null, priority: Priority | null, labels: Array<Label>, sprint: string | null, 
+updatedAt: string, assignees: Array<Person>, epic: EpicChip | null, release: string | null, priority: Priority | null, labels: Array<Label>, sprint: string | null, 
 /**
  * The due date as the list shows it ("Oct 30").
  */

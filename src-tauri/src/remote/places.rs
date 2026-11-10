@@ -17,7 +17,7 @@ use crate::views::{Layout, list_views, view_set_layout};
 
 async fn tree(state: &AppState) -> AppResult<SidebarTree> {
     let viewer = Viewer::of(&state.settings.get().connection, Utc::now());
-    sidebar_tree(&state.db, viewer, state.modes.get().unread_only).await
+    sidebar_tree(&state.db, viewer).await
 }
 
 async fn here(state: &AppState) -> AppResult<Option<Location>> {

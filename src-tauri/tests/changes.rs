@@ -1,5 +1,5 @@
-//! Unseen changes on the demo site synced from the in-process fake Jira into a temp database: the highlight and
-//! chip on rows, Unread and its badge, Mark seen and Mark all seen, and the Since banner of an issue.
+//! Unseen changes on the demo site synced from the in-process fake Jira into a temp database: what the inbox
+//! lists and counts, Mark seen, Mark unread, and the Since banner of an issue.
 
 use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex};
@@ -7,27 +7,23 @@ use std::sync::{Arc, Mutex};
 use chrono::{DateTime, NaiveDate, Utc};
 use tempfile::TempDir;
 
-use taskboard_lib::changes::{Since, UNSEEN, mark_all_seen, mark_seen, mark_unread};
+use taskboard_lib::changes::{Since, UNSEEN, mark_seen, mark_unread};
 use taskboard_lib::connection::{
     ConnectionInput, JiraAccess, fetch_versions, refresh_projects, save, track_project,
 };
 use taskboard_lib::db::{Changes, Db};
 use taskboard_lib::error::ErrorKind;
-use taskboard_lib::filter::{Condition, Field, Filter};
+use taskboard_lib::inbox;
 use taskboard_lib::issues::{ActivityItem, issue_activity, issue_get, issue_related};
 use taskboard_lib::jira::{Limiter, TokenKind};
-use taskboard_lib::lists::{Kind, SidebarTree, Viewer, list_create, sidebar_tree};
+use taskboard_lib::lists::{Kind, SidebarTree, Viewer, sidebar_tree};
 use taskboard_lib::pins::{PinDuration, PinKind, pin_create};
 use taskboard_lib::store::settings::SettingsStore;
 use taskboard_lib::sync::{Emit, Job, SyncContext, full_sync, run_job};
 use taskboard_lib::test_support::demo::{self, DEMO_NOW, ME_EMAIL};
 use taskboard_lib::test_support::fake_jira::{DEMO_TOKEN, FakeJira};
 use taskboard_lib::test_support::{FakeSecrets, temp_config_dir};
-use taskboard_lib::views::rows::Row;
-use taskboard_lib::views::{
-    Narrowing, SubtaskMode, ViewAt, ViewData, unseen_ids, view_rows, view_set_filter,
-    view_set_subtasks, views_of,
-};
+use taskboard_lib::views::{Narrowing, ViewData, view_rows, views_of};
 
 const ME_ACCOUNT_ID: &str = "712020:5a1e0c3f-8d2b-4f61-9c7e-1b2a3c4d5e01";
 const PROJECT_IDS: [&str; 5] = ["10001", "10002", "10003", "10004", "10005"];
@@ -125,15 +121,6 @@ impl Site {
             .unwrap()
     }
 
-    async fn list_of_kind(&self, kind: &str) -> i64 {
-        self.text(format!(
-            "SELECT CAST(id AS TEXT) FROM filter_list WHERE kind = '{kind}'"
-        ))
-        .await
-        .parse()
-        .unwrap()
-    }
-
     async fn nw_list(&self) -> i64 {
         self.text(format!(
             "SELECT CAST(id AS TEXT) FROM filter_list WHERE kind = 'space' AND project_id = '{NW}'"
@@ -154,13 +141,36 @@ impl Site {
         self.data_of(self.nw_list().await).await
     }
 
-    /// Everything with Unread only on.
-    async fn recent_data(&self) -> ViewData {
-        let list = self.list_of_kind("everything").await;
-        let view = views_of(self.db(), list).await.unwrap()[0].id;
-        view_rows(self.db(), viewer(), list, view, unread_only(&[]))
+    /// The inbox's note of the issue, none when the inbox doesn't list it.
+    async fn note_of(&self, key: &str) -> Option<String> {
+        let listed = self
+            .db()
+            .read(|conn| {
+                let taken = inbox::snapshot(conn, Some(ME_ACCOUNT_ID))?;
+                inbox::rows(conn, &taken)
+            })
             .await
-            .unwrap()
+            .unwrap();
+        listed
+            .rows
+            .into_iter()
+            .find(|row| row.key == key)
+            .map(|row| row.note)
+    }
+
+    /// The keys the inbox lists, sorted.
+    async fn inbox_keys(&self) -> Vec<String> {
+        let listed = self
+            .db()
+            .read(|conn| {
+                let taken = inbox::snapshot(conn, Some(ME_ACCOUNT_ID))?;
+                inbox::rows(conn, &taken)
+            })
+            .await
+            .unwrap();
+        let mut keys: Vec<String> = listed.rows.into_iter().map(|row| row.key).collect();
+        keys.sort();
+        keys
     }
 
     async fn run(&self, sql: String) {
@@ -239,86 +249,14 @@ impl Site {
         issue_get(self.db(), viewer(), id).await.unwrap().since
     }
 
-    /// The unread count of Everything in the sidebar.
-    async fn badge(&self) -> Option<i64> {
-        self.tree(true).await.everything.count
+    /// The bell's badge: how many tracked issues are unread.
+    async fn badge(&self) -> u32 {
+        self.db().read(inbox::count).await.unwrap()
     }
 
-    async fn tree(&self, unread: bool) -> SidebarTree {
-        sidebar_tree(self.db(), viewer(), unread).await.unwrap()
+    async fn tree(&self) -> SidebarTree {
+        sidebar_tree(self.db(), viewer()).await.unwrap()
     }
-
-    /// The view at `index` of the list, in the given subtask mode.
-    async fn view_in(&self, list: i64, index: usize, mode: SubtaskMode) -> i64 {
-        let view = views_of(self.db(), list).await.unwrap()[index].id;
-        view_set_subtasks(self.db(), view, mode).await.unwrap();
-        view
-    }
-
-    async fn filter_view(&self, view: i64, conditions: Vec<Condition>) {
-        view_set_filter(self.db(), viewer(), view, Filter { conditions })
-            .await
-            .unwrap();
-    }
-
-    /// The keys Mark all as read would mark, sorted.
-    async fn unseen_keys(&self, list: i64, view: Option<ViewAt>) -> Vec<String> {
-        let ids = self
-            .db()
-            .read(move |conn| unseen_ids(conn, &viewer(), list, view.as_ref()))
-            .await
-            .unwrap();
-        let mut keys = Vec::new();
-        for id in ids {
-            keys.push(
-                self.text(format!("SELECT key FROM cache.issue WHERE id = '{id}'"))
-                    .await,
-            );
-        }
-        keys.sort();
-        keys
-    }
-
-    /// A story, its unread subtask and an unread task outside the story's filter.
-    async fn unread_story_subtask_and_task(&self) {
-        self.comment_after_seen("NW-1042").await;
-        self.comment_after_seen("NW-1059").await;
-        self.comment_after_seen("NW-1044").await;
-    }
-}
-
-fn at(view_id: i64, narrowing: Narrowing) -> Option<ViewAt> {
-    Some(ViewAt { view_id, narrowing })
-}
-
-/// Unread only on, keeping the issues with these ids that were read since the owner came here.
-fn unread_only(read_here: &[String]) -> Narrowing {
-    Narrowing {
-        unread: true,
-        read_here: read_here.to_vec(),
-        ..Narrowing::default()
-    }
-}
-
-fn of_type(name: &str) -> Vec<Condition> {
-    vec![Condition::is(Field::Type, name)]
-}
-
-fn row_of<'a>(data: &'a ViewData, key: &str) -> &'a Row {
-    data.rows
-        .values()
-        .find(|row| row.key == key)
-        .unwrap_or_else(|| panic!("no row {key}"))
-}
-
-fn sorted_keys(data: &ViewData) -> Vec<String> {
-    let mut keys: Vec<String> = data.rows.values().map(|row| row.key.clone()).collect();
-    keys.sort();
-    keys
-}
-
-fn state(row: &Row) -> (bool, Option<&str>) {
-    (row.changed, row.change_note.as_deref())
 }
 
 impl Site {
@@ -390,82 +328,72 @@ impl Site {
     }
 }
 
-mod rows {
+mod unread_issues {
     use super::*;
 
     #[tokio::test]
     #[ignore = "syncs the demo site into a temp database"]
-    async fn the_first_sync_leaves_no_issue_changed_and_recently_changed_empty() {
+    async fn the_first_sync_leaves_no_issue_unread() {
         let site = Site::new().await;
 
-        let nw = site.nw_data().await;
-        let recent = site.recent_data().await;
-
-        assert!(nw.rows.values().all(|row| state(row) == (false, None)));
-        assert!(recent.rows.is_empty());
-        assert_eq!(site.badge().await, Some(0));
+        assert_eq!(site.inbox_keys().await, Vec::<String>::new());
+        assert_eq!(site.unread_keys().await, Vec::<String>::new());
+        assert_eq!(site.badge().await, 0);
     }
 
     #[tokio::test]
     #[ignore = "syncs the demo site into a temp database"]
-    async fn a_change_after_the_seen_time_highlights_the_row_with_a_chip() {
+    async fn a_change_after_the_seen_time_makes_the_issue_unread_with_a_note() {
         let site = Site::new().await;
         site.comment_after_seen("NW-1042").await;
 
-        let data = site.nw_data().await;
-
         assert_eq!(
-            state(row_of(&data, "NW-1042")),
-            (true, Some("1 new comment"))
+            site.note_of("NW-1042").await.as_deref(),
+            Some("1 new comment.")
         );
-        assert_eq!(state(row_of(&data, "NW-1044")), (false, None));
+        assert_eq!(site.note_of("NW-1044").await, None);
+        assert_eq!(site.badge().await, 1);
     }
 
     #[tokio::test]
     #[ignore = "syncs the demo site into a temp database"]
-    async fn a_change_before_the_seen_time_does_not_highlight_the_row() {
+    async fn a_change_before_the_seen_time_leaves_the_issue_read() {
         let site = Site::new().await;
         site.record_change("NW-1042", "comment_added", Some("4"), Some("5"), NINE)
             .await;
         site.set_seen("NW-1042", TEN).await;
 
-        let data = site.nw_data().await;
-
-        assert_eq!(state(row_of(&data, "NW-1042")), (false, None));
+        assert_eq!(site.note_of("NW-1042").await, None);
     }
 
     #[tokio::test]
     #[ignore = "syncs the demo site into a temp database"]
-    async fn a_change_without_any_seen_row_highlights_the_row() {
+    async fn a_change_without_any_seen_row_makes_the_issue_unread() {
         let site = Site::new().await;
         site.record_change("NW-1042", "comment_added", Some("4"), Some("5"), NINE)
             .await;
         site.forget_seen("NW-1042").await;
 
-        let data = site.nw_data().await;
-
         assert_eq!(
-            state(row_of(&data, "NW-1042")),
-            (true, Some("1 new comment"))
+            site.note_of("NW-1042").await.as_deref(),
+            Some("1 new comment.")
         );
     }
 
     #[tokio::test]
     #[ignore = "syncs the demo site into a temp database"]
-    async fn a_gone_record_alone_never_highlights_a_row() {
+    async fn a_gone_record_alone_never_makes_an_issue_unread() {
         let site = Site::new().await;
         site.set_seen("NW-1042", EIGHT).await;
         site.record_change("NW-1042", "gone", None, None, NINE)
             .await;
 
-        let data = site.nw_data().await;
-
-        assert_eq!(state(row_of(&data, "NW-1042")), (false, None));
+        assert_eq!(site.note_of("NW-1042").await, None);
     }
 
     #[tokio::test]
     #[ignore = "syncs the demo site into a temp database"]
-    async fn the_chip_says_assigned_to_you_for_my_account_and_counts_the_other_changes() {
+    async fn the_note_says_assigned_to_you_for_my_account_and_adds_the_other_changes() {
         let site = Site::new().await;
         site.set_seen("NW-1042", EIGHT).await;
         site.record_change("NW-1042", "assignee", None, Some(ME_ACCOUNT_ID), NINE)
@@ -479,12 +407,24 @@ mod rows {
         )
         .await;
 
-        let data = site.nw_data().await;
-
         assert_eq!(
-            state(row_of(&data, "NW-1042")),
-            (true, Some("Assigned to you +1"))
+            site.note_of("NW-1042").await.as_deref(),
+            Some("Assigned to you, due date changed.")
         );
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn reading_an_issue_never_moves_a_row_of_a_view() {
+        let site = Site::new().await;
+        site.comment_after_seen("NW-1042").await;
+        site.comment_after_seen("NW-1044").await;
+        let before = site.nw_data().await;
+
+        site.mark(&["NW-1042"], LATER).await;
+
+        let after = site.nw_data().await;
+        assert_eq!(after, before);
     }
 }
 
@@ -500,11 +440,10 @@ mod marking_seen {
 
         site.mark(&["NW-1042"], LATER).await;
 
-        let data = site.nw_data().await;
-        assert_eq!(state(row_of(&data, "NW-1042")), (false, None));
+        assert_eq!(site.note_of("NW-1042").await, None);
         assert_eq!(
-            state(row_of(&data, "NW-1044")),
-            (true, Some("1 new comment"))
+            site.note_of("NW-1044").await.as_deref(),
+            Some("1 new comment.")
         );
         assert_eq!(site.seen_at("NW-1042").await, LATER);
     }
@@ -541,16 +480,13 @@ mod marking_seen {
 
     #[tokio::test]
     #[ignore = "syncs the demo site into a temp database"]
-    async fn mark_all_seen_announces_only_the_issues_that_were_unseen() {
+    async fn marking_several_issues_seen_announces_only_the_ones_that_were_unseen() {
         let site = Site::new().await;
         site.comment_after_seen("NW-1042").await;
         site.set_seen("NW-1044", LATER).await;
-        let ids = vec![site.id_of("NW-1042").await, site.id_of("NW-1044").await];
         let announced = watch(site.db());
 
-        mark_all_seen(site.db(), move |_| Ok(ids), LATER.into())
-            .await
-            .unwrap();
+        site.mark(&["NW-1042", "NW-1044"], LATER).await;
 
         assert_eq!(
             *announced.lock().unwrap(),
@@ -572,8 +508,7 @@ mod marking_seen {
         site.mark(&["NW-1042"], LATER).await;
 
         assert_eq!(site.seen_at("NW-1042").await, AHEAD);
-        let data = site.nw_data().await;
-        assert_eq!(state(row_of(&data, "NW-1042")), (false, None));
+        assert_eq!(site.note_of("NW-1042").await, None);
     }
 
     #[tokio::test]
@@ -598,227 +533,24 @@ mod marking_seen {
         site.mark(&["NW-1042"], LATER).await;
 
         assert_eq!(site.seen_at("NW-1042").await, LATER);
-        let data = site.nw_data().await;
-        assert_eq!(state(row_of(&data, "NW-1042")), (false, None));
+        assert_eq!(site.note_of("NW-1042").await, None);
     }
 
     #[tokio::test]
     #[ignore = "syncs the demo site into a temp database"]
-    async fn mark_all_seen_marks_only_the_unseen_issues_of_that_list() {
+    async fn marking_seen_leaves_the_unseen_issues_of_other_spaces_unread() {
         let site = Site::new().await;
         site.comment_after_seen("NW-1042").await;
         site.comment_after_seen("NW-1044").await;
         site.comment_after_seen("LUM-318").await;
-        let nw = site.nw_list().await;
 
-        let mut marked = mark_all_seen(
-            site.db(),
-            move |conn| unseen_ids(conn, &viewer(), nw, None),
-            LATER.into(),
-        )
-        .await
-        .unwrap();
+        site.mark(&["NW-1042", "NW-1044"], LATER).await;
 
-        let mut expected = vec![site.id_of("NW-1042").await, site.id_of("NW-1044").await];
-        expected.sort();
-        marked.sort();
-        assert_eq!(marked, expected);
-        let data = site.nw_data().await;
-        assert_eq!(state(row_of(&data, "NW-1042")), (false, None));
-        assert_eq!(state(row_of(&data, "NW-1044")), (false, None));
-        let recent = site.recent_data().await;
-        assert_eq!(sorted_keys(&recent), ["LUM-318"]);
-    }
-
-    #[tokio::test]
-    #[ignore = "syncs the demo site into a temp database"]
-    async fn unseen_ids_of_a_list_are_the_issues_with_unseen_changes_in_it() {
-        let site = Site::new().await;
-        site.comment_after_seen("NW-1042").await;
-        site.comment_after_seen("LUM-318").await;
-        let nw = site.nw_list().await;
-
-        let ids = site
-            .db()
-            .read(move |conn| unseen_ids(conn, &viewer(), nw, None))
-            .await
-            .unwrap();
-
-        assert_eq!(ids, [site.id_of("NW-1042").await]);
+        assert_eq!(site.inbox_keys().await, ["LUM-318"]);
     }
 }
 
-mod mark_all_as_read_per_view {
-    use super::*;
-
-    #[tokio::test]
-    #[ignore = "syncs the demo site into a temp database"]
-    async fn without_a_view_every_unread_issue_of_the_list_counts_subtasks_too() {
-        let site = Site::new().await;
-        site.unread_story_subtask_and_task().await;
-        let nw = site.nw_list().await;
-
-        let keys = site.unseen_keys(nw, None).await;
-
-        assert_eq!(keys, ["NW-1042", "NW-1044", "NW-1059"]);
-    }
-
-    #[tokio::test]
-    #[ignore = "syncs the demo site into a temp database"]
-    async fn a_view_with_its_own_filter_follows_its_subtask_mode() {
-        let site = Site::new().await;
-        site.unread_story_subtask_and_task().await;
-        let nw = site.nw_list().await;
-        let view = site.view_in(nw, 0, SubtaskMode::Hidden).await;
-        site.filter_view(view, of_type("Story")).await;
-
-        for (mode, expected) in [
-            (SubtaskMode::Hidden, vec!["NW-1042"]),
-            (SubtaskMode::Hierarchy, vec!["NW-1042", "NW-1059"]),
-            (SubtaskMode::List, vec!["NW-1042", "NW-1059"]),
-        ] {
-            view_set_subtasks(site.db(), view, mode).await.unwrap();
-
-            let keys = site.unseen_keys(nw, at(view, Narrowing::default())).await;
-
-            assert_eq!(keys, expected, "{mode:?}");
-        }
-    }
-
-    #[tokio::test]
-    #[ignore = "syncs the demo site into a temp database"]
-    async fn a_board_view_counts_as_hidden_whatever_its_subtask_mode() {
-        let site = Site::new().await;
-        site.unread_story_subtask_and_task().await;
-        let nw = site.nw_list().await;
-        let board = site.view_in(nw, 1, SubtaskMode::Hierarchy).await;
-        site.filter_view(board, of_type("Story")).await;
-
-        let keys = site.unseen_keys(nw, at(board, Narrowing::default())).await;
-
-        assert_eq!(keys, ["NW-1042"]);
-    }
-
-    #[tokio::test]
-    #[ignore = "syncs the demo site into a temp database"]
-    async fn the_view_draft_stands_in_for_the_views_own_filter() {
-        let site = Site::new().await;
-        site.unread_story_subtask_and_task().await;
-        let nw = site.nw_list().await;
-        let view = site.view_in(nw, 0, SubtaskMode::Hidden).await;
-        site.filter_view(view, of_type("Story")).await;
-        let narrowing = Narrowing {
-            view_draft: Some(of_type("Task")),
-            ..Narrowing::default()
-        };
-
-        let keys = site.unseen_keys(nw, at(view, narrowing)).await;
-
-        assert_eq!(keys, ["NW-1044"]);
-    }
-
-    #[tokio::test]
-    #[ignore = "syncs the demo site into a temp database"]
-    async fn the_list_draft_stands_in_for_the_filter_lists_own_filter() {
-        let site = Site::new().await;
-        site.unread_story_subtask_and_task().await;
-        let nw = site.nw_list().await;
-        let stories = list_create(
-            site.db(),
-            viewer(),
-            nw,
-            "Stories".into(),
-            Some(Filter {
-                conditions: of_type("Story"),
-            }),
-        )
-        .await
-        .unwrap();
-        let view = site.view_in(stories, 0, SubtaskMode::Hidden).await;
-        let narrowing = Narrowing {
-            list_draft: Some(of_type("Task")),
-            ..Narrowing::default()
-        };
-
-        let saved = site
-            .unseen_keys(stories, at(view, Narrowing::default()))
-            .await;
-        let drafted = site.unseen_keys(stories, at(view, narrowing)).await;
-
-        assert_eq!(saved, ["NW-1042"]);
-        assert_eq!(drafted, ["NW-1044"]);
-    }
-
-    #[tokio::test]
-    #[ignore = "syncs the demo site into a temp database"]
-    async fn the_me_chip_and_the_text_narrow_the_marked_issues() {
-        let site = Site::new().await;
-        site.unread_story_subtask_and_task().await;
-        let nw = site.nw_list().await;
-        let view = site.view_in(nw, 0, SubtaskMode::Hidden).await;
-        let mine = Narrowing {
-            me: true,
-            ..Narrowing::default()
-        };
-        let gallery = Narrowing {
-            text: "gallery".into(),
-            ..Narrowing::default()
-        };
-
-        let assigned_to_me = site.unseen_keys(nw, at(view, mine)).await;
-        let matching_the_text = site.unseen_keys(nw, at(view, gallery)).await;
-
-        assert_eq!(assigned_to_me, ["NW-1042", "NW-1059"]);
-        assert_eq!(matching_the_text, ["NW-1044"]);
-    }
-
-    #[tokio::test]
-    #[ignore = "syncs the demo site into a temp database"]
-    async fn on_unread_a_view_with_its_own_filter_leaves_out_the_unread_issues_outside_it() {
-        let site = Site::new().await;
-        site.unread_story_subtask_and_task().await;
-        let all = site.list_of_kind("everything").await;
-        let view = site.view_in(all, 0, SubtaskMode::Hidden).await;
-
-        let everything = site.unseen_keys(all, at(view, unread_only(&[]))).await;
-        site.filter_view(view, of_type("Story")).await;
-        let stories = site.unseen_keys(all, at(view, unread_only(&[]))).await;
-        view_set_subtasks(site.db(), view, SubtaskMode::Hierarchy)
-            .await
-            .unwrap();
-        let with_descendants = site.unseen_keys(all, at(view, unread_only(&[]))).await;
-
-        assert_eq!(everything, ["NW-1042", "NW-1044", "NW-1059"]);
-        assert_eq!(stories, ["NW-1042"]);
-        assert_eq!(with_descendants, ["NW-1042", "NW-1059"]);
-    }
-
-    #[tokio::test]
-    #[ignore = "syncs the demo site into a temp database"]
-    async fn marking_all_as_read_in_a_view_leaves_the_other_unread_issues_unread() {
-        let site = Site::new().await;
-        site.unread_story_subtask_and_task().await;
-        let nw = site.nw_list().await;
-        let view = site.view_in(nw, 0, SubtaskMode::Hidden).await;
-        site.filter_view(view, of_type("Story")).await;
-
-        let marked = mark_all_seen(
-            site.db(),
-            move |conn| unseen_ids(conn, &viewer(), nw, at(view, Narrowing::default()).as_ref()),
-            LATER.into(),
-        )
-        .await
-        .unwrap();
-
-        assert_eq!(marked, [site.id_of("NW-1042").await]);
-        assert_eq!(
-            sorted_keys(&site.recent_data().await),
-            ["NW-1044", "NW-1059"]
-        );
-    }
-}
-
-mod unread_only_mode {
+mod inbox_listing {
     use super::*;
 
     #[tokio::test]
@@ -827,15 +559,13 @@ mod unread_only_mode {
         let site = Site::new().await;
         site.comment_after_seen("NW-1059").await;
 
-        let data = site.recent_data().await;
-
-        assert_eq!(sorted_keys(&data), ["NW-1059"]);
-        assert_eq!(site.badge().await, Some(1));
+        assert_eq!(site.inbox_keys().await, ["NW-1059"]);
+        assert_eq!(site.badge().await, 1);
     }
 
     #[tokio::test]
     #[ignore = "syncs the demo site into a temp database"]
-    async fn lists_exactly_the_unseen_issues_including_done_ones_and_counts_them_in_the_sidebar() {
+    async fn lists_exactly_the_unseen_issues_including_done_ones() {
         let site = Site::new().await;
         let done = site
             .text(format!(
@@ -852,10 +582,8 @@ mod unread_only_mode {
         let mut expected = vec!["NW-1042".to_string(), "LUM-318".to_string(), done];
         expected.sort();
 
-        let data = site.recent_data().await;
-
-        assert_eq!(sorted_keys(&data), expected);
-        assert_eq!(site.badge().await, Some(3));
+        assert_eq!(site.inbox_keys().await, expected);
+        assert_eq!(site.badge().await, 3);
     }
 
     #[tokio::test]
@@ -866,9 +594,7 @@ mod unread_only_mode {
             .await;
         site.set_seen("NW-1042", TEN).await;
 
-        let data = site.recent_data().await;
-
-        assert!(data.rows.is_empty());
+        assert_eq!(site.inbox_keys().await, Vec::<String>::new());
     }
 
     #[tokio::test]
@@ -880,25 +606,14 @@ mod unread_only_mode {
 
         site.mark(&["NW-1042"], LATER).await;
 
-        let data = site.recent_data().await;
-        assert_eq!(sorted_keys(&data), ["NW-1044"]);
-        assert_eq!(site.badge().await, Some(1));
+        assert_eq!(site.inbox_keys().await, ["NW-1044"]);
+        assert_eq!(site.badge().await, 1);
     }
 
     #[tokio::test]
     #[ignore = "syncs the demo site into a temp database"]
-    async fn unread_counts_in_the_sidebar_cover_every_list_open_or_done_and_leave_the_bookmark_count()
-     {
+    async fn the_sidebar_counts_the_open_issues_whatever_is_unread() {
         let site = Site::new().await;
-        let done = site
-            .text(format!(
-                "SELECT key FROM cache.issue
-                 WHERE project_id = '{NW}' AND status_category = 'done' AND gone = 0 ORDER BY key LIMIT 1"
-            ))
-            .await;
-        site.comment_after_seen("NW-1042").await;
-        site.comment_after_seen(&done).await;
-        site.comment_after_seen("LUM-318").await;
         let bookmarked = site.id_of("NW-1044").await;
         pin_create(
             site.db(),
@@ -910,62 +625,15 @@ mod unread_only_mode {
         )
         .await
         .unwrap();
+        let before = site.tree().await;
 
-        let unread = site.tree(true).await;
-        let open = site.tree(false).await;
-
-        let nw_unread = |tree: &SidebarTree| {
-            tree.spaces
-                .iter()
-                .find(|s| s.key == "NW")
-                .unwrap()
-                .open_count
-        };
-        let lum_unread = unread.spaces.iter().find(|s| s.key == "LUM").unwrap();
-        assert_eq!(unread.everything.count, Some(3));
-        assert_eq!(nw_unread(&unread), 2);
-        assert_eq!(lum_unread.open_count, 1);
-        assert!(nw_unread(&open) > nw_unread(&unread));
-        let bookmarks = |tree: &SidebarTree| {
-            tree.home
-                .iter()
-                .find(|n| n.kind == Kind::Pinned)
-                .unwrap()
-                .count
-        };
-        assert_eq!(bookmarks(&unread), Some(1));
-        assert_eq!(bookmarks(&open), Some(1));
-    }
-
-    #[tokio::test]
-    #[ignore = "syncs the demo site into a temp database"]
-    async fn a_view_shows_the_unseen_issues_and_those_read_here_in_any_list() {
-        let site = Site::new().await;
         site.comment_after_seen("NW-1042").await;
-        site.comment_after_seen("NW-1044").await;
         site.comment_after_seen("LUM-318").await;
-        site.mark(&["NW-1042"], LATER).await;
-        let read_here = [site.id_of("NW-1042").await];
-        let everything = site.list_of_kind("everything").await;
-        let nw = site.nw_list().await;
+        let after = site.tree().await;
 
-        for (list, kept, expected) in [
-            (
-                everything,
-                &read_here[..],
-                vec!["LUM-318", "NW-1042", "NW-1044"],
-            ),
-            (everything, &[][..], vec!["LUM-318", "NW-1044"]),
-            (nw, &read_here[..], vec!["NW-1042", "NW-1044"]),
-            (nw, &[][..], vec!["NW-1044"]),
-        ] {
-            let view = views_of(site.db(), list).await.unwrap()[0].id;
-            let data = view_rows(site.db(), viewer(), list, view, unread_only(kept))
-                .await
-                .unwrap();
-
-            assert_eq!(sorted_keys(&data), expected, "list {list}, kept {kept:?}");
-        }
+        assert_eq!(after, before);
+        let bookmarks = after.home.iter().find(|n| n.kind == Kind::Pinned).unwrap();
+        assert_eq!(bookmarks.count, Some(1));
     }
 }
 
@@ -974,10 +642,6 @@ mod marking_unread {
 
     async fn unread_flag(site: &Site, key: &str) -> bool {
         site.detail_unread(key).await
-    }
-
-    async fn badge(site: &Site) -> Option<i64> {
-        site.badge().await
     }
 
     #[tokio::test]
@@ -989,11 +653,12 @@ mod marking_unread {
 
         mark_unread(site.db(), id, None).await.unwrap();
 
-        let nw = site.nw_data().await;
-        assert!(row_of(&nw, "NW-1042").changed);
-        assert!(!row_of(&nw, "NW-1044").changed);
-        assert_eq!(sorted_keys(&site.recent_data().await), ["NW-1042"]);
-        assert_eq!(badge(&site).await, Some(1));
+        assert_eq!(site.inbox_keys().await, ["NW-1042"]);
+        assert_eq!(
+            site.note_of("NW-1042").await.as_deref(),
+            Some("Marked unread.")
+        );
+        assert_eq!(site.badge().await, 1);
         assert!(unread_flag(&site, "NW-1042").await);
         assert!(!unread_flag(&site, "NW-1044").await);
     }
@@ -1026,7 +691,7 @@ mod marking_unread {
 
         mark_unread(site.db(), id, None).await.unwrap();
 
-        assert_eq!(sorted_keys(&site.recent_data().await), ["NW-1042"]);
+        assert_eq!(site.inbox_keys().await, ["NW-1042"]);
         assert!(unread_flag(&site, "NW-1042").await);
     }
 
@@ -1040,29 +705,8 @@ mod marking_unread {
         site.mark(&["NW-1042"], LATER).await;
 
         assert!(!unread_flag(&site, "NW-1042").await);
-        assert!(site.recent_data().await.rows.is_empty());
-        assert!(!row_of(&site.nw_data().await, "NW-1042").changed);
-        assert_eq!(badge(&site).await, Some(0));
-    }
-
-    #[tokio::test]
-    #[ignore = "syncs the demo site into a temp database"]
-    async fn mark_all_seen_clears_unread_flags_of_the_list() {
-        let site = Site::new().await;
-        let id = site.id_of("NW-1042").await;
-        mark_unread(site.db(), id.clone(), None).await.unwrap();
-        let nw = site.nw_list().await;
-
-        let marked = mark_all_seen(
-            site.db(),
-            move |conn| unseen_ids(conn, &viewer(), nw, None),
-            LATER.into(),
-        )
-        .await
-        .unwrap();
-
-        assert_eq!(marked, [id]);
-        assert!(site.recent_data().await.rows.is_empty());
+        assert_eq!(site.inbox_keys().await, Vec::<String>::new());
+        assert_eq!(site.badge().await, 0);
     }
 
     #[tokio::test]
@@ -1106,7 +750,7 @@ mod marking_unread {
             changes,
             [(EIGHT.to_string(), false), (TEN.to_string(), true)]
         );
-        assert_eq!(sorted_keys(&site.recent_data().await), ["NW-1042"]);
+        assert_eq!(site.inbox_keys().await, ["NW-1042"]);
     }
 
     #[tokio::test]
@@ -1136,59 +780,6 @@ mod marking_unread {
 
         assert_eq!(err.kind(), ErrorKind::InvalidInput);
         assert!(!unread_flag(&site, "NW-1042").await);
-    }
-}
-
-mod read_here {
-    use super::*;
-
-    async fn data_keeping(site: &Site, kind: &str, keys: &[&str]) -> ViewData {
-        let list = site.list_of_kind(kind).await;
-        let view = views_of(site.db(), list).await.unwrap()[0].id;
-        let mut read_here = Vec::new();
-        for key in keys {
-            read_here.push(site.id_of(key).await);
-        }
-        view_rows(site.db(), viewer(), list, view, unread_only(&read_here))
-            .await
-            .unwrap()
-    }
-
-    #[tokio::test]
-    #[ignore = "syncs the demo site into a temp database"]
-    async fn unread_keeps_listing_an_issue_read_here_as_not_changed() {
-        let site = Site::new().await;
-        site.comment_after_seen("NW-1042").await;
-        site.comment_after_seen("NW-1044").await;
-        site.mark(&["NW-1042"], LATER).await;
-
-        let data = data_keeping(&site, "everything", &["NW-1042"]).await;
-
-        assert_eq!(sorted_keys(&data), ["NW-1042", "NW-1044"]);
-        assert!(!row_of(&data, "NW-1042").changed);
-        assert!(row_of(&data, "NW-1044").changed);
-    }
-
-    #[tokio::test]
-    #[ignore = "syncs the demo site into a temp database"]
-    async fn unread_without_read_here_drops_the_read_issue() {
-        let site = Site::new().await;
-        site.comment_after_seen("NW-1042").await;
-        site.mark(&["NW-1042"], LATER).await;
-
-        let data = data_keeping(&site, "everything", &[]).await;
-
-        assert!(data.rows.is_empty());
-    }
-
-    #[tokio::test]
-    #[ignore = "syncs the demo site into a temp database"]
-    async fn read_here_never_adds_issues_outside_the_list() {
-        let site = Site::new().await;
-
-        let bookmarks = data_keeping(&site, "pinned", &["NW-1042"]).await;
-
-        assert!(bookmarks.rows.is_empty());
     }
 }
 
@@ -1479,7 +1070,7 @@ mod after_a_delta_sync {
 
     #[tokio::test]
     #[ignore = "syncs the demo site into a temp database"]
-    async fn what_the_site_did_shows_as_chips_on_the_edited_issues() {
+    async fn what_the_site_did_shows_as_notes_on_the_edited_issues() {
         let site = Site::new().await;
         site.run(format!("UPDATE issue_seen SET seen_at = '{TEN}'"))
             .await;
@@ -1507,21 +1098,19 @@ mod after_a_delta_sync {
 
         run_job(&site.ctx, Job::Delta, &*emit, None).await;
 
-        let data = site.nw_data().await;
         assert_eq!(
-            state(row_of(&data, "NW-1042")),
-            (true, Some("1 new comment"))
+            site.note_of("NW-1042").await.as_deref(),
+            Some("1 new comment.")
         );
         assert_eq!(
-            state(row_of(&data, "NW-1044")),
-            (true, Some("Moved to Done"))
+            site.note_of("NW-1044").await.as_deref(),
+            Some("Moved to Done.")
         );
         assert_eq!(
-            state(row_of(&data, "NW-1049")),
-            (true, Some("Priority lowered"))
+            site.note_of("NW-1049").await.as_deref(),
+            Some("Priority lowered.")
         );
-        assert_eq!(state(row_of(&data, &added)), (true, Some("New")));
-        let recent = site.recent_data().await;
+        assert_eq!(site.note_of(&added).await.as_deref(), Some("Created."));
         let mut expected = vec![
             "NW-1042".to_string(),
             "NW-1044".to_string(),
@@ -1529,7 +1118,7 @@ mod after_a_delta_sync {
             added,
         ];
         expected.sort();
-        assert_eq!(sorted_keys(&recent), expected);
+        assert_eq!(site.inbox_keys().await, expected);
     }
 
     fn demo_user(account_id: &str) -> serde_json::Value {
@@ -1557,7 +1146,7 @@ mod after_a_delta_sync {
 
     #[tokio::test]
     #[ignore = "syncs the demo site into a temp database"]
-    async fn a_comment_mentioning_me_shows_mentioned_you_first_on_the_row() {
+    async fn a_comment_mentioning_me_says_mentioned_you_in_the_note() {
         let site = Site::new().await;
 
         mention_then_delta(
@@ -1568,12 +1157,11 @@ mod after_a_delta_sync {
         )
         .await;
 
-        let data = site.nw_data().await;
         assert_eq!(
-            state(row_of(&data, "NW-1049")),
-            (true, Some("Mentioned you"))
+            site.note_of("NW-1049").await.as_deref(),
+            Some("Mentioned you.")
         );
-        assert_eq!(state(row_of(&data, "NW-1042")), (false, None));
+        assert_eq!(site.note_of("NW-1042").await, None);
     }
 
     #[tokio::test]
@@ -1589,10 +1177,9 @@ mod after_a_delta_sync {
         )
         .await;
 
-        let data = site.nw_data().await;
         assert_eq!(
-            state(row_of(&data, "NW-1049")),
-            (true, Some("1 new comment"))
+            site.note_of("NW-1049").await.as_deref(),
+            Some("1 new comment.")
         );
     }
 }
@@ -1691,10 +1278,9 @@ mod own_changes_made_in_jira {
 
         site.delta_sync().await;
 
-        let data = site.nw_data().await;
         assert_eq!(
-            state(row_of(&data, "NW-1044")),
-            (true, Some("Moved to Done"))
+            site.note_of("NW-1044").await.as_deref(),
+            Some("Moved to Done.")
         );
         assert_eq!(site.recorded_fields("NW-1044").await, ["status"]);
     }
@@ -1718,8 +1304,10 @@ mod own_changes_made_in_jira {
 
         site.delta_sync().await;
 
-        let data = site.nw_data().await;
-        assert_eq!(state(row_of(&data, "NW-1044")), (true, Some("Reassigned")));
+        assert_eq!(
+            site.note_of("NW-1044").await.as_deref(),
+            Some("Reassigned to Jonas Reiter.")
+        );
         assert_eq!(site.recorded_fields("NW-1044").await, ["assignee"]);
     }
 
@@ -1791,9 +1379,8 @@ mod own_changes_made_in_jira {
 
         site.delta_sync().await;
 
-        let data = site.nw_data().await;
-        assert_eq!(state(row_of(&data, &mine)), (false, None));
-        assert_eq!(state(row_of(&data, &theirs)), (true, Some("New")));
+        assert_eq!(site.note_of(&mine).await, None);
+        assert_eq!(site.note_of(&theirs).await.as_deref(), Some("Created."));
         assert_eq!(site.recorded_fields(&mine).await, Vec::<String>::new());
         assert_eq!(site.recorded_fields(&theirs).await, ["created"]);
         assert_eq!(site.seen_at(&mine).await, DELTA_AT);
@@ -1814,11 +1401,10 @@ mod own_changes_made_in_jira {
 
         site.delta_sync().await;
 
-        let data = site.nw_data().await;
-        assert_eq!(state(row_of(&data, "NW-1049")), (false, None));
+        assert_eq!(site.note_of("NW-1049").await, None);
         assert_eq!(
-            state(row_of(&data, "NW-1042")),
-            (true, Some("1 new comment"))
+            site.note_of("NW-1042").await.as_deref(),
+            Some("1 new comment.")
         );
         assert_eq!(site.recorded_fields("NW-1049").await, Vec::<String>::new());
         assert_eq!(site.recorded_fields("NW-1042").await, ["comment_added"]);
@@ -1839,10 +1425,9 @@ mod own_changes_made_in_jira {
 
         site.delta_sync().await;
 
-        let data = site.nw_data().await;
         assert_eq!(
-            state(row_of(&data, "NW-1049")),
-            (true, Some("2 new comments"))
+            site.note_of("NW-1049").await.as_deref(),
+            Some("2 new comments.")
         );
     }
 
@@ -1861,8 +1446,7 @@ mod own_changes_made_in_jira {
         site.delta_sync().await;
 
         assert_eq!(site.recorded_fields("NW-1049").await, Vec::<String>::new());
-        let data = site.nw_data().await;
-        assert_eq!(state(row_of(&data, "NW-1049")), (false, None));
+        assert_eq!(site.note_of("NW-1049").await, None);
     }
 
     #[tokio::test]
@@ -1891,15 +1475,14 @@ mod own_changes_made_in_jira {
 
         site.delta_sync().await;
 
-        let data = site.nw_data().await;
         assert_eq!(
-            state(row_of(&data, "NW-1044")),
-            (true, Some("Moved to Done"))
+            site.note_of("NW-1044").await.as_deref(),
+            Some("Moved to Done.")
         );
-        assert_eq!(state(row_of(&data, &mine)), (true, Some("New")));
+        assert_eq!(site.note_of(&mine).await.as_deref(), Some("Created."));
         assert_eq!(
-            state(row_of(&data, "NW-1042")),
-            (true, Some("1 new comment"))
+            site.note_of("NW-1042").await.as_deref(),
+            Some("1 new comment.")
         );
         assert_eq!(
             site.number("SELECT COUNT(*) FROM cache.issue WHERE history_synced_at IS NOT NULL")
@@ -1988,8 +1571,7 @@ mod after_a_restart {
 
         site.refill_cache().await;
 
-        let data = site.nw_data().await;
-        assert_eq!(state(row_of(&data, "NW-1042")), (true, Some("Updated")));
+        assert_eq!(site.note_of("NW-1042").await.as_deref(), Some("Updated."));
         assert_eq!(site.unread_keys().await, ["NW-1042"]);
         assert_eq!(
             site.detail_since("NW-1042").await,
@@ -2014,9 +1596,8 @@ mod after_a_restart {
 
         site.refill_cache().await;
 
-        let data = site.nw_data().await;
-        assert_eq!(state(row_of(&data, "NW-1044")), (false, None));
-        assert_eq!(state(row_of(&data, "NW-1049")), (false, None));
+        assert_eq!(site.note_of("NW-1044").await, None);
+        assert_eq!(site.note_of("NW-1049").await, None);
         assert_eq!(site.unread_keys().await, Vec::<String>::new());
         assert_eq!(
             site.number(
@@ -2041,8 +1622,7 @@ mod after_a_restart {
 
         site.refill_cache().await;
 
-        let data = site.nw_data().await;
-        assert_eq!(state(row_of(&data, "NW-1042")), (false, None));
+        assert_eq!(site.note_of("NW-1042").await, None);
         assert_eq!(site.seen_at("NW-1042").await, TEN);
     }
 
@@ -2057,8 +1637,7 @@ mod after_a_restart {
 
         site.refill_cache().await;
 
-        let data = site.nw_data().await;
-        assert_eq!(state(row_of(&data, "NW-1042")), (true, Some("Updated")));
+        assert_eq!(site.note_of("NW-1042").await.as_deref(), Some("Updated."));
     }
 
     #[tokio::test]
@@ -2070,8 +1649,7 @@ mod after_a_restart {
 
         site.refill_cache().await;
 
-        let data = site.nw_data().await;
-        assert_eq!(state(row_of(&data, "NW-1049")), (true, Some("New")));
+        assert_eq!(site.note_of("NW-1049").await.as_deref(), Some("Created."));
         assert_eq!(site.unread_keys().await, ["NW-1049"]);
         assert_eq!(site.recorded_fields("NW-1049").await, ["created"]);
     }
@@ -2085,8 +1663,7 @@ mod after_a_restart {
 
         site.refill_cache().await;
 
-        let data = site.nw_data().await;
-        assert_eq!(state(row_of(&data, "NW-1060")), (false, None));
+        assert_eq!(site.note_of("NW-1060").await, None);
         assert_eq!(
             site.seen_at("NW-1060").await,
             site.text("SELECT updated_at FROM cache.issue WHERE key = 'NW-1060'".into())

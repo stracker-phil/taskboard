@@ -23,14 +23,6 @@ pub struct Narrowing {
     pub list_draft: Option<Vec<Condition>>,
     /// Unsaved conditions in place of the view's own ones.
     pub view_draft: Option<Vec<Condition>>,
-    /// Only unread issues, and the ones read since the owner came here (`read_here`): Unread only is on.
-    #[serde(skip)]
-    #[ts(skip)]
-    pub unread: bool,
-    /// Unread only keeps these read issues (read since the owner came here); set by Rust, never by the page.
-    #[serde(skip)]
-    #[ts(skip)]
-    pub read_here: Vec<String>,
     /// The Me rules this view has on, drafted or saved (ADR 0051); `None` follows the app's.
     pub me_on: Option<Vec<MeMatch>>,
     /// What Me mode counts as mine besides my assigned issues (`resolve_me_rules`).

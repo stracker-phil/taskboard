@@ -42,6 +42,7 @@ pub const GO_LEVELS: &[Item] = &[
     item("Everything", "page:go.everything", "CmdOrCtrl+Shift+E"),
     item("Recently Viewed", "page:go.viewed", "CmdOrCtrl+Y"),
     item("Bookmarks", "page:go.pinned", "CmdOrCtrl+Shift+P"),
+    item("Notifications", "page:inbox.toggle", "CmdOrCtrl+Shift+U"),
 ];
 pub const GO_MOVES: &[Item] = &[
     item("Back", "page:history.back", "CmdOrCtrl+BracketLeft"),
@@ -87,16 +88,10 @@ pub const LIST_TOOLBAR: &[Item] = &[
     item("Edit Filter…", "page:toolbar.filter", "CmdOrCtrl+Alt+F"),
     item("Only My Issues", "page:toolbar.me", "CmdOrCtrl+Shift+M"),
     plain("Me Mode Options…", "page:toolbar.meOptions"),
-    item("Unread Only", "page:toolbar.unread", "CmdOrCtrl+Shift+U"),
     item("Filter This View", "page:toolbar.search", "CmdOrCtrl+F"),
     item("Save View", "page:view.save", "CmdOrCtrl+S"),
     plain("Revert View", "page:view.revert"),
 ];
-pub const LIST_SEEN: &[Item] = &[item(
-    "Mark All as Read",
-    "page:view.markAllSeen",
-    "CmdOrCtrl+Shift+A",
-)];
 pub const ISSUE: &[Item] = &[
     plain("Open", "page:issue.open"),
     item(
@@ -149,7 +144,7 @@ pub const APP_MENU: MenuDef = (crate::APP_NAME, &[&[SETTINGS], &[QUIT]]);
 pub const FILE_MENU: MenuDef = ("File", &[FILE, FILE_SYNC, &[RESET_CACHE], &[CLOSE]]);
 pub const GO_MENU: MenuDef = ("Go", &[GO_LEVELS, GO_MOVES]);
 /// The layouts come last: changing a view's layout is rare.
-pub const LIST_MENU: MenuDef = ("List", &[LIST_TOOLBAR, LIST_SEEN, LIST_LAYOUTS]);
+pub const LIST_MENU: MenuDef = ("List", &[LIST_TOOLBAR, LIST_LAYOUTS]);
 pub const ISSUE_MENU: MenuDef = ("Issue", &[ISSUE]);
 pub const VIEW_MENU: MenuDef = ("View", &[VIEW, &[RELOAD]]);
 /// Between macOS's Minimize/Zoom and Bring All to Front.
@@ -202,7 +197,6 @@ mod tests {
             WINDOW_TABS,
             LIST_LAYOUTS,
             LIST_TOOLBAR,
-            LIST_SEEN,
             ISSUE,
             VIEW,
             HELP,
@@ -229,19 +223,11 @@ mod tests {
 
     #[test]
     fn page_items_use_the_ids_the_page_registers() {
-        let page_ids: Vec<&str> = [
-            FILE,
-            GO_LEVELS,
-            GO_MOVES,
-            LIST_TOOLBAR,
-            LIST_SEEN,
-            LIST_LAYOUTS,
-            ISSUE,
-        ]
-        .into_iter()
-        .flatten()
-        .filter_map(|item| item.command.strip_prefix("page:"))
-        .collect();
+        let page_ids: Vec<&str> = [FILE, GO_LEVELS, GO_MOVES, LIST_TOOLBAR, LIST_LAYOUTS, ISSUE]
+            .into_iter()
+            .flatten()
+            .filter_map(|item| item.command.strip_prefix("page:"))
+            .collect();
         assert_eq!(
             page_ids,
             [
@@ -251,6 +237,7 @@ mod tests {
                 "go.everything",
                 "go.viewed",
                 "go.pinned",
+                "inbox.toggle",
                 "history.back",
                 "history.forward",
                 "view.previous",
@@ -260,11 +247,9 @@ mod tests {
                 "toolbar.filter",
                 "toolbar.me",
                 "toolbar.meOptions",
-                "toolbar.unread",
                 "toolbar.search",
                 "view.save",
                 "view.revert",
-                "view.markAllSeen",
                 "view.layout.list",
                 "view.layout.board",
                 "view.layout.table",
@@ -341,11 +326,7 @@ mod tests {
         let first_commands: Vec<&str> = LIST_MENU.1.iter().map(|g| g[0].command).collect();
         assert_eq!(
             first_commands,
-            [
-                LIST_TOOLBAR[0].command,
-                LIST_SEEN[0].command,
-                LIST_LAYOUTS[0].command
-            ]
+            [LIST_TOOLBAR[0].command, LIST_LAYOUTS[0].command]
         );
     }
 
@@ -500,12 +481,20 @@ mod tests {
     }
 
     #[test]
-    fn mark_all_seen_lives_in_the_list_menu_not_in_issue() {
-        fn commands(items: &[Item]) -> Vec<&str> {
-            items.iter().map(|item| item.command).collect()
+    fn the_go_menu_opens_the_notifications_with_shift_command_u() {
+        let found = GO_LEVELS
+            .iter()
+            .find(|item| item.command == "page:inbox.toggle")
+            .map(|item| (item.label, item.accelerator));
+        assert_eq!(found, Some(("Notifications", Some("CmdOrCtrl+Shift+U"))));
+    }
+
+    #[test]
+    fn no_menu_offers_unread_only_or_mark_all_as_read() {
+        for item in all_items() {
+            assert_ne!(item.command, "page:toolbar.unread");
+            assert_ne!(item.command, "page:view.markAllSeen");
         }
-        assert_eq!(commands(LIST_SEEN), ["page:view.markAllSeen"]);
-        assert!(!commands(ISSUE).contains(&"page:view.markAllSeen"));
     }
 
     #[test]
@@ -527,7 +516,7 @@ mod tests {
     }
 
     #[test]
-    fn unread_and_bookmark_items_carry_their_labels() {
+    fn read_and_bookmark_items_carry_their_labels() {
         let label_of = |items: &[Item], command: &str| {
             items
                 .iter()
@@ -536,14 +525,6 @@ mod tests {
         };
         assert_eq!(label_of(GO_LEVELS, "page:go.recent"), None);
         assert_eq!(label_of(GO_LEVELS, "page:go.pinned"), Some("Bookmarks"));
-        assert_eq!(
-            label_of(LIST_TOOLBAR, "page:toolbar.unread"),
-            Some("Unread Only")
-        );
-        assert_eq!(
-            label_of(LIST_SEEN, "page:view.markAllSeen"),
-            Some("Mark All as Read")
-        );
         assert_eq!(
             label_of(ISSUE, "page:issue.markSeen"),
             Some("Mark as Read or Unread")

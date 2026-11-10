@@ -43,7 +43,6 @@
 .table-row::before { content: none; }
 .table-row__pick { display: grid; flex: none; place-items: center; width: 24px; height: 100%; }
 .table-row:hover .pick-box { opacity: 1; }
-.table-row--changed, .table-row--changed:hover { background: var(--changed-bg); }
 .table-row--selected, .table-row--selected:hover { background: var(--selection-bg); }
 .table-row--picked:not(.table-row--selected) { background: var(--picked-bg); }
 .table-row__cell { display: flex; flex: none; align-items: center; gap: 7px; min-width: 0; box-sizing: border-box; padding-right: 12px; overflow: hidden; }
@@ -52,7 +51,6 @@
 .table-row__key { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); white-space: nowrap; }
 .table-row__summary { flex: 1; min-width: 240px; font-size: 13px; white-space: nowrap; }
 .table-row__title { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.table-row--changed .table-row__title { font-weight: 600; }
 /* Hierarchy (ADR 0040): titles line up behind the room of a caret (16 + the 7px gap); each level indents one
    step more. */
 .table-row--tree .table-row__summary { padding-left: calc((var(--depth, 0) + 1) * 23px); }

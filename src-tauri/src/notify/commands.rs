@@ -1,11 +1,8 @@
 //! The commands a notification's button runs.
 
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 
 use crate::bus::{Command, CommandBus};
-use crate::events::announce_modes;
-use crate::state::AppState;
-use crate::store::modes::Mode;
 use crate::window;
 
 pub fn register(bus: &mut CommandBus<AppHandle>) {
@@ -20,18 +17,11 @@ pub fn register(bus: &mut CommandBus<AppHandle>) {
             }),
     );
     bus.add(
-        Command::new("unread:show", "Show Unread")
-            .help("Show the window at Everything with Unread only on")
+        Command::new("inbox:show", "Show Notifications")
+            .help("Show the window with the inbox open")
             .hidden()
             .run(|app: AppHandle| async move {
-                let modes = app
-                    .state::<AppState>()
-                    .modes
-                    .set(Mode::UnreadOnly, true)
-                    .await?;
-                announce_modes(&app, modes);
-                window::show_main(&app);
-                window::run_page_command(&app, "page:go.everything");
+                window::run_page_command(&app, "page:inbox.open");
                 Ok(())
             }),
     );
@@ -61,12 +51,13 @@ mod tests {
     }
 
     #[test]
-    fn showing_unread_is_a_hidden_command() {
+    fn showing_the_notifications_is_a_hidden_command() {
         let bus = registered();
 
-        assert!(bus.knows("unread:show"));
-        let info = bus.info("unread:show").unwrap();
-        assert_eq!(info.title, "Show Unread");
+        assert!(bus.knows("inbox:show"));
+        let info = bus.info("inbox:show").unwrap();
+        assert_eq!(info.title, "Show Notifications");
         assert!(info.hidden);
+        assert!(!bus.knows("unread:show"));
     }
 }

@@ -47,8 +47,8 @@ export function useIssueActions() {
       copyAppLink: (key: string) => copyAppLink({ kind: "issue", key }, `Copied the Taskboard link to ${key}`),
       copyMarkdown: copyAsMarkdown,
       openInJira,
-      markSeen: (id: string) => void attempt(api.issuesMarkSeen([id]), "Could not mark it read"),
-      markUnread: (id: string) => void attempt(api.issueMarkUnread(id), "Could not mark it unread"),
+      /** M: read when it is unread, else unread again. */
+      toggleRead: (id: string) => void attempt(api.issueToggleSeen(id), "Could not change the read state"),
       togglePin: (id: string) => void attempt(api.pinToggleIssue(id), "Could not change the bookmark"),
       toggleMine: canAssign ? (id: string) => runWrite(id, api.issueToggleMine(id), "Could not change the assignee") : null,
       /** Opens the status menu under `at`. */

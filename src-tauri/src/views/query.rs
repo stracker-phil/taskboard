@@ -15,17 +15,15 @@ use super::fetch::{Source, fetch};
 use super::filter::view_conditions;
 use super::groups::{Facts, Group, Lookup, group};
 use super::lookup::{spaces, versions};
-use super::model::{GroupBy, Layout, SubtaskMode, View};
+use super::model::{GroupBy, SubtaskMode, View};
 use super::narrowing::Narrowing;
 use super::read::read_view;
 use super::rows::{Person, Row};
 use super::sorting::{fold, sort};
 use super::subtasks::{Nested, as_items, descendants, expand, nest};
-use crate::changes::{Names, UNSEEN, chip, facts, unseen_changes};
 use crate::db::Db;
 use crate::error::{AppError, AppResult};
 use crate::filter::{Ctx, compile};
-use crate::issues::status_names;
 use crate::lists::{Kind, Viewer, all_nodes, scope_of};
 use crate::me_mode::{self, MeRule};
 use crate::pins::active;
@@ -55,7 +53,7 @@ pub async fn view_rows(
         .await
 }
 
-/// The view and its issues: the level's filter, its kind's rule and the narrowing, highlighted and sorted.
+/// The view and its issues: the level's filter, its kind's rule and the narrowing, sorted.
 pub(super) struct Fetched {
     pub view: View,
     /// The subtask mode the rows follow.
@@ -66,14 +64,6 @@ pub(super) struct Fetched {
     /// In Hierarchy, each root's subtree in depth order; it never went through the filter.
     pub below: HashMap<String, Vec<Row>>,
     pub ctx: Ctx,
-}
-
-impl Fetched {
-    /// Every issue the view shows, collapsed subtrees included.
-    pub fn ids(&self) -> impl Iterator<Item = &str> {
-        let items = self.items.iter().map(|(row, _)| row.id.as_str());
-        items.chain(self.below.values().flatten().map(|row| row.id.as_str()))
-    }
 }
 
 /// `mode` overrides the view's subtask mode (the Board always hides subtasks).
@@ -123,7 +113,6 @@ pub(super) fn fetch_view(
         SubtaskMode::Hidden => Vec::new(),
         _ => descendants(conn, &source, &results)?,
     };
-    mark_changed(conn, ctx.me.as_deref(), &mut results, &mut descendants)?;
     let (by, descending) = (view.sort.by, view.sort.descending);
     let (items, below) = match mode {
         SubtaskMode::Hidden => {
@@ -257,81 +246,6 @@ fn build(
     })
 }
 
-/// Rows with unseen changes are highlighted and say what changed.
-fn mark_changed(
-    conn: &Connection,
-    me: Option<&str>,
-    results: &mut [(Row, Facts)],
-    descendants: &mut [(Row, Facts)],
-) -> AppResult<()> {
-    let ids: Vec<&str> = results
-        .iter()
-        .chain(descendants.iter())
-        .map(|(row, _)| row.id.as_str())
-        .collect();
-    if ids.is_empty() {
-        return Ok(());
-    }
-    let unseen = unseen_changes(conn, &ids)?;
-    if unseen.is_empty() {
-        return Ok(());
-    }
-    let statuses: HashMap<String, String> = status_names(conn)?
-        .into_iter()
-        .map(|(id, (name, _))| (id, name))
-        .collect();
-    let names = Names {
-        me,
-        statuses: &statuses,
-        people: &HashMap::new(),
-    };
-    for (row, _) in results.iter_mut().chain(descendants.iter_mut()) {
-        if let Some(changes) = unseen.get(&row.id) {
-            row.changed = true;
-            row.change_note = chip(&facts(changes), &names);
-        }
-    }
-    Ok(())
-}
-
-/// The view of a level and how the toolbar narrows it.
-pub struct ViewAt {
-    pub view_id: i64,
-    pub narrowing: Narrowing,
-}
-
-/// The unread issues Mark all as read marks: exactly those the view shows in its mode (ADR 0040), collapsed
-/// subtrees included; without a view, every unread issue of the filter list.
-pub fn unseen_ids(
-    conn: &Connection,
-    viewer: &Viewer,
-    list_id: i64,
-    view: Option<&ViewAt>,
-) -> AppResult<Vec<String>> {
-    let (condition, params) = match view {
-        Some(at) => {
-            let board = read_view(conn, at.view_id)?.layout == Layout::Board;
-            let mode = board.then_some(SubtaskMode::Hidden);
-            let fetched = fetch_view(conn, viewer, list_id, at.view_id, &at.narrowing, mode)?;
-            let ids: Vec<&str> = fetched.ids().collect();
-            let ids = serde_json::to_string(&ids)?;
-            (
-                "i.id IN (SELECT value FROM json_each(?))".to_string(),
-                vec![ids.into()],
-            )
-        }
-        None => {
-            let ctx = viewer.ctx(conn)?;
-            conditions(conn, viewer, &ctx, list_id, None, &Narrowing::default())?
-        }
-    };
-    let mut query = conn.prepare(&format!(
-        "SELECT i.id FROM cache.issue i WHERE {condition} AND {UNSEEN}"
-    ))?;
-    let ids = query.query_map(params_from_iter(params), |r| r.get(0))?;
-    Ok(ids.collect::<Result<_, _>>()?)
-}
-
 /// The level's conditions, the view's own ones, its kind's own rule and the narrowing, as one SQL condition.
 /// The narrowing's drafts stand in for the list's and the view's own conditions; they compile under the same
 /// chain as `list_set_filter` and `view_set_filter` check them.
@@ -367,11 +281,6 @@ fn conditions(
             active("?")
         ));
         params.push(format_utc(viewer.now).into());
-    }
-    if narrowing.unread {
-        let kept = vec!["?"; narrowing.read_here.len()].join(", ");
-        condition.push_str(&format!(" AND ({UNSEEN} OR i.id IN ({kept}))"));
-        params.extend(narrowing.read_here.iter().map(|id| id.clone().into()));
     }
     if narrowing.me {
         let (mine, mine_params) = me_mode::condition(&narrowing.me_rules, ctx)?;

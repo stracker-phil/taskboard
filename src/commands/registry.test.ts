@@ -10,6 +10,8 @@ beforeEach(() => {
   registerCoreScopes();
   registerScope({ id: "test.left", parent: "main", label: "Left", isActive: () => true });
   registerScope({ id: "test.right", parent: "main", label: "Right", isActive: () => true });
+  registerScope({ id: "test.overlay", parent: "main", label: "Overlay", isActive: () => true, shadows: true });
+  registerScope({ id: "test.overlay.inner", parent: "test.overlay", label: "Overlay inner", isActive: () => true });
 });
 
 describe("conflicts", () => {
@@ -31,6 +33,38 @@ describe("conflicts", () => {
     registerCommands([command("a", "test.left", "Mod+K"), command("b", "test.right", "Mod+K")]);
 
     expect(conflicts()).toEqual([]);
+  });
+
+  describe("with a child scope that shadows its parent", () => {
+    it("does not report a key shared with the parent scope", () => {
+      registerCommands([command("a", "main", "Escape"), command("b", "test.overlay", "Escape")]);
+
+      expect(conflicts()).toEqual([]);
+    });
+
+    it("does not report a key shared with an ancestor above the parent", () => {
+      registerCommands([command("a", "global", "Escape"), command("b", "test.overlay", "Escape")]);
+
+      expect(conflicts()).toEqual([]);
+    });
+
+    it("does not report a key shared with the parent scope by a scope below the shadowing one", () => {
+      registerCommands([command("a", "main", "Escape"), command("b", "test.overlay.inner", "Escape")]);
+
+      expect(conflicts()).toEqual([]);
+    });
+
+    it("still reports a key shared inside the shadowing scope", () => {
+      registerCommands([command("a", "test.overlay", "Escape"), command("b", "test.overlay", "Escape")]);
+
+      expect(conflicts().map((c) => [c.binding, c.a.id, c.b.id])).toEqual([["Escape", "a", "b"]]);
+    });
+
+    it("still reports the same key in a child scope that does not shadow", () => {
+      registerCommands([command("a", "main", "Escape"), command("b", "test.left", "Escape")]);
+
+      expect(conflicts().map((c) => [c.binding, c.a.id, c.b.id])).toEqual([["Escape", "a", "b"]]);
+    });
   });
 
   it("does not report different bindings", () => {

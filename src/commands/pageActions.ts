@@ -48,7 +48,6 @@ export const PAGE_ACTION_COMMANDS: Command[] = [
   action("view.layout.table", "Show as Table", "Mod+Ctrl+3"),
   action("toolbar.me", "Only My Issues", "Mod+Shift+M"),
   action("toolbar.meOptions", "Me Mode Options…"),
-  action("toolbar.unread", "Unread Only", "Mod+Shift+U"),
   action("toolbar.search", "Filter This View", "Mod+F"),
   action("toolbar.filter", "Edit Filter…", "Mod+Alt+F"),
   action("toolbar.columns", "Columns…", "Mod+Alt+C"),
@@ -60,5 +59,6 @@ export const PAGE_ACTION_COMMANDS: Command[] = [
   action("go.viewed", "Go to Recently Viewed", "Mod+Y"),
   action("history.back", "Back", "Mod+["),
   action("history.forward", "Forward", "Mod+]"),
-  action("view.markAllSeen", "Mark All as Read", "Mod+Shift+A"),
+  action("inbox.toggle", "Notifications", "Mod+Shift+U"),
+  action("inbox.open", "Show Notifications"),
 ];

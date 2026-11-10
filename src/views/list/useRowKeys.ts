@@ -152,10 +152,8 @@ export function useRowKeys(current: RowKeyState): RefObject<RowKeyState> {
         else explainWritesOff();
       },
       toggleRead: () => {
-        const { selected, actions, data } = state.current;
-        if (!selected) return;
-        if (data.rows[selected]?.changed) actions.markSeen(selected);
-        else actions.markUnread(selected);
+        const { selected, actions } = state.current;
+        if (selected) actions.toggleRead(selected);
       },
       // The preview shows one issue: opening it drops the picks.
       togglePeek: () => {

@@ -1,4 +1,4 @@
-//! Unseen changes in words: the change chip on a row and the Since-yesterday sentence.
+//! Unseen changes in words: the Since-yesterday sentence and the inbox's lines.
 
 use std::collections::HashMap;
 
@@ -143,28 +143,6 @@ fn for_me(facts: &[Fact], names: &Names) -> Vec<Fact> {
         .collect()
 }
 
-/// The row's chip: the most important fact, and how many more there are ("Moved to Review +1").
-pub fn chip(facts: &[Fact], names: &Names) -> Option<String> {
-    let facts = for_me(facts, names);
-    let text = match facts.first()? {
-        Fact::Mentioned(_) => "Mentioned you".into(),
-        Fact::New => "New".into(),
-        Fact::Comments(n) => comments(*n),
-        Fact::Moved(id) => format!("Moved to {}", status(names, id)),
-        Fact::PriorityRaised => "Priority raised".into(),
-        Fact::PriorityLowered => "Priority lowered".into(),
-        Fact::Assigned(to) if is_me(to, names.me) => "Assigned to you".into(),
-        Fact::Assigned(Some(_)) => "Reassigned".into(),
-        Fact::Assigned(None) => "Unassigned".into(),
-        Fact::Due => "Due date changed".into(),
-        Fact::Updated => "Updated".into(),
-    };
-    Some(match facts.len() {
-        1 => text,
-        n => format!("{text} +{}", n - 1),
-    })
-}
-
 /// Every fact as a clause of the banner's sentence ("2 new comments, moved to Review.").
 pub fn sentence(facts: &[Fact], names: &Names) -> Option<String> {
     let clauses: Vec<String> = for_me(facts, names)
@@ -226,12 +204,6 @@ mod tests {
         }
     }
 
-    fn chip_of(changes: &[Change]) -> Option<String> {
-        let statuses = map(&[("10002", "In Progress"), ("10003", "In Review")]);
-        let people = map(&[(MARTA, "Marta Klein")]);
-        chip(&facts(changes), &names(Some(ME), &statuses, &people))
-    }
-
     fn sentence_of(changes: &[Change]) -> Option<String> {
         let statuses = map(&[("10003", "In Review")]);
         let people = map(&[(MARTA, "Marta Klein")]);
@@ -239,51 +211,33 @@ mod tests {
     }
 
     #[test]
-    fn the_chip_names_the_most_important_change() {
+    fn the_sentence_orders_clauses_and_merges_runs_of_changes() {
         let cases: Vec<(Vec<Change>, Option<&str>)> = vec![
-            (vec![], None),
-            (vec![change("created", None, Some("NW-1"))], Some("New")),
-            (
-                vec![change("comment_added", Some("4"), Some("5"))],
-                Some("1 new comment"),
-            ),
             (
                 vec![
                     change("comment_added", Some("1"), Some("2")),
                     change("comment_added", Some("2"), Some("4")),
                 ],
-                Some("3 new comments"),
-            ),
-            (
-                vec![change("status", Some("10002"), Some("10003"))],
-                Some("Moved to In Review"),
+                Some("3 new comments."),
             ),
             (
                 vec![change("status", Some("10002"), Some("10009"))],
-                Some("Moved to 10009"),
+                Some("moved to 10009."),
             ),
             (
                 vec![
                     change("status", Some("10002"), Some("10003")),
                     change("status", Some("10003"), Some("10002")),
                 ],
-                Some("Moved to In Progress"),
-            ),
-            (
-                vec![change("priority", Some("Medium"), Some("High"))],
-                Some("Priority raised"),
-            ),
-            (
-                vec![change("priority", Some("High"), Some("Low"))],
-                Some("Priority lowered"),
+                Some("moved to 10002."),
             ),
             (
                 vec![change("priority", None, Some("High"))],
-                Some("Priority raised"),
+                Some("priority raised."),
             ),
             (
                 vec![change("priority", Some("High"), None)],
-                Some("Priority lowered"),
+                Some("priority lowered."),
             ),
             (
                 vec![
@@ -293,24 +247,11 @@ mod tests {
                 None,
             ),
             (
-                vec![change("assignee", None, Some(ME))],
-                Some("Assigned to you"),
-            ),
-            (
-                vec![change("assignee", Some(ME), Some(MARTA))],
-                Some("Reassigned"),
-            ),
-            (vec![change("assignee", Some(ME), None)], Some("Unassigned")),
-            (
-                vec![change("due_date", Some("2026-10-30"), Some("2026-11-02"))],
-                Some("Due date changed"),
-            ),
-            (
                 vec![
                     change("status", Some("10002"), Some("10003")),
                     change("comment_added", Some("1"), Some("2")),
                 ],
-                Some("1 new comment +1"),
+                Some("1 new comment, moved to In Review."),
             ),
             (
                 vec![
@@ -318,44 +259,44 @@ mod tests {
                     change("assignee", None, Some(MARTA)),
                     change("priority", Some("Low"), Some("Highest")),
                 ],
-                Some("Priority raised +2"),
+                Some("priority raised, reassigned to Marta Klein, due date changed."),
             ),
             (
                 vec![
                     change("created", None, Some("NW-1")),
                     change("comment_added", Some("0"), Some("1")),
                 ],
-                Some("New +1"),
+                Some("created, 1 new comment."),
             ),
             (vec![change("gone", None, None)], None),
         ];
         for (changes, expected) in cases {
-            assert_eq!(chip_of(&changes).as_deref(), expected, "{changes:?}");
+            assert_eq!(sentence_of(&changes).as_deref(), expected, "{changes:?}");
         }
     }
 
     #[test]
-    fn a_chip_without_names_falls_back_to_ids() {
+    fn a_sentence_without_names_falls_back_to_ids() {
         let none = HashMap::new();
 
-        let found = chip(
+        let found = sentence(
             &facts(&[change("status", None, Some("10003"))]),
             &names(None, &none, &none),
         );
 
-        assert_eq!(found.as_deref(), Some("Moved to 10003"));
+        assert_eq!(found.as_deref(), Some("moved to 10003."));
     }
 
     #[test]
     fn nobody_is_me_when_the_account_is_unknown() {
         let none = HashMap::new();
 
-        let found = chip(
+        let found = sentence(
             &facts(&[change("assignee", None, Some(ME))]),
             &names(None, &none, &none),
         );
 
-        assert_eq!(found.as_deref(), Some("Reassigned"));
+        assert_eq!(found.as_deref(), Some("reassigned to account-me."));
     }
 
     #[test]
@@ -416,26 +357,12 @@ mod tests {
     }
 
     #[test]
-    fn the_chip_says_mentioned_you_only_when_the_connected_account_is_mentioned() {
+    fn a_mention_comment_counts_as_the_mention_not_again_as_a_new_comment() {
         let cases: Vec<(Vec<Change>, Option<&str>)> = vec![
-            (vec![mention("90001", ME)], Some("Mentioned you")),
+            (vec![mention("90001", ME)], Some("mentioned you.")),
             (
                 vec![mention("90001", MARTA), mention("90002", ME)],
-                Some("Mentioned you"),
-            ),
-            (
-                vec![
-                    mention("90001", ME),
-                    change("comment_added", Some("4"), Some("5")),
-                ],
-                Some("Mentioned you"),
-            ),
-            (
-                vec![
-                    mention("90001", ME),
-                    change("comment_added", Some("4"), Some("6")),
-                ],
-                Some("Mentioned you +1"),
+                Some("mentioned you."),
             ),
             (
                 vec![
@@ -443,7 +370,7 @@ mod tests {
                     mention("90002", ME),
                     change("comment_added", Some("4"), Some("6")),
                 ],
-                Some("Mentioned you"),
+                Some("mentioned you."),
             ),
             (
                 vec![
@@ -451,19 +378,11 @@ mod tests {
                     change("comment_added", Some("4"), Some("5")),
                     change("status", Some("10002"), Some("10003")),
                 ],
-                Some("Mentioned you +1"),
-            ),
-            (vec![mention("90001", MARTA)], None),
-            (
-                vec![
-                    mention("90001", MARTA),
-                    change("comment_added", Some("4"), Some("5")),
-                ],
-                Some("1 new comment"),
+                Some("mentioned you, moved to In Review."),
             ),
         ];
         for (changes, expected) in cases {
-            assert_eq!(chip_of(&changes).as_deref(), expected, "{changes:?}");
+            assert_eq!(sentence_of(&changes).as_deref(), expected, "{changes:?}");
         }
     }
 
@@ -508,26 +427,21 @@ mod tests {
         let facts = facts(&changes);
 
         assert_eq!(
-            chip(&facts, &names(None, &none, &none)).as_deref(),
-            Some("1 new comment")
-        );
-        assert_eq!(
             sentence(&facts, &names(None, &none, &none)).as_deref(),
             Some("1 new comment.")
         );
     }
 
     #[test]
-    fn an_updated_record_is_the_updated_fact_with_a_chip_and_a_clause() {
+    fn an_updated_record_is_the_updated_fact_with_a_clause() {
         let changes = [change("updated", None, None)];
 
         assert_eq!(facts(&changes), [Fact::Updated]);
-        assert_eq!(chip_of(&changes).as_deref(), Some("Updated"));
         assert_eq!(sentence_of(&changes).as_deref(), Some("updated."));
     }
 
     #[test]
-    fn updated_comes_last_in_the_chip_count_and_the_sentence() {
+    fn updated_comes_last_in_the_facts_and_the_sentence() {
         let changes = [
             change("updated", None, None),
             change("status", Some("10002"), Some("10003")),
@@ -538,7 +452,6 @@ mod tests {
             facts(&changes),
             [Fact::Moved("10003".into()), Fact::Due, Fact::Updated]
         );
-        assert_eq!(chip_of(&changes).as_deref(), Some("Moved to In Review +2"));
         assert_eq!(
             sentence_of(&changes).as_deref(),
             Some("moved to In Review, due date changed, updated.")

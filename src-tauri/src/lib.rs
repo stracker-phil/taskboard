@@ -19,6 +19,7 @@ pub mod events;
 pub mod field_choice;
 pub mod filter;
 mod handlers;
+pub mod inbox;
 mod instance;
 pub mod ipc;
 pub mod issues;

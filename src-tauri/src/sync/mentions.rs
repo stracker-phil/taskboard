@@ -1,5 +1,5 @@
 //! Mentions in comments the cache hasn't seen yet, recorded as `mention` changes: one per mentioned account, so
-//! Unread can say "Mentioned you". The owner's own comments mention no news.
+//! the inbox can say "Mentioned you". The owner's own comments mention no news.
 
 use std::collections::HashSet;
 

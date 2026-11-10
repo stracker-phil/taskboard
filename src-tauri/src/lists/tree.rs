@@ -6,7 +6,6 @@ use ts_rs::TS;
 
 use super::context::{Viewer, names};
 use super::nodes::{Kind, Node, all_nodes, scope_of};
-use crate::changes::UNSEEN;
 use crate::db::Db;
 use crate::error::AppResult;
 use crate::filter::{Compiled, Ctx, Names, OPEN_ISSUES, TRACKED_ISSUES, compile, describe};
@@ -35,8 +34,7 @@ pub struct ListNode {
     pub id: i64,
     pub kind: Kind,
     pub name: String,
-    /// Open issues, or unread ones under Unread only; for Bookmarks its active pins; none for a filter that can't
-    /// be compiled.
+    /// Open issues; for Bookmarks its active pins; none for a filter that can't be compiled.
     pub count: Option<i64>,
     /// Conditions of its own, for the Filter button's badge.
     pub own_conditions: usize,
@@ -71,9 +69,8 @@ pub struct SpaceNode {
     pub lists: Vec<ListNode>,
 }
 
-/// `unread`: every count is of unread issues (Unread only), open or done; otherwise of open issues.
-pub async fn sidebar_tree(db: &Db, viewer: Viewer, unread: bool) -> AppResult<SidebarTree> {
-    db.read(move |conn| build(conn, &viewer, unread)).await
+pub async fn sidebar_tree(db: &Db, viewer: Viewer) -> AppResult<SidebarTree> {
+    db.read(move |conn| build(conn, &viewer)).await
 }
 
 struct SpaceRow {
@@ -110,7 +107,7 @@ fn tracked_spaces(conn: &Connection) -> AppResult<Vec<SpaceRow>> {
     Ok(rows.collect::<Result<_, _>>()?)
 }
 
-fn build(conn: &Connection, viewer: &Viewer, unread: bool) -> AppResult<SidebarTree> {
+fn build(conn: &Connection, viewer: &Viewer) -> AppResult<SidebarTree> {
     let ctx = viewer.ctx(conn)?;
     let names = names(conn)?;
     let nodes = all_nodes(conn)?;
@@ -185,7 +182,7 @@ fn build(conn: &Connection, viewer: &Viewer, unread: bool) -> AppResult<SidebarT
         pinned_lists,
         spaces,
     };
-    counter.fill(conn, &mut tree, unread)?;
+    counter.fill(conn, &mut tree)?;
     let pin_count = active_pin_count(conn, viewer)?;
     for node in tree.home.iter_mut().filter(|n| n.kind == Kind::Pinned) {
         node.count = Some(pin_count);
@@ -253,7 +250,7 @@ impl Counter {
         self.nodes.push((id, compiled));
     }
 
-    fn counts(&self, conn: &Connection, unread: bool) -> AppResult<Vec<(i64, i64)>> {
+    fn counts(&self, conn: &Connection) -> AppResult<Vec<(i64, i64)>> {
         if self.nodes.is_empty() {
             return Ok(Vec::new());
         }
@@ -262,9 +259,8 @@ impl Counter {
             .iter()
             .map(|(_, c)| format!("COUNT(*) FILTER (WHERE {})", c.condition))
             .collect();
-        let counted = if unread { UNSEEN } else { OPEN_ISSUES };
         let sql = format!(
-            "SELECT {} FROM cache.issue i WHERE {TRACKED_ISSUES} AND {counted}",
+            "SELECT {} FROM cache.issue i WHERE {TRACKED_ISSUES} AND {OPEN_ISSUES}",
             columns.join(", ")
         );
         let params = self.nodes.iter().flat_map(|(_, c)| c.params.iter());
@@ -274,8 +270,8 @@ impl Counter {
         Ok(self.nodes.iter().map(|(id, _)| *id).zip(counts).collect())
     }
 
-    fn fill(self, conn: &Connection, tree: &mut SidebarTree, unread: bool) -> AppResult<()> {
-        let counts = self.counts(conn, unread)?;
+    fn fill(self, conn: &Connection, tree: &mut SidebarTree) -> AppResult<()> {
+        let counts = self.counts(conn)?;
         let count_of = |id: i64| counts.iter().find(|(n, _)| *n == id).map(|(_, c)| *c);
         let mut set = |node: &mut ListNode| node.count = count_of(node.id);
         set(&mut tree.everything);

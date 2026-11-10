@@ -92,8 +92,6 @@ mod tests {
             style: Style::Progress,
             status_name: "In Progress".to_string(),
             comment_count: 0,
-            changed: false,
-            change_note: None,
             assignees: Vec::new(),
             epic: None,
             release: None,

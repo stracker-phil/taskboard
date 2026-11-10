@@ -37,7 +37,7 @@ pub use filter::{
 };
 pub use model::{DEFAULT_COLUMNS, GroupBy, IssueOpening, Layout, Sort, SortBy, SubtaskMode, View};
 pub use narrowing::Narrowing;
-pub use query::{ViewAt, ViewData, unseen_ids, view_people, view_rows};
+pub use query::{ViewData, view_people, view_rows};
 pub use read::{columns_for_new_view, list_views, read_view, views_of};
 pub use sorting::fold;
 pub use validate::clean_name;

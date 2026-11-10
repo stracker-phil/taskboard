@@ -1,4 +1,4 @@
-import { isAncestor, scopeDef, specificity } from "./scopes";
+import { isAncestor, scopeDef, shadowsAncestor, specificity } from "./scopes";
 
 export type Scope = string;
 
@@ -232,8 +232,12 @@ export interface Conflict {
   b: Command;
 }
 
+/** Two scopes can both have a key at once, unless the inner one shadows the outer. */
 function scopesOverlap(a: Scope, b: Scope): boolean {
-  return a === b || isAncestor(a, b) || isAncestor(b, a);
+  if (a === b) return true;
+  if (isAncestor(a, b)) return !shadowsAncestor(b, a);
+  if (isAncestor(b, a)) return !shadowsAncestor(a, b);
+  return false;
 }
 
 /** Pairs of commands that share a binding in overlapping scopes; the Shortcuts page warns about them. */

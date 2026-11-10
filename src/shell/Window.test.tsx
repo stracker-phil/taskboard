@@ -338,7 +338,7 @@ describe("Window", () => {
     const bar = () => screen.queryByRole("navigation", { name: "Bookmarks" });
 
     function renderShell(sidebarHidden: boolean, bookmarksBar: boolean) {
-      mocked.modesGet.mockResolvedValue({ meEverywhere: false, unreadOnly: false, bookmarksBar });
+      mocked.modesGet.mockResolvedValue({ meEverywhere: false, bookmarksBar });
       render(
         <QueryClientProvider client={client}>
           <Window sidebarHidden={sidebarHidden}>
@@ -400,6 +400,22 @@ describe("Window", () => {
       if (bookmarksBar) await screen.findByRole("navigation", { name: "Bookmarks" });
 
       expect(screen.queryByRole("navigation", { name: "Tabs" })).not.toBeInTheDocument();
+    });
+  });
+
+  describe("notifications bell", () => {
+    it("is in the content panel without an Issue view", async () => {
+      await renderWindow(false);
+      await screen.findByText("View body");
+
+      expect(within(screen.getByRole("main")).getByRole("button", { name: "Notifications" })).toBeInTheDocument();
+    });
+
+    it("is in the content panel with an Issue view open", async () => {
+      await renderWindow(true);
+      await screen.findByRole("button", { name: "Close" });
+
+      expect(within(screen.getByRole("main")).getByRole("button", { name: "Notifications" })).toBeInTheDocument();
     });
   });
 

@@ -1,10 +1,12 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
 
 import { api } from "../api";
+import { useInboxState } from "../inbox/inboxState";
+import { useInboxCount, useInboxRows } from "../inbox/queries";
 import { ConnectionPage } from "../components/settings/jira/ConnectionPage";
 import { ProjectsPage } from "../components/settings/jira/ProjectsPage";
 import { SyncPage } from "../components/settings/jira/SyncPage";
@@ -282,7 +284,7 @@ describe("useEvents", () => {
     }
 
     async function renderModes() {
-      mocked.modesGet.mockResolvedValue({ meEverywhere: false, unreadOnly: false, bookmarksBar: false });
+      mocked.modesGet.mockResolvedValue({ meEverywhere: false, bookmarksBar: false });
       mocked.viewRows.mockResolvedValue(viewData([], [row({ key: "NW-1" }), row({ id: "10043", key: "NW-2" })]));
       render(
         <QueryClientProvider client={createQueryClient()}>
@@ -295,10 +297,10 @@ describe("useEvents", () => {
 
     it("refetches the modes and the view rows when modes_changed arrives", async () => {
       await renderModes();
-      mocked.modesGet.mockResolvedValue({ meEverywhere: true, unreadOnly: false, bookmarksBar: false });
+      mocked.modesGet.mockResolvedValue({ meEverywhere: true, bookmarksBar: false });
       mocked.viewRows.mockResolvedValue(viewData([], [row({ key: "NW-1" })]));
 
-      act(() => emitEvent(api, "modes_changed", { meEverywhere: true, unreadOnly: false, bookmarksBar: false }));
+      act(() => emitEvent(api, "modes_changed", { meEverywhere: true, bookmarksBar: false }));
 
       expect(await screen.findByText("Me everywhere: true; rows: NW-1")).toBeInTheDocument();
     });
@@ -310,6 +312,48 @@ describe("useEvents", () => {
       act(() => emitEvent(api, "settings_changed", settings()));
 
       expect(await screen.findByText("Me everywhere: false; rows: NW-2")).toBeInTheDocument();
+    });
+  });
+
+  describe("inbox", () => {
+    function InboxHarness() {
+      useEvents();
+      const badge = useInboxCount();
+      const snapshot = useInboxRows();
+      return (
+        <p>
+          Badge: {badge}; snapshot: {snapshot.unread}
+        </p>
+      );
+    }
+
+    beforeEach(() => {
+      useInboxState.getState().setOpen(true);
+    });
+
+    afterEach(() => {
+      useInboxState.getState().setOpen(false);
+    });
+
+    it.each([
+      ["names issues", { ids: ["1"], all: false }],
+      ["covers all issues", { ids: [], all: true }],
+    ])("refetches the bell's count and the open inbox when issues_changed %s", async (_case, payload) => {
+      mocked.inboxCount.mockResolvedValue(2);
+      mocked.inboxRows.mockResolvedValue({ rows: [], unread: 2 });
+      render(
+        <QueryClientProvider client={createQueryClient()}>
+          <InboxHarness />
+        </QueryClientProvider>,
+      );
+      await screen.findByText("Badge: 2; snapshot: 2");
+      await waitFor(() => expect(mocked.listen).toHaveBeenCalledWith("issues_changed", expect.any(Function)));
+      mocked.inboxCount.mockResolvedValue(3);
+      mocked.inboxRows.mockResolvedValue({ rows: [], unread: 3 });
+
+      act(() => emitEvent(api, "issues_changed", payload));
+
+      expect(await screen.findByText("Badge: 3; snapshot: 3")).toBeInTheDocument();
     });
   });
 

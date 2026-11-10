@@ -98,6 +98,15 @@ describe("TableView", () => {
     expect(screen.queryByRole("grid")).not.toBeInTheDocument();
   });
 
+  it("shows no change chip or marker on a row even when Rust reports the issue unread", async () => {
+    const unread = Object.assign(row({ id: "3", key: "NW-1003", summary: "Fix the footer links" }), { changed: true, changeNote: "2 new comments" });
+    await renderTable(viewData([groupOf([OPEN, unread])], [OPEN, unread], { columns: ["assignee", "priority"], groupBy: "none" }));
+
+    const issue = await screen.findByRole("row", { name: /NW-1003/ });
+    expect(issue).not.toHaveClass("table-row--changed");
+    expect(within(issue).queryByText("2 new comments")).not.toBeInTheDocument();
+  });
+
   describe("headers", () => {
     const headerNames = () => screen.getAllByRole("columnheader").map((h) => h.textContent?.replace(/[↑↓]/, ""));
 

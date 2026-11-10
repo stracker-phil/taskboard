@@ -15,6 +15,7 @@ use taskboard_lib::connection::{
 use taskboard_lib::db::{Changes, Db};
 use taskboard_lib::error::{AppResult, ErrorKind};
 use taskboard_lib::field_choice::field_choice_set;
+use taskboard_lib::inbox;
 use taskboard_lib::issues::{
     ActivityItem, ChangeValue, CustomField, InlineImage, IssueDetail, IssueLink,
     MAX_INLINE_IMAGE_BYTES, RelatedIssue, WebLink, WebLinkKind, attachment_file, attachment_image,
@@ -31,7 +32,7 @@ use taskboard_lib::test_support::demo::{self, DEMO_NOW, ME_EMAIL, REVIEWER};
 use taskboard_lib::test_support::fake_jira::{DEMO_TOKEN, FakeJira};
 use taskboard_lib::test_support::{FakeSecrets, temp_config_dir};
 use taskboard_lib::views::rows::{self, Cell, EpicChip, Person};
-use taskboard_lib::views::{unseen_ids, view_set_columns, views_of};
+use taskboard_lib::views::{view_set_columns, views_of};
 
 const LATER_UTC: &str = "2026-10-28T13:00:00.000Z";
 const NW_PROJECT_ID: &str = "10001";
@@ -2463,35 +2464,14 @@ async fn fetching_history_does_not_make_a_seen_issue_unread() {
     let site = Site::new().await;
     site.execute("UPDATE issue_seen SET seen_at = '2026-10-28T10:00:00.000Z'")
         .await;
-    let space = site
-        .db()
-        .read(|conn| {
-            Ok(conn.query_row(
-                "SELECT id FROM filter_list WHERE kind = 'space' AND project_id = ?1",
-                [NW_PROJECT_ID],
-                |r| r.get::<_, i64>(0),
-            )?)
-        })
-        .await
-        .unwrap();
-    let unseen = site
-        .db()
-        .read(move |conn| unseen_ids(conn, &viewer(), space, None))
-        .await
-        .unwrap();
-    assert_eq!(unseen, Vec::<String>::new());
+    assert_eq!(site.db().read(inbox::count).await.unwrap(), 0);
 
     assert!(site.sync_history("NW-1042").await);
 
     let detail = site.detail("NW-1042").await;
     assert!(!detail.unread);
     assert!(detail.since.is_none());
-    let unseen = site
-        .db()
-        .read(move |conn| unseen_ids(conn, &viewer(), space, None))
-        .await
-        .unwrap();
-    assert_eq!(unseen, Vec::<String>::new());
+    assert_eq!(site.db().read(inbox::count).await.unwrap(), 0);
     assert_eq!(fresh_flags(&site.changes("NW-1042").await), [false; 11]);
 }
 

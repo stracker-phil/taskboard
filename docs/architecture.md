@@ -115,7 +115,7 @@ src-tauri/
   src/events.rs state.rs     every event name; AppState
   src/error.rs lock.rs       AppError (+ ErrorKind); poison-tolerant lock helpers
   src/time.rs text.rs        stored timestamps (UTC text with milliseconds); HTML as plain text for search
-  src/store/                 JsonFile, JsonStore, settings/, keybindings, ui_state, modes (app-wide Me, Unread, bookmarks bar),
+  src/store/                 JsonFile, JsonStore, settings/, keybindings, ui_state, modes (app-wide Me, bookmarks bar),
                              places (each view's place)
   src/bus/                   the command bus
   src/db/                    the two SQLite files: open, migrate, read, the one write path
@@ -139,7 +139,8 @@ src-tauri/
                              order.rs keeps positions; look.rs the tiles' icon and color
   src/search/                full-text search: safe FTS5 queries, the palette's issues and lists, the text field
   src/pins/                  local pins (Bookmarks in the UI): durations to local midnights, the Bookmarks view, Add to Home
-  src/changes/               unseen (unread) changes: the change chip and Since-yesterday words, read and unread
+  src/inbox/                 the inbox: the unread issues' snapshot while it is open, its rows and the bell's count
+  src/changes/               unseen (unread) changes: the Since-yesterday and inbox words, read and unread
   src/issues/                one issue: detail, custom fields, related issues, activity, comments, web links,
                              attachments (preview.rs: the downloaded copies for Quick Look; inline_image.rs: images in
                              rich text as data URLs), history (fetched.rs: how often details are fetched), markdown/: the

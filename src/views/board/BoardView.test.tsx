@@ -396,16 +396,15 @@ describe("BoardView", () => {
       expect(within(screen.getByRole("article")).queryByLabelText(/comment/)).not.toBeInTheDocument();
     });
 
-    it("marks a changed card with the Changed since yesterday dot", async () => {
-      await renderBoard(boardData([PROGRESS], [{ ...PRICING, changed: true }]));
+    it("shows no change dot or tint on a card even when Rust reports the issue unread", async () => {
+      const unread = Object.assign(row({ id: "1", key: "NW-1042", summary: "Redesign the pricing page" }), { changed: true, changeNote: "2 new comments" });
+      await renderBoard(boardData([PROGRESS], [unread]));
 
-      expect(within(screen.getByRole("article")).getByTitle("Changed since yesterday")).toBeInTheDocument();
-    });
-
-    it("shows no change dot on an unchanged card", async () => {
-      await renderBoard(boardData([PROGRESS], [PRICING]));
-
+      const card = screen.getByRole("article");
+      expect(card).not.toHaveClass("board-card--changed");
+      expect(card.querySelector(".board-card__dot")).toBeNull();
       expect(screen.queryByTitle("Changed since yesterday")).not.toBeInTheDocument();
+      expect(screen.queryByText("2 new comments")).not.toBeInTheDocument();
     });
 
     it("makes nothing draggable", async () => {
@@ -988,25 +987,13 @@ describe("BoardView", () => {
         expect(mocked.pinToggleIssue).toHaveBeenCalledWith("2");
       });
 
-      it("M marks the card's unread issue read", async () => {
-        const unread = [row({ id: "1", key: "NW-101", summary: "Draft the sitemap", changed: true })];
-        await renderKeyed(boardData([boardColumn({ key: "1", name: "To Do", style: "todo", ids: ["1"] })], unread));
-        await userEvent.keyboard("j");
-
-        await userEvent.keyboard("m");
-
-        expect(mocked.issuesMarkSeen).toHaveBeenCalledWith(["1"]);
-        expect(mocked.issueMarkUnread).not.toHaveBeenCalled();
-      });
-
-      it("M marks the card's read issue unread", async () => {
+      it("M toggles the read state of the card's issue", async () => {
         await renderKeyed();
-        await userEvent.keyboard("j");
+        await userEvent.keyboard("jj");
 
         await userEvent.keyboard("m");
 
-        expect(mocked.issueMarkUnread).toHaveBeenCalledWith("1");
-        expect(mocked.issuesMarkSeen).not.toHaveBeenCalled();
+        expect(mocked.issueToggleSeen).toHaveBeenCalledWith("2");
       });
 
       it("⌘C copies the card's key", async () => {
@@ -1031,8 +1018,7 @@ describe("BoardView", () => {
 
         expect(useStore.getState().issueView).toBeNull();
         expect(mocked.pinToggleIssue).not.toHaveBeenCalled();
-        expect(mocked.issuesMarkSeen).not.toHaveBeenCalled();
-        expect(mocked.issueMarkUnread).not.toHaveBeenCalled();
+        expect(mocked.issueToggleSeen).not.toHaveBeenCalled();
         expect(mocked.copyText).not.toHaveBeenCalled();
       });
     });
@@ -1137,30 +1123,10 @@ describe("BoardView", () => {
       expect(await screen.findByRole("button", { name: "Remove the bookmark of NW-1042" })).toHaveAttribute("aria-pressed", "true");
     });
 
-    it("offers Mark as read on an unread card and Mark as unread on a read one", async () => {
-      await renderBoard(boardData([PROGRESS, DONE], [{ ...PRICING, changed: true }, NOTES]));
+    it("offers no read toggle on a card", async () => {
+      await renderBoard(boardData([PROGRESS, DONE], [PRICING, NOTES]));
 
-      expect(screen.getByRole("button", { name: "Mark NW-1042 as read" })).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Mark NW-1042 as unread" })).not.toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Mark NW-1001 as unread" })).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Mark NW-1001 as read" })).not.toBeInTheDocument();
-    });
-
-    it("marks an unread card read", async () => {
-      await renderBoard(boardData([PROGRESS, DONE], [{ ...PRICING, changed: true }, NOTES]));
-
-      await userEvent.click(screen.getByRole("button", { name: "Mark NW-1042 as read" }));
-
-      expect(mocked.issuesMarkSeen).toHaveBeenCalledWith(["1"]);
-    });
-
-    it("marks a read card unread without opening it", async () => {
-      await renderBoard(boardData([PROGRESS, DONE], [{ ...PRICING, changed: true }, NOTES]));
-
-      await userEvent.click(screen.getByRole("button", { name: "Mark NW-1001 as unread" }));
-
-      expect(mocked.issueMarkUnread).toHaveBeenCalledWith("2");
-      expect(useStore.getState().issueView).toBeNull();
+      expect(screen.queryByRole("button", { name: /as (read|unread)$/ })).not.toBeInTheDocument();
     });
   });
 });

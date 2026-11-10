@@ -20,12 +20,8 @@ pub struct Row {
     pub style: Style,
     pub status_name: String,
     pub comment_count: i64,
-    /// Changed since the owner last looked.
-    pub changed: bool,
     /// When Jira last changed the issue (UTC); a row whose time moves while shown flashes once.
     pub updated_at: String,
-    /// The change chip's text ("2 new comments").
-    pub change_note: Option<String>,
     pub assignees: Vec<Person>,
     pub epic: Option<EpicChip>,
     pub release: Option<String>,

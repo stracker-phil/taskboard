@@ -10,9 +10,9 @@ use rusqlite::Connection;
 use serde::Serialize;
 use ts_rs::TS;
 
-pub use facts::{Names, chip, facts, sentence};
-pub use seen::{catch_up, mark_all_seen, mark_seen, mark_unread, seen_until_updated};
-pub use unseen::{UNSEEN, seen_at, unseen_changes, unseen_since};
+pub use facts::{Names, facts, sentence};
+pub use seen::{catch_up, mark_seen, mark_unread, seen_until_updated, toggle_seen};
+pub use unseen::{UNSEEN, is_unseen, seen_at, unseen_changes, unseen_since};
 
 pub use unseen::Change;
 use unseen::changes_after;

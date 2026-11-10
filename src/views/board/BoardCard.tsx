@@ -33,7 +33,7 @@ interface Props {
   pinned?: boolean;
 }
 
-/** A Board card: the summary first, always wrapped, the key in the bottom-right corner; changed cards are tinted. */
+/** A Board card: the summary first, always wrapped, the key in the bottom-right corner. */
 export const BoardCard = memo(function BoardCard({ row, fields, inlineLabels = false, statusSquare = false, selected = false, picked = false, onOpen, onToggleBox, onOpenInTab, actions, pinned = false }: Props) {
   const shows = (field: string) => fields.includes(field);
   const flashing = useFlash(row.updatedAt);
@@ -41,7 +41,7 @@ export const BoardCard = memo(function BoardCard({ row, fields, inlineLabels = f
   const labels = shows("labels") && row.labels.length > 0;
   return (
     <article
-      className={["board-card", row.changed && "board-card--changed", flashing && "flash", selected && "board-card--selected", picked && "board-card--picked"].filter(Boolean).join(" ")}
+      className={["board-card", flashing && "flash", selected && "board-card--selected", picked && "board-card--picked"].filter(Boolean).join(" ")}
       aria-current={selected || picked || undefined}
       tabIndex={0}
       aria-label={`${row.key} ${row.summary}`}
@@ -74,14 +74,13 @@ export const BoardCard = memo(function BoardCard({ row, fields, inlineLabels = f
             <PriorityFlag level={row.priority.level} />
           </span>
         )}
-        {row.changed && <span className="board-card__dot" title="Changed since yesterday" />}
         <CopyKey className="board-card__key" issueKey={row.key} />
       </div>
       {onToggleBox && (
         <PickBox issueKey={row.key} picked={picked} onToggle={() => onToggleBox(row.id)} className="board-card__pick" />
       )}
       <span className="board-card__actions">
-        <RowActions issueId={row.id} issueKey={row.key} changed={row.changed} actions={actions} pinned={pinned} />
+        <RowActions issueId={row.id} issueKey={row.key} actions={actions} pinned={pinned} />
       </span>
     </article>
   );

@@ -1,4 +1,4 @@
-//! What a stored issue means for Unread: the changes the owner hasn't made themselves, or, on a project's first
+//! What a stored issue means for the inbox: the changes the owner hasn't made themselves, or, on a project's first
 //! sync, what happened since the owner last looked.
 
 use rusqlite::{Connection, params};
@@ -10,7 +10,7 @@ use crate::db::Changes;
 use crate::error::AppResult;
 use crate::jira::dto::Issue;
 
-/// How a page's issues count for Unread.
+/// How a page's issues count as unread.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Pass {
     /// Changes against the cached issue are recorded.

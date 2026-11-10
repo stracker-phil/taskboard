@@ -329,7 +329,7 @@ mod defaults_on_tracking {
         track_project(&db, NWS.into(), true).await.unwrap();
 
         track_project(&db, NW.into(), false).await.unwrap();
-        let tree = sidebar_tree(&db, viewer(None), false).await.unwrap();
+        let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
         assert_eq!(
             tree.spaces
                 .iter()
@@ -339,7 +339,7 @@ mod defaults_on_tracking {
         );
 
         track_project(&db, NW.into(), true).await.unwrap();
-        let tree = sidebar_tree(&db, viewer(None), false).await.unwrap();
+        let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
         let nw = find_space(&tree, "NW");
         assert_eq!(
             nw.lists.iter().map(|l| l.name.as_str()).collect::<Vec<_>>(),
@@ -407,7 +407,7 @@ mod the_seeded_levels {
     async fn home_holds_bookmarks_with_its_active_pins_and_no_unread_list() {
         let (_dir, db) = lab().await;
 
-        let tree = sidebar_tree(&db, viewer(None), false).await.unwrap();
+        let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
 
         let home: Vec<(Kind, &str, Option<i64>)> = tree
             .home
@@ -436,7 +436,7 @@ mod the_seeded_levels {
         )
         .await;
 
-        let tree = sidebar_tree(&db, viewer(None), false).await.unwrap();
+        let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
 
         let nw = find_space(&tree, "NW");
         let epics = find_list(nw, "Epics");
@@ -451,7 +451,7 @@ mod the_seeded_levels {
     async fn every_list_node_carries_its_own_conditions_and_a_description() {
         let (_dir, db) = tracked_lab().await;
 
-        let tree = sidebar_tree(&db, viewer(None), false).await.unwrap();
+        let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
 
         let nw = find_space(&tree, "NW");
         let bugs = find_list(nw, "Open bugs");
@@ -526,7 +526,7 @@ mod the_tree_on_the_demo_site {
         }
 
         async fn tree(&self) -> SidebarTree {
-            sidebar_tree(self.db(), viewer(Some(ME_ACCOUNT_ID)), false)
+            sidebar_tree(self.db(), viewer(Some(ME_ACCOUNT_ID)))
                 .await
                 .unwrap()
         }
@@ -1517,14 +1517,14 @@ mod status_category_follows_the_spaces_status_types {
             .await
             .unwrap();
 
-        let tree = sidebar_tree(&db, viewer(None), false).await.unwrap();
+        let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
 
         assert_eq!(find_space(&tree, "NW").open_count, 1);
         assert_eq!(find_space(&tree, "NWS").open_count, 1);
         assert_eq!(tree.everything.count, Some(2));
 
         style(&db, NW, REVIEW, Style::Progress).await;
-        let tree = sidebar_tree(&db, viewer(None), false).await.unwrap();
+        let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
 
         assert_eq!(find_space(&tree, "NW").open_count, 2);
         assert_eq!(find_space(&tree, "NWS").open_count, 1);
@@ -1547,10 +1547,10 @@ mod status_category_follows_the_spaces_status_types {
     #[tokio::test]
     async fn the_sidebar_does_not_count_issues_in_a_status_the_space_set_to_done() {
         let (_dir, db) = two_spaces().await;
-        let before = sidebar_tree(&db, viewer(None), false).await.unwrap();
+        let before = sidebar_tree(&db, viewer(None)).await.unwrap();
         style(&db, NW, REVIEW, Style::Done).await;
 
-        let after = sidebar_tree(&db, viewer(None), false).await.unwrap();
+        let after = sidebar_tree(&db, viewer(None)).await.unwrap();
 
         assert_eq!(find_space(&before, "NW").open_count, 2);
         assert_eq!(find_space(&after, "NW").open_count, 1);
@@ -1864,7 +1864,7 @@ mod recently_viewed {
     async fn the_sidebar_counts_the_issues_viewed_within_the_window() {
         let (_dir, db) = viewed_lab().await;
 
-        let tree = sidebar_tree(&db, viewer(None), false).await.unwrap();
+        let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
 
         assert_eq!(tree.home[0].kind, Kind::Viewed);
         assert_eq!(tree.home[0].count, Some(1));
@@ -1878,7 +1878,7 @@ mod recently_viewed {
             .await
             .unwrap();
 
-        let tree = sidebar_tree(&db, viewer(None), false).await.unwrap();
+        let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
 
         let kinds: Vec<Kind> = tree.home.iter().map(|n| n.kind).collect();
         assert_eq!(kinds, [Kind::Viewed, Kind::Pinned, Kind::List]);
@@ -2076,7 +2076,7 @@ mod editing_filter_lists {
             .await
             .unwrap();
 
-        let tree = sidebar_tree(&db, viewer(None), false).await.unwrap();
+        let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
         assert_eq!(
             tree.home
                 .iter()
@@ -2416,7 +2416,7 @@ mod the_look_of_filter_lists {
     use super::*;
 
     async fn nw_list(db: &Db, name: &str) -> ListNode {
-        let tree = sidebar_tree(db, viewer(None), false).await.unwrap();
+        let tree = sidebar_tree(db, viewer(None)).await.unwrap();
         find_list(find_space(&tree, "NW"), name).clone()
     }
 
@@ -3839,7 +3839,7 @@ mod editing_spaces {
         .await
         .unwrap();
 
-        let tree = sidebar_tree(&db, viewer(None), false).await.unwrap();
+        let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
         let space = find_space(&tree, "NW");
         assert_eq!(space.name, "Storefront");
         assert_eq!(space.icon.as_deref(), Some("S"));
@@ -3885,7 +3885,7 @@ mod editing_spaces {
         )
         .await;
         assert_eq!(stored, [[1, 1, 1, 1]]);
-        let tree = sidebar_tree(&db, viewer(None), false).await.unwrap();
+        let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
         let space = find_space(&tree, "NW");
         assert_eq!(space.name, "Website relaunch");
         assert_eq!(space.icon, None);
@@ -3916,7 +3916,7 @@ mod editing_spaces {
         .unwrap();
 
         assert_eq!(name_is_null().await, [1]);
-        let tree = sidebar_tree(&db, viewer(None), false).await.unwrap();
+        let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
         let space = find_space(&tree, "NW");
         assert_eq!(space.name, "Website relaunch");
         assert_eq!(space.project_name, "Website relaunch");
@@ -3933,7 +3933,7 @@ mod editing_spaces {
         .unwrap();
 
         assert_eq!(name_is_null().await, [0]);
-        let tree = sidebar_tree(&db, viewer(None), false).await.unwrap();
+        let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
         let space = find_space(&tree, "NW");
         assert_eq!(space.name, "Storefront");
         assert_eq!(space.project_name, "Website relaunch");
@@ -3972,7 +3972,7 @@ mod editing_spaces {
             .await
             .unwrap();
 
-            let tree = sidebar_tree(&db, viewer(None), false).await.unwrap();
+            let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
             assert_eq!(find_space(&tree, "NW").icon.as_deref(), Some(icon));
         }
     }
@@ -4064,7 +4064,7 @@ mod editing_spaces {
         let accent_of = |key: &'static str| {
             let db = db.clone();
             async move {
-                let tree = sidebar_tree(&db, viewer(None), false).await.unwrap();
+                let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
                 find_space(&tree, key).accent
             }
         };
@@ -4095,7 +4095,7 @@ mod editing_spaces {
         )
         .await;
 
-        let tree = sidebar_tree(&db, viewer(None), false).await.unwrap();
+        let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
 
         assert_eq!(find_space(&tree, "NW").accent, Some(Accent::Blue));
     }
@@ -4117,7 +4117,7 @@ mod editing_spaces {
 
         space_move(&db, NWS.into(), 0).await.unwrap();
 
-        let tree = sidebar_tree(&db, viewer(None), false).await.unwrap();
+        let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
         assert_eq!(
             tree.spaces
                 .iter()
@@ -4132,7 +4132,7 @@ mod editing_spaces {
         assert_dense(&stored);
 
         space_move(&db, NWS.into(), 99).await.unwrap();
-        let tree = sidebar_tree(&db, viewer(None), false).await.unwrap();
+        let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
         assert_eq!(
             tree.spaces
                 .iter()
@@ -4162,19 +4162,19 @@ mod editing_spaces {
 
         space_move(&db, LUM.into(), 0).await.unwrap();
 
-        let tree = sidebar_tree(&db, viewer(None), false).await.unwrap();
+        let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
         assert_eq!(spaces(&tree), ["LUM", "NW"]);
 
         space_move(&db, NW.into(), 0).await.unwrap();
         space_move(&db, NW.into(), 1).await.unwrap();
 
-        let tree = sidebar_tree(&db, viewer(None), false).await.unwrap();
+        let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
         assert_eq!(spaces(&tree), ["LUM", "NW"]);
 
         space_move(&db, LUM.into(), 0).await.unwrap();
         track_project(&db, NWS.into(), true).await.unwrap();
 
-        let tree = sidebar_tree(&db, viewer(None), false).await.unwrap();
+        let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
         let keys = spaces(&tree);
         let position = |key: &str| keys.iter().position(|k| k == key).unwrap();
         assert_eq!(keys.len(), 3);

@@ -122,49 +122,20 @@ describe("ListView", () => {
       expect(within(issue).getByLabelText("3 comments")).toBeInTheDocument();
     });
 
-    it("shows the change chip only for a row with a change note", async () => {
-      const changed = row({ id: "3", key: "NW-1003", summary: "Fix the footer links", changed: true, changeNote: "2 new comments" });
-      await renderList(viewData([groupOf([OPEN, changed])], [OPEN, changed]));
+    it("shows no change chip or marker on a row even when Rust reports the issue unread", async () => {
+      const unread = Object.assign(row({ id: "3", key: "NW-1003", summary: "Fix the footer links" }), { changed: true, changeNote: "2 new comments" });
+      await renderList(viewData([groupOf([OPEN, unread])], [OPEN, unread]));
 
-      expect(within(await screen.findByRole("row", { name: /NW-1003/ })).getByText("2 new comments")).toBeInTheDocument();
-      expect(screen.getAllByText(/new comments/)).toHaveLength(1);
+      const issue = await screen.findByRole("row", { name: /NW-1003/ });
+      expect(issue).not.toHaveClass("list-row--changed");
+      expect(within(issue).queryByText("2 new comments")).not.toBeInTheDocument();
     });
 
-    it("marks a changed row and leaves the others plain", async () => {
-      const changed = row({ id: "3", key: "NW-1003", summary: "Fix the footer links", changed: true });
-      await renderList(viewData([groupOf([OPEN, changed])], [OPEN, changed]));
-
-      expect(await screen.findByRole("row", { name: /NW-1003/ })).toHaveClass("list-row--changed");
-      expect(screen.getByRole("row", { name: /NW-1042/ })).not.toHaveClass("list-row--changed");
-    });
-
-    it("offers Mark as read on an unread row, which marks it read without selecting it", async () => {
-      const changed = row({ id: "3", key: "NW-1003", summary: "Fix the footer links", changed: true, changeNote: "2 new comments" });
-      await renderList(viewData([groupOf([OPEN, changed])], [OPEN, changed]));
-
-      await userEvent.click(await screen.findByRole("button", { name: "Mark NW-1003 as read" }));
-
-      expect(mocked.issuesMarkSeen).toHaveBeenCalledWith(["3"]);
-      expect(screen.getByRole("row", { name: /NW-1003/ })).toHaveAttribute("aria-selected", "false");
-    });
-
-    it("offers Mark as unread on a read row, which marks it unread without selecting it", async () => {
+    it("offers no read toggle on a row", async () => {
       await renderList(viewData([groupOf([OPEN])], [OPEN]));
 
-      await userEvent.click(await screen.findByRole("button", { name: "Mark NW-1042 as unread" }));
-
-      expect(mocked.issueMarkUnread).toHaveBeenCalledWith("1");
-      expect(mocked.issuesMarkSeen).not.toHaveBeenCalled();
-      expect(screen.getByRole("row", { name: /NW-1042/ })).toHaveAttribute("aria-selected", "false");
-    });
-
-    it("offers only one of Mark as read and Mark as unread on a row", async () => {
-      const changed = row({ id: "3", key: "NW-1003", summary: "Fix the footer links", changed: true });
-      await renderList(viewData([groupOf([OPEN, changed])], [OPEN, changed]));
-
-      await screen.findByRole("row", { name: /NW-1003/ });
-      expect(screen.queryByRole("button", { name: "Mark NW-1003 as unread" })).not.toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Mark NW-1042 as read" })).not.toBeInTheDocument();
+      await screen.findByRole("row", { name: /NW-1042/ });
+      expect(screen.queryByRole("button", { name: /as (read|unread)$/ })).not.toBeInTheDocument();
     });
 
     it("selects the row that is clicked", async () => {
@@ -329,8 +300,8 @@ describe("ListView", () => {
       expect(await screen.findByRole("row", { name: /NW-1042/ })).toHaveClass("list-row--wrap");
     });
 
-    it("still shows a wrapping row's change note and comment count", async () => {
-      const changed = row({ id: "3", key: "NW-1003", summary: "Fix the footer links", changed: true, changeNote: "2 new comments", commentCount: 4 });
+    it("still shows a wrapping row's comment count", async () => {
+      const changed = row({ id: "3", key: "NW-1003", summary: "Fix the footer links", commentCount: 4 });
       mocked.viewRows.mockResolvedValue(viewData([groupOf([changed])], [changed]));
       render(
         <QueryClientProvider client={createQueryClient()}>
@@ -339,7 +310,6 @@ describe("ListView", () => {
       );
 
       const issue = await screen.findByRole("row", { name: /NW-1003/ });
-      expect(within(issue).getByText("2 new comments")).toBeInTheDocument();
       expect(within(issue).getByLabelText("4 comments")).toBeInTheDocument();
     });
 
@@ -1071,36 +1041,22 @@ describe("ListView", () => {
       expect(mocked.issueToggleMine).not.toHaveBeenCalled();
     });
 
-    it("marks the selected unread issue read", async () => {
-      const unread = row({ id: "3", key: "NW-1003", summary: "Fix the footer links", changed: true });
-      const unreadRows = [OPEN, unread, LAST];
-      await renderList(viewData([groupOf(unreadRows)], unreadRows));
-      await userEvent.click(await screen.findByText("Fix the footer links"));
-
-      await press("issue.markSeen");
-
-      expect(mocked.issuesMarkSeen).toHaveBeenCalledWith(["3"]);
-      expect(mocked.issueMarkUnread).not.toHaveBeenCalled();
-    });
-
-    it("marks the selected read issue unread", async () => {
+    it("M toggles the read state of the selected issue", async () => {
       await renderList(viewData([groupOf(rows)], rows));
       await userEvent.click(await screen.findByText("Fix the footer links"));
 
       await press("issue.markSeen");
 
-      expect(mocked.issueMarkUnread).toHaveBeenCalledWith("3");
-      expect(mocked.issuesMarkSeen).not.toHaveBeenCalled();
+      expect(mocked.issueToggleSeen).toHaveBeenCalledWith("3");
     });
 
-    it("marks nothing without a selected issue", async () => {
+    it("M toggles nothing without a selected issue", async () => {
       await renderList(viewData([groupOf(rows)], rows));
       await screen.findByRole("row", { name: /NW-1042/ });
 
       await press("issue.markSeen");
 
-      expect(mocked.issuesMarkSeen).not.toHaveBeenCalled();
-      expect(mocked.issueMarkUnread).not.toHaveBeenCalled();
+      expect(mocked.issueToggleSeen).not.toHaveBeenCalled();
     });
 
     it("closes the selected issue's peek and opens it again", async () => {

@@ -1,5 +1,5 @@
 /** Toolbar items that can move into the "…" menu, in the order they go (the owner's choice): the Me chip last. */
-export const OVERFLOW_ORDER = ["columns", "subtasks", "filter", "group", "unread", "me"] as const;
+export const OVERFLOW_ORDER = ["columns", "subtasks", "filter", "group", "me"] as const;
 export type Collapsible = (typeof OVERFLOW_ORDER)[number];
 
 const GAP = 8;

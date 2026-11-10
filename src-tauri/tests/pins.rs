@@ -158,7 +158,7 @@ async fn pins_at(db: &Db, now: &str) -> Pins {
 }
 
 async fn tree_at(db: &Db, now: &str) -> SidebarTree {
-    sidebar_tree(db, viewer(now), false).await.unwrap()
+    sidebar_tree(db, viewer(now)).await.unwrap()
 }
 
 fn targets(items: &[PinItem]) -> Vec<Pinned> {

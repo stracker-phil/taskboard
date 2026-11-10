@@ -88,7 +88,7 @@ The owner's own changes aren't news (`sync::own`, `sync::store`), once Test Conn
 
 A project's first sync (`store::Pass`): with no issue read yet (a new Space) every issue counts as seen. Once the
 owner read some (a fresh cache: a reset, memory mode after a restart), an issue updated after `issue_seen.seen_at`
-records `updated` ("Updated" in Unread) and one never seen records `created`.
+records `updated` ("Updated" in the inbox) and one never seen records `created`.
 
 ## Storing a page
 

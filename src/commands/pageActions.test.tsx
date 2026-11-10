@@ -134,8 +134,8 @@ describe("page action titles", () => {
   it.each([
     ["go.pinned", "Go to Bookmarks"],
     ["go.viewed", "Go to Recently Viewed"],
-    ["view.markAllSeen", "Mark All as Read"],
-    ["toolbar.unread", "Unread Only"],
+    ["inbox.toggle", "Notifications"],
+    ["inbox.open", "Show Notifications"],
     ["history.back", "Back"],
     ["history.forward", "Forward"],
   ])("name %s %s", (id, title) => {
@@ -145,8 +145,17 @@ describe("page action titles", () => {
   it.each([
     ["history.back", "Mod+["],
     ["history.forward", "Mod+]"],
+    ["inbox.toggle", "Mod+Shift+U"],
   ])("binds %s to %s by default", (id, binding) => {
     expect(getCommand(id)?.defaultBinding).toBe(binding);
+  });
+
+  it("binds Show Notifications to no key, so a link or the palette opens the inbox without toggling it shut", () => {
+    expect(getCommand("inbox.open")?.defaultBinding).toBeUndefined();
+  });
+
+  it.each(["view.markAllSeen", "toolbar.unread"])("no longer has the command %s", (id) => {
+    expect(getCommand(id)).toBeUndefined();
   });
 });
 
@@ -159,6 +168,14 @@ describe("default bindings of the main window", () => {
 
   it("are unique per scope, except Escape, which the peek and the Issue view share and never offer together", () => {
     expect(conflicts().map((c) => [c.binding, c.a.id, c.b.id])).toEqual([["Escape", "peek.close", "issue.back"]]);
+  });
+
+  it("let the open notifications take J, K, M, Enter, Escape and ⌘⇧A from the main window without a conflict", () => {
+    const inboxKeys = allCommands().filter((c) => c.scope === "inbox");
+
+    expect(inboxKeys.map((c) => bindingFor(c.id))).toEqual(expect.arrayContaining(["J", "K", "M", "Enter", "Escape", "Mod+Shift+A"]));
+    const clashing = conflicts().filter((c) => c.a.scope === "inbox" || c.b.scope === "inbox");
+    expect(clashing).toEqual([]);
   });
 
   it("include the page actions, the issue keys, the view keys and the palette", () => {

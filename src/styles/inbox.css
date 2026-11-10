@@ -1,0 +1,46 @@
+/* The inbox (docs/ux.md → Inbox): the bell in the content panel's top-right corner, over the preview too, and its
+   dropdown. The rows the bell covers keep room for it (--inbox-slot). */
+.content-panel { --inbox-slot: 36px; }
+.inbox-slot { position: absolute; top: 14px; right: 12px; z-index: 6; }
+.inbox-bell {
+  position: relative; display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: none; border-radius: 7px;
+  background: transparent; color: var(--text-tertiary);
+  transition: background-color var(--motion-fast) var(--ease-out), color var(--motion-fast) var(--ease-out);
+}
+.inbox-bell:hover, .inbox-bell--open { background: var(--fill-hover); color: var(--text); }
+.inbox-bell__badge {
+  position: absolute; top: -3px; right: -5px; min-width: 16px; height: 16px; padding: 0 4px; box-sizing: border-box;
+  border-radius: 8px; background: var(--accent); color: var(--text-on-accent);
+  font-size: 10px; font-weight: 700; line-height: 16px; text-align: center; font-variant-numeric: tabular-nums;
+  animation: fade-in var(--motion-base) var(--ease-out);
+}
+
+.inbox.popover { right: 0; width: 420px; max-height: 70vh; transform-origin: top right; animation: rise-in var(--motion-slow) var(--ease-out); }
+.inbox:focus { outline: none; }
+.inbox__count { font-size: 12px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+.inbox__mark-all {
+  height: 24px; padding: 0 8px; border: none; border-radius: 6px; background: transparent; color: var(--link); font: inherit; font-size: 12px;
+  transition: background-color var(--motion-fast) var(--ease-out);
+}
+.inbox__mark-all:hover:not(:disabled) { background: var(--fill-hover); }
+.inbox__mark-all:disabled { color: var(--text-muted); }
+.inbox__empty { margin: 0; padding: 18px 16px 22px; font-size: 13px; color: var(--text-tertiary); }
+.inbox__rows { flex: 1; min-height: 0; margin: 0; padding: 4px 6px 6px; overflow-y: auto; list-style: none; }
+.inbox__row {
+  display: flex; flex-direction: column; gap: 2px; padding: 7px 10px; border-radius: 8px; cursor: default;
+  transition: opacity var(--motion-base) var(--ease-out);
+}
+.inbox__row--selected { background: var(--selection-bg); }
+.inbox__row--read { opacity: 0.55; }
+.inbox__line { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 13px; }
+.inbox__key { flex: none; font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary); }
+.inbox__summary { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.inbox__row:not(.inbox__row--read) .inbox__summary { font-weight: 600; }
+.inbox__note { display: flex; gap: 8px; padding-left: 18px; font-size: 12px; color: var(--text-tertiary); }
+.inbox__note-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inbox__time { flex: none; font-variant-numeric: tabular-nums; }
+
+/* Room for the bell in the rows under it. */
+.content-header { padding-right: calc(24px + var(--inbox-slot)); }
+.issue-header { padding-right: calc(16px + var(--inbox-slot)); }
+.peek__header { padding-right: calc(14px + var(--inbox-slot)); }

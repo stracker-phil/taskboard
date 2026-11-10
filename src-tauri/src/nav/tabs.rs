@@ -1,5 +1,5 @@
 //! The main window's tabs (ADR 0050): each tab is a place; the active one's is `Saved::location`, so everything
-//! that follows the place (menus, the CLI, Unread's read-here) follows the active tab.
+//! that follows the place (menus, the CLI) follows the active tab.
 
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;

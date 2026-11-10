@@ -6,6 +6,7 @@ import { useNav, useReportShownIssue, useSidebar, useViews } from "../queries/si
 import { narrowingKey } from "../state/slices/narrowing";
 import { useStore } from "../state/store";
 import { HoverPeek } from "../issue/hoverPeek/HoverPeek";
+import { InboxButton } from "../inbox/InboxButton";
 import { CurrentPeek } from "./CurrentPeek";
 import { Header } from "./Header";
 import { TokenBanner } from "./TokenBanner";
@@ -59,6 +60,7 @@ export function Window({ sidebarHidden, children }: Props) {
           {tabsRow && tabStrip}
         </div>
         <main className="content-panel">
+          <InboxButton />
           {issueView ? (
             <IssueView key={issueView.stack.length} id={issueView.stack[issueView.stack.length - 1]} origin={issueView.origin} />
           ) : (

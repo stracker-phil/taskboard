@@ -1,6 +1,6 @@
 #!/bin/zsh
 # Checks that nothing jumps in the running debug app: e2e.sh [level] [view] (default NW "All issues").
-# Opens the view, then clicks Me and Unread only twice each and drags the first row, measuring the content panel,
+# Opens the view, then clicks Me twice and drags the first row, measuring the content panel,
 # the toolbar, the first row and the clicked control after every step. Exits 1 on any drift of 1px or more.
 # Start the app first: bun run build:app && scripts/dev/launch.sh
 set -e
@@ -65,7 +65,6 @@ sleep 1.5
   };
   try {
     await clickTwice('Me', '.me-split__toggle');
-    await clickTwice('Unread only', '[aria-label=\"Unread only\"]');
     await drag();
     report(drift.length === 0 ? 'OK' : 'DRIFT ' + drift.join(' | '));
   } catch (error) {

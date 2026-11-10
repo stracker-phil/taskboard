@@ -27,7 +27,7 @@ The owner's rule (2026-10-30), for every control, list and popover:
   replace what was clicked.
 - **Lists don't re-sort while they are used.** A popover or picker keeps the order it opened with; ticking or
   switching an item changes only its box or switch (`ValuePicker`, `ColumnsPopover`). A row removed from a list
-  on screen keeps its place, grayed, until the page is left (Bookmarks); Unread only keeps the issues read there.
+  on screen keeps its place, grayed, until the page is left (Bookmarks).
 - **Controls keep their size.** A toggle shows its state in color and outline, never by adding an icon or text
   that changes its width (the Me chip). Buttons that only sometimes apply keep their slot, invisible, so their
   neighbors don't move (Settings → Shortcuts). New controls appear where the row has free room, not where they
@@ -111,8 +111,8 @@ The owner's rule (2026-10-30), for every control, list and popover:
   and global filter lists (`Folder`). Recently viewed is a normal view-backed page (tabs, toolbar, List, Table,
   Board): the issues opened in the Issue view in the last 24 hours, newest first, with a Last view column. 34px rows, 10px padding and gap, 8px radius, `--text-strong-body`; icons
   17/1.8; the count 12px `--text-muted`, hidden while Rust has none.
-- **Counts under Unread only** (`ListCount`): every list counts its unread issues, open or done, after a 6px
-  `--accent` dot, in `--accent-text` 600; a list with none shows no number. Bookmarks keeps its bookmark count.
+- **Counts** (`ListCount`): every list counts its open issues; Bookmarks counts its bookmarks. A list whose
+  filter can't be used shows a warning marker with the reason instead.
 - **Spaces** (`SpacesSection`, scrolls): the "Spaces" header (12/600 `--text-muted`); Spaces are added in
   Settings → Projects, not here. Each Space (`SpaceRow`): 36px, the shared 12px chevron (`DisclosureChevron`, the one of every disclosure) in `--text-muted` at 0.4
   opacity, full while the Space has the pointer or holds the shown level, the 22px
@@ -149,8 +149,7 @@ The owner's rule (2026-10-30), for every control, list and popover:
 ## Content header
 
 `src/shell/Header.tsx` and `HeaderTitle.tsx`, styled in `styles/header.css`: 58px on every level (room for its
-tallest control, Open in Jira), 14px 24px 12px padding, a row with a 10px gap. A button that comes or goes there
-(Mark all as read) fades in and moves nothing below it.
+tallest control, Open in Jira), 14px 24px 12px padding, a row with a 10px gap.
 
 - A Space: the 28px tile (8px radius, 14/800) and the name (19/700).
 - A filter list: a breadcrumb button with the 20px tile (6px radius, 10/800) and the Space name (13px
@@ -159,9 +158,6 @@ tallest control, Open in Jira), 14px 24px 12px padding, a row with a 10px gap. A
 - The level shown is the selected one: a click on a Space's or list's name renames it in place, one on its
   tile or folder opens `LookPopover` under it.
 - Everything and the Home lists: their sidebar icon (20/1.8, `--text-tertiary`) and name.
-- **Mark all as read** on the right while Unread only is on (every level but Bookmarks): 28px, 7px radius, a
-  `--border` frame, 12/600; disabled while the level has nothing unread. It marks what the current view shows, in
-  its subtask mode and with its drafts.
 - **Open in Jira ↗** on the right for a Space and its lists: 32px, 12px padding, 8px radius, a `--border`
   frame, 13px `--text-secondary`; opens `<site>/browse/<KEY>`. Hidden elsewhere and without a site.
 
@@ -224,7 +220,7 @@ it for that Space only.
   the circle (`object-fit: cover`), as a `data:` URL from `user_avatar` (`queries/avatars.ts`, stale after an
   hour); people on Jira's default (Gravatar) picture and the demo people keep their initials
   ([ADR 0032](adr/0032-avatars-come-from-atlassians-avatar-host-through-rust.md)).
-- **PriorityFlag** (14, `--flag-*`, Lowest shares Low's color), **ChangeChip** (18, `--changed-chip-*`, 11/600),
+- **PriorityFlag** (14, `--flag-*`, Lowest shares Low's color),
   **CommentCount** (12, bubble icon), label chips (22, `--label-N-*` by a hash of the name).
 
 ## List view
@@ -244,10 +240,10 @@ it for that Space only.
   its header or its widest cell across all loaded rows of the view (`measure.ts`, canvas text metrics,
   cached), so columns line up across groups, but no column is wider than 200 (`MAX_COLUMN_WIDTH`); a longer
   value, such as a long epic name, truncates and shows in full on hover. Gap 20, rows padded 16.
-- Rows 44: mono key, the subtask glyph, the status square right before the summary (600 when changed, on `--changed-bg`), change chip, comment count, then
+- Rows 44: mono key, the subtask glyph, the status square right before the summary, comment count, then
   the cells. Long titles wrap onto more lines by default and the row grows (each row is measured); "Wrap long
   titles" in the Columns popover turns that off per view, and titles truncate instead (`view.wrap_titles`). A
-  wrapped title is one flow: the key, the subtask glyph and the square lead it, the change chip, comment count and child count
+  wrapped title is one flow: the key, the subtask glyph and the square lead it, the comment count and child count
   follow its last word, and its lines start under the key. The Table
   always truncates at a fixed row height; Board cards always wrap. A clicked row is selected (`--selection-bg`).
   A cell without a value shows a muted "—" (`EMPTY`, `views/list/columns.tsx`), in the List and the Table alike.
@@ -259,8 +255,7 @@ it for that Space only.
   shows on hover). With wrapped titles, inline labels flow after the title's last word and wrap like text,
   and the Labels column's chips wrap onto more lines in the cell; the row grows to fit. With "Wrap long titles"
   off, both stay on the row's one line and are cut at the cell's edge; the title comes first and truncates
-  only when the cell is narrower than the title itself, and inline labels fill what it leaves. On one line a
-  change chip gives way before the title: it truncates with an ellipsis down to a few letters first.
+  only when the cell is narrower than the title itself, and inline labels fill what it leaves.
 - Rows are virtualized (`@tanstack/react-virtual`): a card is drawn from its pieces (the header item, then
   rows that know whether they are first, middle, last or the only one).
 - **Subtasks** are the children of the view's results at any depth and of any type, and follow the view's
@@ -310,7 +305,7 @@ Board's `views/board/useBoardPicks.ts`):
   its way there; in the Table in the row's 24px left inset (the spacer it replaces); on a Board card at the end of
   the title's first line, in room the title always keeps free.
 - Picked rows and cards get the neutral `--picked-bg` (a picked card also `--border-strong`), apart from the
-  accent's selection and unread tints; the current row keeps its selection highlight, picked or not. Picking closes the
+  accent's selection; the current row keeps its selection highlight, picked or not. Picking closes the
   preview, which shows one issue. A ⌘ or ⇧ click or double-click opens nothing, and a narrowing that hides a picked
   row leaves it out. Leaving the view drops the picks.
 - **The bulk bar** (`writes/BulkBar.tsx`) fades in centered 16 over the view's bottom while anything is picked: the
@@ -366,9 +361,8 @@ open preview follows the click at once. A Board always opens the Issue view.
 An issue is unread while the sync recorded a change after the owner last read it, or while the owner marked it
 unread (`src-tauri/src/changes/`). The UI says read and unread; the code says seen and unseen.
 
-- Changed rows: `--changed-bg`, a 600 summary and the change chip with the most important change ("New",
-  "2 new comments", "Moved to Review", "Priority raised", "Assigned to you", "Due date changed"; "+N" for
-  more kinds). Changed epic children in the Issue view get the same background.
+- Rows, cards and sidebar counts carry no unread marker ([ADR 0059](adr/0059-the-inbox-replaces-unread-mode.md));
+  the inbox lists what is unread. Changed epic children and related issues in the Issue view keep `--changed-bg`.
 - A row or card whose issue changes while it is on screen (a sync brought a change, or your own change settled:
   `Row.updatedAt` moved) flashes once: `useFlash` (`lib/motion.ts`) adds `.flash`, an accent wash
   (`--flash-bg`) that fades over 1.2 s without moving anything; none under reduced motion. Rows scrolled in later
@@ -379,17 +373,30 @@ unread (`src-tauri/src/changes/`). The UI says read and unread; the code says se
 - Activity after the last look (`fresh`, decided in Rust) sits under a "New since yesterday" divider
   (`--accent-text`, `--changed-border` lines); new comments and changes have `--changed-bg`.
 - An issue open in the preview or the Issue view for the owner's delay (Settings → Behavior, 0–10 s,
-  default 2) counts as read (`useSeenAfter`); leaving sooner doesn't. Mark as read, Mark all as read and M
-  clear it at once.
-- Mark as unread (row toolbar, the Issue view header, M on a read issue) makes the issue unread
+  default 2) counts as read (`useSeenAfter`); leaving sooner doesn't. Mark as read and M clear it at once.
+- Mark as unread (the Issue view header, M on a read issue) makes the issue unread
   (`issue_seen.unread`). Hovering a comment or change in the activity shows Mark unread from here: that item
   and everything newer count as new again. An issue marked unread while it is open stays unread until it is
   opened again (`holdUnread`).
-- **Unread only** ([ADR 0046](adr/0046-unread-is-a-mode-of-every-view.md); the bell button in the toolbar,
-  `UnreadButton.tsx`, ⇧⌘U, `modes.json` `unreadOnly`) narrows every view to its unread issues and turns every
-  sidebar count into an unread count, so the sidebar shows where the news is. Issues read while it is on stay
-  (`NavStore` remembers them) until the owner goes to another level or view; they lose the unread look but don't
-  vanish.
+
+## Inbox
+
+The one place that lists unread issues ([ADR 0059](adr/0059-the-inbox-replaces-unread-mode.md), `src/inbox/`).
+
+- **Bell**: a 26px icon button in the content panel's top-right corner on every page, above the preview too
+  (`InboxButton.tsx`). The rows it covers keep room for it (`--inbox-slot`: the content header, the Issue view's and
+  the preview's headers), so nothing moves when the badge comes or goes. The badge counts unread tracked issues
+  (accent fill, none at 0, "99+" past 99). ⇧⌘U, the Go menu's Notifications and the palette toggle it; a
+  notification's Show Notifications opens it.
+- **Dropdown** (`InboxDropdown.tsx`): right-aligned under the bell, 420px wide, at most 70% of the window high,
+  rising in like a popover. Header: "Notifications", "N unread", Mark all as read. Rows: status square, key (mono),
+  title (one line, 600 while unread), then the note ("Moved to Review, 1 new comment.") and the time in tertiary
+  text. Empty: "You're all caught up."
+- Opening takes a snapshot: rows read while it is open stay, dimmed, in place; order and positions never change
+  while it is open. The next open lists only what is unread then.
+- Keys (`inbox` scope, which shadows the window's while open; `inboxKeys.ts`): J/K and ↓/↑ select, M marks read or
+  unread, ↵ opens the issue in this tab and closes, ⌘↵ opens it in a new tab, ⇧⌘A marks all read, ⎋ closes. A
+  press outside or the bell closes it too; focus moves in and back to the bell.
 
 ## Command palette
 
@@ -469,11 +476,11 @@ and views can be bookmarked; a filter list's bookmark puts it under Home.
 - **Empty level** (`EmptyLevel`, List, Board and Table): the funnel tile and a title that says why in few words
   (`useEmptyReason`): "Nothing in <name> for you" when only Me mode empties it (the same query without Me has
   issues, `list_match_count`; "for <first name>" with the person chip), else "Nothing in <name> → <view>" when
-  the view has its own conditions, else "Nothing in <name>". The suffix fades in once known; while the text,
-  epic or Unread only narrows too, Me's part can't be told apart and the title skips it. Below, "Looks like
+  the view has its own conditions, else "Nothing in <name>". The suffix fades in once known; while the text or
+  epic narrows too, Me's part can't be told apart and the title skips it. Below, "Looks like
   everything is done here." when anything narrows the view, else "No issues here yet."; no filter values in
   words. Then "Edit filter" on a filter list or a view with its own conditions (opens the toolbar's Filter), and
-  one button per narrowing: "Clear search", "Clear Me Mode", "Show anyone", "Turn off Unread only". They wrap and
+  one button per narrowing: "Clear search", "Clear Me Mode", "Show anyone". They wrap and
   stay centered.
 - **Gone issue** (`GoneNotice`, preview and Issue view): the title struck through in `--text-muted`, the notice
   on `--notice-neutral-*` ("Deleted in Jira or you lost access. Last synced <day>. This is the cached copy."),
@@ -689,7 +696,7 @@ button, Escape and a press outside close it, focus goes back to the button).
 - **Person** chip (`PersonChip.tsx`, beside Me, the same pill; a people icon and "Person", or the picked person's
   avatar and first name in the active style): a [menu](#menus) "Issues assigned to" with Anyone, me, and whoever
   has one of the issues the view shows before the chip narrows them (`view_people`: its list's and its own
-  conditions, Me mode, Unread only), by name. So it narrows on top of the filter: filter for five assignees and
+  conditions, Me mode), by name. So it narrows on top of the filter: filter for five assignees and
   pick one, or filter out one and pick among the rest. It is a draft like Me: a pick shows Revert and Save View,
   and Save View keeps it with the view (`view.person`, `view_set_person`). Picking a person turns Me off; turning
   Me on clears the person. Folded into "…" it reads "Assigned to…".
@@ -721,11 +728,10 @@ the same way ([writes.md](writes.md#drag-and-drop)).
   same 26px and padding, centered; owner, 2026-10-29) and the
   count, also turned 90° so a long number fits, and expands on click. Done starts collapsed; the choice is kept per view.
 - Cards (gap 10, padding 12 14, 10px radius, `--card-border`, `--shadow-card`): the summary first (after the status square unless the columns are statuses or status types), 14/400 like
-  the List's titles (600 when changed), always wrapped and never truncated, with the inline labels after it;
+  the List's titles, always wrapped and never truncated, with the inline labels after it;
   then the epic chip and label chips (wrapping); then avatars, release chip, comment count, priority flag and,
-  in the bottom-right corner, the mono key (a 7px `--changed-dot` before it when changed). Card fields (the
-  Columns button reads "Card fields") choose epic, labels, assignee, release and priority. Changed cards use
-  `--changed-bg` and `--changed-border`. Hover never moves a card: it takes a `--border-strong` edge and
+  in the bottom-right corner, the mono key. Card fields (the
+  Columns button reads "Card fields") choose epic, labels, assignee, release and priority. Hover never moves a card: it takes a `--border-strong` edge and
   `--shadow-hover`, and shows the row toolbar in the bottom-right corner over the key.
 - A card opens the full Issue view (the mockup's behavior; List rows open the preview). A Board never shows the
   preview (`CurrentPeek`), whatever opened it.
@@ -763,7 +769,7 @@ low strength), and both pass the same contrast checks.
 | Text | `--text`, `--text-strong-body`, `--text-secondary`, `--text-tertiary`, `--text-muted`, `--text-faint` (decorative glyphs only), `--danger-text` (destructive menu rows), `--text-on-accent`, `--link`, `--link-hover` | zinc 900 → 400, white, blue 700, blue 900 |
 | Lines | `--border` (controls, the tree guide), `--border-strong` (selects, dashed adds), `--hairline` (section edges), `--row-hairline` (between rows), `--card-border` | `#E4E4E7`, `#D4D4D8`, `#EDEDF0`, `#F1F1F3`, `#E9E9EC` |
 | Accent | `--accent`, `--accent-text`, `--selection-bg`/`--selection-text`, `--accent-soft-bg`/`-border`/`-text`, `--button-primary-bg`/`-text`, `--spinner-track`, `--focus-ring` | blue 600, blue 700, `#E3EBFD`, … |
-| Changed | `--changed-bg`, `--changed-border`, `--changed-chip-bg`/`-text`, `--changed-dot` | light blues |
+| Changed | `--changed-bg`, `--changed-border` (new activity, changed related issues) | light blues |
 | Status | `--status-{todo,progress,review,blocked,done}-{bg,fg,border,square,tint,count}`, `--status-todo-tab-{bg,fg}` | gray, blue, violet, red, green |
 | Data | `--flag-*`, `--epic-{1..5}-{bg,fg}`, `--label-{1,2,neutral}-{bg,fg}`, `--avatar-{1..4}`, `--avatar-ring`, `--space-tile-{1..12}`, `--view-{list,board,table}` | |
 | Messages | `--banner-{info,warn,error}-*`, `--notice-neutral-*`, `--pin-*`, `--pr-open-*`, `--sync-*`, `--progress-done` | |
@@ -793,7 +799,7 @@ bundled fonts. Weights 400, 500, 600, 700, 750 (titles) and 800 (tile letters).
 | Status pill | 12 / 700 caps, 0.03em (11 and 10 in smaller pills) | status pills |
 | Key | mono 12 (11 on cards) | issue keys |
 | Key in the header | mono 15 / 600 | the issue key in the Issue view's breadcrumbs and the preview's header |
-| Chip, badge | 11 / 600–700 | change chips, counts badges |
+| Chip, badge | 11 / 600–700 | counts badges |
 
 ## Metrics
 
@@ -933,7 +939,7 @@ global shortcuts.
   Everything ⇧⌘E, Recently Viewed ⌘Y, Bookmarks ⇧⌘P, Back ⌘[, Forward ⌘], Previous/Next Space ⌥⌘↑/↓, Previous/Next List ⌥⌘[/] (within the
   Space, or among the levels outside the Spaces, wrapping), Previous/Next View ⌃⇧⇥/⌃⇥, then the level's views by
   name with ⌘1–⌘9, the shown one checked). List acts on the shown issues (Group and Sort… ⌥⌘G, Columns… ⌥⌘C, Edit
-  Filter… ⌥⌘F, Only My Issues ⇧⌘M, Me Mode Options…, Unread Only ⇧⌘U, Filter This View ⌘F, Save View ⌘S, Revert View; Mark All as Read ⇧⌘A; last, as
+  Filter… ⌥⌘F, Only My Issues ⇧⌘M, Me Mode Options…, Filter This View ⌘F, Save View ⌘S, Revert View; last, as
   it is rare: Show as List / Board / Table ⌃⌘1–3, the shown layout checked). The menus follow the place:
   `menu/place.rs` builds them again whenever the place moves (`NavStore::on_move`) or views, lists or Spaces change. Issue acts on the selected one
   (Open, Open or Close Preview, Open Epic, Open in Jira ⌘↩, Copy Key, Copy Link ⇧⌘C, Add or Remove Bookmark, Mark as Read or Unread).

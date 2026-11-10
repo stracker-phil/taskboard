@@ -19,7 +19,7 @@ export function AppearancePage() {
         value={settings?.appearance ?? null}
         onChange={(appearance) => void attempt(api.appearanceSet(appearance), "Could not change the appearance")}
       />
-      <Row label="Accent color" description="Selection, unread rows, links and focus. A Space can choose its own.">
+      <Row label="Accent color" description="Selection, links and focus. A Space can choose its own.">
         <AccentPicker label="Accent color" value={settings?.accent ?? null} onChange={(accent) => accent && void attempt(api.accentSet(accent), "Could not change the accent color")} />
       </Row>
     </Group>

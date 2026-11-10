@@ -161,6 +161,7 @@ mod tests {
                 "page:go.everything",
                 "page:go.viewed",
                 "page:go.pinned",
+                "page:inbox.toggle",
                 "page:history.back",
                 "page:history.forward",
                 "nav:previousSpace",

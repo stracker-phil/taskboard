@@ -12,7 +12,7 @@ interface MeNarrowing {
 
 /** What follows "Nothing in <level>": " for you" or " for <first name>" when only Me or the person chip empties
  *  the view, else " → <view>" when the view has its own conditions, else null (also while unknown). */
-export function useEmptyReason(listId: number, viewId: number, narrowing: Narrowing, me: MeNarrowing, unreadOnly: boolean) {
+export function useEmptyReason(listId: number, viewId: number, narrowing: Narrowing, me: MeNarrowing) {
   const { data: conditions } = useListConditions(listId, viewId);
   const { data: views } = useViews(listId);
   const viewName = views?.find((v) => v.id === viewId)?.name;
@@ -20,8 +20,8 @@ export function useEmptyReason(listId: number, viewId: number, narrowing: Narrow
   const viewOwn = narrowing.viewDraft ?? conditions?.view.filter(isComplete) ?? [];
   const fixed = conditions?.fixed ? [conditions.fixed] : [];
   const byPerson = me.on || me.person !== null;
-  // The count leaves out the text, epic and Unread narrowings, so it can only tell Me's part alone.
-  const countable = byPerson && conditions !== undefined && narrowing.text.trim() === "" && narrowing.epic === null && !unreadOnly;
+  // The count leaves out the text and epic narrowings, so it can only tell Me's part alone.
+  const countable = byPerson && conditions !== undefined && narrowing.text.trim() === "" && narrowing.epic === null;
   const filter = { conditions: [...fixed, ...own, ...viewOwn] };
   // The person chip isn't part of the count either, so one count without Me answers both.
   const withMe = false;

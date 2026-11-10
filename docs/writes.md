@@ -41,7 +41,7 @@ sent once and never retried.
 While a row is pending, `sync::store` keeps its value over what a sync page brings (`writes::overlay`) and
 stores Jira's value as `base`. A page whose `updated` is older than the cached issue's is skipped. Own changes
 record no `issue_change` (a pending comment counts in `comment_count`, also for the detail comment sync), and what
-Jira changed along with them is seen, so they never show in Unread. At launch `writes::forget_all` drops rows a quit cut off.
+Jira changed along with them is seen, so they never show as unread. At launch `writes::forget_all` drops rows a quit cut off.
 
 ## Outcome
 

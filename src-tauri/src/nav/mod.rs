@@ -10,7 +10,7 @@ use history::Step;
 pub use tabs::Tab;
 use tabs::{SavedTab, active_tab_mut, normalize};
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
@@ -74,8 +74,6 @@ pub type OnMove = Box<dyn Fn() + Send + Sync>;
 #[derive(Clone)]
 pub struct NavStore {
     store: JsonStore<Saved>,
-    /// Issues read while the owner stays at this place: Unread keeps showing them until the place changes.
-    read_here: Arc<Mutex<BTreeSet<String>>>,
     on_move: Arc<Mutex<Option<OnMove>>>,
 }
 
@@ -85,7 +83,6 @@ impl NavStore {
     pub fn open(dir: &Path) -> Self {
         Self {
             store: JsonStore::open(dir.join(NAV_FILE)),
-            read_here: Arc::default(),
             on_move: Arc::default(),
         }
     }
@@ -181,9 +178,6 @@ impl NavStore {
             })
             .await?;
         if let Some(at) = found {
-            if before != Some(at) {
-                self.read_here().clear();
-            }
             self.store
                 .update_async(move |s| {
                     normalize(s);
@@ -285,7 +279,6 @@ impl NavStore {
                 })
                 .await?;
             if before != Some(at) {
-                self.read_here().clear();
                 self.moved();
             }
             return self.current(db).await;
@@ -341,18 +334,6 @@ impl NavStore {
             Some(id) if id != at.list_id => self.go(db, id, None).await,
             _ => self.current(db).await,
         }
-    }
-
-    pub fn keep_read(&self, ids: &[String]) {
-        self.read_here().extend(ids.iter().cloned());
-    }
-
-    pub fn read_here_ids(&self) -> Vec<String> {
-        self.read_here().iter().cloned().collect()
-    }
-
-    fn read_here(&self) -> std::sync::MutexGuard<'_, BTreeSet<String>> {
-        self.read_here.lock().unwrap_or_else(|e| e.into_inner())
     }
 
     pub async fn set_expanded(&self, db: &Db, expanded: Vec<i64>) -> AppResult<Nav> {

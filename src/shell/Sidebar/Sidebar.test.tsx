@@ -91,8 +91,7 @@ async function renderSidebar(tree: SidebarTree = treeWith(), nav: Nav = navAt(nu
 }
 
 // A row's label and count are adjacent spans, so its accessible name is the label followed by the count, no space.
-// With Unread only on, a count shows as a dot and "<n> unread".
-const named = (label: string) => new RegExp(`^${label}\\s*(\\d+( unread)?)?$`);
+const named = (label: string) => new RegExp(`^${label}\\s*(\\d+)?$`);
 const spaceButton = (label: string) => screen.getByRole("button", { name: named(label) });
 
 const menuRows = () => within(screen.getByRole("menu")).getAllByRole("menuitem").map((r) => r.textContent);
@@ -102,7 +101,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
   mocked.pinsList.mockResolvedValue(pins());
-  mocked.modesGet.mockResolvedValue({ meEverywhere: false, unreadOnly: false, bookmarksBar: false });
+  mocked.modesGet.mockResolvedValue({ meEverywhere: false, bookmarksBar: false });
   mocked.listCreate.mockResolvedValue(30);
   mocked.listDuplicate.mockResolvedValue(31);
 });
@@ -132,48 +131,27 @@ describe("Sidebar", () => {
       expect(within(screen.getByRole("navigation", { name: "Home" })).queryByRole("button", { name: /^Unread/ })).not.toBeInTheDocument();
     });
 
-    describe("with Unread only on", () => {
-      beforeEach(() => {
-        mocked.modesGet.mockResolvedValue({ meEverywhere: false, unreadOnly: true, bookmarksBar: false });
-      });
+    it("show plain open counts, with no unread marker", async () => {
+      await renderSidebar(treeWith(), navAt(SPRINT.id, [NW_ID]));
+      await screen.findByRole("button", { name: named("Current sprint") });
 
-      it("show each count as an unread count", async () => {
-        await renderSidebar();
-
-        expect(await within(screen.getByRole("navigation", { name: "Home" })).findByLabelText("42 unread")).toHaveTextContent("42");
-      });
-
-      it("show no count on a list with nothing unread", async () => {
-        const tree = treeWith();
-        tree.everything = list(1, "Everything", { kind: "everything", count: 0 });
-        await renderSidebar(tree, navAt(SPRINT.id, [NW_ID]));
-        await screen.findByLabelText("7 unread");
-
-        expect(within(screen.getByRole("navigation", { name: "Home" })).getByRole("button", { name: "Everything" })).toHaveTextContent(/^Everything$/);
-      });
-
-      it("show the unread count of a Space's lists", async () => {
-        await renderSidebar(treeWith(), navAt(SPRINT.id, [NW_ID]));
-
-        expect(await screen.findByLabelText("7 unread")).toBeInTheDocument();
-      });
-
-      it("keep Bookmarks' plain count", async () => {
-        const tree = treeWith();
-        tree.home = [list(3, "Bookmarks", { kind: "pinned", count: 5 })];
-        await renderSidebar(tree);
-        await screen.findAllByLabelText(/ unread$/);
-
-        const row = within(screen.getByRole("navigation", { name: "Home" })).getByRole("button", { name: named("Bookmarks") });
-        expect(row).toHaveTextContent("Bookmarks5");
-        expect(within(row).queryByLabelText(/unread/)).not.toBeInTheDocument();
-      });
+      expect(screen.queryByLabelText(/unread/)).not.toBeInTheDocument();
     });
 
-    it("show plain counts while Unread only is off", async () => {
-      await renderSidebar();
+    it("show a zero count as 0", async () => {
+      const tree = treeWith();
+      tree.everything = list(1, "Everything", { kind: "everything", count: 0 });
+      await renderSidebar(tree);
 
-      expect(within(screen.getByRole("navigation", { name: "Home" })).queryByLabelText(/unread/)).not.toBeInTheDocument();
+      expect(within(screen.getByRole("navigation", { name: "Home" })).getByRole("button", { name: named("Everything") })).toHaveTextContent("Everything0");
+    });
+
+    it("show Bookmarks' bookmark count", async () => {
+      const tree = treeWith();
+      tree.home = [list(3, "Bookmarks", { kind: "pinned", count: 5 })];
+      await renderSidebar(tree);
+
+      expect(within(screen.getByRole("navigation", { name: "Home" })).getByRole("button", { name: named("Bookmarks") })).toHaveTextContent("Bookmarks5");
     });
 
     it("show no count when it is null", async () => {
@@ -550,7 +528,7 @@ describe("Sidebar", () => {
     const homeButtons = () => within(screen.getByRole("navigation", { name: "Home" })).getAllByRole("button");
 
     beforeEach(() => {
-      mocked.modesGet.mockResolvedValue({ meEverywhere: false, unreadOnly: false, bookmarksBar: true });
+      mocked.modesGet.mockResolvedValue({ meEverywhere: false, bookmarksBar: true });
     });
 
     it("drops the Bookmarks row and the pinned lists from Home", async () => {
@@ -568,7 +546,7 @@ describe("Sidebar", () => {
     });
 
     it("keeps the Bookmarks row and the pinned lists while the bar is off", async () => {
-      mocked.modesGet.mockResolvedValue({ meEverywhere: false, unreadOnly: false, bookmarksBar: false });
+      mocked.modesGet.mockResolvedValue({ meEverywhere: false, bookmarksBar: false });
       const tree = treeWith();
       tree.pinnedLists = [list(22, "Epics", { count: 3 })];
       await renderSidebar(tree);

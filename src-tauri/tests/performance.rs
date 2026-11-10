@@ -172,7 +172,7 @@ async fn the_sidebar_tree_stays_fast_on_5000_issues() {
     let mut times = Vec::new();
     for _ in 0..RUNS {
         let started = Instant::now();
-        let tree = sidebar_tree(&db, viewer(), false).await.unwrap();
+        let tree = sidebar_tree(&db, viewer()).await.unwrap();
         times.push(started.elapsed());
         assert!(tree.everything.count.unwrap_or(0) > 0);
     }

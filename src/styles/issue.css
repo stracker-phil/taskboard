@@ -76,10 +76,6 @@
 .priority-flag--medium { fill: var(--flag-medium); stroke: var(--flag-medium); }
 .priority-flag--low { fill: var(--flag-low); stroke: var(--flag-low); }
 
-.change-chip {
-  display: inline-flex; flex: none; align-items: center; height: 18px; padding: 0 6px; border-radius: 5px;
-  background: var(--changed-chip-bg); color: var(--changed-chip-text); font-size: 11px; font-weight: 600; white-space: nowrap;
-}
 .comment-count { display: inline-flex; flex: none; align-items: center; gap: 3px; font-size: 12px; color: var(--text-muted); }
 .subtask-count { display: inline-flex; flex: none; align-items: center; gap: 3px; font-size: 12px; color: var(--text-muted); }
 .subtask-icon { flex: none; color: var(--text-muted); }

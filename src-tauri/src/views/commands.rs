@@ -189,15 +189,13 @@ pub async fn space_default_columns(
     super::space_default_columns(&state.db, project_id, columns).await
 }
 
-/// The page's narrowing with what Rust adds: the issues read here, Me mode's rules and the app-wide modes.
+/// The page's narrowing with what Rust adds: Me mode's rules and the app-wide modes.
 fn with_modes(state: &AppState, narrowing: Narrowing) -> (Narrowing, Viewer) {
     let settings = state.settings.get();
     let modes = state.modes.get();
     let narrowing = Narrowing {
-        read_here: state.nav.read_here_ids(),
         me_rules: narrowing.resolve_me_rules(&settings.behaviour.me_rules),
         me: narrowing.me || modes.me_everywhere,
-        unread: modes.unread_only,
         ..narrowing
     };
     (narrowing, Viewer::of(&settings.connection, Utc::now()))

@@ -12,7 +12,7 @@ All in the config dir (`~/Library/Application Support/com.philippstracker.taskbo
 |---|---|---|
 | `local.sqlite` | The owner's setup: Spaces, filter lists, views, bookmarks (`pin`), status style overrides, read and unread marks (`issue_seen`), last views and interactions (`issue_activity`) | kept |
 | `cache.sqlite` | The tracker mirror (Jira today): spaces, issues, comments, people, versions, fields, change log, sync state, search index. With `sync.memoryOnly` there is no file: the mirror is an in-memory database ([ADR 0057](adr/0057-jira-data-can-live-in-memory-only.md)) | deleted and recreated empty; with `sync.clearCacheOnQuit` also at every quit and launch |
-| `settings.json`, `keybindings.json`, `ui_state.json`, `modes.json`, `places.json` | Settings, key overrides, window layout (the hidden sidebar, the activity column's width), the app-wide modes Rust applies to every view (`store/modes.rs`: Me mode in all views, Unread only, the bookmarks bar), each view's remembered place (`store/`; no longer the Me chip or the text filter, [ADR 0038](adr/0038-filter-changes-are-drafts-until-the-view-is-saved.md): an old `onlyMine` seeds `view.only_mine` once at startup, `text` is ignored) | kept |
+| `settings.json`, `keybindings.json`, `ui_state.json`, `modes.json`, `places.json` | Settings, key overrides, window layout (the hidden sidebar, the activity column's width), the app-wide modes Rust applies to every view (`store/modes.rs`: Me mode in all views, the bookmarks bar; an old file's `unreadOnly` is ignored, [ADR 0059](adr/0059-the-inbox-replaces-unread-mode.md)), each view's remembered place (`store/`; no longer the Me chip or the text filter, [ADR 0038](adr/0038-filter-changes-are-drafts-until-the-view-is-saved.md): an old `onlyMine` seeds `view.only_mine` once at startup, `text` is ignored) | kept |
 | `nav.json` | The main window's place: the open level and view, the open tabs and the active one, the last closed tabs' places, each level's last view, the expanded Spaces (`nav/`, `nav/tabs.rs`; a file without tabs is one tab); per tab the issue its Issue view shows and its Back and Forward steps, 100 each way (`nav/history.rs`, ADR 0052). A place that no longer exists falls back to the level's default view, then to Everything | kept |
 
 Attachments shown in Quick Look are downloaded to `~/Library/Caches/<bundle identifier>/attachments/<id>/<name>`
@@ -70,7 +70,7 @@ unique across sources (Jira's numeric ids; another source prefixes its own):
 | `status` | `id, name, category` (`new`, `indeterminate`, `done`) |
 | `issue` | keyed by the numeric Jira id (as text), never the key. Normalized columns for everything the UI filters, groups or sorts on; `custom` (migration `cache/0011`, [ADR 0041](adr/0041-an-issues-big-texts-live-beside-its-row.md)): the non-null custom fields' values as one JSON object, which custom columns and custom-field filters read. Ours, derived during sync: `status_category`, `type_is_subtask`, `is_epic`, `sprint_id`, `sprint_state`, `comment_count`, `comments_synced_at`, `links_synced_at`, `history_synced_at`, `synced_at`, `gone`, `left_scope_at` (migration `cache/0012`: when reconciliation last found it outside the sync scope, [sync.md](sync.md#jobs)). Indexed by key ignoring case (`issue_key`) and by the number after its dash (`issue_key_number`) |
 | `issue_body` | an issue's big texts, kept out of the rows every view reads (migration `cache/0011`, cascades): `description_html`, `description_adf`, and `raw`: the rest of Jira's issue JSON that no column or table holds (`sync::raw::kept_raw`: no description, custom fields or comment bodies, only the custom rendered fields). Attachments and links are read from `raw` (migration `cache/0009` clears the delta cursor so the next sync is a full one that fills the attachments) |
-| `issue_change` | what the sync saw change (status, assignee, due date, priority, comments, created, gone), `updated` (a project's first sync in a fresh cache: the issue was updated after `issue_seen.seen_at`; no values, left out of the activity), and `mention`: one row per account a comment the cache hadn't seen mentions (`old_value` the comment id, `new_value` the account, `changed_at` the comment's time; `sync::mentions`). Unread says "Mentioned you" only for the connected account's; the activity leaves them out. Reconciliation deletes the changes older than `sync.keepHistoryDays` (90 by default) that the owner has seen (`changed_at` at or before `issue_seen.seen_at`), except `created` (the activity always shows it) and `gone` (the purge of gone issues counts from it); the rest go with their issue |
+| `issue_change` | what the sync saw change (status, assignee, due date, priority, comments, created, gone), `updated` (a project's first sync in a fresh cache: the issue was updated after `issue_seen.seen_at`; no values, left out of the activity), and `mention`: one row per account a comment the cache hadn't seen mentions (`old_value` the comment id, `new_value` the account, `changed_at` the comment's time; `sync::mentions`). The inbox says "Mentioned you" only for the connected account's; the activity leaves them out. Reconciliation deletes the changes older than `sync.keepHistoryDays` (90 by default) that the owner has seen (`changed_at` at or before `issue_seen.seen_at`), except `created` (the activity always shows it) and `gone` (the purge of gone issues counts from it); the rest go with their issue |
 | `comment` | `body_html` from Jira, `body_text` (ours) for search, `body_adf` (migration `cache/0010`, [ADR 0036](adr/0036-rich-text-renders-from-adf-not-renderedfields.md)): the body as ADF, which the page is shown from (`adf::html_or`); null on rows from before the migration until the next sync, which then show `body_html` |
 | `remote_link` | an issue's web links (migration `cache/0004`): `issue_id` (cascades), `id`, `position`, `url` (untrusted), `title`, `application`, `relationship`, `source`; replaced as a whole when the issue is opened, at most every 5 minutes: `issue.links_synced_at` (migration `cache/0005`) holds the last fetch (`issues::issue_sync_web_links`, `issues::fetched::FRESH_FOR`) |
 | `issue_history` | an issue's history, Jira's changelog (migration `cache/0007`, [ADR 0031](adr/0031-issue-history-comes-from-the-changelog-on-demand.md)): `issue_id` (cascades), `position` (oldest first), `field` (Jira's name: `status`, `Fix Version`, `Sprint`), `field_id`, `from_value`/`to_value` (ids: status, account, version), `from_text`/`to_text`, `author_id`, `changed_at` (UTC, sorts with `issue_change`), `source`; replaced as a whole when the issue is opened, at most every 5 minutes: `issue.history_synced_at` holds the last fetch (`issues::issue_sync_history`). Never read by `changes::UNSEEN` |
@@ -129,8 +129,7 @@ JSON; no condition is stored as null:
 
 A view holds the same JSON in `view.filter` (migration `local/0012`, [ADR 0033](adr/0033-views-can-hold-their-own-filter.md)):
 its own conditions, ANDed with its level's chain, so two views of one list can show different issues. Only the
-view's issues are narrowed (`view_rows`, `view_board`, their groups and Board columns, and Mark all as read from
-that view); the sidebar counts stay with the level. A view filter that can't be read or compiled is an error of that view only.
+view's issues are narrowed (`view_rows`, `view_board`, their groups and Board columns); the sidebar counts stay with the level. A view filter that can't be read or compiled is an error of that view only.
 `view_set_filter(id, filter)` compiles it under the level first and puts its custom fields in the list (`field_choice`);
 `list_conditions(id, viewId)` returns the view's conditions next to the level's (`ListConditions.view`,
 `viewError`), and `View.ownConditions` counts them for the Filter badge. Duplicating a view or a filter list
@@ -146,7 +145,7 @@ the connected account's issues, like a view's `Narrowing.me`.
 
 Built in (migration `local/0002`): Everything (one "All issues" view grouped by Space), and under Home
 Bookmarks (kind `pinned`; renamed by `local/0008`). The Unread list (kind `recent`) is gone since `local/0018`,
-with its views and bookmarks: Unread only is a mode of every view ([ADR 0046](adr/0046-unread-is-a-mode-of-every-view.md)).
+with its views and bookmarks; the inbox lists the unread issues ([ADR 0059](adr/0059-the-inbox-replaces-unread-mode.md)).
 Recently viewed (kind `viewed`, `local/0025`, position -1 so it leads Home) holds one condition, `lastView`
 `withinLastHours` 24, which only `lists::list_set_window` changes (`withinLastHours` or `withinLastDays`, a count
 of at least 1); `list_conditions` reports it as `fixed`. Its "All issues" view is ungrouped, sorted by last view
@@ -159,9 +158,7 @@ views and bookmarks; a level keeps at least one view.
 ### Group and sort keys
 
 `view_rows(listId, viewId, narrowing)` returns the view's issues as `ViewData { groupBy, subtasks, groups,
-rows, columns }`: the level's filter, plus the view's own conditions, plus the kind's own rule (Bookmarks: the actively bookmarked issues), plus Unread only when it is on
-(`modes.json`; issues with unseen changes or marked unread, open or done, plus those read since the owner came to
-this place), plus the narrowing (`me`: the view's Me chip as drafted or saved, `text` in the key or summary ignoring
+rows, columns }`: the level's filter, plus the view's own conditions, plus the kind's own rule (Bookmarks: the actively bookmarked issues), plus the narrowing (`me`: the view's Me chip as drafted or saved, `text` in the key or summary ignoring
 case and accents, `epic`, and the draft conditions `listDraft` and `viewDraft`).
 
 A view's subtasks are the descendants of its results through `cache.issue.parent_id`, of any type
@@ -175,8 +172,8 @@ ancestor among the results and puts each one's subtree right after it in depth o
 siblings sorted by the view's sort, with the group's count counting the roots and `me` and `text` narrowing the
 roots only. Every row carries `childCount` (its direct children in the cache) and its `parentId`. `view_board`
 always shows the results only. The sidebar counts the results. `places.json` keeps a view's collapsed rows
-(`ViewPlace.collapsedParents`). `list_mark_all_seen(listId, viewId, narrowing)` marks the unseen issues among
-exactly the rows the view shows (`views::unseen_ids` with a `ViewAt`); without a view, the level's.
+(`ViewPlace.collapsedParents`). Rows carry no read state; `issue_toggle_seen(id)` (the M key on a row) marks an
+unread issue read and a read one unread.
 
 | `groupBy` | Groups, in order |
 |---|---|

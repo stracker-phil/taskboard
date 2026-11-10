@@ -216,6 +216,3 @@
 }
 .sb-list__icon:hover, .sb-list__icon[aria-expanded="true"] { background: var(--fill-hover); color: var(--text); }
 .sb-list-row[data-dragging] { opacity: 0.5; }
-/* Unread only: the count is of unread issues, after the dot unread rows carry. */
-.sb-row__count--unread { display: flex; align-items: center; gap: 5px; color: var(--accent-text); font-weight: 600; }
-.sb-row__unread-dot { width: 6px; height: 6px; border-radius: 3px; background: var(--accent); }

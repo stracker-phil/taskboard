@@ -151,7 +151,7 @@ impl Site {
     }
 
     async fn tree(&self) -> SidebarTree {
-        sidebar_tree(self.db(), viewer(), false).await.unwrap()
+        sidebar_tree(self.db(), viewer()).await.unwrap()
     }
 
     async fn everything(&self) -> i64 {
@@ -601,17 +601,6 @@ mod rows {
         let untouched = serde_json::to_value(row_of(&data, "NW-977")).unwrap();
         assert!(untouched["lastView"].is_null());
         assert!(untouched["lastInteraction"].is_null());
-    }
-
-    #[tokio::test]
-    #[ignore = "syncs the demo site into a temp database"]
-    async fn nobody_is_marked_changed_after_the_first_sync() {
-        let site = Site::new().await;
-
-        let data = site.nw_data(Narrowing::default()).await;
-
-        assert!(data.rows.values().all(|row| !row.changed));
-        assert!(data.rows.values().all(|row| row.change_note.is_none()));
     }
 
     #[tokio::test]

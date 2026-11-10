@@ -9,6 +9,8 @@ import { VIEW_KEY_COMMANDS } from "./viewKeys";
 import { TAB_KEY_COMMANDS } from "./tabKeys";
 import { PAGE_ACTION_COMMANDS } from "./pageActions";
 import { ACTIVITY_KEY_COMMANDS } from "./activityKeys";
+import { INBOX_KEY_COMMANDS } from "../inbox/inboxKeys";
+import { useInboxState } from "../inbox/inboxState";
 
 /** The window this page runs in: the Taskboard window (`main`) or Settings. */
 export type WindowName = "main" | "settings";
@@ -21,6 +23,7 @@ export function registerCoreScopes() {
   // Settings lists the Taskboard window's keys without running them.
   registerScope({ id: "main", parent: "global", label: "Taskboard window", isActive: () => currentWindow === "main" });
   registerScope({ id: "settings", parent: "global", label: "Settings window", isActive: () => currentWindow === "settings" });
+  registerScope({ id: "inbox", parent: "main", label: "Notifications", isActive: () => currentWindow === "main" && useInboxState.getState().open, shadows: true });
 }
 
 /** Escape belongs to a field being typed in or an open sheet or popover before it closes the window. */
@@ -41,6 +44,7 @@ const APP_COMMANDS: Command[] = [
   ...PAGE_ACTION_COMMANDS,
   ...ISSUE_KEY_COMMANDS,
   ...ACTIVITY_KEY_COMMANDS,
+  ...INBOX_KEY_COMMANDS,
   { id: "settings.close", title: "Close Settings", scope: "settings", defaultBinding: "Escape", when: escapeIsFree, run: () => runBusCommand("window:close", "Could not close the window") },
   { id: "settings.search", title: "Search Settings", scope: "settings", defaultBinding: "Mod+F", run: () => document.querySelector<HTMLInputElement>(".settings-nav-search")?.focus() },
 ];

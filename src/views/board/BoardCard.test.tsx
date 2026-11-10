@@ -7,8 +7,7 @@ import { BoardCard } from "./BoardCard";
 const actions: ComponentProps<typeof BoardCard>["actions"] = {
   copyKey: vi.fn(),
   openInJira: null,
-  markSeen: vi.fn(),
-  markUnread: vi.fn(),
+  toggleRead: vi.fn(),
   togglePin: vi.fn(),
   toggleMine: null,
   changeStatus: null,

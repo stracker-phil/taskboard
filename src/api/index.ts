@@ -23,6 +23,7 @@ import type {
   DropOutcome,
   DropTargets,
   ErrorKind,
+  Inbox,
   EventName,
   EventPayloads,
   Filter,
@@ -94,7 +95,7 @@ export const api = {
   setKeybindings: (bindings: Keybindings) => invoke<Keybindings>("set_keybindings", { bindings }),
   getUiState: () => invoke<UiState>("get_ui_state"),
   setUiState: (ui: UiState) => invoke<UiState>("set_ui_state", { ui }),
-  /** Me mode in every view and Unread only (`modes.json`). */
+  /** Me mode in every view and where the bookmarks show (`modes.json`). */
   modesGet: () => invoke<Modes>("modes_get"),
   modeSet: (mode: Mode, on: boolean) => invoke<Modes>("mode_set", { mode, on }),
   openLogFolder: () => invoke<void>("open_log_folder"),
@@ -237,7 +238,6 @@ export const api = {
   searchForget: (text: string) => invoke<string[]>("search_forget", { text }),
   /** Every enabled item of the app menu, in menu order, for the command palette. */
   menuCommands: () => invoke<MenuCommand[]>("menu_commands"),
-  /** Their highlight and change chip clear. */
   issuesMarkSeen: (ids: string[]) => invoke<void>("issues_mark_seen", { ids }),
   /** The Issue view shows the issue: its last view and last interaction. */
   issueViewed: (id: string) => invoke<void>("issue_viewed", { id }),
@@ -245,6 +245,16 @@ export const api = {
   issuePreviewed: (id: string) => invoke<void>("issue_previewed", { id }),
   /** Unread again: from the activity item at `from` (its time) on, or the whole issue. */
   issueMarkUnread: (id: string, from: string | null = null) => invoke<void>("issue_mark_unread", { id, from }),
+  /** Read when it is unread, else unread again. */
+  issueToggleSeen: (id: string) => invoke<void>("issue_toggle_seen", { id }),
+  /** Snapshots the unread issues and lists them; read ones stay listed until `inboxClose`. */
+  inboxOpen: () => invoke<Inbox>("inbox_open"),
+  /** The open inbox's issues with their read state now. */
+  inboxRows: () => invoke<Inbox>("inbox_rows"),
+  inboxClose: () => invoke<void>("inbox_close"),
+  /** How many issues are unread: the bell's badge. */
+  inboxCount: () => invoke<number>("inbox_count"),
+  inboxMarkAllSeen: () => invoke<void>("inbox_mark_all_seen"),
   pinsList: () => invoke<Pins>("pins_list"),
   /** Pins the target, or changes the duration and reason of its pin. */
   pinCreate: (kind: PinKind, target: string, duration: PinDuration, reason: string | null) =>
@@ -257,10 +267,6 @@ export const api = {
   pinMove: (id: number, before: number | null) => invoke<void>("pin_move", { id, before }),
   /** P: unpins the issue, or pins it until unpinned. */
   pinToggleIssue: (id: string) => invoke<void>("pin_toggle_issue", { id }),
-  /** Marks the unseen issues the view shows, narrowed as asked, seen; without a view every unseen issue of the
-   *  filter list. */
-  listMarkAllSeen: (listId: number, viewId: number | null, narrowing: Narrowing | null) =>
-    invoke<void>("list_mark_all_seen", { listId, viewId, narrowing }),
   /** Fetches the issue's comments from Jira when the cached ones may be behind. */
   issueSyncComments: (id: string) => invoke<boolean>("issue_sync_comments", { id }),
   /** The issue's cached web links (pull requests, documents). */

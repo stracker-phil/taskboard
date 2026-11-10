@@ -23,7 +23,7 @@ export interface EventPayloads {
   window_opened: null;
   /** Settings were saved, from any window. */
   settings_changed: Settings;
-  /** Me mode in every view or Unread only was switched. */
+  /** Me mode in every view or where the bookmarks show was switched. */
   modes_changed: Modes;
   /** Shortcut overrides were saved, from any window. */
   keybindings_changed: Keybindings;

@@ -1,9 +1,6 @@
 import { Funnel } from "lucide-react";
-import { api } from "../api";
-import { useModes } from "../queries/modes";
 import { useSidebar } from "../queries/sidebar";
 import { NO_NARROWING, useRequestNarrowing } from "../queries/views";
-import { attempt } from "../state/requests";
 import { narrowingKey } from "../state/slices/narrowing";
 import { useStore } from "../state/store";
 import { findLevel } from "./levels";
@@ -15,9 +12,8 @@ export function EmptyLevel({ listId, viewId }: { listId: number; viewId: number 
   const { data: tree } = useSidebar();
   const key = narrowingKey(listId, viewId);
   const narrowing = useRequestNarrowing(listId, viewId) ?? NO_NARROWING;
-  const { unreadOnly } = useModes();
   const me = useMeMode(key, narrowing.me, narrowing.person, narrowing.meOn);
-  const { suffix, viewFiltered } = useEmptyReason(listId, viewId, narrowing, me, unreadOnly);
+  const { suffix, viewFiltered } = useEmptyReason(listId, viewId, narrowing, me);
   const setNarrowing = useStore((s) => s.setNarrowing);
   const requestFilter = useStore((s) => s.requestFilter);
   const level = tree ? findLevel(tree, listId) : null;
@@ -26,12 +22,11 @@ export function EmptyLevel({ listId, viewId }: { listId: number; viewId: number 
   const listFiltered = level.kind === "list" || (level.kind === "home" && level.node.kind === "list");
   const editsFilter = listFiltered || viewFiltered;
   const text = narrowing.text.trim();
-  const narrowed = editsFilter || me.on || me.person !== null || text !== "" || narrowing.epic !== null || unreadOnly;
+  const narrowed = editsFilter || me.on || me.person !== null || text !== "" || narrowing.epic !== null;
   const widen = [
     text && { label: "Clear search", run: () => setNarrowing(key, { text: "" }) },
     me.on && { label: "Clear Me Mode", run: () => me.setMe(false) },
     me.person && { label: "Show anyone", run: () => me.setPerson(null) },
-    unreadOnly && { label: "Turn off Unread only", run: () => void attempt(api.modeSet("unreadOnly", false), "Could not change Unread only") },
   ].filter((action): action is { label: string; run: () => void } => Boolean(action));
   return (
     <div className="empty-level">

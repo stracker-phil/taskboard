@@ -43,7 +43,6 @@
 .list-row--last { border-radius: 0 0 10px 10px; clip-path: inset(0 -4px -4px -4px); }
 .list-row--only { border-top-color: transparent; border-radius: 0 10px 10px 10px; clip-path: none; }
 .list-row:hover { background: var(--row-hover-bg); }
-.list-row--changed, .list-row--changed:hover { background: var(--changed-bg); }
 .list-row--selected, .list-row--selected:hover { background: var(--selection-bg); }
 
 /* An ungrouped view's card has no tab, so its top corners are both round. */
@@ -55,12 +54,9 @@
 /* The title and its inline labels share what the name cell has left; the title comes first. */
 .list-row__title { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .list-row__summary { min-width: 0; overflow: hidden; font-size: 14px; white-space: nowrap; text-overflow: ellipsis; }
-.list-row--changed .list-row__summary { font-weight: 600; }
-/* On one line the change chip gives way first, down to a few letters, before the title shortens. */
-.list-row:not(.list-row--wrap) .change-chip { display: block; flex: 0 1000 auto; min-width: 44px; overflow: hidden; line-height: 18px; text-overflow: ellipsis; }
 .list-row__cell { display: flex; align-items: center; min-width: 0; white-space: nowrap; }
 /* A cell that opens its menu (status, assignee, priority) shades its value on hover, in the List and the Table: a
-   box reaching 5px past the value (a shadow, so it takes no room), translucent so a selected or unread row keeps its
+   box reaching 5px past the value (a shadow, so it takes no room), translucent so a selected row keeps its
    color under it. The value's parts size as a cell's own children do. */
 .cell-edit__value {
   display: inline-flex; align-items: center; gap: inherit; min-width: 0; max-width: 100%; border-radius: 4px;
@@ -117,8 +113,7 @@
 .list-row--wrap .list-row__title > :is(.list-row__key, .subtask-icon) { line-height: 22px; vertical-align: top; }
 .list-row--wrap .list-row__title > .subtask-icon { margin-top: 4px; }
 .list-row--wrap .status-square { margin-top: 6px; vertical-align: top; }
-.list-row--wrap .list-row__title > :is(.change-chip, .comment-count, .subtask-count) { vertical-align: top; word-spacing: normal; }
-.list-row--wrap .list-row__title > .change-chip { margin-top: 2px; line-height: 18px; }
+.list-row--wrap .list-row__title > :is(.comment-count, .subtask-count) { vertical-align: top; word-spacing: normal; }
 
 /* Hierarchy (ADR 0040): each level indents one step. A row's caret sits beside the row, since the card clips
    what its rows draw outside it: a top-level row's in the gutter under its group's chevron, a nested row's just

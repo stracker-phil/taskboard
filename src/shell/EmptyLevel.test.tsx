@@ -51,7 +51,7 @@ const renderSpace = () => renderEmpty(SPACE_ID, sidebarTree([securitySpace()]));
 beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
-  mocked.modesGet.mockResolvedValue({ meEverywhere: false, unreadOnly: false, bookmarksBar: false });
+  mocked.modesGet.mockResolvedValue({ meEverywhere: false, bookmarksBar: false });
   mocked.viewsOf.mockImplementation(async (listId) => [view({ id: VIEW_ID, listId, name: "Release" })]);
   mocked.listConditions.mockResolvedValue(conditions());
   mocked.listMatchCount.mockResolvedValue({ open: 3, total: 3 });
@@ -198,15 +198,6 @@ describe("EmptyLevel", () => {
       expect(screen.getByRole("heading", { name: "Nothing in Security" })).toBeInTheDocument();
     });
 
-    it("skips 'for you' while Unread only is on", async () => {
-      mocked.modesGet.mockResolvedValue({ meEverywhere: false, unreadOnly: true, bookmarksBar: false });
-      await renderSpace();
-
-      await screen.findByRole("button", { name: "Turn off Unread only" });
-      await waitFor(() => expect(mocked.listConditions).toHaveBeenCalled());
-      expect(screen.getByRole("heading", { name: "Nothing in Security" })).toBeInTheDocument();
-    });
-
     it("turns the Me narrowing off and drops it from the title", async () => {
       await renderSpace();
 
@@ -239,7 +230,7 @@ describe("EmptyLevel", () => {
 
     it("also switches Me off in every view when it applies everywhere", async () => {
       useStore.getState().setNarrowing(SPACE_KEY, { me: false });
-      mocked.modesGet.mockResolvedValue({ meEverywhere: true, unreadOnly: false, bookmarksBar: false });
+      mocked.modesGet.mockResolvedValue({ meEverywhere: true, bookmarksBar: false });
       await renderSpace();
 
       await userEvent.click(await screen.findByRole("button", { name: "Clear Me Mode" }));
@@ -302,39 +293,14 @@ describe("EmptyLevel", () => {
     });
   });
 
-  describe("Turn off Unread only", () => {
-    it("is not offered while Unread only is off", async () => {
-      await renderSpace();
-
-      await screen.findByRole("heading", { name: /^Nothing in / });
-      expect(screen.queryByRole("button", { name: "Turn off Unread only" })).not.toBeInTheDocument();
-    });
-
-    it("counts as narrowing and turns the mode off", async () => {
-      mocked.modesGet.mockResolvedValue({ meEverywhere: false, unreadOnly: true, bookmarksBar: false });
-      await renderSpace();
-      expect(await screen.findByText("Looks like everything is done here.")).toBeInTheDocument();
-
-      await userEvent.click(screen.getByRole("button", { name: "Turn off Unread only" }));
-
-      expect(mocked.modeSet).toHaveBeenCalledWith("unreadOnly", false);
-    });
-  });
-
   describe("with several narrowings", () => {
     it("offers one button for each", async () => {
       mocked.listConditions.mockResolvedValue(conditions({ kind: "list", own: [BLOCKED] }));
-      mocked.modesGet.mockResolvedValue({ meEverywhere: false, unreadOnly: true, bookmarksBar: false });
       useStore.getState().setNarrowing(KEY, { me: true, text: "pricing" });
       await renderEmpty(FILTER_ID, treeWithFilter());
 
-      await screen.findByRole("button", { name: "Turn off Unread only" });
-      expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual([
-        "Edit filter",
-        "Clear search",
-        "Clear Me Mode",
-        "Turn off Unread only",
-      ]);
+      await screen.findByRole("button", { name: "Clear Me Mode" });
+      expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual(["Edit filter", "Clear search", "Clear Me Mode"]);
     });
   });
 });
