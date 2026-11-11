@@ -572,15 +572,15 @@ view with its place intact).
 - Pull requests (`issue/PullRequests.tsx`, [ADR 0061](adr/0061-pull-request-status-comes-from-the-gh-cli.md)):
   the web links that are GitHub pull requests or GitLab and Bitbucket merge or pull requests, one 32px row each in
   the field grid's label column ("Pull request", "Pull requests" on the first row), between the field grid and the
-  links, sharing their hairlines. A row shows the state icon, the mono number (`#481`, the repository in the
+  links, with a hairline above and below (the links' top one). A row shows the state icon, the mono number (`#481`, the repository in the
   tooltip), the title (GitHub's, else the link's) and, once `gh` answers, fading in at its end: the checks
   (`CircleCheck`/`CircleX`/`CircleDashed` in `--pr-check-*` and "9/12", the tooltip in words), the review
   (Approved, Changes requested, Awaiting review; nothing when none is asked for) and a state pill (Open, Draft,
   Merged, Closed; 20 high, 10/700 caps, `--pr-{state}-bg/fg`). Without a status it says "No status" with the
   reason as its tooltip; GitLab and Bitbucket rows have none. A click opens the address like a web link. Rust keeps
   each status for 5 minutes (`pull_requests::FRESH_FOR`); opening the issue refreshes older ones, and while a pull
-  request isn't merged it refreshes again every 5 minutes. The preview shows the same rows under a "Pull requests"
-  heading, after its chips.
+  request is open or a draft it refreshes again every 5 minutes (merged and closed ones don't change). The preview
+  shows the same rows under a "Pull requests" heading, after its chips, with a hairline under them.
 - Activity (400 wide by default, 300–720 by dragging its left edge or ←/→ on the focused edge; saved in
   `ui_state.json` `activityWidth` for every issue, `useActivityWidth`; `--panel-subtle-bg`): All / Comments / Changes
   (⌥1 / ⌥2 / ⌥3, `commands/activityKeys.ts`; the choice is saved in `ui_state.json` `activityFilter` and every issue

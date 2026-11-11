@@ -71,13 +71,13 @@
 .issue-links__relation { flex: none; width: 110px; font-size: 13px; color: var(--text-muted); white-space: nowrap; }
 .issue-links__relation::first-letter { text-transform: uppercase; }
 
-/* Pull requests: between the field grid and the links, in the field grid's label column; the status fades in
-   when gh answers. */
+/* Pull requests: between the field grid and the links, in the field grid's label column, with a hairline
+   above and below; the status fades in when gh answers. */
 .pull-requests { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .pull-requests--issue { padding: 10px 0; border-top: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline); }
-.pull-requests--issue:has(+ .issue-links) { padding-bottom: 0; border-bottom: 0; }
-.pull-requests--issue + .issue-links { margin-top: -18px; border-top: 0; }
+.pull-requests--issue + .issue-links { margin-top: -22px; border-top: 0; }
 .pull-requests--issue + .issue-main__description { padding-top: 0; border-top: 0; }
+.pull-requests--peek { padding-bottom: 12px; border-bottom: 1px solid var(--hairline); }
 .pull-requests--peek h2 { margin: 0 0 4px; font-size: 13px; font-weight: 700; color: var(--text-secondary); }
 .pull-requests__row { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .pull-requests__label { flex: none; width: 110px; font-size: 13px; color: var(--text-muted); white-space: nowrap; }

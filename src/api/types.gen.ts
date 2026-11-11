@@ -500,7 +500,7 @@ export type IssueOpening = "full" | "preview";
 
 export type IssuePullRequests = { items: Array<PullRequest>, 
 /**
- * When to sync again: while a GitHub pull request isn't merged, the time until its status is due (0 when it
+ * When to sync again: while a GitHub pull request is open or a draft (or its lookup failed), the time until its status is due (0 when it
  * is due now or was never fetched); none when nothing needs asking.
  */
 refreshInMs: number | null, };

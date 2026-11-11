@@ -79,6 +79,23 @@ impl StatusSource for Scripted {
     }
 }
 
+fn status_in(state: PrState) -> PrStatus {
+    PrStatus {
+        state,
+        ..status("Scripted")
+    }
+}
+
+/// Answers each lookup with the state registered for its pull request number.
+struct ByNumber(Vec<(u32, PrState)>);
+
+impl StatusSource for ByNumber {
+    fn status<'a>(&'a self, pr: &'a GithubPr) -> StatusAnswer<'a> {
+        let state = self.0.iter().find(|(n, _)| *n == pr.number).unwrap().1;
+        Box::pin(async move { Ok(status_in(state)) })
+    }
+}
+
 fn demo_statuses() -> PullRequestStatuses {
     PullRequestStatuses::new(Arc::new(FakePullRequests))
 }
@@ -341,6 +358,62 @@ async fn a_merged_pull_request_beside_an_open_one_leaves_the_open_ones_due_time(
         .await
         .unwrap();
 
+    assert_eq!(pulls.refresh_in_ms, Some(5 * 60 * 1000));
+}
+
+#[tokio::test]
+async fn a_closed_pull_request_is_never_asked_again() {
+    let (_dir, db) = seeded().await;
+    let statuses = PullRequestStatuses::new(Scripted::new(vec![Ok(status_in(PrState::Closed))]));
+
+    let pulls = statuses
+        .of_issue(&db, OPEN_ONLY.into(), at(0, 0), true)
+        .await
+        .unwrap();
+
+    assert_eq!(pulls.items[0].status, Some(status_in(PrState::Closed)));
+    assert_eq!(pulls.refresh_in_ms, None);
+}
+
+#[tokio::test]
+async fn a_closed_pull_request_beside_an_open_one_leaves_the_open_ones_due_time() {
+    let (_dir, db) = seeded().await;
+    db.write(|tx, _| {
+        Ok(tx
+            .execute(
+                "INSERT INTO cache.remote_link (issue_id, id, position, url, title) VALUES
+                 ('20003', '1', 0, 'https://github.com/example/shop/pull/481', 'Postcode checks'),
+                 ('20003', '2', 1, 'https://github.com/example/shop/pull/476', 'Shipping rates')",
+                [],
+            )
+            .map(|_| ())?)
+    })
+    .await
+    .unwrap();
+    let statuses = PullRequestStatuses::new(Arc::new(ByNumber(vec![
+        (481, PrState::Open),
+        (476, PrState::Closed),
+    ])));
+
+    let pulls = statuses
+        .of_issue(&db, NO_LINKS.into(), at(0, 0), true)
+        .await
+        .unwrap();
+
+    assert_eq!(pulls.refresh_in_ms, Some(5 * 60 * 1000));
+}
+
+#[tokio::test]
+async fn a_draft_pull_request_is_asked_again_after_five_minutes() {
+    let (_dir, db) = seeded().await;
+    let statuses = PullRequestStatuses::new(Scripted::new(vec![Ok(status_in(PrState::Draft))]));
+
+    let pulls = statuses
+        .of_issue(&db, OPEN_ONLY.into(), at(0, 0), true)
+        .await
+        .unwrap();
+
+    assert_eq!(pulls.items[0].status, Some(status_in(PrState::Draft)));
     assert_eq!(pulls.refresh_in_ms, Some(5 * 60 * 1000));
 }
 

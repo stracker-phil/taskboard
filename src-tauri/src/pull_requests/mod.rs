@@ -22,7 +22,7 @@ pub use github::GithubPr;
 pub use status::{Checks, ChecksState, PrState, PrStatus, ReviewState};
 
 /// How long a pull request's status is kept before `gh` is asked again, and how often an open issue asks
-/// again while a pull request isn't merged.
+/// again while a pull request is open or a draft.
 const FRESH_FOR: Duration = Duration::minutes(5);
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
@@ -47,7 +47,7 @@ pub struct PullRequest {
 #[serde(rename_all = "camelCase")]
 pub struct IssuePullRequests {
     pub items: Vec<PullRequest>,
-    /// When to sync again: while a GitHub pull request isn't merged, the time until its status is due (0 when it
+    /// When to sync again: while a GitHub pull request is open or a draft (or its lookup failed), the time until its status is due (0 when it
     /// is due now or was never fetched); none when nothing needs asking.
     #[ts(type = "number | null")]
     pub refresh_in_ms: Option<u64>,
@@ -151,13 +151,13 @@ impl PullRequestStatuses {
     }
 }
 
-/// When a GitHub pull request's status is due again; never once it is merged.
+/// When a GitHub pull request's status is due again; never once it is merged or closed, which don't change.
 fn due_at(entry: Option<&Entry>, now: DateTime<Utc>) -> Option<DateTime<Utc>> {
     match entry {
         None => Some(now),
         Some(Entry {
             answer: Ok(status), ..
-        }) if status.state == PrState::Merged => None,
+        }) if matches!(status.state, PrState::Merged | PrState::Closed) => None,
         Some(entry) => Some(entry.fetched_at + FRESH_FOR),
     }
 }

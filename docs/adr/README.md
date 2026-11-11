@@ -71,5 +71,6 @@ stands in Taskboard. The numbers in this table are Taskboard's.
 | [0059](0059-the-inbox-replaces-unread-mode.md) | The inbox replaces Unread mode (supersedes 0046) | Accepted (2026-11-10) |
 | [0060](0060-a-status-bar-under-the-panel.md) | A status bar under the content panel | Accepted (2026-11-11) |
 | [0061](0061-pull-request-status-comes-from-the-gh-cli.md) | Pull request status comes from the GitHub CLI | Accepted (2026-11-11) |
+| [0062](0062-only-open-pull-requests-refresh.md) | Only open and draft pull requests refresh | Accepted (2026-11-11) |
 
 Open: integrations with Daybook and TimeTracker.
