@@ -4,11 +4,11 @@
   color-scheme: light;
 
   /* Surfaces */
-  --window-bg: #f4f4f5;
+  --window-bg: #ededef;
   --panel-bg: #ffffff;
   --panel-subtle-bg: #fafafa;
   --fill-subtle: #f4f4f5;
-  --fill-hover: #ebebee;
+  --fill-hover: #e4e4e8;
   --segmented-bg: #eeeef1;
   --list-bg: #f7f7f8;
   --hover-bg: #f4f4f5;
