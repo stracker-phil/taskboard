@@ -85,11 +85,13 @@
   box-shadow: none;
 }
 
-/* The view under the header and the tabs. */
+/* The view under the header and the tabs. Its own stacking context: a hovered row WebKit lifts onto a layer stays
+   under the toolbar's popovers. */
 .content-panel__body {
   position: relative;
   flex: 1;
   min-height: 0;
+  isolation: isolate;
 }
 
 .content-panel__placeholder {
