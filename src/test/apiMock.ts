@@ -29,6 +29,7 @@ import {
   type MenuCommand,
   type Nav,
   type PaletteResults,
+  type Person,
   type Pins,
   type Priorities,
   type Related,
@@ -194,6 +195,7 @@ export function createApiMock(): Api {
     issueDrop: vi.fn(async (): Promise<DropOutcome> => ({ kind: "done", outcome: { done: "Done", reverse: null } })),
     issueTransitions: vi.fn().mockResolvedValue([]),
     issueAssignees: vi.fn(async (): Promise<Assignees> => ({ people: [], current: null })),
+    issueMentionable: vi.fn(async (): Promise<Person[]> => []),
     issuePriorities: vi.fn(
       async (): Promise<Priorities> => ({
         options: [

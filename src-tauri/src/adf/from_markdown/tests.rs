@@ -1,6 +1,31 @@
 use super::*;
 use serde_json::{Value, json};
 
+fn from_markdown(text: &str) -> Value {
+    super::from_markdown(text, &[])
+}
+
+fn person(account_id: &str, name: &str) -> Mentionable {
+    Mentionable {
+        account_id: account_id.into(),
+        name: name.into(),
+    }
+}
+
+fn team() -> Vec<Mentionable> {
+    vec![
+        person("acc-marta", "Marta Klein"),
+        person("acc-jonas", "Jonas Reiter"),
+    ]
+}
+
+fn mention(account_id: &str, name: &str) -> Value {
+    json!({
+        "type": "mention",
+        "attrs": { "id": account_id, "text": format!("@{name}"), "accessLevel": "" },
+    })
+}
+
 fn doc(content: Value) -> Value {
     json!({ "type": "doc", "version": 1, "content": content })
 }
@@ -512,6 +537,173 @@ fn an_escaped_marker_stays_literal() {
     assert_eq!(
         from_markdown("\\*not bold\\*"),
         doc(json!([paragraph(json!([text("*not bold*")]))]))
+    );
+}
+
+fn mentioning(input: &str) -> Value {
+    super::from_markdown(input, &team())
+}
+
+#[test]
+fn an_at_sign_and_a_persons_name_become_a_mention_node() {
+    assert_eq!(
+        mentioning("@Marta Klein"),
+        doc(json!([paragraph(json!([mention(
+            "acc-marta",
+            "Marta Klein"
+        )]))]))
+    );
+}
+
+#[test]
+fn text_around_a_mention_stays_text() {
+    assert_eq!(
+        mentioning("hi @Marta Klein, thanks"),
+        doc(json!([paragraph(json!([
+            text("hi "),
+            mention("acc-marta", "Marta Klein"),
+            text(", thanks"),
+        ]))]))
+    );
+}
+
+#[test]
+fn several_mentions_in_one_text_each_become_a_node() {
+    assert_eq!(
+        mentioning("@Marta Klein and @Jonas Reiter"),
+        doc(json!([paragraph(json!([
+            mention("acc-marta", "Marta Klein"),
+            text(" and "),
+            mention("acc-jonas", "Jonas Reiter"),
+        ]))]))
+    );
+}
+
+#[test]
+fn a_mention_may_follow_an_opening_bracket_or_a_line_break() {
+    assert_eq!(
+        mentioning("(@Marta Klein)\n@Jonas Reiter"),
+        doc(json!([paragraph(json!([
+            text("("),
+            mention("acc-marta", "Marta Klein"),
+            text(")"),
+            { "type": "hardBreak" },
+            mention("acc-jonas", "Jonas Reiter"),
+        ]))]))
+    );
+}
+
+#[test]
+fn the_longest_matching_name_wins() {
+    let people = [
+        person("acc-short", "Marta"),
+        person("acc-long", "Marta Klein"),
+    ];
+    assert_eq!(
+        super::from_markdown("@Marta Klein", &people),
+        doc(json!([paragraph(json!([mention(
+            "acc-long",
+            "Marta Klein"
+        )]))]))
+    );
+    assert_eq!(
+        super::from_markdown("@Marta Reiter", &people),
+        doc(json!([paragraph(json!([
+            mention("acc-short", "Marta"),
+            text(" Reiter"),
+        ]))]))
+    );
+}
+
+#[test]
+fn a_name_with_non_ascii_letters_is_a_mention() {
+    let people = [person("acc-jurgen", "Jürgen Weiß")];
+    assert_eq!(
+        super::from_markdown("cc @Jürgen Weiß!", &people),
+        doc(json!([paragraph(json!([
+            text("cc "),
+            mention("acc-jurgen", "Jürgen Weiß"),
+            text("!"),
+        ]))]))
+    );
+}
+
+#[test]
+fn text_that_is_not_exactly_a_name_stays_text() {
+    for input in [
+        "a@Marta Klein",
+        "@Marta Kleinx",
+        "@Marta Klein2",
+        "@Marta Kleinü",
+        "@marta klein",
+        "@Marta",
+        "@Nobody Else",
+        "Marta Klein",
+        "@ Marta Klein",
+        "mail me@example.com",
+    ] {
+        assert_eq!(
+            mentioning(input),
+            doc(json!([paragraph(json!([text(input)]))])),
+            "{input:?}"
+        );
+    }
+}
+
+#[test]
+fn without_people_an_at_sign_and_a_name_stay_text() {
+    assert_eq!(
+        from_markdown("@Marta Klein"),
+        doc(json!([paragraph(json!([text("@Marta Klein")]))]))
+    );
+}
+
+#[test]
+fn a_mention_inside_bold_text_is_a_node_without_marks_and_the_rest_stays_bold() {
+    let strong = json!([{ "type": "strong" }]);
+    assert_eq!(
+        mentioning("**ask @Marta Klein now**"),
+        doc(json!([paragraph(json!([
+            marked("ask ", strong.clone()),
+            mention("acc-marta", "Marta Klein"),
+            marked(" now", strong),
+        ]))]))
+    );
+}
+
+#[test]
+fn a_name_in_code_or_in_link_text_stays_text() {
+    assert_eq!(
+        mentioning("`@Marta Klein`"),
+        doc(json!([paragraph(json!([marked(
+            "@Marta Klein",
+            json!([{ "type": "code" }])
+        )]))]))
+    );
+    assert_eq!(
+        mentioning("```\n@Marta Klein\n```"),
+        doc(json!([{ "type": "codeBlock", "content": [text("@Marta Klein")] }]))
+    );
+    assert_eq!(
+        mentioning("[@Marta Klein](https://example.com)"),
+        doc(json!([paragraph(json!([linked(
+            "@Marta Klein",
+            "https://example.com"
+        )]))]))
+    );
+}
+
+#[test]
+fn a_mention_in_a_list_item_is_a_node_in_its_paragraph() {
+    assert_eq!(
+        mentioning("- @Jonas Reiter"),
+        doc(json!([{
+            "type": "bulletList",
+            "content": [list_item(json!([paragraph(json!([mention(
+                "acc-jonas",
+                "Jonas Reiter"
+            )]))]))],
+        }]))
     );
 }
 

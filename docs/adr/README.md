@@ -73,5 +73,6 @@ stands in Taskboard. The numbers in this table are Taskboard's.
 | [0061](0061-pull-request-status-comes-from-the-gh-cli.md) | Pull request status comes from the GitHub CLI | Accepted (2026-11-11) |
 | [0062](0062-only-open-pull-requests-refresh.md) | Only open and draft pull requests refresh | Accepted (2026-11-11) |
 | [0063](0063-comments-are-written-in-markdown.md) | Comments are written in Markdown | Accepted (2026-11-11) |
+| [0064](0064-comment-mentions-come-from-the-space-team.md) | Comment mentions come from the Space's team | Accepted (2026-11-11) |
 
 Open: integrations with Daybook and TimeTracker.

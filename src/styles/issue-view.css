@@ -285,3 +285,5 @@ button.web-link:hover { background: var(--row-hover-bg); }
 .comment-box__input:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -1px; }
 .comment-box__actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
 .comment-box__hint { font-size: 12px; color: var(--text-muted); }
+/* People to mention under the comment field's `@name` (`MentionList`): the menu's look, focus stays in the field. */
+.mention-list { max-height: 248px; overflow-y: auto; }

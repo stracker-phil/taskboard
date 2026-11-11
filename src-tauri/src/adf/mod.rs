@@ -14,7 +14,7 @@ mod inline;
 mod markdown;
 mod media;
 
-pub use from_markdown::from_markdown;
+pub use from_markdown::{Mentionable, from_markdown};
 pub use markdown::to_markdown;
 pub use media::{File, Media, is_inline_image};
 

@@ -1,9 +1,11 @@
 //! Markdown (CommonMark with strike-through) → an ADF document, for comments typed in Taskboard. A line break
-//! inside a paragraph stays a line break, bare `http(s)://` addresses become links and raw HTML stays text.
+//! inside a paragraph stays a line break, bare `http(s)://` addresses become links, `@Full Name` of someone who
+//! may be mentioned becomes a mention and raw HTML stays text.
 //! Blocks ADF doesn't allow where they were typed (a heading in a list, a quote in a quote) become what it
 //! allows there.
 
 mod links;
+mod mentions;
 #[cfg(test)]
 mod tests;
 
@@ -11,17 +13,32 @@ use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
 use serde_json::{Map, Value, json};
 
 use links::Piece;
+use mentions::Part;
 
-pub fn from_markdown(text: &str) -> Value {
-    let mut doc = Builder::default();
+/// Someone a comment may mention.
+#[derive(Clone, Debug)]
+pub struct Mentionable {
+    pub account_id: String,
+    pub name: String,
+}
+
+pub fn from_markdown(text: &str, people: &[Mentionable]) -> Value {
+    let mut doc = Builder {
+        people,
+        open: Vec::new(),
+        doc: Vec::new(),
+        marks: Vec::new(),
+        text: String::new(),
+        link: None,
+    };
     for event in Parser::new_ext(text, Options::ENABLE_STRIKETHROUGH) {
         doc.event(event);
     }
     doc.finish()
 }
 
-#[derive(Default)]
-struct Builder {
+struct Builder<'p> {
+    people: &'p [Mentionable],
     /// Open blocks below the document, innermost last.
     open: Vec<Block>,
     doc: Vec<Value>,
@@ -44,7 +61,7 @@ struct OpenLink {
     wrote_text: bool,
 }
 
-impl Builder {
+impl Builder<'_> {
     fn event(&mut self, event: Event) {
         match event {
             Event::Start(tag) => self.start(tag),
@@ -219,15 +236,22 @@ impl Builder {
             return;
         }
         for piece in links::split(&text) {
-            let node = match piece {
-                Piece::Text(text) => text_node(text, &marks),
+            match piece {
+                Piece::Text(text) => {
+                    for part in mentions::split(text, self.people) {
+                        let node = match part {
+                            Part::Text(text) => text_node(text, &marks),
+                            Part::Mention(person) => mention_node(person),
+                        };
+                        self.inline(node);
+                    }
+                }
                 Piece::Link(address) => {
                     let mut marks = marks.clone();
                     marks.push(link_mark(address));
-                    text_node(address, &marks)
+                    self.inline(text_node(address, &marks));
                 }
-            };
-            self.inline(node);
+            }
         }
     }
 
@@ -325,6 +349,13 @@ fn allowed_marks(marks: &[Value]) -> Vec<Value> {
     } else {
         marks.to_vec()
     }
+}
+
+fn mention_node(person: &Mentionable) -> Value {
+    json!({
+        "type": "mention",
+        "attrs": { "id": person.account_id, "text": format!("@{}", person.name), "accessLevel": "" },
+    })
 }
 
 fn link_mark(href: &str) -> Value {

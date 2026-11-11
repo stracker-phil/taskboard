@@ -1070,7 +1070,7 @@ mod activity {
             watched_client(&fake, FakeSecrets::with(ME_EMAIL, DEMO_TOKEN));
 
         client
-            .add_comment("NW-1042", from_markdown("Checked on staging"))
+            .add_comment("NW-1042", from_markdown("Checked on staging", &[]))
             .await
             .unwrap();
 
@@ -1092,7 +1092,7 @@ mod activity {
             watched_client(&fake, FakeSecrets::with(ME_EMAIL, DEMO_TOKEN));
 
         let result = client
-            .add_comment("NW-1042", from_markdown("Checked on staging"))
+            .add_comment("NW-1042", from_markdown("Checked on staging", &[]))
             .await;
 
         assert!(result.is_err());
@@ -1112,7 +1112,7 @@ mod activity {
         let (client, in_flight, _) = watched_client(&fake, FakeSecrets::default());
 
         let err = client
-            .add_comment("NW-1042", from_markdown("Checked on staging"))
+            .add_comment("NW-1042", from_markdown("Checked on staging", &[]))
             .await
             .unwrap_err();
 

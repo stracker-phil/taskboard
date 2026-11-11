@@ -22,7 +22,7 @@ pub use bulk::{
     BulkOutcome, BulkStatus, IssueChange, apply_many, bulk_assignees, bulk_priorities,
     bulk_statuses,
 };
-pub use comment::{MAX_COMMENT_CHARS, add_comment};
+pub use comment::{MAX_COMMENT_CHARS, add_comment, mentionable};
 pub use drop::{DropOutcome, DropTarget, DropTargets, ViewGroup, arrange, drop_on, drop_targets};
 pub use offers::Offers;
 pub use pending::{forget_all, overlay};

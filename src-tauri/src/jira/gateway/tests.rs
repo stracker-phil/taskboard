@@ -1078,7 +1078,7 @@ fn reading_transitions_is_a_read_and_writing_them_is_a_write() {
 fn add_comment(issue_text: &str) -> Endpoint {
     Endpoint::AddComment {
         issue: issue(issue_text),
-        body: crate::adf::from_markdown("Checked on staging"),
+        body: crate::adf::from_markdown("Checked on staging", &[]),
     }
 }
 
@@ -1096,7 +1096,7 @@ fn adding_a_comment_plans_a_post_with_the_adf_body_and_the_rendered_body_expansi
             assert_eq!(plan.method, Method::POST, "{target}");
             assert_eq!(
                 plan.body,
-                Some(json!({ "body": crate::adf::from_markdown("Checked on staging") })),
+                Some(json!({ "body": crate::adf::from_markdown("Checked on staging", &[]) })),
                 "{target}"
             );
             assert!(plan.authenticated, "{target}");

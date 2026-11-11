@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../test/apiMock")).createApiMock() }));
 
-import { api, type WriteOutcome } from "../api";
+import { api, type Person, type WriteOutcome } from "../api";
 import { createQueryClient } from "../queries/queryClient";
 import { resetStore, useStore } from "../state/store";
 import { behaviour, settings } from "../test/settings";
@@ -24,7 +24,7 @@ function renderBox() {
   );
 }
 
-const box = () => screen.findByRole("textbox", { name: "Add a comment" });
+const box = () => screen.findByRole("combobox", { name: "Add a comment" });
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -38,7 +38,7 @@ describe("CommentBox", () => {
     renderBox();
     await vi.waitFor(() => expect(mocked.getSettings).toHaveBeenCalled());
 
-    expect(screen.queryByRole("textbox", { name: "Add a comment" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Add a comment" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Comment" })).not.toBeInTheDocument();
   });
 
@@ -47,7 +47,7 @@ describe("CommentBox", () => {
     renderBox();
     await vi.waitFor(() => expect(mocked.getSettings).toHaveBeenCalled());
 
-    expect(screen.queryByRole("textbox", { name: "Add a comment" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Add a comment" })).not.toBeInTheDocument();
   });
 
   it("stays when only another kind of change is switched off", async () => {
@@ -203,6 +203,156 @@ describe("CommentBox", () => {
       await userEvent.keyboard("{Escape}");
 
       expect(input).not.toHaveFocus();
+    });
+  });
+
+  it("hints at Markdown, mentions and the send shortcut", async () => {
+    renderBox();
+    await box();
+
+    expect(screen.getByText("Markdown · @ mentions · ⌘↩ to send")).toBeInTheDocument();
+  });
+
+  describe("mentions", () => {
+    const marta: Person = { accountId: "acc-marta", name: "Marta Klein", initials: "MK", color: 1 };
+    const jonas: Person = { accountId: "acc-jonas", name: "Jonas Reiter", initials: "JR", color: 2 };
+    const list = () => screen.queryByRole("listbox", { name: "People to mention" });
+    const options = () => screen.getAllByRole("option");
+    const expectSelected = (name: string) => {
+      const chosen = screen.getAllByRole("option", { selected: true });
+      expect(chosen).toHaveLength(1);
+      expect(chosen[0]).toHaveAccessibleName(name);
+    };
+    const expectOptions = (...names: string[]) => {
+      expect(options()).toHaveLength(names.length);
+      names.forEach((name, i) => expect(options()[i]).toHaveAccessibleName(name));
+    };
+
+    async function typeInto(text: string) {
+      renderBox();
+      const input = await box();
+      await vi.waitFor(() => expect(mocked.issueMentionable).toHaveBeenCalledWith("10042"));
+      await userEvent.type(input, text);
+      return input;
+    }
+
+    beforeEach(() => {
+      mocked.issueMentionable.mockResolvedValue([marta, jonas]);
+    });
+
+    it("lists only the people matching the typed @name", async () => {
+      await typeInto("Thanks @ma");
+
+      expect(await screen.findByRole("listbox", { name: "People to mention" })).toBeInTheDocument();
+      expectOptions("Marta Klein");
+    });
+
+    it("lists everyone once only the @ is typed, with the first person selected", async () => {
+      await typeInto("@");
+
+      await screen.findByRole("listbox", { name: "People to mention" });
+      expectOptions("Marta Klein", "Jonas Reiter");
+      expectSelected("Marta Klein");
+    });
+
+    it("shows no list when nobody matches", async () => {
+      await typeInto("Thanks @zz");
+
+      expect(list()).not.toBeInTheDocument();
+    });
+
+    it("shows no list for an @ inside a word", async () => {
+      await typeInto("write to a@ma");
+
+      expect(list()).not.toBeInTheDocument();
+    });
+
+    it("moves the selection with the arrow keys and wraps at both ends", async () => {
+      await typeInto("@");
+      await screen.findByRole("listbox", { name: "People to mention" });
+
+      await userEvent.keyboard("{ArrowDown}");
+      expectSelected("Jonas Reiter");
+      await userEvent.keyboard("{ArrowDown}");
+      expectSelected("Marta Klein");
+      await userEvent.keyboard("{ArrowUp}");
+      expectSelected("Jonas Reiter");
+    });
+
+    it("inserts the selected person on Enter, closes the list and does not send the comment", async () => {
+      const input = await typeInto("Thanks @ma");
+      await screen.findByRole("listbox", { name: "People to mention" });
+
+      await userEvent.keyboard("{Enter}");
+
+      expect(input).toHaveValue("Thanks @Marta Klein ");
+      expect(list()).not.toBeInTheDocument();
+      expect(mocked.issueComment).not.toHaveBeenCalled();
+    });
+
+    it("inserts the person chosen with the arrow keys on Enter", async () => {
+      const input = await typeInto("@");
+      await screen.findByRole("listbox", { name: "People to mention" });
+
+      await userEvent.keyboard("{ArrowDown}{Enter}");
+
+      expect(input).toHaveValue("@Jonas Reiter ");
+    });
+
+    it("inserts the selected person on Tab and keeps the focus in the field", async () => {
+      const input = await typeInto("Thanks @ma");
+      await screen.findByRole("listbox", { name: "People to mention" });
+
+      await userEvent.keyboard("{Tab}");
+
+      expect(input).toHaveValue("Thanks @Marta Klein ");
+      expect(input).toHaveFocus();
+    });
+
+    it("inserts a person when their option is clicked", async () => {
+      const input = await typeInto("Thanks @jo");
+
+      await userEvent.click(await screen.findByRole("option", { name: /Jonas Reiter/ }));
+
+      expect(input).toHaveValue("Thanks @Jonas Reiter ");
+      expect(list()).not.toBeInTheDocument();
+      expect(input).toHaveFocus();
+    });
+
+    it("closes the list on Escape and keeps the focus, a second Escape leaves the field", async () => {
+      const input = await typeInto("Thanks @ma");
+      await screen.findByRole("listbox", { name: "People to mention" });
+
+      await userEvent.keyboard("{Escape}");
+      expect(list()).not.toBeInTheDocument();
+      expect(input).toHaveFocus();
+      expect(input).toHaveValue("Thanks @ma");
+
+      await userEvent.keyboard("{Escape}");
+      expect(input).not.toHaveFocus();
+    });
+
+    it("sends the comment on ⌘↩ while the list is open", async () => {
+      await typeInto("Thanks @ma");
+      await screen.findByRole("listbox", { name: "People to mention" });
+
+      await userEvent.keyboard("{Meta>}{Enter}{/Meta}");
+
+      expect(mocked.issueComment).toHaveBeenCalledWith("10042", "Thanks @ma");
+    });
+
+    it("is a combobox whose aria-expanded follows the list", async () => {
+      renderBox();
+      const input = await screen.findByRole("combobox", { name: "Add a comment" });
+      await vi.waitFor(() => expect(mocked.issueMentionable).toHaveBeenCalled());
+      expect(input).toHaveAttribute("aria-expanded", "false");
+
+      await userEvent.type(input, "@ma");
+      await screen.findByRole("listbox", { name: "People to mention" });
+      expect(input).toHaveAttribute("aria-expanded", "true");
+
+      await userEvent.keyboard("{Enter}");
+      expect(input).toHaveAttribute("aria-expanded", "false");
     });
   });
 });

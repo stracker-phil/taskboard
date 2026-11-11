@@ -29,7 +29,7 @@ use taskboard_lib::views::GroupBy;
 use taskboard_lib::writes::{
     Assignees, Change, DropOutcome, DropTargets, MAX_COMMENT_CHARS, Offers, Reverse,
     TransitionOption, WriteOutcome, add_comment, add_web_link, apply, assignees, drop_on,
-    drop_targets, forget_all, priorities, toggle_mine, transitions,
+    drop_targets, forget_all, mentionable, priorities, toggle_mine, transitions,
 };
 
 const PROJECT_IDS: [&str; 5] = ["10001", "10002", "10003", "10004", "10005"];
@@ -1821,6 +1821,170 @@ mod commenting {
             rig.jira_comments("NW-1042").await as i64,
             COMMENTS_ON_NW_1042
         );
+    }
+
+    fn mention_of(account_id: &str, name: &str) -> Value {
+        json!({
+            "type": "mention",
+            "attrs": { "id": account_id, "text": format!("@{name}"), "accessLevel": "" },
+        })
+    }
+
+    /// The first paragraph's content of the comment the fake received.
+    fn sent_paragraph(rig: &Rig) -> Value {
+        let sent = rig
+            .fake
+            .requests()
+            .into_iter()
+            .find(|r| r.method == "POST" && r.path.ends_with("/comment"))
+            .expect("the comment was posted")
+            .body;
+        sent["body"]["content"][0]["content"].clone()
+    }
+
+    #[tokio::test]
+    async fn the_name_of_a_team_member_is_sent_as_a_mention() {
+        let rig = Rig::synced().await;
+
+        rig.comment(NW_1042, "cc @Marta Klein, please look")
+            .await
+            .unwrap();
+
+        assert_eq!(
+            sent_paragraph(&rig),
+            json!([
+                { "type": "text", "text": "cc " },
+                mention_of(MARTA, "Marta Klein"),
+                { "type": "text", "text": ", please look" },
+            ])
+        );
+    }
+
+    #[tokio::test]
+    async fn the_pending_comment_shows_the_mention() {
+        let rig = Rig::synced().await;
+        rig.fake.set_latency(std::time::Duration::from_millis(100));
+
+        let (result, shown) = tokio::join!(rig.comment(NW_1042, "cc @Marta Klein"), async {
+            tokio::time::timeout(std::time::Duration::from_secs(30), async {
+                loop {
+                    let html: Option<String> = rig
+                        .ctx
+                        .db
+                        .read(|conn| {
+                            Ok(conn
+                                .query_row(
+                                    "SELECT body_html FROM cache.comment WHERE id LIKE 'pending:%'",
+                                    [],
+                                    |row| row.get(0),
+                                )
+                                .ok())
+                        })
+                        .await
+                        .unwrap();
+                    if let Some(html) = html {
+                        return html;
+                    }
+                    tokio::time::sleep(std::time::Duration::from_millis(2)).await;
+                }
+            })
+            .await
+            .expect("the pending comment never showed")
+        });
+
+        result.unwrap();
+        assert!(
+            shown.contains("<span class=\"adf-mention\">@Marta Klein</span>"),
+            "{shown:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn the_name_of_someone_outside_the_team_stays_text() {
+        let rig = Rig::synced().await;
+        space_set_member(&rig.ctx.db, NW_PROJECT.into(), JONAS.into(), false, None)
+            .await
+            .unwrap();
+
+        rig.comment(NW_1042, "cc @Jonas Reiter").await.unwrap();
+
+        assert_eq!(
+            sent_paragraph(&rig),
+            json!([{ "type": "text", "text": "cc @Jonas Reiter" }])
+        );
+    }
+
+    #[tokio::test]
+    async fn my_own_name_stays_text() {
+        let rig = Rig::synced().await;
+
+        rig.comment(NW_1042, "note to @Alex Morgan").await.unwrap();
+
+        assert_eq!(
+            sent_paragraph(&rig),
+            json!([{ "type": "text", "text": "note to @Alex Morgan" }])
+        );
+    }
+}
+
+mod mentionable_people {
+    use super::*;
+
+    async fn names(rig: &Rig, issue_id: &str, me: Option<&str>) -> Vec<String> {
+        let me = me.map(|account_id| Me {
+            account_id: account_id.into(),
+            name: "Alex Morgan".into(),
+        });
+        mentionable(&rig.ctx.db, issue_id.into(), me)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|p| p.name)
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn are_the_issues_spaces_team_without_me() {
+        let rig = Rig::synced().await;
+
+        assert_eq!(
+            names(&rig, NW_1044, Some(ALEX)).await,
+            ["Anna Lutz", "Jonas Reiter", "Marta Klein"]
+        );
+    }
+
+    #[tokio::test]
+    async fn without_me_the_whole_team_is_offered() {
+        let rig = Rig::synced().await;
+
+        assert_eq!(
+            names(&rig, NW_1044, None).await,
+            ["Alex Morgan", "Anna Lutz", "Jonas Reiter", "Marta Klein"]
+        );
+    }
+
+    #[tokio::test]
+    async fn a_person_switched_off_in_the_space_is_not_offered() {
+        let rig = Rig::synced().await;
+        space_set_member(&rig.ctx.db, NW_PROJECT.into(), JONAS.into(), false, None)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            names(&rig, NW_1044, Some(ALEX)).await,
+            ["Anna Lutz", "Marta Klein"]
+        );
+    }
+
+    #[tokio::test]
+    async fn an_unknown_issue_is_not_found() {
+        let rig = Rig::synced().await;
+
+        let err = mentionable(&rig.ctx.db, "999999".into(), None)
+            .await
+            .unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::NotFound);
     }
 }
 

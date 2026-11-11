@@ -4,8 +4,8 @@
 use chrono::Utc;
 use rusqlite::{Connection, params};
 
-use super::{Me, WriteOutcome, ensure_allowed, issue_key, me_of, remember_me};
-use crate::adf::{self, Media};
+use super::{Me, WriteOutcome, ensure_allowed, issue_key, issue_project, me_of, remember_me};
+use crate::adf::{self, Media, Mentionable};
 use crate::db::Db;
 use crate::error::{AppError, AppResult};
 use crate::issues::store_comment;
@@ -16,6 +16,7 @@ use crate::sync::refetch_issue;
 use crate::sync::source::Source;
 use crate::text::html_to_text;
 use crate::time::format_utc;
+use crate::views::rows::Person;
 
 /// Jira's comment length cap, in characters.
 pub const MAX_COMMENT_CHARS: usize = 32_767;
@@ -30,7 +31,12 @@ pub async fn add_comment(
     ensure_allowed(settings, Capability::Comment)?;
     let me = me_of(settings)?;
     let text = checked_text(&text)?;
-    let body = adf::from_markdown(&text);
+    let people: Vec<Mentionable> = mentionable(db, issue_id.clone(), Some(me.clone()))
+        .await?
+        .into_iter()
+        .map(Mentionable::from)
+        .collect();
+    let body = adf::from_markdown(&text, &people);
     let change = format!("Comment ({} characters)", text.chars().count());
     let html = adf::to_html(&body, &Media::default()).unwrap_or_default();
     let text = html_to_text(&html);
@@ -71,6 +77,26 @@ pub async fn add_comment(
         done: format!("Commented on {key}"),
         reverse: None,
     })
+}
+
+impl From<Person> for Mentionable {
+    fn from(person: Person) -> Self {
+        Mentionable {
+            account_id: person.account_id,
+            name: person.name,
+        }
+    }
+}
+
+/// Whom a comment on the issue may mention: the issue's Space's team, without me.
+pub async fn mentionable(db: &Db, issue_id: String, me: Option<Me>) -> AppResult<Vec<Person>> {
+    db.read(move |conn| {
+        let project = issue_project(conn, &issue_id)?;
+        let mut people = crate::team::active(conn, &[project], None)?;
+        people.retain(|p| me.as_ref().is_none_or(|me| me.account_id != p.account_id));
+        Ok(people)
+    })
+    .await
 }
 
 fn checked_text(text: &str) -> AppResult<String> {

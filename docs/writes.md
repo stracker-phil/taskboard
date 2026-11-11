@@ -131,13 +131,16 @@ are off, with a modifier key, or on a button in the row.
 `issue_comment(id, text)` (`writes::add_comment`) takes Markdown, at most `MAX_COMMENT_CHARS` (Jira's 32,767),
 and turns it into ADF (`adf::from_markdown`, [ADR 0063](adr/0063-comments-are-written-in-markdown.md): emphasis,
 strike-through, code, links, lists, quotes, headings, code blocks and rules; a line break is a hard break, bare
-`http(s)://` addresses become links, raw HTML stays text). The comment shows in the activity at once as a `cache.comment` row with
+`http(s)://` addresses become links, raw HTML stays text). `@Full Name` of someone `writes::mentionable` lists
+(the issue's Space's active team without me; command `issue_mentionable`) becomes an ADF mention, so Jira
+notifies them ([ADR 0064](adr/0064-comment-mentions-come-from-the-space-team.md)). The comment shows in the activity at once as a `cache.comment` row with
 the id `pending:<random>` by the connected account, and the issue's `comment_count` goes up, so the fetch that
 brings Jira's comment records no change and the own comment isn't unread. Both comment replacements (the sync's
 and `issue_sync_comments`) keep `pending:` rows. Jira accepts: its answer replaces the pending row
 (`issues::store_comment`) in the transaction that stores the fetched issue. Jira refuses: the row and the count go
 and the box keeps the text. There is no reverse; editing and deleting comments aren't built. The box sits above
-the Issue view's activity (`CommentBox`): ⌘↩ sends, esc leaves it.
+the Issue view's activity (`CommentBox`): ⌘↩ sends, esc leaves it. Typing `@` and letters opens the people to
+mention under the caret (`MentionList`, `writes/mentions.ts`); ↑↓ move, ↩ or ⇥ insert `@Full Name `, esc hides it.
 
 ## Titles
 
@@ -190,6 +193,7 @@ A change refused before it is sent (changes off, a switched-off kind) records no
 | `issue_write(id, change)` | `Change::Assign { accountId }` (null unassigns) |
 | `issue_toggle_mine(id)` | assigns to me, or unassigns when it is mine |
 | `issue_assignees(id)` | who the issue may be assigned to, and who has it |
+| `issue_mentionable(id)` | whom a comment on the issue may mention: its Space's team without me |
 | `issue_write(id, Transition { transitionId })` | moves the issue along a transition from `issue_transitions` |
 | `issue_write(id, Priority { name })` | sets the priority to one the edit screen offers |
 | `issue_write(id, Title { text })` | renames the issue |

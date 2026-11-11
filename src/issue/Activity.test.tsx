@@ -48,7 +48,7 @@ describe("Activity", () => {
     mocked.getSettings.mockResolvedValue(settings({ behaviour: behaviour({ allowJiraChanges: true }) }));
     renderActivity([commentItem()]);
 
-    expect(await screen.findByRole("textbox", { name: "Add a comment" })).toBeInTheDocument();
+    expect(await screen.findByRole("combobox", { name: "Add a comment" })).toBeInTheDocument();
   });
 
   it("offers no comment box while changes to Jira are off", async () => {
@@ -56,7 +56,7 @@ describe("Activity", () => {
     await screen.findByText("Sam Lee");
     await waitFor(() => expect(mocked.getSettings).toHaveBeenCalled());
 
-    expect(screen.queryByRole("textbox", { name: "Add a comment" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Add a comment" })).not.toBeInTheDocument();
   });
 
   it("marks an edited comment and names an unknown author", async () => {
@@ -390,7 +390,7 @@ describe("Activity", () => {
     renderActivity([]);
 
     await screen.findByText("Nothing here yet.");
-    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Add a comment" })).not.toBeInTheDocument();
     expect(screen.queryByText(/commenting|reply in jira/i)).not.toBeInTheDocument();
   });
 });

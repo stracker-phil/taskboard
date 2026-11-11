@@ -344,6 +344,8 @@ export const api = {
   meRuleEdit: (edit: MeRuleEdit) => invoke<Settings>("me_rule_edit", { edit }),
   /** Who the issue may be assigned to: its Space's active team, me first, and who has it now. */
   issueAssignees: (id: string) => invoke<Assignees>("issue_assignees", { id }),
+  /** Whom a comment on the issue may mention: its Space's team, without me. */
+  issueMentionable: (id: string) => invoke<Person[]>("issue_mentionable", { id }),
   /** Every person with activity in a tracked Space against every Space (Settings → Team). */
   teamMatrix: () => invoke<TeamMatrix>("team_matrix"),
   spaceSetMember: (projectId: string, accountId: string, active: boolean) =>

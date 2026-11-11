@@ -127,6 +127,13 @@ pub async fn issue_drop(
     .await
 }
 
+/// Whom a comment on the issue may mention.
+#[tauri::command]
+pub async fn issue_mentionable(state: State<'_, AppState>, id: String) -> AppResult<Vec<Person>> {
+    let me = crate::team::Me::of(&state.settings.get().connection);
+    super::mentionable(&state.db, id, me).await
+}
+
 /// Who the issue may be assigned to.
 #[tauri::command]
 pub async fn issue_assignees(state: State<'_, AppState>, id: String) -> AppResult<Assignees> {

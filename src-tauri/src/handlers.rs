@@ -121,6 +121,7 @@ pub fn handlers() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
         crate::writes::commands::issue_drop_targets,
         crate::writes::commands::issue_drop,
         crate::writes::commands::issue_assignees,
+        crate::writes::commands::issue_mentionable,
         crate::writes::commands::issue_add_web_link,
         crate::avatars::commands::user_avatar,
         views::views_of,

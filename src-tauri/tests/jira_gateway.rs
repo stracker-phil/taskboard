@@ -741,7 +741,7 @@ mod writes {
     }
 
     fn comment_body(text: &str) -> serde_json::Value {
-        taskboard_lib::adf::from_markdown(text)
+        taskboard_lib::adf::from_markdown(text, &[])
     }
 
     async fn comment_count(client: &JiraClient) -> usize {
