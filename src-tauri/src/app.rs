@@ -10,8 +10,8 @@ use tauri_plugin_log::{RotationStrategy, Target, TargetKind, TimezoneStrategy};
 use crate::cli::LogLevel;
 use crate::db::{ANNOUNCE_EVERY, Db, LocalPart, coalesce};
 use crate::events::{
-    ISSUE_DETAILS_CHANGED_EVENT, ISSUES_CHANGED_EVENT, LOCAL_CHANGED_EVENT, SYNC_PROGRESS_EVENT,
-    SYNC_STATE_EVENT,
+    ISSUE_DETAILS_CHANGED_EVENT, ISSUES_CHANGED_EVENT, JIRA_ACTIVITY_EVENT, LOCAL_CHANGED_EVENT,
+    SYNC_PROGRESS_EVENT, SYNC_STATE_EVENT,
 };
 use crate::handlers::handlers;
 use crate::ipc::IpcMessage;
@@ -73,6 +73,7 @@ pub fn start(
             forget_unsettled_writes(&state);
             follow_the_place_in_the_menus(app.handle(), &state);
             announce_db_changes(app.handle(), &state.db);
+            announce_jira_activity(app.handle(), &state);
             give_spaces_their_lists(&state.db);
             carry_over_me_chips(app.handle(), &state);
             start_sync(app.handle(), &state);
@@ -170,6 +171,19 @@ fn follow_the_place_in_the_menus(app: &AppHandle, state: &AppState) {
         .nav
         .on_move(Box::new(move || menu::place::refresh(&handle)));
     menu::place::refresh(app);
+}
+
+/// Every Jira request starting or ending, for the status bar.
+fn announce_jira_activity(app: &AppHandle, state: &AppState) {
+    let app = app.clone();
+    state
+        .jira
+        .in_flight()
+        .set_notifier(Box::new(move |activity| {
+            if let Err(e) = app.emit(JIRA_ACTIVITY_EVENT, activity) {
+                log::warn!("Couldn't announce the Jira activity: {e}");
+            }
+        }));
 }
 
 /// A sync stores a page every few milliseconds; the page hears about them at most every `ANNOUNCE_EVERY`.

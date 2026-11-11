@@ -2,6 +2,7 @@
 //! from Atlassian's avatar host through `AvatarClient` (ADR 0032).
 
 mod avatar;
+mod doing;
 mod endpoint;
 mod guard;
 mod http;
@@ -24,6 +25,7 @@ pub use params::{
     Jql, LinkTitle, PageToken, PriorityName, ProjectKey, TITLE_MAX, TransitionId, WebUrl,
 };
 
+use super::in_flight::InFlight;
 use super::limiter::Limiter;
 use super::retry::{Retry, send_with_retries};
 use super::site::Site;
@@ -37,16 +39,23 @@ pub struct Gateway {
     site: Site,
     secrets: Arc<dyn SecretStore>,
     limiter: Arc<Limiter>,
+    in_flight: Arc<InFlight>,
     rng: Mutex<fastrand::Rng>,
 }
 
 impl Gateway {
-    pub fn new(site: Site, secrets: Arc<dyn SecretStore>, limiter: Arc<Limiter>) -> Self {
+    pub fn new(
+        site: Site,
+        secrets: Arc<dyn SecretStore>,
+        limiter: Arc<Limiter>,
+        in_flight: Arc<InFlight>,
+    ) -> Self {
         Self {
             http: Http::new(site.hosts()),
             site,
             secrets,
             limiter,
+            in_flight,
             rng: Mutex::new(fastrand::Rng::new()),
         }
     }
@@ -56,6 +65,7 @@ impl Gateway {
     }
 
     pub async fn send<T: DeserializeOwned>(&self, endpoint: Endpoint) -> AppResult<T> {
+        let _running = self.in_flight.begin(endpoint.doing());
         let planned = endpoint.plan(&self.site)?;
         if let Err(refused) = check(&planned, &self.site) {
             self.log(&refused.to_string());
@@ -85,6 +95,7 @@ impl Gateway {
 
     /// A file's bytes (an attachment), checked like `send` but in any format, up to `MAX_ATTACHMENT_BYTES`.
     pub async fn download(&self, endpoint: Endpoint) -> AppResult<Vec<u8>> {
+        let _running = self.in_flight.begin(endpoint.doing());
         let planned = endpoint.plan(&self.site)?;
         if let Err(refused) = check(&planned, &self.site) {
             self.log(&refused.to_string());

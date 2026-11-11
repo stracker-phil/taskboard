@@ -157,9 +157,9 @@
   pointer-events: none;
 }
 
-/* The window's sidebar toggle (shell.css) sits at the footer's left end, Settings at its right; the footer shares
-   the status bar's 32px row (status-bar.css). */
-.sb-footer { display: flex; flex: none; align-items: center; justify-content: flex-end; height: 26px; }
+/* Settings sits right after the window's sidebar toggle (shell.css); the footer shares the status bar's 32px row
+   (status-bar.css). */
+.sb-footer { display: flex; flex: none; align-items: center; height: 26px; padding-left: 30px; }
 .sb-settings, .sidebar-toggle {
   display: flex;
   flex: none;

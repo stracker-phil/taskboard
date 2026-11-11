@@ -77,7 +77,12 @@
 }
 
 .shell--sidebar-hidden .content-panel {
-  margin-left: 8px;
+  /* Unboxed: without the sidebar the panel fills the window between the title strip and the status bar. */
+  margin: 4px 0 0;
+  border-top: 1px solid var(--hairline);
+  border-bottom: 1px solid var(--hairline);
+  border-radius: 0;
+  box-shadow: none;
 }
 
 /* The view under the header and the tabs. */

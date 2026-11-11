@@ -1,5 +1,5 @@
 // Re-exports the IPC types generated from Rust (`bun run types`); everything defined below is frontend-only.
-import type { IssuesChanged, LocalChanged, Modes, Nav, Settings, SyncProgress, SyncState, UiState } from "./types.gen";
+import type { IssuesChanged, JiraActivity, LocalChanged, Modes, Nav, Settings, SyncProgress, SyncState, UiState } from "./types.gen";
 
 export type * from "./types.gen";
 
@@ -41,6 +41,8 @@ export interface EventPayloads {
   local_changed: LocalChanged;
   /** The sync engine's state changed. */
   sync_state: SyncState;
+  /** A Jira request started or ended. */
+  jira_activity: JiraActivity;
   /** A page of a full sync was stored. */
   sync_progress: SyncProgress;
   /** A command outside the page moved the main window (previous/next Space). */

@@ -21,17 +21,18 @@ pub use scope::{
 };
 
 use crate::error::{AppError, AppResult};
-use crate::jira::{JiraClient, Limiter};
+use crate::jira::{InFlight, JiraClient, Limiter};
 use crate::lock::MutexExt;
 use crate::secrets::{Remembered, Secret, SecretStore};
 use crate::store::settings::Connection;
 
 /// What every Jira request needs besides the settings: the Keychain, read once and kept in memory, the shared
-/// rate limit and the client of the connected site, whose connections are reused.
+/// rate limit, the requests in flight and the client of the connected site, whose connections are reused.
 #[derive(Clone)]
 pub struct JiraAccess {
     secrets: Arc<Remembered>,
     limiter: Arc<Limiter>,
+    in_flight: Arc<InFlight>,
     client: Arc<Mutex<Option<Arc<JiraClient>>>>,
 }
 
@@ -40,6 +41,7 @@ impl JiraAccess {
         Self {
             secrets: Arc::new(Remembered::new(secrets)),
             limiter,
+            in_flight: Arc::default(),
             client: Arc::default(),
         }
     }
@@ -55,9 +57,15 @@ impl JiraAccess {
             site,
             self.secrets.clone(),
             self.limiter.clone(),
+            self.in_flight.clone(),
         ));
         *cached = Some(Arc::clone(&client));
         Ok(client)
+    }
+
+    /// What every client is asking Jira right now.
+    pub fn in_flight(&self) -> &InFlight {
+        &self.in_flight
     }
 
     /// Saving the connection reads the Keychain afresh and starts a new client.

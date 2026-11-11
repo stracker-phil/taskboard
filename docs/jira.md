@@ -181,6 +181,10 @@ ends; the caller decides whether to repeat the job.
 - `jira/limiter.rs` `Limiter`: a burst of 5 (`BURST`), then 5 requests per second, shared by every client.
 - `jira/parallel.rs`: `ask_all` / `run_all` ask several things at once, `BURST` in flight, answers in the order
   asked: the bulk menus and changes, and the permission check of the tracked projects.
+- `jira/in_flight.rs` `InFlight`: every request the gateway sends or downloads, in words (`Endpoint::doing`,
+  `gateway/doing.rs`), from its start to its answer, shared by every client through `JiraAccess::in_flight`.
+  Each start and end emits `jira_activity` (`JiraActivity`, oldest first); `jira_activity` the command reads it.
+  The status bar shows it ([ux.md](ux.md#status-bar)).
 - `jira/retry.rs`: `429` is retried, and `503` only with `Retry-After`; at most `MAX_RETRIES` (4). A
   `Retry-After` in seconds or as an HTTP date is honored (capped at 15 minutes); without one, the wait is
   exponential with full jitter (base 1 s, cap 30 s). `RateLimit-Reason` is logged. Writes will pass

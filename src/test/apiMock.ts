@@ -251,6 +251,7 @@ export function createApiMock(): Api {
     statusStyleSet: vi.fn().mockResolvedValue([]),
     statusStylesAll: vi.fn().mockResolvedValue([]),
     statusStyleSetApp: vi.fn().mockResolvedValue([]),
+    jiraActivity: vi.fn().mockResolvedValue({ doing: [] }),
     syncOverview: vi.fn(async (): Promise<SyncOverview> => ({ state: { state: "idle", lastOk: null }, lastFullAt: null, projects: [], cacheBytes: 0 })),
     syncRun: done(),
     diagnosticsGet: vi.fn(async (): Promise<Diagnostics> => ({ groups: [] })),

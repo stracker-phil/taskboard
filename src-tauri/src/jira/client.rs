@@ -3,6 +3,7 @@
 use std::sync::Arc;
 
 use super::gateway::Gateway;
+use super::in_flight::InFlight;
 use super::limiter::Limiter;
 use super::site::Site;
 use crate::secrets::SecretStore;
@@ -12,10 +13,16 @@ pub struct JiraClient {
 }
 
 impl JiraClient {
-    /// `limiter` is shared by every client, so a reconnect can't double the request rate.
-    pub fn new(site: Site, secrets: Arc<dyn SecretStore>, limiter: Arc<Limiter>) -> Self {
+    /// `limiter` and `in_flight` are shared by every client, so a reconnect can't double the request rate or
+    /// lose the requests still running.
+    pub fn new(
+        site: Site,
+        secrets: Arc<dyn SecretStore>,
+        limiter: Arc<Limiter>,
+        in_flight: Arc<InFlight>,
+    ) -> Self {
         Self {
-            gateway: Gateway::new(site, secrets, limiter),
+            gateway: Gateway::new(site, secrets, limiter, in_flight),
         }
     }
 

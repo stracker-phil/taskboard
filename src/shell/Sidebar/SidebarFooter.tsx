@@ -1,7 +1,7 @@
 import { Settings } from "lucide-react";
 import { runBusCommand } from "../../state/requests";
 
-/** Settings, at the sidebar's foot beside the window's sidebar toggle. */
+/** Settings, right after the window's sidebar toggle. */
 export function SidebarFooter() {
   return (
     <div className="sb-footer">

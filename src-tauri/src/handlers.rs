@@ -58,6 +58,7 @@ pub fn handlers() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
         pins::pin_move,
         pins::pin_toggle_issue,
         connection::connection_get,
+        connection::jira_activity,
         connection::connection_change_permissions,
         connection::connection_save,
         connection::connection_test,

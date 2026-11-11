@@ -6,6 +6,7 @@ import type {
   AppError,
   AppInfo,
   AppStatusRow,
+  JiraActivity,
   Assignees,
   Accent,
   Appearance,
@@ -130,6 +131,8 @@ export const api = {
   scopeSave: (jql: string | null) => invoke<ScopeView>("scope_save", { jql }),
   /** Saves the intervals and days to keep; the scope changes through `scopeSave`. */
   syncSave: (sync: SyncSettings) => invoke<SyncSettings>("sync_save", { sync }),
+  /** What Taskboard is asking Jira right now; `jira_activity` events follow every change. */
+  jiraActivity: () => invoke<JiraActivity>("jira_activity"),
   /** The sync state and what the cache holds per tracked project. */
   syncOverview: () => invoke<SyncOverview>("sync_overview"),
   /** Queues a full sync and returns at once; progress arrives as `sync_progress` and `sync_state` events. */

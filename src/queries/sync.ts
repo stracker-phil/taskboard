@@ -37,3 +37,21 @@ export function describeSyncState(state: SyncState): string {
       return state.message;
   }
 }
+
+/** What Taskboard is asking Jira right now, oldest first; follows `jira_activity`. */
+export function useJiraActivity(): string[] {
+  const [doing, setDoing] = useState<string[]>([]);
+  useEffect(() => {
+    let live = true;
+    const unlisten = api.listen("jira_activity", (activity) => setDoing(activity.doing));
+    void api
+      .jiraActivity()
+      .then((activity) => live && setDoing(activity.doing))
+      .catch(() => {});
+    return () => {
+      live = false;
+      void unlisten.then((fn) => fn()).catch(() => {});
+    };
+  }, []);
+  return doing;
+}

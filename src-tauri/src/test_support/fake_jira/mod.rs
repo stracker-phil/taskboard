@@ -99,6 +99,7 @@ impl FakeJira {
             self.site(token_kind),
             Arc::new(FakeSecrets::with(ME_EMAIL, DEMO_TOKEN)),
             Arc::new(Limiter::new(1000, 1000)),
+            Arc::default(),
         )
     }
 

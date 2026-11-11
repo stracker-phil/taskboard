@@ -44,3 +44,23 @@
 .status-sync[data-state="offline"] { background: var(--panel-bg); }
 .status-sync[data-state="paused"], .status-sync[data-state="error"] { background: var(--sync-error-bg); color: var(--sync-error-text); }
 .status-sync[data-state="running"] { color: var(--sync-busy); }
+
+/* What Taskboard is asking Jira: it fades in after a moment; growing to the left, it moves nothing beside it. */
+.status-activity {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 0 6px;
+  white-space: nowrap;
+  animation: fade-in var(--motion-base) var(--ease-out);
+}
+.status-activity__text { overflow: hidden; text-overflow: ellipsis; }
+.status-activity__spinner {
+  flex: none; width: 10px; height: 10px; box-sizing: border-box; border-radius: 50%;
+  border: 1.5px solid var(--spinner-track); border-top-color: var(--accent);
+  animation: spin 0.9s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .status-activity__spinner { animation: none; }
+}

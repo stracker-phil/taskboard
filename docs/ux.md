@@ -42,9 +42,9 @@ The owner's rule (2026-10-30), for every control, list and popover:
 
 ## Window
 
-- **Frame** (`src/shell/Window.tsx`, `styles/shell.css`): a 264px sidebar (padding 16 12 12, gap 16) on
-  `--window-bg`, beside the content panel: `--panel-bg`, inset 8px top, right and bottom (none toward the
-  sidebar), 12px radius, `--shadow-panel`. Popovers anchor to the panel. The content column and every strip
+- **Frame** (`src/shell/Window.tsx`, `styles/shell.css`): a 264px sidebar (padding 16 12 3, gap 16) on
+  `--window-bg`, beside the content panel: `--panel-bg`, inset 8px at the top and right (none toward the
+  sidebar or the status bar below), 12px radius, `--shadow-panel`. Popovers anchor to the panel. The content column and every strip
   above the panel drag the window: each bar and the panel keep 8px of window above them (the column's 4px top
   padding plus a 34px strip's 4px around its 26px items), so there is always room to grab the window.
 - **Traffic lights** are the native ones, inside the sidebar's top 18px strip (`trafficLightPosition` 20, 24);
@@ -76,8 +76,9 @@ The owner's rule (2026-10-30), for every control, list and popover:
   An issue opens in its own tab, at its view with its Issue view shown, by a ⌘ double-click on its row or card
   (behind; ⌘⇧ shows it) or Issue → Open in New Tab ⌘⇧↩ (shown); the double-click's ⌘-clicks leave the picks as
   they were. Such a tab is named by the issue's key and title. ⌘⇧1–⌘⇧9 show the first to ninth tab.
-- **Sidebar** ([below](#sidebar)): ⌘\ or the sidebar toggle hides it; the panel then takes the full width under
-  a 34px title strip that keeps the traffic lights off it and holds the first bar, 20px after Back and Forward. The state is kept in `ui_state.json`.
+- **Sidebar** ([below](#sidebar)): ⌘\ or the sidebar toggle hides it; the panel then is unboxed: the full width
+  between a 34px title strip (it keeps the traffic lights off the panel and holds the first bar, 20px after Back
+  and Forward) and the status bar, with a `--hairline` toward each instead of an inset, radius and shadow. The state is kept in `ui_state.json`.
 - **Back and Forward** (`src/shell/NavArrows.tsx`, [ADR 0052](adr/0052-back-and-forward-live-in-each-tabs-nav.md)):
   two 26px arrow buttons (16/1.8, `--text-tertiary`, `--fill-hover` under the pointer, 35% while there is nowhere
   to go) that the frame draws 20px right of the traffic lights and level with them, in every layout: over the
@@ -93,7 +94,10 @@ The owner's rule (2026-10-30), for every control, list and popover:
   it, and its empty space drags the window. It holds what concerns the whole app, at its right end, ending at the
   panel's right edge, 12px `--text-tertiary`: the memory chip (`MemoryStatus`; memory-stick icon 14/1.8 in a fixed
   26px slot, shown only with `sync.memoryOnly`; its tooltip names the cached issues and the megabytes), then the
-  [sync state](#sync-state). What concerns the view (its issue count) stays on the view line.
+  [sync state](#sync-state). Before them, while Taskboard asks Jira anything (`JiraActivityStatus`, Rust's
+  `jira_activity`): a 10px spinner and the newest request in words, "Saving the status…", with "+N" for the others
+  running; its tooltip lists them all. It fades in once requests have run 300ms, so quick ones never show, and
+  stays through gaps under 250ms, so a menu's load and the change after it read as one. What concerns the view (its issue count) stays on the view line.
 - **Content panel** (`main`, a flex column): the [header](#content-header), the [view tabs](#view-tabs), then
   the view body (`.content-panel__body`). The body stays and only its content changes: `MainBody` shows a view once
   its rows or Board are loaded and keeps the one before until then, so switching views, layouts or the narrowing
@@ -136,8 +140,8 @@ The owner's rule (2026-10-30), for every control, list and popover:
   selected one's name renames it, one on its tile or icon opens the look editor (`LookPopover`, saved with
   `space_update` or `list_set_look`) under it. A double-click renames as well. The header and Home show the same
   tile.
-- **Footer** (`SidebarFooter`): 26px, in the status bar's row (the sidebar keeps 3px below it): room on the
-  left for the window's [sidebar toggle](#window), Settings at the right (26px, gear 16/1.8).
+- **Footer** (`SidebarFooter`): 26px, in the status bar's row (the sidebar keeps 3px below it): the window's
+  [sidebar toggle](#window), then Settings 4px after it (26px, gear 16/1.8).
 - **Hover**: rows, "+", Settings and the sidebar toggle take `--fill-hover`; the selected row keeps
   its fill.
 - **Context menus** ([Menus](#menus)). A filter list: Rename, Icon and Color…, Duplicate, Add to Home or

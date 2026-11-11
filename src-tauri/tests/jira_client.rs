@@ -294,6 +294,7 @@ mod errors {
             fake.site(TokenKind::Classic),
             Arc::new(FakeSecrets::default()),
             Arc::new(Limiter::new(1000, 1000)),
+            Arc::default(),
         );
 
         let err = client.myself().await.unwrap_err();
@@ -1027,12 +1028,90 @@ mod attachment_downloads {
             fake.site(TokenKind::Classic),
             Arc::new(FakeSecrets::default()),
             Arc::new(Limiter::new(1000, 1000)),
+            Arc::default(),
         );
 
         let err = client.attachment_content(PDF_ID).await.unwrap_err();
 
         assert_eq!(err.kind(), ErrorKind::NotConnected);
         assert!(fake.requests().is_empty());
+    }
+}
+
+mod activity {
+    use super::*;
+    use std::sync::Mutex;
+    use taskboard_lib::adf::from_plain_text;
+    use taskboard_lib::jira::{InFlight, JiraActivity};
+
+    fn watched_client(
+        fake: &FakeJira,
+        secrets: FakeSecrets,
+    ) -> (JiraClient, Arc<InFlight>, Arc<Mutex<Vec<Vec<String>>>>) {
+        let in_flight = Arc::new(InFlight::default());
+        let heard = Arc::new(Mutex::new(Vec::new()));
+        let sink = Arc::clone(&heard);
+        in_flight.set_notifier(Box::new(move |activity: &JiraActivity| {
+            sink.lock().unwrap().push(activity.doing.clone());
+        }));
+        let client = JiraClient::new(
+            fake.site(TokenKind::Classic),
+            Arc::new(secrets),
+            Arc::new(Limiter::new(1000, 1000)),
+            Arc::clone(&in_flight),
+        );
+        (client, in_flight, heard)
+    }
+
+    #[tokio::test]
+    async fn a_comment_in_flight_is_reported_in_words_until_it_returns() {
+        let fake = FakeJira::start_demo().await;
+        let (client, in_flight, heard) =
+            watched_client(&fake, FakeSecrets::with(ME_EMAIL, DEMO_TOKEN));
+
+        client
+            .add_comment("NW-1042", from_plain_text("Checked on staging"))
+            .await
+            .unwrap();
+
+        assert_eq!(
+            *heard.lock().unwrap(),
+            [vec!["Sending the comment".to_string()], Vec::<String>::new()]
+        );
+        assert_eq!(in_flight.activity(), JiraActivity::default());
+    }
+
+    #[tokio::test]
+    async fn a_rejected_comment_leaves_no_activity_behind() {
+        let fake = FakeJira::start_demo().await;
+        fake.answer_next_write(500, json!({ "errorMessages": ["Internal error"] }));
+        let (client, in_flight, heard) =
+            watched_client(&fake, FakeSecrets::with(ME_EMAIL, DEMO_TOKEN));
+
+        let result = client
+            .add_comment("NW-1042", from_plain_text("Checked on staging"))
+            .await;
+
+        assert!(result.is_err());
+        assert_eq!(
+            *heard.lock().unwrap(),
+            [vec!["Sending the comment".to_string()], Vec::<String>::new()]
+        );
+        assert_eq!(in_flight.activity(), JiraActivity::default());
+    }
+
+    #[tokio::test]
+    async fn without_a_token_the_comment_fails_and_leaves_no_activity_behind() {
+        let fake = FakeJira::start_demo().await;
+        let (client, in_flight, _) = watched_client(&fake, FakeSecrets::default());
+
+        let err = client
+            .add_comment("NW-1042", from_plain_text("Checked on staging"))
+            .await
+            .unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::NotConnected);
+        assert_eq!(in_flight.activity(), JiraActivity::default());
     }
 }
 

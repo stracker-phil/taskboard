@@ -1,3 +1,4 @@
+import { JiraActivityStatus } from "./JiraActivityStatus";
 import { MemoryStatus } from "./MemoryStatus";
 import { SyncStatus } from "./SyncStatus";
 
@@ -6,6 +7,7 @@ import { SyncStatus } from "./SyncStatus";
 export function StatusBar() {
   return (
     <footer className="status-bar" data-tauri-drag-region>
+      <JiraActivityStatus />
       <MemoryStatus />
       <SyncStatus />
     </footer>

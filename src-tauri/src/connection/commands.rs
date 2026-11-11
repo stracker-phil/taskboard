@@ -30,6 +30,12 @@ pub async fn connection_change_permissions(
     Ok(super::permissions::not_allowed(&granted))
 }
 
+/// What Taskboard is asking Jira right now; `jira_activity` announces every change.
+#[tauri::command]
+pub fn jira_activity(state: State<'_, AppState>) -> crate::jira::JiraActivity {
+    state.jira.in_flight().activity()
+}
+
 #[tauri::command]
 pub fn connection_get(state: State<'_, AppState>) -> ConnectionView {
     super::view(&state.settings, &state.jira, today())

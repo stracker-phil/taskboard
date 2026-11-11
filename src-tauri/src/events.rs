@@ -36,6 +36,8 @@ pub const LOCAL_CHANGED_EVENT: &str = "local_changed";
 pub const SYNC_STATE_EVENT: &str = "sync_state";
 /// Payload: a `SyncProgress`, after every page of a full sync.
 pub const SYNC_PROGRESS_EVENT: &str = "sync_progress";
+/// Payload: the `JiraActivity` after a Jira request started or ended.
+pub const JIRA_ACTIVITY_EVENT: &str = "jira_activity";
 /// To the main window. No payload; shows or hides the sidebar.
 pub const TOGGLE_SIDEBAR_EVENT: &str = "toggle_sidebar";
 /// To the main window. Payload: the id of a page command to run (a menu item for something the page does).

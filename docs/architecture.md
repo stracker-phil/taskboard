@@ -121,8 +121,9 @@ src-tauri/
   src/db/                    the two SQLite files: open, migrate, read, the one write path
   migrations/local/ cache/   numbered SQL migrations per file
   src/net.rs secrets.rs      hosts, the avatar host rule (AvatarUrl), answer and error types, log redaction; the Keychain
-  src/jira/                  Jira Cloud: site, client, limiter, retries, paging, endpoints, DTOs, JQL; capability.rs:
-                             what the app does with Jira, named by every endpoint (Settings → Connection)
+  src/jira/                  Jira Cloud: site, client, limiter, retries, requests in flight, paging, endpoints, DTOs,
+                             JQL; capability.rs: what the app does with Jira, named by every endpoint (Settings →
+                             Connection)
   src/jira/gateway/          the one door to Jira: endpoint allowlist, validated values, guard, the HTTP client,
                              the avatar client (avatar.rs)
   src/connection/            the Jira connection: Keychain access, Test Connection, tracked projects, scope

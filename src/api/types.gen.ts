@@ -495,6 +495,12 @@ export type IssuesChanged = { ids: Array<string>,
  */
 all: boolean, };
 
+export type JiraActivity = { 
+/**
+ * One entry per request in flight, oldest first ("Saving the status").
+ */
+doing: Array<string>, };
+
 export type Job = "full" | "delta" | "reconcile";
 
 export type Label = { name: string, 
