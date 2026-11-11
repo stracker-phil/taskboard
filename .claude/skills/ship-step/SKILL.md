@@ -24,10 +24,14 @@ description: Finish a development step in Taskboard - clean up and review the co
 6. Stage the step's files by path (check `git status` for stray files), then commit following
    `.claude/rules/commits.md`. Never push.
 7. Choose the bump from `git log v<last>..HEAD` (`git describe --tags --abbrev=0` names the last; with no
-   tag yet, from the commit "Set the version to 1.0.1") per ADR 0054: major if existing use breaks, minor for
-   new features or visible behavior, patch otherwise. Run `bun run release major|minor|patch` (in the
+   tag yet, from the commit "Set the version to 1.0.1") per ADR 0054 and 0065: minor for new features, visible
+   behavior and changes that break existing use, patch otherwise. Major only with the owner's explicit
+   approval, asked first. Run `bun run release major|minor|patch` (in the
    background; it takes minutes): `scripts/install.sh` installs the release build as
    `~/Applications/Taskboard.app` and `taskboard`, and restarts the running app on it, so the user's app
    always matches the last commit; then the script commits "Release X.Y.Z" and tags `vX.Y.Z` (never pushed).
-8. Report to the user: what changed, the `ci` summary, open review questions, and that the release app was
+8. If this step added an ADR that other apps of the family could share, ask the owner whether to propose it
+   for the family catalog (the user-level `app-blueprint` skill, mode `record`). Only ask: never edit the
+   catalog yourself, and drop it when the owner says no.
+9. Report to the user: what changed, the `ci` summary, open review questions, and that the release app was
    installed with its new version.
