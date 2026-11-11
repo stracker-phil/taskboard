@@ -48,7 +48,7 @@ The owner's rule (2026-10-30), for every control, list and popover:
   above the panel drag the window: each bar and the panel keep 8px of window above them (the column's 4px top
   padding plus a 34px strip's 4px around its 26px items), so there is always room to grab the window.
 - **Traffic lights** are the native ones, inside the sidebar's top 18px strip (`trafficLightPosition` 20, 24);
-  the strip and empty chrome drag the window. There is no icon rail or status bar, and no top bar but the
+  the strip and empty chrome drag the window. There is no icon rail, a [status bar](#status-bar) under the panel ([ADR 0060](adr/0060-a-status-bar-under-the-panel.md)), and no top bar but the
   bookmarks bar ([ADR 0047](adr/0047-the-bookmarks-bar-is-the-only-top-bar.md)) and, from a second tab, the tabs
   ([ADR 0050](adr/0050-tabs-in-the-main-window.md)).
 - **Bookmarks bar** (`src/pins/BookmarksBar.tsx`, `styles/bookmarks-bar.css`; View → Show Bookmarks Bar ⇧⌘B,
@@ -83,12 +83,17 @@ The owner's rule (2026-10-30), for every control, list and popover:
   to go) that the frame draws 20px right of the traffic lights and level with them, in every layout: over the
   sidebar's top, or in the title strip ahead of the tabs or the bookmarks bar. They walk the active tab's places and
   issues (⌘[ and ⌘], Go → Back and Forward); a step back to an issue opens it in the Issue view again.
-- **Sidebar toggle** (`src/shell/SidebarToggle.tsx`): a 34px button (panel icon 17/1.8, styled like Settings)
-  that the frame, not the sidebar, draws 12px from the window's left and bottom edges, so it never moves. With
-  the sidebar shown it is the footer's first item; hidden, it floats over the panel's lower-left corner on
-  `--panel-bg` with `--shadow-panel` (`--shadow-hover` on hover), and the Table and Board keep 46px clear
-  below their content. "Hide sidebar" or "Show sidebar" with the current shortcut; `aria-pressed` while the
-  sidebar shows. It runs `view:toggleSidebar` and stays the same element, so focus stays on it.
+- **Sidebar toggle** (`src/shell/SidebarToggle.tsx`): a 26px button (panel icon 16/1.8, styled like Settings)
+  that the frame, not the sidebar, draws 12px from the window's left edge in the bottom row, so it never moves:
+  the sidebar footer's first item, or the status bar's while the sidebar is hidden. "Hide sidebar" or "Show
+  sidebar" with the current shortcut; `aria-pressed` while the sidebar shows. It runs `view:toggleSidebar` and
+  stays the same element, so focus stays on it.
+- **Status bar** (`src/shell/statusBar/`, `styles/status-bar.css`, [ADR 0060](adr/0060-a-status-bar-under-the-panel.md)):
+  a 32px row on `--window-bg` under the panel, level with the sidebar footer; the panel keeps no bottom gap above
+  it, and its empty space drags the window. It holds what concerns the whole app, at its right end, ending at the
+  panel's right edge, 12px `--text-tertiary`: the memory chip (`MemoryStatus`; memory-stick icon 14/1.8 in a fixed
+  26px slot, shown only with `sync.memoryOnly`; its tooltip names the cached issues and the megabytes), then the
+  [sync state](#sync-state). What concerns the view (its issue count) stays on the view line.
 - **Content panel** (`main`, a flex column): the [header](#content-header), the [view tabs](#view-tabs), then
   the view body (`.content-panel__body`). The body stays and only its content changes: `MainBody` shows a view once
   its rows or Board are loaded and keeps the one before until then, so switching views, layouts or the narrowing
@@ -131,11 +136,9 @@ The owner's rule (2026-10-30), for every control, list and popover:
   selected one's name renames it, one on its tile or icon opens the look editor (`LookPopover`, saved with
   `space_update` or `list_set_look`) under it. A double-click renames as well. The header and Home show the same
   tile.
-- **Footer** (`SidebarFooter`): room on the left for the window's [sidebar toggle](#window), then the sync
-  chip (34px, 13px `--text-tertiary`; a 7px dot in `--sync-ok`, `--sync-busy`, `--sync-offline` or
-  `--sync-error-dot` by state; the state in words from `describeSyncState`; a refresh icon 14/2; a click syncs
-  now) and Settings (34px, gear 17/1.8).
-- **Hover**: rows, "+", the chip, Settings and the sidebar toggle take `--fill-hover`; the selected row keeps
+- **Footer** (`SidebarFooter`): 26px, in the status bar's row (the sidebar keeps 3px below it): room on the
+  left for the window's [sidebar toggle](#window), Settings at the right (26px, gear 16/1.8).
+- **Hover**: rows, "+", Settings and the sidebar toggle take `--fill-hover`; the selected row keeps
   its fill.
 - **Context menus** ([Menus](#menus)). A filter list: Rename, Icon and Color…, Duplicate, Add to Home or
   Remove from Home, Delete. A Space: Rename, Icon and Color…, Client label…, Space Settings…, Stop tracking.
@@ -503,11 +506,20 @@ and views can be bookmarked; a filter list's bookmark puts it under Home.
   on `--notice-neutral-*` ("Deleted in Jira or you lost access. Last synced <day>. This is the cached copy."),
   Remove from cache (`issue_forget`, gone issues only) and Remove bookmark while bookmarked.
 
-## Sync chip and token banners
+## Sync state and token banners
 
-The sidebar footer's chip (artboard 8, panel 5) says "Synced 2 min ago" (counting on), "Syncing… 3 changes"
-with a turning icon, "Offline · synced 14:02" (the last sync that worked) on white, or "Sync paused · token" / "Sync failed" in
-red; its tooltip names the reason and the time of the next try, a click syncs now (⌘R). Under the content header (panel 4) a red banner says Jira rejected
+### Sync state
+
+The status bar's last item (`SyncStatus`, `statusBar/syncWords.ts`; 26px, 7px radius, a 7px dot in `--sync-ok`,
+`--sync-busy`, `--sync-offline` or `--sync-error-dot`, a refresh icon 13/2 that turns while a sync runs) says
+"Synced 2 min ago" (counting on; "Synced at 14:02" later that day, then "yesterday at 09:12" and "on 3 Nov at
+09:12"), "Syncing… 3 changes", "Offline · synced at 14:02" (the last sync that worked) on white, or "Sync paused ·
+token" / "Sync failed" in red. It never cuts its text. Its tooltip names the reason and the time of the next try,
+the last sync and the last full sync with date and seconds, and that a click syncs now (⌘R).
+
+### Token banners
+
+Under the content header (panel 4) a red banner says Jira rejected
 the token (sync paused) with Update token, and an amber one warns 14 days before the token expires, with
 Replace and × (dismissed for the rest of the day). Nothing blocks: the app keeps working from the cache.
 
@@ -822,7 +834,7 @@ bundled fonts. Weights 400, 500, 600, 700, 750 (titles) and 800 (tile letters).
 ## Metrics
 
 Radii: 6 (tiles, chips, row hover), 7 (pills, small buttons, popover rows), 8 (sidebar rows, toolbar
-buttons, group tabs), 9 (search, sync chip), 10 (cards, list group cards), 12 (panel, popovers, board
+buttons, group tabs), 9 (search), 7 (sidebar footer, status bar items), 10 (cards, list group cards), 12 (panel, popovers, board
 columns), 16 (palette), 3 (status squares), 50% (avatars, dots). Heights: sidebar search and home rows 34, Space
 rows 36, filter-list rows 32; view tabs 42, toolbar 50 (controls 30), group tab 30, list row 44, board column
 300 wide.

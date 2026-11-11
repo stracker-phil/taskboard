@@ -1,0 +1,46 @@
+/* The status bar (src/shell/statusBar/): a 32px row on the window background under the content panel, level with
+   the sidebar footer; its items end at the panel's right edge. */
+.status-bar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  height: 32px;
+  padding: 0 8px 0 46px;
+  box-sizing: border-box;
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+.status-bar__spin { animation: spin 1s linear infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .status-bar__spin { animation: none; }
+}
+
+/* Memory mode: a fixed 26px slot, so the chip coming or going moves nothing. */
+.status-memory { display: grid; flex: none; place-items: center; width: 26px; height: 26px; }
+.status-memory > [role="img"] { display: grid; place-items: center; animation: fade-in var(--motion-base) var(--ease-out); }
+
+.status-sync {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 7px;
+  height: 26px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.status-sync:hover { background: var(--fill-hover); }
+.status-sync__dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--sync-ok); }
+.status-sync__dot[data-state="running"] { background: var(--sync-busy); }
+.status-sync__dot[data-state="offline"] { background: var(--sync-offline); }
+.status-sync__dot[data-state="error"], .status-sync__dot[data-state="paused"] { background: var(--sync-error-dot); }
+.status-sync[data-state="offline"] { background: var(--panel-bg); }
+.status-sync[data-state="paused"], .status-sync[data-state="error"] { background: var(--sync-error-bg); color: var(--sync-error-text); }
+.status-sync[data-state="running"] { color: var(--sync-busy); }

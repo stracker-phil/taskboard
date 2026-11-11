@@ -7,9 +7,8 @@ import { fail, useStore } from "../../../state/store";
 import { ConfirmSheet } from "../../ConfirmSheet";
 import { Group, Row, Segmented, Switch } from "../controls";
 import { useBusyAction } from "../useBusyAction";
+import { megabytes } from "../../../lib/size";
 import { ShowDataFolder } from "./ShowDataFolder";
-
-const megabytes = (bytes: number) => `${(bytes / 1_000_000).toFixed(1)} MB`;
 
 const WHAT_STAYS = "Spaces, filter lists, views, bookmarks and what you've read stay.";
 

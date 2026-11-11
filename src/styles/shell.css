@@ -16,7 +16,8 @@
   flex-direction: column;
   gap: 16px;
   min-height: 0;
-  padding: 16px 12px 12px;
+  /* The footer ends in the status bar's row: 3px under its 26px items. */
+  padding: 16px 12px 3px;
 }
 
 /* The native traffic lights sit here (tauri.conf.json `trafficLightPosition`). */
@@ -25,19 +26,13 @@
   height: 18px;
 }
 
-/* The sidebar toggle never moves: the footer's first item, or floating over the panel's corner when hidden. */
+/* The sidebar toggle never moves: in the bottom row, the sidebar footer's first item or the status bar's. */
 .sidebar-toggle {
   position: absolute;
-  bottom: 12px;
+  bottom: 3px;
   left: 12px;
   z-index: 3;
-  transition: background-color var(--motion-base) var(--ease-out), box-shadow var(--motion-base) var(--ease-out);
 }
-.shell--sidebar-hidden .sidebar-toggle { background: var(--panel-bg); box-shadow: var(--shadow-panel); }
-.shell--sidebar-hidden .sidebar-toggle:hover { background: var(--panel-bg); box-shadow: var(--shadow-hover); color: var(--text); }
-
-/* Views whose content reaches the panel's lower-left corner scroll it clear of the floating toggle. */
-.shell--sidebar-hidden .board { padding-bottom: 46px; }
 
 .shell__content {
   display: flex;
@@ -74,7 +69,7 @@
   flex-direction: row;
   flex: 1;
   min-height: 0;
-  margin: 4px 8px 8px 0;
+  margin: 4px 8px 0 0;
   overflow: hidden;
   border-radius: 12px;
   background: var(--panel-bg);

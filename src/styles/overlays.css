@@ -30,7 +30,8 @@
 .toasts {
   position: fixed;
   right: 16px;
-  bottom: 16px;
+  /* Over the panel, clear of the status bar's 32px. */
+  bottom: 48px;
   transition: bottom var(--motion-base) var(--ease-out);
   z-index: 70;
   display: flex;
@@ -39,7 +40,7 @@
   gap: 8px;
 }
 /* Above the bulk bar while issues are picked, so a narrow window never puts one over the other. */
-body:has(.bulk-bar:not(.bulk-bar--leaving)) .toasts { bottom: 72px; }
+body:has(.bulk-bar:not(.bulk-bar--leaving)) .toasts { bottom: 96px; }
 .toast {
   display: flex;
   align-items: flex-start;

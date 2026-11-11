@@ -7,6 +7,7 @@ import "./base.css";
 import "./controls.css";
 import "./shell.css";
 import "./sidebar.css";
+import "./status-bar.css";
 import "./header.css";
 import "./issue.css";
 import "./list.css";

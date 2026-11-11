@@ -69,5 +69,6 @@ stands in Taskboard. The numbers in this table are Taskboard's.
 | [0057](0057-jira-data-can-live-in-memory-only.md) | Jira data can live in memory only (opt-in) | Accepted (2026-11-10) |
 | [0058](0058-own-changes-are-not-news.md) | The owner's own changes aren't news | Accepted (2026-11-10) |
 | [0059](0059-the-inbox-replaces-unread-mode.md) | The inbox replaces Unread mode (supersedes 0046) | Accepted (2026-11-10) |
+| [0060](0060-a-status-bar-under-the-panel.md) | A status bar under the content panel | Accepted (2026-11-11) |
 
 Open: integrations with Daybook and TimeTracker.

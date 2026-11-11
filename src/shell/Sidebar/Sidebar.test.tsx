@@ -984,12 +984,11 @@ describe("Sidebar", () => {
       expect(mocked.runCommand).toHaveBeenCalledWith("app:settings");
     });
 
-    it("shows the sync state and syncs when the chip is clicked", async () => {
+    it("leaves the sync state to the status bar", async () => {
       await renderSidebar();
+      await screen.findByRole("button", { name: "Settings" });
 
-      await userEvent.click(await screen.findByRole("button", { name: "Not synced yet" }));
-
-      expect(mocked.runCommand).toHaveBeenCalledWith("sync:refresh");
+      expect(screen.queryByRole("button", { name: "Not synced yet" })).not.toBeInTheDocument();
     });
   });
 

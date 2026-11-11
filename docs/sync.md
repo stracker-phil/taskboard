@@ -72,7 +72,7 @@ its newest entry, which the history already has.
 hourly, a delta every `focused_minutes` while the main window has focus (5 by default) and every
 `background_minutes` otherwise (15), and right away after the Mac woke (a tick more than 2 minutes late). While
 a sync is failing, only a delta runs, at the failure's `retryAt` or after a wake. ⌘R (`sync:refresh`, also the
-sync chip and `taskboard sync`) queues a delta, ⌘⇧R (`sync:full`, `taskboard sync --full`) a full sync.
+status bar's sync state and `taskboard sync`) queues a delta, ⌘⇧R (`sync:full`, `taskboard sync --full`) a full sync.
 
 ## Own changes
 

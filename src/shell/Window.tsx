@@ -14,6 +14,7 @@ import { findLevel } from "./levels";
 import { Sidebar } from "./Sidebar/Sidebar";
 import { NavArrows } from "./NavArrows";
 import { SidebarToggle } from "./SidebarToggle";
+import { StatusBar } from "./statusBar/StatusBar";
 import { TabStrip } from "./TabStrip";
 import { Toolbar } from "./toolbar/Toolbar";
 import { ViewTabs } from "./ViewTabs";
@@ -24,8 +25,8 @@ interface Props {
   children: ReactNode;
 }
 
-/** The main window's frame: the sidebar beside the inset content panel, and the sidebar toggle fixed in the
- *  lower-left corner over both. */
+/** The main window's frame: the sidebar beside the inset content panel and the status bar under it, and the
+ *  sidebar toggle fixed in the lower-left corner, in the sidebar footer's row or the status bar's. */
 export function Window({ sidebarHidden, children }: Props) {
   const issueView = useStore((s) => s.issueView);
   const { bookmarksBar } = useModes();
@@ -74,6 +75,7 @@ export function Window({ sidebarHidden, children }: Props) {
             </>
           )}
         </main>
+        <StatusBar />
       </div>
       <HoverPeek />
     </div>

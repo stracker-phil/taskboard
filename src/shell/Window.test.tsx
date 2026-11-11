@@ -419,6 +419,18 @@ describe("Window", () => {
     });
   });
 
+  describe("status bar", () => {
+    it("shows the sync state outside the content panel and syncs when it is clicked", async () => {
+      await renderWindow(false);
+
+      const chip = await within(screen.getByRole("contentinfo")).findByRole("button", { name: "Not synced yet" });
+      await userEvent.click(chip);
+
+      expect(screen.getByRole("main")).not.toContainElement(chip);
+      expect(mocked.runCommand).toHaveBeenCalledWith("sync:refresh");
+    });
+  });
+
   describe("without an Issue view", () => {
     it("shows the view body and stays that way when the place changes", async () => {
       await renderWindow(false);

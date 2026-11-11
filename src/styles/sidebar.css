@@ -157,54 +157,23 @@
   pointer-events: none;
 }
 
-/* The window's sidebar toggle (shell.css) sits over the footer's left end. */
-.sb-footer { display: flex; flex: none; align-items: center; gap: 6px; padding-left: 40px; }
-.sb-sync {
-  display: flex;
-  flex: 1;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  height: 34px;
-  padding: 0 10px;
-  border: none;
-  border-radius: 9px;
-  background: transparent;
-  color: var(--text-tertiary);
-  font-size: 13px;
-  text-align: left;
-}
-.sb-sync__text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sb-sync__dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--sync-ok); }
-.sb-sync__dot[data-state="running"] { background: var(--sync-busy); }
-.sb-sync__dot[data-state="offline"] { background: var(--sync-offline); }
-.sb-sync__dot[data-state="error"], .sb-sync__dot[data-state="paused"] { background: var(--sync-error-dot); }
+/* The window's sidebar toggle (shell.css) sits at the footer's left end, Settings at its right; the footer shares
+   the status bar's 32px row (status-bar.css). */
+.sb-footer { display: flex; flex: none; align-items: center; justify-content: flex-end; height: 26px; }
 .sb-settings, .sidebar-toggle {
   display: flex;
   flex: none;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  width: 26px;
+  height: 26px;
   padding: 0;
   border: none;
-  border-radius: 9px;
+  border-radius: 7px;
   background: transparent;
   color: var(--text-tertiary);
 }
-.sb-sync:hover, .sb-settings:hover, .sidebar-toggle:hover { background: var(--fill-hover); }
-
-/* The chip's states (artboard 8, panel 5): offline on white, paused and failed in red. */
-.sb-sync[data-state="offline"] { background: var(--panel-bg); }
-.sb-sync[data-state="paused"], .sb-sync[data-state="error"] { background: var(--sync-error-bg); color: var(--sync-error-text); }
-.sb-sync[data-state="running"] { color: var(--sync-busy); }
-.sb-sync__spin { animation: spin 1s linear infinite; }
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .sb-sync__spin { animation: none; }
-}
+.sb-settings:hover, .sidebar-toggle:hover { background: var(--fill-hover); }
 
 /* A filter list row: its icon is its own button over the row's icon slot (it opens the icon picker). */
 .sb-list-row { position: relative; display: flex; flex-direction: column; }

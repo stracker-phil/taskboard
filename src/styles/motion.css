@@ -30,6 +30,11 @@
   from { opacity: 0; }
 }
 
+/* Spinners and turning icons. */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 /* Disclosures (sidebar Spaces) grow open and shrink closed. */
 .disclosure { display: grid; grid-template-rows: 1fr; animation: grow-in var(--motion-slow) var(--ease-in-out); }
 .disclosure__inner { min-height: 0; overflow: hidden; }
@@ -46,7 +51,7 @@
 .disclosure-chevron--closed { transform: rotate(-90deg); }
 
 /* Hover and press: a short tint or border change on every interactive element. */
-.sb-row, .sb-new-list, .sb-sync, .sb-settings, .sb-spaces__add, .view-tab, .view-tabs__add,
+.sb-row, .sb-new-list, .status-sync, .sb-settings, .sb-spaces__add, .view-tab, .view-tabs__add,
 .open-in-jira, .content-header__crumb, .icon-btn, .btn-primary-dark {
   transition: background-color var(--motion-fast) var(--ease-out), color var(--motion-fast) var(--ease-out),
     border-color var(--motion-fast) var(--ease-out), box-shadow var(--motion-fast) var(--ease-out);
