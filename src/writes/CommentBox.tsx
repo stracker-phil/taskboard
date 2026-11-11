@@ -59,7 +59,7 @@ export function CommentBox({ issueId }: { issueId: string }) {
         onKeyDown={onKeyDown}
       />
       <div className="comment-box__actions">
-        <span className="comment-box__hint">⌘↩ to send</span>
+        <span className="comment-box__hint">Markdown · ⌘↩ to send</span>
         <button type="submit" className="btn btn-primary" disabled={empty || sending}>
           {sending ? "Sending…" : "Comment"}
         </button>

@@ -90,7 +90,7 @@ pub enum Endpoint {
         issue: IssueRef,
         transition: TransitionId,
     },
-    /// Write: adds a comment; `body` is an ADF document (`adf::from_plain_text`).
+    /// Write: adds a comment; `body` is an ADF document (`adf::from_markdown`).
     AddComment {
         issue: IssueRef,
         body: Value,

@@ -1,5 +1,5 @@
 //! Atlassian Document Format (ADF) → HTML for the page, ADF → Markdown for an issue copied as Markdown, and
-//! plain text → ADF for comments typed in Taskboard.
+//! Markdown → ADF for comments typed in Taskboard.
 //! Pure: no database, no network.
 //!
 //! Jira's own rendering (`renderedFields`) goes through wiki markup and loses formatting: inline code comes back
@@ -9,12 +9,12 @@
 //! the page fills (ADR 0039), other media become text chips (ADR 0020).
 
 mod blocks;
-mod from_text;
+mod from_markdown;
 mod inline;
 mod markdown;
 mod media;
 
-pub use from_text::from_plain_text;
+pub use from_markdown::from_markdown;
 pub use markdown::to_markdown;
 pub use media::{File, Media, is_inline_image};
 

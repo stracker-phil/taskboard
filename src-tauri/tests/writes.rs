@@ -1666,6 +1666,59 @@ mod commenting {
     }
 
     #[tokio::test]
+    async fn markdown_in_a_comment_is_sent_as_formatted_adf_and_shown_as_plain_text() {
+        let rig = Rig::synced().await;
+        rig.fake.set_latency(std::time::Duration::from_millis(100));
+
+        let (result, shown) = tokio::join!(
+            rig.comment(NW_1042, "Ship **today**\n\n- first\n- second"),
+            async {
+                tokio::time::timeout(std::time::Duration::from_secs(30), async {
+                    loop {
+                        let text: Option<String> = rig
+                            .ctx
+                            .db
+                            .read(|conn| {
+                                Ok(conn
+                                    .query_row(
+                                        "SELECT body_text FROM cache.comment WHERE id LIKE 'pending:%'",
+                                        [],
+                                        |row| row.get(0),
+                                    )
+                                    .ok())
+                            })
+                            .await
+                            .unwrap();
+                        if let Some(text) = text {
+                            return text;
+                        }
+                        tokio::time::sleep(std::time::Duration::from_millis(2)).await;
+                    }
+                })
+                .await
+                .expect("the pending comment never showed")
+            }
+        );
+
+        result.unwrap();
+        assert!(!shown.contains("**"), "{shown:?}");
+        let sent = rig
+            .fake
+            .requests()
+            .into_iter()
+            .find(|r| r.method == "POST" && r.path.ends_with("/comment"))
+            .expect("the comment was posted")
+            .body;
+        let content = sent["body"]["content"].as_array().unwrap();
+        assert_eq!(
+            content[0]["content"][1],
+            json!({ "type": "text", "text": "today", "marks": [{ "type": "strong" }] })
+        );
+        assert_eq!(content[1]["type"], "bulletList");
+        assert_eq!(content[1]["content"].as_array().unwrap().len(), 2);
+    }
+
+    #[tokio::test]
     async fn shows_the_comment_and_its_count_at_once_while_it_is_on_its_way() {
         let rig = Rig::synced().await;
         rig.fake.set_latency(std::time::Duration::from_millis(100));

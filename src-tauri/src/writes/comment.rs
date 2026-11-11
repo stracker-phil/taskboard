@@ -14,6 +14,7 @@ use crate::jira::dto::Comment;
 use crate::store::settings::Settings;
 use crate::sync::refetch_issue;
 use crate::sync::source::Source;
+use crate::text::html_to_text;
 use crate::time::format_utc;
 
 /// Jira's comment length cap, in characters.
@@ -29,12 +30,14 @@ pub async fn add_comment(
     ensure_allowed(settings, Capability::Comment)?;
     let me = me_of(settings)?;
     let text = checked_text(&text)?;
-    let body = adf::from_plain_text(&text);
+    let body = adf::from_markdown(&text);
     let change = format!("Comment ({} characters)", text.chars().count());
+    let html = adf::to_html(&body, &Media::default()).unwrap_or_default();
+    let text = html_to_text(&html);
     let shown = Shown {
         issue_id: issue_id.clone(),
         pending_id: format!("pending:{}", fastrand::u64(..)),
-        html: adf::to_html(&body, &Media::default()).unwrap_or_default(),
+        html,
         adf: body.to_string(),
         text,
         at: format_utc(Utc::now()),

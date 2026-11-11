@@ -43,6 +43,8 @@ fastrand = "2"
 futures-util = { version = "0.3", default-features = false, features = ["alloc"] }
 base64 = "0.22"
 unicode-normalization = "0.1.26"
+# Markdown comments (`adf::from_markdown`), the parser without its HTML writer.
+pulldown-cmark = { version = "0.13.6", default-features = false }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # Quick Look for attachments (ADR 0035).

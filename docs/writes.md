@@ -128,9 +128,10 @@ are off, with a modifier key, or on a button in the row.
 
 ## Comments
 
-`issue_comment(id, text)` (`writes::add_comment`) takes plain text, at most `MAX_COMMENT_CHARS` (Jira's 32,767),
-and turns it into ADF (`adf::from_plain_text`: a blank line starts a paragraph, a line break is a hard break,
-`http(s)://` addresses become links). The comment shows in the activity at once as a `cache.comment` row with
+`issue_comment(id, text)` (`writes::add_comment`) takes Markdown, at most `MAX_COMMENT_CHARS` (Jira's 32,767),
+and turns it into ADF (`adf::from_markdown`, [ADR 0063](adr/0063-comments-are-written-in-markdown.md): emphasis,
+strike-through, code, links, lists, quotes, headings, code blocks and rules; a line break is a hard break, bare
+`http(s)://` addresses become links, raw HTML stays text). The comment shows in the activity at once as a `cache.comment` row with
 the id `pending:<random>` by the connected account, and the issue's `comment_count` goes up, so the fetch that
 brings Jira's comment records no change and the own comment isn't unread. Both comment replacements (the sync's
 and `issue_sync_comments`) keep `pending:` rows. Jira accepts: its answer replaces the pending row
