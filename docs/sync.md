@@ -76,7 +76,7 @@ status bar's sync state and `taskboard sync`) queues a delta, ⌘⇧R (`sync:ful
 
 ## Own changes
 
-The owner's own changes aren't news (`sync::own`, `sync::store`), once Test Connection knows the account:
+The owner's own changes aren't news (`sync::own`, `sync::news`), once Test Connection knows the account:
 
 - A page records no `created` for an issue the owner reported, and no `comment_added` or `mention` for new
   comments that are all the owner's; the issue is then seen up to its `updated` (`changes::catch_up`) unless other
@@ -86,7 +86,7 @@ The owner's own changes aren't news (`sync::own`, `sync::store`), once Test Conn
   last changelog entry is the owner's goes; an `updated` row goes when every entry since `seen_at` is the owner's.
   A failure keeps the changes as recorded.
 
-A project's first sync (`store::Pass`): with no issue read yet (a new Space) every issue counts as seen. Once the
+A project's first sync (`news::Pass`): with no issue read yet (a new Space) every issue counts as seen. Once the
 owner read some (a fresh cache: a reset, memory mode after a restart), an issue updated after `issue_seen.seen_at`
 records `updated` ("Updated" in the inbox) and one never seen records `created`.
 
@@ -119,6 +119,9 @@ all of an issue's comments, they replace the cached ones.
 
 ## Where to see it
 
+- The main window's status bar ([ADR 0060](adr/0060-a-status-bar-under-the-panel.md),
+  `src/shell/statusBar/StatusBar.tsx`): the sync state (a click queues a delta), memory mode, and the Jira
+  requests in flight (`jira_activity`, [jira.md](jira.md#limits-and-retries)).
 - Settings → Sync → Synced: the state, Sync Now, and per tracked project the cached and open issues and the last
   full sync (`sync_overview`, `sync_run`).
 - Settings → Privacy & Data → Jira data: "Keep Jira data in memory only" (`sync.memoryOnly`) empties the cache,

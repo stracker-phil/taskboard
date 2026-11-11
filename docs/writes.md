@@ -1,7 +1,7 @@
 # Writes
 
 `src-tauri/src/writes/` changes Jira: it assigns issues (`assign.rs`), moves them along their workflow
-(`transition.rs`), sets their priority (`priority.rs`), adds comments (`comment.rs`) and web links (`web_link.rs`) ([ADR 0044](adr/0044-writes-show-at-once-and-settle-after-jira.md)).
+(`transition.rs`), sets their priority (`priority.rs`), renames them (`title.rs`), adds comments (`comment.rs`) and web links (`web_link.rs`) ([ADR 0044](adr/0044-writes-show-at-once-and-settle-after-jira.md)).
 Every write is an allowlisted gateway endpoint with `Access::Write` ([jira.md](jira.md#gateway-and-allowlist)),
 sent once and never retried.
 
@@ -31,7 +31,7 @@ sent once and never retried.
 1. In one `Db::write`: the issue row shows the new value and `cache.pending_write` records it with the value
    the row had (`pending::begin`); `issues_changed` refreshes the page at once. A second write to the same
    field while one is on its way is refused.
-2. The write goes to Jira through `Source` (`assign`, `transition`, `set_priority`).
+2. The write goes to Jira through `Source` (`assign`, `transition`, `set_priority`, `set_title`).
 3. Refused: the row gets `base` back (`pending::roll_back`) and the error reaches the page, which toasts it.
 4. Accepted: `sync::refetch_issue` fetches the issue with the sync's fields and stores it like a sync page;
    the pending row goes in the same transaction (`pending::settle`), and the issue counts as seen up to its new
@@ -203,7 +203,7 @@ A change refused before it is sent (changes off, a switched-off kind) records no
 | `issues_bulk_assignees(ids)` | me and whoever is on the team of every picked issue's Space |
 | `issues_write_many(changes, what, total)` | sends the changes side by side through `apply`; one outcome for the toast, with the reverses |
 | `issue_priorities(id)` | the priorities the issue's edit screen offers, and the one it has |
-| `issue_comment(id, text)` | adds a plain-text comment |
+| `issue_comment(id, text)` | adds a comment written in Markdown, with `@Full Name` mentions |
 | `issue_add_web_link(id, url, title)` | adds a web link; `title` null names it after its pull request or address |
 | `issue_drop_targets(id, groupBy, fromKey, groups)` | the places a dragged issue may go, each with its action, in the view's order |
 | `issue_drop(id, groupBy, key)` | moves the issue into a group of the view (a drop) |

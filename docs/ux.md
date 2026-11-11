@@ -99,7 +99,8 @@ The owner's rule (2026-10-30), for every control, list and popover:
   running; its tooltip lists them all. It fades in once requests have run 300ms, so quick ones never show, and
   stays through gaps under 250ms, so a menu's load and the change after it read as one. What concerns the view (its issue count) stays on the view line.
 - **Content panel** (`main`, a flex column): the [header](#content-header), the [view tabs](#view-tabs), then
-  the view body (`.content-panel__body`). The body stays and only its content changes: `MainBody` shows a view once
+  the view body (`.content-panel__body`, its own stacking context with `isolation: isolate`, so a hovered row WebKit
+  lifts onto a layer stays under the toolbar's popovers). The body stays and only its content changes: `MainBody` shows a view once
   its rows or Board are loaded and keeps the one before until then, so switching views, layouts or the narrowing
   never blanks it. Until the issue list the body is `SyncStatusView` (`src/shell/SyncStatusView.tsx`) says
   "Connect Jira in Settings" with an Open Settings button while no project is tracked; during a full sync
@@ -114,7 +115,7 @@ The owner's rule (2026-10-30), for every control, list and popover:
 
 - **Traffic-light strip** (18px, a drag region) for the native window buttons.
 - **Search**: 34px, 9px radius, a `--border` frame on `--panel-bg`, `--text-muted`; Search icon 15/2, the
-  label, a "⌘K" key hint (11px, `--fill-subtle`, 5px radius). Disabled until the palette exists.
+  label, a "⌘K" key hint (11px, `--fill-subtle`, 5px radius). A click opens the [command palette](#command-palette).
 - **Home** (`HomeRows`): Everything (`Layers2`), then the Home lists in Rust's order: Recently viewed
   (`History`, always right after Everything, also while Bookmarks sits in the bookmarks bar), Bookmarks (`Bookmark`)
   and global filter lists (`Folder`). Recently viewed is a normal view-backed page (tabs, toolbar, List, Table,
@@ -241,7 +242,7 @@ it for that Space only.
 - The list canvas is `--list-bg` under a `--hairline`; padding 22 24 64 52 (a 30px chevron gutter; the bottom room keeps the last rows clear of the bulk bar).
 - Each group is a white card (radius 10, top-left 0, `--shadow-group-card`, `--row-hairline` between rows)
   with its **tab** sitting on it: a status pill (`tab` variant; for other groupings a neutral tab with the
-  Space tile, avatar, epic color or flag) and the count. Clicking the tab toggles the group; a closed group is
+  Space's own tile (its icon and color, `Mark` in `GroupHeader.tsx`), avatar, epic color or flag) and the count. Clicking the tab toggles the group; a closed group is
   the tab alone. Groups are 44 apart; Done starts closed.
 - **Column headers** sit in each group's tab row (11/600 caps, 0.05em, `--text-muted`), bottom-aligned with
   the tab; there is no global header row. Without grouping the one card has the headers and no tab.
@@ -585,7 +586,7 @@ view with its place intact).
   `ui_state.json` `activityWidth` for every issue, `useActivityWidth`; `--panel-subtle-bg`): All / Comments / Changes
   (⌥1 / ⌥2 / ⌥3, `commands/activityKeys.ts`; the choice is saved in `ui_state.json` `activityFilter` and every issue
   opens with it), comment cards and change lines (status
-  changes as activity pills; a change line shows who changed what on its first line and from → to on a second, each line truncating instead of wrapping), newest first; the comment box waits for writes. It is two lines tall when empty and grows with the text (no resize corner; `useAutoGrow`), up to 60% of the window, then scrolls inside; it snaps back after sending. It takes Markdown; its hint reads "Markdown · @ mentions · ⌘↩ to send". `@` and a few letters open the
+  changes as activity pills; a change line shows who changed what on its first line and from → to on a second, each line truncating instead of wrapping), newest first; the comment box is absent while changes to Jira, or comments, are off (`useJiraChange`). It is two lines tall when empty and grows with the text (no resize corner; `useAutoGrow`), up to 60% of the window, then scrolls inside; it snaps back after sending. It takes Markdown; its hint reads "Markdown · @ mentions · ⌘↩ to send". `@` and a few letters open the
   matching team members under the caret's line (the menu's look, avatar and name, 248px tall at most, above the line
   when there is no room below); the focus stays in the field, ↑↓ move, ↩ or ⇥ insert the name, esc hides the list. Opening an issue fetches its
   comments when the cached ones may be behind (`issue_sync_comments`). Change lines come from Jira's changelog
@@ -607,7 +608,8 @@ view with its place intact).
 - Rich text styles (`.jira-html` in `issue-view.css`): inline `code` and old `tt` as a mono chip on
   `--fill-subtle` (not inside `pre`), code blocks on `--fill-subtle`, struck text muted, quotes with a
   `--border-strong` bar, tables with `--border` lines and `--fill-subtle` headers, panels on the banner and status
-  backgrounds by type, expands in a bordered box with a bold title, mentions in `--accent-text`, and status
+  backgrounds by type, expands in a bordered box with a bold title, mentions in `--accent-text` at 600 (a mention of me also on an
+  `--accent-soft-bg` chip), and status
   lozenges as small uppercase chips in the status and label colors.
 
 **Remember my place:** each view keeps its opened and closed groups, scroll position, selected row and open
@@ -903,7 +905,7 @@ no separate Settings design; owner, 2026-10-28). Its colors are the `--settings-
   (`components/Modal.tsx`, an `alertdialog` over `--scrim`). Other failures are error toasts.
 - Pages register in `registry/settingsPages.ts`, in groups: **Jira** (what Taskboard reads, and how), then
   **Workspace** (how the owner works with it), then **System** (the app itself).
-  - **Connection** (`components/settings/jira/`): *Jira site* (site URL, email, the API token as a password
+  - **Connection** (Jira; `components/settings/jira/`): *Jira site* (site URL, email, the API token as a password
     field that never shows a saved token, Classic or Scoped token kind, the cloud ID for Scoped; Save and
     Test Connection, with "Connected as …" or the error below), *Token* (the expiry date and how soon it
     runs out), *Token scopes* (`TokenScopesGroup`: every scope a scoped token needs, once each, with Required,
@@ -918,14 +920,19 @@ no separate Settings design; owner, 2026-10-28). Its colors are the `--settings-
     and Show Data Folder.
   - **Projects**: Refresh after a successful test, "N of M tracked", a filter field (every word in the name or
     key, ignoring case) and a Track switch per project.
-  - **Spaces** (`SpacesPage`): the tracked Spaces in sidebar order, each a row with its tile, name, key and
+  - **Sync**: *Scope* (the effective JQL in a monospaced field; Validate, Save, Reset to Default), *Intervals*
+    (minutes in front and in the background, days to keep done issues) and *Synced* (the sync state line with
+    Sync Now, one row per tracked project with its key, last full sync and "N issues · M open"; while an emptied
+    cache refills, the last rows stay).
+  - **Spaces** (Workspace; `SpacesPage`): the tracked Spaces in sidebar order, each a row with its tile, name, key and
     client and Move Up / Move Down buttons; clicking the row opens that Space's own page (`spaces/SpaceSettings`,
     ClickUp's Space settings; also `app:settings:space:<projectId>`), with "‹ Spaces" back to the list. The
     sidebar menu's Space Settings… shows the same page in a sheet over the main window (`shell/SpaceSheet.tsx`,
     640 wide, scrolling inside, in the Settings window's look, without "‹ Spaces"; Done or esc closes it); both edit
     the same settings. Under the header a segmented control picks one tab (General, Team, Statuses, Custom
     Fields; a link to a section opens its tab), and only that tab's groups show, fading in. *General*: its fields (`SpaceFields` in `components/SpaceEditor.tsx`): Name
-    (empty uses the project's), Icon and color (the look editor; a Space always has a color) and Client (empty means internal). *Layouts*: a switch per layout
+    (empty uses the project's), Icon and color (the look editor; a Space always has a color) and Client (empty means internal), then the Space's own accent color (`SpaceAccent`, used while the Space is
+    shown); under it *Layouts*: a switch per layout
     its views offer (one stays on), the default layout of new views and their grouping. *Statuses*: only the
     statuses this Space's issues are in, like Settings → Statuses, with "N issues" after the pill and Default (the
     app-wide style) in place of Automatic. *Custom fields* (`spaces/SpaceCustomFields`): the fields opted in
@@ -940,6 +947,13 @@ no separate Settings design; owner, 2026-10-28). Its colors are the `--settings-
     "Track projects under Projects to get Spaces." when none is tracked. The sidebar's "Client label…" item
     opens `SpacePopover` (300px, 12px radius, `--shadow-popover`, at the top left of the content panel) with the
     Client field; Esc, Done or a click outside close it.
+  - **Team** (`jira/TeamPage`): one grid of everyone with activity in a tracked Space (rows, by name, with a
+    search field) against the tracked Spaces (columns in sidebar order: tile and key, the name as tooltip); a
+    checkbox per cell puts the person on that Space's team (`space_set_member`). By default everyone ever assigned
+    one of the Space's issues is on its team and nobody else; a box where the person has no activity is quieter
+    until ticked, and its tooltip says why a box is on. The header row and the name column stay while the grid
+    scrolls; rows keep their order while boxes are ticked. The team is who Assign to… and assignee drops offer, always
+    after me: I can be picked in every Space, on its team or not.
   - **Statuses** (`jira/StatusesPage`, `StatusStyleGroups`): every status the tracked projects use, in a section
     per style it shows (Backlog, To do, In progress, In review, Blocked, Done, the style's square in the heading), with a search field; a
     row: the pill and a button (the style's square and "Automatic · X" or the style's name) with a menu of
@@ -948,21 +962,11 @@ no separate Settings design; owner, 2026-10-28). Its colors are the `--settings-
   - **Custom fields** (`jira/CustomFieldsPage`): every custom field of the site (name, Jira type in tertiary
     text, a search field) against List (a column and filter choice) and Detail (the Issue view), in the Team grid
     (`SettingsMatrix`). A field without a box is hidden everywhere; rows keep their order while boxes are ticked.
-  - **Team** (`jira/TeamPage`): one grid of everyone with activity in a tracked Space (rows, by name, with a
-    search field) against the tracked Spaces (columns in sidebar order: tile and key, the name as tooltip); a
-    checkbox per cell puts the person on that Space's team (`space_set_member`). By default everyone ever assigned
-    one of the Space's issues is on its team and nobody else; a box where the person has no activity is quieter
-    until ticked, and its tooltip says why a box is on. The header row and the name column stay while the grid
-    scrolls; rows keep their order while boxes are ticked. The team is who Assign to… and assignee drops offer, always
-    after me: I can be picked in every Space, on its team or not.
-  - **Sync**: *Scope* (the effective JQL in a monospaced field; Validate, Save, Reset to Default), *Intervals*
-    (minutes in front and in the background, days to keep done issues) and *Synced* (the sync state line with
-    Sync Now, one row per tracked project with its key, last full sync and "N issues · M open"; while an emptied
-    cache refills, the last rows stay).
   - **Behavior** (Workspace): *Behavior* (read delay, where a click opens issues, default bookmark duration,
     notifications), *Me Mode* (the Me popover's switches, plus "Add Field…" for a user field from `cache.field`,
     `me_user_fields`; a field rule can be removed).
-  - **Appearance**: Automatic, Light or Dark. **Shortcuts**: every command and its key, rebindable.
+  - **Appearance** (System): Automatic, Light or Dark, and the accent color (`AccentPicker`; selection, links
+    and focus; a Space can choose its own). **Shortcuts**: every command and its key, rebindable.
   - **Status** (`components/settings/status/`, Daybook's Status page): `diagnostics_get` reports groups of
     rows, each a value and maybe a bus command as a button: *Jira* (site, account, API token and its expiry),
     *Sync* (state, tracked projects, last full sync, cached issues, cache size with Compact; in memory mode "Jira
@@ -988,16 +992,17 @@ global shortcuts.
 
 - **Menus** (`src-tauri/src/menu/`), in the Mac order: Taskboard, File, Edit, Go, List, Issue, View, Window, Help.
   File holds the core actions (New Filter List ⌘N, New View ⌘T; Refresh ⌘R, Full Sync ⇧⌘R; Reset Cache…,
-  which opens Settings → Privacy & Data → Jira data to confirm; Close Window ⌘W). Go moves around (Command Palette ⌘K,
-  Everything ⇧⌘E, Recently Viewed ⌘Y, Bookmarks ⇧⌘P, Back ⌘[, Forward ⌘], Previous/Next Space ⌥⌘↑/↓, Previous/Next List ⌥⌘[/] (within the
+  which opens Settings → Privacy & Data → Jira data to confirm; Close Tab or Window ⌘W). Go moves around (Command Palette ⌘K,
+  Everything ⇧⌘E, Recently Viewed ⌘Y, Bookmarks ⇧⌘P, Notifications ⇧⌘U, Back ⌘[, Forward ⌘], Previous/Next Space ⌥⌘↑/↓, Previous/Next List ⌥⌘[/] (within the
   Space, or among the levels outside the Spaces, wrapping), Previous/Next View ⌃⇧⇥/⌃⇥, then the level's views by
   name with ⌘1–⌘9, the shown one checked). List acts on the shown issues (Group and Sort… ⌥⌘G, Columns… ⌥⌘C, Edit
   Filter… ⌥⌘F, Only My Issues ⇧⌘M, Me Mode Options…, Filter This View ⌘F, Save View ⌘S, Revert View; last, as
   it is rare: Show as List / Board / Table ⌃⌘1–3, the shown layout checked). The menus follow the place:
   `menu/place.rs` builds them again whenever the place moves (`NavStore::on_move`) or views, lists or Spaces change. Issue acts on the selected one
-  (Open, Open or Close Preview, Open Epic, Open in Jira ⌘↩, Copy Key, Copy Link ⇧⌘C, Add or Remove Bookmark, Mark as Read or Unread).
-  View is the window's appearance only (Toggle Sidebar ⌘\, Enter Full Screen; the debug build's Reload ⌥⌘R),
-  never what the page shows. Help has Open Log Folder and Show Data Folder. Plain-letter keys stay off menu
+  (Open, Open in New Tab ⌘⇧↩, Open or Close Preview, Open Epic, Open in Jira ⌘↩, Copy Key, Copy Link ⇧⌘C, Copy Taskboard Link, Add or Remove Bookmark, Mark as Read or Unread,
+  Assign to Me or Unassign, Change Status…, Assign To…, Change Priority…, Rename… F2).
+  View is the window's appearance only (Toggle Sidebar ⌘\, Show Bookmarks Bar ⇧⌘B, Enter Full Screen; the debug build's Reload ⌥⌘R),
+  never what the page shows. Window holds the tabs ([Window → Tabs](#window)). Help has Open Log Folder and Show Data Folder. Plain-letter keys stay off menu
   items so they never take a typed letter; Copy Key has no ⌘C there because Edit → Copy owns it.
 - Bare keys never fire in text fields; there only ⌘ and ⌃ combinations and Escape do.
 - ↵ and Space on a focused button, link or checkbox activate it. `Tab` moves focus (sidebar, tabs, toolbar, content).

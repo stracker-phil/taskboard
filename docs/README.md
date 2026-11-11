@@ -27,6 +27,7 @@ The rules in [`.claude/rules/`](../.claude/rules/) are binding for changes:
 - [`testing.md`](../.claude/rules/testing.md)
 - [`commits.md`](../.claude/rules/commits.md)
 - [`demo-data.md`](../.claude/rules/demo-data.md)
+- [`stable-controls.md`](../.claude/rules/stable-controls.md)
 - [`rust-test-conventions.md`](../.claude/rules/rust-test-conventions.md)
 - [`ts-test-conventions.md`](../.claude/rules/ts-test-conventions.md)
 

@@ -24,7 +24,8 @@ Scopes a scoped token needs, and why: [scopes.md](scopes.md).
 The expiry date warns 14 days ahead (`connection::token_expiry`).
 
 Settings → Sync sets the scope JQL (validated by Jira's `jql/parse` before it is saved; empty = the default
-over the tracked projects), the intervals and the days done issues stay, and resets the cache.
+over the tracked projects), the intervals and the days done issues stay. Settings → Privacy & Data → Jira data
+resets the cache (Refetch from Jira in memory mode).
 
 In the debug build the fake Jira runs at `http://127.0.0.1:47470` (`dev/fake.rs` `FAKE_JIRA_PORT`) with the demo site
 dated to today; any email and token connect to it.
@@ -106,11 +107,11 @@ One method on `JiraClient` each (`jira/api.rs`), one `Endpoint` each; the answer
 | `changelog` | `GET issue/{id}/changelog`, every page by `startAt` (`maxResults=100`; only these two query keys are allowed) | `Changelog`, oldest first: id, author, time and the changed fields (`ChangeItem`: field name and id, `from`/`to` ids, `fromString`/`toString` texts). Asked when an issue is opened, at most every 5 minutes ([ADR 0031](adr/0031-issue-history-comes-from-the-changelog-on-demand.md)) |
 | `attachment_content` | `GET attachment/content/{id}?redirect=false` (the id digits only; `redirect` is the only query key) | the file's bytes in any format, through `Gateway::download` and `Http::download`: no redirect followed, at most `MAX_ATTACHMENT_BYTES` (50 MB, by `Content-Length` and while reading), a 5-minute timeout. For Quick Look ([ADR 0035](adr/0035-attachments-preview-in-quick-look.md)) and inline images ([ADR 0039](adr/0039-inline-images-come-from-issue-attachments-through-rust.md)) |
 | `check_jql` | `POST jql/parse?validation=strict` | Jira's messages; empty when valid |
-| `transitions` | `GET issue/{id}/transitions` | `Transition`: id, name, `to` status, `hasScreen` |
+| `transitions` | `GET issue/{id}/transitions` | `Transition`: id, name, `to` status, `hasScreen`; kept for 60 s by `writes::Offers` ([writes.md](writes.md#offers)) |
 | `transition` (write) | `POST issue/{id}/transitions` with `{"transition": {"id": …}}` (`TransitionId`: digits) | nothing (`204`) |
 | `add_comment` (write) | `POST issue/{id}/comment?expand=renderedBody` with `{"body": <ADF>}` | `Comment` as Jira stored it (`201`) |
 | `add_remote_link` (write) | `POST issue/{id}/remotelink` with `{"object": {"url": …, "title": …}}` (`WebUrl`: http(s) with a host, up to 2000; `LinkTitle`: not blank, no control characters, up to 255) | the new link's id |
-| `priorities` | `GET issue/{id}/editmeta` | the names of the priority field's allowed values; empty without the field |
+| `priorities` | `GET issue/{id}/editmeta` | the names of the priority field's allowed values; empty without the field; kept for 10 minutes by `writes::Offers` |
 | `set_priority` (write) | `PUT issue/{id}` with `{"fields": {"priority": {"name": …}}}` (`PriorityName`: not blank, no control characters, up to 255) | nothing (`204`) |
 | `assign` (write) | `PUT issue/{id}/assignee` with `{"accountId": …}` (`AccountId`: letters, digits, `:`, `_`, `-`, up to 128; null unassigns) | nothing (`204`) |
 
@@ -131,8 +132,10 @@ once.
 
 ## Rich text (ADF)
 
-Comments typed in Taskboard go the other way: `adf::from_plain_text` (`adf/from_text.rs`) turns plain text into
-an ADF document ([writes.md](writes.md#comments)).
+Comments typed in Taskboard go the other way: `adf::from_markdown` (`adf/from_markdown/`) turns the comment's
+Markdown into an ADF document, with mention nodes for the Space team members it names (`adf::Mentionable`,
+`from_markdown/mentions.rs`; [ADR 0063](adr/0063-comments-are-written-in-markdown.md),
+[ADR 0064](adr/0064-comment-mentions-come-from-the-space-team.md), [writes.md](writes.md#comments)).
 
 Descriptions, rich text custom fields and comments are shown from their Atlassian Document Format, not from
 Jira's `renderedFields` HTML ([ADR 0036](adr/0036-rich-text-renders-from-adf-not-renderedfields.md)): Jira builds

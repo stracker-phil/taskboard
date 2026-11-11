@@ -20,28 +20,35 @@ support. To build it or port it, point a coding agent at [AGENTS.md](AGENTS.md).
   sprint, open bugs, a release); every list has views as tabs, shown as a List, a Board or a Table, grouped,
   sorted and with their own columns, filter, Me chip and subtasks (hidden, under their parent or as rows).
   Filters run locally, so they are instant; changes stay a draft until Save View (⌘S). Spaces, lists and views
-  get their own icon and color.
-- **Space settings:** per Space, the layouts its views offer and how new views start, its own status colors
-  (six status types from Backlog to Done, which views can also group by) and where each custom field shows.
-- **What changed:** Unread collects mentions of you ("Mentioned you", your name marked in the comment), new
-  comments, status and assignee changes since you last looked, and
-  anything you mark unread; read marks survive a cache reset. Bookmarks keep issues, comments, lists and views
-  at hand, for good or for a while.
+  get their own icon and color. Places open in tabs (⌘⇧T, or ⌘-click), each with its own Back and Forward.
+- **Settings for every Space or one:** status styles (six status types from Backlog to Done, which views can
+  also group by) and the custom fields to download are chosen for all Spaces at once; a Space can override its
+  statuses, leave out fields, and sets its layouts, how new views start and its team.
+- **What changed:** the inbox under the bell in the top-right corner (⇧⌘U) lists the issues with news since you
+  last looked: mentions of you ("Mentioned you", your name marked in the comment), new comments, status and
+  assignee changes, and anything you mark unread. Your own changes don't count. It previews an issue beside the
+  list, and read marks survive a cache reset. Recently viewed lists the issues you opened lately; Bookmarks
+  keep issues, comments, lists and views at hand, for good or for a while.
 - **The Issue view:** description and the filled custom fields (acceptance criteria, steps to reproduce)
-  as rich text with inline images, attachments that open in Quick Look, web links (pull requests show as
-  such), related issues and subtasks, and the activity: comments and Jira's history, newest first, with
-  people's avatars. ⌘F finds words in the open issue and steps through the matches with ↩. A click opens an
-  issue in the Preview beside the list or in the full view, per view, a double-click always in the full view;
-  ⌥ + hover peeks at any issue. A click on an issue key copies it.
-- **Quick changes:** with Settings → Connection → Allow changes to Jira on (off by default), assign an issue to
-  yourself or unassign it from its row, its header or with I, and move it to another status from its status pill
-  or with S (moves that need Jira's own screen open Jira), and comment on it from the Issue view. Drag rows and cards onto another status, status type or
-  assignee group; only the moves Jira's workflow allows take the drop. The change shows at once; if Jira refuses it, the
-  old value comes back. The confirmation offers the opposite change ("Change back to Jamie Doe"), which is a
-  second change in Jira, not an undo.
+  as rich text with inline images, attachments that open in Quick Look, pull requests at the top with their
+  GitHub status (open, draft, merged, closed; through your own `gh` command line), web links, related issues and
+  subtasks, and the activity: comments and Jira's history, newest first, with people's avatars. ⌘F finds words
+  in the open issue and steps through the matches with ↩. A click opens an issue in the Preview beside the list
+  or in the full view, per view, a double-click always in the full view; ⌥ + hover peeks at any issue. A click
+  on an issue key copies it; Copy as Markdown copies the whole issue.
+- **Quick changes:** with Settings → Connection → Allow changes to Jira on (off by default, and each kind of
+  change on its own), assign an issue (I), move it to another status from its status square or with S (moves
+  that need Jira's own screen open Jira), change its priority, rename it in place, add a web link, and comment
+  in Markdown, with `@` to mention someone from the Space's team. Drag rows and cards onto another status, status
+  type, priority or assignee group; only the moves Jira's workflow allows take the drop. Pick several issues
+  (X, ⌘- or ⇧-click, or a group's checkbox) and change them at once from the bulk bar. The change shows at once;
+  if Jira refuses it, the old value comes back. The confirmation offers the opposite change ("Change back to
+  Jamie Doe"), which is a second change in Jira, not an undo.
+- **A status bar:** under the panel, what Taskboard is asking Jira right now, the sync state (a click syncs) and
+  whether Jira data lives in memory only.
 - **Notifications:** after a sync, while Taskboard isn't in front, macOS notifications for mentions of you and
-  issues assigned to you (or every change of your issues, or none: Settings → Behavior), with a button that opens
-  the issue.
+  issues assigned to you (or every change of your issues, or none: Settings → Behavior), with buttons that open
+  the issue or the inbox.
 - **Keyboard first:** ⌘K finds issues by key or text and runs any command (`>` commands, `#` issues, `/` Spaces
   and lists), J/K move, every action has a menu item and a rebindable key, right-click menus offer the rest,
   and the `taskboard` command line drives the window from scripts.
@@ -50,7 +57,7 @@ support. To build it or port it, point a coding agent at [AGENTS.md](AGENTS.md).
 |---|---|
 | ![The Board layout of a Space, with labels on the cards](docs/screens/board-dark.png) | ![The Issue view finding a word: an inline image, web links, subtasks, an attachment and the activity with Jira's history](docs/screens/issue-light.png) |
 | ![A filter list's Filter popover: its own conditions, a draft for this view and Save View](docs/screens/filter-dark.png) | ![A view tab's menu: rename, icon and color, duplicate, layout](docs/screens/menu-light.png) |
-| ![Unread, with what changed on each issue](docs/screens/unread-dark.png) | ![The Table layout](docs/screens/table-light.png) |
+| ![The inbox, with what changed on each issue](docs/screens/inbox-dark.png) | ![The Table layout](docs/screens/table-light.png) |
 | ![The command palette finding issues and actions](docs/screens/palette-dark.png) | ![A Space's settings: name, icon and color, client, layouts](docs/screens/space-settings-dark.png) |
 
 All screenshots show made-up demo data from the debug build.
@@ -60,9 +67,11 @@ All screenshots show made-up demo data from the debug build.
 - A scoped API token needs the scopes in [docs/scopes.md](docs/scopes.md); `write:jira-work` only for changes.
 - The API token lives only in the macOS Keychain; it is never written to the settings, the cache or the logs.
 - Network traffic goes only to your Jira site and `api.atlassian.com`, through one allowlisted gateway that
-  refuses anything but the reads Taskboard needs and its few changes (assigning, moving and commenting on an issue), which are sent once
-  and only while you allow changes to Jira. Profile pictures come from Atlassian's avatar host,
-  without credentials.
+  refuses anything but the reads Taskboard needs and its few changes (assignee, status, priority, title,
+  comments, web links), which are sent once and only while you allow each of them. Profile pictures come from
+  Atlassian's avatar host, without credentials.
+- Pull request statuses come from your own `gh` command line (Homebrew), run with fixed arguments for GitHub
+  pull request links only; Taskboard holds no GitHub token and opens no connection to GitHub itself.
 - The cache stays on your Mac (`~/Library/Application Support/com.philippstracker.taskboard/`). Settings →
   Privacy & Data, File → Reset Cache… or `taskboard reset-cache --yes` empties it; with "Clear the cache when
   Taskboard quits" on, no copy of your issues stays on the Mac after quitting; with "Keep Jira data in memory
@@ -103,7 +112,7 @@ never changes Settings, and it never changes Jira.
 | `taskboard sync [--full]` | fetches what changed in Jira now (`--full`: every issue of the sync scope); returns at once |
 | `taskboard reset-cache --yes` | empties the local copy of Jira and fetches it again; Spaces, filter lists, views and bookmarks stay |
 
-A `LEVEL` is `everything`, `recent` (Unread), `pinned` (Bookmarks), a Space's key or name, a filter list's name (`KEY/name` when
+A `LEVEL` is `everything`, `viewed` (Recently viewed), `pinned` (Bookmarks), a Space's key or name, a filter list's name (`KEY/name` when
 two Spaces have one of that name) or any id from `spaces` and `filters`. A `VIEW` is a view's name or id. A
 unique start of a name is enough. `--json` prints any reply as JSON.
 

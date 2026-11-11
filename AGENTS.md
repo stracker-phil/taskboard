@@ -30,7 +30,8 @@ cd taskboard
 bun install
 scripts/create-signing-cert.sh   # once per Mac without an Apple Development certificate (ADR 0053)
 bun run build:app                # debug bundle: src-tauri/target/debug/bundle/macos/Taskboard (Debug).app
-bun run release                  # release bundle and .dmg, installed to ~/Applications and ~/.local/bin
+bun run release minor            # major|minor|patch; needs a clean tree: bumps the version, builds the .app and
+                                 # .dmg, installs them to ~/Applications and ~/.local/bin, commits "Release X.Y.Z", tags it
 ```
 
 Debug builds are never installed; call them by path or start them with `scripts/dev/launch.sh`. They keep
@@ -44,7 +45,7 @@ build's, and start with made-up demo data.
 | `bun run test` | Vitest and Rust unit tests pass |
 | `bun run lint` | exits 0: types drift check, `tsc`, ESLint, `clippy -D warnings` |
 | `cargo fmt --manifest-path src-tauri/Cargo.toml --check` | no differences |
-| `bun run release` | `Taskboard.app` and a `.dmg` in `src-tauri/target/release/bundle/` |
+| `bun run release major\|minor\|patch` | on a clean tree: `Taskboard.app` and a `.dmg` in `src-tauri/target/release/bundle/`, installed, a "Release X.Y.Z" commit and a `vX.Y.Z` tag |
 
 ## Adapt
 

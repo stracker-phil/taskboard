@@ -13,7 +13,7 @@ reaches the wrong app ([adapting.md](adapting.md)).
 | `taskboard://command/<id>` | a command from a short allowlist (below) |
 
 A level and a view are named as the command line names them (`remote/levels.rs`): an id, a Space's key or
-name, a filter list's name (`NW%2FOpen%20bugs`) or `everything`, `recent`, `pinned`. The links the app hands out
+name, a filter list's name (`NW%2FOpen%20bugs`) or `everything`, `viewed`, `pinned`. The links the app hands out
 use ids, so renaming keeps them working.
 
 ## Copy Taskboard Link

@@ -48,12 +48,14 @@ view_id() { "$BIN" views "$1" --json | python3 -I -c 'import json, sys; print(ne
 narrowing_key() { "$BIN" status --json | python3 -I -c 'import json, sys; p = json.load(sys.stdin)["place"]; print(p["listId"], p["viewId"], sep=":")'; }
 
 appearance dark
-# Changes on the demo site since the first sync fill Unread.
+# Changes on the demo site since the first sync fill the inbox.
 "$BIN" dev drift >/dev/null
 "$BIN" sync >/dev/null
 for _ in {1..20}; do sleep 1; "$BIN" status | grep -q "sync: idle" && break; done
-"$BIN" go recent >/dev/null
-shot unread-dark
+"$BIN" go NW "All issues" >/dev/null
+"$HERE/js.sh" 'window.__TAURI_INTERNALS__.invoke("run_command", { id: "page:inbox.toggle" })'
+shot inbox-dark
+"$HERE/js.sh" 'window.__TAURI_INTERNALS__.invoke("run_command", { id: "page:inbox.toggle" })'
 
 # The List with subtasks under their parents, in both appearances.
 "$HERE/js.sh" "window.__TAURI_INTERNALS__.invoke('view_set_subtasks', { id: $(view_id NW "All issues"), mode: 'hierarchy' })"
@@ -89,14 +91,14 @@ shot menu-light
 sleep 2
 "$HERE/js.sh" '(() => { const h = [...document.querySelectorAll("h2, h3")].find((e) => e.textContent.trim() === "Web links"); h?.scrollIntoView({ block: "start" }); })()'
 # Find in this issue, highlighting its matches.
-"$HERE/js.sh" '(() => { const input = document.querySelector(".issue-header input"); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set; set.call(input, "checkout"); input.dispatchEvent(new Event("input", { bubbles: true })); })()'
+"$HERE/js.sh" '(() => { const input = document.querySelector("input[aria-label^=Find]") ?? document.querySelector(".issue-header input"); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set; set.call(input, "checkout"); input.dispatchEvent(new Event("input", { bubbles: true })); })()'
 shot issue-light
 "$BIN" go NW Table >/dev/null
 shot table-light
 
 appearance dark
-# The Settings window, alone on screen so the capture picks it.
-"$HERE/js.sh" 'window.__TAURI_INTERNALS__.invoke("run_command", { id: "app:settings:space:10001" })'
-sleep 1
-"$BIN" hide >/dev/null
+# A Space's settings, in their sheet over the main window.
+"$BIN" go NW "All issues" >/dev/null
+"$HERE/js.sh" "window.taskboard.getState().setSpaceSheet('10001')"
 shot space-settings-dark
+"$HERE/js.sh" 'window.taskboard.getState().setSpaceSheet(null)'

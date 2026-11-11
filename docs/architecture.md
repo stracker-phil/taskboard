@@ -24,8 +24,8 @@ These rules hold everywhere in the code. Keep them when you change things.
    [ADR 0009](adr/0009-a-scheme-per-system-mode.md)). A Vitest scan enforces it.
 7. **The look is native and light** ([ADR 0010](adr/0010-native-macos-look.md), [ux.md](ux.md)).
 8. **One write path into the data.** Every change goes through the data layer's one write function, which
-   validates, saves and announces it as an event (and, with a database, records its inverse for undo, as
-   TimeTracker's ops). No other code writes the data.
+   validates, saves and announces it as an event. No other code writes the data. There is no undo: reversing a
+   change to Jira is a second change ([writes.md](writes.md#outcome)).
 9. **Commands live in Rust** ([ADR 0012](adr/0012-commands-live-in-rust.md)). Menus, shortcuts, the palette,
    the CLI and links run commands of one bus by id.
 10. **Small feature modules** ([ADR 0014](adr/0014-small-feature-modules.md)): by feature, pure cores, ports
@@ -62,7 +62,7 @@ These rules hold everywhere in the code. Keep them when you change things.
   ([ADR 0016](adr/0016-closing-the-window-keeps-the-app-running.md)). There is no tray, LaunchAgent or global
   shortcut.
 - **The CLI**: `taskboard` starts or activates the app; `status [--json]`, `show`, `focus`, `hide`,
-  `open <KEY>`, `sync [--full]` and `quit` (debug builds also `dev drift` and `dev seed-synthetic <n>`) ask the running app (`cli/`, `remote/`). `show` and `focus` start it when it
+  `open <KEY>`, `spaces`, `filters`, `views`, `go`, `me`, `layout`, `search`, `sync [--full]` and `quit` (debug builds also `dev drift` and `dev seed-synthetic <n>`) ask the running app (`cli/`, `remote/`). `show` and `focus` start it when it
   isn't running; the others exit 2 with "Taskboard isn't running".
 - **Settings** is a window of its own ([ux.md](ux.md#settings)).
 
@@ -129,9 +129,11 @@ src-tauri/
   src/connection/            the Jira connection: Keychain access, Test Connection, tracked projects, scope
   src/sync/                  the sync engine: one task, the full sync, Jira JSON to rows, change records
   src/notify/                macOS notifications for news that concerns the owner, after a change sync
-  src/writes/                changes to Jira (assign): shown at once, sent once, settled by fetching the issue again
+  src/writes/                changes to Jira (assignee, status, priority, title, comments, web links, several issues at
+                             once, drops): shown at once, sent once, settled by fetching the issue again
   src/adf/                   Atlassian Document Format to HTML for descriptions, rich fields and comments (pure;
-                             media.rs: attached images as placeholders the page fills; markdown/: ADF to Markdown)
+                             media.rs: attached images as placeholders the page fills; markdown/: ADF to Markdown;
+                             from_markdown/: Markdown to ADF for comments, with mentions, ADR 0063)
   src/filter/                filter conditions: the model, SQL compiler, conditions in words
   src/lists/ views/          the sidebar tree with counts and defaults; the view tabs and the view query (filter,
                              group, sort, rows, columns; subtasks.rs the results' descendants per subtask mode;
@@ -153,6 +155,8 @@ src-tauri/
   src/status_style/          the six status styles (status types): detection, the owner's app-wide choice and a Space's override
   src/space_config/          a Space's own settings: offered layouts, new views' layout and grouping, field visibility
                              (types.rs the settings, read.rs what views and the Issue view read, edit.rs the changes)
+  src/activity/              when the owner last viewed an issue and last did anything with it (Recently viewed)
+  src/field_choice/          which custom fields show app-wide: list, Issue view or nowhere (ADR 0056)
   src/me_mode/               which issues are mine in Me mode: the assignee plus the owner's rules (ADR 0045)
   src/team/                  who is on which Space's team: its assignees by default, the owner's choices on top
   src/avatars/               people's profile pictures: freshness, the `cache.avatar` rows, `user_avatar` (data URLs)
@@ -169,19 +173,23 @@ src/
   api/index.ts types.gen.ts types.ts   the only IPC; generated and hand-written types
   queries/                   TanStack Query hooks and the event → query-key map (ADR 0018)
   state/store.ts slices/     UI-only state (zustand); slices/narrowing.ts the views' drafts and text filters
-  shell/                     the main window frame: sidebar and content panel
+  shell/                     the main window frame: sidebar and content panel; statusBar/ the status bar (ADR 0060)
   shell/toolbar/             the view toolbar: Group menu, Columns popover, Subtasks menu, Filter popover, Me chip
                              and Me popover (useMeMode.ts),
                              text filter, Save View (useViewDraft.ts)
   views/list/ views/table/   the List and Table layouts over the view query's rows (views/board/ the Board)
   issue/                     the Issue view, the preview (Peek.tsx), activity, rich text (JiraHtml.tsx, InlineImage.tsx);
                              hoverPeek/ the ⌥ + hover Peek; find/ Find in this issue (CSS Custom Highlights)
+  inbox/                     the bell and its inbox of unread issues (ADR 0059)
+  writes/                    changes to Jira: the status, assignee and priority menus, the bulk bar, CommentBox and
+                             mentions, EditableTitle, AddWebLink, dragging onto groups
+  meMode/                    how a Me rule reads
   pins/ palette/             Bookmarks; the command palette (prefixes, ranking, the menus' and the page's commands)
   commands/ registry/        in-window keys; Settings page registry
   components/ (issue/: rings, pills, chips, avatars; menu/: the one in-app menu; look/: tiles and the look editor)
   windows/<name>/ lib/ styles/ test/
 docs/                        this folder; adr/ holds the decision records; plan/ (gitignored) the steps
-scripts/*.sh scripts/dev/    install, stop, signing; the dev loop
+scripts/*.sh scripts/dev/    release, install, stop, signing, clean build; the dev loop
 .claude/                     rules, agents, skills, settings
 ```
 

@@ -24,8 +24,9 @@ Unit tests and lint never run at the same time: both regenerate `src/api/types.g
 | `ci` | runs one suite and replies with a pass/fail summary |
 | `review-code-cleanliness` | reviews a changed file for structure, comment noise, boundaries and over-engineering |
 
-The `ship-step` skill chains cleanup, review, `cargo fmt`, `ci`, build, launch and commit at the end of every
-step.
+The `ship-step` skill chains cleanup, review, `cargo fmt`, `ci`, build, launch, quitting the debug app, commit and
+the release (a major version only with the owner's approval, [ADR 0065](adr/0065-a-major-version-needs-the-owners-approval.md))
+at the end of every step.
 
 ## Rust
 
@@ -79,6 +80,7 @@ keep typing in the terminal. They are macOS-only (zsh, Swift, `screencapture`, `
 |---|---|
 | `bun run build:app` | builds the debug bundle `src-tauri/target/debug/bundle/macos/Taskboard (Debug).app` (`tauri.debug.conf.json`, `VITE_DEV_HOOKS=1`) |
 | `scripts/dev/launch.sh [cli args]` | refuses a bundle older than the sources, signs it, restarts only the debug app next to the terminal window, without focus. Log: `$TMPDIR/taskboard-dev.log`; terminal app: `$TASKBOARD_DEV_TERMINAL` (default `Terminal`) |
+| `scripts/stop-app.sh <path/to/taskboard>` | quits the release or debug app the CLI path names and waits until it is gone; run it with the debug bundle's CLI after testing |
 | `scripts/dev/js.sh '<js>'` | runs JavaScript in the running debug app over its socket. Fire-and-forget; wrap code in an IIFE; the store is `window.taskboard`; a first line `@<label>` targets another window |
 | `scripts/dev/e2e.sh [level] [view]` | checks that nothing jumps in the running debug app: opens the view (default `NW` "All issues"), clicks Me twice and drags the first row, comparing the content panel, the toolbar, the first row and the clicked control before and after each step; prints the drift and exits 1 when anything moved. Run it for UI changes |
 | `scripts/dev/screenshot.sh out.png [--overlay]` | captures the debug app's largest window, also in the background |
@@ -92,6 +94,7 @@ Never use `bun run app`, `open` or AppleScript clicks and keystrokes to drive th
 ### Signing
 
 macOS keys privacy grants and Keychain trust to identifier + certificate
-([ADR 0015](adr/0015-signed-with-a-local-certificate.md)). Run `scripts/create-signing-cert.sh` once per Mac;
-`scripts/sign-app.sh` signs with `TASKBOARD_SIGN_IDENTITY`, else that certificate, else ad hoc. Every build is
+([ADR 0053](adr/0053-builds-are-signed-with-an-apple-development-certificate.md)). `scripts/sign-app.sh` signs
+with `TASKBOARD_SIGN_IDENTITY`, else an `Apple Development` certificate (Xcode, a free Apple ID), else the
+`Taskboard Local Signing` certificate of `scripts/create-signing-cert.sh` (run once per Mac), else ad hoc. Every build is
 signed with the hardened runtime ([ADR 0049](adr/0049-hardened-runtime-strict-csp-and-no-navigation.md)).
