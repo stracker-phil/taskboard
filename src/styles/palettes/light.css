@@ -203,8 +203,18 @@
   --find-match-text: #1c1917;
   --find-current-bg: #f59e0b;
   --find-current-text: #1c1917;
-  --pr-open-bg: #f3e8ff;
-  --pr-open-fg: #6b21a8;
+  /* Pull requests: the state pill (GitHub's colors), the checks and review marks */
+  --pr-open-bg: #dcfce7;
+  --pr-open-fg: #166534;
+  --pr-draft-bg: #f4f4f5;
+  --pr-draft-fg: #52525b;
+  --pr-merged-bg: #f3e8ff;
+  --pr-merged-fg: #6b21a8;
+  --pr-closed-bg: #fef2f2;
+  --pr-closed-fg: #b91c1c;
+  --pr-check-pass: #15803d;
+  --pr-check-fail: #dc2626;
+  --pr-check-pending: #b45309;
 
   /* Sync chip */
   --sync-ok: #22c55e;

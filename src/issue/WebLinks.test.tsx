@@ -8,7 +8,7 @@ vi.mock("../api", async (orig) => ({ ...(await orig<object>()), api: (await impo
 import { api } from "../api";
 import { createQueryClient } from "../queries/queryClient";
 import { resetStore } from "../state/store";
-import { pullRequestLink, webLink } from "../test/webLinks";
+import { webLink } from "../test/webLinks";
 import { WebLinks } from "./WebLinks";
 
 const mocked = vi.mocked(api, true);
@@ -27,15 +27,14 @@ beforeEach(() => {
 });
 
 describe("WebLinks", () => {
-  it("lists each link under Web links with its title and its reference or host", async () => {
-    mocked.issueWebLinks.mockResolvedValue([pullRequestLink(), webLink()]);
+  it("lists each link under Web links with its title and its host or reference", async () => {
+    mocked.issueWebLinks.mockResolvedValue([webLink(), webLink({ id: "30003", title: "Rollout runbook", host: "wiki.example.com", reference: "RUN-7" })]);
     renderLinks();
 
     const section = within(await screen.findByRole("region", { name: "Web links" }));
     expect(section.getByRole("heading", { name: "Web links" })).toBeInTheDocument();
-    const pullRequest = section.getByRole("button", { name: /Validate DACH postcodes/ });
-    expect(pullRequest).toHaveTextContent("shop#481");
     expect(section.getByRole("button", { name: /Postcode guide/ })).toHaveTextContent("docs.example.com");
+    expect(section.getByRole("button", { name: /Rollout runbook/ })).toHaveTextContent("RUN-7");
   });
 
   it("asks Rust to sync the web links of the shown issue", async () => {
@@ -53,12 +52,12 @@ describe("WebLinks", () => {
   });
 
   it("opens an openable link with its url", async () => {
-    mocked.issueWebLinks.mockResolvedValue([pullRequestLink()]);
+    mocked.issueWebLinks.mockResolvedValue([webLink()]);
     renderLinks();
 
-    await userEvent.click(await screen.findByRole("button", { name: /Validate DACH postcodes/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Postcode guide/ }));
 
-    expect(mocked.openUrl).toHaveBeenCalledWith("https://github.com/example/shop/pull/481");
+    expect(mocked.openUrl).toHaveBeenCalledWith("https://docs.example.com/guides/postcodes");
   });
 
   it.each(["http://intranet.example.com/x", "mailto:alex@example.com"])("shows the link %s as text that does not open", async (url) => {
@@ -72,17 +71,17 @@ describe("WebLinks", () => {
   });
 
   it("shows the newly fetched links at once when the sync stored new ones", async () => {
-    mocked.issueWebLinks.mockResolvedValueOnce([]).mockResolvedValue([pullRequestLink(), webLink()]);
+    mocked.issueWebLinks.mockResolvedValueOnce([]).mockResolvedValue([webLink(), webLink({ id: "30003", title: "Rollout runbook" })]);
     mocked.issueSyncWebLinks.mockResolvedValue(true);
     renderLinks();
 
     const section = within(await screen.findByRole("region", { name: "Web links" }));
-    expect(section.getByRole("button", { name: /Validate DACH postcodes/ })).toBeInTheDocument();
+    expect(section.getByRole("button", { name: /Rollout runbook/ })).toBeInTheDocument();
     expect(section.getByRole("button", { name: /Postcode guide/ })).toBeInTheDocument();
   });
 
   it("keeps the section hidden when the sync stored nothing new", async () => {
-    mocked.issueWebLinks.mockResolvedValueOnce([]).mockResolvedValue([pullRequestLink(), webLink()]);
+    mocked.issueWebLinks.mockResolvedValueOnce([]).mockResolvedValue([webLink()]);
     mocked.issueSyncWebLinks.mockResolvedValue(false);
     renderLinks();
 
@@ -93,11 +92,11 @@ describe("WebLinks", () => {
   });
 
   it("still shows the cached links when the sync fails", async () => {
-    mocked.issueWebLinks.mockResolvedValue([pullRequestLink()]);
+    mocked.issueWebLinks.mockResolvedValue([webLink()]);
     mocked.issueSyncWebLinks.mockRejectedValue({ kind: "network", message: "Offline", code: null });
     renderLinks();
 
-    expect(await screen.findByRole("button", { name: /Validate DACH postcodes/ })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /Postcode guide/ })).toBeInTheDocument();
     await waitFor(() => expect(mocked.issueSyncWebLinks).toHaveBeenCalled());
   });
 });

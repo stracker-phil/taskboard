@@ -120,6 +120,14 @@ describe.each(SCHEMES)("%s palette contrast", (scheme) => {
     expect(ratio(`--status-${s}-fg`, `--status-${s}-bg`)).toBeGreaterThanOrEqual(4.5);
   });
 
+  it.each(["open", "draft", "merged", "closed"])("the %s pull request pill reads at 4.5:1", (s) => {
+    expect(ratio(`--pr-${s}-fg`, `--pr-${s}-bg`)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it.each(["pass", "fail", "pending"])("the %s check mark reads at 3:1 on the panel", (s) => {
+    expect(ratio(`--pr-check-${s}`, "--panel-bg")).toBeGreaterThanOrEqual(3);
+  });
+
   it.each([1, 2, 3, 4, 5])("epic chip %i reads at 4.5:1", (n) => {
     expect(ratio(`--epic-${n}-fg`, `--epic-${n}-bg`)).toBeGreaterThanOrEqual(4.5);
   });

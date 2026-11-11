@@ -71,6 +71,45 @@
 .issue-links__relation { flex: none; width: 110px; font-size: 13px; color: var(--text-muted); white-space: nowrap; }
 .issue-links__relation::first-letter { text-transform: uppercase; }
 
+/* Pull requests: between the field grid and the links, in the field grid's label column; the status fades in
+   when gh answers. */
+.pull-requests { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.pull-requests--issue { padding: 10px 0; border-top: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline); }
+.pull-requests--issue:has(+ .issue-links) { padding-bottom: 0; border-bottom: 0; }
+.pull-requests--issue + .issue-links { margin-top: -18px; border-top: 0; }
+.pull-requests--issue + .issue-main__description { padding-top: 0; border-top: 0; }
+.pull-requests--peek h2 { margin: 0 0 4px; font-size: 13px; font-weight: 700; color: var(--text-secondary); }
+.pull-requests__row { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.pull-requests__label { flex: none; width: 110px; font-size: 13px; color: var(--text-muted); white-space: nowrap; }
+.pull-request {
+  display: flex; flex: 1; align-items: center; gap: 8px; min-width: 0; height: 32px; margin-left: -8px; padding: 0 8px;
+  box-sizing: border-box; border: 0; border-radius: 6px; background: transparent; color: var(--text); font-size: 14px;
+  text-align: left; white-space: nowrap; transition: background-color var(--motion-fast) var(--ease-out);
+}
+.pull-requests--peek .pull-request { height: 30px; font-size: 13px; }
+button.pull-request:hover { background: var(--row-hover-bg); }
+.pull-request--inert { color: var(--text-secondary); }
+.pull-request__icon { flex: none; color: var(--text-tertiary); }
+.pull-request__icon--open { color: var(--pr-open-fg); }
+.pull-request__icon--merged { color: var(--pr-merged-fg); }
+.pull-request__icon--closed { color: var(--pr-closed-fg); }
+.pull-request__number { flex: none; font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); }
+.pull-request__title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.pull-request__problem { flex: none; font-size: 12px; color: var(--text-muted); }
+.pull-request__status { display: flex; flex: none; align-items: center; gap: 10px; animation: fade-in var(--motion-base) var(--ease-out); }
+.pull-request__mark { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-variant-numeric: tabular-nums; color: var(--text-secondary); }
+.pull-request__mark--pass svg { color: var(--pr-check-pass); }
+.pull-request__mark--fail svg { color: var(--pr-check-fail); }
+.pull-request__mark--pending svg { color: var(--pr-check-pending); }
+.pull-request__state {
+  display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border-radius: 6px;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase;
+}
+.pull-request__state--open { background: var(--pr-open-bg); color: var(--pr-open-fg); }
+.pull-request__state--draft { background: var(--pr-draft-bg); color: var(--pr-draft-fg); }
+.pull-request__state--merged { background: var(--pr-merged-bg); color: var(--pr-merged-fg); }
+.pull-request__state--closed { background: var(--pr-closed-bg); color: var(--pr-closed-fg); }
+
 .related-issue {
   display: flex; align-items: center; gap: 10px; width: 100%; min-width: 0; height: 40px; padding: 0 8px; box-sizing: border-box;
   border: 0; border-bottom: 1px solid var(--row-hairline); border-radius: 6px; background: transparent; color: var(--text);

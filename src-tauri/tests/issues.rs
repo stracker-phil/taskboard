@@ -19,8 +19,8 @@ use taskboard_lib::inbox;
 use taskboard_lib::issues::{
     ActivityItem, ChangeValue, CustomField, InlineImage, IssueDetail, IssueLink,
     MAX_INLINE_IMAGE_BYTES, RelatedIssue, WebLink, WebLinkKind, attachment_file, attachment_image,
-    image_response, issue_activity, issue_forget, issue_get, issue_related, issue_sync_comments,
-    issue_sync_history, issue_sync_web_links, issue_web_links,
+    image_response, issue_activity, issue_forget, issue_get, issue_other_web_links, issue_related,
+    issue_sync_comments, issue_sync_history, issue_sync_web_links, issue_web_links,
 };
 use taskboard_lib::jira::{Limiter, TokenKind};
 use taskboard_lib::lists::Viewer;
@@ -182,6 +182,11 @@ impl Site {
     async fn web_links(&self, key: &str) -> Vec<WebLink> {
         let id = self.id_of(key).await;
         issue_web_links(self.db(), id).await.unwrap()
+    }
+
+    async fn other_web_links(&self, key: &str) -> Vec<WebLink> {
+        let id = self.id_of(key).await;
+        issue_other_web_links(self.db(), id).await.unwrap()
     }
 
     /// Syncs the history at `minutes` after the demo's now.
@@ -1728,6 +1733,38 @@ async fn syncing_web_links_stores_the_issues_links_in_the_trackers_order() {
         ]
     );
     assert_eq!(site.web_links("NW-1038").await, []);
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn other_web_links_leave_out_pull_requests_and_keep_the_trackers_order() {
+    let site = Site::new().await;
+    assert!(site.sync_web_links("NW-1042").await);
+
+    let others = site.other_web_links("NW-1042").await;
+
+    assert_eq!(
+        others,
+        [WebLink {
+            id: "70002".into(),
+            url: "https://docs.example.com/checkout/postcode-rules".into(),
+            title: "Postcode rules for the checkout".into(),
+            host: Some("docs.example.com".into()),
+            kind: WebLinkKind::Link,
+            reference: None,
+            openable: true,
+        }]
+    );
+}
+
+#[tokio::test]
+#[ignore = "syncs the demo site into a temp database"]
+async fn an_issue_with_only_pull_requests_has_no_other_web_links() {
+    let site = Site::new().await;
+    assert!(site.sync_web_links("NW-1038").await);
+    assert!(!site.web_links("NW-1038").await.is_empty());
+
+    assert_eq!(site.other_web_links("NW-1038").await, []);
 }
 
 #[tokio::test]

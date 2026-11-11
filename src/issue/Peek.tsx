@@ -16,6 +16,7 @@ import { GoneNotice } from "./GoneNotice";
 import { IssueMissing } from "./IssueMissing";
 import { SinceBanner } from "./SinceBanner";
 import { usePreviewedAfter, useSeenAfter } from "./useSeenAfter";
+import { PullRequests } from "./PullRequests";
 import { WebLinks } from "./WebLinks";
 import { IssueActions } from "./IssueActions";
 import { StatusMenuButton } from "../writes/StatusMenuButton";
@@ -100,6 +101,7 @@ function Body({ issue, onExpand, onClose }: { issue: IssueDetail; onExpand: () =
         ))}
       </div>
       {issue.since && <SinceBanner since={issue.since} />}
+      <PullRequests id={issue.id} variant="peek" />
       {issue.descriptionHtml && hasContent(issue.descriptionHtml) ? (
         <JiraHtml html={issue.descriptionHtml} issueId={issue.id} className="peek__description" />
       ) : (

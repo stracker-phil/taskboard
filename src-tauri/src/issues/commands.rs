@@ -54,10 +54,10 @@ pub async fn issue_sync_comments(state: State<'_, AppState>, id: String) -> AppR
     super::issue_sync_comments(&state.db, source.as_ref(), id).await
 }
 
-/// The cached web links (pull requests, documents).
+/// The cached web links other than pull requests (`issue_pull_requests` has those).
 #[tauri::command]
 pub async fn issue_web_links(state: State<'_, AppState>, id: String) -> AppResult<Vec<WebLink>> {
-    super::issue_web_links(&state.db, id).await
+    super::issue_other_web_links(&state.db, id).await
 }
 
 /// The issue as Markdown: front matter, description, rich fields, web links and comments, oldest first.

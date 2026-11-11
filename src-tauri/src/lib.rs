@@ -36,6 +36,7 @@ pub mod net;
 pub mod notify;
 mod order;
 pub mod pins;
+pub mod pull_requests;
 #[cfg(target_os = "macos")]
 mod quicklook;
 mod remote;

@@ -20,7 +20,8 @@ import { pinItem, pins } from "../test/pins";
 import { behaviour, settings } from "../test/settings";
 import { sidebarTree, space } from "../test/spaces";
 import { listNode, view } from "../test/views";
-import { pullRequestLink } from "../test/webLinks";
+import { prStatus, pullRequest } from "../test/pullRequests";
+import { webLink } from "../test/webLinks";
 import { IssueView } from "./IssueView";
 
 const mocked = vi.mocked(api, true);
@@ -588,11 +589,24 @@ describe("IssueView", () => {
     });
 
     it("lists the issue's web links", async () => {
-      mocked.issueWebLinks.mockResolvedValue([pullRequestLink()]);
+      mocked.issueWebLinks.mockResolvedValue([webLink()]);
       renderIssue();
 
       const section = within(await screen.findByRole("region", { name: "Web links" }));
-      expect(section.getByRole("button", { name: /Validate DACH postcodes/ })).toHaveTextContent("shop#481");
+      expect(section.getByRole("button", { name: /Postcode guide/ })).toHaveTextContent("docs.example.com");
+    });
+
+    it("shows the pull requests after the fields and before the links and the description", async () => {
+      serve(issueDetail());
+      mocked.issuePullRequests.mockResolvedValue({ items: [pullRequest({ status: prStatus() })], refreshInMs: null });
+      mocked.issueRelated.mockResolvedValue(related({ links: [{ relation: "blocks", issue: relatedIssue() }] }));
+      renderIssue();
+
+      const pullRequests = await screen.findByRole("region", { name: "Pull requests" });
+      const links = await screen.findByRole("region", { name: "Links" });
+      const before = (a: HTMLElement, b: HTMLElement) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+      expect(before(pullRequests, links)).toBe(true);
+      expect(before(pullRequests, screen.getByRole("region", { name: "Description" }))).toBe(true);
     });
 
     it("asks Rust to sync the issue's comments", async () => {

@@ -1,4 +1,4 @@
-import { GitPullRequest, Link } from "lucide-react";
+import { Link } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { api, type WebLink } from "../api";
@@ -7,7 +7,7 @@ import { attempt } from "../state/requests";
 import { AddWebLinkButton, AddWebLinkForm } from "../writes/AddWebLink";
 import { useJiraChange } from "../writes/useJiraChanges";
 
-/** The issue's web links (pull requests, documents), fetched again whenever the issue is shown. Only https links
+/** The issue's web links that are not pull requests, fetched again whenever the issue is shown. Only https links
  *  open, in the default browser; the rest show as text. Hidden when there are none, except in the Issue view while
  *  changes to Jira are on, where "Add link" adds one. */
 export function WebLinks({ id, variant }: { id: string; variant: "issue" | "peek" }) {
@@ -39,10 +39,9 @@ export function WebLinks({ id, variant }: { id: string; variant: "issue" | "peek
 }
 
 function WebLinkRow({ link }: { link: WebLink }) {
-  const Icon = link.kind === "pullRequest" ? GitPullRequest : Link;
   const content = (
     <>
-      <Icon size={14} strokeWidth={1.9} className="web-link__icon" aria-hidden="true" />
+      <Link size={14} strokeWidth={1.9} className="web-link__icon" aria-hidden="true" />
       <span className="web-link__title">{link.title}</span>
       {(link.reference ?? link.host) && <span className="web-link__meta">{link.reference ?? link.host}</span>}
     </>

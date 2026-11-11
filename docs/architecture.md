@@ -146,6 +146,9 @@ src-tauri/
                              attachments (preview.rs: the downloaded copies for Quick Look; inline_image.rs: images in
                              rich text as data URLs), history (fetched.rs: how often details are fetched), markdown/: the
                              issue as Markdown for the clipboard
+  src/pull_requests/         an issue's pull requests with their GitHub state from `gh` (ADR 0061): github.rs names a
+                             pull request by its address, status.rs sums up gh's answer, gh.rs runs gh, mod.rs keeps
+                             statuses for FRESH_FOR
   src/quicklook.rs           macOS only: the Quick Look panel on one file (ADR 0035)
   src/status_style/          the six status styles (status types): detection, the owner's app-wide choice and a Space's override
   src/space_config/          a Space's own settings: offered layouts, new views' layout and grouping, field visibility

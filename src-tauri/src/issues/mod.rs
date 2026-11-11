@@ -30,4 +30,6 @@ pub use preview::{
     safe_filename,
 };
 pub use related::{Children, IssueLink, Related, RelatedIssue, issue_related};
-pub use web_links::{WebLink, WebLinkKind, classify, issue_sync_web_links, issue_web_links};
+pub use web_links::{
+    WebLink, WebLinkKind, classify, issue_other_web_links, issue_sync_web_links, issue_web_links,
+};

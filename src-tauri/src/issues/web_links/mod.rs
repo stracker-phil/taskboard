@@ -37,6 +37,13 @@ pub async fn issue_web_links(db: &Db, id: String) -> AppResult<Vec<WebLink>> {
     db.read(move |conn| cached(conn, &id)).await
 }
 
+/// The cached web links other than pull requests, which the page shows apart (`pull_requests`).
+pub async fn issue_other_web_links(db: &Db, id: String) -> AppResult<Vec<WebLink>> {
+    let mut links = issue_web_links(db, id).await?;
+    links.retain(|link| link.kind != WebLinkKind::PullRequest);
+    Ok(links)
+}
+
 /// Fetches the issue's web links and replaces the cached ones, unless they were fetched within `FRESH_FOR` of
 /// `now`. Returns whether they changed; the cache emits `issue_details_changed` for the issue when they did.
 /// On a failure the cached links stay.

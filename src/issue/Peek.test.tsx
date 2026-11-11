@@ -16,7 +16,8 @@ import { connectionView } from "../test/jira";
 import { ALEX, changeItem, commentItem } from "../test/issues";
 import { commentTarget, pinItem, pins } from "../test/pins";
 import { behaviour, settings } from "../test/settings";
-import { pullRequestLink } from "../test/webLinks";
+import { prStatus, pullRequest } from "../test/pullRequests";
+import { webLink } from "../test/webLinks";
 import { Peek } from "./Peek";
 
 const mocked = vi.mocked(api, true);
@@ -148,11 +149,20 @@ describe("Peek", () => {
   });
 
   it("lists the issue's web links", async () => {
-    mocked.issueWebLinks.mockResolvedValue([pullRequestLink()]);
+    mocked.issueWebLinks.mockResolvedValue([webLink()]);
     renderPeek();
 
     const section = within(await screen.findByRole("region", { name: "Web links" }));
-    expect(section.getByRole("button", { name: /Validate DACH postcodes/ })).toHaveTextContent("shop#481");
+    expect(section.getByRole("button", { name: /Postcode guide/ })).toHaveTextContent("docs.example.com");
+  });
+
+  it("lists the issue's pull requests with their status under a Pull requests heading", async () => {
+    mocked.issuePullRequests.mockResolvedValue({ items: [pullRequest({ status: prStatus({ state: "draft" }) })], refreshInMs: null });
+    renderPeek();
+
+    const section = within(await screen.findByRole("region", { name: "Pull requests" }));
+    expect(section.getByRole("heading", { name: "Pull requests" })).toBeInTheDocument();
+    expect(section.getByRole("button", { name: /Validate DACH postcodes/ })).toHaveTextContent("Draft");
   });
 
   it("leaves out the epic, release and priority an issue does not have", async () => {

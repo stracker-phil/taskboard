@@ -373,7 +373,7 @@ open preview follows the click at once. A Board always opens the Issue view.
   copies front matter (source URL, pull requests, status, assignee, Developer, priority), the title, every other
   filled content field as a `##` section, the other web links and the comments, oldest first.
 - Body: title 22/750, one line of chips (status pill `peek`, epic chip, release outline chip, priority,
-  assignee), the sanitized description, web links, the latest three activity items with "All activity".
+  assignee), the pull requests, the sanitized description, the other web links, the latest three activity items with "All activity".
 - Footer 36: the keys.
 - Hovering a row shows its toolbar at the end of the title: Mark as read (unread rows) or Mark as unread, Copy
   key, Bookmark, Open in Jira (`RowActions`). Assigning to me or unassigning has no button: I does it
@@ -554,12 +554,11 @@ view with its place intact).
   selectable while a find is active. esc clears the field, then leaves it, then goes back.
 - Main column: type badge · key · comment count (· attachment count, when there are any), the 30/750 title, the field grid (Status, Assignee, Epic chip
   that opens the epic here, Release, Priority, Sprint, then the custom fields opted in for the Issue view that the issue
-  fills, by name), links ("blocks", "is blocked by"), the description,
+  fills, by name), the pull requests, links ("blocks", "is blocked by"), the description,
   then each rich text custom field with content (acceptance criteria, steps to reproduce) as its own section
-  under its Jira name (`RichFields`; the preview shows them under its description too), Web links when there are
-  any (`WebLinks`, also in the preview: a pull request icon and `repo#481` for GitHub, GitLab and Bitbucket pull or
-  merge requests, else a link icon and the host; a row opens its address in the browser through `open_url`, only
-  when it is https, otherwise it is plain text; no remote icon loads), and Child issues (epics) or Subtasks, when there are any:
+  under its Jira name (`RichFields`; the preview shows them under its description too), Web links other than pull
+  requests when there are any (`WebLinks`, also in the preview: a link icon, the title and the host; a row opens its
+  address in the browser through `open_url`, only when it is https, otherwise it is plain text; no remote icon loads), and Child issues (epics) or Subtasks, when there are any:
   open first, done behind "Show N done"; "Open as list view" narrows the origin view to the epic (a removable
   chip in the toolbar, never saved). Last, Attachments when there are any (`Attachments`): a 16/700 heading over
   a two-column grid (gap 8) of tiles (h 44, r 9, `--hairline` border): a 28 × 28 badge with the extension in caps
@@ -570,6 +569,18 @@ view with its place intact).
   an address on the connected https site (`open_url`). Names are plain text.
 - The breadcrumb's Space and list are buttons that go there. Going to the place already shown (sidebar, tabs,
   breadcrumb) closes the Issue view and the preview (`useNavGo`).
+- Pull requests (`issue/PullRequests.tsx`, [ADR 0061](adr/0061-pull-request-status-comes-from-the-gh-cli.md)):
+  the web links that are GitHub pull requests or GitLab and Bitbucket merge or pull requests, one 32px row each in
+  the field grid's label column ("Pull request", "Pull requests" on the first row), between the field grid and the
+  links, sharing their hairlines. A row shows the state icon, the mono number (`#481`, the repository in the
+  tooltip), the title (GitHub's, else the link's) and, once `gh` answers, fading in at its end: the checks
+  (`CircleCheck`/`CircleX`/`CircleDashed` in `--pr-check-*` and "9/12", the tooltip in words), the review
+  (Approved, Changes requested, Awaiting review; nothing when none is asked for) and a state pill (Open, Draft,
+  Merged, Closed; 20 high, 10/700 caps, `--pr-{state}-bg/fg`). Without a status it says "No status" with the
+  reason as its tooltip; GitLab and Bitbucket rows have none. A click opens the address like a web link. Rust keeps
+  each status for 5 minutes (`pull_requests::FRESH_FOR`); opening the issue refreshes older ones, and while a pull
+  request isn't merged it refreshes again every 5 minutes. The preview shows the same rows under a "Pull requests"
+  heading, after its chips.
 - Activity (400 wide by default, 300–720 by dragging its left edge or ←/→ on the focused edge; saved in
   `ui_state.json` `activityWidth` for every issue, `useActivityWidth`; `--panel-subtle-bg`): All / Comments / Changes
   (⌥1 / ⌥2 / ⌥3, `commands/activityKeys.ts`; the choice is saved in `ui_state.json` `activityFilter` and every issue
@@ -811,12 +822,12 @@ low strength), and both pass the same contrast checks.
 | Changed | `--changed-bg`, `--changed-border` (new activity, changed related issues) | light blues |
 | Status | `--status-{todo,progress,review,blocked,done}-{bg,fg,border,square,tint,count}`, `--status-todo-tab-{bg,fg}` | gray, blue, violet, red, green |
 | Data | `--flag-*`, `--epic-{1..5}-{bg,fg}`, `--label-{1,2,neutral}-{bg,fg}`, `--avatar-{1..4}`, `--avatar-ring`, `--space-tile-{1..12}`, `--view-{list,board,table}` | |
-| Messages | `--banner-{info,warn,error}-*`, `--notice-neutral-*`, `--pin-*`, `--pr-open-*`, `--sync-*`, `--progress-done` | |
+| Messages | `--banner-{info,warn,error}-*`, `--notice-neutral-*`, `--pin-*`, `--pr-{open,draft,merged,closed}-{bg,fg}`, `--pr-check-{pass,fail,pending}`, `--sync-*`, `--progress-done` | |
 | Shadows | `--shadow-{panel,popover,palette,peek,raised,card,knob,group-card,hover,hover-toolbar}` | |
 | Hover, list | `--hover-bg`, `--row-hover-bg`, `--list-bg` | `#F4F4F5`, `#FAFAFB`, `#F7F7F8` |
 
 The mockup's near-duplicates are merged: the palette's own grays map to the zinc scale, the palette's active
-row uses `--selection-bg`, the PR chip uses the Checkout epic's purple, the warning banner text uses the amber
+row uses `--selection-bg`, the Merged pull request pill uses the Checkout epic's purple, the warning banner text uses the amber
 `#92400E`. The accent is fixed blue; there is no accent or scheme choice. Hover fills (not in the mockup) use
 `--fill-hover`.
 

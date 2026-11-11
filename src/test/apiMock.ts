@@ -184,6 +184,8 @@ export function createApiMock(): Api {
     issueWebLinks: vi.fn().mockResolvedValue([]),
     issueMarkdown: vi.fn().mockResolvedValue("# Demo issue\n"),
     issueSyncWebLinks: vi.fn().mockResolvedValue(false),
+    issuePullRequests: vi.fn().mockResolvedValue({ items: [], refreshInMs: null }),
+    issueSyncPullRequests: vi.fn().mockResolvedValue({ items: [], refreshInMs: null }),
     issueAddWebLink: vi.fn(async (): Promise<WriteOutcome> => ({ done: "Added the link to NW-1042", reverse: null })),
     issueSyncHistory: vi.fn().mockResolvedValue(false),
     issueForget: done(),

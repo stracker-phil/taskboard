@@ -227,6 +227,14 @@ projects: Array<string>, };
 
 export type ChangeValue = { "kind": "status", "value": { name: string, style: Style, } } | { "kind": "person", "value": Person } | { "kind": "text", "value": string };
 
+export type Checks = { state: ChecksState, 
+/**
+ * Finished without failing (skipped and neutral count as passed).
+ */
+passed: number, total: number, };
+
+export type ChecksState = "passing" | "failing" | "pending" | "none";
+
 export type Children = { 
 /**
  * Not done yet, by status then key.
@@ -489,6 +497,13 @@ relation: string, issue: RelatedIssue, };
  * What a click on an issue opens: the preview beside the view, or the full Issue view.
  */
 export type IssueOpening = "full" | "preview";
+
+export type IssuePullRequests = { items: Array<PullRequest>, 
+/**
+ * When to sync again: while a GitHub pull request isn't merged, the time until its status is due (0 when it
+ * is due now or was never fetched); none when nothing needs asking.
+ */
+refreshInMs: number | null, };
 
 /**
  * Payload of `issues_changed` and `issue_details_changed`.
@@ -778,6 +793,10 @@ space: string | null, };
 
 export type Pins = { active: Array<PinItem>, recentlyUnpinned: Array<PinItem>, };
 
+export type PrState = "open" | "draft" | "merged" | "closed";
+
+export type PrStatus = { title: string, state: PrState, checks: Checks, review: ReviewState, };
+
 /**
  * What the priority menu offers: the priorities Jira allows on the issue's edit screen, and the one it has.
  */
@@ -796,6 +815,20 @@ export type ProjectCounts = { id: string, key: string, name: string,
 cached: number, open: number, lastFullAt: string | null, };
 
 export type ProjectRow = { id: string, key: string, name: string, tracked: boolean, };
+
+export type PullRequest = { id: string, url: string, number: number, 
+/**
+ * `owner/repo` on GitHub, the repository's name elsewhere.
+ */
+repo: string, 
+/**
+ * GitHub's title, else the link's.
+ */
+title: string, openable: boolean, 
+/**
+ * What GitHub says; none for GitLab and Bitbucket, and when `problem` says why not.
+ */
+status: PrStatus | null, problem: string | null, };
 
 export type Related = { children: Children, links: Array<IssueLink>, };
 
@@ -820,6 +853,8 @@ export type Reverse = {
  * "Change back to Jamie Doe", "Change back to In Progress".
  */
 label: string, change: Change, };
+
+export type ReviewState = "approved" | "changesRequested" | "waiting" | "none";
 
 export type Row = { id: string, key: string, summary: string, style: Style, statusName: string, commentCount: number, 
 /**

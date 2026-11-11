@@ -29,6 +29,7 @@ import { IssueFind } from "./find/IssueFind";
 import { JiraHtml } from "./JiraHtml";
 import { RichFields } from "./RichFields";
 import { Children, Links } from "./Related";
+import { PullRequests } from "./PullRequests";
 import { WebLinks } from "./WebLinks";
 import { explainWritesOff } from "../writes/runWrite";
 import { assignMenuAnchor } from "../writes/assignMenu";
@@ -189,6 +190,7 @@ function IssueMain({ issue, origin }: { issue: IssueDetail; origin: IssueOrigin 
       {issue.gone && <GoneNotice issue={issue} onRemoved={closeIssue} />}
       {issue.since && <SinceBanner since={issue.since} onMarkSeen={() => void attempt(api.issuesMarkSeen([issue.id]), "Could not mark it read")} />}
       <FieldGrid issue={issue} onOpenEpic={openRelated} />
+      <PullRequests id={issue.id} variant="issue" />
       {related && <Links links={related.links} onOpen={openRelated} />}
       <section className="issue-main__description" aria-label="Description">
         <h2>Description</h2>

@@ -9,6 +9,8 @@ export const useIssueActivity = (id: string) => useQuery({ queryKey: [...issueKe
 export const useIssueRelated = (id: string) => useQuery({ queryKey: [...issueKey(id), "related"], queryFn: () => api.issueRelated(id) });
 export const webLinksKey = (id: string) => [...issueKey(id), "webLinks"] as const;
 export const useIssueWebLinks = (id: string) => useQuery({ queryKey: webLinksKey(id), queryFn: () => api.issueWebLinks(id) });
+export const pullRequestsKey = (id: string) => [...issueKey(id), "pullRequests"] as const;
+export const useIssuePullRequests = (id: string) => useQuery({ queryKey: pullRequestsKey(id), queryFn: () => api.issuePullRequests(id) });
 
 /** With `keepPrevious`, the last issue stays (as placeholder data) while the next one loads. */
 export const useIssue = (id: string | null, { keepPrevious = false } = {}) =>

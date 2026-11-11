@@ -83,6 +83,7 @@ import type {
   TransitionOption,
   WebLink,
   WriteOutcome,
+  IssuePullRequests,
 } from "./types";
 
 export * from "./types";
@@ -278,6 +279,10 @@ export const api = {
   issueMarkdown: (id: string) => invoke<string>("issue_markdown", { id }),
   /** Fetches the issue's web links from Jira; true when they changed. */
   issueSyncWebLinks: (id: string) => invoke<boolean>("issue_sync_web_links", { id }),
+  /** The issue's pull requests with the GitHub statuses already known; runs nothing. */
+  issuePullRequests: (id: string) => invoke<IssuePullRequests>("issue_pull_requests", { id }),
+  /** Asks `gh` for the statuses that are due (older than 5 minutes), then answers like `issuePullRequests`. */
+  issueSyncPullRequests: (id: string) => invoke<IssuePullRequests>("issue_sync_pull_requests", { id }),
   /** Fetches the issue's history (Jira's changelog) at most every 5 minutes; true when it changed. */
   issueSyncHistory: (id: string) => invoke<boolean>("issue_sync_history", { id }),
   /** Changes the issue in Jira; the cache shows it at once and takes the old value back when Jira refuses. */

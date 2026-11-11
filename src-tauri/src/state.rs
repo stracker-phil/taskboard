@@ -11,6 +11,7 @@ use crate::jira::Limiter;
 use crate::jira::gateway::AvatarClient;
 use crate::launch::LaunchQueue;
 use crate::nav::NavStore;
+use crate::pull_requests::PullRequestStatuses;
 use crate::secrets::SecretStore;
 use crate::store::keybindings::KeybindingsStore;
 use crate::store::modes::ModesStore;
@@ -33,6 +34,8 @@ pub struct AppState {
     pub inbox: InboxSession,
     /// Jira's answers on what issues allow, kept for a while.
     pub offers: Offers,
+    /// Pull request statuses from `gh`, kept for a while.
+    pub pull_requests: PullRequestStatuses,
 }
 
 impl AppState {
@@ -52,6 +55,7 @@ impl AppState {
             places: PlaceStore::open(config_dir),
             inbox: InboxSession::default(),
             offers: Offers::default(),
+            pull_requests: PullRequestStatuses::new(crate::pull_requests::default_source()),
         })
     }
 }
