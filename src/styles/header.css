@@ -106,6 +106,11 @@
   color: var(--text-muted);
 }
 .view-tabs__add:hover { color: var(--text); }
+/* The view's issue count after its narrowing, at the line's right end. */
+.view-tabs__count {
+  align-self: center; margin-left: auto; padding-left: 12px;
+  color: var(--text-muted); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap;
+}
 
 /* Token banners under the content header (artboard 8, panel 4). */
 .banner {

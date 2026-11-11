@@ -40,6 +40,8 @@ pub struct ViewData {
     pub groups: Vec<Group>,
     pub rows: HashMap<String, Row>,
     pub columns: Vec<String>,
+    /// How many issues the view shows: every row, subtasks included.
+    pub total: u32,
 }
 
 pub async fn view_rows(
@@ -232,16 +234,18 @@ fn build(
     };
     let mut groups = group(&items, view.group_by, &lookup);
     expand(&mut groups, &below);
+    let rows: HashMap<String, Row> = items
+        .into_iter()
+        .map(|(row, _)| row)
+        .chain(below.into_values().flatten())
+        .map(|row| (row.id.clone(), row))
+        .collect();
     Ok(ViewData {
         group_by: view.group_by,
         subtasks: mode,
         groups,
-        rows: items
-            .into_iter()
-            .map(|(row, _)| row)
-            .chain(below.into_values().flatten())
-            .map(|row| (row.id.clone(), row))
-            .collect(),
+        total: rows.len() as u32,
+        rows,
         columns: view.columns,
     })
 }

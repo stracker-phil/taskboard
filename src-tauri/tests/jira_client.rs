@@ -1076,7 +1076,10 @@ mod activity {
 
         assert_eq!(
             *heard.lock().unwrap(),
-            [vec!["Sending the comment".to_string()], Vec::<String>::new()]
+            [
+                vec!["Sending the comment".to_string()],
+                Vec::<String>::new()
+            ]
         );
         assert_eq!(in_flight.activity(), JiraActivity::default());
     }
@@ -1095,7 +1098,10 @@ mod activity {
         assert!(result.is_err());
         assert_eq!(
             *heard.lock().unwrap(),
-            [vec!["Sending the comment".to_string()], Vec::<String>::new()]
+            [
+                vec!["Sending the comment".to_string()],
+                Vec::<String>::new()
+            ]
         );
         assert_eq!(in_flight.activity(), JiraActivity::default());
     }

@@ -27,6 +27,8 @@ pub struct BoardData {
     pub rows: HashMap<String, Row>,
     /// What a card shows besides its key and summary, in order.
     pub card_fields: Vec<String>,
+    /// How many cards the Board shows, collapsed columns included.
+    pub total: u32,
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq, TS)]
@@ -151,12 +153,14 @@ pub async fn view_board(
                 columns
             }
         };
+        let rows: HashMap<String, Row> = items
+            .into_iter()
+            .map(|(row, _)| (row.id.clone(), row))
+            .collect();
         Ok(BoardData {
             columns,
-            rows: items
-                .into_iter()
-                .map(|(row, _)| (row.id.clone(), row))
-                .collect(),
+            total: rows.len() as u32,
+            rows,
             card_fields: view.columns,
         })
     })

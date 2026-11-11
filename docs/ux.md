@@ -192,6 +192,10 @@ padding, 2px gap, a `--hairline` bottom line.
 - After the tabs a 1px `--border` separator (10px inset) and "+ View" (`--text-muted`, also ⌘T): a menu
   captioned "New view" with a row per layout (its tile, name and a one-line hint) that adds a view of that
   layout named after it and opens it.
+- At the line's right end the issue count (`ViewCount`, 12px `--text-muted`, tabular figures): "42 issues", every
+  row the view shows after its narrowing (Me, the person chip, Filter drafts, the text field), from `total` of the
+  view's own `view_rows` or `view_board` answer, so it always matches the rows. Its slot stays empty until the
+  first answer; while the next one loads it keeps the last number. The sidebar's counts don't follow it.
 - A click on a tab opens it; a click on the open tab's name renames it in place (so does a double-click), one
   on its tile edits the look. Drag a tab sideways to reorder (`useDragReorder` on the x axis, `view_move`), with
   a 2px `--accent` line where it lands; a drag is never a click.
@@ -641,7 +645,8 @@ menu ([ADR 0034](adr/0034-menus-are-drawn-in-the-page.md)); only the app's menu 
 `components/TooltipHost.tsx`, mounted once per window, replaces the native tooltip: it takes any `title` over
 as `data-tooltip` (an icon-only control keeps it as its `aria-label`) and shows a `--tooltip-bg` bubble below
 the control (above when there's no room) after 450 ms, at once while moving between controls within 600 ms,
-and on keyboard focus. A press, a key, the wheel or leaving hides it. Text cut off with an ellipsis (or
+and on keyboard focus, as wide as its longest line up to 420px (line breaks in the `title` stay), centered
+on the control but kept 8px inside the window. A press, a key, the wheel or leaving hides it. Text cut off with an ellipsis (or
 clamped to fewer lines) shows its whole text the same way, before any `title` around it; so every label that
 can be cut (titles, names, epic chips, breadcrumbs) uses `text-overflow: ellipsis`, never a bare clip.
 

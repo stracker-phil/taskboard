@@ -7,5 +7,5 @@ export function boardColumn(patch: Partial<BoardColumn> = {}): BoardColumn {
 
 /** A board of these columns and the rows they point at. */
 export function boardData(columns: BoardColumn[], rows: Row[] = [], patch: Partial<BoardData> = {}): BoardData {
-  return { columns, rows: Object.fromEntries(rows.map((r) => [r.id, r])), cardFields: [], ...patch };
+  return { columns, rows: Object.fromEntries(rows.map((r) => [r.id, r])), cardFields: [], total: rows.length, ...patch };
 }

@@ -158,7 +158,7 @@ views and bookmarks; a level keeps at least one view.
 ### Group and sort keys
 
 `view_rows(listId, viewId, narrowing)` returns the view's issues as `ViewData { groupBy, subtasks, groups,
-rows, columns }`: the level's filter, plus the view's own conditions, plus the kind's own rule (Bookmarks: the actively bookmarked issues), plus the narrowing (`me`: the view's Me chip as drafted or saved, `text` in the key or summary ignoring
+rows, columns, total }` (`total`: the rows it holds, subtasks included; `view_board`'s `BoardData` has its cards'): the level's filter, plus the view's own conditions, plus the kind's own rule (Bookmarks: the actively bookmarked issues), plus the narrowing (`me`: the view's Me chip as drafted or saved, `text` in the key or summary ignoring
 case and accents, `epic`, and the draft conditions `listDraft` and `viewDraft`).
 
 A view's subtasks are the descendants of its results through `cache.issue.parent_id`, of any type

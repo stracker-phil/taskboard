@@ -118,7 +118,7 @@ export function groupOf(rows: Row[], patch: Partial<Group> = {}): Group {
 }
 
 export function viewData(groups: Group[], rows: Row[], patch: Partial<ViewData> = {}): ViewData {
-  return { groupBy: "status", groups, rows: Object.fromEntries(rows.map((r) => [r.id, r])), columns: [], subtasks: "hidden", ...patch };
+  return { groupBy: "status", groups, rows: Object.fromEntries(rows.map((r) => [r.id, r])), columns: [], subtasks: "hidden", total: rows.length, ...patch };
 }
 
 export const COLUMNS: Column[] = [

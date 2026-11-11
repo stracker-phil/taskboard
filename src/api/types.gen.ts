@@ -160,7 +160,11 @@ export type BoardData = { columns: Array<BoardColumn>, rows: { [key in string]: 
 /**
  * What a card shows besides its key and summary, in order.
  */
-cardFields: Array<string>, };
+cardFields: Array<string>, 
+/**
+ * How many cards the Board shows, collapsed columns included.
+ */
+total: number, };
 
 /**
  * What a bulk change did, for one toast.
@@ -1189,7 +1193,11 @@ isDefault: boolean,
  */
 ownConditions: number, };
 
-export type ViewData = { groupBy: GroupBy, subtasks: SubtaskMode, groups: Array<Group>, rows: { [key in string]: Row }, columns: Array<string>, };
+export type ViewData = { groupBy: GroupBy, subtasks: SubtaskMode, groups: Array<Group>, rows: { [key in string]: Row }, columns: Array<string>, 
+/**
+ * How many issues the view shows: every row, subtasks included.
+ */
+total: number, };
 
 /**
  * A group of the view the drag starts in, in the view's order.

@@ -62,7 +62,9 @@
 
 /* The app's tooltip (components/TooltipHost.tsx): small and dark in both schemes, rising in. */
 .tooltip {
-  position: fixed; z-index: 100; max-width: 280px; padding: 4px 8px; border-radius: 6px; transform: translateX(-50%);
+  /* Its own width wherever it starts, so a control at the window's edge doesn't squeeze it before TooltipHost
+     moves it inside. */
+  position: fixed; z-index: 100; width: max-content; max-width: min(420px, calc(100vw - 16px)); padding: 4px 8px; border-radius: 6px; transform: translateX(-50%);
   border: 1px solid var(--tooltip-border); background: var(--tooltip-bg); color: var(--tooltip-text);
   box-shadow: var(--shadow-raised);
   font-size: 12px; font-weight: 500; line-height: 1.35; pointer-events: none; white-space: pre-line;

@@ -16,6 +16,7 @@ import { useStore } from "../state/store";
 import { copyAppLink } from "../views/list/useIssueActions";
 import { LAYOUT_ORDER, LAYOUTS, LayoutTile } from "./viewLayouts";
 import { ViewTab } from "./ViewTab";
+import { ViewCount } from "./ViewCount";
 
 /** The level's view tabs (layout tile and name), "+ View", and ⌘1–⌘9 for the nth tab. */
 export function ViewTabs({ listId, viewId }: { listId: number; viewId: number }) {
@@ -162,6 +163,7 @@ export function ViewTabs({ listId, viewId }: { listId: number; viewId: number })
       <button ref={addRef} type="button" className="view-tabs__add" aria-haspopup="menu" title={title("New view", "view.new")} onClick={addMenu}>
         + View
       </button>
+      <ViewCount listId={listId} viewId={viewId} />
       {looking && (
         <LookPopover
           title="Icon and color"

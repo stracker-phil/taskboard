@@ -3275,6 +3275,183 @@ mod subtasks {
     }
 }
 
+mod total {
+    use super::*;
+
+    async fn nw_with_mode(site: &Site, mode: SubtaskMode) -> (i64, i64) {
+        let (space, view) = site.nw().await;
+        view_set_subtasks(site.db(), view, mode).await.unwrap();
+        (space, view)
+    }
+
+    async fn nw_board(site: &Site, narrowing: Narrowing) -> BoardData {
+        let (space, view) = site.nw().await;
+        view_board(site.db(), viewer(), space, view, narrowing)
+            .await
+            .unwrap()
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn a_view_total_is_the_number_of_rows_it_holds() {
+        let site = Site::new().await;
+
+        let data = site.nw_data(Narrowing::default()).await;
+
+        let in_cache = number(
+            site.db(),
+            format!("SELECT COUNT(*) FROM cache.issue WHERE project_id = '{NW}' AND gone = 0"),
+        )
+        .await;
+        assert_eq!(i64::from(data.total), in_cache);
+        assert_eq!(data.total as usize, data.rows.len());
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn narrowing_lowers_the_view_total_to_the_rows_left() {
+        let site = Site::new().await;
+        let everyone = site.nw_data(Narrowing::default()).await;
+
+        for (label, narrowing) in [
+            (
+                "me",
+                Narrowing {
+                    me: true,
+                    ..Narrowing::default()
+                },
+            ),
+            ("text", narrowing_text("nw-104")),
+            ("person", narrowing_person(JONAS_ACCOUNT_ID)),
+        ] {
+            let data = site.nw_data(narrowing).await;
+
+            assert!(data.total > 0, "{label}");
+            assert!(data.total < everyone.total, "{label}");
+            assert_eq!(data.total as usize, data.rows.len(), "{label}");
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn a_view_with_nothing_left_has_a_total_of_zero() {
+        let site = Site::new().await;
+
+        let data = site.nw_data(narrowing_text("zzzz-no-such-text")).await;
+
+        assert_eq!(data.total, 0);
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn subtasks_count_in_the_total_in_list_and_hierarchy_mode() {
+        let site = Site::new().await;
+        let (space, view) = site.nw().await;
+        view_set_filter(
+            site.db(),
+            viewer(),
+            view,
+            Filter {
+                conditions: vec![Condition::is(Field::Type, "Story")],
+            },
+        )
+        .await
+        .unwrap();
+        let hidden = site.data(space, view, Narrowing::default()).await;
+
+        for mode in [SubtaskMode::List, SubtaskMode::Hierarchy] {
+            view_set_subtasks(site.db(), view, mode).await.unwrap();
+
+            let data = site.data(space, view, Narrowing::default()).await;
+
+            if mode == SubtaskMode::List {
+                assert!(data.rows.values().any(|row| row.is_subtask), "{mode:?}");
+            }
+            assert_eq!(data.total as usize, data.rows.len(), "{mode:?}");
+            assert!(data.total > hidden.total, "{mode:?}");
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn narrowing_lowers_the_total_in_list_mode_too() {
+        let site = Site::new().await;
+        let (space, view) = nw_with_mode(&site, SubtaskMode::List).await;
+        let everyone = site.data(space, view, Narrowing::default()).await;
+
+        let mine = site
+            .data(
+                space,
+                view,
+                Narrowing {
+                    me: true,
+                    ..Narrowing::default()
+                },
+            )
+            .await;
+
+        assert!(mine.total > 0);
+        assert!(mine.total < everyone.total);
+        assert_eq!(mine.total as usize, mine.rows.len());
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn a_board_total_counts_every_card_including_collapsed_columns() {
+        let site = Site::new().await;
+
+        let board = nw_board(&site, Narrowing::default()).await;
+
+        let collapsed: usize = board
+            .columns
+            .iter()
+            .filter(|c| c.collapsed)
+            .map(|c| c.ids.len())
+            .sum();
+        assert!(collapsed > 0);
+        assert_eq!(
+            board.total as usize,
+            board.columns.iter().map(|c| c.ids.len()).sum::<usize>()
+        );
+        assert_eq!(board.total as usize, board.rows.len());
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn narrowing_lowers_the_board_total_to_the_cards_left() {
+        let site = Site::new().await;
+        let everyone = nw_board(&site, Narrowing::default()).await;
+
+        for (label, narrowing) in [
+            (
+                "me",
+                Narrowing {
+                    me: true,
+                    ..Narrowing::default()
+                },
+            ),
+            ("text", narrowing_text("nw-104")),
+            ("person", narrowing_person(JONAS_ACCOUNT_ID)),
+        ] {
+            let board = nw_board(&site, narrowing).await;
+
+            assert!(board.total > 0, "{label}");
+            assert!(board.total < everyone.total, "{label}");
+            assert_eq!(board.total as usize, board.rows.len(), "{label}");
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "syncs the demo site into a temp database"]
+    async fn a_board_with_no_cards_has_a_total_of_zero() {
+        let site = Site::new().await;
+
+        let board = nw_board(&site, narrowing_text("zzzz-no-such-text")).await;
+
+        assert_eq!(board.total, 0);
+    }
+}
+
 mod catalog {
     use super::*;
 
