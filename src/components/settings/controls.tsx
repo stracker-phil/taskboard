@@ -23,7 +23,7 @@ export function Group({ title, description, anchor, children }: { title?: string
 }
 
 interface RowProps {
-  label: string;
+  label: ReactNode;
   description?: ReactNode;
   htmlFor?: string;
   /** The control goes below the label instead of beside it. */

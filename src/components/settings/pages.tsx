@@ -26,6 +26,8 @@ export function registerCoreSettingsPages() {
     sections: [
       { id: "site", title: "Jira site" },
       { id: "token", title: "Token" },
+      { id: "scopes", title: "Token scopes" },
+      { id: "reads", title: "What Taskboard reads" },
       { id: "changes", title: "Changes" },
     ],
     Body: ConnectionPage,
@@ -36,10 +38,7 @@ export function registerCoreSettingsPages() {
     label: "Privacy & Data",
     icon: ShieldCheck,
     order: 1,
-    sections: [
-      { id: "cache", title: "Jira data" },
-      { id: "reads", title: "What Taskboard reads" },
-    ],
+    sections: [{ id: "cache", title: "Jira data" }],
     Body: PrivacyPage,
   });
   registerSettingsPage({

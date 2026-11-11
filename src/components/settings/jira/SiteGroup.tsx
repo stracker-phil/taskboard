@@ -11,7 +11,7 @@ const TOKEN_PAGE = "https://id.atlassian.com/manage-profile/security/api-tokens"
 
 const KIND_HINTS: Record<TokenKind, string> = {
   classic: "Calls your site directly.",
-  scoped: "Calls api.atlassian.com; needs read:jira-work and read:jira-user.",
+  scoped: "Calls api.atlassian.com, with the scopes under Token scopes.",
 };
 
 /** What the form edits; the token is kept apart and never shown once saved. */

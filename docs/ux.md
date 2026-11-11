@@ -893,15 +893,16 @@ no separate Settings design; owner, 2026-10-28). Its colors are the `--settings-
   - **Connection** (`components/settings/jira/`): *Jira site* (site URL, email, the API token as a password
     field that never shows a saved token, Classic or Scoped token kind, the cloud ID for Scoped; Save and
     Test Connection, with "Connected as …" or the error below), *Token* (the expiry date and how soon it
-    runs out), *Changes* (Allow changes to Jira, then a switch per kind of change, dimmed while changes are off)
-    Each row ends with the token scope it needs as Jira names it (`read:jira-work`; monospaced, selectable); the
-    group says which one is optional for a scoped token. The list comes from Rust (`jira_capabilities`), named by
-    the requests the gateway sends.
+    runs out), *Token scopes* (`TokenScopesGroup`: every scope a scoped token needs, once each, with Required,
+    Needed for changes or Optional and the capabilities that use it), *What Taskboard reads* (`ReadsGroup`: the
+    reads, no control), *Changes* (Allow changes to Jira, then a switch per kind of change, dimmed while changes
+    are off). Each read and change row ends with the token scope it needs as Jira names it (`read:jira-work`;
+    monospaced, selectable), so all scopes live on this one page. The list comes from Rust (`jira_capabilities`),
+    named by the requests the gateway sends.
   - **Privacy & Data** (`components/settings/privacy/`): *Jira data* (`StorageGroup`): Keep Jira data in memory
     only first, then the cache's size with Reset Cache (in memory: "Jira data in memory" with Refetch from Jira,
     both confirmed in a sheet), in file mode Keep history you've read and Clear the cache when Taskboard quits,
-    and Show Data Folder. *What Taskboard reads* (`ReadsGroup`): the reads, label, detail and token scope, no
-    control; the group says which scopes a scoped token requires.
+    and Show Data Folder.
   - **Projects**: Refresh after a successful test, "N of M tracked", a filter field (every word in the name or
     key, ignoring case) and a Track switch per project.
   - **Spaces** (`SpacesPage`): the tracked Spaces in sidebar order, each a row with its tile, name, key and

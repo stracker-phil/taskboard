@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -8,7 +8,9 @@ vi.mock("../../../api", async (orig) => ({ ...(await orig<object>()), api: (awai
 import { api } from "../../../api";
 import { createQueryClient } from "../../../queries/queryClient";
 import { resetStore } from "../../../state/store";
+import { capabilityRows } from "../../../test/capabilities";
 import { connectionView, PROJECTS } from "../../../test/jira";
+import { settings } from "../../../test/settings";
 import { ConnectionPage } from "./ConnectionPage";
 
 const mocked = vi.mocked(api, true);
@@ -25,6 +27,8 @@ async function renderPage() {
 beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
+  mocked.getSettings.mockResolvedValue(settings());
+  mocked.jiraCapabilities.mockResolvedValue(capabilityRows());
   mocked.connectionGet.mockResolvedValue(connectionView());
   mocked.projectsList.mockResolvedValue([]);
   mocked.projectsRefresh.mockResolvedValue([]);
@@ -136,6 +140,15 @@ describe("ConnectionPage", () => {
     });
   });
 
+  describe("scoped token hint", () => {
+    it("points a scoped token to the Token scopes group", async () => {
+      mocked.connectionGet.mockResolvedValue(connectionView({ tokenKind: "scoped" }));
+      await renderPage();
+
+      expect(screen.getByText("Calls api.atlassian.com, with the scopes under Token scopes.")).toBeInTheDocument();
+    });
+  });
+
   describe("Cloud ID", () => {
     it("is hidden for a classic token", async () => {
       await renderPage();
@@ -231,12 +244,47 @@ describe("ConnectionPage", () => {
       expect(await screen.findByRole("switch", { name: "Allow changes to Jira" })).not.toBeChecked();
     });
 
-    it("does not list what Taskboard reads; that lives on the Privacy & Data page", async () => {
+  });
+
+  describe("What Taskboard reads", () => {
+    it("lists the read rows with their detail and no switch", async () => {
+      await renderPage();
+
+      expect(await screen.findByText("Your account")).toBeInTheDocument();
+      expect(screen.getByText(/Reads the issues of the projects you track\./)).toBeInTheDocument();
+      expect(screen.getByText("Always on: Taskboard reads only these from Jira.")).toBeInTheDocument();
+      expect(screen.queryByRole("switch", { name: "Your account" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("switch", { name: "Issues" })).not.toBeInTheDocument();
+    });
+
+    it("lists no change among the reads", async () => {
+      await renderPage();
+
+      const reads = await screen.findByRole("region", { name: "What Taskboard reads" });
+
+      expect(within(reads).queryByText("Assign issues")).not.toBeInTheDocument();
+    });
+
+    it("is absent while the capabilities load", async () => {
+      mocked.jiraCapabilities.mockReturnValue(new Promise(() => {}));
       await renderPage();
 
       await screen.findByRole("switch", { name: "Allow changes to Jira" });
 
       expect(screen.queryByText("What Taskboard reads")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("group order", () => {
+    it("shows the site, token, token scopes, reads and changes groups in that order", async () => {
+      await renderPage();
+
+      const titles = ["Jira site", "Token", "Token scopes", "What Taskboard reads", "Changes"];
+      const headings = await Promise.all(titles.map((title) => screen.findByRole("heading", { name: title })));
+
+      headings.slice(1).forEach((heading, i) => {
+        expect(headings[i].compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      });
     });
   });
 

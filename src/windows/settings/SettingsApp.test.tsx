@@ -76,7 +76,14 @@ describe("SettingsApp", () => {
 
     expect(screen.getByRole("heading", { name: "Privacy & Data" })).toBeInTheDocument();
     expect(await screen.findByRole("button", { name: "Reset Cache" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "What Taskboard reads" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "What Taskboard reads" })).not.toBeInTheDocument();
+  });
+
+  it("shows the Token scopes and What Taskboard reads groups on the Connection page", async () => {
+    await renderSettings();
+
+    expect(await screen.findByRole("heading", { name: "Token scopes" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "What Taskboard reads" })).toBeInTheDocument();
   });
 
   describe("search", () => {
@@ -129,13 +136,14 @@ describe("SettingsApp", () => {
       expect(screen.queryByText("No Results")).not.toBeInTheDocument();
     });
 
-    it("finds the Privacy & Data page by its What Taskboard reads section", async () => {
+    it.each(["What Taskboard reads", "Token scopes"])("finds the Connection page by its %s section", async (section) => {
       await renderSettings();
 
-      await userEvent.type(screen.getByRole("searchbox", { name: "Search Settings" }), "What Taskboard reads");
+      await userEvent.type(screen.getByRole("searchbox", { name: "Search Settings" }), section);
 
       const nav = screen.getByRole("navigation", { name: "Settings pages" });
-      expect(within(nav).getAllByRole("button").map((b) => b.textContent?.trim())).toEqual([expect.stringContaining("Privacy & Data")]);
+      expect(within(nav).getAllByRole("button").map((b) => b.textContent?.trim())).toEqual([expect.stringContaining("Connection")]);
+      expect(within(nav).getByRole("button")).toHaveTextContent(section);
     });
   });
 
@@ -237,13 +245,17 @@ describe("SettingsApp", () => {
       expect(screen.queryByText("Extras body")).not.toBeInTheDocument();
     });
 
-    it.each(["cache", "reads"])("shows Privacy & Data on the open_settings event with the %s section", async (section) => {
+    it.each([
+      ["cache", "Privacy & Data"],
+      ["scopes", "Connection"],
+      ["reads", "Connection"],
+    ])("shows the page of the %s section on the open_settings event: %s", async (section, heading) => {
       window.history.replaceState({}, "", "/?page=extras");
       await renderSettings();
 
       act(() => emitEvent(api, "open_settings", section));
 
-      expect(screen.getByRole("heading", { name: "Privacy & Data", level: 2 })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: heading, level: 2 })).toBeInTheDocument();
       expect(screen.queryByText("Extras body")).not.toBeInTheDocument();
     });
   });

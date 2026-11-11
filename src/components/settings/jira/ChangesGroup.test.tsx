@@ -180,23 +180,13 @@ describe("ChangesGroup", () => {
       expect(description).toHaveTextContent(`${detail} · ${scope}`);
     });
 
-    it("lists the optional scopes of the changes in the Changes description", async () => {
+    it("describes the group without listing scopes", async () => {
       await renderGroup(true);
 
-      expect(await screen.findByText(/Optional for a scoped token:/)).toHaveTextContent(
-        "Each change is sent to Jira once. Optional for a scoped token: write:jira-work, only while changes are on.",
-      );
-    });
+      const description = await screen.findByText("Each change is sent to Jira once.");
 
-    it("derives the description from the scopes of the change rows", async () => {
-      mocked.jiraCapabilities.mockResolvedValue([
-        { ...rows[0], scope: "read:example-first" },
-        { ...rows[5], scope: "write:example-one" },
-        { ...rows[6], scope: "write:example-two" },
-      ]);
-      await renderGroup(true);
-
-      expect(await screen.findByText(/Optional for a scoped token:/)).toHaveTextContent("write:example-one, write:example-two, only while");
+      expect(description).not.toHaveTextContent("write:jira-work");
+      expect(screen.queryByText(/Optional for a scoped token/)).not.toBeInTheDocument();
     });
   });
 });

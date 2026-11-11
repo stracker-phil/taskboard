@@ -7,7 +7,6 @@ vi.mock("../../../api", async (orig) => ({ ...(await orig<object>()), api: (awai
 import { api } from "../../../api";
 import { createQueryClient } from "../../../queries/queryClient";
 import { resetStore } from "../../../state/store";
-import { capabilityRows } from "../../../test/capabilities";
 import { syncOverview } from "../../../test/jira";
 import { settings } from "../../../test/settings";
 import { PrivacyPage } from "./PrivacyPage";
@@ -30,63 +29,19 @@ beforeEach(() => {
 });
 
 describe("PrivacyPage", () => {
-  it("shows the Jira data group before what Taskboard reads", async () => {
+  it("shows the Jira data group", async () => {
     renderPage();
 
-    const data = await screen.findByText("Jira data");
-    const reads = await screen.findByText("What Taskboard reads");
-
-    expect(data.compareDocumentPosition(reads) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(await screen.findByText("Jira data")).toBeInTheDocument();
   });
 
-  describe("what Taskboard reads", () => {
-    it("lists the read rows with their detail and no switch", async () => {
-      renderPage();
+  it("does not list what Taskboard reads or the token scopes; those live on the Connection page", async () => {
+    renderPage();
 
-      expect(await screen.findByText("Your account")).toBeInTheDocument();
-      expect(screen.getByText(/Reads the issues of the projects you track\./)).toBeInTheDocument();
-      expect(screen.queryByRole("switch", { name: "Your account" })).not.toBeInTheDocument();
-      expect(screen.queryByRole("switch", { name: "Issues" })).not.toBeInTheDocument();
-    });
+    await screen.findByText("Jira data");
 
-    it("is absent while the capabilities load", async () => {
-      mocked.jiraCapabilities.mockReturnValueOnce(new Promise(() => {}));
-
-      renderPage();
-
-      await screen.findByText("Jira data");
-      expect(screen.queryByText("What Taskboard reads")).not.toBeInTheDocument();
-    });
-
-    it("lists no change among the reads", async () => {
-      renderPage();
-
-      await screen.findByText("Your account");
-
-      expect(screen.queryByText("Assign issues")).not.toBeInTheDocument();
-    });
-
-    it("lists the required scopes of the reads once each, in row order, in the description", async () => {
-      renderPage();
-
-      expect(await screen.findByText(/Required for a scoped token:/)).toHaveTextContent(
-        "Always on: Taskboard reads only these from Jira. Required for a scoped token: read:jira-user, read:jira-work.",
-      );
-    });
-
-    it("derives the description from the scopes of the read rows", async () => {
-      const rows = capabilityRows();
-      mocked.jiraCapabilities.mockResolvedValue([
-        { ...rows[0], scope: "read:example-first" },
-        { ...rows[1], scope: "read:example-second" },
-        { ...rows[5], scope: "write:example-one" },
-      ]);
-      renderPage();
-
-      const description = await screen.findByText(/Required for a scoped token:/);
-
-      expect(description).toHaveTextContent("read:example-first, read:example-second.");
-      expect(description).not.toHaveTextContent("write:example-one");
-    });
+    expect(screen.queryByText("What Taskboard reads")).not.toBeInTheDocument();
+    expect(screen.queryByText("Token scopes")).not.toBeInTheDocument();
+    expect(screen.queryByText("Your account")).not.toBeInTheDocument();
   });
 });

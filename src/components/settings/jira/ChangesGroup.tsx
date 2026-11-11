@@ -3,8 +3,6 @@ import { useCapabilities, useChangePermissions, useSettings } from "../../../que
 import { attempt } from "../../../state/requests";
 import { Group, Row, Switch, SwitchInput } from "../controls";
 
-const scopes = (rows: CapabilityRow[]) => [...new Set(rows.map((row) => row.scope))];
-
 /** Changes to Jira on or off, then each kind of change on its own, each with the token scope it needs. The list
  *  comes from the gateway's own requests (`jira::capability`), so it is what the app does. */
 export function ChangesGroup() {
@@ -24,11 +22,7 @@ export function ChangesGroup() {
     <Group
       title="Changes"
       anchor="changes"
-      description={
-        <>
-          Each change is sent to Jira once. Optional for a scoped token: <ScopeNames scopes={scopes(changes)} />, only while changes are on.
-        </>
-      }
+      description="Each change is sent to Jira once."
     >
       <Switch label="Allow changes to Jira" checked={behaviour.allowJiraChanges} onChange={setAllowJiraChanges} />
       {changes.map((row) => (
@@ -59,11 +53,7 @@ export function ReadsGroup() {
     <Group
       title="What Taskboard reads"
       anchor="reads"
-      description={
-        <>
-          Always on: Taskboard reads only these from Jira. Required for a scoped token: <ScopeNames scopes={scopes(reads)} />.
-        </>
-      }
+      description="Always on: Taskboard reads only these from Jira."
     >
       {reads.map((row) => (
         <Row key={row.capability} label={row.label} description={<Described row={row} />} />
@@ -80,19 +70,6 @@ function Described({ row, notAllowedIn = [] }: { row: CapabilityRow; notAllowedI
       {notAllowedIn.length > 0 && (
         <span className="settings-not-allowed">Jira doesn't allow it in {notAllowedIn.join(", ")}</span>
       )}
-    </>
-  );
-}
-
-function ScopeNames({ scopes }: { scopes: string[] }) {
-  return (
-    <>
-      {scopes.map((scope, index) => (
-        <span key={scope}>
-          {index > 0 && ", "}
-          <code className="settings-scope">{scope}</code>
-        </span>
-      ))}
     </>
   );
 }

@@ -48,8 +48,12 @@ describe("resolveSettingsPage", () => {
     expect(resolveSettingsPage("space:10001")?.id).toBe("spaces");
   });
 
-  it.each(["cache", "reads"])("resolves the %s section to the Privacy & Data page", (section) => {
-    expect(resolveSettingsPage(section)?.id).toBe("privacy");
+  it.each([
+    ["cache", "privacy"],
+    ["scopes", "connection"],
+    ["reads", "connection"],
+  ])("resolves the %s section to the %s page", (section, page) => {
+    expect(resolveSettingsPage(section)?.id).toBe(page);
   });
 
   it("resolves the synced section to the Sync page", () => {
