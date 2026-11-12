@@ -144,7 +144,7 @@ mod tests {
                 ("New View", "page:view.new", Some("CmdOrCtrl+T")),
                 ("Refresh", "sync:refresh", Some("CmdOrCtrl+R")),
                 ("Full Sync", "sync:full", Some("CmdOrCtrl+Shift+R")),
-                ("Reset Cache…", "app:settings:cache", None),
+                ("Refetch from Jira…", "app:settings:cache", None),
                 ("Close Tab or Window", "window:close", Some("CmdOrCtrl+W")),
             ]
         );

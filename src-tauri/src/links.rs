@@ -259,7 +259,7 @@ mod tests {
 
     #[test]
     fn other_commands_are_refused_naming_the_id() {
-        for id in ["app:quit", "app:compactCache", "app:settings:"] {
+        for id in ["app:quit", "app:data", "app:settings:"] {
             assert_eq!(
                 parse(&link(&format!("command/{id}"))),
                 Err(format!("A link can't run “{id}”.")),

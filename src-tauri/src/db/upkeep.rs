@@ -1,114 +1,37 @@
-//! Keeps the files lean: the query planner's statistics fresh, the write-ahead log short, and the cache compacted
-//! once deletions left much of it empty. A cache in memory has no file to keep lean.
+//! Keeps the query planner's statistics fresh and reports how much memory the Jira mirror takes.
 
 use std::sync::Arc;
 
 use rusqlite::Connection;
-use serde::Serialize;
-use ts_rs::TS;
 
-use super::{CACHE_FILE, CacheKind, Db, blocking};
+use super::{Db, blocking};
 use crate::error::AppResult;
 use crate::lock::MutexExt;
-
-/// Above this share of free pages, `tidy_cache` compacts the cache.
-const COMPACT_ABOVE: f64 = 0.25;
-
-#[derive(Serialize, Clone, Copy, Debug, PartialEq, TS)]
-#[ts(export, export_to = "src/api/types.gen.ts")]
-#[serde(rename_all = "camelCase")]
-pub struct CacheSize {
-    #[ts(type = "number")]
-    pub bytes: u64,
-    /// The share of the file that deletions left empty, 0 to 1.
-    pub free: f64,
-}
 
 impl Db {
     /// Refreshes the planner's statistics where they went stale; cheap, for quit and after a full sync.
     pub async fn optimize(&self) -> AppResult<()> {
-        self.on_writer(|conn| Ok(conn.execute_batch("PRAGMA optimize; PRAGMA cache.optimize;")?))
-            .await
-    }
-
-    pub async fn cache_size(&self) -> AppResult<CacheSize> {
-        self.read(cache_size).await
-    }
-
-    /// Whether `cache.sqlite` is on disk; in memory mode it must not be.
-    pub fn cache_file_exists(&self) -> bool {
-        self.inner.dir.join(CACHE_FILE).exists()
-    }
-
-    /// Rewrites the cache without its empty pages and empties its write-ahead log; returns the size after, or
-    /// `None` for a cache in memory.
-    pub async fn compact_cache(&self) -> AppResult<Option<CacheSize>> {
-        if !self.has_cache_file() {
-            return Ok(None);
-        }
-        self.on_writer(|conn| {
-            compact(conn)?;
-            cache_size(conn)
+        let inner = Arc::clone(&self.inner);
+        blocking(move || {
+            Ok(inner
+                .writer
+                .lock_unpoisoned()
+                .execute_batch("PRAGMA optimize; PRAGMA cache.optimize;")?)
         })
         .await
-        .map(Some)
     }
 
-    /// After a full sync: compacts the cache when much of it is empty, else only trims its write-ahead log. A
-    /// memory cache only gets its planner statistics refreshed.
-    pub async fn tidy_cache(&self) -> AppResult<()> {
-        if !self.has_cache_file() {
-            return self.optimize().await;
-        }
-        self.on_writer(|conn| {
-            if cache_size(conn)?.free > COMPACT_ABOVE {
-                compact(conn)
-            } else {
-                checkpoint(conn)
-            }
-        })
-        .await?;
-        self.optimize().await
-    }
-
-    fn has_cache_file(&self) -> bool {
-        self.cache_kind() == CacheKind::File
-    }
-
-    /// Runs `f` on the writer outside a transaction, which `VACUUM` needs. Only for upkeep that changes no rows:
-    /// it bypasses `Db::write`, so nothing is announced.
-    async fn on_writer<T: Send + 'static>(
-        &self,
-        f: impl FnOnce(&Connection) -> AppResult<T> + Send + 'static,
-    ) -> AppResult<T> {
-        let inner = Arc::clone(&self.inner);
-        blocking(move || f(&inner.writer.lock_unpoisoned())).await
+    /// The mirror's size in memory.
+    pub async fn cache_bytes(&self) -> AppResult<u64> {
+        self.read(cache_bytes).await
     }
 }
 
-fn cache_size(conn: &Connection) -> AppResult<CacheSize> {
+fn cache_bytes(conn: &Connection) -> AppResult<u64> {
     let pragma = |name: &str| -> AppResult<u64> {
         Ok(conn.query_row(&format!("PRAGMA cache.{name}"), [], |row| row.get(0))?)
     };
-    let (pages, free, page_size) = (
-        pragma("page_count")?,
-        pragma("freelist_count")?,
-        pragma("page_size")?,
-    );
-    Ok(CacheSize {
-        bytes: pages * page_size,
-        free: free as f64 / pages.max(1) as f64,
-    })
-}
-
-fn compact(conn: &Connection) -> AppResult<()> {
-    conn.execute_batch("VACUUM cache;")?;
-    checkpoint(conn)
-}
-
-fn checkpoint(conn: &Connection) -> AppResult<()> {
-    conn.query_row("PRAGMA cache.wal_checkpoint(TRUNCATE)", [], |_| Ok(()))?;
-    Ok(())
+    Ok(pragma("page_count")? * pragma("page_size")?)
 }
 
 #[cfg(test)]
@@ -124,8 +47,6 @@ mod tests {
         status_category, created_at, updated_at, synced_at) \
         SELECT 20000 + i, 'NW-' || i, '10001', hex(randomblob(300)), 'Task', '1', 'new', \
         '2026-01-05T09:00:00Z', '2026-01-05T09:00:00Z', '2026-01-05T09:00:00Z' FROM n";
-    const KEEP_FIRST_THREE: &str =
-        "DELETE FROM cache.issue WHERE key NOT IN ('NW-1', 'NW-2', 'NW-3')";
 
     fn open_db() -> (TempDir, Db) {
         let dir = temp_config_dir();
@@ -142,131 +63,41 @@ mod tests {
         .unwrap();
     }
 
-    async fn kept_keys(db: &Db) -> Vec<String> {
-        db.read(|conn| {
-            let mut stmt = conn.prepare("SELECT key FROM cache.issue ORDER BY key")?;
-            let keys = stmt
-                .query_map([], |row| row.get(0))?
-                .collect::<Result<_, _>>()?;
-            Ok(keys)
-        })
+    async fn issue_count(db: &Db) -> i64 {
+        db.read(
+            |conn| Ok(conn.query_row("SELECT COUNT(*) FROM cache.issue", [], |row| row.get(0))?),
+        )
         .await
         .unwrap()
     }
 
-    async fn db_with_mostly_deleted_issues() -> (TempDir, Db) {
-        let (dir, db) = open_db();
-        exec(&db, PROJECT).await;
-        exec(&db, MANY_ISSUES).await;
-        exec(&db, KEEP_FIRST_THREE).await;
-        (dir, db)
-    }
-
     #[tokio::test]
-    async fn a_fresh_cache_has_almost_no_free_pages() {
+    async fn an_empty_cache_already_takes_some_memory() {
         let (_dir, db) = open_db();
 
-        let size = db.cache_size().await.unwrap();
-
-        assert!(size.bytes > 0);
-        assert!(size.free < 0.1, "{size:?}");
+        assert!(db.cache_bytes().await.unwrap() > 0);
     }
 
     #[tokio::test]
-    async fn deleting_most_rows_leaves_the_cache_mostly_free() {
-        let (_dir, db) = db_with_mostly_deleted_issues().await;
-
-        let size = db.cache_size().await.unwrap();
-
-        assert!(size.free > COMPACT_ABOVE, "{size:?}");
-    }
-
-    #[tokio::test]
-    async fn compacting_shrinks_the_cache_and_keeps_its_rows() {
-        let (_dir, db) = db_with_mostly_deleted_issues().await;
-        let before = db.cache_size().await.unwrap();
-
-        let after = db.compact_cache().await.unwrap().unwrap();
-
-        assert!(after.bytes < before.bytes, "{before:?} -> {after:?}");
-        assert!(after.free < 0.05, "{after:?}");
-        assert_eq!(db.cache_size().await.unwrap(), after);
-        assert_eq!(kept_keys(&db).await, ["NW-1", "NW-2", "NW-3"]);
-    }
-
-    #[tokio::test]
-    async fn tidying_compacts_a_cache_that_is_mostly_free() {
-        let (_dir, db) = db_with_mostly_deleted_issues().await;
-        let before = db.cache_size().await.unwrap();
-
-        db.tidy_cache().await.unwrap();
-
-        let after = db.cache_size().await.unwrap();
-        assert!(after.bytes < before.bytes, "{before:?} -> {after:?}");
-        assert!(after.free < 0.05, "{after:?}");
-        assert_eq!(kept_keys(&db).await, ["NW-1", "NW-2", "NW-3"]);
-    }
-
-    #[tokio::test]
-    async fn tidying_leaves_a_cache_with_few_free_pages_at_its_size() {
+    async fn the_cache_size_grows_when_rows_are_added() {
         let (_dir, db) = open_db();
+        let empty = db.cache_bytes().await.unwrap();
+
         exec(&db, PROJECT).await;
         exec(&db, MANY_ISSUES).await;
-        let before = db.cache_size().await.unwrap();
 
-        db.tidy_cache().await.unwrap();
-
-        let after = db.cache_size().await.unwrap();
-        assert!(after.bytes >= before.bytes, "{before:?} -> {after:?}");
-        assert_eq!(kept_keys(&db).await.len(), 1500);
+        let filled = db.cache_bytes().await.unwrap();
+        assert!(filled > empty, "{empty} -> {filled}");
     }
 
     #[tokio::test]
     async fn optimizing_succeeds_and_keeps_the_data() {
-        let (_dir, db) = db_with_mostly_deleted_issues().await;
+        let (_dir, db) = open_db();
+        exec(&db, PROJECT).await;
+        exec(&db, MANY_ISSUES).await;
 
         db.optimize().await.unwrap();
 
-        assert_eq!(kept_keys(&db).await, ["NW-1", "NW-2", "NW-3"]);
-    }
-
-    #[tokio::test]
-    async fn a_memory_cache_has_a_growing_size_and_nothing_to_compact_but_tidying_succeeds() {
-        let dir = temp_config_dir();
-        let db = Db::open_with(dir.path(), CacheKind::Memory).unwrap();
-        let empty = db.cache_size().await.unwrap();
-        exec(&db, PROJECT).await;
-        exec(&db, MANY_ISSUES).await;
-        let filled = db.cache_size().await.unwrap();
-        exec(&db, KEEP_FIRST_THREE).await;
-
-        assert!(empty.bytes > 0, "{empty:?}");
-        assert!(filled.bytes > empty.bytes, "{empty:?} -> {filled:?}");
-        assert_eq!(db.compact_cache().await.unwrap(), None);
-        db.tidy_cache().await.unwrap();
-        assert_eq!(kept_keys(&db).await, ["NW-1", "NW-2", "NW-3"]);
-    }
-
-    #[tokio::test]
-    async fn the_cache_file_exists_in_file_mode_and_not_in_memory_mode() {
-        let (_dir, file_db) = open_db();
-        let memory_dir = temp_config_dir();
-        let memory_db = Db::open_with(memory_dir.path(), CacheKind::Memory).unwrap();
-
-        assert!(file_db.cache_file_exists());
-        assert!(!memory_db.cache_file_exists());
-    }
-
-    #[test]
-    fn the_cache_size_serializes_with_camel_case_fields() {
-        let size = CacheSize {
-            bytes: 8192,
-            free: 0.5,
-        };
-
-        assert_eq!(
-            serde_json::to_value(size).unwrap(),
-            serde_json::json!({ "bytes": 8192, "free": 0.5 })
-        );
+        assert_eq!(issue_count(&db).await, 1500);
     }
 }

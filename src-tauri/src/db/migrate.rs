@@ -34,6 +34,8 @@ pub const LOCAL: &[&str] = &[
     include_str!("../../migrations/local/0026_status_style.sql"),
     include_str!("../../migrations/local/0027_field_choice.sql"),
     include_str!("../../migrations/local/0028_field_choice_from_set_up_spaces.sql"),
+    include_str!("../../migrations/local/0029_drop_field_choice_seed.sql"),
+    include_str!("../../migrations/local/0030_write_log_without_link_urls.sql"),
 ];
 pub const CACHE: &[&str] = &[
     include_str!("../../migrations/cache/0001_init.sql"),
@@ -952,6 +954,96 @@ mod tests {
             .unwrap();
 
         assert_eq!(sources(&conn, "remote_link"), Vec::<String>::new());
+    }
+
+    fn write_log_changes(conn: &Connection) -> Vec<String> {
+        let mut query = conn
+            .prepare("SELECT change FROM write_log ORDER BY id")
+            .unwrap();
+        query
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect()
+    }
+
+    #[test]
+    fn web_link_records_shrink_to_their_start_and_length_and_other_records_stay() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        migrate(&mut conn, "local", &LOCAL[..29]).unwrap();
+        for change in [
+            "Web link: https://example.com/a/long/address",
+            "Web link: https://a.io",
+            "Web link: https://ex",
+            "Web link: ",
+            "Comment: \"Looks good…\" (16 characters)",
+            "Status: Done",
+            "Title (14 characters)",
+        ] {
+            conn.execute(
+                "INSERT INTO write_log (at, issue_id, change) \
+                 VALUES ('2026-10-28T12:00:00.000Z', '20001', ?1)",
+                [change],
+            )
+            .unwrap();
+        }
+
+        migrate(&mut conn, "local", LOCAL).unwrap();
+
+        assert_eq!(
+            write_log_changes(&conn),
+            [
+                "Web link: \"https://ex…\" (34 characters)",
+                "Web link: \"https://a.…\" (12 characters)",
+                "Web link: \"https://ex\" (10 characters)",
+                "Web link: \"\" (0 characters)",
+                "Comment: \"Looks good…\" (16 characters)",
+                "Status: Done",
+                "Title (14 characters)",
+            ]
+        );
+    }
+
+    #[test]
+    fn web_link_records_already_in_the_short_form_are_left_alone() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        migrate(&mut conn, "local", &LOCAL[..29]).unwrap();
+        conn.execute(
+            "INSERT INTO write_log (at, issue_id, change) VALUES \
+             ('2026-10-28T12:00:00.000Z', '20001', 'Web link: \"https://ex…\" (34 characters)')",
+            [],
+        )
+        .unwrap();
+
+        migrate(&mut conn, "local", LOCAL).unwrap();
+
+        assert_eq!(
+            write_log_changes(&conn),
+            ["Web link: \"https://ex…\" (34 characters)"]
+        );
+    }
+
+    #[test]
+    fn the_field_choice_seed_table_is_dropped_when_present() {
+        let seed = "field_choice_seed".to_string();
+        let mut conn = Connection::open_in_memory().unwrap();
+        migrate(&mut conn, "local", &LOCAL[..28]).unwrap();
+        assert!(tables(&conn).contains(&seed));
+
+        migrate(&mut conn, "local", LOCAL).unwrap();
+
+        assert!(!tables(&conn).contains(&seed));
+    }
+
+    #[test]
+    fn a_database_without_the_field_choice_seed_table_migrates_without_error() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        migrate(&mut conn, "local", &LOCAL[..28]).unwrap();
+        conn.execute_batch("DROP TABLE field_choice_seed").unwrap();
+
+        migrate(&mut conn, "local", LOCAL).unwrap();
+
+        assert!(!tables(&conn).contains(&"field_choice_seed".to_string()));
     }
 
     #[test]

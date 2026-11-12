@@ -43,7 +43,7 @@ pub async fn overview(db: &Db, state: SyncState) -> AppResult<SyncOverview> {
         state,
         last_full_at,
         projects,
-        cache_bytes: db.cache_size().await?.bytes,
+        cache_bytes: db.cache_bytes().await?,
     })
 }
 
@@ -85,7 +85,7 @@ mod tests {
             .unwrap();
 
         assert!(overview.cache_bytes > 0);
-        assert_eq!(overview.cache_bytes, db.cache_size().await.unwrap().bytes);
+        assert_eq!(overview.cache_bytes, db.cache_bytes().await.unwrap());
     }
 
     #[test]

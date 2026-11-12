@@ -1,5 +1,4 @@
 import { JiraActivityStatus } from "./JiraActivityStatus";
-import { MemoryStatus } from "./MemoryStatus";
 import { SyncStatus } from "./SyncStatus";
 
 /** The strip under the content panel for what concerns the whole app (ADR 0060). The window's sidebar toggle
@@ -8,7 +7,6 @@ export function StatusBar() {
   return (
     <footer className="status-bar" data-tauri-drag-region>
       <JiraActivityStatus />
-      <MemoryStatus />
       <SyncStatus />
     </footer>
   );

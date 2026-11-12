@@ -188,10 +188,10 @@ pub async fn run_job(
     }
 }
 
-/// A full sync replaced much of the cache; a failed tidy leaves it as it is and doesn't fail the sync.
+/// A full sync replaced much of the cache; stale planner statistics don't fail the sync.
 async fn tidy_after_full(ctx: &SyncContext) {
-    if let Err(e) = ctx.db.tidy_cache().await {
-        log::warn!("The cache wasn't tidied after the full sync: {e}");
+    if let Err(e) = ctx.db.optimize().await {
+        log::warn!("The planner statistics weren't refreshed after the full sync: {e}");
     }
 }
 

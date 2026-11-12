@@ -69,13 +69,13 @@ describe("SettingsApp", () => {
     expect(await screen.findByRole("button", { name: "Sync Now" })).toBeInTheDocument();
   });
 
-  it("shows the Privacy & Data page with the cache reset when chosen in the page list", async () => {
+  it("shows the Privacy & Data page with the Refetch from Jira button when chosen in the page list", async () => {
     await renderSettings();
 
     await userEvent.click(screen.getByRole("button", { name: /Privacy & Data/ }));
 
     expect(screen.getByRole("heading", { name: "Privacy & Data" })).toBeInTheDocument();
-    expect(await screen.findByRole("button", { name: "Reset Cache" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Refetch from Jira" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "What Taskboard reads" })).not.toBeInTheDocument();
   });
 

@@ -57,6 +57,7 @@ pub fn show(app: &AppHandle, notice: &Notice) {
         None => builder.action_type_id(SHOW_INBOX),
     };
     if let Err(e) = builder.show() {
-        log::warn!("Couldn't show a notification ({}): {e}", notice.title);
+        let about = notice.key.as_deref().unwrap_or("summary");
+        log::warn!("Couldn't show a notification ({about}): {e}");
     }
 }

@@ -22,6 +22,8 @@ write to them. Taskboard differs only where its job differs; each deviation has 
   and split it into focused modules in the same step, without asking.
 - Keep modules small, isolated and replaceable (ADR 0014): by feature, pure cores, a trait only where a second
   implementation exists today. No speculative abstractions.
+- No issue content on disk: Jira data lives in memory only; only ids, keys, timestamps and the owner's own setup
+  are persisted, never text a person wrote in Jira (`.claude/rules/no-issue-data-on-disk.md`).
 - Demo data only: code, docs, tests, commits and screenshots never contain the owner's real data
   (`.claude/rules/demo-data.md`). The debug build runs on its own data folder with the demo seed.
 - The implementation plan lives in `docs/plan/` (gitignored). Work one step per session; set its status from

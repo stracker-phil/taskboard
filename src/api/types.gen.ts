@@ -188,12 +188,6 @@ export type BulkStatus = { statusName: string, style: Style,
  */
 changes: Array<IssueChange>, };
 
-export type CacheSize = { bytes: number, 
-/**
- * The share of the file that deletions left empty, 0 to 1.
- */
-free: number, };
-
 export type Capability = "account" | "projects" | "issues" | "issueDetails" | "checkQueries" | "assign" | "changeStatus" | "changePriority" | "changeTitle" | "comment" | "addWebLink";
 
 /**
@@ -1064,18 +1058,6 @@ focusedMinutes: number, backgroundMinutes: number,
  * How long finished issues stay in the default scope.
  */
 keepDoneDays: number, 
-/**
- * How long the changes recorded for an issue stay cached once the owner has seen them.
- */
-keepHistoryDays: number, 
-/**
- * Empties the cache when Taskboard quits, and at launch in case it didn't quit cleanly.
- */
-clearCacheOnQuit: boolean, 
-/**
- * Keeps the Jira mirror in memory instead of `cache.sqlite` (ADR 0057).
- */
-memoryOnly: boolean, 
 /**
  * Issue types (by name) the sync leaves out, whatever the scope.
  */

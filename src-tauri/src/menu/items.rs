@@ -34,7 +34,7 @@ pub const FILE_SYNC: &[Item] = &[
     item("Full Sync", "sync:full", "CmdOrCtrl+Shift+R"),
 ];
 /// Opens Settings at the Cache group, which asks before it empties the cache.
-pub const RESET_CACHE: Item = plain("Reset Cache…", "app:settings:cache");
+pub const REFETCH_FROM_JIRA: Item = plain("Refetch from Jira…", "app:settings:cache");
 pub const CLOSE: Item = item("Close Tab or Window", "window:close", "CmdOrCtrl+W");
 pub const PALETTE: Item = item("Command Palette…", "page:palette.open", "CmdOrCtrl+K");
 pub const GO_LEVELS: &[Item] = &[
@@ -141,7 +141,7 @@ pub const HELP: &[Item] = &[
 pub type MenuDef = (&'static str, &'static [&'static [Item]]);
 
 pub const APP_MENU: MenuDef = (crate::APP_NAME, &[&[SETTINGS], &[QUIT]]);
-pub const FILE_MENU: MenuDef = ("File", &[FILE, FILE_SYNC, &[RESET_CACHE], &[CLOSE]]);
+pub const FILE_MENU: MenuDef = ("File", &[FILE, FILE_SYNC, &[REFETCH_FROM_JIRA], &[CLOSE]]);
 pub const GO_MENU: MenuDef = ("Go", &[GO_LEVELS, GO_MOVES]);
 /// The layouts come last: changing a view's layout is rare.
 pub const LIST_MENU: MenuDef = ("List", &[LIST_TOOLBAR, LIST_LAYOUTS]);
@@ -185,7 +185,7 @@ mod tests {
 
     #[test]
     fn every_item_const_appears_in_the_menus_exactly_once() {
-        let mut expected: Vec<&str> = [&SETTINGS, &QUIT, &RESET_CACHE, &CLOSE, &RELOAD]
+        let mut expected: Vec<&str> = [&SETTINGS, &QUIT, &REFETCH_FROM_JIRA, &CLOSE, &RELOAD]
             .iter()
             .map(|item| item.command)
             .collect();
@@ -538,11 +538,11 @@ mod tests {
     #[test]
     fn reset_cache_opens_settings_at_the_cache_section_without_a_key() {
         let bus = registered();
-        assert_eq!(RESET_CACHE.label, "Reset Cache…");
-        assert_eq!(RESET_CACHE.command, "app:settings:cache");
-        assert_eq!(RESET_CACHE.accelerator, None);
-        assert!(bus.knows(RESET_CACHE.command));
-        let info = bus.info(RESET_CACHE.command).unwrap();
+        assert_eq!(REFETCH_FROM_JIRA.label, "Refetch from Jira…");
+        assert_eq!(REFETCH_FROM_JIRA.command, "app:settings:cache");
+        assert_eq!(REFETCH_FROM_JIRA.accelerator, None);
+        assert!(bus.knows(REFETCH_FROM_JIRA.command));
+        let info = bus.info(REFETCH_FROM_JIRA.command).unwrap();
         assert_eq!(info.title, "Settings Page");
         assert!(info.hidden);
     }

@@ -17,10 +17,20 @@ pub struct SentChange {
     pub at: String,
     /// `None` when the issue had left the cache.
     pub issue_key: Option<String>,
-    /// "Status: Done", "Comment (42 characters)".
+    /// "Status: Done", `Comment: "Looks good…" (42 characters)`.
     pub change: String,
     /// Jira's refusal; `None` when Jira took it.
     pub error: Option<String>,
+}
+
+/// Typed text as the record keeps it: its first 10 characters and its length, never all of it
+/// (`.claude/rules/no-issue-data-on-disk.md`).
+pub fn typed(kind: &str, text: &str) -> String {
+    const SHOWN: usize = 10;
+    let count = text.chars().count();
+    let start: String = text.chars().take(SHOWN).collect();
+    let more = if count > SHOWN { "…" } else { "" };
+    format!("{kind}: \"{start}{more}\" ({count} characters)")
 }
 
 /// Records a change Jira was asked for, with its refusal if any; a change Jira took counts as using the issue. A
@@ -253,17 +263,46 @@ mod tests {
         assert_eq!(activity_of(&db, "20001").await, None);
     }
 
+    #[test]
+    fn typed_text_keeps_its_first_ten_characters_and_its_length() {
+        for (kind, text, expected) in [
+            ("Comment", "", "Comment: \"\" (0 characters)"),
+            (
+                "Comment",
+                "Looks good",
+                "Comment: \"Looks good\" (10 characters)",
+            ),
+            (
+                "Comment",
+                "Looks good to me",
+                "Comment: \"Looks good…\" (16 characters)",
+            ),
+            (
+                "Title",
+                "Säule montieren bitte",
+                "Title: \"Säule mont…\" (21 characters)",
+            ),
+            (
+                "Web link",
+                "https://example.com/spec",
+                "Web link: \"https://ex…\" (24 characters)",
+            ),
+        ] {
+            assert_eq!(typed(kind, text), expected, "{text}");
+        }
+    }
+
     #[tokio::test]
     async fn recording_stores_the_change_and_a_refusals_message_and_never_fails() {
         let (_dir, db) = db_with_cached_issue().await;
 
-        record(&db, "20001", "Comment (12 characters)".into(), None).await;
+        record(&db, "20001", typed("Comment", "Looks good"), None).await;
         let refusal = AppError::InvalidInput("Not allowed".into());
         record(&db, "20001", "Priority: Low".into(), Some(&refusal)).await;
 
         let stored = all(&db).await;
         assert_eq!(stored.len(), 2);
-        assert_eq!(stored[1].change, "Comment (12 characters)");
+        assert_eq!(stored[1].change, "Comment: \"Looks good\" (10 characters)");
         assert_eq!(stored[1].issue_key.as_deref(), Some("NW-1"));
         assert_eq!(stored[1].error, None);
         assert_eq!(stored[0].change, "Priority: Low");

@@ -10,8 +10,8 @@ import { fullDateTime } from "../../lib/relativeTime";
 import { createQueryClient } from "../../queries/queryClient";
 import { resetStore } from "../../state/store";
 import { emitEvent } from "../../test/apiMock";
-import { projectCounts, syncOverview } from "../../test/jira";
-import { defaultSync, settings } from "../../test/settings";
+import { syncOverview } from "../../test/jira";
+import { settings } from "../../test/settings";
 import { StatusBar } from "./StatusBar";
 
 const mocked = vi.mocked(api, true);
@@ -36,9 +36,9 @@ const progress = (patch: Partial<SyncProgress> = {}): SyncProgress => ({
   ...patch,
 });
 
-async function renderBar(overview: Partial<SyncOverview> = {}, memoryOnly = false) {
+async function renderBar(overview: Partial<SyncOverview> = {}) {
   mocked.syncOverview.mockResolvedValue(syncOverview(overview));
-  mocked.getSettings.mockResolvedValue(settings({ sync: { ...defaultSync(), memoryOnly } }));
+  mocked.getSettings.mockResolvedValue(settings());
   render(
     <QueryClientProvider client={createQueryClient()}>
       <StatusBar />
@@ -135,26 +135,10 @@ describe("StatusBar", () => {
     });
   });
 
-  describe("the memory chip", () => {
-    it("names the cached issues and the size of the cache while the data lives in memory only", async () => {
-      await renderBar({ projects: [projectCounts({ cached: 33 }), projectCounts({ id: "10002", key: "LUM", cached: 9 })], cacheBytes: 1_540_000 }, true);
+  it("shows no memory indicator next to the sync state", async () => {
+    await renderBar({ cacheBytes: 1_540_000 });
+    await chip("Not synced yet");
 
-      const icon = await screen.findByRole("img", { name: "Jira data in memory" });
-
-      expect(icon).toHaveAttribute("title", expect.stringContaining("42 issues · 1.5 MB"));
-    });
-
-    it("says issue in the singular for a single cached issue", async () => {
-      await renderBar({ projects: [projectCounts({ cached: 1 })], cacheBytes: 0 }, true);
-
-      expect(await screen.findByRole("img", { name: "Jira data in memory" })).toHaveAttribute("title", expect.stringContaining("1 issue · 0.0 MB"));
-    });
-
-    it("is absent while the data is stored on disk", async () => {
-      await renderBar({ projects: [projectCounts()] }, false);
-      await chip("Not synced yet");
-
-      expect(screen.queryByRole("img", { name: "Jira data in memory" })).not.toBeInTheDocument();
-    });
+    expect(screen.queryByRole("img", { name: "Jira data in memory" })).not.toBeInTheDocument();
   });
 });

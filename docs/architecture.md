@@ -75,9 +75,10 @@ loads as defaults, unknown keys are ignored and a file that cannot be parsed is 
 `<name>.<timestamp>.corrupt`. A store saves a changed copy before it swaps it in.
 
 Taskboard's data is two SQLite files ([data.md](data.md), [ADR 0019](adr/0019-two-sqlite-files-through-rusqlite.md)):
-`local.sqlite` holds the owner's setup (Spaces, filter lists, views, bookmarks), `cache.sqlite` the Jira mirror,
-attached as `cache` (with `sync.memoryOnly` an in-memory database instead, [ADR 0057](adr/0057-jira-data-can-live-in-memory-only.md)). Every change goes through `Db::write`, which emits `issues_changed`,
-`issue_details_changed` or `local_changed` after the commit, at most every 500 ms during a burst. Reset cache deletes only the cache file.
+`local.sqlite` holds the owner's setup (Spaces, filter lists, views, bookmarks); the Jira mirror is an in-memory
+database attached as `cache`, gone at every quit ([ADR 0066](adr/0066-jira-data-lives-in-memory-only.md)). Nothing a
+person wrote in Jira is written to disk ([`no-issue-data-on-disk.md`](../.claude/rules/no-issue-data-on-disk.md)). Every change goes through `Db::write`, which emits `issues_changed`,
+`issue_details_changed` or `local_changed` after the commit, at most every 500 ms during a burst. Refetch from Jira empties only the mirror and fetches it again.
 
 Jira is reached only through `jira/gateway/` ([jira.md](jira.md)): one `JiraClient` per connection, whose
 gateway sends only the operations on its allowlist, to the site and `api.atlassian.com` only

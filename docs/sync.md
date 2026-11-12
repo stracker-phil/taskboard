@@ -1,6 +1,6 @@
 # Sync
 
-`src-tauri/src/sync/` mirrors the sync scope from Jira into `cache.sqlite`
+`src-tauri/src/sync/` mirrors the sync scope from Jira into the in-memory cache
 ([ADR 0023](adr/0023-one-sync-task-full-sync-per-project-changes-by-diffing.md)). The UI never waits for it: it
 reads the cache and listens to the events.
 
@@ -60,7 +60,7 @@ row `gone`), which takes it out of every list at once. Issues gone for more than
 comments, changes and seen rows. An issue Jira returns that is outside the scope (done for longer than the scope
 keeps, moved to an untracked project) stays cached with `issue.left_scope_at` and is asked for again only after 7
 days (`RECHECK_LEFT_SCOPE`), so one deleted since is still noticed; the mark goes when the scope lists it again.
-Seen changes older than `sync.keepHistoryDays` (Settings → Sync, 90 days by default) are pruned ([data.md](data.md#tables)). Runs after every full sync and hourly.
+Seen changes older than 90 days (`reconcile::KEEP_SEEN_CHANGES`) are pruned ([data.md](data.md#tables)). Runs after every full sync and hourly.
 
 **Detail**: opening an issue fetches its comments when the cached ones are older than the issue
 (`issues::issue_sync_comments`), and its web links unless fetched in the last 5 minutes (`issues::issue_sync_web_links`,
@@ -94,7 +94,7 @@ The owner's own changes aren't news (`sync::own`, `sync::news`), once Test Conne
   A failure keeps the changes as recorded.
 
 A project's first sync (`news::Pass`): with no issue read yet (a new Space) every issue counts as seen. Once the
-owner read some (a fresh cache: a reset, memory mode after a restart), an issue updated after `issue_seen.seen_at`
+owner read some (a fresh cache: a reset, every launch), an issue updated after `issue_seen.seen_at`
 records `updated` ("Updated" in the inbox) and one never seen records `created`.
 
 ## Storing a page
@@ -127,15 +127,12 @@ all of an issue's comments, they replace the cached ones.
 ## Where to see it
 
 - The main window's status bar ([ADR 0060](adr/0060-a-status-bar-under-the-panel.md),
-  `src/shell/statusBar/StatusBar.tsx`): the sync state (a click queues a delta), memory mode, and the Jira
+  `src/shell/statusBar/StatusBar.tsx`): the sync state (a click queues a delta) and the Jira
   requests in flight (`jira_activity`, [jira.md](jira.md#limits-and-retries)).
 - Settings → Sync → Synced: the state, Sync Now, and per tracked project the cached and open issues and the last
   full sync (`sync_overview`, `sync_run`).
-- Settings → Privacy & Data → Jira data: "Keep Jira data in memory only" (`sync.memoryOnly`) empties the cache,
-  keeps it in memory and syncs again. The cache's size (`SyncOverview.cache_bytes`) with Reset Cache, or Refetch
-  from Jira in memory mode; in file mode also how long read history stays and the switch that clears the cache at
-  every quit (`sync.clearCacheOnQuit`; also at launch, for a session that didn't quit cleanly). Read marks stay.
-  Show Data Folder opens the folder, so the owner can see that no `cache.sqlite` is there.
+- Settings → Privacy & Data → Jira data: the mirror's size in memory (`SyncOverview.cache_bytes`) with Refetch from
+  Jira (`cache_reset`: drops the mirror and queues a full sync; read marks stay), and Show Data Folder.
 - `taskboard status [--json]`: the same overview; `taskboard sync [--full]` queues a sync and returns;
   `taskboard reset-cache --yes` empties the cache and queues a full sync.
 - The main window shows "Loading your Jira issues" with per-project progress while the first sync runs.

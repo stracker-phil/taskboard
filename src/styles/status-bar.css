@@ -19,8 +19,6 @@
 }
 
 /* Memory mode: a fixed 26px slot, so the chip coming or going moves nothing. */
-.status-memory { display: grid; flex: none; place-items: center; width: 26px; height: 26px; }
-.status-memory > [role="img"] { display: grid; place-items: center; animation: fade-in var(--motion-base) var(--ease-out); }
 
 .status-sync {
   display: flex;

@@ -145,9 +145,6 @@ pub struct SyncFacts {
 
 pub struct CacheFacts {
     pub bytes: u64,
-    pub in_memory: bool,
-    /// Whether `cache.sqlite` is on disk.
-    pub file_exists: bool,
 }
 
 pub fn sync_group(facts: &SyncFacts) -> DiagnosticGroup {
@@ -186,19 +183,12 @@ pub fn sync_group(facts: &SyncFacts) -> DiagnosticGroup {
     )
 }
 
-/// An in-memory cache has no file to compact, so it offers the data folder, where no cache file should be.
 fn cache_row(cache: &CacheFacts) -> DiagnosticRow {
-    use DiagnosticTone::*;
-    let size = megabytes(cache.bytes);
-    if !cache.in_memory {
-        return row("Cache size", size, Info).offering("app:compactCache", "Compact");
-    }
-    let (tone, file) = if cache.file_exists {
-        (Warn, "a cache file is on disk")
-    } else {
-        (Ok, "no cache file")
-    };
-    row("Jira data", format!("In memory · {size} · {file}"), tone).offering("app:data", "Show")
+    row(
+        "Jira data",
+        format!("In memory · {}", megabytes(cache.bytes)),
+        DiagnosticTone::Info,
+    )
 }
 
 /// "0.4 MB", "12.5 MB".
@@ -271,11 +261,7 @@ mod tests {
             last_full: Some("Mon 09:00".into()),
             tracked: 2,
             cached: 120,
-            cache: CacheFacts {
-                bytes: 12_500_000,
-                in_memory: false,
-                file_exists: true,
-            },
+            cache: CacheFacts { bytes: 12_500_000 },
         };
         overrides(&mut facts);
         facts
@@ -595,63 +581,21 @@ mod tests {
     }
 
     #[test]
-    fn the_cache_size_is_the_last_row_in_decimal_megabytes_offering_compaction() {
+    fn the_jira_data_row_is_last_shows_the_memory_size_in_decimal_megabytes_and_has_no_button() {
         for (bytes, shown) in [
-            (0, "0.0 MB"),
-            (400_000, "0.4 MB"),
-            (12_500_000, "12.5 MB"),
-            (1_234_000_000, "1234.0 MB"),
+            (0, "In memory · 0.0 MB"),
+            (400_000, "In memory · 0.4 MB"),
+            (12_500_000, "In memory · 12.5 MB"),
+            (1_234_000_000, "In memory · 1234.0 MB"),
         ] {
             let group = sync_group(&sync(|f| f.cache.bytes = bytes));
+            assert_eq!(group.rows.len(), 5);
             assert_eq!(
                 group.rows.last().unwrap(),
-                &expected(
-                    "Cache size",
-                    shown,
-                    DiagnosticTone::Info,
-                    Some(("app:compactCache", "Compact"))
-                ),
+                &expected("Jira data", shown, DiagnosticTone::Info, None),
                 "{bytes}"
             );
         }
-    }
-
-    #[test]
-    fn a_memory_cache_without_a_file_is_an_ok_jira_data_row_offering_the_data_folder() {
-        let group = sync_group(&sync(|f| {
-            f.cache.in_memory = true;
-            f.cache.file_exists = false;
-        }));
-
-        assert_eq!(group.rows.len(), 5);
-        assert_eq!(
-            group.rows.last().unwrap(),
-            &expected(
-                "Jira data",
-                "In memory · 12.5 MB · no cache file",
-                DiagnosticTone::Ok,
-                Some(("app:data", "Show"))
-            )
-        );
-    }
-
-    #[test]
-    fn a_memory_cache_with_a_file_on_disk_warns_and_offers_the_data_folder() {
-        let group = sync_group(&sync(|f| {
-            f.cache.in_memory = true;
-            f.cache.file_exists = true;
-        }));
-
-        assert_eq!(group.rows.len(), 5);
-        assert_eq!(
-            group.rows.last().unwrap(),
-            &expected(
-                "Jira data",
-                "In memory · 12.5 MB · a cache file is on disk",
-                DiagnosticTone::Warn,
-                Some(("app:data", "Show"))
-            )
-        );
     }
 
     #[test]

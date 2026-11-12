@@ -198,7 +198,7 @@ mod tests {
             SyncSettings {
                 scope_override: None,
                 focused_minutes: 10,
-                clear_cache_on_quit: true,
+                background_minutes: 30,
                 ..SyncSettings::default()
             },
         )
@@ -208,7 +208,7 @@ mod tests {
         let expected = SyncSettings {
             scope_override: Some("project = NW".into()),
             focused_minutes: 10,
-            clear_cache_on_quit: true,
+            background_minutes: 30,
             ..SyncSettings::default()
         };
         assert_eq!(saved, expected);

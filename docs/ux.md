@@ -92,8 +92,7 @@ The owner's rule (2026-10-30), for every control, list and popover:
 - **Status bar** (`src/shell/statusBar/`, `styles/status-bar.css`, [ADR 0060](adr/0060-a-status-bar-under-the-panel.md)):
   a 32px row on `--window-bg` under the panel, level with the sidebar footer; the panel keeps no bottom gap above
   it, and its empty space drags the window. It holds what concerns the whole app, at its right end, ending at the
-  panel's right edge, 12px `--text-tertiary`: the memory chip (`MemoryStatus`; memory-stick icon 14/1.8 in a fixed
-  26px slot, shown only with `sync.memoryOnly`; its tooltip names the cached issues and the megabytes), then the
+  panel's right edge, 12px `--text-tertiary`: the
   [sync state](#sync-state). Before them, while Taskboard asks Jira anything (`JiraActivityStatus`, Rust's
   `jira_activity`): a 10px spinner and the newest request in words, "Saving the status…", with "+N" for the others
   running; its tooltip lists them all. It fades in once requests have run 300ms, so quick ones never show, and
@@ -880,7 +879,7 @@ themselves (success 2.5 s, info 4 s, errors 8 s, with an action 10 s), repeats c
 first, a click on the scrim closes them, Tab cycles inside them, and closing returns the focus to where it was.
 Everything that loses the owner's setup asks first in a `ConfirmSheet` (`components/ConfirmSheet.tsx`; the page
 calls `useStore.getState().confirm({ title, text, action })` and `ConfirmHost` shows it): deleting a filter list
-or a view, Stop tracking, Reset Cache. The question names what goes and what stays; Cancel and Esc keep it.
+or a view, Stop tracking, Refetch from Jira. The question names what goes and what stays; Cancel and Esc keep it.
 
 ## Settings
 
@@ -914,10 +913,8 @@ no separate Settings design; owner, 2026-10-28). Its colors are the `--settings-
     are off). Each read and change row ends with the token scope it needs as Jira names it (`read:jira-work`;
     monospaced, selectable), so all scopes live on this one page. The list comes from Rust (`jira_capabilities`),
     named by the requests the gateway sends.
-  - **Privacy & Data** (`components/settings/privacy/`): *Jira data* (`StorageGroup`): Keep Jira data in memory
-    only first, then the cache's size with Reset Cache (in memory: "Jira data in memory" with Refetch from Jira,
-    both confirmed in a sheet), in file mode Keep history you've read and Clear the cache when Taskboard quits,
-    and Show Data Folder.
+  - **Privacy & Data** (`components/settings/privacy/`): *Jira data* (`StorageGroup`): "Nothing from Jira is written to
+    disk", "Jira data in memory" with its size and Refetch from Jira (confirmed in a sheet), and Show Data Folder.
   - **Projects**: Refresh after a successful test, "N of M tracked", a filter field (every word in the name or
     key, ignoring case) and a Track switch per project.
   - **Sync**: *Scope* (the effective JQL in a monospaced field; Validate, Save, Reset to Default), *Issue types*
@@ -971,8 +968,7 @@ no separate Settings design; owner, 2026-10-28). Its colors are the `--settings-
     and focus; a Space can choose its own). **Shortcuts**: every command and its key, rebindable.
   - **Status** (`components/settings/status/`, Daybook's Status page): `diagnostics_get` reports groups of
     rows, each a value and maybe a bus command as a button: *Jira* (site, account, API token and its expiry),
-    *Sync* (state, tracked projects, last full sync, cached issues, cache size with Compact; in memory mode "Jira
-    data": the size and whether a `cache.sqlite` is on disk, with Show), *This Mac* (version, data and log folders
+    *Sync* (state, tracked projects, last full sync, cached issues, "Jira data": in memory, with its size), *This Mac* (version, data and log folders
     with Show, the command-line tool's path) and, last because it is long, *Changes Sent to Jira* (the newest 50,
     refused ones in red, with Export…). Only ok, warning and error values carry an icon; info values have none.
     Every value is a button that copies it (`lib/clipboard.ts` `copyWithToast`, "Copied Data folder"; a path
@@ -993,7 +989,7 @@ lists and rebinds the page's keys (conflicts are flagged); the menu shows the de
 global shortcuts.
 
 - **Menus** (`src-tauri/src/menu/`), in the Mac order: Taskboard, File, Edit, Go, List, Issue, View, Window, Help.
-  File holds the core actions (New Filter List ⌘N, New View ⌘T; Refresh ⌘R, Full Sync ⇧⌘R; Reset Cache…,
+  File holds the core actions (New Filter List ⌘N, New View ⌘T; Refresh ⌘R, Full Sync ⇧⌘R; Refetch from Jira…,
   which opens Settings → Privacy & Data → Jira data to confirm; Close Tab or Window ⌘W). Go moves around (Command Palette ⌘K,
   Everything ⇧⌘E, Recently Viewed ⌘Y, Bookmarks ⇧⌘P, Notifications ⇧⌘U, Back ⌘[, Forward ⌘], Previous/Next Space ⌥⌘↑/↓, Previous/Next List ⌥⌘[/] (within the
   Space, or among the levels outside the Spaces, wrapping), Previous/Next View ⌃⇧⇥/⌃⇥, then the level's views by

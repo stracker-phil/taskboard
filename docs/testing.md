@@ -67,8 +67,7 @@ launch (`alex.morgan@example.com`, a demo token in the debug Keychain service), 
 runs a full sync, so every screen goes through the real sync. `taskboard dev drift` (the debug binary) changes
 the demo site the way a working day would (a comment, a status, a priority, a new and a deleted issue); the
 next sync picks it up. `taskboard dev seed-synthetic 5000` serves 5,000 generated issues instead and resyncs
-from an empty cache, for scrolling and timing checks; to go back, quit the debug app and delete `cache.sqlite*`
-in its data folder. To start over, quit the debug app and delete
+from an empty cache, for scrolling and timing checks; to go back, quit and restart the debug app. To start over, quit the debug app and delete
 `~/Library/Application Support/com.philippstracker.taskboard.debug/`.
 
 ## Driving the app

@@ -37,7 +37,7 @@ pub async fn add_comment(
         .map(Mentionable::from)
         .collect();
     let body = adf::from_markdown(&text, &people);
-    let change = format!("Comment ({} characters)", text.chars().count());
+    let change = super::sent::typed("Comment", &text);
     let html = adf::to_html(&body, &Media::default()).unwrap_or_default();
     let text = html_to_text(&html);
     let shown = Shown {

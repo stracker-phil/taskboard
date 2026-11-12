@@ -1,16 +1,14 @@
 //! The two SQLite databases (ADR 0019): `local.sqlite`, the owner's own setup, with the Jira mirror attached
-//! as `cache`, either `cache.sqlite` or an in-memory database (ADR 0057). One writer connection and a few
-//! readers; every call runs off the async workers. All writes go through `Db::write`, which announces what
-//! changed after the commit.
+//! as `cache`, an in-memory database (ADR 0066). One writer connection and a few readers; every call runs off
+//! the async workers. All writes go through `Db::write`, which announces what changed after the commit.
 
 mod changes;
 mod coalesce;
 mod connection;
-mod field_seed;
 mod migrate;
 mod upkeep;
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 
@@ -18,8 +16,7 @@ use rusqlite::{Connection, Transaction};
 
 pub use changes::{Changes, IssuesChanged, LocalChanged, LocalPart};
 pub use coalesce::{ANNOUNCE_EVERY, coalesce};
-pub use connection::{CACHE_FILE, CacheKind, LOCAL_FILE};
-pub use upkeep::CacheSize;
+pub use connection::{CACHE_FILE, LOCAL_FILE};
 
 use crate::error::{AppError, AppResult};
 use crate::lock::MutexExt;
@@ -35,7 +32,6 @@ pub struct Db {
 }
 
 struct Inner {
-    dir: PathBuf,
     cache: Mutex<connection::Cache>,
     writer: Mutex<Connection>,
     readers: Vec<Mutex<Connection>>,
@@ -44,19 +40,14 @@ struct Inner {
 }
 
 impl Db {
-    /// Creates or migrates both files in `dir` and opens the connections.
+    /// Creates or migrates the local file in `dir`, starts an empty mirror and opens the connections.
     pub fn open(dir: &Path) -> AppResult<Self> {
-        Self::open_with(dir, CacheKind::File)
-    }
-
-    pub fn open_with(dir: &Path, kind: CacheKind) -> AppResult<Self> {
-        let cache = connection::prepare(dir, kind)?;
+        let cache = connection::prepare(dir)?;
         let readers = (0..READERS)
             .map(|_| connection::open(dir, &cache).map(Mutex::new))
             .collect::<AppResult<_>>()?;
         Ok(Self {
             inner: Arc::new(Inner {
-                dir: dir.to_path_buf(),
                 writer: Mutex::new(connection::open(dir, &cache)?),
                 cache: Mutex::new(cache),
                 readers,
@@ -110,25 +101,15 @@ impl Db {
         .await
     }
 
-    pub fn cache_kind(&self) -> CacheKind {
-        self.inner.cache.lock_unpoisoned().kind()
-    }
-
-    /// Deletes the Jira mirror and starts an empty one; the owner's own setup stays.
+    /// Replaces the Jira mirror with an empty one; the owner's own setup stays.
     pub async fn reset_cache(&self) -> AppResult<()> {
-        let kind = self.cache_kind();
-        self.switch_cache(kind).await
-    }
-
-    /// Replaces the mirror with an empty one of `kind`, like a reset.
-    pub async fn switch_cache(&self, kind: CacheKind) -> AppResult<()> {
         let inner = Arc::clone(&self.inner);
         blocking(move || {
             let writer = inner.writer.lock_unpoisoned();
             let readers: Vec<_> = inner.readers.iter().map(|r| r.lock_unpoisoned()).collect();
             let mut cache = inner.cache.lock_unpoisoned();
             let conns: Vec<&Connection> = readers.iter().map(|r| &**r).chain([&*writer]).collect();
-            let replaced = replace_cache(&conns, &mut cache, &inner.dir, kind);
+            let replaced = replace_cache(&conns, &mut cache);
             // Even after a failure every connection gets a cache back, so later queries keep working.
             for conn in &conns {
                 connection::ensure_attached(conn, &cache)?;
@@ -157,17 +138,11 @@ impl Inner {
     }
 }
 
-fn replace_cache(
-    conns: &[&Connection],
-    cache: &mut connection::Cache,
-    dir: &Path,
-    kind: CacheKind,
-) -> AppResult<()> {
+fn replace_cache(conns: &[&Connection], cache: &mut connection::Cache) -> AppResult<()> {
     for conn in conns {
         connection::detach_cache(conn)?;
     }
-    connection::remove_cache_files(dir)?;
-    *cache = connection::Cache::create(dir, kind)?;
+    *cache = connection::Cache::create()?;
     Ok(())
 }
 
@@ -245,10 +220,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn open_creates_both_files_migrated_to_the_latest_version() {
+    async fn open_creates_the_local_file_and_a_memory_cache_migrated_to_the_latest_version() {
         let (dir, db) = open_db();
         assert!(dir.path().join(LOCAL_FILE).is_file());
-        assert!(dir.path().join(CACHE_FILE).is_file());
+        assert!(!dir.path().join(CACHE_FILE).exists());
         assert_eq!(
             count(&db, "PRAGMA user_version").await,
             migrate::LOCAL.len() as i64
@@ -263,7 +238,6 @@ mod tests {
     async fn connections_use_wal_and_enforce_foreign_keys() {
         let (_dir, db) = open_db();
         assert_eq!(text(&db, "PRAGMA journal_mode").await, "wal");
-        assert_eq!(text(&db, "PRAGMA cache.journal_mode").await, "wal");
         assert_eq!(count(&db, "PRAGMA foreign_keys").await, 1);
         let orphan = db
             .write(|tx, _| {
@@ -279,10 +253,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn database_files_are_private_to_the_user() {
+    async fn the_local_file_is_private_to_the_user() {
         let (dir, _db) = open_db();
         assert_eq!(mode_of(&dir.path().join(LOCAL_FILE)), 0o600);
-        assert_eq!(mode_of(&dir.path().join(CACHE_FILE)), 0o600);
     }
 
     #[tokio::test]
@@ -302,21 +275,13 @@ mod tests {
             text(&db, "SELECT name FROM space WHERE project_id = '10001'").await,
             "Shop floor"
         );
-        assert_eq!(text(&db, "SELECT name FROM cache.space").await, "Northwind");
+        assert_eq!(count(&db, "SELECT COUNT(*) FROM cache.space").await, 0);
     }
 
     #[test]
     fn a_local_file_from_a_newer_version_is_refused() {
         let dir = temp_config_dir();
         prepare_future_file(&dir.path().join(LOCAL_FILE));
-        let err = Db::open(dir.path()).err().expect("open must fail");
-        assert_eq!(err.kind(), ErrorKind::Db);
-    }
-
-    #[test]
-    fn a_cache_file_from_a_newer_version_is_refused() {
-        let dir = temp_config_dir();
-        prepare_future_file(&dir.path().join(CACHE_FILE));
         let err = Db::open(dir.path()).err().expect("open must fail");
         assert_eq!(err.kind(), ErrorKind::Db);
     }
@@ -477,22 +442,9 @@ mod tests {
         );
     }
 
-    fn open_memory_db() -> (TempDir, Db) {
-        let dir = temp_config_dir();
-        let db = Db::open_with(dir.path(), CacheKind::Memory).unwrap();
-        (dir, db)
-    }
-
-    fn cache_file_space_count(dir: &Path) -> i64 {
-        rusqlite::Connection::open(dir.join(CACHE_FILE))
-            .unwrap()
-            .query_row("SELECT COUNT(*) FROM space", [], |row| row.get(0))
-            .unwrap()
-    }
-
     #[tokio::test]
-    async fn a_memory_cache_stores_and_reads_issues_without_creating_a_cache_file() {
-        let (dir, db) = open_memory_db();
+    async fn the_cache_stores_and_reads_issues_without_creating_a_cache_file() {
+        let (dir, db) = open_db();
 
         exec(&db, PROJECT).await;
         exec(&db, ISSUE).await;
@@ -500,23 +452,12 @@ mod tests {
         assert_eq!(text(&db, "SELECT key FROM cache.issue").await, "NW-1");
         assert!(!dir.path().join(CACHE_FILE).exists());
         assert!(dir.path().join(LOCAL_FILE).is_file());
-        assert_eq!(db.cache_kind(), CacheKind::Memory);
-        assert_eq!(
-            count(&db, "PRAGMA cache.user_version").await,
-            migrate::CACHE.len() as i64
-        );
-    }
-
-    #[test]
-    fn a_db_opened_the_usual_way_keeps_its_cache_in_a_file() {
-        let (_dir, db) = open_db();
-        assert_eq!(db.cache_kind(), CacheKind::File);
     }
 
     #[tokio::test]
-    async fn two_memory_caches_in_one_process_do_not_see_each_other() {
-        let (_first_dir, first) = open_memory_db();
-        let (_second_dir, second) = open_memory_db();
+    async fn two_caches_in_one_process_do_not_see_each_other() {
+        let (_first_dir, first) = open_db();
+        let (_second_dir, second) = open_db();
 
         exec(&first, PROJECT).await;
         exec(&first, ISSUE).await;
@@ -527,9 +468,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn reopening_in_memory_mode_starts_with_an_empty_cache_and_keeps_the_local_data() {
+    async fn reopening_a_folder_starts_with_an_empty_cache_and_keeps_the_local_data() {
         let dir = temp_config_dir();
-        let db = Db::open_with(dir.path(), CacheKind::Memory).unwrap();
+        let db = Db::open(dir.path()).unwrap();
         exec(&db, PROJECT).await;
         exec(&db, ISSUE).await;
         exec(&db, "INSERT INTO space (project_id) VALUES ('10001')").await;
@@ -547,7 +488,7 @@ mod tests {
         .await;
         drop(db);
 
-        let db = Db::open_with(dir.path(), CacheKind::Memory).unwrap();
+        let db = Db::open(dir.path()).unwrap();
 
         assert_eq!(count(&db, "SELECT COUNT(*) FROM cache.space").await, 0);
         assert_eq!(count(&db, "SELECT COUNT(*) FROM cache.issue").await, 0);
@@ -557,16 +498,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn opening_in_memory_mode_deletes_a_leftover_cache_file_and_its_companions() {
+    async fn opening_deletes_a_leftover_cache_file_and_its_companions() {
         let dir = temp_config_dir();
-        let db = Db::open(dir.path()).unwrap();
-        exec(&db, PROJECT).await;
-        drop(db);
-        for suffix in ["-wal", "-shm"] {
-            std::fs::write(dir.path().join(format!("{CACHE_FILE}{suffix}")), b"").unwrap();
+        for suffix in ["", "-wal", "-shm"] {
+            std::fs::write(dir.path().join(format!("{CACHE_FILE}{suffix}")), b"old").unwrap();
         }
 
-        let db = Db::open_with(dir.path(), CacheKind::Memory).unwrap();
+        let db = Db::open(dir.path()).unwrap();
 
         for suffix in ["", "-wal", "-shm"] {
             assert!(
@@ -578,64 +516,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn switching_to_memory_removes_the_cache_file_and_keeps_the_local_rows() {
+    async fn resetting_the_cache_writes_no_file() {
         let (dir, db) = open_db();
-        exec(&db, PROJECT).await;
-        exec(&db, "INSERT INTO space (project_id) VALUES ('10001')").await;
-        let sink = Arc::new(Mutex::new(Vec::new()));
-        db.set_notifier(collect_into(&sink));
-
-        db.switch_cache(CacheKind::Memory).await.unwrap();
-
-        assert_eq!(db.cache_kind(), CacheKind::Memory);
-        assert!(!dir.path().join(CACHE_FILE).exists());
-        assert_eq!(count(&db, "SELECT COUNT(*) FROM cache.space").await, 0);
-        assert_eq!(count(&db, "SELECT COUNT(*) FROM space").await, 1);
-        exec(&db, PROJECT).await;
-        assert_eq!(count(&db, "SELECT COUNT(*) FROM cache.space").await, 1);
-        assert!(!dir.path().join(CACHE_FILE).exists());
-        assert_eq!(
-            *sink.lock().unwrap(),
-            vec![Changes {
-                cache_reset: true,
-                ..Changes::default()
-            }]
-        );
-    }
-
-    #[tokio::test]
-    async fn switching_to_a_file_creates_an_empty_migrated_cache_that_is_used() {
-        let (dir, db) = open_memory_db();
-        exec(&db, PROJECT).await;
-
-        db.switch_cache(CacheKind::File).await.unwrap();
-
-        assert_eq!(db.cache_kind(), CacheKind::File);
-        assert!(dir.path().join(CACHE_FILE).is_file());
-        assert_eq!(count(&db, "SELECT COUNT(*) FROM cache.space").await, 0);
-        assert_eq!(
-            count(&db, "PRAGMA cache.user_version").await,
-            migrate::CACHE.len() as i64
-        );
-        assert_eq!(cache_file_space_count(dir.path()), 0);
-        exec(&db, PROJECT).await;
-        assert_eq!(cache_file_space_count(dir.path()), 1);
-    }
-
-    #[tokio::test]
-    async fn resetting_a_memory_cache_empties_it_without_writing_a_file() {
-        let (dir, db) = open_memory_db();
         exec(&db, PROJECT).await;
         exec(&db, ISSUE).await;
 
         db.reset_cache().await.unwrap();
 
-        assert_eq!(db.cache_kind(), CacheKind::Memory);
-        assert_eq!(count(&db, "SELECT COUNT(*) FROM cache.issue").await, 0);
-        assert_eq!(count(&db, "SELECT COUNT(*) FROM cache.space").await, 0);
         assert!(!dir.path().join(CACHE_FILE).exists());
-        exec(&db, PROJECT).await;
-        assert_eq!(count(&db, "SELECT COUNT(*) FROM cache.space").await, 1);
     }
 
     #[tokio::test]
@@ -667,14 +555,16 @@ mod tests {
 
     #[tokio::test]
     async fn the_announcement_comes_after_the_commit() {
-        let (dir, db) = open_db();
+        let (_dir, db) = open_db();
         let seen = Arc::new(Mutex::new(Vec::new()));
-        let cache_path = dir.path().join(CACHE_FILE);
         let sink = Arc::clone(&seen);
+        let reader = db.clone();
+        let handle = tokio::runtime::Handle::current();
         db.set_notifier(Box::new(move |_| {
-            let conn = rusqlite::Connection::open(&cache_path).unwrap();
-            let projects: i64 = conn
-                .query_row("SELECT COUNT(*) FROM space", [], |row| row.get(0))
+            let projects: i64 = handle
+                .block_on(reader.read(|conn| {
+                    Ok(conn.query_row("SELECT COUNT(*) FROM cache.space", [], |row| row.get(0))?)
+                }))
                 .unwrap();
             sink.lock().unwrap().push(projects);
         }));

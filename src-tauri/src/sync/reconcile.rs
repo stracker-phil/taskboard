@@ -17,6 +17,8 @@ use crate::time::format_utc;
 
 /// Gone issues stay reachable from pins, links and search this long, then leave the cache.
 const KEEP_GONE: Duration = Duration::days(7);
+/// Changes the owner has seen are dropped after this long; a session rarely lasts that long.
+const KEEP_SEEN_CHANGES: Duration = Duration::days(90);
 /// An issue found outside the scope is asked for again after this long, so one deleted since is noticed.
 const RECHECK_LEFT_SCOPE: Duration = Duration::days(7);
 
@@ -92,8 +94,7 @@ pub async fn reconcile(
     }
     let now = Utc::now();
     let gone_before = format_utc(now - KEEP_GONE);
-    let keep_history = Duration::days(i64::from(ctx.settings.get().sync.keep_history_days));
-    let changes_before = format_utc(now - keep_history);
+    let changes_before = format_utc(now - KEEP_SEEN_CHANGES);
     let stamp = format_utc(now);
     let excluded = ctx.settings.get().sync.excluded_types;
     let (purged, pruned) = ctx

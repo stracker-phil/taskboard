@@ -66,7 +66,7 @@ stands in Taskboard. The numbers in this table are Taskboard's.
 | [0054](0054-every-release-build-gets-a-new-version.md) | Every release build gets a new version | Accepted (2026-11-05) |
 | [0055](0055-status-styles-are-chosen-app-wide-a-space-overrides.md) | Status styles are chosen app-wide; a Space overrides them | Accepted (2026-11-10) |
 | [0056](0056-custom-fields-are-opted-in-app-wide-a-space-opts-out.md) | Custom fields are opted in app-wide; a Space opts out | Accepted (2026-11-10) |
-| [0057](0057-jira-data-can-live-in-memory-only.md) | Jira data can live in memory only (opt-in) | Accepted (2026-11-10) |
+| [0057](0057-jira-data-can-live-in-memory-only.md) | Jira data can live in memory only (opt-in) | Superseded by [0066](0066-jira-data-lives-in-memory-only.md) |
 | [0058](0058-own-changes-are-not-news.md) | The owner's own changes aren't news | Accepted (2026-11-10) |
 | [0059](0059-the-inbox-replaces-unread-mode.md) | The inbox replaces Unread mode (supersedes 0046) | Accepted (2026-11-10) |
 | [0060](0060-a-status-bar-under-the-panel.md) | A status bar under the content panel | Accepted (2026-11-11) |
@@ -75,5 +75,6 @@ stands in Taskboard. The numbers in this table are Taskboard's.
 | [0063](0063-comments-are-written-in-markdown.md) | Comments are written in Markdown | Accepted (2026-11-11) |
 | [0064](0064-comment-mentions-come-from-the-space-team.md) | Comment mentions come from the Space's team | Accepted (2026-11-11) |
 | [0065](0065-a-major-version-needs-the-owners-approval.md) | A major version needs the owner's approval (supersedes part of 0054) | Accepted (2026-11-11) |
+| [0066](0066-jira-data-lives-in-memory-only.md) | Jira data lives in memory only; no issue text on disk | Accepted (2026-11-12) |
 
 Open: integrations with Daybook and TimeTracker.

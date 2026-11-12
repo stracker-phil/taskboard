@@ -1923,19 +1923,14 @@ mod reconciliation {
     }
 
     #[tokio::test]
-    async fn the_kept_history_setting_decides_how_old_a_seen_change_must_be_to_be_pruned() {
+    async fn a_seen_change_is_pruned_once_it_is_older_than_90_days() {
         let rig = Rig::connected().await;
         rig.full_sync().await;
-        rig.ctx
-            .settings
-            .edit(|settings| settings.sync.keep_history_days = 30)
-            .await
-            .unwrap();
         let db = &rig.ctx.db;
         let now = Utc::now();
         let days_ago =
             |days: i64| taskboard_lib::time::format_utc(now - chrono::Duration::days(days));
-        let (seen, old, recent) = (days_ago(0), days_ago(40), days_ago(20));
+        let (seen, old, recent) = (days_ago(0), days_ago(100), days_ago(80));
         db.write(move |tx, _| {
             tx.execute(
                 "UPDATE issue_seen SET seen_at = ?1 WHERE issue_id = '101042'",

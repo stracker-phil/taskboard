@@ -14,7 +14,6 @@ use groups::{
 };
 
 use crate::connection;
-use crate::db::CacheKind;
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 use crate::sync::{SyncEngine, SyncState, overview};
@@ -64,9 +63,7 @@ pub async fn diagnostics_get(
         tracked: counts.projects.len(),
         cached: counts.projects.iter().map(|p| p.cached).sum(),
         cache: CacheFacts {
-            bytes: state.db.cache_size().await?.bytes,
-            in_memory: state.db.cache_kind() == CacheKind::Memory,
-            file_exists: state.db.cache_file_exists(),
+            bytes: state.db.cache_bytes().await?,
         },
     };
     let paths = app.path();

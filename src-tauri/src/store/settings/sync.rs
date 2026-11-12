@@ -3,13 +3,11 @@
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
-use crate::db::CacheKind;
 use crate::error::{AppError, AppResult};
 
 const FOCUSED_MINUTES: (u32, u32) = (1, 60);
 const BACKGROUND_MINUTES: (u32, u32) = (5, 120);
 const KEEP_DONE_DAYS: (u32, u32) = (7, 365);
-const KEEP_HISTORY_DAYS: (u32, u32) = (7, 365);
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, TS)]
 #[ts(export, export_to = "src/api/types.gen.ts")]
@@ -22,12 +20,6 @@ pub struct SyncSettings {
     pub background_minutes: u32,
     /// How long finished issues stay in the default scope.
     pub keep_done_days: u32,
-    /// How long the changes recorded for an issue stay cached once the owner has seen them.
-    pub keep_history_days: u32,
-    /// Empties the cache when Taskboard quits, and at launch in case it didn't quit cleanly.
-    pub clear_cache_on_quit: bool,
-    /// Keeps the Jira mirror in memory instead of `cache.sqlite` (ADR 0057).
-    pub memory_only: bool,
     /// Issue types (by name) the sync leaves out, whatever the scope.
     pub excluded_types: Vec<String>,
 }
@@ -39,23 +31,12 @@ impl Default for SyncSettings {
             focused_minutes: 5,
             background_minutes: 15,
             keep_done_days: 90,
-            keep_history_days: 90,
-            clear_cache_on_quit: false,
-            memory_only: false,
             excluded_types: Vec::new(),
         }
     }
 }
 
 impl SyncSettings {
-    pub fn cache_kind(&self) -> CacheKind {
-        if self.memory_only {
-            CacheKind::Memory
-        } else {
-            CacheKind::File
-        }
-    }
-
     pub fn validate(&self) -> AppResult<()> {
         check("sync.focusedMinutes", self.focused_minutes, FOCUSED_MINUTES)?;
         check(
@@ -63,12 +44,7 @@ impl SyncSettings {
             self.background_minutes,
             BACKGROUND_MINUTES,
         )?;
-        check("sync.keepDoneDays", self.keep_done_days, KEEP_DONE_DAYS)?;
-        check(
-            "sync.keepHistoryDays",
-            self.keep_history_days,
-            KEEP_HISTORY_DAYS,
-        )
+        check("sync.keepDoneDays", self.keep_done_days, KEEP_DONE_DAYS)
     }
 
     /// Moves out-of-bounds values to the nearest bound and tidies the excluded types.
@@ -78,7 +54,6 @@ impl SyncSettings {
             focused_minutes: clamp(self.focused_minutes, FOCUSED_MINUTES),
             background_minutes: clamp(self.background_minutes, BACKGROUND_MINUTES),
             keep_done_days: clamp(self.keep_done_days, KEEP_DONE_DAYS),
-            keep_history_days: clamp(self.keep_history_days, KEEP_HISTORY_DAYS),
             excluded_types: tidy_types(self.excluded_types),
             ..self
         }
@@ -162,55 +137,6 @@ mod tests {
         }
     }
 
-    fn keeping_history(days: u32) -> SyncSettings {
-        SyncSettings {
-            keep_history_days: days,
-            ..SyncSettings::default()
-        }
-    }
-
-    #[test]
-    fn the_history_is_kept_for_90_days_by_default() {
-        assert_eq!(SyncSettings::default().keep_history_days, 90);
-    }
-
-    #[test]
-    fn the_history_bounds_are_valid_and_one_past_them_names_the_field() {
-        for days in [7, 365] {
-            assert_eq!(keeping_history(days).validate(), Ok(()), "{days}");
-        }
-        for days in [0, 6, 366] {
-            assert_eq!(
-                invalid_path(&keeping_history(days)),
-                "sync.keepHistoryDays",
-                "{days}"
-            );
-        }
-    }
-
-    #[test]
-    fn clamping_moves_the_kept_history_to_the_nearest_bound() {
-        for (days, expected) in [(0, 7), (6, 7), (30, 30), (366, 365), (10_000, 365)] {
-            assert_eq!(
-                keeping_history(days).clamped().keep_history_days,
-                expected,
-                "{days}"
-            );
-        }
-    }
-
-    #[test]
-    fn a_file_without_the_history_key_reads_90_days() {
-        let read: SyncSettings = serde_json::from_value(json!({ "keepDoneDays": 30 })).unwrap();
-        assert_eq!(read.keep_history_days, 90);
-    }
-
-    #[test]
-    fn the_history_key_reads_from_camel_case() {
-        let read: SyncSettings = serde_json::from_value(json!({ "keepHistoryDays": 30 })).unwrap();
-        assert_eq!(read, keeping_history(30));
-    }
-
     #[test]
     fn the_message_of_an_invalid_field_gives_the_allowed_range() {
         assert_eq!(
@@ -246,9 +172,6 @@ mod tests {
                 "focusedMinutes": 5,
                 "backgroundMinutes": 15,
                 "keepDoneDays": 90,
-                "keepHistoryDays": 90,
-                "clearCacheOnQuit": false,
-                "memoryOnly": false,
                 "excludedTypes": [],
             })
         );
@@ -303,55 +226,14 @@ mod tests {
     }
 
     #[test]
-    fn the_cache_lives_in_a_file_by_default() {
-        let settings = SyncSettings::default();
-        assert!(!settings.memory_only);
-        assert_eq!(settings.cache_kind(), CacheKind::File);
-    }
-
-    #[test]
-    fn the_memory_only_key_reads_from_camel_case_and_selects_the_memory_cache() {
-        let read: SyncSettings = serde_json::from_value(json!({ "memoryOnly": true })).unwrap();
-        assert!(read.memory_only);
-        assert_eq!(read.cache_kind(), CacheKind::Memory);
-    }
-
-    #[test]
-    fn a_file_without_the_memory_only_key_keeps_the_cache_in_a_file() {
-        let read: SyncSettings = serde_json::from_value(json!({ "focusedMinutes": 10 })).unwrap();
-        assert_eq!(read.cache_kind(), CacheKind::File);
-    }
-
-    #[test]
-    fn the_cache_is_kept_on_quit_by_default() {
-        assert!(!SyncSettings::default().clear_cache_on_quit);
-    }
-
-    #[test]
-    fn a_file_without_the_clear_on_quit_key_reads_false_and_keeps_the_rest() {
-        let read: SyncSettings = serde_json::from_value(json!({ "focusedMinutes": 10 })).unwrap();
+    fn a_file_with_the_removed_cache_keys_still_loads_and_ignores_them() {
+        let read: SyncSettings = serde_json::from_value(json!({
+            "focusedMinutes": 10,
+            "keepHistoryDays": 30,
+            "clearCacheOnQuit": true,
+            "memoryOnly": true,
+        }))
+        .unwrap();
         assert_eq!(read, sync(10, 15, 90));
-    }
-
-    #[test]
-    fn the_clear_on_quit_key_reads_from_camel_case() {
-        let read: SyncSettings =
-            serde_json::from_value(json!({ "clearCacheOnQuit": true })).unwrap();
-        assert_eq!(
-            read,
-            SyncSettings {
-                clear_cache_on_quit: true,
-                ..SyncSettings::default()
-            }
-        );
-    }
-
-    #[test]
-    fn clamping_keeps_the_clear_on_quit_choice() {
-        let settings = SyncSettings {
-            clear_cache_on_quit: true,
-            ..sync(0, 1000, 90)
-        };
-        assert!(settings.clamped().clear_cache_on_quit);
     }
 }

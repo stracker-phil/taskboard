@@ -44,8 +44,8 @@ support. To build it or port it, point a coding agent at [AGENTS.md](AGENTS.md).
   (X, ⌘- or ⇧-click, or a group's checkbox) and change them at once from the bulk bar. The change shows at once;
   if Jira refuses it, the old value comes back. The confirmation offers the opposite change ("Change back to
   Jamie Doe"), which is a second change in Jira, not an undo.
-- **A status bar:** under the panel, what Taskboard is asking Jira right now, the sync state (a click syncs) and
-  whether Jira data lives in memory only.
+- **A status bar:** under the panel, what Taskboard is asking Jira right now, and the sync state (a click
+  syncs).
 - **Notifications:** after a sync, while Taskboard isn't in front, macOS notifications for mentions of you and
   issues assigned to you (or every change of your issues, or none: Settings → Behavior), with buttons that open
   the issue or the inbox.
@@ -72,10 +72,10 @@ All screenshots show made-up demo data from the debug build.
   Atlassian's avatar host, without credentials.
 - Pull request statuses come from your own `gh` command line (Homebrew), run with fixed arguments for GitHub
   pull request links only; Taskboard holds no GitHub token and opens no connection to GitHub itself.
-- The cache stays on your Mac (`~/Library/Application Support/com.philippstracker.taskboard/`). Settings →
-  Privacy & Data, File → Reset Cache… or `taskboard reset-cache --yes` empties it; with "Clear the cache when
-  Taskboard quits" on, no copy of your issues stays on the Mac after quitting; with "Keep Jira data in memory
-  only" on, none is written to disk at all.
+- Jira data lives in memory only and is gone when Taskboard quits: nothing anyone wrote in Jira is written to
+  disk. Your own setup (Spaces, lists, views, bookmarks, read marks) stays in
+  `~/Library/Application Support/com.philippstracker.taskboard/`. Settings → Privacy & Data, File → Refetch from Jira…
+  or `taskboard reset-cache --yes` fetches the issues again.
 
 ## Install
 

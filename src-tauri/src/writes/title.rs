@@ -44,7 +44,7 @@ pub(super) async fn set_title(
         Begun::Sent(change) => change,
     };
     let write = source.set_title(&issue_id, &title);
-    let sent = format!("Title ({} characters)", title.chars().count());
+    let sent = super::sent::typed("Title", &title);
     send(db, source, &issue_id, Field::Title, sent, write).await?;
     Ok(change.outcome())
 }

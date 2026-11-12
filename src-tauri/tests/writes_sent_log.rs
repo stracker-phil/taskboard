@@ -265,7 +265,11 @@ async fn renaming_records_the_length_of_the_title_and_never_the_title() {
 
     assert_eq!(
         rig.record().await,
-        [entry("NW-1042", "Title (14 characters)", false)]
+        [entry(
+            "NW-1042",
+            "Title: \"Grüße aus …\" (14 characters)",
+            false
+        )]
     );
 }
 
@@ -286,7 +290,11 @@ async fn a_rename_jira_refuses_is_recorded_as_refused() {
 
     assert_eq!(
         rig.record().await,
-        [entry("NW-1042", "Title (13 characters)", true)]
+        [entry(
+            "NW-1042",
+            "Title: \"Checkout c…\" (13 characters)",
+            true
+        )]
     );
 }
 
@@ -320,14 +328,18 @@ async fn a_rename_that_is_not_sent_leaves_no_record() {
 }
 
 #[tokio::test]
-async fn a_comment_records_its_length_and_never_its_text() {
+async fn a_comment_records_its_start_and_length_and_never_all_of_its_text() {
     let rig = Rig::synced().await;
 
     rig.comment(NW_1042, "Checked on staging").await.unwrap();
 
     assert_eq!(
         rig.record().await,
-        [entry("NW-1042", "Comment (18 characters)", false)]
+        [entry(
+            "NW-1042",
+            "Comment: \"Checked on…\" (18 characters)",
+            false
+        )]
     );
 }
 
@@ -339,19 +351,27 @@ async fn a_comment_counts_characters_not_bytes() {
 
     assert_eq!(
         rig.record().await,
-        [entry("NW-1042", "Comment (14 characters)", false)]
+        [entry(
+            "NW-1042",
+            "Comment: \"Grüße aus …\" (14 characters)",
+            false
+        )]
     );
 }
 
 #[tokio::test]
-async fn a_web_link_records_its_address() {
+async fn a_web_link_records_the_start_of_its_address_and_never_all_of_it() {
     let rig = Rig::synced().await;
 
     rig.link(NW_1042).await.unwrap();
 
     assert_eq!(
         rig.record().await,
-        [entry("NW-1042", &format!("Web link: {SPEC_URL}"), false)]
+        [entry(
+            "NW-1042",
+            "Web link: \"https://do…\" (38 characters)",
+            false
+        )]
     );
 }
 
@@ -408,7 +428,11 @@ async fn a_comment_jira_refuses_is_recorded_as_refused() {
 
     assert_eq!(
         rig.record().await,
-        [entry("NW-1042", "Comment (7 characters)", true)]
+        [entry(
+            "NW-1042",
+            "Comment: \"Checked\" (7 characters)",
+            true
+        )]
     );
 }
 
@@ -442,7 +466,11 @@ async fn a_kind_of_change_switched_off_leaves_no_record_while_the_others_do() {
     rig.link(NW_1042).await.unwrap();
     assert_eq!(
         rig.record().await,
-        [entry("NW-1042", &format!("Web link: {SPEC_URL}"), false)]
+        [entry(
+            "NW-1042",
+            "Web link: \"https://do…\" (38 characters)",
+            false
+        )]
     );
 }
 

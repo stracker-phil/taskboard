@@ -69,7 +69,6 @@ pub fn start(
             clear_attachments(app.handle());
             app.set_menu(menu::build(app.handle(), &menu::place::Place::default())?)?;
             let state = app.state::<AppState>();
-            clear_cache_if_asked(&state);
             forget_unsettled_writes(&state);
             follow_the_place_in_the_menus(app.handle(), &state);
             announce_db_changes(app.handle(), &state.db);
@@ -103,26 +102,12 @@ pub fn start(
             RunEvent::Exit => {
                 clear_attachments(app);
                 let state = app.state::<AppState>();
-                clear_cache_if_asked(&state);
                 if let Err(e) = tauri::async_runtime::block_on(state.db.optimize()) {
                     log::warn!("The database wasn't optimized at quit: {e}");
                 }
             }
             _ => {}
         });
-}
-
-/// With `sync.clearCacheOnQuit` no copy of the Jira issues outlives a session: it runs at quit, and at launch
-/// for a session that didn't quit cleanly. A cache in memory never outlives one.
-fn clear_cache_if_asked(state: &AppState) {
-    let sync = state.settings.get().sync;
-    if !sync.clear_cache_on_quit || sync.memory_only {
-        return;
-    }
-    match tauri::async_runtime::block_on(state.db.reset_cache()) {
-        Ok(()) => log::info!("Cache cleared (clear on quit)"),
-        Err(e) => log::warn!("The cache wasn't cleared: {e}"),
-    }
 }
 
 /// A write cut off by the last quit can't settle; its issue keeps what it shows until the sync brings more.
