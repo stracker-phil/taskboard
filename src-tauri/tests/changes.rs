@@ -1221,6 +1221,32 @@ fn changelog_entry(author: &str, field: &str, at: &str) -> serde_json::Value {
     })
 }
 
+/// The most changelog entries the fake's search embeds per issue.
+const EMBEDDED_HISTORIES: usize = 100;
+
+/// `entries` after enough older entries by someone else that the search can't embed the whole changelog, so
+/// who made the change is found by the post-sync pass instead.
+fn beyond_the_embedded(entries: Vec<serde_json::Value>) -> Vec<serde_json::Value> {
+    let marta = person(MARTA_ACCOUNT_ID);
+    let older = (0..EMBEDDED_HISTORIES).map(|n| {
+        serde_json::json!({
+            "id": format!("older-{n}"),
+            "author": marta,
+            "created": LAST_WEEK.replace('Z', "+0000"),
+            "items": [{
+                "field": "labels",
+                "fieldId": "labels",
+                "fieldtype": "jira",
+                "from": null,
+                "fromString": null,
+                "to": null,
+                "toString": null
+            }]
+        })
+    });
+    older.chain(entries).collect()
+}
+
 mod own_changes_made_in_jira {
     use super::*;
 
@@ -1341,7 +1367,7 @@ mod own_changes_made_in_jira {
             .edit_issue("NW-1044", |fields| fields["status"] = done_status());
         site.fake.set_changelog(
             "NW-1044",
-            vec![changelog_entry(ME_ACCOUNT_ID, "status", DELTA_AT)],
+            beyond_the_embedded(vec![changelog_entry(ME_ACCOUNT_ID, "status", DELTA_AT)]),
         );
 
         site.delta_sync().await;
@@ -1352,11 +1378,11 @@ mod own_changes_made_in_jira {
         let history: Vec<(&str, Option<String>)> = items
             .iter()
             .filter_map(|item| match item {
-                ActivityItem::Change { field, author, .. } => Some((
+                ActivityItem::Change { field, author, .. } if field == "status" => Some((
                     field.as_str(),
                     author.as_ref().map(|a| a.account_id.clone()),
                 )),
-                ActivityItem::Comment { .. } => None,
+                _ => None,
             })
             .collect();
         assert_eq!(history, [("status", Some(ME_ACCOUNT_ID.to_string()))]);
@@ -1512,8 +1538,10 @@ mod own_changes_made_in_jira {
                 fields["duedate"] = serde_json::json!("2030-01-01");
             });
             let stamp = at.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string();
-            site.fake
-                .set_changelog(key, vec![changelog_entry(ME_ACCOUNT_ID, "duedate", &stamp)]);
+            site.fake.set_changelog(
+                key,
+                beyond_the_embedded(vec![changelog_entry(ME_ACCOUNT_ID, "duedate", &stamp)]),
+            );
         }
         let (oldest, newest) = keys.split_at(keys.len() - CHECKED);
 

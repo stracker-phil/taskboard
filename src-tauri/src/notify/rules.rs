@@ -53,18 +53,23 @@ fn status_event(categories: &Categories) -> NotifyEvent {
     }
 }
 
-/// Whether `event` on `subject` shows in `channel`: events about the owner pass the scope and type filters.
+/// Whether `event` on `subject` shows in `channel`: events about the owner pass the scope, type and automation
+/// filters. `by_automation`: an app account made the change.
 pub fn counts(
     settings: &Notifications,
     channel: Channel,
     event: NotifyEvent,
     subject: &Subject,
+    by_automation: bool,
 ) -> bool {
     if !settings.events(channel).contains(&event) {
         return false;
     }
     if event.is_about_me() {
         return true;
+    }
+    if settings.ignore_automations && by_automation {
+        return false;
     }
     if settings.excluded_types.contains(&subject.issue_type) {
         return false;
@@ -89,12 +94,15 @@ pub struct Judged {
     pub change: Change,
     pub subject: Subject,
     pub categories: Categories,
+    /// Made by an app account; an unknown author or account type is not.
+    pub by_automation: bool,
 }
 
 impl Judged {
     pub fn counts(&self, settings: &Notifications, channel: Channel, me: Option<&str>) -> bool {
-        event_of(&self.change, me, &self.categories)
-            .is_some_and(|event| counts(settings, channel, event, &self.subject))
+        event_of(&self.change, me, &self.categories).is_some_and(|event| {
+            counts(settings, channel, event, &self.subject, self.by_automation)
+        })
     }
 }
 
@@ -119,8 +127,10 @@ pub fn judged(conn: &Connection, which: Which, me: Option<&str>) -> AppResult<Ve
         "SELECT c.id, c.issue_id, c.quiet, c.field, c.old_value, c.new_value, c.changed_at, i.issue_type,
            COALESCE(i.assignee_id = ?1, 0), COALESCE(i.reporter_id = ?1, 0), i.custom,
            (SELECT category FROM cache.status WHERE id = c.old_value AND c.field = 'status'),
-           (SELECT category FROM cache.status WHERE id = c.new_value AND c.field = 'status')
+           (SELECT category FROM cache.status WHERE id = c.new_value AND c.field = 'status'),
+           COALESCE(u.account_type = 'app', 0)
          FROM cache.issue_change c JOIN cache.issue i ON i.id = c.issue_id
+           LEFT JOIN cache.user u ON u.account_id = c.author_id
          WHERE c.id > ?2 {unsettled}
          ORDER BY c.id"
     ))?;
@@ -147,6 +157,7 @@ pub fn judged(conn: &Connection, which: Which, me: Option<&str>) -> AppResult<Ve
                 from: r.get(11)?,
                 to: r.get(12)?,
             },
+            by_automation: r.get(13)?,
         })
     })?;
     Ok(rows.collect::<Result<_, _>>()?)
@@ -227,7 +238,10 @@ mod tests {
             event("people", Some("customfield_10042"), Some(ME)),
             Some(NotifyEvent::AddsMeToPeopleField)
         );
-        assert_eq!(event("people", Some("customfield_10042"), Some(MARTA)), None);
+        assert_eq!(
+            event("people", Some("customfield_10042"), Some(MARTA)),
+            None
+        );
     }
 
     #[test]
@@ -294,14 +308,14 @@ mod tests {
             ),
             (None, Some("done"), NotifyEvent::MovedToDone),
             (Some("done"), Some("new"), NotifyEvent::Reopened),
-            (
-                Some("indeterminate"),
-                Some("new"),
-                NotifyEvent::Reopened,
-            ),
+            (Some("indeterminate"), Some("new"), NotifyEvent::Reopened),
             (None, Some("new"), NotifyEvent::Reopened),
             (Some("new"), Some("indeterminate"), NotifyEvent::OtherChange),
-            (Some("done"), Some("indeterminate"), NotifyEvent::OtherChange),
+            (
+                Some("done"),
+                Some("indeterminate"),
+                NotifyEvent::OtherChange,
+            ),
             (Some("new"), Some("new"), NotifyEvent::OtherChange),
             (Some("done"), Some("done"), NotifyEvent::OtherChange),
             (Some("new"), None, NotifyEvent::OtherChange),
@@ -350,7 +364,7 @@ mod tests {
             (Channel::InApp, NotifyEvent::MentionsMe, false),
         ] {
             assert_eq!(
-                counts(&settings, channel, event, &story()),
+                counts(&settings, channel, event, &story(), false),
                 expected,
                 "{channel:?} {event:?}"
             );
@@ -368,7 +382,7 @@ mod tests {
         for event in NotifyEvent::ALL.into_iter().filter(|e| e.is_about_me()) {
             for channel in [Channel::InApp, Channel::Mac] {
                 assert!(
-                    counts(&settings, channel, event, &story()),
+                    counts(&settings, channel, event, &story(), false),
                     "{channel:?} {event:?}"
                 );
             }
@@ -390,19 +404,22 @@ mod tests {
             &settings,
             Channel::InApp,
             NotifyEvent::NewComment,
-            &test_case
+            &test_case,
+            false
         ));
         assert!(!counts(
             &settings,
             Channel::Mac,
             NotifyEvent::Created,
-            &test_case
+            &test_case,
+            false
         ));
         assert!(counts(
             &settings,
             Channel::InApp,
             NotifyEvent::NewComment,
-            &story()
+            &story(),
+            false
         ));
     }
 
@@ -417,7 +434,8 @@ mod tests {
             &settings,
             Channel::InApp,
             NotifyEvent::DueOrPriority,
-            &story()
+            &story(),
+            false
         ));
     }
 
@@ -453,7 +471,13 @@ mod tests {
                 };
 
                 assert_eq!(
-                    counts(&settings, Channel::InApp, NotifyEvent::NewComment, &subject),
+                    counts(
+                        &settings,
+                        Channel::InApp,
+                        NotifyEvent::NewComment,
+                        &subject,
+                        false
+                    ),
                     expected,
                     "{label}, {name}"
                 );
@@ -472,7 +496,104 @@ mod tests {
             &settings,
             Channel::Mac,
             NotifyEvent::NewComment,
-            &story()
+            &story(),
+            false
+        ));
+    }
+
+    #[test]
+    fn a_change_by_an_automation_is_blocked_in_both_channels_while_they_are_ignored() {
+        let settings = Notifications {
+            ignore_automations: true,
+            ..all_events()
+        };
+
+        for channel in [Channel::InApp, Channel::Mac] {
+            for event in NotifyEvent::ALL.into_iter().filter(|e| !e.is_about_me()) {
+                assert!(
+                    !counts(&settings, channel, event, &story(), true),
+                    "{channel:?} {event:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_change_by_an_automation_counts_when_automations_are_not_ignored() {
+        let settings = Notifications {
+            ignore_automations: false,
+            ..all_events()
+        };
+
+        for channel in [Channel::InApp, Channel::Mac] {
+            for event in NotifyEvent::ALL {
+                assert!(
+                    counts(&settings, channel, event, &story(), true),
+                    "{channel:?} {event:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_change_by_a_person_counts_whether_or_not_automations_are_ignored() {
+        for ignore_automations in [true, false] {
+            let settings = Notifications {
+                ignore_automations,
+                ..all_events()
+            };
+
+            for channel in [Channel::InApp, Channel::Mac] {
+                assert!(
+                    counts(&settings, channel, NotifyEvent::NewComment, &story(), false),
+                    "{channel:?} ignore {ignore_automations}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn events_about_me_by_an_automation_still_count_in_both_channels() {
+        let settings = Notifications {
+            ignore_automations: true,
+            ..all_events()
+        };
+
+        for event in NotifyEvent::ALL.into_iter().filter(|e| e.is_about_me()) {
+            for channel in [Channel::InApp, Channel::Mac] {
+                assert!(
+                    counts(&settings, channel, event, &story(), true),
+                    "{channel:?} {event:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn an_automation_change_is_blocked_before_the_scope_is_asked() {
+        let settings = Notifications {
+            scope: NotifyScope::Involved,
+            ignore_automations: true,
+            ..all_events()
+        };
+        let mine = Subject {
+            assigned_to_me: true,
+            ..story()
+        };
+
+        assert!(counts(
+            &settings,
+            Channel::InApp,
+            NotifyEvent::NewComment,
+            &mine,
+            false
+        ));
+        assert!(!counts(
+            &settings,
+            Channel::InApp,
+            NotifyEvent::NewComment,
+            &mine,
+            true
         ));
     }
 
@@ -531,11 +652,7 @@ mod tests {
         .unwrap()
     }
 
-    async fn settle_all(
-        db: &Db,
-        settings: Notifications,
-        again: bool,
-    ) -> BTreeSet<String> {
+    async fn settle_all(db: &Db, settings: Notifications, again: bool) -> BTreeSet<String> {
         db.write(move |tx, changes| {
             settle(tx, changes, &settings, Some(ME), again)?;
             Ok(changes.issues.clone())
@@ -661,13 +778,7 @@ mod tests {
 
         assert_eq!(
             quiet_marks(&db).await,
-            [
-                Some(true),
-                Some(false),
-                Some(true),
-                Some(true),
-                Some(false)
-            ]
+            [Some(true), Some(false), Some(true), Some(true), Some(false)]
         );
         assert_eq!(changed, ids(&["1", "3", "4"]));
         assert!(
@@ -711,6 +822,134 @@ mod tests {
         assert_eq!(changed, ids(&["1", "3", "4"]));
     }
 
+    /// Five priority changes on issue 4 by an app account, a person, an account the cache doesn't know, nobody
+    /// and an account of unknown type; then an assignment to the owner by the app account.
+    const BY_AUTHORS: &str = "
+        INSERT INTO cache.user (account_id, name, account_type) VALUES
+          ('account-test-runner', 'Test Runner', 'app'),
+          ('account-marta', 'Marta Klein', 'atlassian'),
+          ('account-untyped', 'Sam Becker', NULL);
+        INSERT INTO cache.issue_change (issue_id, field, old_value, new_value, changed_at, author_id) VALUES
+          ('4', 'priority', 'High', 'Low', '2026-10-28T10:00:00Z', 'account-test-runner'),
+          ('4', 'priority', 'Low', 'High', '2026-10-28T10:01:00Z', 'account-marta'),
+          ('4', 'priority', 'High', 'Low', '2026-10-28T10:02:00Z', 'account-ghost'),
+          ('4', 'priority', 'Low', 'High', '2026-10-28T10:03:00Z', NULL),
+          ('4', 'priority', 'High', 'Low', '2026-10-28T10:04:00Z', 'account-untyped'),
+          ('4', 'assignee', NULL, 'account-me', '2026-10-28T10:05:00Z', 'account-test-runner');";
+
+    async fn with_authors() -> (TempDir, Db) {
+        let (dir, db) = seeded().await;
+        db.write(|tx, _| {
+            tx.execute_batch(BY_AUTHORS)?;
+            Ok(())
+        })
+        .await
+        .unwrap();
+        (dir, db)
+    }
+
+    #[tokio::test]
+    async fn judged_marks_only_changes_by_an_app_account_as_by_an_automation() {
+        let (_dir, db) = with_authors().await;
+
+        let rows = judged_rows(&db, Which::All).await;
+
+        let marks: Vec<bool> = rows.iter().skip(5).map(|j| j.by_automation).collect();
+        assert_eq!(marks, [true, false, false, false, false, true]);
+        assert!(rows.iter().take(5).all(|j| !j.by_automation));
+    }
+
+    #[tokio::test]
+    async fn settling_makes_an_automations_change_quiet_by_default_and_leaves_the_rest_counting() {
+        let (_dir, db) = with_authors().await;
+
+        let changed = settle_all(&db, Notifications::default(), false).await;
+
+        assert_eq!(
+            quiet_marks(&db).await,
+            [
+                Some(false),
+                Some(false),
+                Some(false),
+                Some(false),
+                Some(false),
+                Some(true),
+                Some(false),
+                Some(false),
+                Some(false),
+                Some(false),
+                Some(false),
+            ]
+        );
+        assert_eq!(changed, ids(&["4"]));
+    }
+
+    #[tokio::test]
+    async fn settling_again_with_automations_not_ignored_lets_their_changes_count() {
+        let (_dir, db) = with_authors().await;
+        settle_all(&db, Notifications::default(), false).await;
+
+        let changed = settle_all(
+            &db,
+            Notifications {
+                ignore_automations: false,
+                ..Notifications::default()
+            },
+            true,
+        )
+        .await;
+
+        assert_eq!(quiet_marks(&db).await, vec![Some(false); 11]);
+        assert_eq!(changed, ids(&["4"]));
+    }
+
+    #[tokio::test]
+    async fn settling_again_with_automations_ignored_silences_the_changes_already_counted() {
+        let (_dir, db) = with_authors().await;
+        settle_all(
+            &db,
+            Notifications {
+                ignore_automations: false,
+                ..Notifications::default()
+            },
+            false,
+        )
+        .await;
+
+        settle_all(&db, Notifications::default(), true).await;
+
+        let marks = quiet_marks(&db).await;
+        assert_eq!(marks[5], Some(true));
+        assert_eq!(marks.iter().filter(|m| **m == Some(true)).count(), 1);
+    }
+
+    #[tokio::test]
+    async fn settling_still_counts_an_assignment_to_me_by_an_automation() {
+        let (_dir, db) = with_authors().await;
+
+        settle_all(&db, Notifications::default(), false).await;
+
+        assert_eq!(quiet_marks(&db).await[10], Some(false));
+    }
+
+    #[tokio::test]
+    async fn the_mac_channel_ignores_automations_the_same_way() {
+        let (_dir, db) = with_authors().await;
+        let settings = Notifications {
+            mac: NotifyEvent::ALL.to_vec(),
+            ..Notifications::default()
+        };
+
+        let rows = judged_rows(&db, Which::All).await;
+
+        let counting: Vec<bool> = rows
+            .iter()
+            .skip(5)
+            .map(|j| j.counts(&settings, Channel::Mac, Some(ME)))
+            .collect();
+        assert_eq!(counting, [false, true, true, true, true, true]);
+    }
+
     #[tokio::test]
     async fn settling_again_with_the_same_settings_changes_nothing() {
         let (_dir, db) = seeded().await;
@@ -744,13 +983,7 @@ mod tests {
 
         assert_eq!(
             quiet_marks(&db).await,
-            [
-                Some(true),
-                Some(true),
-                Some(true),
-                Some(false),
-                Some(true)
-            ]
+            [Some(true), Some(true), Some(true), Some(false), Some(true)]
         );
         assert_eq!(changed, ids(&["2", "4"]));
     }

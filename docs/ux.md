@@ -974,6 +974,8 @@ no separate Settings design; owner, 2026-10-28). Its colors are the `--settings-
     user field under Custom fields to use it." with a link to that page. *Issue types*: one `ValuePicker` (a ticked
     type counts; the excluded ones are stored, so a new type counts) whose field sums up the choice (`typesSummary`:
     "All types", "All except Test, Test Execution", "Only Bug, Story", "3 types left out" past 40 characters).
+    Last, a checkbox row Ignore changes made by automations (on by default, ADR 0069): an app account's changes and
+    comments stay in the activity but never make an issue unread or notify, unless they are about you.
     *Notify me about* (`EventsGroup`): the changes against In app (unread, in the inbox) and macOS in one
     `SettingsMatrix`, under the headings About you (Mentions me, Assigns me, Unassigns me, Adds me to a people field;
     they always pass the filters) and On these issues (New comment, Moved to Done, Reopened, Other status change,

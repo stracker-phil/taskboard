@@ -35,6 +35,7 @@ export const notifications = (patch: Partial<Notifications> = {}): Notifications
   excludedTypes: [],
   inApp: ["mentionsMe", "assignsMe", "unassignsMe", "addsMeToPeopleField", "newComment", "movedToDone", "reopened", "otherChange", "dueOrPriority", "created"],
   mac: ["mentionsMe", "assignsMe", "addsMeToPeopleField"],
+  ignoreAutomations: true,
   ...patch,
 });
 

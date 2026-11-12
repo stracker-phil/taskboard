@@ -39,6 +39,8 @@ pub trait IssuePages: Send {
     fn next_page(
         &mut self,
     ) -> Pin<Box<dyn Future<Output = Option<AppResult<SearchPage>>> + Send + '_>>;
+    /// Asks again from the failed page without `part` in `expand`; false when `expand` didn't hold it.
+    fn without_expand(&mut self, part: &str) -> bool;
 }
 
 pub trait Source: Send + Sync {

@@ -12,7 +12,7 @@ const MAX_FIELD: usize = 100;
 const MAX_FIELDS: usize = 500;
 const MAX_PAGE_TOKEN: usize = 4096;
 /// The `expand` values a search may ask for.
-const EXPANDS: &[&str] = &["renderedFields"];
+const EXPANDS: &[&str] = &["renderedFields", "changelog"];
 
 /// An uppercase ASCII letter, then uppercase letters, digits or `_` (Jira's rule for project keys).
 pub(super) fn is_project_key(text: &str) -> bool {
@@ -587,14 +587,17 @@ mod tests {
     }
 
     #[test]
-    fn only_rendered_fields_can_be_expanded() {
-        for text in ["renderedFields", "renderedFields,renderedFields"] {
+    fn only_rendered_fields_and_the_changelog_can_be_expanded() {
+        for text in [
+            "renderedFields",
+            "renderedFields,renderedFields",
+            "changelog",
+            "renderedFields,changelog",
+        ] {
             assert_eq!(Expand::parse(text).unwrap().as_str(), text);
         }
         for text in [
-            "changelog",
             "",
-            "renderedFields,changelog",
             "renderedFields,",
             ",renderedFields",
             "renderedfields",

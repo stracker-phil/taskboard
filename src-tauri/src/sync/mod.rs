@@ -1,5 +1,7 @@
 //! The sync engine (`docs/sync.md`): one task owns all network work and mirrors the sync scope into the cache.
 
+pub mod attribute;
+mod authors;
 mod backoff;
 pub mod commands;
 mod delta;
@@ -12,7 +14,7 @@ pub mod map;
 mod mentions;
 mod news;
 mod overview;
-mod own;
+mod page;
 pub mod raw;
 mod reconcile;
 mod refetch;
@@ -20,6 +22,7 @@ mod retention;
 pub mod schedule;
 pub mod source;
 pub mod store;
+pub mod users;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

@@ -8,7 +8,9 @@ use super::fetched::{self, Detail};
 use crate::db::{Changes, Db};
 use crate::error::AppResult;
 use crate::jira::dto::Changelog;
+use crate::sync::map::UserRow;
 use crate::sync::source::Source;
+use crate::sync::users::upsert_user;
 use crate::time::utc_text;
 
 /// Fetches the issue's changelog and replaces the cached history, unless it was fetched within `FRESH_FOR` of
@@ -94,12 +96,8 @@ fn store(conn: &Connection, id: &str, entries: &[Changelog], source: &str) -> Ap
         let Some(changed_at) = utc_text(&entry.created) else {
             continue;
         };
-        if let Some(author) = entry.author.as_ref().filter(|a| !a.display_name.is_empty()) {
-            conn.execute(
-                "INSERT INTO cache.user (account_id, name, avatar_url) VALUES (?1, ?2, ?3)
-                 ON CONFLICT (account_id) DO UPDATE SET name = excluded.name, avatar_url = excluded.avatar_url",
-                params![author.account_id, author.display_name, author.avatar_url()],
-            )?;
+        if let Some(author) = entry.author.as_ref().and_then(UserRow::of) {
+            upsert_user(conn, &author)?;
         }
         incoming.extend(entry.items.iter().map(|item| HistoryRow {
             field: item.field.clone(),

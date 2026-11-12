@@ -47,8 +47,12 @@ type, the Issue view refetched it).
    cursors move; the next run repeats it.
 
 **Delta** (`delta.rs`): `(<scope>) AND updated >= "<cursor − 2 min>" ORDER BY updated ASC`, the date literal in
-the Jira user's time zone from `/myself` (Jira reads JQL dates there, at minute precision). Pages are stored
-like the full sync's (changes recorded); the cursor (`last_delta_at`) moves to the newest `updated` only after
+the Jira user's time zone from `/myself` (Jira reads JQL dates there, at minute precision), with
+`expand=renderedFields,changelog`: the embedded changelog names who made a change ([Who made a
+change](#who-made-a-change)). When a page fails with a server error, an unreadable answer or a `400` naming the
+expand, that page is asked again once without `changelog` and the rest of the delta goes on without it
+(`IssuePages::without_expand`, logged at info by error kind). Pages are stored like the full sync's (changes
+recorded); the cursor (`last_delta_at`) moves to the newest `updated` only after
 the whole job succeeded, so a failed page is fetched again next time. Without a cursor the delta runs a full
 sync. Afterwards the comments of the 20 most recently updated issues are fetched when they may be behind.
 Progress counts changed issues (`fetched`).
@@ -81,17 +85,22 @@ hourly, a delta every `focused_minutes` while the main window has focus (5 by de
 a sync is failing, only a delta runs, at the failure's `retryAt` or after a wake. ⌘R (`sync:refresh`, also the
 status bar's sync state and `taskboard sync`) queues a delta, ⌘⇧R (`sync:full`, `taskboard sync --full`) a full sync.
 
-## Own changes
+## Who made a change
 
-The owner's own changes aren't news (`sync::own`, `sync::news`), once Test Connection knows the account:
+Each recorded change keeps its author (`issue_change.author_id`, [notifications.md](notifications.md#authors));
+the owner's own changes aren't news (`sync::news`, `sync::authors`, `sync::attribute`), once Test Connection knows
+the account:
 
-- A page records no `created` for an issue the owner reported, and no `comment_added` or `mention` for new
-  comments that are all the owner's; the issue is then seen up to its `updated` (`changes::catch_up`) unless other
-  changes are unseen.
-- After a delta or full sync, the 50 most recently updated issues with a recorded status, assignee, priority, due
-  date or `updated` change get Jira's changelog (`Source::changelog`), kept as their history. A field change whose
-  last changelog entry is the owner's goes; an `updated` row goes when every entry since `seen_at` is the owner's.
-  A failure keeps the changes as recorded.
+- A page names the author where it can: the reporter for `created`, the comments' author for `comment_added`
+  and `mention`, and for field rows the delta's embedded changelog when it is complete (`authors::author_of`). A
+  change by the connected account isn't recorded; the issue is then seen up to its `updated`
+  (`changes::catch_up`) unless other changes are unseen.
+- After a delta or full sync, the 50 most recently updated issues with a status, assignee, priority, due date,
+  people or `updated` row still without an author get Jira's changelog (`Source::changelog`), kept as their
+  history (`attribute::attribute_changes`). A field row takes the author of the field's last changelog entry up
+  to the change; an `updated` row the one author of every entry since `seen_at`. The owner's rows go; the others
+  are settled again in the same transaction (an automation's may stop counting). A failure keeps the changes as
+  recorded, their authors unknown.
 
 A project's first sync (`news::Pass`): with no issue read yet (a new Space) every issue counts as seen. Once the
 owner read some (a fresh cache: a reset, every launch), an issue updated after `issue_seen.seen_at`
@@ -105,7 +114,7 @@ and the people it names (`users.rs`). Timestamps are stored as UTC with millisec
 (`time::utc`, `time::format_utc`). The sprint is the active one, else the one with the highest id;
 an epic is hierarchy level 1 or type "Epic".
 
-`store.rs` writes them, skipping a page older than the cached issue (`updated`) and keeping the value of a
+`page.rs` writes them (people through `users::upsert_user`), skipping a page older than the cached issue (`updated`) and keeping the value of a
 write on its way (`writes::overlay`, [writes.md](writes.md)): the issue row, its `issue_body` and its custom fields' values (`raw.rs`,
 [ADR 0041](adr/0041-an-issues-big-texts-live-beside-its-row.md)). An issue whose kept JSON and custom values equal
 the cached ones is skipped, so a sync without changes announces nothing; the kept JSON leaves out Jira's
@@ -115,7 +124,7 @@ new `updated`, and a `mention` row for each account an ADF `mention` node of a c
 names (`sync::mentions`, `adf::mentions`), and a `people` row for each people field that newly names the
 connected account in a newer version (`diff::people_added`, [notifications.md](notifications.md#people-fields)).
 The sync then settles the page's new rows in the same transaction (`notify::rules::settle`): a change Settings →
-Notifications doesn't count in app is stored `quiet`. A project's first sync compares with nothing ([Own changes](#own-changes)). When the search returned
+Notifications doesn't count in app is stored `quiet`. A project's first sync compares with nothing ([Who made a change](#who-made-a-change)). When the search returned
 all of an issue's comments, they replace the cached ones.
 
 ## Events

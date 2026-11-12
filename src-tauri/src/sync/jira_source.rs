@@ -32,6 +32,10 @@ impl IssuePages for JiraPages<'_> {
     ) -> Pin<Box<dyn Future<Output = Option<AppResult<SearchPage>>> + Send + '_>> {
         Box::pin(self.0.next_page())
     }
+
+    fn without_expand(&mut self, part: &str) -> bool {
+        self.0.without_expand(part)
+    }
 }
 
 impl Source for JiraSource {

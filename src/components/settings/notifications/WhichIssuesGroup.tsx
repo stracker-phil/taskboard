@@ -56,7 +56,7 @@ export function WhichIssuesGroup({ notifications }: { notifications: Notificatio
   const scopeName = useId();
   const typesId = useId();
   const { data: types = [] } = useNotificationIssueTypes();
-  const { scope, involvement, excludedTypes } = notifications;
+  const { scope, involvement, excludedTypes, ignoreAutomations } = notifications;
   // The involvement rows stay in place and only dim, so picking a scope moves nothing.
   const allIssues = scope === "allIssues";
 
@@ -85,6 +85,13 @@ export function WhichIssuesGroup({ notifications }: { notifications: Notificatio
           onChange={(kept) => save({ excludedTypes: types.filter((type) => !kept.includes(type)) })}
         />
       </Row>
+      <TickRow
+        type="checkbox"
+        label="Ignore changes made by automations"
+        description="Changes and comments by apps (Xray, CI, Jira Automation) stay in the activity but never make an issue unread or notify."
+        checked={ignoreAutomations}
+        onChange={(on) => save({ ignoreAutomations: on })}
+      />
     </Group>
   );
 }

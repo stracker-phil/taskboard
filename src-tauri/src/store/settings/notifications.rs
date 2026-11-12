@@ -99,6 +99,8 @@ pub struct Notifications {
     pub in_app: Vec<NotifyEvent>,
     /// The events a macOS notification announces after a change sync.
     pub mac: Vec<NotifyEvent>,
+    /// Changes by app accounts (Xray, CI, Jira Automation) count only when they are about the owner.
+    pub ignore_automations: bool,
 }
 
 impl Default for Notifications {
@@ -113,6 +115,7 @@ impl Default for Notifications {
                 NotifyEvent::AssignsMe,
                 NotifyEvent::AddsMeToPeopleField,
             ],
+            ignore_automations: true,
         }
     }
 }
@@ -217,6 +220,7 @@ mod tests {
         assert!(defaults.excluded_types.is_empty());
         assert_eq!(defaults.in_app, NotifyEvent::ALL.to_vec());
         assert_eq!(defaults.mac, default_mac());
+        assert!(defaults.ignore_automations);
     }
 
     #[test]
@@ -363,6 +367,29 @@ mod tests {
     }
 
     #[test]
+    fn a_notifications_object_without_ignore_automations_reads_it_on() {
+        let settings: Settings =
+            serde_json::from_str(r#"{"notifications":{"scope":"involved","mac":[]}}"#).unwrap();
+
+        assert!(settings.notifications.ignore_automations);
+    }
+
+    #[test]
+    fn ignore_automations_round_trips_off_and_on() {
+        for ignore_automations in [false, true] {
+            let notifications = Notifications {
+                ignore_automations,
+                ..Notifications::default()
+            };
+
+            let json = serde_json::to_string(&notifications).unwrap();
+            let back: Notifications = serde_json::from_str(&json).unwrap();
+
+            assert_eq!(back, notifications, "{ignore_automations}");
+        }
+    }
+
+    #[test]
     fn notifications_serialize_with_camel_case_names() {
         assert_eq!(
             serde_json::to_value(Notifications::default()).unwrap(),
@@ -375,6 +402,7 @@ mod tests {
                     "movedToDone", "reopened", "otherChange", "dueOrPriority", "created"
                 ],
                 "mac": ["mentionsMe", "assignsMe", "addsMeToPeopleField"],
+                "ignoreAutomations": true,
             })
         );
     }

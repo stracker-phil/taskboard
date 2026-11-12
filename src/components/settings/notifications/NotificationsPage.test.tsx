@@ -76,6 +76,42 @@ describe("NotificationsPage", () => {
       expect(box("Created by me")).not.toBeChecked();
     });
 
+    describe("ignore automations", () => {
+      const AUTOMATIONS = "Ignore changes made by automations";
+
+      it("shows ticked by default", async () => {
+        await renderPage();
+
+        expect(box(AUTOMATIONS)).toBeChecked();
+      });
+
+      it("shows unticked when the setting is off", async () => {
+        await renderPage(notifications({ ignoreAutomations: false }));
+
+        expect(box(AUTOMATIONS)).not.toBeChecked();
+      });
+
+      it.each(["allIssues", "involved"] as const)("is enabled under the %s scope", async (scope) => {
+        await renderPage(notifications({ scope }));
+
+        expect(box(AUTOMATIONS)).toBeEnabled();
+      });
+
+      it("saves false with the rest unchanged when unticked, and true when ticked again", async () => {
+        await renderPage();
+
+        await userEvent.click(box(AUTOMATIONS));
+
+        expect(mocked.notificationsSave).toHaveBeenLastCalledWith(notifications({ ignoreAutomations: false }));
+        await waitFor(() => expect(box(AUTOMATIONS)).not.toBeChecked());
+
+        await userEvent.click(box(AUTOMATIONS));
+
+        expect(mocked.notificationsSave).toHaveBeenLastCalledWith(notifications({ ignoreAutomations: true }));
+        await waitFor(() => expect(box(AUTOMATIONS)).toBeChecked());
+      });
+    });
+
     describe("people-field hint", () => {
       it("lists the names of the opted-in people fields", async () => {
         mocked.notificationPeopleFields.mockResolvedValue([

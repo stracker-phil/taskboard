@@ -1553,7 +1553,7 @@ mod the_delta_sync {
                 &*emit,
                 Some("2026-10-27T09:00:00.000Z".into())
             ),
-            after_the_next_search_request(&rig, || rig.fake.fail_next(1, 500, None))
+            after_the_next_search_request(&rig, || rig.fake.fail_next(2, 500, None))
         );
 
         match state {
@@ -1579,6 +1579,117 @@ mod the_delta_sync {
         assert!(idle_after_a_sync(&retry), "{retry:?}");
         assert_eq!(priority_of(&rig.ctx.db, "NW-1049").await, "Low");
         assert_eq!(rig.cursor().await.as_deref(), Some(LATER_UTC));
+    }
+
+    /// The `expand` of every search the fake received since `skip` requests.
+    fn expands_since(rig: &Rig, skip: usize) -> Vec<Value> {
+        rig.fake
+            .requests()
+            .into_iter()
+            .skip(skip)
+            .filter(|request| request.path == SEARCH_PATH)
+            .map(|request| request.body["expand"].clone())
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn asks_for_the_changelog_with_the_rendered_fields_where_the_full_sync_asks_for_the_latter_only()
+     {
+        let rig = Rig::connected().await;
+        rig.full_sync().await;
+        let full = expands_since(&rig, 0);
+        let asked = rig.requests();
+
+        rig.job(Job::Delta, None).await;
+
+        assert!(!full.is_empty());
+        for expand in full {
+            assert_eq!(expand, json!("renderedFields"));
+        }
+        assert_eq!(
+            expands_since(&rig, asked),
+            [json!("renderedFields,changelog")]
+        );
+    }
+
+    #[tokio::test]
+    async fn a_page_refused_because_of_the_changelog_is_asked_again_without_it_and_the_sync_goes_on()
+     {
+        for (what, status, answer) in [
+            (
+                "a server error",
+                500,
+                json!({ "errorMessages": ["Internal server error"] }),
+            ),
+            (
+                "a refusal naming the expand",
+                400,
+                json!({ "errorMessages": ["The value 'changelog' is not allowed for expand"] }),
+            ),
+        ] {
+            let rig = Rig::connected().await;
+            rig.full_sync().await;
+            let asked = rig.requests();
+            rig.fake.set_now(later());
+            rig.fake.edit_issue("NW-1049", low_priority);
+            rig.fake.set_latency(Duration::from_millis(30));
+            let emit = rig.emit();
+
+            let (state, ()) = tokio::join!(
+                run_job(&rig.ctx, Job::Delta, &*emit, None),
+                after_the_next_search_request(&rig, || rig
+                    .fake
+                    .answer_next(status, answer.clone()))
+            );
+
+            assert!(idle_after_a_sync(&state), "{what}: {state:?}");
+            assert_eq!(
+                expands_since(&rig, asked),
+                [json!("renderedFields,changelog"), json!("renderedFields")],
+                "{what}"
+            );
+            assert_eq!(priority_of(&rig.ctx.db, "NW-1049").await, "Low", "{what}");
+            assert_eq!(rig.cursor().await.as_deref(), Some(LATER_UTC), "{what}");
+        }
+    }
+
+    #[tokio::test]
+    async fn a_jql_error_that_does_not_name_the_changelog_still_fails_the_job() {
+        let rig = Rig::connected().await;
+        rig.full_sync().await;
+        let cursor = rig.cursor().await;
+        let asked = rig.requests();
+        rig.fake.set_now(later());
+        rig.fake.edit_issue("NW-1049", low_priority);
+        rig.fake.set_latency(Duration::from_millis(30));
+        let emit = rig.emit();
+
+        let (state, ()) = tokio::join!(
+            run_job(&rig.ctx, Job::Delta, &*emit, None),
+            after_the_next_search_request(&rig, || {
+                rig.fake.answer_next(
+                400,
+                json!({ "errorMessages": ["Error in the JQL Query: the field 'projct' does not exist"] })
+            )
+            })
+        );
+
+        assert!(
+            matches!(
+                state,
+                SyncState::Error {
+                    kind: ErrorKind::InvalidJql,
+                    ..
+                }
+            ),
+            "{state:?}"
+        );
+        assert_eq!(
+            expands_since(&rig, asked),
+            [json!("renderedFields,changelog")]
+        );
+        assert_eq!(rig.cursor().await, cursor);
+        assert_eq!(priority_of(&rig.ctx.db, "NW-1049").await, "Highest");
     }
 
     #[tokio::test]

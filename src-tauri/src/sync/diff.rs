@@ -24,6 +24,8 @@ pub struct ChangeRow {
     pub new_value: Option<String>,
     /// The new version's `updated`.
     pub changed_at: String,
+    /// The account that made it, when known (`authors`).
+    pub author: Option<String>,
 }
 
 impl ChangeRow {
@@ -44,6 +46,7 @@ pub fn diff(old: Option<&Snapshot>, new: &IssueRow) -> Vec<ChangeRow> {
         old_value,
         new_value,
         changed_at: new.updated_at.clone(),
+        author: None,
     };
     let Some(old) = old else {
         return vec![change("created", None, Some(new.key.clone()))];
@@ -103,6 +106,7 @@ pub fn people_added(old: &Snapshot, new: &IssueRow, me: &str, fields: &[String])
             old_value: Some(field),
             new_value: Some(me.to_string()),
             changed_at: new.updated_at.clone(),
+            author: None,
         })
         .collect()
 }
@@ -164,6 +168,7 @@ mod tests {
             old_value: old.map(String::from),
             new_value: new.map(String::from),
             changed_at: UPDATED.into(),
+            author: None,
         }
     }
 
@@ -375,7 +380,11 @@ mod tests {
     #[test]
     fn being_named_already_or_removed_makes_no_row() {
         let cases = [
-            ("already named", naming_me_in(&[DEVELOPER]), naming_me_in(&[DEVELOPER])),
+            (
+                "already named",
+                naming_me_in(&[DEVELOPER]),
+                naming_me_in(&[DEVELOPER]),
+            ),
             ("removed", naming_me_in(&[DEVELOPER]), None),
             ("never named", None, None),
         ];
@@ -412,12 +421,15 @@ mod tests {
 
     #[test]
     fn fields_outside_the_list_and_other_accounts_make_no_row() {
-        let someone_else = Some(
-            serde_json::json!({(DEVELOPER): {"accountId": "account-marta"}}).to_string(),
-        );
-        let other_field = Some(serde_json::json!({"customfield_10099": {"accountId": ME}}).to_string());
+        let someone_else =
+            Some(serde_json::json!({(DEVELOPER): {"accountId": "account-marta"}}).to_string());
+        let other_field =
+            Some(serde_json::json!({"customfield_10099": {"accountId": ME}}).to_string());
 
-        for (label, custom) in [("someone else", someone_else), ("unlisted field", other_field)] {
+        for (label, custom) in [
+            ("someone else", someone_else),
+            ("unlisted field", other_field),
+        ] {
             assert_eq!(
                 people_added(&older(None), &newer(custom), ME, &people_fields()),
                 vec![],

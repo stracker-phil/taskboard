@@ -60,6 +60,7 @@ impl FakeJira {
                 data,
                 now,
                 hidden: HashSet::new(),
+                changelog_gone: HashSet::new(),
                 screens: HashSet::new(),
                 denied: HashSet::new(),
                 page_size: None,
@@ -349,6 +350,30 @@ impl FakeJira {
         stamp_issue(issue, now);
     }
 
+    /// Like `edit_issue`, and logs the change in the issue's changelog as made by `author` (a user object)
+    /// with `items` (changelog items: `field`, `fieldId`, `from`, `to`, …).
+    pub fn edit_issue_as(
+        &self,
+        id_or_key: &str,
+        author: Value,
+        items: Vec<Value>,
+        edit: impl FnOnce(&mut Value),
+    ) {
+        let mut content = self.content();
+        let now = content.now;
+        let next_id = content.data.changelogs.values().flatten().count() + 990_000;
+        let issue = issue_mut(&mut content.data, id_or_key);
+        edit(&mut issue["fields"]);
+        stamp_issue(issue, now);
+        let id = issue["id"].as_str().unwrap_or_default().to_string();
+        content.data.changelogs.entry(id).or_default().push(json!({
+            "id": next_id.to_string(),
+            "author": author,
+            "created": jira_time(now),
+            "items": items,
+        }));
+    }
+
     /// Moves an issue to another project: same id, a new key there.
     pub fn move_issue(&self, id_or_key: &str, project_key: &str) {
         let mut content = self.content();
@@ -371,6 +396,16 @@ impl FakeJira {
         let mut content = self.content();
         let id = issue_mut(&mut content.data, id_or_key)["id"].clone();
         content.data.issues.retain(|issue| issue["id"] != id);
+    }
+
+    /// The issue was deleted just after a search listed it: searches still return it, its changelog answers 404.
+    pub fn delete_issue_after_search(&self, id_or_key: &str) {
+        let mut content = self.content();
+        let id = issue_mut(&mut content.data, id_or_key)["id"]
+            .as_str()
+            .unwrap_or_default()
+            .to_string();
+        content.changelog_gone.insert(id);
     }
 
     /// The user loses access: the issue still exists but no endpoint shows it.

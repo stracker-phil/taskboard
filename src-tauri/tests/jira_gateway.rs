@@ -209,8 +209,8 @@ mod refused_requests {
                 request("project = NW", &["*all"], None),
             ),
             (
-                "a search expanding the changelog",
-                request("project = NW", &["summary"], Some("changelog")),
+                "a search expanding the names",
+                request("project = NW", &["summary"], Some("names")),
             ),
             (
                 "a search of an empty query",

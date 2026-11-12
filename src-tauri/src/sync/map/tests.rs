@@ -61,6 +61,7 @@ fn user_row(account_id: &str, name: &str) -> UserRow {
         account_id: account_id.into(),
         name: name.into(),
         avatar_url: None,
+        account_type: Some("atlassian".into()),
     }
 }
 
@@ -514,6 +515,121 @@ fn people_are_listed_once_in_the_order_assignee_reporter_commenters() {
             user_row(MARTA, "Marta Klein"),
         ]
     );
+}
+
+const RUNNER: &str = "557058:5a1e0c3f-8d2b-4f61-9c7e-1b2a3c4d5e90";
+
+fn changelog_by(authors: &[Value]) -> Value {
+    let histories: Vec<Value> = authors
+        .iter()
+        .enumerate()
+        .map(|(index, author)| {
+            let mut entry = json!({
+                "id": format!("{}", 80000 + index),
+                "created": "2026-10-23T09:30:00.000+0200",
+                "items": [{"field": "status", "fieldId": "status"}]
+            });
+            if !author.is_null() {
+                entry["author"] = author.clone();
+            }
+            entry
+        })
+        .collect();
+    json!({ "startAt": 0, "maxResults": 100, "total": histories.len(), "histories": histories })
+}
+
+fn runner() -> Value {
+    json!({
+        "accountId": RUNNER,
+        "displayName": "Test Runner",
+        "accountType": "app",
+        "avatarUrls": {}
+    })
+}
+
+#[test]
+fn a_user_row_keeps_the_account_type() {
+    for (account_type, expected) in [
+        (Some("app"), Some("app")),
+        (Some("atlassian"), Some("atlassian")),
+        (None, None),
+    ] {
+        let mut user = json!({"accountId": "account-1", "displayName": "Sam Becker"});
+        if let Some(account_type) = account_type {
+            user["accountType"] = json!(account_type);
+        }
+        let user: crate::jira::dto::User = serde_json::from_value(user).unwrap();
+
+        assert_eq!(
+            UserRow::of(&user).unwrap().account_type.as_deref(),
+            expected,
+            "{account_type:?}"
+        );
+    }
+}
+
+#[test]
+fn a_user_row_needs_a_display_name() {
+    let user: crate::jira::dto::User =
+        serde_json::from_value(json!({"accountId": "account-1", "accountType": "app"})).unwrap();
+
+    assert_eq!(UserRow::of(&user), None);
+}
+
+#[test]
+fn the_people_of_an_issue_keep_their_account_types() {
+    let mapped = mapped_edit("NW-1042", |issue| {
+        issue["fields"]["assignee"]["accountType"] = json!("app");
+        issue["fields"]["reporter"]["accountType"] = Value::Null;
+    });
+
+    let types: Vec<(&str, Option<&str>)> = mapped
+        .users
+        .iter()
+        .map(|u| (u.account_id.as_str(), u.account_type.as_deref()))
+        .collect();
+    assert_eq!(
+        types,
+        [
+            (ALEX, Some("app")),
+            (JONAS, None),
+            (MARTA, Some("atlassian")),
+        ]
+    );
+}
+
+#[test]
+fn changelog_authors_are_people_of_the_issue_with_their_account_type() {
+    let mapped = mapped_edit("NW-1042", |issue| {
+        issue["changelog"] = changelog_by(&[runner()]);
+    });
+
+    let last = mapped.users.last().unwrap();
+    assert_eq!(mapped.users.len(), 4);
+    assert_eq!(last.account_id, RUNNER);
+    assert_eq!(last.name, "Test Runner");
+    assert_eq!(last.account_type.as_deref(), Some("app"));
+}
+
+#[test]
+fn a_changelog_author_already_named_by_the_issue_is_listed_once() {
+    let author = issue_json("NW-1042")["fields"]["assignee"].clone();
+    let mapped = mapped_edit("NW-1042", |issue| {
+        issue["changelog"] = changelog_by(&[runner(), author.clone(), runner()]);
+    });
+
+    let ids: Vec<&str> = mapped.users.iter().map(|u| u.account_id.as_str()).collect();
+    assert_eq!(ids, [ALEX, JONAS, MARTA, RUNNER]);
+}
+
+#[test]
+fn changelog_entries_without_an_author_or_a_name_add_no_people() {
+    let mapped = mapped_edit("NW-1042", |issue| {
+        issue["changelog"] = changelog_by(&[Value::Null, json!({"accountId": "deleted-user-1"})]);
+    });
+
+    let ids: Vec<&str> = mapped.users.iter().map(|u| u.account_id.as_str()).collect();
+    assert_eq!(ids, [ALEX, JONAS, MARTA]);
 }
 
 #[test]

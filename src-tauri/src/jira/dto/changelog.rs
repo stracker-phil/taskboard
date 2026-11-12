@@ -1,4 +1,5 @@
-//! An issue's changelog: who changed which field when, as `GET /issue/{id}/changelog` pages it.
+//! An issue's changelog: who changed which field when, as `GET /issue/{id}/changelog` pages it and a search
+//! with `expand=changelog` embeds it.
 
 use serde::Deserialize;
 
@@ -13,6 +14,27 @@ pub(crate) struct ChangelogPage {
     pub total: u64,
     #[serde(default)]
     pub is_last: bool,
+}
+
+/// The changelog a search embeds with `expand=changelog`: possibly only part of it.
+#[derive(Deserialize, Debug, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct EmbeddedChangelog {
+    #[serde(default)]
+    pub start_at: u64,
+    #[serde(default)]
+    pub max_results: u64,
+    #[serde(default)]
+    pub total: u64,
+    #[serde(default)]
+    pub histories: Vec<Changelog>,
+}
+
+impl EmbeddedChangelog {
+    /// Holds every entry, so it can tell who made each change.
+    pub fn is_complete(&self) -> bool {
+        self.start_at + self.histories.len() as u64 >= self.total
+    }
 }
 
 /// One edit: every field it changed, at one time, by one person.
@@ -108,6 +130,7 @@ mod tests {
                         display_name: "Alex Morgan".into(),
                         active: true,
                         avatar_urls: Default::default(),
+                        account_type: None,
                     }),
                     created: "2026-10-23T09:30:00.000+0200".into(),
                     items: vec![ChangeItem {
@@ -136,6 +159,53 @@ mod tests {
                 },
             ]
         );
+    }
+
+    fn embedded(start_at: u64, total: u64, histories: usize) -> EmbeddedChangelog {
+        let histories: Vec<_> = (0..histories)
+            .map(|n| {
+                json!({
+                    "id": format!("{}", 80000 + n),
+                    "created": "2026-10-23T09:30:00.000+0200",
+                    "items": []
+                })
+            })
+            .collect();
+        serde_json::from_value(json!({
+            "startAt": start_at,
+            "maxResults": 100,
+            "total": total,
+            "histories": histories
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn an_embedded_changelog_is_complete_when_it_holds_every_entry() {
+        for (start_at, total, held, expected) in [
+            (0, 3, 3, true),
+            (0, 0, 0, true),
+            (0, 5, 3, false),
+            (0, 100, 99, false),
+            (0, 3, 4, true),
+            (2, 5, 3, true),
+            (2, 5, 2, false),
+            (2, 5, 0, false),
+        ] {
+            assert_eq!(
+                embedded(start_at, total, held).is_complete(),
+                expected,
+                "startAt {start_at}, total {total}, held {held}"
+            );
+        }
+    }
+
+    #[test]
+    fn an_embedded_changelog_without_its_counts_is_complete_and_empty() {
+        let changelog: EmbeddedChangelog = serde_json::from_value(json!({})).unwrap();
+
+        assert!(changelog.histories.is_empty());
+        assert!(changelog.is_complete());
     }
 
     #[test]

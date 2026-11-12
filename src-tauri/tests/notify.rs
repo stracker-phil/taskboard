@@ -368,7 +368,8 @@ mod the_notices {
     }
 
     #[tokio::test]
-    async fn mentions_of_others_and_changes_of_others_issues_are_not_announced_in_the_involved_scope() {
+    async fn mentions_of_others_and_changes_of_others_issues_are_not_announced_in_the_involved_scope()
+     {
         let rig = Rig::synced().await;
         let before = rig.newest_change().await;
         rig.fake.add_mention(
@@ -410,9 +411,9 @@ mod the_notices {
     async fn a_created_issue_is_announced_only_when_issue_created_is_ticked() {
         let rig = Rig::synced().await;
         let before = rig.newest_change().await;
-        let added = rig
-            .fake
-            .add_issue("NW-1055", "NW", "Order confirmation email: shipping notice");
+        let added =
+            rig.fake
+                .add_issue("NW-1055", "NW", "Order confirmation email: shipping notice");
         rig.delta().await;
         let ticked = notifications(|n| n.mac = vec![NotifyEvent::Created]);
 
@@ -691,7 +692,11 @@ mod the_mac_column {
                 filter(n);
             });
             let expected: Vec<Notice> = expected.into_iter().cloned().collect();
-            assert_eq!(rig.notices_after(before, &settings).await, expected, "{name}");
+            assert_eq!(
+                rig.notices_after(before, &settings).await,
+                expected,
+                "{name}"
+            );
         }
     }
 

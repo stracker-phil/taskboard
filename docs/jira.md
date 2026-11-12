@@ -58,7 +58,7 @@ header for every request from it and sends `Authorization: Basic base64(email:to
    authenticated. Path segments are pushed one by one, so a value can't add a segment, a query or a fragment.
 2. `params.rs` validates every value first: `ProjectKey` (`[A-Z][A-Z0-9_]*`), `IssueRef` (digits, or a key),
    `IssueRefs` (1 to `BULK_FETCH_MAX`), `Jql` (non-empty, at most 10,000 characters, body only), `FieldIds`
-   (explicit ids, never `*all`), `Expand` (`renderedFields`), `PageToken`. A refused value fails as
+   (explicit ids, never `*all`), `Expand` (`renderedFields`, `changelog`, comma-separated), `PageToken`. A refused value fails as
    `invalid_input` and nothing is sent.
 3. `guard.rs` `check` compares the planned request with `RULES` (method, path under the REST base, allowed
    query keys, read or write) and the unauthenticated `GET /_edge/tenant_info`. Anything else, a fragment,
@@ -100,7 +100,7 @@ One method on `JiraClient` each (`jira/api.rs`), one `Endpoint` each; the answer
 | `statuses` | `GET status` | `Status` with its category key |
 | `versions` | `GET project/{key}/versions` | `Version` |
 | `my_permissions` | `GET mypermissions?projectKey=&permissions=` (the changes' project permissions) | `MyPermissions` |
-| `search_jql` | `POST search/jql`, `maxResults=100`, explicit fields | `SearchPages`, a cursor of `SearchPage` |
+| `search_jql` | `POST search/jql`, `maxResults=100`, explicit fields; `expand=renderedFields` (full sync), `renderedFields,changelog` (change sync) | `SearchPages`, a cursor of `SearchPage`; with `changelog` each `Issue` embeds an `EmbeddedChangelog` (`startAt`, `maxResults`, `total`, `histories`), possibly partial. `SearchPages::without_expand` asks the failed page again without a part, the change sync's fallback when a page fails on the changelog ([sync.md](sync.md#jobs), [ADR 0069](adr/0069-changes-by-automations-can-be-ignored.md)) |
 | `bulk_fetch` | `POST issue/bulkfetch`, up to `BULK_FETCH_MAX` ids | `BulkFetch`: issues and the ids Jira refused |
 | `approximate_count` | `POST search/approximate-count` | a count |
 | `comments` | `GET issue/{key}/comment`, every page, `expand=renderedBody` | `Comment` with ADF and HTML |
@@ -233,8 +233,8 @@ but answers `401` without one.
   a search and is an error in `jql/parse`.
 - Knobs: `set_page_size`, `cap_max_results`, `fail_next(count, status, retry_after)`, `answer_next`,
   `set_latency`, `go_offline` / `go_online` (the port refuses connections), `advance` (the clock), and data
-  changes: `edit_issue`, `move_issue` (same id, new key), `delete_issue`, `revoke_access`, `set_remote_links`, `set_changelog`. It serves the demo attachments' made-up bytes (`demo/attachment_files.rs`: a
-  240×120 PNG of a small mockup, a one-page PDF, a zip with one note) at `attachment/content/{id}`, and a 303 without `redirect=false`. `set_page_size` pages the changelog too.
+  changes: `edit_issue`, `edit_issue_as` (also logs a changelog entry by the given author), `move_issue` (same id, new key), `delete_issue`, `revoke_access`, `set_remote_links`, `set_changelog`. It serves the demo attachments' made-up bytes (`demo/attachment_files.rs`: a
+  240×120 PNG of a small mockup, a one-page PDF, a zip with one note) at `attachment/content/{id}`, and a 303 without `redirect=false`. `set_page_size` pages the changelog too. A search with `expand=changelog` embeds each issue's first 100 changelog entries with `total`.
 - `requests()` and `paths()` return what it was asked, with the `Authorization` header and the JSON body.
 
 The demo site (`test_support/demo/`) is made up and matches the mockup (`demo/web_links.rs` gives a few issues

@@ -20,6 +20,7 @@ use crate::db::Db;
 use crate::error::AppResult;
 use crate::lock::MutexExt;
 use crate::store::settings::{Channel, Notifications, Settings};
+use crate::sync::attribute::newest_change;
 use crate::sync::{Job, SyncState};
 
 /// More issues than this in one sync make a single summary notification.
@@ -90,14 +91,6 @@ impl Notifier {
         self.0.store(newest, Ordering::SeqCst);
         Ok(notices)
     }
-}
-
-fn newest_change(conn: &Connection) -> AppResult<i64> {
-    Ok(conn.query_row(
-        "SELECT COALESCE(MAX(rowid), 0) FROM cache.issue_change",
-        [],
-        |row| row.get(0),
-    )?)
 }
 
 struct Issue {

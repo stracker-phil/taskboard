@@ -2,8 +2,8 @@
 
 use chrono::Utc;
 
+use super::attribute::{attribute_changes, newest_change};
 use super::map::FieldIds;
-use super::own::{drop_own_changes, newest_change};
 use super::source::Source;
 use super::store::{
     Pass, fetched_fields, has_project_sync, page_pass, record_project_sync, record_scope_sync,
@@ -88,7 +88,14 @@ pub async fn full_sync(
     ctx.db
         .write(move |tx, _| record_scope_sync(tx, &scope, &now, newest.as_deref()))
         .await?;
-    drop_own_changes(&ctx.db, run.source.as_ref(), run.me.as_deref(), after).await;
+    attribute_changes(
+        &ctx.db,
+        run.source.as_ref(),
+        &run.notifications,
+        run.me.as_deref(),
+        after,
+    )
+    .await;
     Ok(())
 }
 

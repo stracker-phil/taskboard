@@ -14,8 +14,9 @@ announces.
 | `excludedTypes` | issue types (by name) whose changes count nowhere; a type added later counts | none |
 | `inApp` | the events that make an issue unread | every event |
 | `mac` | the events a macOS notification announces | `mentionsMe`, `assignsMe`, `addsMeToPeopleField` |
+| `ignoreAutomations` | changes by app accounts (Xray, CI, Jira Automation) count only when they are about the owner ([ADR 0069](adr/0069-changes-by-automations-can-be-ignored.md)) | on (an old file without it reads on) |
 
-The scope, involvement and types are shared by both channels. Saved only through `notifications_save`, which
+The scope, involvement, types and the automation switch are shared by both channels. Saved only through `notifications_save`, which
 tidies the types like `sync.excludedTypes` and keeps the events in the page's order (`Notifications::tidied`).
 `notification_issue_types` offers the cached issues' types plus the excluded ones; `notification_people_fields`
 lists the people fields (`PeopleField { id, name }`).
@@ -41,10 +42,33 @@ Each `cache.issue_change` row is one `NotifyEvent`, or none:
 | `created` | `created` |
 | `gone` | none |
 
-`counts(settings, channel, event, subject)`: the event must be ticked for the channel. The four "about you" events
-(`NotifyEvent::is_about_me`) then always count; the others skip an excluded type and, with `involved`, an issue
-the owner isn't involved in (`Subject`: assigned to or reported by the connected account, or named in a people
-field). A change that has no event never counts.
+`counts(settings, channel, event, subject, by_automation)`: the event must be ticked for the channel. The four
+"about you" events (`NotifyEvent::is_about_me`) then always count, also when an app made them; the others skip,
+with `ignoreAutomations`, a change an app account made (`Judged.by_automation`: the row's `author_id` is a
+`cache.user` with `account_type` `app`; an unknown author or type is not an automation), an excluded type and,
+with `involved`, an issue the owner isn't involved in (`Subject`: assigned to or reported by the connected
+account, or named in a people field). A change that has no event never counts.
+
+## Authors
+
+Each `issue_change` row keeps who made it in `author_id` (NULL: unknown, which counts):
+
+| Row | Author |
+|---|---|
+| `created` | the reporter |
+| `comment_added` | the one account that wrote every new comment the search brought, when they cover all that were added; else unknown |
+| `mention` | the comment's author |
+| `status`, `assignee`, `priority`, `due_date`, `people` | the newest changelog entry for that field (a people row by the field id in `old_value`) at or before the change |
+| `updated` | the one account behind every changelog entry since `seen_at`; else unknown |
+
+The field rows read the changelog the change sync's search embeds (`expand=changelog`, `sync::authors`), but only
+when it is complete (`EmbeddedChangelog::is_complete`). Otherwise, and for the full sync and reconciliation, which
+don't ask for it, the post-pass after the sync (`sync::attribute`) fetches the changelog of the 50 most recently
+updated issues with an unattributed field row, names the authors, and settles those rows again in the same
+transaction. People seen as changelog authors are stored like any other (`sync::users::upsert_user` keeps a
+known `account_type` when an answer leaves it out). Rows recorded before the launch's first change sync, rows of
+issues past the 50, and rows whose changelog entry is missing stay unknown, so they count: the accepted
+after-launch gap.
 
 ## People fields (`notify::people`)
 
@@ -60,7 +84,8 @@ change stays in the issue's activity and its Since-yesterday banner; it just nev
 issue the owner marked unread (`issue_seen.unread`) stays unread regardless.
 
 - **When changes are recorded**: the delta, full and reconciliation syncs call `settle(…, again = false)` right
-  after `store_page`, in the same transaction, deciding the rows still `NULL`. A row not settled yet counts.
+  after `store_page`, in the same transaction, deciding the rows still `NULL`. A row not settled yet counts. The
+  authors' post-pass resets `quiet` of the rows it attributes and settles them again.
 - **Again** (`resettle`, every row): on `notifications_save`, and when the connected account changes
   (`connection_save`, `connection_test`, the full sync's `/myself`). An issue whose unread state flips is
   announced as changed, so the bell and lists follow at once.
@@ -73,8 +98,8 @@ issue the owner marked unread (`issue_seen.unread`) stays unread regardless.
   rows cached at launch.
 - The owner's own changes never notify. Taskboard's writes are seen up to Jira's answer ([writes.md](writes.md)). The
   sync records no `created` for an issue the owner reported, no `comment_added` or `mention` for the owner's own
-  comments, and drops field changes Jira's changelog says the owner made ([sync.md](sync.md#own-changes)), all
-  before the notifier looks.
+  comments, and drops field changes Jira's changelog says the owner made ([sync.md](sync.md#who-made-a-change)),
+  all before the notifier looks. The post-pass runs inside the sync job, so the notifier judges the final authors.
 
 ## macOS (`notify::notices`)
 

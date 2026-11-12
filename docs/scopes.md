@@ -28,12 +28,13 @@ No scope covers profile pictures: they come from Atlassian's public avatar host 
 Reads the issues and everything around them. Every request of the sync and of an opened issue
 ([sync.md](sync.md), [jira.md](jira.md#endpoints)):
 
-- **Issues:** `POST search/jql` (full and change syncs), `POST issue/bulkfetch` (reconciliation and
-  the fetch after a change), `POST search/approximate-count` (sync progress).
+- **Issues:** `POST search/jql` (full and change syncs; the change sync's also brings each issue's recent
+  history with `expand=changelog`, no further scope), `POST issue/bulkfetch` (reconciliation and the fetch after
+  a change), `POST search/approximate-count` (sync progress).
 - **Around them:** `GET field` (custom fields, the sprint and epic color fields), `GET status`,
   `GET project/search` (Settings → Projects), `GET project/{key}/versions` (releases).
 - **An opened issue:** `GET issue/{id}/comment`, `GET issue/{id}/remotelink` (web links),
-  `GET issue/{id}/changelog` (history), `GET attachment/content/{id}` (Quick Look, inline images).
+  `GET issue/{id}/changelog` (history; also after a sync, for the authors of its changes), `GET attachment/content/{id}` (Quick Look, inline images).
 - **The status menu and drags:** `GET issue/{id}/transitions`, the moves the workflow offers;
   `GET issue/{id}/editmeta`, the priorities an issue may get.
 - **Settings → Sync:** `POST jql/parse` validates the sync scope's JQL.

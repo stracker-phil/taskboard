@@ -29,6 +29,9 @@ pub struct User {
     pub active: bool,
     #[serde(default)]
     pub avatar_urls: AvatarUrls,
+    /// `atlassian`, `app` (an automation: Xray, CI, Jira Automation) or `customer`.
+    #[serde(default)]
+    pub account_type: Option<String>,
 }
 
 impl User {
@@ -108,4 +111,34 @@ pub struct Version {
     pub archived: bool,
     #[serde(default)]
     pub release_date: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+
+    #[test]
+    fn a_user_reads_its_account_type() {
+        for account_type in ["atlassian", "app", "customer"] {
+            let user: User = serde_json::from_value(json!({
+                "accountId": "account-1",
+                "displayName": "Sam Becker",
+                "accountType": account_type
+            }))
+            .unwrap();
+
+            assert_eq!(user.account_type.as_deref(), Some(account_type));
+        }
+    }
+
+    #[test]
+    fn a_user_without_an_account_type_has_none() {
+        let user: User = serde_json::from_value(json!({ "accountId": "account-1" })).unwrap();
+
+        assert_eq!(user.account_type, None);
+        assert_eq!(user.display_name, "");
+        assert!(user.active);
+    }
 }

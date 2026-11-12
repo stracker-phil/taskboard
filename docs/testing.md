@@ -65,7 +65,8 @@ The debug app never seeds its database directly ([ADR 0022](adr/0022-the-debug-b
 it starts the fake at `http://127.0.0.1:47470` with the demo site dated to today, connects to it on its first
 launch (`alex.morgan@example.com`, a demo token in the debug Keychain service), tracks the five demo Spaces and
 runs a full sync, so every screen goes through the real sync. `taskboard dev drift` (the debug binary) changes
-the demo site the way a working day would (a comment, a status, a priority, a new and a deleted issue); the
+the demo site the way a working day would (a comment, a status, a priority, a new and a deleted issue, and a
+comment and a priority change by the app account Test Runner, which stay read while automations are ignored); the
 next sync picks it up. `taskboard dev seed-synthetic 5000` serves 5,000 generated issues instead and resyncs
 from an empty cache, for scrolling and timing checks; to go back, quit and restart the debug app. To start over, quit the debug app and delete
 `~/Library/Application Support/com.philippstracker.taskboard.debug/`.

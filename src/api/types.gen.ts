@@ -737,7 +737,11 @@ inApp: Array<NotifyEvent>,
 /**
  * The events a macOS notification announces after a change sync.
  */
-mac: Array<NotifyEvent>, };
+mac: Array<NotifyEvent>, 
+/**
+ * Changes by app accounts (Xray, CI, Jira Automation) count only when they are about the owner.
+ */
+ignoreAutomations: boolean, };
 
 /**
  * A kind of change, as the Notifications page lists it.

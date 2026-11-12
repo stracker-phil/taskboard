@@ -13,7 +13,7 @@ mod title;
 mod transition;
 mod web_link;
 
-use rusqlite::{Connection, OptionalExtension, params};
+use rusqlite::{Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
@@ -36,6 +36,7 @@ use crate::jira::capability::Capability;
 use crate::store::settings::Settings;
 use crate::sync::refetch_issue;
 use crate::sync::source::Source;
+use crate::sync::users::remember_user;
 use crate::team::Me;
 
 /// A change to one issue, as the page asks for it.
@@ -257,9 +258,5 @@ fn issue_project(conn: &Connection, id: &str) -> AppResult<String> {
 
 /// Rows name the assignee from `cache.user`, which may not know the connected account yet.
 fn remember_me(conn: &Connection, me: &Me) -> AppResult<()> {
-    conn.execute(
-        "INSERT INTO cache.user (account_id, name) VALUES (?1, ?2) ON CONFLICT (account_id) DO NOTHING",
-        params![me.account_id, me.name],
-    )?;
-    Ok(())
+    remember_user(conn, &me.account_id, &me.name)
 }

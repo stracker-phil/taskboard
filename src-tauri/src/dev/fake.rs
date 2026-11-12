@@ -145,7 +145,25 @@ pub fn drift() -> AppResult<String> {
     });
     let added = fake.add_issue("NW-1042", "NW", "Update the cookie banner copy");
     fake.delete_issue("NW-1055");
+    // An app account's changes, which stay read while automations are ignored.
+    let automation = person("Test Runner")?;
+    fake.add_comment(
+        "NW-1047",
+        automation.clone(),
+        "Automated run finished: 42 of 42 checks passed.",
+    );
+    let (highest, high) = (
+        json!({ "id": "1", "name": "Highest" }),
+        json!({ "id": "2", "name": "High" }),
+    );
+    let item = json!({
+        "field": "priority", "fieldtype": "jira", "fieldId": "priority",
+        "from": highest["id"], "fromString": highest["name"], "to": high["id"], "toString": high["name"],
+    });
+    fake.edit_issue_as("NW-1038", automation, vec![item], |fields| {
+        fields["priority"] = high
+    });
     Ok(format!(
-        "Drifted the fake Jira: comment on NW-1042, a mention of you on NW-1049, NW-1044 done, NW-1049 lowered to Low, new {added}, NW-1055 deleted"
+        "Drifted the fake Jira: comment on NW-1042, a mention of you on NW-1049, NW-1044 done, NW-1049 lowered to Low, new {added}, NW-1055 deleted; Test Runner (an app) commented on NW-1047 and lowered NW-1038 to High"
     ))
 }

@@ -8,7 +8,9 @@ use serde_json::Value;
 use crate::db::Db;
 use crate::error::AppResult;
 use crate::jira::dto::Comment;
+use crate::sync::map::UserRow;
 use crate::sync::source::Source;
+use crate::sync::users::upsert_user;
 use crate::text::html_to_text;
 use crate::time::{format_utc, utc_text};
 
@@ -108,12 +110,13 @@ pub fn store_comment(
         .unwrap_or_default();
     let mut author_changed = false;
     if let Some(author) = &comment.author {
-        author_changed = conn.execute(
-            "INSERT INTO cache.user (account_id, name, avatar_url) VALUES (?1, ?2, ?3)
-             ON CONFLICT (account_id) DO UPDATE SET name = excluded.name, avatar_url = excluded.avatar_url
-             WHERE name IS NOT excluded.name OR avatar_url IS NOT excluded.avatar_url",
-            params![author.account_id, author.display_name, author.avatar_url()],
-        )? > 0;
+        let row = UserRow {
+            account_id: author.account_id.clone(),
+            name: author.display_name.clone(),
+            avatar_url: author.avatar_url(),
+            account_type: author.account_type.clone(),
+        };
+        author_changed = upsert_user(conn, &row)?;
     }
     conn.execute(
         "INSERT INTO cache.comment (id, issue_id, author_id, body_html, body_text, created_at, updated_at, body_adf)

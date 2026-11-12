@@ -13,7 +13,7 @@ pub struct SearchRequest {
     pub jql: String,
     /// Always explicit; never `*all`.
     pub fields: Vec<String>,
-    /// Comma-separated (`renderedFields`).
+    /// Comma-separated (`renderedFields,changelog`).
     pub expand: Option<String>,
 }
 
@@ -48,6 +48,21 @@ impl<'a> SearchPages<'a> {
             _ => self.done = true,
         }
         Some(answer)
+    }
+
+    /// Leaves `part` out of `expand` from the page that failed on. Returns whether `expand` held it.
+    pub fn without_expand(&mut self, part: &str) -> bool {
+        let Some(expand) = self.request.expand.as_deref() else {
+            return false;
+        };
+        let kept: Vec<&str> = expand.split(',').filter(|p| *p != part).collect();
+        if kept.len() == expand.split(',').count() {
+            return false;
+        }
+        self.request.expand = (!kept.is_empty()).then(|| kept.join(","));
+        // The failed page's token is still the next one.
+        self.done = false;
+        true
     }
 
     fn endpoint(&self) -> AppResult<Endpoint> {

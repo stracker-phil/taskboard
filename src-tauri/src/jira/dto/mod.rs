@@ -12,7 +12,7 @@ mod transition;
 
 pub use attachment::{Attachment, AttachmentAuthor};
 pub(crate) use changelog::ChangelogPage;
-pub use changelog::{ChangeItem, Changelog};
+pub use changelog::{ChangeItem, Changelog, EmbeddedChangelog};
 pub use comment::Comment;
 pub(crate) use comment::{CommentPage, ParsedQueries};
 pub(crate) use edit_meta::EditMeta;

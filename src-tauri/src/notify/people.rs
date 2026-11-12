@@ -184,7 +184,11 @@ mod tests {
 
         assert_eq!(
             ids,
-            ["customfield_10044", "customfield_10042", "customfield_10043"]
+            [
+                "customfield_10044",
+                "customfield_10042",
+                "customfield_10043"
+            ]
         );
     }
 
@@ -193,7 +197,12 @@ mod tests {
         let dir = temp_config_dir();
         let db = Db::open(dir.path()).unwrap();
 
-        assert!(db.read(|conn| people_fields(conn)).await.unwrap().is_empty());
+        assert!(
+            db.read(|conn| people_fields(conn))
+                .await
+                .unwrap()
+                .is_empty()
+        );
     }
 
     #[test]

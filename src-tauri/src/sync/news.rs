@@ -3,6 +3,7 @@
 
 use rusqlite::{Connection, params};
 
+use super::authors::{Clues, Entry, author_of};
 use super::diff::{ChangeRow, Snapshot, diff, people_added};
 use super::map::{IssueRow, Mapped};
 use crate::changes::{catch_up, seen_at, seen_until_updated};
@@ -54,6 +55,8 @@ pub struct Arrival<'a> {
     pub previous: Option<&'a Snapshot>,
     /// The authors of its fetched comments the cache didn't hold.
     pub new_comments: &'a [Option<String>],
+    /// Its whole changelog, when the search brought all of it.
+    pub history: Option<&'a [Entry]>,
     pub pass: Pass,
     /// The connected account.
     pub me: Option<&'a str>,
@@ -68,6 +71,7 @@ pub fn record_news(conn: &Connection, changes: &mut Changes, arrival: Arrival) -
         row,
         previous,
         new_comments,
+        history,
         pass,
         me,
         people,
@@ -82,17 +86,23 @@ pub fn record_news(conn: &Connection, changes: &mut Changes, arrival: Arrival) -
             )?;
             Ok(())
         }
-        (Pass::FirstOfKnownProject, None) => record_since_seen(conn, changes, row, me),
+        (Pass::FirstOfKnownProject, None) => record_since_seen(conn, changes, row, me, history),
         (_, previous) => {
             let mut found = diff(previous, row);
             if let (Some(previous), Some(me)) = (previous, me) {
                 found.extend(people_added(previous, row, me, people));
             }
-            let theirs = not_mine(found, row, new_comments, me);
-            if theirs.dropped {
-                catch_up(conn, changes, &row.id)?;
+            let seen = seen_for(conn, &row.id, &found, history)?;
+            let clues = Clues {
+                reporter: row.reporter_id.as_deref(),
+                new_comments,
+                history,
+                seen: &seen,
+            };
+            for change in &mut found {
+                change.author = author_of(change, &clues);
             }
-            record_changes(conn, &row.id, &theirs.changes)
+            record_theirs(conn, changes, &row.id, found, me)
         }
     }
 }
@@ -115,36 +125,30 @@ struct Theirs {
     dropped: bool,
 }
 
-/// Leaves out an issue the owner created and comments that are all the owner's.
-fn not_mine(
-    found: Vec<ChangeRow>,
-    row: &IssueRow,
-    new_comments: &[Option<String>],
-    me: Option<&str>,
-) -> Theirs {
-    let Some(me) = me else {
-        return Theirs {
-            changes: found,
-            dropped: false,
-        };
-    };
-    let all_comments_mine = |change: &ChangeRow| {
-        let added = change.added_comments();
-        added > 0
-            && new_comments.len() as i64 >= added
-            && new_comments.iter().all(|a| a.as_deref() == Some(me))
-    };
-    let mine = |change: &ChangeRow| match change.field {
-        "created" => row.reporter_id.as_deref() == Some(me),
-        "comment_added" => all_comments_mine(change),
-        _ => false,
-    };
+/// Leaves out the changes the owner made.
+fn not_mine(found: Vec<ChangeRow>, me: Option<&str>) -> Theirs {
     let before = found.len();
-    let changes: Vec<ChangeRow> = found.into_iter().filter(|c| !mine(c)).collect();
+    let changes: Vec<ChangeRow> = found
+        .into_iter()
+        .filter(|c| me.is_none() || c.author.as_deref() != me)
+        .collect();
     Theirs {
         dropped: changes.len() < before,
         changes,
     }
+}
+
+/// When the owner last looked, which only an `updated` row read from the changelog needs.
+fn seen_for(
+    conn: &Connection,
+    id: &str,
+    found: &[ChangeRow],
+    history: Option<&[Entry]>,
+) -> AppResult<String> {
+    if history.is_none() || found.iter().all(|c| c.field != "updated") {
+        return Ok(String::new());
+    }
+    Ok(seen_at(conn, id)?.unwrap_or_default())
 }
 
 /// A fresh cache has no versions to compare with: an issue updated after the owner last saw it is "updated",
@@ -154,34 +158,66 @@ fn record_since_seen(
     changes: &mut Changes,
     row: &IssueRow,
     me: Option<&str>,
+    history: Option<&[Entry]>,
 ) -> AppResult<()> {
-    let change = |field| ChangeRow {
-        field,
-        old_value: None,
-        new_value: (field == "created").then(|| row.key.clone()),
-        changed_at: row.updated_at.clone(),
+    let seen = seen_at(conn, &row.id)?;
+    let change = |field| {
+        let mut change = ChangeRow {
+            field,
+            old_value: None,
+            new_value: (field == "created").then(|| row.key.clone()),
+            changed_at: row.updated_at.clone(),
+            author: None,
+        };
+        let clues = Clues {
+            reporter: row.reporter_id.as_deref(),
+            new_comments: &[],
+            history,
+            seen: seen.as_deref().unwrap_or_default(),
+        };
+        change.author = author_of(&change, &clues);
+        change
     };
-    match seen_at(conn, &row.id)? {
-        Some(seen) if row.updated_at > seen => record_changes(conn, &row.id, &[change("updated")]),
-        Some(_) => Ok(()),
+    let found = match seen.as_deref() {
+        Some(seen) if row.updated_at.as_str() > seen => vec![change("updated")],
+        Some(_) => return Ok(()),
         None if me.is_some() && row.reporter_id.as_deref() == me => {
-            seen_until_updated(conn, changes, &row.id)
+            return seen_until_updated(conn, changes, &row.id);
         }
-        None => record_changes(conn, &row.id, &[change("created")]),
+        None => vec![change("created")],
+    };
+    record_theirs(conn, changes, &row.id, found, me)
+}
+
+/// Records the changes the owner didn't make; dropping one of theirs catches the issue up.
+fn record_theirs(
+    conn: &Connection,
+    changes: &mut Changes,
+    issue_id: &str,
+    found: Vec<ChangeRow>,
+    me: Option<&str>,
+) -> AppResult<()> {
+    let theirs = not_mine(found, me);
+    // Recorded first, so catching up past the owner's own change can't hide someone else's.
+    record_changes(conn, issue_id, &theirs.changes)?;
+    if theirs.dropped {
+        catch_up(conn, changes, issue_id)?;
     }
+    Ok(())
 }
 
 fn record_changes(conn: &Connection, issue_id: &str, found: &[ChangeRow]) -> AppResult<()> {
     for change in found {
         conn.execute(
-            "INSERT INTO cache.issue_change (issue_id, field, old_value, new_value, changed_at)
-             VALUES (?1, ?2, ?3, ?4, ?5)",
+            "INSERT INTO cache.issue_change (issue_id, field, old_value, new_value, changed_at, author_id)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             params![
                 issue_id,
                 change.field,
                 change.old_value,
                 change.new_value,
-                change.changed_at
+                change.changed_at,
+                change.author
             ],
         )?;
     }

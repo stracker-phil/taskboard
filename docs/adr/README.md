@@ -78,5 +78,6 @@ stands in Taskboard. The numbers in this table are Taskboard's.
 | [0066](0066-jira-data-lives-in-memory-only.md) | Jira data lives in memory only; no issue text on disk | Accepted (2026-11-12) |
 | [0067](0067-every-count-is-what-its-list-shows.md) | Every count is what its list shows | Accepted (2026-11-12) |
 | [0068](0068-notification-settings-decide-what-counts.md) | Notification settings decide what counts (supersedes `behaviour.notifyAbout`, part of 0059) | Accepted (2026-11-12) |
+| [0069](0069-changes-by-automations-can-be-ignored.md) | Changes by automations can be ignored | Accepted (2026-11-12) |
 
 Open: integrations with Daybook and TimeTracker.

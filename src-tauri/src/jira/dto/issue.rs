@@ -5,6 +5,8 @@ use chrono::{DateTime, FixedOffset};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use super::changelog::EmbeddedChangelog;
+
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Issue {
@@ -15,6 +17,9 @@ pub struct Issue {
     pub fields: Value,
     #[serde(default)]
     pub rendered_fields: Value,
+    /// Only with `expand=changelog`.
+    #[serde(default, skip_serializing)]
+    pub changelog: Option<EmbeddedChangelog>,
 }
 
 impl Issue {
@@ -136,6 +141,67 @@ mod tests {
         assert_eq!(issue.project_id(), None);
         assert_eq!(issue.status_id(), None);
         assert_eq!(issue.updated(), None);
+    }
+
+    #[test]
+    fn an_issue_embeds_its_changelog_with_authors_and_account_types() {
+        let issue = issue(json!({
+            "id": "10042",
+            "key": "NW-12",
+            "changelog": {
+                "startAt": 0,
+                "maxResults": 100,
+                "total": 2,
+                "histories": [
+                    {
+                        "id": "80001",
+                        "author": {
+                            "accountId": "account-runner",
+                            "displayName": "Test Runner",
+                            "accountType": "app"
+                        },
+                        "created": "2026-10-23T09:30:00.000+0200",
+                        "items": [{ "field": "status", "fieldId": "status" }]
+                    },
+                    {
+                        "id": "80002",
+                        "created": "2026-10-24T10:00:00.000+0200",
+                        "items": []
+                    }
+                ]
+            }
+        }));
+
+        let changelog = issue.changelog.unwrap();
+        assert!(changelog.is_complete());
+        assert_eq!(changelog.histories.len(), 2);
+        let author = changelog.histories[0].author.as_ref().unwrap();
+        assert_eq!(author.account_id, "account-runner");
+        assert_eq!(author.account_type.as_deref(), Some("app"));
+        assert_eq!(changelog.histories[1].author, None);
+    }
+
+    #[test]
+    fn an_issue_without_the_expand_has_no_changelog() {
+        let issue = issue(json!({ "id": "10042", "key": "NW-12" }));
+
+        assert_eq!(issue.changelog, None);
+    }
+
+    #[test]
+    fn an_issue_serializes_without_its_changelog() {
+        let issue = issue(json!({
+            "id": "10042",
+            "key": "NW-12",
+            "changelog": { "total": 0, "histories": [] }
+        }));
+
+        assert!(
+            serde_json::to_value(&issue)
+                .unwrap()
+                .get("changelog")
+                .is_none()
+        );
     }
 
     #[test]

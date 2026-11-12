@@ -1,5 +1,5 @@
 //! Mentions in comments the cache hasn't seen yet, recorded as `mention` changes: one per mentioned account, so
-//! the inbox can say "Mentioned you". The owner's own comments mention no news.
+//! the inbox can say "Mentioned you", by the comment's author. The owner's own comments mention no news.
 
 use std::collections::HashSet;
 
@@ -32,9 +32,9 @@ pub fn record_mentions(conn: &Connection, mapped: &Mapped, me: Option<&str>) -> 
         };
         for account in adf::mentions(&doc) {
             conn.execute(
-                "INSERT INTO cache.issue_change (issue_id, field, old_value, new_value, changed_at)
-                 VALUES (?1, 'mention', ?2, ?3, ?4)",
-                params![issue_id, comment.id, account, comment.created_at],
+                "INSERT INTO cache.issue_change (issue_id, field, old_value, new_value, changed_at, author_id)
+                 VALUES (?1, 'mention', ?2, ?3, ?4, ?5)",
+                params![issue_id, comment.id, account, comment.created_at, comment.author_id],
             )?;
         }
     }

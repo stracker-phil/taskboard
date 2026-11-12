@@ -12,6 +12,8 @@ use crate::jira::dto::parse_jira_time;
 use crate::test_support::demo::JiraData;
 
 const DEFAULT_PAGE_SIZE: usize = 50;
+/// The most changelog entries a search embeds per issue with `expand=changelog`.
+const EMBEDDED_HISTORIES: usize = 100;
 
 /// The site's content plus what the knobs hide.
 pub struct Content {
@@ -19,6 +21,8 @@ pub struct Content {
     pub now: DateTime<Utc>,
     /// Revoked: the user can no longer see these issue ids.
     pub hidden: HashSet<String>,
+    /// Deleted after a search listed them: the issue ids whose changelog answers 404.
+    pub changelog_gone: HashSet<String>,
     pub page_size: Option<usize>,
     /// Status ids whose transitions ask for a screen.
     pub screens: HashSet<String>,
@@ -205,7 +209,7 @@ fn search(site: &Content, body: &Value) -> Response {
         .get(start..end)
         .unwrap_or_default()
         .iter()
-        .map(|issue| shaped(issue, &body["fields"], &body["expand"]))
+        .map(|issue| shaped(site, issue, &body["fields"], &body["expand"]))
         .collect();
     let mut answer = json!({ "issues": issues, "isLast": is_last });
     if !is_last {
@@ -214,8 +218,8 @@ fn search(site: &Content, body: &Value) -> Response {
     Response::json(200, answer)
 }
 
-/// The issue with only the asked fields; `renderedFields` only when expanded.
-fn shaped(issue: &Value, fields: &Value, expand: &Value) -> Value {
+/// The issue with only the asked fields; `renderedFields` and the changelog only when expanded.
+fn shaped(site: &Content, issue: &Value, fields: &Value, expand: &Value) -> Value {
     let asked = string_list(fields);
     let all = asked.is_empty() || asked.contains(&"*all");
     let mut shaped = json!({ "id": issue["id"], "key": issue["key"], "self": issue["self"] });
@@ -226,14 +230,27 @@ fn shaped(issue: &Value, fields: &Value, expand: &Value) -> Value {
         .filter(|(name, _)| all || asked.contains(&name.as_str()))
         .map(|(name, value)| (name.clone(), value.clone()));
     shaped["fields"] = Value::Object(kept.collect());
-    if expand
-        .as_str()
-        .unwrap_or_default()
-        .contains("renderedFields")
-    {
+    let expand: Vec<&str> = expand.as_str().unwrap_or_default().split(',').collect();
+    if expand.contains(&"renderedFields") {
         shaped["renderedFields"] = issue["renderedFields"].clone();
     }
+    if expand.contains(&"changelog") {
+        shaped["changelog"] = embedded_changelog(site, issue);
+    }
     shaped
+}
+
+/// Like Jira, at most `EMBEDDED_HISTORIES` entries; `total` tells whether that is all of them.
+fn embedded_changelog(site: &Content, issue: &Value) -> Value {
+    let id = issue["id"].as_str().unwrap_or_default();
+    let all = site.data.changelogs.get(id).cloned().unwrap_or_default();
+    let histories: Vec<Value> = all.iter().take(EMBEDDED_HISTORIES).cloned().collect();
+    json!({
+        "startAt": 0,
+        "maxResults": histories.len(),
+        "total": all.len(),
+        "histories": histories,
+    })
 }
 
 fn find_issue<'a>(site: &'a Content, id_or_key: &str) -> Option<&'a Value> {
@@ -262,7 +279,7 @@ fn bulk_fetch(site: &Content, body: &Value) -> Response {
     let mut errors = Vec::new();
     for id in asked {
         match find_issue(site, id) {
-            Some(issue) => issues.push(shaped(issue, &body["fields"], &body["expand"])),
+            Some(issue) => issues.push(shaped(site, issue, &body["fields"], &body["expand"])),
             None => errors.push(json!({
                 "issueIdsOrKeys": [id],
                 "errorMessages": ["The issue does not exist or you do not have permission to see it."],
@@ -316,6 +333,9 @@ fn changelog(site: &Content, id_or_key: &str, request: &Recorded) -> Response {
         return not_found();
     };
     let id = issue["id"].as_str().unwrap_or_default();
+    if site.changelog_gone.contains(id) {
+        return not_found();
+    }
     let all = site.data.changelogs.get(id).cloned().unwrap_or_default();
     let (start, asked) = offset_query(request, 100);
     let size = site.page_size.unwrap_or(asked).max(1);

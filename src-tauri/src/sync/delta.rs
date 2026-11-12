@@ -1,9 +1,10 @@
-//! The delta sync: what changed since the last run, a 2-minute overlap included (upserts are idempotent).
+//! The delta sync: what changed since the last run, a 2-minute overlap included (upserts are idempotent). It
+//! asks for each issue's recent changelog too, which names who made a change (`authors`).
 
 use chrono::{DateTime, Duration, Utc};
 
+use super::attribute::{attribute_changes, newest_change};
 use super::full::{current_scope, full_sync, refresh_fields, search_fields};
-use super::own::{drop_own_changes, newest_change};
 use super::store::{Pass, last_delta_at, recently_updated, record_delta, store_page};
 use super::{Job, SyncContext, SyncEvent, SyncProgress};
 use crate::error::{AppError, AppResult};
@@ -14,6 +15,9 @@ use crate::time::format_utc;
 
 /// Jira's JQL dates have minute precision; the overlap makes sure no change slips between two runs.
 const OVERLAP: Duration = Duration::minutes(2);
+const EXPAND: &str = "renderedFields,changelog";
+/// The expand part dropped when Jira refuses it, so the sync goes on without authors.
+const CHANGELOG: &str = "changelog";
 /// After a delta, the comments of this many recently updated issues are fetched if they may be behind.
 const PREFETCH_COMMENTS: usize = 20;
 
@@ -47,7 +51,7 @@ pub async fn delta_sync(
     let mut pages = source.issues(SearchRequest {
         jql: query,
         fields: search_fields(&ctx.db, &ids).await?,
-        expand: Some("renderedFields".into()),
+        expand: Some(EXPAND.into()),
     });
     let mut progress = SyncProgress {
         job: Job::Delta,
@@ -59,7 +63,20 @@ pub async fn delta_sync(
     };
     let mut newest: Option<String> = None;
     while let Some(page) = pages.next_page().await {
-        let issues = page?.issues;
+        let issues = match page {
+            Ok(page) => page.issues,
+            Err(e) if changelog_may_be_to_blame(&e) => {
+                if !pages.without_expand(CHANGELOG) {
+                    return Err(e);
+                }
+                log::info!(
+                    "The change sync goes on without the changelog after a {:?} error",
+                    e.kind()
+                );
+                continue;
+            }
+            Err(e) => return Err(e),
+        };
         let ids = ids.clone();
         let me = connection.account_id.clone();
         let notifications = notifications.clone();
@@ -81,15 +98,29 @@ pub async fn delta_sync(
     ctx.db
         .write(move |tx, _| record_delta(tx, newest.as_deref()))
         .await?;
-    drop_own_changes(
+    attribute_changes(
         &ctx.db,
         source.as_ref(),
+        &notifications,
         connection.account_id.as_deref(),
         after,
     )
     .await;
     prefetch_comments(ctx).await;
     Ok(())
+}
+
+/// A server error (or an answer too big to read), or a refusal that names the expand. Asking without the
+/// changelog once more costs one request; a sync broken by it would cost every change.
+fn changelog_may_be_to_blame(e: &AppError) -> bool {
+    match e {
+        AppError::Internal(_) => true,
+        AppError::InvalidJql(messages) => messages.iter().any(|m| {
+            let m = m.to_lowercase();
+            m.contains("expand") || m.contains(CHANGELOG)
+        }),
+        _ => false,
+    }
 }
 
 /// Best effort: a failure leaves the cached comments; the Issue view fetches again when opened.
