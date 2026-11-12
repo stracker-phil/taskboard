@@ -46,7 +46,6 @@ import type {
   IssueDetail,
   IssueOpening,
   ListConditions,
-  MatchCount,
   Narrowing,
   Nav,
   PaletteResults,
@@ -161,7 +160,7 @@ export const api = {
   /** Typed issue keys as a key condition stores them; invalid input names a word that isn't a key. */
   filterParseKeys: (text: string) => invoke<string[]>("filter_parse_keys", { text }),
   /** `me`: only the connected account's issues, like the Me chip. */
-  listMatchCount: (id: number, filter: Filter, me: boolean) => invoke<MatchCount>("list_match_count", { id, filter, me }),
+  listMatchCount: (id: number, filter: Filter, me: boolean) => invoke<number>("list_match_count", { id, filter, me }),
   spaceMove: (projectId: string, position: number) => invoke<void>("space_move", { projectId, position }),
   spaceUpdate: (projectId: string, update: SpaceUpdate) => invoke<void>("space_update", { projectId, update }),
   spaceSetAccent: (projectId: string, accent: Accent | null) => invoke<void>("space_set_accent", { projectId, accent }),

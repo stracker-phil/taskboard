@@ -14,7 +14,7 @@ pub struct SpaceRow {
     pub key: String,
     pub name: String,
     pub client: Option<String>,
-    pub open: i64,
+    pub count: i64,
     pub current: bool,
 }
 
@@ -27,8 +27,8 @@ pub struct LevelRow {
     pub name: String,
     /// The key of the Space it belongs to; none under Home.
     pub space: Option<String>,
-    /// Open issues; none when its filter can't be used.
-    pub open: Option<i64>,
+    /// The issues its filter returns; none when its filter can't be used.
+    pub count: Option<i64>,
     pub current: bool,
 }
 

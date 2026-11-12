@@ -54,7 +54,7 @@ beforeEach(() => {
   mocked.modesGet.mockResolvedValue({ meEverywhere: false, bookmarksBar: false });
   mocked.viewsOf.mockImplementation(async (listId) => [view({ id: VIEW_ID, listId, name: "Release" })]);
   mocked.listConditions.mockResolvedValue(conditions());
-  mocked.listMatchCount.mockResolvedValue({ open: 3, total: 3 });
+  mocked.listMatchCount.mockResolvedValue(3);
 });
 
 describe("EmptyLevel", () => {
@@ -173,7 +173,7 @@ describe("EmptyLevel", () => {
     });
 
     it("falls back to the view's name when nothing would show even without Me", async () => {
-      mocked.listMatchCount.mockResolvedValue({ open: 0, total: 0 });
+      mocked.listMatchCount.mockResolvedValue(0);
       mocked.listConditions.mockResolvedValue(conditions({ view: [BLOCKED] }));
       await renderSpace();
 

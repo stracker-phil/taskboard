@@ -120,7 +120,7 @@ The owner's rule (2026-10-30), for every control, list and popover:
   and global filter lists (`Folder`). Recently viewed is a normal view-backed page (tabs, toolbar, List, Table,
   Board): the issues opened in the Issue view in the last 24 hours, newest first, with a Last view column. 34px rows, 10px padding and gap, 8px radius, `--text-strong-body`; icons
   17/1.8; the count 12px `--text-muted`, hidden while Rust has none.
-- **Counts** (`ListCount`): every list counts its open issues; Bookmarks counts its bookmarks. A list whose
+- **Counts** (`ListCount`): every list counts what its own filter returns, every status (its views' own conditions aside, [ADR 0067](adr/0067-every-count-is-what-its-list-shows.md)); Bookmarks counts its bookmarks. A list whose
   filter can't be used shows a warning marker with the reason instead.
 - **Spaces** (`SpacesSection`, scrolls): the "Spaces" header (12/600 `--text-muted`); Spaces are added in
   Settings → Projects, not here. Each Space (`SpaceRow`): 36px, the shared 12px chevron (`DisclosureChevron`, the one of every disclosure) in `--text-muted` at 0.4
@@ -195,7 +195,7 @@ padding, 2px gap, a `--hairline` bottom line.
 - At the line's right end the issue count (`ViewCount`, 12px `--text-muted`, tabular figures): "42 issues", every
   row the view shows after its narrowing (Me, the person chip, Filter drafts, the text field), from `total` of the
   view's own `view_rows` or `view_board` answer, so it always matches the rows. Its slot stays empty until the
-  first answer; while the next one loads it keeps the last number. The sidebar's counts don't follow it.
+  first answer; while the next one loads it keeps the last number. The sidebar's counts leave the view's own conditions out; the Filter popover shows this number.
 - A click on a tab opens it; a click on the open tab's name renames it in place (so does a double-click), one
   on its tile edits the look. Drag a tab sideways to reorder (`useDragReorder` on the x axis, `view_move`), with
   a 2px `--accent` line where it lands; a drag is never a click.
@@ -713,8 +713,8 @@ button, Escape and a press outside close it, focus goes back to the button).
   with a drag handle (⋮⋮) to reorder and a 30 × 18 switch (`components/Toggle.tsx`). A long list scrolls. Each change saves to the view; "Use as Space default" sets
   the columns new views in the Space start with.
 - **Filter** (badge: the filter list's own conditions plus the view's): the *Filter* popover (440 wide,
-  right-aligned): "Show issues where" and the live count of open issues ("N issues match" on a filter list,
-  with a condition or with the Me chip on, "N open issues" before any); inherited conditions locked on `--fill-subtle` with a lock,
+  right-aligned): "Show issues where" and the view's row count (`useViewTotal`, the number `ViewCount` shows: "N issues match" while
+  a condition, Me, the person chip, the text or the epic narrows, "N issues" before any); inherited conditions locked on `--fill-subtle` with a lock,
   "from Space" or "this Space"; then two sections under small caps headings ([ADR 0033](adr/0033-views-can-hold-their-own-filter.md)):
   "All views of this list" (the filter list's own conditions, only on a filter list) and "This view" (the
   view's own conditions; Everything, a Space and Bookmarks show only this one). Recently viewed starts with
@@ -726,8 +726,7 @@ button, Escape and a press outside close it, focus goes back to the button).
   "+ Add condition". Inside a Space the Project field isn't offered (`projectFixed`). Changes apply to the rows
   at once as drafts and are not saved ([ADR 0038](adr/0038-filter-changes-are-drafts-until-the-view-is-saved.md)):
   the footer says "Changes show until you leave this view.", and while something differs from what's saved "Not
-  saved: Save View keeps it." with Save View as a link. The live count follows the drafts and the Me chip (not
-  the text filter, a search) and counts every matching issue, like the sidebar. On Everything and a Space "Save as filter list" turns the view's (drafted)
+  saved: Save View keeps it." with Save View as a link. The count follows the drafts at once, since they narrow the rows. On Everything and a Space "Save as filter list" turns the view's (drafted)
   conditions into a new list and opens it. A picked field's value opens a
   list with a search box and a checkbox per value (`ValuePicker`); every tick applies at once, and several values
   are stored as `in` / `not in` (shown as "is" / "is not"). Epics are listed as "key · title", so the search

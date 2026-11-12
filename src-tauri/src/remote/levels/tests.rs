@@ -22,7 +22,7 @@ fn space(
     key: &str,
     name: &str,
     client: Option<&str>,
-    open_count: i64,
+    count: i64,
     lists: Vec<ListNode>,
 ) -> SpaceNode {
     SpaceNode {
@@ -35,7 +35,7 @@ fn space(
         color: None,
         accent: None,
         client: client.map(String::from),
-        open_count,
+        count,
         lists,
     }
 }
@@ -291,7 +291,7 @@ fn space_rows_carry_each_spaces_fields_and_flag_the_current_one() {
                 key: "NW".into(),
                 name: "Website relaunch".into(),
                 client: Some("Northwind Ltd".into()),
-                open: 21,
+                count: 21,
                 current: false,
             },
             SpaceRow {
@@ -299,7 +299,7 @@ fn space_rows_carry_each_spaces_fields_and_flag_the_current_one() {
                 key: "NWS".into(),
                 name: "Northwind support".into(),
                 client: None,
-                open: 6,
+                count: 6,
                 current: true,
             },
         ]
@@ -317,7 +317,7 @@ fn level_row(
     kind: Kind,
     name: &str,
     space: Option<&str>,
-    open: Option<i64>,
+    count: Option<i64>,
     current: bool,
 ) -> LevelRow {
     LevelRow {
@@ -325,7 +325,7 @@ fn level_row(
         kind,
         name: name.into(),
         space: space.map(String::from),
-        open,
+        count,
         current,
     }
 }

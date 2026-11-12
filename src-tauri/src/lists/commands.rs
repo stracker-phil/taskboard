@@ -3,7 +3,7 @@
 use chrono::Utc;
 use tauri::State;
 
-use super::{FilterOptions, ListConditions, MatchCount, SidebarTree, SpaceUpdate, Viewer};
+use super::{FilterOptions, ListConditions, SidebarTree, SpaceUpdate, Viewer};
 use crate::error::AppResult;
 use crate::filter::{Filter, Op, parse_keys};
 use crate::look::Accent;
@@ -81,7 +81,7 @@ pub async fn list_match_count(
     id: i64,
     filter: Filter,
     me: bool,
-) -> AppResult<MatchCount> {
+) -> AppResult<i64> {
     super::list_match_count(&state.db, viewer(&state), id, filter, me).await
 }
 

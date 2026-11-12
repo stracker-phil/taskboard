@@ -112,7 +112,7 @@ JSON; no condition is stored as null:
 ```
 
 - `field`: `status` (id), `statusCategory` (`new`, `indeterminate`, `done`; the category of the status type the
-  owner picked in the issue's Space, else app-wide, else Jira's: `filter::STATUS_CATEGORY`, also the sidebar's open counts), `type` (name), `assignee`,
+  owner picked in the issue's Space, else app-wide, else Jira's: `filter::STATUS_CATEGORY`), `type` (name), `assignee`,
   `reporter` (account id or `me`), `priority` (name), `epic` (the parent's issue id), `issueKey` and `parentKey`
   (issue keys, the issue's own or its parent's; `filter::parse_keys` checks and uppercases them, and `not in`
   keeps issues without a parent), `release` (fix version id),
@@ -138,8 +138,9 @@ The page edits both layers and the Me chip as drafts ([ADR 0038](adr/0038-filter
 `Narrowing.listDraft` and `Narrowing.viewDraft` stand in for the filter list's own and the view's stored conditions in
 `view_rows` and `view_board` (a list draft only on a filter list), compiled under the same chain as the setters check
 them, and nothing is written until Save View calls `list_set_filter`, `view_set_filter` and `view_set_only_mine`.
-`list_match_count`, the popover's live count, counts every matching issue, like the sidebar, and with `me` only
-the connected account's issues, like a view's `Narrowing.me`.
+`list_match_count` counts the issues a level's chain and a draft match (with `me` only the connected account's, like
+a view's `Narrowing.me`), for the empty level's reason. The popover shows the view's own `total`; the sidebar counts
+each list's chain, every status ([ADR 0067](adr/0067-every-count-is-what-its-list-shows.md)).
 
 Built in (migration `local/0002`): Everything (one "All issues" view grouped by Space), and under Home
 Bookmarks (kind `pinned`; renamed by `local/0008`). The Unread list (kind `recent`) is gone since `local/0018`,

@@ -1,4 +1,4 @@
-//! The sidebar tree and the view tabs on temp folders: the defaults a tracked project gets, the open-issue
+//! The sidebar tree and the view tabs on temp folders: the defaults a tracked project gets, the
 //! counts on the demo site synced from the in-process fake Jira, ancestor filtering and the edits that keep
 //! positions dense.
 
@@ -19,7 +19,7 @@ use taskboard_lib::error::{AppError, ErrorKind};
 use taskboard_lib::filter::{Condition, Field, Filter, Op, Value};
 use taskboard_lib::jira::{Limiter, TokenKind};
 use taskboard_lib::lists::{
-    Kind, LIST_VIEW, ListConditions, ListNode, LockedCondition, MatchCount, SidebarTree, SpaceNode,
+    Kind, LIST_VIEW, ListConditions, ListNode, LockedCondition, SidebarTree, SpaceNode,
     SpaceUpdate, ValueKind, Viewer, ensure_tracked_spaces, filter_options, list_conditions,
     list_create, list_delete, list_duplicate, list_match_count, list_move, list_rename,
     list_set_filter, list_set_look, list_set_window, sidebar_tree, space_move, space_set_accent,
@@ -444,7 +444,7 @@ mod the_seeded_levels {
         assert!(epics.error.is_some());
         let sprint = find_list(nw, "Current sprint");
         assert_eq!((sprint.count, sprint.error.clone()), (Some(0), None));
-        assert_eq!(nw.open_count, 0);
+        assert_eq!(nw.count, 0);
     }
 
     #[tokio::test]
@@ -533,27 +533,28 @@ mod the_tree_on_the_demo_site {
     }
 
     #[tokio::test]
-    async fn spaces_count_their_open_issues_and_everything_sums_them() {
+    async fn spaces_count_every_issue_they_hold_done_included_and_everything_sums_them() {
         let site = Synced::new().await;
 
         let tree = site.tree().await;
 
-        let counts: Vec<(&str, &str, i64)> = tree
-            .spaces
-            .iter()
-            .map(|s| (s.key.as_str(), s.name.as_str(), s.open_count))
-            .collect();
-        assert_eq!(
-            counts,
-            [
-                ("NW", "Website relaunch", 26),
-                ("NWS", "Northwind support", 6),
-                ("LUM", "Lumen iOS app", 11),
-                ("FBA", "Fernweh booking API", 12),
-                ("INT", "Internal tools", 8),
-            ]
-        );
-        assert_eq!(tree.everything.count, Some(63));
+        let mut held = Vec::new();
+        for space in &tree.spaces {
+            held.push(
+                number(
+                    site.db(),
+                    format!(
+                        "SELECT COUNT(*) FROM cache.issue WHERE project_id = '{}' AND gone = 0",
+                        space.project_id
+                    ),
+                )
+                .await,
+            );
+        }
+        let counts: Vec<i64> = tree.spaces.iter().map(|s| s.count).collect();
+        assert_eq!(counts, held);
+        assert!(find_space(&tree, "NW").count > 26);
+        assert_eq!(tree.everything.count, Some(held.iter().sum::<i64>()));
         assert_eq!(
             tree.spaces
                 .iter()
@@ -567,15 +568,15 @@ mod the_tree_on_the_demo_site {
     async fn subtasks_count_in_the_sidebar_whatever_their_views_show() {
         let site = Synced::new().await;
         let nw = space_node_id(site.db(), NW).await;
-        let open_in_nw = number(
+        let issues_in_nw = number(
             site.db(),
-            "SELECT COUNT(*) FROM cache.issue WHERE project_id = '10001' AND status_category != 'done'",
+            "SELECT COUNT(*) FROM cache.issue WHERE project_id = '10001' AND gone = 0",
         )
         .await;
-        let open_subtasks_in_nw = number(
+        let subtasks_in_nw = number(
             site.db(),
             "SELECT COUNT(*) FROM cache.issue
-             WHERE project_id = '10001' AND status_category != 'done' AND type_is_subtask = 1",
+             WHERE project_id = '10001' AND gone = 0 AND type_is_subtask = 1",
         )
         .await;
         let before = site.tree().await;
@@ -586,33 +587,34 @@ mod the_tree_on_the_demo_site {
                 .unwrap();
         }
 
-        assert_eq!(open_subtasks_in_nw, 6);
-        assert_eq!(find_space(&before, "NW").open_count, open_in_nw);
-        assert_eq!(open_in_nw, 26);
+        assert_eq!(subtasks_in_nw, 8);
+        assert_eq!(find_space(&before, "NW").count, issues_in_nw);
         assert_eq!(site.tree().await, before);
     }
 
     #[tokio::test]
-    async fn the_website_relaunch_default_lists_count_their_open_issues() {
+    async fn the_website_relaunch_default_lists_count_every_issue_their_filter_returns() {
         let site = Synced::new().await;
 
         let tree = site.tree().await;
 
         let nw = find_space(&tree, "NW");
-        let lists: Vec<(&str, Option<i64>)> = nw
-            .lists
-            .iter()
-            .map(|l| (l.name.as_str(), l.count))
-            .collect();
+        let names: Vec<&str> = nw.lists.iter().map(|l| l.name.as_str()).collect();
         assert_eq!(
-            lists,
-            [
-                ("Current sprint", Some(12)),
-                ("Epics", Some(5)),
-                ("Release 2.4.0", Some(9)),
-                ("Open bugs", Some(3)),
-            ]
+            names,
+            ["Current sprint", "Epics", "Release 2.4.0", "Open bugs"]
         );
+        let epics = number(
+            site.db(),
+            "SELECT COUNT(*) FROM cache.issue
+             WHERE project_id = '10001' AND gone = 0 AND issue_type = 'Epic'",
+        )
+        .await;
+        assert_eq!(find_list(nw, "Epics").count, Some(epics));
+        assert!(epics >= 5);
+        assert!(find_list(nw, "Current sprint").count >= Some(12));
+        assert!(find_list(nw, "Release 2.4.0").count >= Some(9));
+        assert_eq!(find_list(nw, "Open bugs").count, Some(3));
         assert!(nw.lists.iter().all(|l| l.error.is_none()));
     }
 
@@ -694,17 +696,25 @@ mod the_tree_on_the_demo_site {
         .unwrap();
 
         let tree = site.tree().await;
-        let open_bugs_per_space: Vec<i64> = tree
-            .spaces
-            .iter()
-            .map(|s| find_list(s, "Open bugs").count.unwrap())
-            .collect();
+        let bugs_in_lum = number(
+            site.db(),
+            "SELECT COUNT(*) FROM cache.issue
+             WHERE project_id = '10003' AND issue_type = 'Bug' AND gone = 0",
+        )
+        .await;
+        let bugs_in_tracked_projects = number(
+            site.db(),
+            "SELECT COUNT(*) FROM cache.issue
+             WHERE issue_type = 'Bug' AND gone = 0
+               AND project_id IN (SELECT project_id FROM space WHERE tracked = 1)",
+        )
+        .await;
         assert_eq!(
             find_list(find_space(&tree, "LUM"), "Bugs").count,
-            find_list(find_space(&tree, "LUM"), "Open bugs").count
+            Some(bugs_in_lum)
         );
         let global = tree.home.iter().find(|n| n.name == "All bugs").unwrap();
-        assert_eq!(global.count, Some(open_bugs_per_space.iter().sum::<i64>()));
+        assert_eq!(global.count, Some(bugs_in_tracked_projects));
         assert!(global.count > find_list(find_space(&tree, "LUM"), "Bugs").count);
     }
 
@@ -738,19 +748,12 @@ mod the_tree_on_the_demo_site {
 
         let in_space = "FROM cache.issue WHERE project_id = '10001' AND gone = 0";
         assert_eq!(
-            (everything_in_the_space.open, everything_in_the_space.total),
-            (
-                number(
-                    site.db(),
-                    format!("SELECT COUNT(*) {in_space} AND status_category <> 'done'")
-                )
-                .await,
-                number(site.db(), format!("SELECT COUNT(*) {in_space}")).await
-            )
+            everything_in_the_space,
+            number(site.db(), format!("SELECT COUNT(*) {in_space}")).await
         );
-        assert_eq!(everything_in_the_space.open, 26);
-        assert_eq!(bugs_in_the_space.open, open_bugs);
-        assert_eq!(bugs_in_the_space.total, all_bugs);
+        assert!(everything_in_the_space > 26);
+        assert_eq!(bugs_in_the_space, all_bugs);
+        assert!(bugs_in_the_space >= open_bugs);
     }
 
     #[tokio::test]
@@ -792,18 +795,9 @@ mod the_tree_on_the_demo_site {
         let tracked = "FROM cache.issue WHERE gone = 0
              AND project_id IN (SELECT project_id FROM space WHERE tracked = 1)";
         assert_eq!(
-            count.open,
-            number(
-                site.db(),
-                format!("SELECT COUNT(*) {tracked} AND status_category <> 'done'")
-            )
-            .await
-        );
-        assert_eq!(
-            count.total,
+            count,
             number(site.db(), format!("SELECT COUNT(*) {tracked}")).await
         );
-        assert_eq!(count.open, 63);
     }
 
     #[tokio::test]
@@ -821,7 +815,7 @@ mod the_tree_on_the_demo_site {
         .await
         .unwrap();
 
-        assert_eq!(count, MatchCount { open: 6, total: 8 });
+        assert_eq!(count, 8);
     }
 
     #[tokio::test]
@@ -840,10 +834,17 @@ mod the_tree_on_the_demo_site {
         .unwrap();
 
         let tree = site.tree().await;
+        let subtasks = number(
+            site.db(),
+            "SELECT COUNT(*) FROM cache.issue
+             WHERE project_id = '10001' AND issue_type = 'Subtask' AND gone = 0",
+        )
+        .await;
         assert_eq!(
             find_list(find_space(&tree, "NW"), "Small steps").count,
-            Some(6)
+            Some(subtasks)
         );
+        assert_eq!(subtasks, 8);
     }
 
     #[tokio::test]
@@ -877,18 +878,10 @@ mod the_tree_on_the_demo_site {
         );
         assert_eq!(
             mine,
-            MatchCount {
-                open: number(
-                    site.db(),
-                    format!("SELECT COUNT(*) {assigned_to_me} AND status_category <> 'done'")
-                )
-                .await,
-                total: number(site.db(), format!("SELECT COUNT(*) {assigned_to_me}")).await,
-            }
+            number(site.db(), format!("SELECT COUNT(*) {assigned_to_me}")).await
         );
-        assert!(mine.total > 0);
-        assert!(mine.total < everyone.total);
-        assert!(mine.open < everyone.open);
+        assert!(mine > 0);
+        assert!(mine < everyone);
     }
 
     #[tokio::test]
@@ -923,7 +916,7 @@ mod the_tree_on_the_demo_site {
         .await
         .unwrap();
 
-        assert_eq!(data.rows.len() as i64, mine.total);
+        assert_eq!(data.rows.len() as i64, mine);
     }
 
     #[tokio::test]
@@ -936,7 +929,7 @@ mod the_tree_on_the_demo_site {
             .await
             .unwrap();
 
-        assert_eq!(count, MatchCount { open: 0, total: 0 });
+        assert_eq!(count, 0);
     }
 
     #[tokio::test]
@@ -1411,7 +1404,7 @@ mod status_category_follows_the_spaces_status_types {
             .unwrap();
     }
 
-    async fn matching(db: &Db, op: Op, category: &str) -> MatchCount {
+    async fn matching(db: &Db, op: Op, category: &str) -> i64 {
         let everything = node_id(db, "everything").await;
         let draft = filter(vec![Condition::new(
             Field::StatusCategory,
@@ -1427,18 +1420,9 @@ mod status_category_follows_the_spaces_status_types {
     async fn without_an_owner_choice_jiras_category_applies() {
         let (_dir, db) = two_spaces().await;
 
-        assert_eq!(
-            matching(&db, Op::Is, "done").await,
-            MatchCount { open: 0, total: 2 }
-        );
-        assert_eq!(
-            matching(&db, Op::Is, "indeterminate").await,
-            MatchCount { open: 2, total: 2 }
-        );
-        assert_eq!(
-            matching(&db, Op::IsNot, "done").await,
-            MatchCount { open: 4, total: 4 }
-        );
+        assert_eq!(matching(&db, Op::Is, "done").await, 2);
+        assert_eq!(matching(&db, Op::Is, "indeterminate").await, 2);
+        assert_eq!(matching(&db, Op::IsNot, "done").await, 4);
     }
 
     #[tokio::test]
@@ -1446,18 +1430,9 @@ mod status_category_follows_the_spaces_status_types {
         let (_dir, db) = two_spaces().await;
         style(&db, NW, REVIEW, Style::Done).await;
 
-        assert_eq!(
-            matching(&db, Op::IsNot, "done").await,
-            MatchCount { open: 3, total: 3 }
-        );
-        assert_eq!(
-            matching(&db, Op::Is, "done").await,
-            MatchCount { open: 0, total: 3 }
-        );
-        assert_eq!(
-            matching(&db, Op::Is, "indeterminate").await,
-            MatchCount { open: 1, total: 1 }
-        );
+        assert_eq!(matching(&db, Op::IsNot, "done").await, 3);
+        assert_eq!(matching(&db, Op::Is, "done").await, 3);
+        assert_eq!(matching(&db, Op::Is, "indeterminate").await, 1);
     }
 
     #[tokio::test]
@@ -1465,14 +1440,8 @@ mod status_category_follows_the_spaces_status_types {
         let (_dir, db) = two_spaces().await;
         style(&db, NW, SHIPPED, Style::Todo).await;
 
-        assert_eq!(
-            matching(&db, Op::Is, "new").await,
-            MatchCount { open: 3, total: 3 }
-        );
-        assert_eq!(
-            matching(&db, Op::Is, "done").await,
-            MatchCount { open: 0, total: 1 }
-        );
+        assert_eq!(matching(&db, Op::Is, "new").await, 3);
+        assert_eq!(matching(&db, Op::Is, "done").await, 1);
     }
 
     #[tokio::test]
@@ -1482,14 +1451,8 @@ mod status_category_follows_the_spaces_status_types {
             .await
             .unwrap();
 
-        assert_eq!(
-            matching(&db, Op::Is, "done").await,
-            MatchCount { open: 0, total: 4 }
-        );
-        assert_eq!(
-            matching(&db, Op::Is, "indeterminate").await,
-            MatchCount { open: 0, total: 0 }
-        );
+        assert_eq!(matching(&db, Op::Is, "done").await, 4);
+        assert_eq!(matching(&db, Op::Is, "indeterminate").await, 0);
     }
 
     #[tokio::test]
@@ -1500,18 +1463,12 @@ mod status_category_follows_the_spaces_status_types {
             .unwrap();
         style(&db, NW, REVIEW, Style::Progress).await;
 
-        assert_eq!(
-            matching(&db, Op::Is, "indeterminate").await,
-            MatchCount { open: 1, total: 1 }
-        );
-        assert_eq!(
-            matching(&db, Op::Is, "done").await,
-            MatchCount { open: 0, total: 3 }
-        );
+        assert_eq!(matching(&db, Op::Is, "indeterminate").await, 1);
+        assert_eq!(matching(&db, Op::Is, "done").await, 3);
     }
 
     #[tokio::test]
-    async fn the_sidebar_does_not_count_issues_in_a_status_set_to_done_app_wide() {
+    async fn the_sidebar_counts_issues_in_a_status_set_to_done_app_wide() {
         let (_dir, db) = two_spaces().await;
         status_style_set_app(&db, REVIEW.into(), Some(Style::Done))
             .await
@@ -1519,15 +1476,15 @@ mod status_category_follows_the_spaces_status_types {
 
         let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
 
-        assert_eq!(find_space(&tree, "NW").open_count, 1);
-        assert_eq!(find_space(&tree, "NWS").open_count, 1);
-        assert_eq!(tree.everything.count, Some(2));
+        assert_eq!(find_space(&tree, "NW").count, 3);
+        assert_eq!(find_space(&tree, "NWS").count, 3);
+        assert_eq!(tree.everything.count, Some(6));
 
         style(&db, NW, REVIEW, Style::Progress).await;
         let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
 
-        assert_eq!(find_space(&tree, "NW").open_count, 2);
-        assert_eq!(find_space(&tree, "NWS").open_count, 1);
+        assert_eq!(find_space(&tree, "NW").count, 3);
+        assert_eq!(find_space(&tree, "NWS").count, 3);
     }
 
     #[tokio::test]
@@ -1538,25 +1495,25 @@ mod status_category_follows_the_spaces_status_types {
 
             assert_eq!(
                 matching(&db, Op::Is, "indeterminate").await,
-                MatchCount { open: 3, total: 3 },
+                3,
                 "{style_name:?}"
             );
         }
     }
 
     #[tokio::test]
-    async fn the_sidebar_does_not_count_issues_in_a_status_the_space_set_to_done() {
+    async fn the_sidebar_counts_issues_in_a_status_the_space_set_to_done() {
         let (_dir, db) = two_spaces().await;
         let before = sidebar_tree(&db, viewer(None)).await.unwrap();
         style(&db, NW, REVIEW, Style::Done).await;
 
         let after = sidebar_tree(&db, viewer(None)).await.unwrap();
 
-        assert_eq!(find_space(&before, "NW").open_count, 2);
-        assert_eq!(find_space(&after, "NW").open_count, 1);
-        assert_eq!(find_space(&after, "NWS").open_count, 2);
-        assert_eq!(before.everything.count, Some(4));
-        assert_eq!(after.everything.count, Some(3));
+        assert_eq!(find_space(&before, "NW").count, 3);
+        assert_eq!(find_space(&after, "NW").count, 3);
+        assert_eq!(find_space(&after, "NWS").count, 3);
+        assert_eq!(before.everything.count, Some(6));
+        assert_eq!(after.everything.count, Some(6));
     }
 }
 
@@ -1861,13 +1818,43 @@ mod recently_viewed {
     }
 
     #[tokio::test]
-    async fn the_sidebar_counts_the_issues_viewed_within_the_window() {
+    async fn the_sidebar_counts_the_open_issues_viewed_within_the_window() {
         let (_dir, db) = viewed_lab().await;
 
         let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
 
         assert_eq!(tree.home[0].kind, Kind::Viewed);
         assert_eq!(tree.home[0].count, Some(1));
+    }
+
+    #[tokio::test]
+    async fn the_sidebar_counts_a_done_issue_viewed_within_the_window() {
+        let (_dir, db) = viewed_lab().await;
+        db.write(|tx, _| {
+            tx.execute_batch(
+                "INSERT INTO cache.status (id, name, category) VALUES ('s9', 'Shipped', 'done');
+                 INSERT INTO cache.issue (id, key, project_id, summary, issue_type, status_id,
+                   status_category, created_at, updated_at, synced_at) VALUES
+                   ('6', 'NW-6', '10001', 'Issue 6', 'Task', 's9', 'done',
+                    '2026-10-20T09:00:00.000Z', '2026-10-20T09:00:00.000Z', '2026-10-20T09:00:00.000Z'),
+                   ('7', 'NW-7', '10001', 'Issue 7', 'Task', 's9', 'done',
+                    '2026-10-20T09:00:00.000Z', '2026-10-20T09:00:00.000Z', '2026-10-20T09:00:00.000Z')",
+            )?;
+            Ok(())
+        })
+        .await
+        .unwrap();
+        issue_viewed(&db, "6".into(), TWO_HOURS_AGO.parse().unwrap())
+            .await
+            .unwrap();
+        issue_viewed(&db, "7".into(), THIRTY_SIX_HOURS_AGO.parse().unwrap())
+            .await
+            .unwrap();
+
+        let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
+
+        assert_eq!(shown_keys(&db).await, ["NW-1", "NW-6"]);
+        assert_eq!(tree.home[0].count, Some(2));
     }
 
     #[tokio::test]

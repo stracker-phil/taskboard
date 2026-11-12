@@ -579,7 +579,8 @@ export type ListKind = "everything" | "space" | "list" | "pinned" | "viewed";
 
 export type ListNode = { id: number, kind: ListKind, name: string, 
 /**
- * Open issues; for Bookmarks its active pins; none for a filter that can't be compiled.
+ * Every issue the list's own filter returns, whatever its views add (ADR 0067); for Bookmarks its active pins;
+ * none for a filter that can't be compiled.
  */
 count: number | null, 
 /**
@@ -623,8 +624,6 @@ export type LockedCondition = { field: string, op: string, value: string,
  * Where it comes from: "this Space" or "from Space".
  */
 source: string, };
-
-export type MatchCount = { open: number, total: number, };
 
 export type MatchedIn = "key" | "summary" | "description" | "comment";
 
@@ -987,7 +986,7 @@ color: string | null, client: string | null,
 /**
  * Its own accent color, in place of the app's while it is shown.
  */
-accent: Accent | null, openCount: number, lists: Array<ListNode>, };
+accent: Accent | null, count: number, lists: Array<ListNode>, };
 
 /**
  * The owner's names for a Space; empty values go back to the project's.

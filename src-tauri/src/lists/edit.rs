@@ -11,7 +11,7 @@ use super::nodes::{Kind, Node, all_nodes, node, scope_of};
 use crate::db::{Changes, Db, LocalPart};
 use crate::error::{AppError, AppResult};
 use crate::field_choice::show_in_list;
-use crate::filter::{Condition, Field, Filter, OPEN_ISSUES, Op, Value, compile};
+use crate::filter::{Condition, Field, Filter, Op, Value, compile};
 use crate::look::Accent;
 use crate::look::{clean_color, clean_icon};
 use crate::order::Siblings;
@@ -229,24 +229,16 @@ pub async fn list_set_window(db: &Db, id: i64, op: Op, count: u32) -> AppResult<
     .await
 }
 
-#[derive(Serialize, Clone, Copy, Debug, PartialEq, TS)]
-#[ts(export, export_to = "src/api/types.gen.ts")]
-#[serde(rename_all = "camelCase")]
-pub struct MatchCount {
-    pub open: i64,
-    pub total: i64,
-}
-
-/// The Filter popover's live count: what `node_id` inherits ANDed with `draft` in place of its own
-/// conditions, with `me` narrowed as `view_rows` narrows `Narrowing::me`. On a Space or Everything the draft is
-/// a new filter list's. Every matching issue, like the sidebar's counts (ADR 0040).
+/// The issues `node_id` inherits ANDed with `draft` in place of its own conditions, with `me` narrowed as
+/// `view_rows` narrows `Narrowing::me`; on a Space or Everything the draft is a new filter list's. An empty level
+/// asks it whether its filter or the Me chip hides everything.
 pub async fn list_match_count(
     db: &Db,
     viewer: Viewer,
     node_id: i64,
     draft: Filter,
     me: bool,
-) -> AppResult<MatchCount> {
+) -> AppResult<i64> {
     db.read(move |conn| {
         let nodes = all_nodes(conn)?;
         let target = node(conn, node_id)?;
@@ -260,17 +252,8 @@ pub async fn list_match_count(
             condition.push_str(" AND i.assignee_id = ?");
             params.push(ctx.me.unwrap_or_default().into());
         }
-        let sql = format!(
-            "SELECT COUNT(*) FILTER (WHERE {OPEN_ISSUES}), COUNT(*) FROM cache.issue i WHERE {condition}"
-        );
-        Ok(
-            conn.query_row(&sql, params_from_iter(&params), |row| {
-                Ok(MatchCount {
-                    open: row.get(0)?,
-                    total: row.get(1)?,
-                })
-            })?,
-        )
+        let sql = format!("SELECT COUNT(*) FROM cache.issue i WHERE {condition}");
+        Ok(conn.query_row(&sql, params_from_iter(&params), |row| row.get(0))?)
     })
     .await
 }

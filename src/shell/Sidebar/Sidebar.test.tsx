@@ -56,8 +56,8 @@ function treeWith(patch: { nw?: Partial<SpaceNode>; nws?: ListNode[] } = {}): Si
     pinnedLists: [],
     spaces: [
       space({ icon: "R", color: "3", client: "Northwind", lists: [SPRINT, EPICS], ...patch.nw }),
-      space({ listId: 13, projectId: "10003", key: "NWS", name: "Northwind support", projectName: "Northwind support", icon: null, color: null, openCount: 5, lists: patch.nws ?? [BUGS] }),
-      lumenSpace({ openCount: 9, lists: [RELEASE] }),
+      space({ listId: 13, projectId: "10003", key: "NWS", name: "Northwind support", projectName: "Northwind support", icon: null, color: null, count: 5, lists: patch.nws ?? [BUGS] }),
+      lumenSpace({ count: 9, lists: [RELEASE] }),
     ],
   };
 }

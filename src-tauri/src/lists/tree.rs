@@ -1,4 +1,4 @@
-//! The sidebar tree with open-issue counts, counted in one pass over the cache.
+//! The sidebar tree with each list's count, counted in one pass over the cache.
 
 use rusqlite::{Connection, params_from_iter};
 use serde::Serialize;
@@ -8,7 +8,7 @@ use super::context::{Viewer, names};
 use super::nodes::{Kind, Node, all_nodes, scope_of};
 use crate::db::Db;
 use crate::error::AppResult;
-use crate::filter::{Compiled, Ctx, Names, OPEN_ISSUES, TRACKED_ISSUES, compile, describe};
+use crate::filter::{Compiled, Ctx, Names, TRACKED_ISSUES, compile, describe};
 use crate::look::Accent;
 use crate::pins::active;
 use crate::time::format_utc;
@@ -34,7 +34,8 @@ pub struct ListNode {
     pub id: i64,
     pub kind: Kind,
     pub name: String,
-    /// Open issues; for Bookmarks its active pins; none for a filter that can't be compiled.
+    /// Every issue the list's own filter returns, whatever its views add (ADR 0067); for Bookmarks its active pins;
+    /// none for a filter that can't be compiled.
     pub count: Option<i64>,
     /// Conditions of its own, for the Filter button's badge.
     pub own_conditions: usize,
@@ -65,7 +66,7 @@ pub struct SpaceNode {
     pub client: Option<String>,
     /// Its own accent color, in place of the app's while it is shown.
     pub accent: Option<Accent>,
-    pub open_count: i64,
+    pub count: i64,
     pub lists: Vec<ListNode>,
 }
 
@@ -171,7 +172,7 @@ fn build(conn: &Connection, viewer: &Viewer) -> AppResult<SidebarTree> {
             color: space.color,
             client: space.client,
             accent: space.accent,
-            open_count: own.count.unwrap_or(0),
+            count: own.count.unwrap_or(0),
             lists,
         });
     }
@@ -260,7 +261,7 @@ impl Counter {
             .map(|(_, c)| format!("COUNT(*) FILTER (WHERE {})", c.condition))
             .collect();
         let sql = format!(
-            "SELECT {} FROM cache.issue i WHERE {TRACKED_ISSUES} AND {OPEN_ISSUES}",
+            "SELECT {} FROM cache.issue i WHERE {TRACKED_ISSUES}",
             columns.join(", ")
         );
         let params = self.nodes.iter().flat_map(|(_, c)| c.params.iter());
@@ -278,7 +279,7 @@ impl Counter {
         tree.home.iter_mut().for_each(&mut set);
         tree.pinned_lists.iter_mut().for_each(&mut set);
         for space in &mut tree.spaces {
-            space.open_count = count_of(space.list_id).unwrap_or(0);
+            space.count = count_of(space.list_id).unwrap_or(0);
             space.lists.iter_mut().for_each(&mut set);
         }
         Ok(())

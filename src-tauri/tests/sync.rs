@@ -145,8 +145,8 @@ impl Rig {
         self.ctx.db.read(last_delta_at).await.unwrap()
     }
 
-    /// `(Everything's open count, the NW Space's open count)` as the sidebar shows them.
-    async fn open_counts(&self) -> (Option<i64>, i64) {
+    /// `(Everything's count, the NW Space's count)` as the sidebar shows them.
+    async fn counts(&self) -> (Option<i64>, i64) {
         let viewer = Viewer {
             me: None,
             time_zone: Some("Europe/Berlin".into()),
@@ -154,7 +154,7 @@ impl Rig {
         };
         let tree = sidebar_tree(&self.ctx.db, viewer).await.unwrap();
         let nw = tree.spaces.iter().find(|s| s.key == "NW").unwrap();
-        (tree.everything.count, nw.open_count)
+        (tree.everything.count, nw.count)
     }
 
     /// The search requests the fake received, oldest first.
@@ -1656,7 +1656,7 @@ mod reconciliation {
     }
 
     async fn assert_issue_leaves_the_cache_views(rig: &Rig, id: &str, key: &str) {
-        let (everything, nw) = rig.open_counts().await;
+        let (everything, nw) = rig.counts().await;
         let state = rig.job(Job::Reconcile, None).await;
 
         assert!(
@@ -1669,7 +1669,7 @@ mod reconciliation {
             vec![(key.to_string(), "gone".to_string())]
         );
         assert_eq!(rig.announced_ids(), BTreeSet::from([id.to_string()]));
-        assert_eq!(rig.open_counts().await, (everything.map(|n| n - 1), nw - 1));
+        assert_eq!(rig.counts().await, (everything.map(|n| n - 1), nw - 1));
     }
 
     #[tokio::test]

@@ -25,7 +25,7 @@ export function space(patch: Partial<SpaceNode> = {}): SpaceNode {
     color: "1",
     accent: null,
     client: null,
-    openCount: 21,
+    count: 21,
     lists: [],
     ...patch,
   };

@@ -205,7 +205,6 @@ impl Site {
         list_match_count(self.db(), viewer(), space, filter, false)
             .await
             .unwrap()
-            .total
     }
 }
 

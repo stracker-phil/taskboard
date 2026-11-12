@@ -141,7 +141,7 @@ pub fn space_rows(tree: &SidebarTree, current: Option<i64>) -> Vec<SpaceRow> {
             key: space.key.clone(),
             name: space.name.clone(),
             client: space.client.clone(),
-            open: space.open_count,
+            count: space.count,
             current: current == Some(space.list_id),
         })
         .collect()
@@ -155,7 +155,7 @@ pub fn level_rows(tree: &SidebarTree, space: Option<i64>, current: Option<i64>) 
         kind: node.kind,
         name: node.name.clone(),
         space: key.map(String::from),
-        open: node.count,
+        count: node.count,
         current: current == Some(node.id),
     };
     let home = std::iter::once(&tree.everything)

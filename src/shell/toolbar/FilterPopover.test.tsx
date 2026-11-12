@@ -10,7 +10,9 @@ import { api, type ListConditions } from "../../api";
 import { createQueryClient } from "../../queries/queryClient";
 import { narrowingKey } from "../../state/slices/narrowing";
 import { resetStore, useStore } from "../../state/store";
+import { boardData } from "../../test/board";
 import { filterOptions, listConditions } from "../../test/filters";
+import { viewData } from "../../test/issues";
 import { sidebarTree, space } from "../../test/spaces";
 import { view } from "../../test/views";
 import { FilterPopover } from "./FilterPopover";
@@ -87,7 +89,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
   mocked.filterOptions.mockResolvedValue(OPTIONS);
-  mocked.listMatchCount.mockResolvedValue({ open: 5, total: 9 });
+  mocked.viewRows.mockResolvedValue(viewData([], [], { total: 5 }));
   mocked.sidebarTree.mockResolvedValue(sidebarTree([space()]));
   mocked.viewsOf.mockResolvedValue([view({ id: VIEW_ID })]);
 });
@@ -225,7 +227,7 @@ describe("FilterPopover", () => {
     });
 
     it("keeps a condition whose text is still empty out of the match count", async () => {
-      mocked.listMatchCount.mockImplementation(async (_listId, { conditions }) => ({ open: conditions.length, total: 9 }));
+      mocked.viewRows.mockImplementation(async (_list, _view, narrowing) => viewData([], [], { total: narrowing.listDraft?.length ?? 1 }));
       const popover = await openFilter(FILTER_LIST);
       await userEvent.click(within(section(popover, LIST_SECTION)).getByRole("button", { name: "+ Add condition" }));
       expect(await within(popover).findByText("2 issues match")).toBeInTheDocument();
@@ -298,13 +300,14 @@ describe("FilterPopover", () => {
       expect(within(popover).getByLabelText("Value")).toHaveValue("2026-10-01");
     });
 
-    it("counts the drafted conditions instead of the saved ones", async () => {
+    it("shows the total of the new rows answer once a condition is drafted", async () => {
+      mocked.viewRows.mockImplementation(async (_list, _view, narrowing) => viewData([], [], { total: narrowing.listDraft?.[0]?.value === "Low" ? 3 : 5 }));
       const popover = await openFilter(FILTER_LIST);
-      await waitFor(() => expect(mocked.listMatchCount).toHaveBeenLastCalledWith(21, { conditions: [HIGH_PRIORITY] }, false));
+      expect(await within(popover).findByText("5 issues match")).toBeInTheDocument();
 
       await swapPriority(popover);
 
-      await waitFor(() => expect(mocked.listMatchCount).toHaveBeenLastCalledWith(21, { conditions: [LOW_PRIORITY] }, false));
+      expect(await within(popover).findByText("3 issues match")).toBeInTheDocument();
     });
   });
 
@@ -419,10 +422,43 @@ describe("FilterPopover", () => {
   });
 
   describe("on a Space", () => {
-    it("counts the open issues before any condition is added", async () => {
+    it("shows the view's total as plain issues while nothing narrows", async () => {
+      mocked.viewRows.mockResolvedValue(viewData([], [], { total: 12 }));
       const popover = await openFilter(SPACE, 11);
 
-      expect(await within(popover).findByText("5 open issues")).toBeInTheDocument();
+      expect(await within(popover).findByText("12 issues")).toBeInTheDocument();
+    });
+
+    it("says a single issue in the singular", async () => {
+      mocked.viewRows.mockResolvedValue(viewData([], [], { total: 1 }));
+      const popover = await openFilter(SPACE, 11);
+
+      expect(await within(popover).findByText("1 issue")).toBeInTheDocument();
+    });
+
+    it("says a single matching issue in the singular once narrowed", async () => {
+      mocked.viewRows.mockResolvedValue(viewData([], [], { total: 1 }));
+      const popover = await openFilter(SPACE, 11);
+
+      await userEvent.click(within(popover).getByRole("button", { name: "+ Add condition" }));
+
+      expect(await within(popover).findByText("1 issue matches")).toBeInTheDocument();
+    });
+
+    it("shows the board's total on a board view", async () => {
+      mocked.viewsOf.mockResolvedValue([view({ id: VIEW_ID, layout: "board" })]);
+      mocked.viewBoard.mockResolvedValue(boardData([], [], { total: 7 }));
+      const popover = await openFilter(SPACE, 11);
+
+      expect(await within(popover).findByText("7 issues")).toBeInTheDocument();
+    });
+
+    it("shows no count until the rows load", async () => {
+      mocked.viewRows.mockReturnValue(new Promise(() => {}));
+      const popover = await openFilter(SPACE, 11);
+
+      await waitFor(() => expect(mocked.viewRows).toHaveBeenCalled());
+      expect(within(popover).queryByText(/\d issues?/)).not.toBeInTheDocument();
     });
 
     it("counts the matching issues once a condition is added", async () => {
@@ -496,33 +532,34 @@ describe("FilterPopover", () => {
       const popover = await openFilter(SPACE, 11);
 
       expect(await within(popover).findByText("5 issues match")).toBeInTheDocument();
-      expect(within(popover).queryByText("5 open issues")).not.toBeInTheDocument();
-      await waitFor(() => expect(mocked.listMatchCount).toHaveBeenLastCalledWith(11, { conditions: [] }, true));
+      expect(within(popover).queryByText("5 issues")).not.toBeInTheDocument();
     });
 
-    it("counts with Me off for a view that did not save it", async () => {
-      await openFilter(SPACE, 11);
+    it("says plain issues for a view that did not save Me", async () => {
+      const popover = await openFilter(SPACE, 11);
 
-      await waitFor(() => expect(mocked.listMatchCount).toHaveBeenLastCalledWith(11, { conditions: [] }, false));
+      expect(await within(popover).findByText("5 issues")).toBeInTheDocument();
     });
 
     it.each([
-      ["on over a view that saved Me off", true, false],
-      ["off over a view that saved Me on", false, true],
-    ])("counts with the drafted Me chip %s", async (_name, drafted, saved) => {
+      ["on over a view that saved Me off", true, false, "4 issues match"],
+      ["off over a view that saved Me on", false, true, "5 issues"],
+    ])("shows the total of the rows asked with the drafted Me chip %s", async (_name, drafted, saved, expected) => {
+      mocked.viewRows.mockImplementation(async (_list, _view, narrowing) => viewData([], [], { total: narrowing.me ? 4 : 5 }));
       savedOnlyMine(saved);
       useStore.getState().setNarrowing(narrowingKey(11, VIEW_ID), { me: drafted });
 
-      await openFilter(SPACE, 11);
+      const popover = await openFilter(SPACE, 11);
 
-      await waitFor(() => expect(mocked.listMatchCount).toHaveBeenLastCalledWith(11, { conditions: [] }, drafted));
+      expect(await within(popover).findByText(expected)).toBeInTheDocument();
     });
 
-    it("counts the drafted conditions together with Me", async () => {
+    it("shows the total of the rows asked with Me together with the drafted conditions", async () => {
+      mocked.viewRows.mockImplementation(async (_list, _view, narrowing) => viewData([], [], { total: narrowing.me ? 2 : 5 }));
       savedOnlyMine(true, 21);
-      await openFilter(FILTER_LIST);
+      const popover = await openFilter(FILTER_LIST);
 
-      await waitFor(() => expect(mocked.listMatchCount).toHaveBeenLastCalledWith(21, { conditions: [HIGH_PRIORITY] }, true));
+      expect(await within(popover).findByText("2 issues match")).toBeInTheDocument();
     });
   });
 
@@ -642,10 +679,14 @@ describe("FilterPopover", () => {
       expect(draft()?.view).toEqual([]);
     });
 
-    it("counts the issues matching the list and view conditions together", async () => {
-      await openFilter(listConditions({ kind: "list", own: [HIGH_PRIORITY], view: [NO_DUE_DATE] }));
+    it("shows the total of the rows asked once a condition is added in This view", async () => {
+      mocked.viewRows.mockImplementation(async (_list, _view, narrowing) => viewData([], [], { total: narrowing.viewDraft?.length ? 8 : 5 }));
+      const popover = await openFilter(FILTER_LIST);
+      expect(await within(popover).findByText("5 issues match")).toBeInTheDocument();
 
-      await waitFor(() => expect(mocked.listMatchCount).toHaveBeenCalledWith(21, { conditions: [HIGH_PRIORITY, NO_DUE_DATE] }, false));
+      await userEvent.click(within(section(popover, VIEW_SECTION)).getByRole("button", { name: "+ Add condition" }));
+
+      expect(await within(popover).findByText("8 issues match")).toBeInTheDocument();
     });
 
     it("shows a damaged view filter in This view and not in the list section", async () => {
@@ -790,17 +831,10 @@ describe("FilterPopover", () => {
       expect(screen.getByRole("dialog", { name: "Filter" })).toBeInTheDocument();
     });
 
-    it("counts the issues under the fixed condition and says they match", async () => {
+    it("shows the view's total and says the issues match, because of the fixed condition", async () => {
       const popover = await openFilter(VIEWED);
 
       expect(await within(popover).findByText("5 issues match")).toBeInTheDocument();
-      await waitFor(() => expect(mocked.listMatchCount).toHaveBeenLastCalledWith(21, { conditions: [WINDOW] }, false));
-    });
-
-    it("counts the fixed condition together with the view's drafted ones", async () => {
-      await openFilter(listConditions({ kind: "viewed", fixed: WINDOW, view: [NO_DUE_DATE] }));
-
-      await waitFor(() => expect(mocked.listMatchCount).toHaveBeenLastCalledWith(21, { conditions: [WINDOW, NO_DUE_DATE] }, false));
     });
   });
 

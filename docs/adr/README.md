@@ -33,7 +33,7 @@ stands in Taskboard. The numbers in this table are Taskboard's.
 | [0021](0021-the-token-lives-in-the-keychain-through-secrets-rs.md) | The API token lives in the Keychain through `secrets.rs` | Amended by 0026 |
 | [0022](0022-the-debug-build-syncs-from-a-built-in-fake-jira.md) | The debug build syncs from a built-in fake Jira | Accepted (2026-10-28) |
 | [0023](0023-one-sync-task-full-sync-per-project-changes-by-diffing.md) | One sync task; the full sync runs per tracked project; changes are recorded by diffing | Accepted (2026-10-28) |
-| [0024](0024-filters-run-locally-in-sql-views-never-filter.md) | Filters run locally in SQL; views never filter | Superseded in part by 0033 (view filters), 0038 (the saved Me chip) |
+| [0024](0024-filters-run-locally-in-sql-views-never-filter.md) | Filters run locally in SQL; views never filter | Superseded in part by 0033 (view filters), 0038 (the saved Me chip), 0067 (counts) |
 | [0025](0025-all-jira-traffic-goes-through-one-allowlisted-gateway.md) | All Jira traffic goes through one allowlisted gateway | Accepted (2026-10-28) |
 | [0026](0026-the-debug-build-keeps-its-demo-token-in-memory.md) | The debug build keeps its demo token in memory | Accepted (2026-10-28) |
 | [0027](0027-jira-html-is-sanitised-and-shows-no-remote-content.md) | Jira HTML is sanitised and shows no remote content | Superseded in part by 0036 (rendering ADF) and 0039 (inline images) |
@@ -47,9 +47,9 @@ stands in Taskboard. The numbers in this table are Taskboard's.
 | [0035](0035-attachments-preview-in-quick-look.md) | Attachments preview in Quick Look | Accepted (2026-10-29) |
 | [0036](0036-rich-text-renders-from-adf-not-renderedfields.md) | Rich text renders from ADF, not renderedFields | Superseded in part by 0039 (inline images) |
 | [0037](0037-views-choose-how-subtasks-show.md) | Views choose how subtasks show | Accepted (2026-10-29) |
-| [0038](0038-filter-changes-are-drafts-until-the-view-is-saved.md) | Filter changes are drafts until the view is saved | Accepted (2026-10-29) |
+| [0038](0038-filter-changes-are-drafts-until-the-view-is-saved.md) | Filter changes are drafts until the view is saved | Superseded in part by 0067 (the popover's count) |
 | [0039](0039-inline-images-come-from-issue-attachments-through-rust.md) | Inline images come from issue attachments through Rust | Superseded in part by 0042 (the app scheme) |
-| [0040](0040-subtasks-are-the-children-of-a-views-results.md) | Subtasks are the children of a view's results | Accepted (2026-10-29) |
+| [0040](0040-subtasks-are-the-children-of-a-views-results.md) | Subtasks are the children of a view's results | Superseded in part by 0067 (the popover's count) |
 | [0041](0041-an-issues-big-texts-live-beside-its-row.md) | An issue's big texts live beside its row | Accepted (2026-10-30) |
 | [0042](0042-inline-images-load-through-an-app-scheme.md) | Inline images load through an app scheme | Accepted (2026-10-30) |
 | [0043](0043-the-palette-runs-the-menus.md) | The palette runs the menus | Accepted (2026-10-30) |
@@ -64,7 +64,7 @@ stands in Taskboard. The numbers in this table are Taskboard's.
 | [0052](0052-back-and-forward-live-in-each-tabs-nav.md) | Back and Forward live in each tab's nav | Accepted (2026-11-02) |
 | [0053](0053-builds-are-signed-with-an-apple-development-certificate.md) | Builds are signed with an Apple Development certificate | Accepted (2026-11-03) |
 | [0054](0054-every-release-build-gets-a-new-version.md) | Every release build gets a new version | Accepted (2026-11-05) |
-| [0055](0055-status-styles-are-chosen-app-wide-a-space-overrides.md) | Status styles are chosen app-wide; a Space overrides them | Accepted (2026-11-10) |
+| [0055](0055-status-styles-are-chosen-app-wide-a-space-overrides.md) | Status styles are chosen app-wide; a Space overrides them | Superseded in part by 0067 (open counts) |
 | [0056](0056-custom-fields-are-opted-in-app-wide-a-space-opts-out.md) | Custom fields are opted in app-wide; a Space opts out | Accepted (2026-11-10) |
 | [0057](0057-jira-data-can-live-in-memory-only.md) | Jira data can live in memory only (opt-in) | Superseded by [0066](0066-jira-data-lives-in-memory-only.md) |
 | [0058](0058-own-changes-are-not-news.md) | The owner's own changes aren't news | Accepted (2026-11-10) |
@@ -76,5 +76,6 @@ stands in Taskboard. The numbers in this table are Taskboard's.
 | [0064](0064-comment-mentions-come-from-the-space-team.md) | Comment mentions come from the Space's team | Accepted (2026-11-11) |
 | [0065](0065-a-major-version-needs-the-owners-approval.md) | A major version needs the owner's approval (supersedes part of 0054) | Accepted (2026-11-11) |
 | [0066](0066-jira-data-lives-in-memory-only.md) | Jira data lives in memory only; no issue text on disk | Accepted (2026-11-12) |
+| [0067](0067-every-count-is-what-its-list-shows.md) | Every count is what its list shows | Accepted (2026-11-12) |
 
 Open: integrations with Daybook and TimeTracker.

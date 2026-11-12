@@ -12,8 +12,16 @@ fn width<T>(rows: &[T], cell: impl Fn(&T) -> usize) -> usize {
     rows.iter().map(cell).max().unwrap_or(0)
 }
 
-fn open_text(open: Option<i64>) -> String {
-    open.map_or_else(|| "filter can't be used".into(), |n| format!("{n} open"))
+fn issue_count(n: i64) -> String {
+    if n == 1 {
+        "1 issue".into()
+    } else {
+        format!("{n} issues")
+    }
+}
+
+fn count_text(count: Option<i64>) -> String {
+    count.map_or_else(|| "filter can't be used".into(), issue_count)
 }
 
 pub fn spaces(rows: &[SpaceRow]) -> String {
@@ -29,12 +37,12 @@ pub fn spaces(rows: &[SpaceRow]) -> String {
             .map(|c| format!(" ({c})"))
             .unwrap_or_default();
         format!(
-            "{}{:>id$}  {:<key$}  {}{client} · {} open",
+            "{}{:>id$}  {:<key$}  {}{client} · {}",
             marker(r.current),
             r.id,
             r.key,
             r.name,
-            r.open
+            issue_count(r.count)
         )
     }))
 }
@@ -53,7 +61,7 @@ pub fn levels(rows: &[LevelRow]) -> String {
             "{}{:>id$}  {name} · {}",
             marker(r.current),
             r.id,
-            open_text(r.open)
+            count_text(r.count)
         )
     }))
 }

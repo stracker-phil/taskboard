@@ -1,4 +1,4 @@
-//! The other Spaces (open counts in the sidebar, subtasks included: NWS 6, LUM 11, FBA 12, INT 8) and the
+//! The other Spaces (open issues, subtasks included: NWS 6, LUM 11, FBA 12, INT 8) and the
 //! untracked archive project.
 
 use super::catalog::Kind::{Bug, Story, Subtask, Task};

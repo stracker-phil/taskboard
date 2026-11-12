@@ -29,9 +29,9 @@ fn search() -> IpcMessage {
     }
 }
 
-fn space(id: i64, key: &str, name: &str, client: Option<&str>, open: i64, current: bool) -> Value {
+fn space(id: i64, key: &str, name: &str, client: Option<&str>, count: i64, current: bool) -> Value {
     json!({
-        "id": id, "key": key, "name": name, "client": client, "open": open, "current": current
+        "id": id, "key": key, "name": name, "client": client, "count": count, "current": current
     })
 }
 
@@ -40,11 +40,11 @@ fn level(
     kind: &str,
     name: &str,
     space: Option<&str>,
-    open: Option<i64>,
+    count: Option<i64>,
     current: bool,
 ) -> Value {
     json!({
-        "id": id, "kind": kind, "name": name, "space": space, "open": open, "current": current
+        "id": id, "kind": kind, "name": name, "space": space, "count": count, "current": current
     })
 }
 
@@ -59,14 +59,23 @@ fn issue(key: &str, status: &str, summary: &str, gone: bool) -> Value {
 }
 
 #[test]
-fn spaces_align_ids_and_keys_mark_the_current_one_and_show_client_and_open_count() {
+fn spaces_align_ids_and_keys_mark_the_current_one_and_show_client_and_issue_count() {
     let reply = json!([
         space(2, "NW", "Website relaunch", Some("Northwind Ltd"), 21, true),
         space(10, "NWS", "Northwind support", None, 6, false),
     ]);
     assert_eq!(
         printed(&IpcMessage::Spaces, reply),
-        "*  2  NW   Website relaunch (Northwind Ltd) · 21 open\n  10  NWS  Northwind support · 6 open"
+        "*  2  NW   Website relaunch (Northwind Ltd) · 21 issues\n  10  NWS  Northwind support · 6 issues"
+    );
+}
+
+#[test]
+fn a_count_of_one_is_written_in_the_singular() {
+    let reply = json!([space(2, "NW", "Website relaunch", None, 1, false)]);
+    assert_eq!(
+        printed(&IpcMessage::Spaces, reply),
+        "  2  NW  Website relaunch · 1 issue"
     );
 }
 
@@ -87,8 +96,8 @@ fn filters_prefix_a_spaces_lists_with_its_key_and_leave_home_lists_plain() {
     ]);
     assert_eq!(
         printed(&filters(), reply),
-        "   3  Bookmarks · 4 open\n\
-         * 12  NW/Open bugs · 12 open\n\
+        "   3  Bookmarks · 4 issues\n\
+         * 12  NW/Open bugs · 12 issues\n\
          \u{20} 13  NWS/Broken · filter can't be used"
     );
 }

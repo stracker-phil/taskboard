@@ -38,7 +38,7 @@ export function useEmptyReason(listId: number, viewId: number, narrowing: Narrow
   function suffix() {
     const viewSuffix = viewFiltered && viewName ? ` → ${viewName}` : null;
     if (countable && count === undefined) return null;
-    if (!countable || count === undefined || count.total === 0) return viewSuffix;
+    if (!countable || count === undefined || count === 0) return viewSuffix;
     if (me.on) return " for you";
     const name = people?.find((p) => p.accountId === me.person)?.name;
     return name ? ` for ${name.split(" ")[0]}` : viewSuffix;

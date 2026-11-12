@@ -103,7 +103,7 @@ never changes Settings, and it never changes Jira.
 | `taskboard status` | the version, the window, where it is (`at: NW Website relaunch › Board`), the sync and each Space's cached and open issues |
 | `taskboard open <KEY>` | opens an issue (`NW-12`, any case) in the full Issue view over its Space, starting Taskboard if needed |
 | `taskboard spaces` | the tracked Spaces with their ids and keys; `*` marks the open one |
-| `taskboard filters [SPACE]` | Everything, Home's lists and every Space's filter lists (`NW/Open bugs`) with their ids and open issues |
+| `taskboard filters [SPACE]` | Everything, Home's lists and every Space's filter lists (`NW/Open bugs`) with their ids and issue counts |
 | `taskboard views [LEVEL]` | a level's views with their ids and layouts (default: the open level) |
 | `taskboard go <LEVEL> [VIEW]` | opens a level at a view, or at the one it showed last; prints where it went |
 | `taskboard me [on\|off]` | shows only my issues in the current view; without an argument it flips |

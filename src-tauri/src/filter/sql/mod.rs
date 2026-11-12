@@ -49,9 +49,6 @@ macro_rules! status_category {
 }
 pub const STATUS_CATEGORY: &str = status_category!();
 
-/// Issues the sidebar counts.
-pub const OPEN_ISSUES: &str = concat!(status_category!(), " <> 'done'");
-
 /// What compiling needs to know beyond the conditions.
 #[derive(Clone, Debug)]
 pub struct Ctx {

@@ -1,10 +1,10 @@
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { ListFilter, Lock } from "lucide-react";
 import { useId, useState, type RefObject } from "react";
 import { api, type Condition, type FilterOptions, type ListConditions, type LockedCondition, type Op } from "../../api";
 import { Popover } from "../../components/Popover";
 import { useNavGo, useSidebar } from "../../queries/sidebar";
 import { useFilterOptions, useListConditions, useRequestNarrowing } from "../../queries/views";
+import { issueCount, matchCount, useViewTotal } from "../viewTotal";
 import { attempt } from "../../state/requests";
 import { narrowingKey } from "../../state/slices/narrowing";
 import { useStore } from "../../state/store";
@@ -55,11 +55,11 @@ function Editor({ listId, viewId, conditions, options: allOptions, dirty, onSave
   const setNarrowing = useStore((s) => s.setNarrowing);
   const setListDraft = (update: (all: Condition[]) => Condition[]) => setNarrowing(key, { list: update(useStore.getState().narrowings[key]?.list ?? conditions.own) });
   const setViewDraft = (update: (all: Condition[]) => Condition[]) => setNarrowing(key, { view: update(useStore.getState().narrowings[key]?.view ?? conditions.view) });
-  const listComplete = listDraft.filter(isComplete);
   const viewComplete = viewDraft.filter(isComplete);
-  const me = useRequestNarrowing(listId, viewId)?.me ?? false;
+  const narrowing = useRequestNarrowing(listId, viewId);
+  const me = narrowing?.me ?? false;
   const fixed = conditions.fixed ? [conditions.fixed] : [];
-  const count = useMatchCount(listId, [...fixed, ...listComplete, ...viewComplete], me);
+  const total = useViewTotal(listId, viewId);
 
   const { data: tree } = useSidebar();
   const go = useNavGo();
@@ -72,14 +72,15 @@ function Editor({ listId, viewId, conditions, options: allOptions, dirty, onSave
     onClose();
     await go(id);
   };
-  const narrowed = editsList || fixed.length > 0 || me || listDraft.length + viewDraft.length > 0;
+  const byChips = narrowing?.person != null || narrowing?.epic != null || (narrowing?.text.trim() ?? "") !== "";
+  const narrowed = editsList || fixed.length > 0 || me || byChips || listDraft.length + viewDraft.length > 0;
 
   return (
     <>
       <div className="popover__header filter-popover__header">
         <ListFilter size={14} aria-hidden="true" className="filter-popover__icon" />
         <span className="popover__title">Show issues where</span>
-        {count && <span className="popover__meta">{narrowed ? matchText(count.open) : openText(count.open)}</span>}
+        {total !== undefined && <span className="popover__meta">{narrowed ? matchCount(total) : issueCount(total)}</span>}
       </div>
       <div className="filter-popover__body">
         {conditions.locked.map((locked, i) => (
@@ -178,18 +179,4 @@ function LockedRow({ condition }: { condition: LockedCondition }) {
       <span className="locked-condition__source">{condition.source}</span>
     </div>
   );
-}
-
-/** Open issues, like the sidebar counts. */
-const matchText = (n: number) => (n === 1 ? "1 issue matches" : `${n} issues match`);
-const openText = (n: number) => (n === 1 ? "1 open issue" : `${n} open issues`);
-
-/** Open issues under the drafts and the Me chip; the text filter is a search and isn't counted. */
-function useMatchCount(listId: number, conditions: Condition[], me: boolean) {
-  const { data } = useQuery({
-    queryKey: ["matchCount", listId, conditions, me],
-    queryFn: () => api.listMatchCount(listId, { conditions }, me),
-    placeholderData: keepPreviousData,
-  });
-  return data;
 }

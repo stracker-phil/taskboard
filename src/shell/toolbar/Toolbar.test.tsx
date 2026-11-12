@@ -64,7 +64,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
   installCommands("main");
-  mocked.listMatchCount.mockResolvedValue({ open: 5, total: 9 });
+  mocked.listMatchCount.mockResolvedValue(5);
   mocked.viewsOf.mockResolvedValue([view()]);
 });
 

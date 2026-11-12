@@ -6,6 +6,4 @@ mod sql;
 
 pub use describe::{Names, Parts, describe, parts};
 pub use model::{Condition, Field, Filter, ME, Op, Value, parse_keys};
-pub use sql::{
-    Compiled, Ctx, CustomField, FIELDS_IN_USE, OPEN_ISSUES, RELEVANT_FIELD, TRACKED_ISSUES, compile,
-};
+pub use sql::{Compiled, Ctx, CustomField, FIELDS_IN_USE, RELEVANT_FIELD, TRACKED_ISSUES, compile};
