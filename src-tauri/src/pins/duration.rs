@@ -1,9 +1,11 @@
 //! How long a pin lasts: day-based durations end at the owner's local midnight.
 
-use chrono::{DateTime, Days, Duration, NaiveDate, NaiveTime, TimeZone, Utc};
+use chrono::{DateTime, Days, Duration, Utc};
 use chrono_tz::Tz;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
+
+use crate::time::day_start;
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, TS)]
 #[ts(export, export_to = "src/api/types.gen.ts")]
@@ -27,17 +29,6 @@ pub fn expires_at(duration: PinDuration, now: DateTime<Utc>, tz: Tz) -> Option<D
     };
     let today = now.with_timezone(&tz).date_naive();
     Some(day_start(today + Days::new(days), tz))
-}
-
-/// Local midnight; on a day whose midnight a clock change skips, the first local time that exists.
-fn day_start(date: NaiveDate, tz: Tz) -> DateTime<Utc> {
-    let midnight = date.and_time(NaiveTime::MIN);
-    (0..=3)
-        .find_map(|hours| {
-            tz.from_local_datetime(&(midnight + Duration::hours(hours)))
-                .earliest()
-        })
-        .map_or_else(|| midnight.and_utc(), |at| at.with_timezone(&Utc))
 }
 
 /// "today" on its last day, "2d left" before; empty for a pin without an end.

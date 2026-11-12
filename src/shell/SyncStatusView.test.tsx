@@ -11,6 +11,7 @@ import { createQueryClient } from "../queries/queryClient";
 import { useEvents } from "../queries/useEvents";
 import { resetStore } from "../state/store";
 import { emitEvent } from "../test/apiMock";
+import { BERLIN_DAYS } from "../test/days";
 import { projectCounts, syncOverview } from "../test/jira";
 import { SyncStatusView } from "./SyncStatusView";
 
@@ -48,6 +49,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
   mocked.syncOverview.mockResolvedValue(syncOverview());
+  mocked.localDays.mockResolvedValue(BERLIN_DAYS);
 });
 
 describe("SyncStatusView", () => {
@@ -192,12 +194,12 @@ describe("SyncStatusView", () => {
     });
 
     it("shows when the last full sync finished", async () => {
-      const lastFullAt = "2026-03-04T09:30:00Z";
+      const lastFullAt = "2026-11-12T08:30:00Z";
       mocked.syncOverview.mockResolvedValue(syncOverview({ lastFullAt, projects: [NW] }));
 
       await renderView();
 
-      expect(await screen.findByText(`Synced at ${formatLocalTime(lastFullAt)}`)).toBeInTheDocument();
+      expect(await screen.findByText(`Synced at ${formatLocalTime(lastFullAt, BERLIN_DAYS)}`)).toBeInTheDocument();
     });
   });
 
@@ -216,7 +218,11 @@ describe("SyncStatusView", () => {
         "Jira answered with an unexpected response.",
       ],
       ["a pause", { state: "paused", message: "Reconnect Jira to continue." }, "Reconnect Jira to continue."],
-      ["an offline state", { state: "offline", since: "2026-03-04T09:30:00Z", retryAt: "2026-03-04T09:35:00Z", lastOk: null }, `Offline since ${formatLocalTime("2026-03-04T09:30:00Z")}`],
+      [
+        "an offline state",
+        { state: "offline", since: "2026-11-12T08:30:00Z", retryAt: "2026-11-12T08:35:00Z", lastOk: null },
+        `Offline since ${formatLocalTime("2026-11-12T08:30:00Z", BERLIN_DAYS)}`,
+      ],
     ])("shows the message for %s", async (_name, state, text) => {
       mocked.syncOverview.mockResolvedValue(syncOverview({ state, projects: [NW] }));
 

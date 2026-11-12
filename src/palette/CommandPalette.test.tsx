@@ -103,7 +103,7 @@ async function search(text: string) {
 const FILE_MENU = [menuCommand(), menuCommand({ label: "Full sync", command: "sync:full" })];
 const items = (count: number, menu = "Go"): MenuCommand[] => Array.from({ length: count }, (_, i) => menuCommand({ menu, label: `Item ${i + 1}`, command: `bus:${i + 1}` }));
 
-registerSettingsPage({ id: "zebra", group: "Jira", label: "Zebra stripes", icon: SettingsIcon, Body: () => null, sections: [{ id: "site", title: "Site address" }] });
+registerSettingsPage({ id: "zebra", group: "Jira", label: "Zebra stripes", icon: SettingsIcon, Body: () => null, rows: [{ id: "site", title: "Site address" }] });
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -371,7 +371,7 @@ describe("CommandPalette", () => {
 
       await search("all");
 
-      const row = await screen.findByRole("option", { name: /All issues/ });
+      const row = await screen.findByRole("option", { name: /Website relaunch › All issues/ });
       expect(within(row).getByText("Website relaunch › All issues")).toBeInTheDocument();
     });
 
@@ -540,7 +540,7 @@ describe("CommandPalette", () => {
       expect(mocked.runCommand).toHaveBeenCalledWith("app:settings:zebra");
     });
 
-    it("finds a Settings page by the title of one of its groups", async () => {
+    it("finds a Settings page by the title of one of its rows", async () => {
       await renderPalette();
 
       await search(">site address");

@@ -10,16 +10,17 @@ const OPTIONS = ["system", "light", "dark"] as const satisfies readonly Appearan
 export function AppearancePage() {
   const { data: settings } = useSettings();
   return (
-    <Group title="Appearance" anchor="appearance">
+    <Group>
       <Segmented
-        label="Appearance"
+        label="Mode"
+        anchor="mode"
         description="Automatic follows macOS."
         options={OPTIONS}
         labels={{ system: "Automatic" }}
         value={settings?.appearance ?? null}
         onChange={(appearance) => void attempt(api.appearanceSet(appearance), "Could not change the appearance")}
       />
-      <Row label="Accent color" description="Selection, links and focus. A Space can choose its own.">
+      <Row label="Accent color" anchor="accent" description="Selection, links and focus. A Space can choose its own.">
         <AccentPicker label="Accent color" value={settings?.accent ?? null} onChange={(accent) => accent && void attempt(api.accentSet(accent), "Could not change the accent color")} />
       </Row>
     </Group>

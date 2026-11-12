@@ -9,6 +9,7 @@ import type {
   JiraActivity,
   Assignees,
   Accent,
+  LocalDays,
   Appearance,
   Behaviour,
   MeMatch,
@@ -235,6 +236,8 @@ export const api = {
   /** Light, dark or following macOS; every window repaints. */
   appearanceSet: (appearance: Appearance) => invoke<Settings>("appearance_set", { appearance }),
   accentSet: (accent: Accent) => invoke<Settings>("accent_set", { accent }),
+  /** The owner's day boundaries and time zone, for "today" and "yesterday" (ADR 0074). */
+  localDays: () => invoke<LocalDays>("local_days"),
   issueGet: (id: string) => invoke<IssueDetail>("issue_get", { id }),
   /** Remove from cache: only for an issue gone from Jira. */
   issueForget: (id: string) => invoke<void>("issue_forget", { id }),

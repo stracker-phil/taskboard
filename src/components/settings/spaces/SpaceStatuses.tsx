@@ -17,7 +17,7 @@ export function SpaceStatuses({ projectId }: { projectId: string }) {
     );
 
   return (
-    <Group title="Statuses" anchor="statuses" description="The statuses this Space's issues are in, in the style each one shows in here. Default is the style chosen in Settings → Statuses.">
+    <Group title="Statuses" description="The statuses this Space's issues are in, in the style each one shows in here. Default is the style chosen in Settings → Statuses.">
       {rows.length === 0 ? (
         <div className="settings-row">
           <span className="settings-empty">Statuses appear after the first sync.</span>

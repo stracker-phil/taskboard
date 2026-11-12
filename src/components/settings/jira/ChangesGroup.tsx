@@ -24,7 +24,7 @@ export function ChangesGroup() {
       anchor="changes"
       description="Each change is sent to Jira once."
     >
-      <Switch label="Allow changes to Jira" checked={behaviour.allowJiraChanges} onChange={setAllowJiraChanges} />
+      <Switch label="Allow changes to Jira" anchor="allow-changes" checked={behaviour.allowJiraChanges} onChange={setAllowJiraChanges} />
       {changes.map((row) => (
         <Row
           key={row.capability}

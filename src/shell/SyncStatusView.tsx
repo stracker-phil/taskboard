@@ -1,5 +1,6 @@
-import { api, type ProjectCounts, type SyncOverview, type SyncProgress } from "../api";
+import { api, type LocalDays, type ProjectCounts, type SyncOverview, type SyncProgress } from "../api";
 import { formatLocalTime } from "../lib/time";
+import { useLocalDays } from "../queries/localDays";
 import { describeSyncState, useSyncOverview, useSyncProgress } from "../queries/sync";
 import { fail } from "../state/store";
 
@@ -7,11 +8,12 @@ import { fail } from "../state/store";
 export function SyncStatusView() {
   const { data: overview } = useSyncOverview();
   const progress = useSyncProgress();
+  const days = useLocalDays();
   if (!overview) return null;
-  return <div className="content-panel__placeholder">{body(overview, progress)}</div>;
+  return <div className="content-panel__placeholder">{body(overview, progress, days)}</div>;
 }
 
-function body(overview: SyncOverview, progress: Record<string, SyncProgress>) {
+function body(overview: SyncOverview, progress: Record<string, SyncProgress>, days: LocalDays | undefined) {
   const { state, projects } = overview;
   if (projects.length === 0) return <ConnectPrompt />;
   switch (state.state) {
@@ -25,12 +27,12 @@ function body(overview: SyncOverview, progress: Record<string, SyncProgress>) {
           <p>
             {total === 1 ? "1 issue" : `${total} issues`} in {spaces}
           </p>
-          {overview.lastFullAt && <p className="sync-status__detail">Synced at {formatLocalTime(overview.lastFullAt)}</p>}
+          {overview.lastFullAt && <p className="sync-status__detail">Synced at {formatLocalTime(overview.lastFullAt, days)}</p>}
         </div>
       );
     }
     default:
-      return <p>{describeSyncState(state)}</p>;
+      return <p>{describeSyncState(state, days)}</p>;
   }
 }
 

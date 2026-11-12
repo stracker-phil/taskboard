@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { SyncProgress, SyncState } from "../../api";
 import { clockTime, fullDateTime } from "../../lib/relativeTime";
+import { BERLIN_DAYS } from "../../test/days";
 import { syncDetail, syncText } from "./syncWords";
 
-const NOW = new Date(2026, 2, 4, 12, 0);
-const LAST_OK = new Date(2026, 2, 4, 11, 58).toISOString();
-const SINCE = new Date(2026, 2, 4, 11, 40).toISOString();
-const LAST_FULL = new Date(2026, 2, 4, 9, 30).toISOString();
-const RETRY_AT = new Date(2026, 2, 4, 12, 5).toISOString();
+const NOW = new Date("2026-11-12T11:00:00Z");
+const LAST_OK = "2026-11-12T10:58:00Z";
+const SINCE = "2026-11-12T10:40:00Z";
+const LAST_FULL = "2026-11-12T08:30:00Z";
+const RETRY_AT = "2026-11-12T11:05:00Z";
 
 const progress = (patch: Partial<SyncProgress> = {}): SyncProgress => ({
   job: "delta",
@@ -36,11 +37,17 @@ describe("syncText", () => {
     ["a pause", PAUSED, [], "Sync paused · token"],
     ["an error", FAILED, [], "Sync failed"],
   ])("words %s", (_name, state, prog, text) => {
-    expect(syncText(state, prog, NOW)).toBe(text);
+    expect(syncText(state, prog, NOW, BERLIN_DAYS)).toBe(text);
   });
 
-  it("words an older success with its clock time", () => {
-    expect(syncText({ state: "idle", lastOk: LAST_FULL }, [], NOW)).toBe(`Synced at ${clockTime(LAST_FULL)}`);
+  it("words an older success of today with its clock time in the owner's zone", () => {
+    const clock = new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" }).format(new Date(LAST_FULL));
+
+    expect(syncText({ state: "idle", lastOk: LAST_FULL }, [], NOW, BERLIN_DAYS)).toBe(`Synced at ${clock}`);
+  });
+
+  it("words a success from the day before as yesterday", () => {
+    expect(syncText({ state: "idle", lastOk: "2026-11-11T09:00:00Z" }, [], NOW, BERLIN_DAYS)).toMatch(/^Synced yesterday at /);
   });
 });
 

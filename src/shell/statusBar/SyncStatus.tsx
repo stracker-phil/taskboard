@@ -1,5 +1,6 @@
 import { RotateCw } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useLocalDays } from "../../queries/localDays";
 import { useSyncOverview, useSyncProgress } from "../../queries/sync";
 import { runBusCommand } from "../../state/requests";
 import { syncDetail, syncText } from "./syncWords";
@@ -20,6 +21,7 @@ export function SyncStatus() {
   const { data: overview } = useSyncOverview();
   const progress = useSyncProgress();
   const now = useTicker();
+  const days = useLocalDays();
   const state = overview?.state;
   return (
     <button
@@ -30,7 +32,7 @@ export function SyncStatus() {
       onClick={() => runBusCommand("sync:refresh", "Could not sync")}
     >
       <span className="status-sync__dot" data-state={state?.state} aria-hidden="true" />
-      <span className="status-sync__text">{state ? syncText(state, Object.values(progress), now) : ""}</span>
+      <span className="status-sync__text">{state ? syncText(state, Object.values(progress), now, days) : ""}</span>
       <RotateCw size={13} strokeWidth={2} aria-hidden="true" className={state?.state === "running" ? "status-bar__spin" : undefined} />
     </button>
   );

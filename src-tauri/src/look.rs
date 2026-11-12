@@ -6,23 +6,29 @@ use ts_rs::TS;
 
 use crate::error::{AppError, AppResult};
 
-/// The windows' accent color (`palettes/*.css`, `data-accent`): the app's, or a Space's own while it is shown.
+/// The windows' accent color (`styles/accents.css`, `data-accent`): the app's, or a Space's own while it is shown.
+/// System follows the macOS accent color; the others are the family's nine hues (ADR 0073). The hues an earlier
+/// version offered read as their nearest one.
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq, TS)]
 #[ts(export, export_to = "src/api/types.gen.ts")]
 #[serde(rename_all = "camelCase")]
 pub enum Accent {
-    Purple,
-    Pink,
-    Red,
     Orange,
-    Yellow,
-    Green,
+    #[serde(alias = "yellow")]
+    Gold,
+    Red,
+    #[serde(alias = "pink")]
+    Magenta,
+    Purple,
+    Indigo,
+    Blue,
+    #[serde(alias = "green")]
     Teal,
     Graphite,
     /// Also what an unknown value reads as.
     #[default]
     #[serde(other)]
-    Blue,
+    System,
 }
 
 /// The tile colors the palette has.
@@ -114,15 +120,16 @@ mod tests {
     #[test]
     fn each_accent_serializes_as_its_camel_case_name_and_reads_back() {
         for (accent, name) in [
-            (Accent::Purple, "purple"),
-            (Accent::Pink, "pink"),
-            (Accent::Red, "red"),
+            (Accent::System, "system"),
             (Accent::Orange, "orange"),
-            (Accent::Yellow, "yellow"),
-            (Accent::Green, "green"),
+            (Accent::Gold, "gold"),
+            (Accent::Red, "red"),
+            (Accent::Magenta, "magenta"),
+            (Accent::Purple, "purple"),
+            (Accent::Indigo, "indigo"),
+            (Accent::Blue, "blue"),
             (Accent::Teal, "teal"),
             (Accent::Graphite, "graphite"),
-            (Accent::Blue, "blue"),
         ] {
             assert_eq!(
                 serde_json::to_value(accent).unwrap(),
@@ -137,15 +144,29 @@ mod tests {
     }
 
     #[test]
-    fn an_unknown_accent_reads_as_blue_which_is_the_default() {
-        for input in ["magenta", "", "Purple"] {
+    fn an_unknown_accent_reads_as_system_which_is_the_default() {
+        for input in ["chartreuse", "", "Purple"] {
             assert_eq!(
                 serde_json::from_value::<Accent>(serde_json::json!(input)).unwrap(),
-                Accent::Blue,
+                Accent::System,
                 "{input:?}"
             );
         }
-        assert_eq!(Accent::default(), Accent::Blue);
+        assert_eq!(Accent::default(), Accent::System);
+    }
+
+    #[test]
+    fn the_old_accent_names_read_as_their_nearest_hue_and_serialize_as_the_new_name() {
+        for (old, accent, new) in [
+            ("pink", Accent::Magenta, "magenta"),
+            ("yellow", Accent::Gold, "gold"),
+            ("green", Accent::Teal, "teal"),
+        ] {
+            let read = serde_json::from_value::<Accent>(serde_json::json!(old)).unwrap();
+
+            assert_eq!(read, accent, "{old}");
+            assert_eq!(serde_json::to_value(read).unwrap(), serde_json::json!(new));
+        }
     }
 
     #[test]

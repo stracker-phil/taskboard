@@ -174,14 +174,15 @@ describe("collectCommands", () => {
       label: "Palette demo",
       icon: SettingsIcon,
       Body: () => null,
-      sections: [
+      keywords: ["demo words"],
+      rows: [
         { id: "site", title: "Site" },
         { id: "token", title: "Token" },
       ],
     });
 
-    it("lists a page as “Settings: label” with its section titles as detail", () => {
-      expect(byLabel(collectAll([]), "Settings: Palette demo")).toMatchObject({ section: "Settings", detail: "Site, Token" });
+    it("lists a page as “Settings: label” with its keywords and row titles as detail", () => {
+      expect(byLabel(collectAll([]), "Settings: Palette demo")).toMatchObject({ section: "Settings", detail: "demo words, Site, Token" });
     });
 
     it("opens the page through the Rust command for it", () => {

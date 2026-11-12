@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { BERLIN_DAYS } from "../test/days";
 import { clockTime, fullDateTime, shortWhen, timeAgo } from "./relativeTime";
 
 const NOW = new Date("2026-03-04T12:00:00Z");
@@ -26,47 +27,55 @@ describe("timeAgo", () => {
 });
 
 describe("shortWhen", () => {
-  const LOCAL_NOON = new Date(2026, 2, 4, 12, 0);
-  const iso = (date: Date) => date.toISOString();
+  const BERLIN_NOON = new Date("2026-11-12T11:00:00Z");
+  const berlin = (iso: string, options: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat(undefined, { ...options, timeZone: "Europe/Berlin" }).format(new Date(iso));
+  const berlinClock = (iso: string) => berlin(iso, { hour: "2-digit", minute: "2-digit" });
+  const berlinDate = (iso: string) => berlin(iso, { day: "numeric", month: "short" });
 
-  it.each<[string, Date, string]>([
-    ["under a minute ago", new Date(2026, 2, 4, 11, 59, 30), "just now"],
-    ["a future timestamp", new Date(2026, 2, 4, 12, 10), "just now"],
-    ["five minutes ago", new Date(2026, 2, 4, 11, 55), "5 min ago"],
-    ["59 minutes ago", new Date(2026, 2, 4, 11, 0, 30), "59 min ago"],
+  it.each<[string, string, string]>([
+    ["under a minute ago", "2026-11-12T10:59:30Z", "just now"],
+    ["a future timestamp", "2026-11-12T11:10:00Z", "just now"],
+    ["five minutes ago", "2026-11-12T10:55:00Z", "5 min ago"],
+    ["59 minutes ago", "2026-11-12T10:00:30Z", "59 min ago"],
   ])("says %s as %s", (_name, at, text) => {
-    expect(shortWhen(iso(at), LOCAL_NOON)).toBe(text);
+    expect(shortWhen(at, BERLIN_NOON, BERLIN_DAYS)).toBe(text);
   });
 
-  it("names the clock time for an earlier moment of the same day", () => {
-    const at = iso(new Date(2026, 2, 4, 8, 30));
+  it("names the clock time in the owner's zone for an earlier moment of today", () => {
+    const at = "2026-11-12T07:30:00Z";
 
-    expect(shortWhen(at, LOCAL_NOON)).toBe(`at ${clockTime(at)}`);
+    expect(shortWhen(at, BERLIN_NOON, BERLIN_DAYS)).toBe(`at ${berlinClock(at)}`);
   });
 
   it("keeps counting minutes across midnight while under an hour", () => {
-    const now = new Date(2026, 2, 5, 0, 30);
+    const now = new Date("2026-11-11T23:30:00Z");
 
-    expect(shortWhen(iso(new Date(2026, 2, 4, 23, 50)), now)).toBe("40 min ago");
+    expect(shortWhen("2026-11-11T22:50:00Z", now, BERLIN_DAYS)).toBe("40 min ago");
   });
 
-  it("names yesterday and the clock time for a moment on the previous day", () => {
-    const at = iso(new Date(2026, 2, 3, 9, 12));
+  it("calls a moment just after local midnight today, though it is still the day before in UTC", () => {
+    const at = "2026-11-11T23:00:00Z";
 
-    expect(shortWhen(at, LOCAL_NOON)).toBe(`yesterday at ${clockTime(at)}`);
+    expect(shortWhen(at, BERLIN_NOON, BERLIN_DAYS)).toBe(`at ${berlinClock(at)}`);
   });
 
-  it("names yesterday across a month boundary", () => {
-    const at = iso(new Date(2026, 1, 28, 9, 12));
+  it("calls a moment just before local midnight yesterday", () => {
+    const at = "2026-11-11T22:59:00Z";
 
-    expect(shortWhen(at, new Date(2026, 2, 1, 12, 0))).toBe(`yesterday at ${clockTime(at)}`);
+    expect(shortWhen(at, BERLIN_NOON, BERLIN_DAYS)).toBe(`yesterday at ${berlinClock(at)}`);
   });
 
-  it("names the day and month and the clock time for anything older", () => {
-    const date = new Date(2026, 1, 20, 9, 12);
-    const at = iso(date);
+  it("names the day and month in the owner's zone and the clock time for anything older", () => {
+    const at = "2026-10-20T22:30:00Z";
 
-    expect(shortWhen(at, LOCAL_NOON)).toBe(`on ${date.toLocaleDateString(undefined, { day: "numeric", month: "short" })} at ${clockTime(at)}`);
+    expect(shortWhen(at, BERLIN_NOON, BERLIN_DAYS)).toBe(`on ${berlinDate(at)} at ${berlinClock(at)}`);
+    expect(berlinDate(at)).toContain("21");
+  });
+
+  it("names the day and month for any moment while the days have not loaded", () => {
+    const at = "2026-11-12T07:30:00Z";
+
+    expect(shortWhen(at, BERLIN_NOON, undefined)).toMatch(/^on .+ at /);
   });
 });
 

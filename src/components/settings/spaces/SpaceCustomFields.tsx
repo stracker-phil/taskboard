@@ -32,7 +32,7 @@ export function SpaceCustomFields({ config }: { config: SpaceConfig }) {
   }));
 
   return (
-    <Group title="Custom fields" anchor="fields" description="Where the fields picked in Settings → Custom fields show in this Space: as a column and filter choice, in the Issue view.">
+    <Group title="Custom fields" description="Where the fields picked in Settings → Custom fields show in this Space: as a column and filter choice, in the Issue view.">
       {rows.length === 0 ? (
         <div className="settings-row">
           <span className="settings-empty">No fields are shown. Pick fields in Settings → Custom fields.</span>

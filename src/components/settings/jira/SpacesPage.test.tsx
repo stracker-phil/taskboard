@@ -10,7 +10,7 @@ import { createQueryClient } from "../../../queries/queryClient";
 import { resetStore } from "../../../state/store";
 import { lumenSpace, sidebarTree, space } from "../../../test/spaces";
 import { Toasts } from "../../Toasts";
-import { SectionTarget } from "../controls";
+import { ScrollTarget } from "../controls";
 import { SpacesPage } from "./SpacesPage";
 
 const mocked = vi.mocked(api, true);
@@ -19,13 +19,14 @@ async function renderPage(spaces: SpaceNode[], target?: string) {
   mocked.sidebarTree.mockResolvedValue(sidebarTree(spaces));
   render(
     <QueryClientProvider client={createQueryClient()}>
-      <SectionTarget.Provider value={target}>
+      <ScrollTarget.Provider value={target ? { id: target } : undefined}>
         <SpacesPage />
-      </SectionTarget.Provider>
+      </ScrollTarget.Provider>
       <Toasts />
     </QueryClientProvider>,
   );
-  await screen.findByRole("region", { name: "Spaces" });
+  if (spaces.length === 0) await screen.findByText("Track projects under Projects to get Spaces.");
+  else if (!target) await screen.findByRole("button", { name: `${spaces[0].name} settings` });
 }
 
 const NORTHWIND = () => space({ client: "Northwind" });

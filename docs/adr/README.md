@@ -5,8 +5,9 @@ most a page; the docs pages explain how. A Decision names the alternatives it re
 is never edited: a new record supersedes it, and a dated amendment under Status only corrects facts that
 changed.
 
-Records inherited from Daybook, TimeTracker or DataBee say so under Status; they state the decision as it
-stands in Taskboard. The numbers in this table are Taskboard's.
+Records taken from the family catalog (the user-level `app-blueprint` skill) say so under Status, with the slug
+and the sibling record that implements it; they state the decision as it holds for Taskboard. The numbers in this
+table are Taskboard's.
 
 | No. | Title | Status |
 |---|---|---|
@@ -80,5 +81,9 @@ stands in Taskboard. The numbers in this table are Taskboard's.
 | [0068](0068-notification-settings-decide-what-counts.md) | Notification settings decide what counts (supersedes `behaviour.notifyAbout`, part of 0059) | Accepted (2026-11-12) |
 | [0069](0069-changes-by-automations-can-be-ignored.md) | Changes by automations can be ignored | Accepted (2026-11-12) |
 | [0070](0070-daybook-reaches-taskboard-through-its-cli-and-links.md) | Daybook reaches Taskboard through its CLI and links | Accepted (2026-11-12) |
+| [0071](0071-the-settings-search-finds-every-row.md) | The Settings search finds every row | Accepted (2026-11-12) |
+| [0072](0072-a-taken-key-is-reassigned-after-asking.md) | A taken key is reassigned after asking; the menu's keys stay fixed for now | Accepted (2026-11-12) |
+| [0073](0073-the-accent-follows-the-family-system-or-nine-hues.md) | The accent follows the family: System or one of nine hues (supersedes part of 0028) | Accepted (2026-11-12) |
+| [0074](0074-the-owners-days-come-from-rust.md) | The owner's days come from Rust; the page formats with Intl | Accepted (2026-11-12) |
 
 Open: integrations with Daybook and TimeTracker.

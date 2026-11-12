@@ -1,18 +1,20 @@
 import { api, type IssueDetail } from "../api";
 import { formatLocalDate } from "../lib/time";
+import { useLocalDays } from "../queries/localDays";
 import { usePinOf } from "../queries/pins";
 import { attempt } from "../state/requests";
 
 /** An issue Jira deleted or hid from the owner (artboard 8, card 6): the cached copy, Remove from cache, Remove bookmark. */
 export function GoneNotice({ issue, onRemoved }: { issue: IssueDetail; onRemoved: () => void }) {
   const pin = usePinOf("issue", issue.id);
+  const days = useLocalDays();
   const remove = async () => {
     // The command answers nothing (null), so success is marked before `attempt` turns a failure into null.
     if (await attempt(api.issueForget(issue.id).then(() => true), "Could not remove it from the cache")) onRemoved();
   };
   return (
     <div className="gone-notice">
-      <p className="gone-notice__text">Deleted in Jira or you lost access. Last synced {formatLocalDate(issue.syncedAt)}. This is the cached copy.</p>
+      <p className="gone-notice__text">Deleted in Jira or you lost access. Last synced {formatLocalDate(issue.syncedAt, days)}. This is the cached copy.</p>
       <div className="gone-notice__actions">
         <button type="button" className="btn-secondary btn-secondary--small" onClick={() => void remove()}>
           Remove from cache

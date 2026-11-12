@@ -18,8 +18,6 @@ export function StatusesPage() {
 
   return (
     <Group
-      title="Statuses"
-      anchor="statuses"
       description="The style each status shows in, in every Space. Automatic picks one from the Jira category and the name; a Space can choose its own in its settings."
     >
       {rows.length === 0 ? (

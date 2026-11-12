@@ -4074,17 +4074,42 @@ mod editing_spaces {
     }
 
     #[tokio::test]
-    async fn an_unknown_stored_accent_shows_as_blue_in_the_tree() {
+    async fn an_unknown_stored_accent_shows_as_system_in_the_tree() {
         let (_dir, db) = tracked_lab().await;
         execute(
             &db,
-            "UPDATE space SET accent = 'magenta' WHERE project_id = '10001'",
+            "UPDATE space SET accent = 'chartreuse' WHERE project_id = '10001'",
         )
         .await;
 
         let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
 
-        assert_eq!(find_space(&tree, "NW").accent, Some(Accent::Blue));
+        assert_eq!(find_space(&tree, "NW").accent, Some(Accent::System));
+    }
+
+    #[tokio::test]
+    async fn an_old_stored_accent_shows_as_its_nearest_hue_in_the_tree() {
+        for (stored, expected) in [
+            (
+                "UPDATE space SET accent = 'pink' WHERE project_id = '10001'",
+                Accent::Magenta,
+            ),
+            (
+                "UPDATE space SET accent = 'yellow' WHERE project_id = '10001'",
+                Accent::Gold,
+            ),
+            (
+                "UPDATE space SET accent = 'green' WHERE project_id = '10001'",
+                Accent::Teal,
+            ),
+        ] {
+            let (_dir, db) = tracked_lab().await;
+            execute(&db, stored).await;
+
+            let tree = sidebar_tree(&db, viewer(None)).await.unwrap();
+
+            assert_eq!(find_space(&tree, "NW").accent, Some(expected), "{stored}");
+        }
     }
 
     #[tokio::test]

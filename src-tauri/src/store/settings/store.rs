@@ -281,7 +281,7 @@ mod tests {
     }
 
     #[test]
-    fn a_file_without_accent_reads_as_blue() {
+    fn a_file_without_accent_reads_as_system() {
         let dir = temp_config_dir();
         fs::write(
             dir.path().join(FILE_NAME),
@@ -291,8 +291,18 @@ mod tests {
 
         let settings = SettingsStore::open(dir.path()).get();
 
-        assert_eq!(settings.accent, crate::look::Accent::Blue);
+        assert_eq!(settings.accent, crate::look::Accent::System);
         assert_eq!(settings.sync.focused_minutes, 10);
+    }
+
+    #[test]
+    fn an_old_accent_name_in_the_file_reads_as_its_nearest_hue() {
+        let dir = temp_config_dir();
+        fs::write(dir.path().join(FILE_NAME), r#"{"accent":"pink"}"#).unwrap();
+
+        let settings = SettingsStore::open(dir.path()).get();
+
+        assert_eq!(settings.accent, crate::look::Accent::Magenta);
     }
 
     #[tokio::test]
@@ -319,11 +329,11 @@ mod tests {
     }
 
     #[test]
-    fn an_unknown_accent_in_the_file_reads_as_blue_and_keeps_the_rest() {
+    fn an_unknown_accent_in_the_file_reads_as_system_and_keeps_the_rest() {
         let dir = temp_config_dir();
         fs::write(
             dir.path().join(FILE_NAME),
-            r#"{"accent":"magenta","sync":{"focusedMinutes":10}}"#,
+            r#"{"accent":"chartreuse","sync":{"focusedMinutes":10}}"#,
         )
         .unwrap();
 

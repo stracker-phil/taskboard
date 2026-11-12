@@ -10,7 +10,9 @@ intent. This page holds the rules every feature follows and grows with the code.
 These rules hold everywhere in the code. Keep them when you change things.
 
 1. **Rust owns the logic; React only renders** ([ADR 0001](adr/0001-rust-owns-the-logic.md)). Validation,
-   ordering, filtering, grouping, dates and the CLI are Rust. The page asks, renders and forwards intent.
+   ordering, filtering, grouping, dates and the CLI are Rust. The page asks, renders and forwards intent. Days are
+   Rust's too: the page formats times with `Intl` and tells today from yesterday only by the boundaries `local_days`
+   reports (`lib/time.ts` `dayOf`, [ADR 0074](adr/0074-the-owners-days-come-from-rust.md)).
 2. **IPC only in `api.ts` files** ([ADR 0002](adr/0002-ipc-in-api-files.md)). Only `src/api/index.ts` (and
    `src/<module>/api.ts`) imports `@tauri-apps/*`. Everything else imports the `api` object, which is also
    what UI tests mock. `src/test/boundary.test.ts` enforces it.

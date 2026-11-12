@@ -56,8 +56,6 @@ export function TeamPage() {
 
   return (
     <Group
-      title="Team"
-      anchor="team"
       description="Who is on each Space's team: offered to assign issues to, as a person filter and as a drop target. Everyone ever assigned an issue of a Space is on its team unless you switch them off; anyone else who reported, commented or changed something there joins only when you switch them on."
     >
       {matrix && matrix.people.length === 0 ? (

@@ -17,7 +17,8 @@ describe("contrastRatio", () => {
   });
 });
 
-const ACCENTS = ["blue", "purple", "pink", "red", "orange", "yellow", "green", "teal", "graphite"] as const;
+// "system" is left out: its colors come from the CSS `AccentColor` keyword, which only the browser resolves.
+const ACCENTS = ["orange", "gold", "red", "magenta", "purple", "indigo", "blue", "teal", "graphite"] as const;
 
 /** Splits `a, b(c, d), e` at the commas outside parentheses. */
 function splitArgs(text: string): string[] {

@@ -43,7 +43,7 @@ export function CustomFieldsPage() {
   }));
 
   return (
-    <Group title="Custom fields" anchor="fields" description="Pick where each Jira field shows. Fields without a box are hidden and never downloaded. A Space can hide a field again in its settings.">
+    <Group description="Pick where each Jira field shows. Fields without a box are hidden and never downloaded. A Space can hide a field again in its settings.">
       {fields && fields.length === 0 ? (
         <div className="settings-row">
           <span className="settings-empty">Custom fields appear after the first sync.</span>

@@ -13,7 +13,7 @@ import { fieldSetting, space, spaceConfig } from "../../../test/spaces";
 import { teamCell, teamMatrix } from "../../../test/team";
 import { MenuHost } from "../../menu";
 import { Toasts } from "../../Toasts";
-import { SectionTarget } from "../controls";
+import { ScrollTarget } from "../controls";
 import { SpaceSettings } from "./SpaceSettings";
 
 const mocked = vi.mocked(api, true);
@@ -40,9 +40,9 @@ async function renderSettings(config: SpaceConfig = spaceConfig(), tab?: string)
 const client = createQueryClient();
 const atTarget = (target: string | undefined) => (
   <QueryClientProvider client={client}>
-    <SectionTarget.Provider value={target}>
+    <ScrollTarget.Provider value={target ? { id: target } : undefined}>
       <SpaceSettings space={space()} />
-    </SectionTarget.Provider>
+    </ScrollTarget.Provider>
   </QueryClientProvider>
 );
 function renderAtTarget(target: string | undefined) {
@@ -216,6 +216,20 @@ describe("SpaceSettings", () => {
       await userEvent.click(within(group).getByRole("radio", { name: "Teal" }));
 
       expect(mocked.spaceSetAccent).toHaveBeenCalledWith("10001", "teal");
+    });
+
+    it("follows System while the settings have not loaded", async () => {
+      mocked.getSettings.mockReturnValueOnce(new Promise(() => {}));
+      mocked.spaceConfig.mockResolvedValue(spaceConfig());
+      render(
+        <QueryClientProvider client={createQueryClient()}>
+          <SpaceSettings space={space({ accent: null })} />
+        </QueryClientProvider>,
+      );
+      await screen.findByRole("region", { name: "Layouts" });
+      const group = screen.getByRole("radiogroup", { name: "Accent color" });
+
+      expect(within(group).getByRole("radio", { name: "Same as the app (System)", checked: true })).toBeInTheDocument();
     });
 
     it("sends null when the swatch that follows the app is clicked", async () => {

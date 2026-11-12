@@ -3,6 +3,7 @@ import { useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { api, type EventName, type EventPayloads, type IssuesChanged } from "../api";
 import { SETTINGS_KEYS } from "./settings";
 import { NAV_KEY, SIDEBAR_KEY, VIEWS_KEY } from "./sidebar";
+import { LOCAL_DAYS_KEY } from "./localDays";
 import { SYNC_KEY } from "./sync";
 import { ISSUE_KEY, issueKey } from "./issues";
 import { MODES_KEY } from "./modes";
@@ -21,7 +22,7 @@ type Invalidation<E extends EventName> = QueryKey[] | ((payload: EventPayloads[E
  *  keys here. */
 export const INVALIDATIONS: { [E in EventName]?: Invalidation<E> } = {
   // Me mode's rules change which rows a view shows.
-  settings_changed: [SETTINGS_KEYS.settings, SETTINGS_KEYS.connection, SETTINGS_KEYS.scope, SETTINGS_KEYS.capabilities, VIEW_ROWS_KEY],
+  settings_changed: [LOCAL_DAYS_KEY, SETTINGS_KEYS.settings, SETTINGS_KEYS.connection, SETTINGS_KEYS.scope, SETTINGS_KEYS.capabilities, VIEW_ROWS_KEY],
   // Tracking a project changes the Spaces. A deleted list or view moves the place, so Rust's place is asked
   // again too. Rows depend on the lists, the views, the Spaces and the status styles.
   // Last views and interactions only change rows and counts.

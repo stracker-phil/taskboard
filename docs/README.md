@@ -5,7 +5,7 @@ use it, see the [project README](../README.md).
 
 | Page | Covers |
 |---|---|
-| [architecture.md](architecture.md) | Design rules, process model, data, repository map |
+| [architecture.md](architecture.md) | Design rules, process model, data, repository map, webview hardening |
 | [ux.md](ux.md) | Design language: the mockup's window, tokens, type, metrics, Settings, keys |
 | [data.md](data.md) | The two SQLite files, their tables, the write path, migration rules |
 | [sync.md](sync.md) | The sync engine: jobs, states, storing pages, change records, events |
@@ -15,7 +15,7 @@ use it, see the [project README](../README.md).
 | [writes.md](writes.md) | Changes to Jira: the two locks, pending writes, the flow, "Change back to …" |
 | [jira.md](jira.md) | The Jira client: site and tokens, endpoints, limits, retries, errors, JQL, the fake Jira |
 | [testing.md](testing.md) | Unit and integration tests, the test agents, the demo seed, scripts that drive the app, signing |
-| [adapting.md](adapting.md) | Identity (names, ids, paths), platform-specific code, conventions to keep |
+| [adapting.md](adapting.md) | Identity (names, ids, paths), network hosts, platform-specific code, common changes, conventions to keep |
 | [adr/](adr/README.md) | Architecture decision records: why the design is the way it is |
 
 Pages for the other layers (`backend.md`, `frontend.md`) and for each feature are added with the code
@@ -33,11 +33,12 @@ The rules in [`.claude/rules/`](../.claude/rules/) are binding for changes:
 
 ## Sibling apps
 
-Taskboard is the fourth app of the same owner and inherits their stack, process and look. When this repo has
-no answer yet, look there (read-only):
+Taskboard is one app of the owner's family and shares their stack, process and look (family catalog: the
+user-level `app-blueprint` skill). When this repo has no answer yet, look there (read-only):
 
 | App | Path | Take from it |
 |---|---|---|
-| Daybook | `../daybook` | the newest and most mature: the look (`docs/ux.md`, `src/styles/`), Settings window, scrollbars, dev scripts, demo screenshots |
-| TimeTracker | `../timetracker` | SQLite through sqlx (migrations, repositories, undo as ops), the demo seed and showcase, the CLI and MCP server, performance tests |
-| DataBee | `../databee` | optional features as inline plugins, ports with fakes (`Database`, `SecretStore`), the read-only MCP server |
+| Daybook | `../daybook` | the Rust command bus (`docs/commands.md`), extra windows on a native layer, menu-bar app, global shortcuts, local HTTP API, JSON stores with repair |
+| TimeTracker | `../timetracker` | SQLite through sqlx, undo as ops, the seeds and showcase, performance tests, socket `watch`, the MCP server, `PopUpButton` |
+| DataBee | `../databee` | optional features as inline plugins, ports with fakes (`Database`, `SecretStore`), the `Secret` type |
+| Launcher | `../project-launcher` | the Settings search over every row, Settings → Shortcuts (Reassign, Reset), the accent choice |

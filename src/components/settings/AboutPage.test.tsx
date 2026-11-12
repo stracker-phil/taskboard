@@ -28,10 +28,11 @@ beforeEach(() => {
 });
 
 describe("AboutPage", () => {
-  it("shows the app version", async () => {
+  it("shows the app name and version in the Version row", async () => {
     renderPage();
 
-    expect(await screen.findByText("Version 4.5.6")).toBeInTheDocument();
+    expect(await screen.findByText("Taskboard 4.5.6")).toBeInTheDocument();
+    expect(screen.getByText("Version")).toBeInTheDocument();
   });
 
   it("opens the data folder through the app:data command", async () => {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api, type SyncProgress, type SyncState } from "../api";
+import { api, type LocalDays, type SyncProgress, type SyncState } from "../api";
 import { formatLocalTime } from "../lib/time";
 
 export const SYNC_KEY = ["sync"] as const;
@@ -24,14 +24,14 @@ export function useSyncProgress(): Record<string, SyncProgress> {
 }
 
 /** One line for the sync state: "Synced at …", "Syncing…", "Offline since …" or Rust's message. */
-export function describeSyncState(state: SyncState): string {
+export function describeSyncState(state: SyncState, days: LocalDays | undefined): string {
   switch (state.state) {
     case "idle":
-      return state.lastOk ? `Synced at ${formatLocalTime(state.lastOk)}` : "Not synced yet";
+      return state.lastOk ? `Synced at ${formatLocalTime(state.lastOk, days)}` : "Not synced yet";
     case "running":
       return "Syncing…";
     case "offline":
-      return `Offline since ${formatLocalTime(state.since)}`;
+      return `Offline since ${formatLocalTime(state.since, days)}`;
     case "error":
     case "paused":
       return state.message;

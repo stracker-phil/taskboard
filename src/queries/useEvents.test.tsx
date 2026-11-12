@@ -11,12 +11,14 @@ import { ConnectionPage } from "../components/settings/jira/ConnectionPage";
 import { ProjectsPage } from "../components/settings/jira/ProjectsPage";
 import { SyncPage } from "../components/settings/jira/SyncPage";
 import { emitEvent } from "../test/apiMock";
+import { BERLIN_DAYS, localDays } from "../test/days";
 import { connectionView, PROJECTS, projectCounts, syncOverview } from "../test/jira";
 import { row, statusStyle, viewData } from "../test/issues";
 import { nav as navAt } from "../test/nav";
 import { settings } from "../test/settings";
 import { lumenSpace, sidebarTree, space } from "../test/spaces";
 import { useModes } from "./modes";
+import { useLocalDays } from "./localDays";
 import { createQueryClient } from "./queryClient";
 import { useIssue } from "./issues";
 import { useNav, useSpaces } from "./sidebar";
@@ -312,6 +314,29 @@ describe("useEvents", () => {
       act(() => emitEvent(api, "settings_changed", settings()));
 
       expect(await screen.findByText("Me everywhere: false; rows: NW-2")).toBeInTheDocument();
+    });
+  });
+
+  describe("local days", () => {
+    function DaysHarness() {
+      useEvents();
+      return <p>Zone: {useLocalDays()?.timeZone ?? "loading"}</p>;
+    }
+
+    it("refetches the day boundaries when settings_changed arrives", async () => {
+      mocked.localDays.mockResolvedValue(localDays({ timeZone: "UTC" }));
+      render(
+        <QueryClientProvider client={createQueryClient()}>
+          <DaysHarness />
+        </QueryClientProvider>,
+      );
+      await screen.findByText("Zone: UTC");
+      await waitFor(() => expect(mocked.listen).toHaveBeenCalledWith("settings_changed", expect.any(Function)));
+      mocked.localDays.mockResolvedValue(BERLIN_DAYS);
+
+      act(() => emitEvent(api, "settings_changed", settings()));
+
+      expect(await screen.findByText("Zone: Europe/Berlin")).toBeInTheDocument();
     });
   });
 

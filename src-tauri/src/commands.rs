@@ -1,6 +1,7 @@
 //! The core Tauri commands: settings, key bindings and UI state, and the small OS helpers (links, the log
 //! folder) the page calls.
 
+use chrono::Utc;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_opener::OpenerExt;
 
@@ -8,6 +9,7 @@ use crate::error::{AppError, AppResult};
 use crate::events::{KEYBINDINGS_CHANGED_EVENT, announce_settings};
 use crate::jira::capability::{Capability, CapabilityRow, capability_rows};
 use crate::launch::LaunchEvent;
+use crate::lists::Viewer;
 use crate::look::Accent;
 use crate::state::AppState;
 use crate::store::keybindings::Keybindings;
@@ -15,6 +17,7 @@ use crate::store::modes::{Mode, Modes};
 use crate::store::places::ViewPlace;
 use crate::store::settings::{Appearance, Behaviour, MAX_SEEN_AFTER_SECONDS, Settings};
 use crate::store::ui_state::UiState;
+use crate::time::LocalDays;
 
 #[tauri::command]
 pub fn get_settings(state: State<'_, AppState>) -> Settings {
@@ -58,6 +61,13 @@ pub async fn accent_set(
     let saved = state.settings.edit(move |s| s.accent = accent).await?;
     announce_settings(&app, &saved);
     Ok(saved)
+}
+
+/// The owner's day boundaries in their Jira time zone, for "today" and "yesterday" on the page.
+#[tauri::command]
+pub fn local_days(state: State<'_, AppState>) -> LocalDays {
+    let viewer = Viewer::of(&state.settings.get().connection, Utc::now());
+    crate::time::local_days(viewer.now, viewer.tz())
 }
 
 /// Settings → General's defaults for seeing issues and pinning; the delay is clamped to 0–10 seconds.

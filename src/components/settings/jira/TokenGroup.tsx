@@ -42,6 +42,7 @@ export function TokenGroup({ view }: { view: ConnectionView }) {
     <Group title="Token" anchor="token">
       <TextField
         label="Expires on"
+        anchor="token-expires"
         type="date"
         description={expiryText(view.expiry)}
         value={connection.tokenExpires ?? ""}

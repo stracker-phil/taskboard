@@ -23,7 +23,7 @@ export function IssueTypesGroup() {
 
   return (
     <Group title="Issue types" anchor="issue-types" description="Types you don't need, such as test management issues.">
-      <Row label="Leave out" htmlFor={id} description="Not copied, listed or counted; the copies Taskboard has go at once.">
+      <Row label="Leave out" anchor="leave-out" htmlFor={id} description="Not copied, listed or counted; the copies Taskboard has go at once.">
         <ValuePicker id={id} choices={types.map((name) => ({ id: name, name }))} selected={sync.excludedTypes} placeholder="None" onChange={(values) => void save(values)} />
       </Row>
     </Group>

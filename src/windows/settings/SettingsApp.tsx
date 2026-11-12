@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import { api } from "../../api";
 import { useCommandKeys } from "../../commands";
-import { SettingsWindow } from "../../components/settings/SettingsWindow";
+import { SettingsWindow, type SettingsRequest } from "../../components/settings/SettingsWindow";
+import { ConfirmHost } from "../../components/ConfirmSheet";
 import { MenuHost } from "../../components/menu";
 import { Toasts } from "../../components/Toasts";
 import { TooltipHost } from "../../components/TooltipHost";
@@ -12,22 +13,23 @@ import { trackWindowFocus } from "../../lib/windowFocus";
 import { queryClient as defaultClient } from "../../queries/queryClient";
 import { useEvents } from "../../queries/useEvents";
 
-/** The page Rust opened the window at (`?page=`); later pages arrive as `open_settings`. */
-function initialPage(): string | undefined {
-  return new URLSearchParams(window.location.search).get("page") ?? undefined;
+/** The page or row Rust opened the window at (`?page=`); later ones arrive as `open_settings`. */
+function initialRequest(): SettingsRequest {
+  return { id: new URLSearchParams(window.location.search).get("page") ?? undefined };
 }
 
-/** Shows the pages Rust asks for. */
-function useOpenSettings(setPage: (page: string) => void) {
+/** Shows the pages and rows Rust asks for. */
+function useOpenSettings(open: (id: string) => void) {
   useEffect(() => {
-    const unlisten = api.listen("open_settings", setPage);
+    const unlisten = api.listen("open_settings", open);
     return () => void unlisten.then((fn) => fn()).catch(() => {});
-  }, [setPage]);
+  }, [open]);
 }
 
 function SettingsRoot() {
-  const [page, setPage] = useState(initialPage);
-  useOpenSettings(setPage);
+  const [request, setRequest] = useState(initialRequest);
+  const open = useCallback((id: string) => setRequest({ id }), []);
+  useOpenSettings(open);
   useCommandKeys();
   useEvents();
   useAppearance();
@@ -36,10 +38,11 @@ function SettingsRoot() {
 
   return (
     <>
-      <SettingsWindow page={page} onPage={setPage} />
+      <SettingsWindow request={request} onOpen={open} />
       <Toasts />
       <TooltipHost />
       <MenuHost />
+      <ConfirmHost />
     </>
   );
 }

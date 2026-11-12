@@ -71,6 +71,8 @@ const inputClass = (type: FieldType, wide?: boolean, mono?: boolean) =>
 
 interface FieldProps {
   label: string;
+  /** The row id the page registers (`rows`). */
+  anchor?: string;
   description?: ReactNode;
   placeholder?: string;
   /** Room for a URL. */
@@ -81,11 +83,11 @@ interface FieldProps {
 }
 
 /** A row with an input and its error below it; `children` gets the input's id and its error's id. */
-function FieldRow({ label, description, error, suffix, children }: FieldProps & { children: (ids: { id: string; errorId: string }) => ReactNode }) {
+function FieldRow({ label, description, anchor, error, suffix, children }: FieldProps & { children: (ids: { id: string; errorId: string }) => ReactNode }) {
   const id = useId();
   const errorId = `${id}-error`;
   return (
-    <Row label={label} description={description} htmlFor={id}>
+    <Row label={label} description={description} anchor={anchor} htmlFor={id}>
       <div className="settings-field">
         <div className="settings-input">
           {children({ id, errorId })}

@@ -18,9 +18,10 @@ const INVOLVEMENT: { key: keyof Involvement; label: string }[] = [
   { key: "peopleFields", label: "Named in a people field" },
 ];
 
-function TickRow({ type, label, description, checked, disabled, onChange, name }: {
+function TickRow({ type, label, anchor, description, checked, disabled, onChange, name }: {
   type: "radio" | "checkbox";
   label: string;
+  anchor: string;
   description?: ReactNode;
   checked: boolean;
   disabled?: boolean;
@@ -29,7 +30,7 @@ function TickRow({ type, label, description, checked, disabled, onChange, name }
 }) {
   const id = useId();
   return (
-    <Row label={label} description={description} htmlFor={id} disabled={disabled}>
+    <Row label={label} anchor={anchor} description={description} htmlFor={id} disabled={disabled}>
       <input id={id} className="settings-check" type={type} name={name} checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} />
     </Row>
   );
@@ -63,20 +64,21 @@ export function WhichIssuesGroup({ notifications }: { notifications: Notificatio
   return (
     <Group title="Which issues" anchor="which-issues" description="The issues whose changes count, in app and on macOS.">
       {SCOPES.map((option) => (
-        <TickRow key={option.scope} type="radio" name={scopeName} label={option.label} checked={scope === option.scope} onChange={() => save({ scope: option.scope })} />
+        <TickRow key={option.scope} type="radio" name={scopeName} label={option.label} anchor={`notify-${option.scope}`} checked={scope === option.scope} onChange={() => save({ scope: option.scope })} />
       ))}
       {INVOLVEMENT.map(({ key, label }) => (
         <TickRow
           key={key}
           type="checkbox"
           label={label}
+          anchor={`notify-${key}`}
           description={key === "peopleFields" ? <PeopleFieldsHint /> : undefined}
           checked={involvement[key]}
           disabled={allIssues}
           onChange={(on) => save({ involvement: { ...involvement, [key]: on } })}
         />
       ))}
-      <Row label="Issue types" htmlFor={typesId} description="A type left out counts only for the changes about you.">
+      <Row label="Issue types" anchor="notify-types" htmlFor={typesId} description="A type left out counts only for the changes about you.">
         <ValuePicker
           id={typesId}
           choices={types.map((name) => ({ id: name, name }))}
@@ -88,6 +90,7 @@ export function WhichIssuesGroup({ notifications }: { notifications: Notificatio
       <TickRow
         type="checkbox"
         label="Ignore changes made by automations"
+        anchor="ignore-automations"
         description="Changes and comments by apps (Xray, CI, Jira Automation) stay in the activity but never make an issue unread or notify."
         checked={ignoreAutomations}
         onChange={(on) => save({ ignoreAutomations: on })}

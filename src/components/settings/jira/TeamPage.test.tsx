@@ -24,7 +24,8 @@ async function renderPage(matrix: TeamMatrix = teamMatrix()) {
       <Toasts />
     </QueryClientProvider>,
   );
-  await screen.findByRole("region", { name: "Team" });
+  if (matrix.people.length === 0) await screen.findByText("People appear after the first sync.");
+  else await screen.findByRole("textbox", { name: "Search people" });
 }
 
 const box = (name: string) => screen.findByRole("checkbox", { name });

@@ -13,7 +13,7 @@ refactoring, document intent through their names, and verify observable behavior
 public functions: returned values, stored rows, serialized shapes and `AppError` kinds.
 
 Read `.claude/rules/testing.md`, `docs/testing.md` and the docs page of the layer under test
-(`docs/backend.md`, `docs/data.md`, …) first.
+(`docs/architecture.md` and the feature's page, e.g. `docs/data.md`) first.
 
 ## When invoked
 

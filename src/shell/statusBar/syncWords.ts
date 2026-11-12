@@ -1,17 +1,17 @@
-import type { SyncProgress, SyncState } from "../../api";
+import type { LocalDays, SyncProgress, SyncState } from "../../api";
 import { clockTime, fullDateTime, shortWhen } from "../../lib/relativeTime";
 
 /** The status bar's line for each sync state. */
-export function syncText(state: SyncState, progress: SyncProgress[], now: Date): string {
+export function syncText(state: SyncState, progress: SyncProgress[], now: Date, days: LocalDays | undefined): string {
   switch (state.state) {
     case "idle":
-      return state.lastOk ? `Synced ${shortWhen(state.lastOk, now)}` : "Not synced yet";
+      return state.lastOk ? `Synced ${shortWhen(state.lastOk, now, days)}` : "Not synced yet";
     case "running": {
       const changes = state.job === "delta" ? progress.reduce((sum, p) => sum + p.fetched, 0) : 0;
       return changes > 0 ? `Syncing… ${changes} ${changes === 1 ? "change" : "changes"}` : "Syncing…";
     }
     case "offline":
-      return state.lastOk ? `Offline · synced ${shortWhen(state.lastOk, now)}` : "Offline";
+      return state.lastOk ? `Offline · synced ${shortWhen(state.lastOk, now, days)}` : "Offline";
     case "paused":
       return "Sync paused · token";
     case "error":

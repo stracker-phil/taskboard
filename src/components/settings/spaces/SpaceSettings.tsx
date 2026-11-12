@@ -9,7 +9,7 @@ import { SpaceFields } from "../../SpaceEditor";
 import { openMenu } from "../../menu";
 import { SpaceLookButton } from "../../SpaceLookButton";
 import { SegmentedControl } from "../../SegmentedControl";
-import { Group, Row, SectionTarget, Segmented, SwitchInput } from "../controls";
+import { Group, Row, ScrollTarget, Segmented, SwitchInput } from "../controls";
 import { useSettings } from "../../../queries/settings";
 import { attempt } from "../../../state/requests";
 import { AccentPicker } from "../AccentPicker";
@@ -32,7 +32,7 @@ const tabOf = (section: string | undefined): Tab => TABS.find((tab) => tab === s
 export function SpaceSettings({ space, onBack }: { space: SpaceNode; onBack?: () => void }) {
   const { data: config } = useSpaceConfig(space.projectId);
   const [editingLook, setEditingLook] = useState(false);
-  const target = useContext(SectionTarget);
+  const target = useContext(ScrollTarget)?.id;
   const [tab, setTab] = useState(() => tabOf(target));
   const [shownTarget, setShownTarget] = useState(target);
   if (target !== shownTarget) {
@@ -81,7 +81,7 @@ function SpaceAccent({ space }: { space: SpaceNode }) {
       <AccentPicker
         label="Accent color"
         value={space.accent}
-        appAccent={settings?.accent ?? "blue"}
+        appAccent={settings?.accent ?? "system"}
         onChange={(accent) => void attempt(api.spaceSetAccent(space.projectId, accent), "Could not change the accent color")}
       />
     </Row>
@@ -115,7 +115,7 @@ function LayoutsGroup({ config }: { config: SpaceConfig }) {
     );
 
   return (
-    <Group title="Layouts" anchor="layouts" description="The layouts this Space's views can show. A view in a layout you switch off shows the default layout until you turn it on again.">
+    <Group title="Layouts" description="The layouts this Space's views can show. A view in a layout you switch off shows the default layout until you turn it on again.">
       {LAYOUTS.map((layout) => {
         const on = current.layouts.includes(layout);
         const last = on && current.layouts.length === 1;

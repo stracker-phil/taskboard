@@ -91,6 +91,7 @@ export function SiteGroup({ view }: { view: ConnectionView }) {
     <Group title="Jira site" anchor="site">
       <DraftField
         label="Site URL"
+        anchor="site-url"
         wide
         placeholder="https://example.atlassian.net"
         autoComplete="url"
@@ -100,6 +101,7 @@ export function SiteGroup({ view }: { view: ConnectionView }) {
       />
       <DraftField
         label="Email"
+        anchor="email"
         type="email"
         wide
         placeholder="alex.morgan@example.com"
@@ -110,6 +112,7 @@ export function SiteGroup({ view }: { view: ConnectionView }) {
       />
       <DraftField
         label="API token"
+        anchor="api-token"
         type="password"
         wide
         autoComplete="off"
@@ -124,6 +127,7 @@ export function SiteGroup({ view }: { view: ConnectionView }) {
       />
       <Segmented
         label="Token kind"
+        anchor="token-kind"
         description={KIND_HINTS[draft.tokenKind]}
         options={["classic", "scoped"] as const}
         value={draft.tokenKind}
@@ -133,6 +137,7 @@ export function SiteGroup({ view }: { view: ConnectionView }) {
         (cloudIdEditable ? (
           <DraftField
             label="Cloud ID"
+            anchor="cloud-id"
             mono
             wide
             description="Test Connection finds it; type it in when your site doesn't tell it."
@@ -141,7 +146,7 @@ export function SiteGroup({ view }: { view: ConnectionView }) {
             onChange={(cloudId) => edit({ cloudId })}
           />
         ) : (
-          <Row label="Cloud ID" description="Found by Test Connection.">
+          <Row label="Cloud ID" anchor="cloud-id" description="Found by Test Connection.">
             <span className="settings-value mono">{saved.cloudId}</span>
           </Row>
         ))}

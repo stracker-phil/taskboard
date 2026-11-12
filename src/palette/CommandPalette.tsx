@@ -9,7 +9,7 @@ import { useIssueActions } from "../views/list/useIssueActions";
 import { collectCommands, snapshotPage, type PaletteCommand } from "./commands";
 import { CommandRow, IssueRow, ListRow, PrefixButtons, PrefixRow, RecentSearchRow, SavedSearchRow, ViewRow } from "./PaletteRows";
 import { parsePrefix, PREFIXES, SCOPES, type Prefix } from "./prefixes";
-import { ranked } from "./rank";
+import { ranked } from "../lib/rank";
 import { saveSearch } from "./saveSearch";
 
 /** Without a prefix at most this many commands show, so issues and lists stay in sight. */

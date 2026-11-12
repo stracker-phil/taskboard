@@ -20,7 +20,7 @@ async function renderPage(appearance: Appearance = "system") {
       <AppearancePage />
     </QueryClientProvider>,
   );
-  const group = screen.getByRole("group", { name: "Appearance" });
+  const group = screen.getByRole("group", { name: "Mode" });
   await within(group).findByRole("button", { pressed: true });
   return group;
 }
@@ -62,7 +62,7 @@ describe("AppearancePage", () => {
 
   describe("accent color", () => {
     it("checks the accent of the settings", async () => {
-      mocked.getSettings.mockResolvedValue(settings({ accent: "green" }));
+      mocked.getSettings.mockResolvedValue(settings({ accent: "gold" }));
       render(
         <QueryClientProvider client={createQueryClient()}>
           <AppearancePage />
@@ -71,16 +71,16 @@ describe("AppearancePage", () => {
 
       const group = await screen.findByRole("radiogroup", { name: "Accent color" });
 
-      expect(await within(group).findByRole("radio", { name: "Green", checked: true })).toBeInTheDocument();
+      expect(await within(group).findByRole("radio", { name: "Gold", checked: true })).toBeInTheDocument();
     });
 
     it("sends the clicked accent to Rust", async () => {
       await renderPage();
       const group = screen.getByRole("radiogroup", { name: "Accent color" });
 
-      await userEvent.click(within(group).getByRole("radio", { name: "Purple" }));
+      await userEvent.click(within(group).getByRole("radio", { name: "Magenta" }));
 
-      expect(mocked.accentSet).toHaveBeenCalledWith("purple");
+      expect(mocked.accentSet).toHaveBeenCalledWith("magenta");
     });
   });
 });

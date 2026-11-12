@@ -53,6 +53,18 @@ ADR 0035; the app cache folder `~/Library/Caches/<bundle identifier>/attachments
 (`tauri-plugin-notification`, `notify/show.rs`), the Homebrew paths of `gh` (`pull_requests/gh.rs` `GH_PATHS`), and the dev scripts (zsh,
 Swift, `screencapture`).
 
+## Common changes
+
+| Goal | Start here |
+|---|---|
+| A new command or shortcut | `src-tauri/src/bus/`, the menu table in `src-tauri/src/menu/`, `src/commands/` for page keys, `docs/ux.md` → Keys |
+| A new setting | the `Settings` model in `src-tauri/src/store/`, a row on a page in `src/components/settings/` with its entry in the page's `rows` (`pages.tsx`) |
+| A new Tauri command | the feature's `commands.rs`, `handlers.rs`, `src/api/index.ts`, `src/test/apiMock.ts` |
+| A new CLI subcommand | `src-tauri/src/cli/`, `src-tauri/src/remote/` |
+| A new color | a token in every palette under `src/styles/palettes/` |
+| A new Jira endpoint | the gateway's `Endpoint` in `src-tauri/src/jira/gateway/`, its scope row in `docs/scopes.md` |
+| A new stored column | `src-tauri/src/db/` (a migration), checked against `.claude/rules/no-issue-data-on-disk.md` |
+
 ## Conventions to keep
 
 - Rust owns the logic; the page renders. IPC only in `api.ts` files; types generated with ts-rs.

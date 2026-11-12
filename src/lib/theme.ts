@@ -35,6 +35,7 @@ function applyScheme(scheme: Scheme) {
  *  paint has colors. */
 export function applyInitialLook() {
   applyScheme(systemDark() ? "dark" : "light");
+  setLook("accent", "system");
 }
 
 /** Keeps the window's scheme in step with the Appearance setting (on Automatic, with macOS) and its accent with the
@@ -51,6 +52,6 @@ export function useAppearance(spaceAccent: Accent | null = null) {
   }, []);
   const appearance = settings?.appearance ?? "system";
   useEffect(() => applyScheme(schemeFor(appearance, dark)), [appearance, dark]);
-  const accent = spaceAccent ?? settings?.accent ?? "blue";
+  const accent = spaceAccent ?? settings?.accent ?? "system";
   useEffect(() => setLook("accent", accent), [accent]);
 }

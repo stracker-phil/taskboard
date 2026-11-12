@@ -24,6 +24,7 @@ import {
   type IssueDetail,
   type Keybindings,
   type LinkTarget,
+  type LocalDays,
   type ListConditions,
   type MeMatch,
   type MenuCommand,
@@ -50,6 +51,7 @@ import {
   type WriteOutcome,
 } from "../api/types";
 import { capabilityRows } from "./capabilities";
+import { localDays } from "./days";
 import { filterOptions } from "./filters";
 import { issueDetail } from "./issues";
 import { nav } from "./nav";
@@ -97,6 +99,7 @@ export function createApiMock(): Api {
     behaviourSet: vi.fn(async (behaviour: Behaviour): Promise<Settings> => settings({ behaviour })),
     jiraCapabilities: vi.fn(async (): Promise<CapabilityRow[]> => capabilityRows()),
     jiraCapabilitySet: vi.fn(async (): Promise<Settings> => settings()),
+    localDays: vi.fn(async (): Promise<LocalDays> => localDays()),
     getKeybindings:vi.fn().mockResolvedValue({}),
     setKeybindings: vi.fn(async (bindings: Keybindings) => bindings),
     getUiState: vi.fn().mockResolvedValue(EMPTY_UI_STATE),

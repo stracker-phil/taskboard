@@ -37,9 +37,10 @@ export function ProjectsPage() {
   const shown = matching(projects, query);
 
   return (
-    <Group title="Projects" anchor="projects">
+    <Group>
       <Row
         label="Jira projects"
+        anchor="jira-projects"
         description={connected ? `${tracked} of ${projects.length} tracked. Tracked projects make the default scope.` : "Test the connection first."}
       >
         <button type="button" className="btn" disabled={!connected || busy} onClick={refresh}>

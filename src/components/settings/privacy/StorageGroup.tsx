@@ -29,12 +29,12 @@ export function StorageGroup() {
 
   return (
     <Group title="Jira data" anchor="cache" description="Nothing from Jira is written to disk; it is gone when Taskboard quits.">
-      <Row label="Jira data in memory" description={overview ? `${megabytes(overview.cacheBytes)} while Taskboard runs.` : undefined}>
+      <Row label="Jira data in memory" anchor="cache-memory" description={overview ? `${megabytes(overview.cacheBytes)} while Taskboard runs.` : undefined}>
         <button type="button" className="btn" disabled={busy} onClick={() => setConfirming(true)}>
           Refetch from Jira
         </button>
       </Row>
-      <Row label="Data folder" description={`Your setup lives here: ${KEPT}.`}>
+      <Row label="Data folder" anchor="data-folder" description={`Your setup lives here: ${KEPT}.`}>
         <ShowDataFolder />
       </Row>
       {confirming && (

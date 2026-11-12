@@ -10,6 +10,7 @@ import { formatLocalTime } from "../../../lib/time";
 import { createQueryClient } from "../../../queries/queryClient";
 import { SYNC_KEY } from "../../../queries/sync";
 import { resetStore } from "../../../state/store";
+import { BERLIN_DAYS } from "../../../test/days";
 import { projectCounts, syncOverview } from "../../../test/jira";
 import { SyncedGroup } from "./SyncedGroup";
 
@@ -27,6 +28,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
   mocked.syncOverview.mockResolvedValue(syncOverview());
+  mocked.localDays.mockResolvedValue(BERLIN_DAYS);
 });
 
 describe("SyncedGroup", () => {
@@ -38,12 +40,12 @@ describe("SyncedGroup", () => {
     });
 
     it("names the time of the last successful sync", async () => {
-      const lastOk = "2026-03-04T09:30:00Z";
+      const lastOk = "2026-11-12T08:30:00Z";
       mocked.syncOverview.mockResolvedValue(syncOverview({ state: { state: "idle", lastOk } }));
 
       renderGroup();
 
-      expect(await screen.findByText(`Synced at ${formatLocalTime(lastOk)}`)).toBeInTheDocument();
+      expect(await screen.findByText(`Synced at ${formatLocalTime(lastOk, BERLIN_DAYS)}`)).toBeInTheDocument();
     });
 
     it("keeps Sync Now disabled until the overview has loaded", async () => {
@@ -99,12 +101,12 @@ describe("SyncedGroup", () => {
     });
 
     it("shows when a project last finished a full sync", async () => {
-      const lastFullAt = "2026-03-04T09:30:00Z";
+      const lastFullAt = "2026-11-12T08:30:00Z";
       mocked.syncOverview.mockResolvedValue(syncOverview({ projects: [projectCounts({ lastFullAt })] }));
 
       renderGroup();
 
-      expect(await screen.findByText(new RegExp(`Synced at ${formatLocalTime(lastFullAt)}`))).toBeInTheDocument();
+      expect(await screen.findByText(new RegExp(`Synced at ${formatLocalTime(lastFullAt, BERLIN_DAYS)}`))).toBeInTheDocument();
     });
 
     it("points to the Connection page when no project is tracked", async () => {

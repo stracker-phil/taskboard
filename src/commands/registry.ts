@@ -240,6 +240,24 @@ function scopesOverlap(a: Scope, b: Scope): boolean {
   return false;
 }
 
+/** The other commands that hold `binding` where `command` works too: taking it means taking it from them. */
+export function holdersOf(command: Command, binding: string, custom: Overrides = overrides): Command[] {
+  const key = normalizeBinding(binding);
+  return allCommands().filter((other) => other.id !== command.id && bindingFor(other.id, custom) === key && scopesOverlap(other.scope, command.scope));
+}
+
+/** `custom` with `command` on `binding` (none for null) and `from` left without a key, as one change. A binding
+ *  equal to the command's default drops its override, so Reset shows only while a key differs from the default. */
+export function withBinding(custom: Overrides, command: Command, binding: string | null, from: Command[] = []): Overrides {
+  const next: Overrides = { ...custom };
+  for (const other of from) next[other.id] = null;
+  const fallback = command.defaultBinding ? normalizeBinding(command.defaultBinding) : null;
+  const key = binding === null ? null : normalizeBinding(binding);
+  if (key === fallback) delete next[command.id];
+  else next[command.id] = key;
+  return next;
+}
+
 /** Pairs of commands that share a binding in overlapping scopes; the Shortcuts page warns about them. */
 export function conflicts(custom: Overrides = overrides): Conflict[] {
   const list = allCommands();

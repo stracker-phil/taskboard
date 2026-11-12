@@ -26,7 +26,8 @@ async function renderPage(rows: FieldChoiceRow[]) {
       <Toasts />
     </QueryClientProvider>,
   );
-  await screen.findByRole("region", { name: "Custom fields" });
+  if (rows.length === 0) await screen.findByText("Custom fields appear after the first sync.");
+  else await screen.findByRole("textbox", { name: "Search fields" });
 }
 
 const rowNames = () => screen.getAllByRole("rowheader").map((h) => h.textContent);

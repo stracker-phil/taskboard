@@ -7,6 +7,7 @@ import { registerCoreSettingsPages } from "./components/settings/pages";
 
 /** Call once per window, before the first render. */
 export function installModules(window: WindowName) {
-  registerCoreSettingsPages();
+  // Commands first: the Shortcuts page lists every command's row for the Settings search.
   installCommands(window);
+  registerCoreSettingsPages();
 }

@@ -38,7 +38,7 @@ export function MeModeGroup({ settings }: { settings: Settings }) {
           </Row>
         );
       })}
-      <Row label="Fields" description="A user field such as a project's own Developer field: issues where it names you count as yours.">
+      <Row label="Fields" anchor="me-fields" description="A user field such as a project's own Developer field: issues where it names you count as yours.">
         <button type="button" className="btn" aria-haspopup="menu" onClick={(e) => add(e.currentTarget)}>
           <Plus size={12} aria-hidden="true" />
           Add Field…

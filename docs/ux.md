@@ -896,8 +896,16 @@ A window of its own (about 880 × 720, at least 760 × 560) in Daybook's System 
 no separate Settings design; owner, 2026-10-28). Its colors are the `--settings-*` tokens of the same palette.
 
 - **Page list** on `--settings-chrome` (190px): a drag strip for the window buttons and a search field that
-  stay put (it narrows by page, group or section title), then rows under small group headings; the current
-  page a `--settings-fill-strong` fill. Only the list scrolls. ⌘F focuses the search.
+  stay put, then rows under small group headings; the current page filled with the accent, gray while another
+  window is in front. Only the
+  list scrolls. ⌘F focuses the search.
+- **Search** ([ADR 0071](adr/0071-the-settings-search-finds-every-row.md)): typing replaces the page list with one
+  list of matching pages and rows, ranked like the palette (`lib/rank.ts`); a row hit shows two lines, the page as
+  listed and the row's title. ↵ or a click opens the page scrolled to the row and washes it once in the accent
+  (`--motion-highlight`), again on every pick. Each page lists its rows in `pages.tsx` (`rows`: the `anchor` of a
+  `Group` or `Row`, its title as shown, `keywords`, `under`); `components/settings/searchIndex.test.tsx` fails when
+  an anchor and its entry drift apart. Rows that show data have no anchor.
+- **No headline repeats the one above it**: a group that would repeat its page's title has no heading.
 - **Page** on `--settings-bg`: the title in the strip beside the window buttons, then groups 24px apart. A
   change applies at once (fields on blur or ↵); only small forms whose fields belong together (the Jira site,
   the scope query) save with their own Save button. Esc (unless a field or a sheet takes it), ⌘W and the
@@ -987,7 +995,8 @@ no separate Settings design; owner, 2026-10-28). Its colors are the `--settings-
     `SettingsMatrix`, under the headings About you (Mentions me, Assigns me, Unassigns me, Adds me to a people field;
     they always pass the filters) and On these issues (New comment, Moved to Done, Reopened, Other status change,
     Due date or priority changed, Issue created). Rows never move; a tick flips only its box.
-  - **Appearance** (System): Automatic, Light or Dark, and the accent color (`AccentPicker`; selection, links
+  - **Appearance** (System): Mode (Automatic, Light or Dark) and the accent color (`AccentPicker`, [ADR 0073](adr/0073-the-accent-follows-the-family-system-or-nine-hues.md):
+    System, then orange, gold, red, magenta, purple, indigo, blue, teal, graphite; selection, links
     and focus; a Space can choose its own). **Shortcuts**: every command and its key, rebindable.
   - **Status** (`components/settings/status/`, Daybook's Status page): `diagnostics_get` reports groups of
     rows, each a value and maybe a bus command as a button: *Jira* (site, account, API token and its expiry),
@@ -1008,7 +1017,9 @@ registry (`src/commands/`), and the menus reach it through the bus family `page:
 window and emits `page_command` (`state/useAppEvents.ts` runs the command when it can). Components offer
 their actions while on screen with `usePageAction(id, run)` (`commands/pageActions.ts`), and their own menus
 to the palette with `usePaletteMenu(id, menu)` (`palette/menus.ts`). Settings → Shortcuts
-lists and rebinds the page's keys (conflicts are flagged); the menu shows the default keys. There are no
+lists and rebinds the page's keys: a key another command holds is taken only after a Reassign sheet, a menu key
+is refused, and Reset shows only while a key differs from its default
+([ADR 0072](adr/0072-a-taken-key-is-reassigned-after-asking.md)); the menu shows the default keys. There are no
 global shortcuts.
 
 - **Menus** (`src-tauri/src/menu/`), in the Mac order: Taskboard, File, Edit, Go, List, Issue, View, Window, Help.
@@ -1018,8 +1029,9 @@ global shortcuts.
   Space, or among the levels outside the Spaces, wrapping), Previous/Next View ⌃⇧⇥/⌃⇥, then the level's views by
   name with ⌘1–⌘9, the shown one checked). List acts on the shown issues (Group and Sort… ⌥⌘G, Columns… ⌥⌘C, Edit
   Filter… ⌥⌘F, Only My Issues ⇧⌘M, Me Mode Options…, Filter This View ⌘F, Save View ⌘S, Revert View; last, as
-  it is rare: Show as List / Board / Table ⌃⌘1–3, the shown layout checked). The menus follow the place:
-  `menu/place.rs` builds them again whenever the place moves (`NavStore::on_move`) or views, lists or Spaces change. Issue acts on the selected one
+  it is rare: Show as List / Board / Table ⌃⌘1–3, the shown layout checked). The menus follow the place
+  (`NavStore::on_move`): `menu/place.rs` updates the items in place and builds the bar again only when the
+  level's views change. Issue acts on the selected one
   (Open, Open in New Tab ⌘⇧↩, Open or Close Preview, Open Epic, Open in Jira ⌘↩, Copy Key, Copy Link ⇧⌘C, Copy Taskboard Link, Add or Remove Bookmark, Mark as Read or Unread,
   Assign to Me or Unassign, Change Status…, Assign To…, Change Priority…, Rename… F2).
   View is the window's appearance only (Toggle Sidebar ⌘\, Show Bookmarks Bar ⇧⌘B, Enter Full Screen; the debug build's Reload ⌥⌘R),

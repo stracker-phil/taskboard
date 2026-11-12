@@ -56,8 +56,16 @@
 }
 .settings-nav button svg { flex: none; color: var(--settings-text-secondary); }
 .settings-nav button:active:not([aria-current="page"]) { background: var(--settings-fill); }
-.settings-nav button[aria-current="page"] { background: var(--settings-fill-strong); color: var(--settings-text-strong); }
-.settings-nav-section { margin-left: auto; font-size: 11px; color: var(--settings-text-secondary); }
+/* The current page is filled with the accent (ADR 0073); gray while another window is in front. */
+.settings-nav button[aria-current="page"] { background: var(--accent); color: var(--text-on-accent); }
+.settings-nav button[aria-current="page"] svg { color: inherit; }
+:root.window-blurred .settings-nav button[aria-current="page"] { background: var(--settings-blurred-fill); color: var(--settings-text); }
+.settings-nav-text { display: flex; flex-direction: column; min-width: 0; }
+.settings-nav-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A row hit: the page as listed, the row's title under it. */
+.settings-nav button:has(.settings-nav-setting) { height: auto; min-height: 28px; padding-block: 4px; }
+.settings-nav button:has(.settings-nav-setting) svg { align-self: flex-start; margin-top: 3px; }
+.settings-nav-setting { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--settings-text-secondary); }
 .settings-nav-empty { margin: 0; padding: 0 8px; color: var(--settings-text-tertiary); }
 
 /* The title sits in the strip beside the window buttons; only the page below it scrolls. */
@@ -79,7 +87,22 @@
 .settings-group h3 { margin: 0 0 0 16px; font-size: 13px; font-weight: 600; }
 .settings-group-desc { margin: 0 0 0 16px; font-size: 11px; line-height: 1.35; color: var(--settings-text-secondary); text-wrap: pretty; }
 .settings-card { margin-top: 4px; padding: 0 16px; border-radius: 12px; background: var(--settings-fill-quiet); }
-.settings-row { display: flex; align-items: center; gap: 16px; min-height: 48px; padding: 14px 0; }
+.settings-row { position: relative; isolation: isolate; display: flex; align-items: center; gap: 16px; min-height: 48px; padding: 14px 0; scroll-margin-top: 8px; }
+/* The row or group Settings was opened at (a search hit, a link): an accent wash that fades once. */
+.settings-row.found::before {
+  content: "";
+  position: absolute;
+  inset: 2px -8px;
+  z-index: -1;
+  border-radius: 8px;
+  pointer-events: none;
+  animation: settings-found var(--motion-highlight) var(--ease-out);
+}
+.settings-group.found > .settings-card { animation: settings-found var(--motion-highlight) var(--ease-out); }
+/* No end stop: the wash fades into each element's own background. */
+@keyframes settings-found {
+  0%, 35% { background: color-mix(in srgb, var(--accent) 15%, var(--settings-fill-quiet)); }
+}
 .settings-row + .settings-row { border-top: 1px solid var(--settings-hairline); }
 .settings-row-text { display: flex; flex: 1; flex-direction: column; gap: 4px; min-width: 0; }
 .settings-row-desc { max-width: 350px; font-size: 11px; line-height: 1.35; color: var(--settings-text-secondary); text-wrap: balance; }

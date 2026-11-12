@@ -29,7 +29,8 @@ async function renderPage(rows: AppStatusRow[]) {
       <MenuHost />
     </QueryClientProvider>,
   );
-  await screen.findByRole("region", { name: "Statuses" });
+  if (rows.length === 0) await screen.findByText("Statuses appear after the first sync.");
+  else await screen.findByRole("textbox", { name: "Search statuses" });
 }
 
 async function openStyleMenu(status: string) {

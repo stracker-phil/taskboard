@@ -68,6 +68,15 @@ describe("applyInitialLook", () => {
 
     expect(scheme()).toBe(expected);
   });
+
+  it("sets the system accent on the root element", () => {
+    stubSystemScheme(false);
+    delete document.documentElement.dataset.accent;
+
+    applyInitialLook();
+
+    expect(document.documentElement.dataset.accent).toBe("system");
+  });
 });
 
 describe("useAppearance", () => {
@@ -111,32 +120,32 @@ describe("useAppearance", () => {
     });
 
     it("applies the accent of the settings", async () => {
-      mountAccent(null, "green");
+      mountAccent(null, "gold");
 
-      await waitFor(() => expect(accent()).toBe("green"));
+      await waitFor(() => expect(accent()).toBe("gold"));
     });
 
-    it("is blue before the settings have loaded", () => {
+    it("is system before the settings have loaded", () => {
       mocked.getSettings.mockReturnValueOnce(new Promise(() => {}));
 
       mountAccent(null);
 
-      expect(accent()).toBe("blue");
+      expect(accent()).toBe("system");
     });
 
     it("applies the shown Space's accent over the app's", async () => {
-      mountAccent("teal", "green");
+      mountAccent("teal", "magenta");
 
       await waitFor(() => expect(accent()).toBe("teal"));
     });
 
     it("goes back to the app's accent when the Space has none", async () => {
-      const { rerender } = mountAccent("teal", "green");
+      const { rerender } = mountAccent("teal", "magenta");
       await waitFor(() => expect(accent()).toBe("teal"));
 
       rerender({ space: null });
 
-      await waitFor(() => expect(accent()).toBe("green"));
+      await waitFor(() => expect(accent()).toBe("magenta"));
     });
   });
 

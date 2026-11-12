@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { acceleratorLabel, bindingFromEvent, clearCommands, conflicts, registerCommands, setOverrides, type Command } from "./registry";
+import { acceleratorLabel, bindingFromEvent, clearCommands, conflicts, holdersOf, registerCommands, setOverrides, withBinding, type Command } from "./registry";
 import { registerCoreScopes } from "./index";
 import { registerScope } from "./scopes";
 
@@ -92,6 +92,94 @@ describe("conflicts", () => {
     setOverrides({ b: "Mod+K" });
 
     expect(conflicts()).toHaveLength(1);
+  });
+});
+
+describe("holdersOf", () => {
+  it("lists the other commands bound to the key in the same scope", () => {
+    registerCommands([command("a", "main", "Mod+K"), command("b", "main", "Mod+K"), command("c", "main", "Mod+J")]);
+
+    expect(holdersOf(command("a", "main"), "Mod+K").map((c) => c.id)).toEqual(["b"]);
+  });
+
+  it("never lists the command itself", () => {
+    registerCommands([command("a", "main", "Mod+K")]);
+
+    expect(holdersOf(command("a", "main"), "Mod+K")).toEqual([]);
+  });
+
+  it("matches a differently spelled binding", () => {
+    registerCommands([command("a", "main", "Mod+K"), command("b", "main")]);
+
+    expect(holdersOf(command("b", "main"), "k+mod").map((c) => c.id)).toEqual(["a"]);
+  });
+
+  it("lists a holder in an ancestor or descendant scope", () => {
+    registerCommands([command("a", "global", "Mod+K"), command("b", "test.left", "Mod+K"), command("c", "main")]);
+
+    expect(holdersOf(command("c", "main"), "Mod+K").map((c) => c.id)).toEqual(["a", "b"]);
+  });
+
+  it("skips a holder in a sibling scope", () => {
+    registerCommands([command("a", "test.left", "Mod+K"), command("b", "test.right")]);
+
+    expect(holdersOf(command("b", "test.right"), "Mod+K")).toEqual([]);
+  });
+
+  it("skips a holder in the scope a shadowing scope covers", () => {
+    registerCommands([command("a", "main", "Escape"), command("b", "test.overlay")]);
+
+    expect(holdersOf(command("b", "test.overlay"), "Escape")).toEqual([]);
+  });
+
+  it("reads the overrides passed in, so a moved or removed key holds nothing", () => {
+    registerCommands([command("a", "main", "Mod+K"), command("b", "main", "Mod+J"), command("c", "main")]);
+    const c = command("c", "main");
+
+    expect(holdersOf(c, "Mod+K", { a: null })).toEqual([]);
+    expect(holdersOf(c, "Mod+K", { a: "Mod+L" })).toEqual([]);
+    expect(holdersOf(c, "Mod+K", { b: "Mod+K" }).map((x) => x.id)).toEqual(["a", "b"]);
+  });
+});
+
+describe("withBinding", () => {
+  const a = command("a", "main", "Mod+K");
+  const b = command("b", "main", "Mod+J");
+
+  it("sets the command's override and keeps the others", () => {
+    expect(withBinding({ z: "Mod+Z" }, a, "Mod+L")).toEqual({ z: "Mod+Z", a: "Mod+L" });
+  });
+
+  it("normalizes the binding", () => {
+    expect(withBinding({}, a, "l+shift+mod")).toEqual({ a: "Mod+Shift+L" });
+  });
+
+  it("stores null for no key", () => {
+    expect(withBinding({}, a, null)).toEqual({ a: null });
+  });
+
+  it("stores null for no key on a command with no default", () => {
+    expect(withBinding({ a: "Mod+L" }, command("a", "main"), null)).toEqual({});
+  });
+
+  it("leaves each from command without a key in the same object", () => {
+    expect(withBinding({}, a, "Mod+J", [b])).toEqual({ a: "Mod+J", b: null });
+  });
+
+  it("drops the override when the binding equals the default", () => {
+    expect(withBinding({ a: "Mod+L", z: "Mod+Z" }, a, "mod+k")).toEqual({ z: "Mod+Z" });
+  });
+
+  it("still unbinds the from commands when the binding is the default", () => {
+    expect(withBinding({ a: "Mod+L" }, a, "Mod+K", [b])).toEqual({ b: null });
+  });
+
+  it("does not change the object passed in", () => {
+    const custom = { a: "Mod+L" };
+
+    withBinding(custom, a, null, [b]);
+
+    expect(custom).toEqual({ a: "Mod+L" });
   });
 });
 

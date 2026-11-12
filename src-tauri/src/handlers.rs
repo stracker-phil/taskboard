@@ -16,6 +16,7 @@ pub fn handlers() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
         commands::update_settings,
         commands::appearance_set,
         commands::accent_set,
+        commands::local_days,
         commands::behaviour_set,
         commands::jira_capabilities,
         commands::jira_capability_set,

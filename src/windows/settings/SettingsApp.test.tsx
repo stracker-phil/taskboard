@@ -88,73 +88,97 @@ describe("SettingsApp", () => {
   });
 
   describe("search", () => {
-    it("finds the Spaces page by its Layouts section", async () => {
+    const search = (text: string) => userEvent.type(screen.getByRole("searchbox", { name: "Search Settings" }), text);
+    const hits = () => within(screen.getByRole("group", { name: "Results" })).getAllByRole("button");
+
+    it("replaces the page list with one Results group of hits", async () => {
       await renderSettings();
 
-      await userEvent.type(screen.getByRole("searchbox", { name: "Search Settings" }), "Layouts");
+      await search("Appearance");
 
-      const nav = screen.getByRole("navigation", { name: "Settings pages" });
-      expect(within(nav).getAllByRole("button").map((b) => b.textContent?.trim())).toEqual([expect.stringContaining("Spaces")]);
+      expect(screen.queryByRole("group", { name: "Jira" })).not.toBeInTheDocument();
+      expect(hits()[0]).toHaveTextContent("Appearance");
     });
 
-    it("finds both the Spaces page by its Custom fields section and the Custom fields page", async () => {
+    it("finds the Spaces page by its Layouts keyword", async () => {
       await renderSettings();
 
-      await userEvent.type(screen.getByRole("searchbox", { name: "Search Settings" }), "Custom fields");
+      await search("Layouts");
 
-      const nav = screen.getByRole("navigation", { name: "Settings pages" });
-      const entries = within(nav).getAllByRole("button").map((b) => b.textContent?.trim());
-      expect(entries).toEqual([expect.stringContaining("Spaces"), "Custom fields"]);
-      expect(entries[0]).toContain("Custom fields");
+      expect(hits()[0]).toHaveAccessibleName("Spaces");
     });
 
-    it("finds both the Spaces page by its Statuses section and the Statuses page", async () => {
+    it("lists the Custom fields page first when its label is typed", async () => {
       await renderSettings();
 
-      await userEvent.type(screen.getByRole("searchbox", { name: "Search Settings" }), "Statuses");
+      await search("Custom fields");
 
-      const nav = screen.getByRole("navigation", { name: "Settings pages" });
-      const entries = within(nav).getAllByRole("button").map((b) => b.textContent?.trim());
-      expect(entries).toEqual([expect.stringContaining("Spaces"), "Statuses"]);
-      expect(entries[0]).toContain("Statuses");
+      expect(hits()[0]).toHaveAccessibleName("Custom fields");
     });
 
-    it.each(["Which issues", "Notify me about"])("finds the Notifications page by its %s section", async (section) => {
+    it("lists a row as a two-line hit showing its page and its title", async () => {
       await renderSettings();
 
-      await userEvent.type(screen.getByRole("searchbox", { name: "Search Settings" }), section);
+      await search("Which issues");
 
-      const nav = screen.getByRole("navigation", { name: "Settings pages" });
-      expect(within(nav).getAllByRole("button").map((b) => b.textContent?.trim())).toEqual([expect.stringContaining("Notifications")]);
-      expect(within(nav).getByRole("button")).toHaveTextContent(section);
+      const hit = screen.getByRole("button", { name: "Which issues, Notifications" });
+      expect(within(hit).getByText("Notifications")).toBeInTheDocument();
+      expect(within(hit).getByText("Which issues")).toBeInTheDocument();
     });
 
-    it("leaves no page when the text matches nothing", async () => {
+    it("finds a row by one of its keywords", async () => {
       await renderSettings();
 
-      await userEvent.type(screen.getByRole("searchbox", { name: "Search Settings" }), "zzz");
+      await search("keychain");
+
+      expect(screen.getByRole("button", { name: "API token, Connection" })).toBeInTheDocument();
+    });
+
+    it("opens the page of a row hit and marks the row as found when the hit is clicked", async () => {
+      await renderSettings();
+      await search("Jira data");
+
+      await userEvent.click(screen.getByRole("button", { name: "Jira data, Privacy & Data" }));
+
+      expect(screen.getByRole("heading", { name: "Privacy & Data", level: 2 })).toBeInTheDocument();
+      await waitFor(() => expect(screen.getByRole("region", { name: "Jira data" })).toHaveClass("found"));
+    });
+
+    it("opens the first hit when Enter is pressed", async () => {
+      await renderSettings();
+
+      await search("Which issues{Enter}");
+
+      expect(screen.getByRole("heading", { name: "Notifications", level: 2 })).toBeInTheDocument();
+      await waitFor(() => expect(screen.getByRole("region", { name: "Which issues" })).toHaveClass("found"));
+    });
+
+    it("leaves no hit when the text matches nothing", async () => {
+      await renderSettings();
+
+      await search("zzz");
 
       expect(screen.getByText("No Results")).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: /Behavior/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole("group", { name: "Results" })).not.toBeInTheDocument();
     });
 
     it("keeps Behavior when the text matches part of its label", async () => {
       await renderSettings();
 
-      await userEvent.type(screen.getByRole("searchbox", { name: "Search Settings" }), "beh");
+      await search("beh");
 
-      expect(screen.getByRole("button", { name: /Behavior/ })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Behavior" })).toBeInTheDocument();
       expect(screen.queryByText("No Results")).not.toBeInTheDocument();
     });
 
-    it.each(["What Taskboard reads", "Token scopes"])("finds the Connection page by its %s section", async (section) => {
+    it("shows the page list again when the text is cleared", async () => {
       await renderSettings();
+      await search("zzz");
 
-      await userEvent.type(screen.getByRole("searchbox", { name: "Search Settings" }), section);
+      await userEvent.clear(screen.getByRole("searchbox", { name: "Search Settings" }));
 
-      const nav = screen.getByRole("navigation", { name: "Settings pages" });
-      expect(within(nav).getAllByRole("button").map((b) => b.textContent?.trim())).toEqual([expect.stringContaining("Connection")]);
-      expect(within(nav).getByRole("button")).toHaveTextContent(section);
+      expect(screen.getByRole("group", { name: "Workspace" })).toBeInTheDocument();
+      expect(screen.queryByText("No Results")).not.toBeInTheDocument();
     });
   });
 
@@ -179,7 +203,7 @@ describe("SettingsApp", () => {
     it("shows the app version", async () => {
       await renderSettings();
 
-      expect(await screen.findByText("Version 4.5.6")).toBeInTheDocument();
+      expect(await screen.findByText("Taskboard 4.5.6")).toBeInTheDocument();
     });
 
     it("opens the log folder from its button", async () => {
@@ -209,7 +233,7 @@ describe("SettingsApp", () => {
       mocked.getSettings.mockResolvedValue(settings({ appearance: "dark" }));
       await renderSettings();
 
-      const group = screen.getByRole("group", { name: "Appearance" });
+      const group = screen.getByRole("group", { name: "Mode" });
       await waitFor(() => expect(within(group).getByRole("button", { name: "Dark" })).toHaveAttribute("aria-pressed", "true"));
     });
 
@@ -217,7 +241,7 @@ describe("SettingsApp", () => {
       mocked.appearanceSet.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
       await renderSettings();
 
-      await userEvent.click(within(screen.getByRole("group", { name: "Appearance" })).getByRole("button", { name: "Light" }));
+      await userEvent.click(within(screen.getByRole("group", { name: "Mode" })).getByRole("button", { name: "Light" }));
 
       expect(await screen.findByText("Could not change the appearance: Disk full")).toBeInTheDocument();
     });
@@ -254,6 +278,16 @@ describe("SettingsApp", () => {
 
       expect(screen.getByRole("heading", { name: "Behavior", level: 2 })).toBeInTheDocument();
       expect(screen.queryByText("Extras body")).not.toBeInTheDocument();
+    });
+
+    it("opens the page of a row on the open_settings event and marks the row as found", async () => {
+      window.history.replaceState({}, "", "/?page=extras");
+      await renderSettings();
+
+      act(() => emitEvent(api, "open_settings", "cache"));
+
+      expect(screen.getByRole("heading", { name: "Privacy & Data", level: 2 })).toBeInTheDocument();
+      await waitFor(() => expect(screen.getByRole("region", { name: "Jira data" })).toHaveClass("found"));
     });
 
     it.each([

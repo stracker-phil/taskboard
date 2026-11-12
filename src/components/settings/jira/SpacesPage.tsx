@@ -6,7 +6,7 @@ import { fail } from "../../../state/store";
 import { SIDEBAR_KEY, useSpaces } from "../../../queries/sidebar";
 import { SpaceTile } from "../../SpaceTile";
 import { SPACE_TARGET } from "../../../registry/settingsPages";
-import { Group, SectionTarget } from "../controls";
+import { Group, ScrollTarget } from "../controls";
 import { SpaceSettings } from "../spaces/SpaceSettings";
 
 /** The tracked Spaces in sidebar order: a row each to open its settings and move it. `space:<projectId>` opens one
@@ -14,10 +14,10 @@ import { SpaceSettings } from "../spaces/SpaceSettings";
 export function SpacesPage() {
   const client = useQueryClient();
   const { data: spaces = [] } = useSpaces();
-  const target = useContext(SectionTarget);
+  const target = useContext(ScrollTarget);
   const [open, setOpen] = useState<string | null>(null);
   useEffect(() => {
-    if (target?.startsWith(SPACE_TARGET)) setOpen(target.slice(SPACE_TARGET.length));
+    if (target?.id.startsWith(SPACE_TARGET)) setOpen(target.id.slice(SPACE_TARGET.length));
   }, [target]);
   const opened = spaces.find((space) => space.projectId === open);
   if (opened) return <SpaceSettings space={opened} onBack={() => setOpen(null)} />;
@@ -29,7 +29,7 @@ export function SpacesPage() {
     );
 
   return (
-    <Group title="Spaces" anchor="spaces" description="Each tracked project is a Space in the sidebar.">
+    <Group description="Each tracked project is a Space in the sidebar.">
       {spaces.length === 0 && (
         <div className="settings-row">
           <span className="settings-empty">Track projects under Projects to get Spaces.</span>

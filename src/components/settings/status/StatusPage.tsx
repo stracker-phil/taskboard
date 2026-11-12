@@ -46,6 +46,14 @@ function DiagnosticValue({ row, onRan }: { row: DiagnosticRow; onRan: () => void
   );
 }
 
+/** The groups `diagnostics_get` reports, as the search finds them; their rows are values, not settings. */
+export const STATUS_GROUPS = [
+  { id: "status", title: "Jira" },
+  { id: "status-sync", title: "Sync" },
+  { id: "status-mac", title: "This Mac" },
+  { id: "status-sent", title: "Changes Sent to Jira" },
+];
+
 /** Settings → Status: what the connection, the sync and this Mac report, read again when the window comes back. */
 export function StatusPage() {
   const client = useQueryClient();
@@ -53,7 +61,7 @@ export function StatusPage() {
   const reload = () => void client.invalidateQueries({ queryKey: DIAGNOSTICS_KEY });
   if (error && !data) return <p className="settings-empty" role="alert">{String((error as { message?: string }).message ?? error)}</p>;
   return data?.groups.map((group) => (
-    <Group key={group.title} title={group.title} anchor={group.title === "Jira" ? "status" : undefined}>
+    <Group key={group.title} title={group.title} anchor={STATUS_GROUPS.find((known) => known.title === group.title)?.id}>
       {group.rows.map((row, index) => (
         <Row key={`${index}:${row.label}`} label={row.label}>
           <DiagnosticValue row={row} onRan={reload} />

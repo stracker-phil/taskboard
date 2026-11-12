@@ -6,6 +6,7 @@ import { useShortcuts } from "../commands/useShortcuts";
 import { Avatar } from "../components/issue/Avatar";
 import { StatusPill } from "../components/issue/StatusPill";
 import { formatLocalTime } from "../lib/time";
+import { useLocalDays } from "../queries/localDays";
 import { useIssueActivity } from "../queries/issues";
 import { usePinOf } from "../queries/pins";
 import { PinButton } from "../pins/PinButton";
@@ -52,7 +53,8 @@ function MarkUnread({ issueId, at, className }: { issueId: string; at: string; c
 function CommentCard({ comment, issueId }: { comment: Comment; issueId: string }) {
   const pin = usePinOf("comment", comment.id);
   const author = comment.author?.name ?? "Someone";
-  const time = formatLocalTime(comment.at);
+  const days = useLocalDays();
+  const time = formatLocalTime(comment.at, days);
   return (
     <article className={comment.fresh ? "comment-card comment-card--new" : "comment-card"}>
       <header className="comment-card__head">
@@ -102,6 +104,7 @@ function ChangeText({ item }: { item: Change }) {
 }
 
 export function ActivityEntry({ item, issueId }: { item: ActivityItem; issueId: string }) {
+  const days = useLocalDays();
   if (item.kind === "comment") return <CommentCard comment={item} issueId={issueId} />;
   return (
     <div className={item.fresh ? "change-line change-line--new" : "change-line"}>
@@ -109,7 +112,7 @@ export function ActivityEntry({ item, issueId }: { item: ActivityItem; issueId: 
         <ChangeText item={item} />
       </span>
       <time className="change-line__time" dateTime={item.at}>
-        {formatLocalTime(item.at)}
+        {formatLocalTime(item.at, days)}
       </time>
       <MarkUnread issueId={issueId} at={item.at} className="comment-card__pin change-line__action" />
     </div>

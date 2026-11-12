@@ -8,6 +8,8 @@ vi.mock("../../api", async (orig) => ({ ...(await orig<object>()), api: (await i
 import { api } from "../../api";
 import { registerCoreScopes } from "../../commands";
 import { clearCommands, registerCommands, type Command } from "../../commands/registry";
+import { ConfirmHost } from "../ConfirmSheet";
+import { Toasts } from "../Toasts";
 import { createQueryClient } from "../../queries/queryClient";
 import { resetStore } from "../../state/store";
 import { ShortcutsPage } from "./ShortcutsPage";
@@ -20,6 +22,8 @@ async function renderPage() {
   render(
     <QueryClientProvider client={createQueryClient()}>
       <ShortcutsPage />
+      <ConfirmHost />
+      <Toasts />
     </QueryClientProvider>,
   );
   await screen.findByText("Open Search");
@@ -164,6 +168,125 @@ describe("ShortcutsPage", () => {
       await renderPage();
 
       expect(screen.queryByRole("button", { name: /^Reset/ })).not.toBeInTheDocument();
+    });
+  });
+
+  describe("taking a key another command holds", () => {
+    const record = async (title: string, keys: string) => {
+      await userEvent.click(field(title));
+      await userEvent.keyboard(keys);
+    };
+
+    it("asks before taking the key and saves once, with both changes, after Reassign", async () => {
+      mocked.getKeybindings.mockResolvedValue({ "sidebar.toggle": "Mod+J" });
+      await renderPage();
+      await screen.findByText("⌘J");
+
+      await record("Copy Link", "{Meta>}k{/Meta}");
+
+      const sheet = await screen.findByRole("alertdialog");
+      expect(within(sheet).getByRole("heading")).toHaveTextContent("⌘K is used by “Open Search”");
+      expect(sheet).toHaveTextContent("Reassign it to “Copy Link”? “Open Search” will have no shortcut.");
+      expect(mocked.setKeybindings).not.toHaveBeenCalled();
+
+      await userEvent.click(within(sheet).getByRole("button", { name: "Reassign" }));
+
+      expect(mocked.setKeybindings).toHaveBeenCalledTimes(1);
+      expect(mocked.setKeybindings).toHaveBeenCalledWith({ "sidebar.toggle": "Mod+J", "search.open": null, "issue.copy": "Mod+K" });
+    });
+
+    it("asks about a key held in an overlapping ancestor scope", async () => {
+      await renderPage();
+
+      await record("Copy Link", "{Meta>}b{/Meta}");
+
+      expect(await screen.findByRole("alertdialog")).toHaveTextContent("⌘B is used by “Toggle sidebar”");
+    });
+
+    it("saves nothing when Cancel is chosen", async () => {
+      await renderPage();
+      await record("Copy Link", "{Meta>}k{/Meta}");
+
+      await userEvent.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Cancel" }));
+
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+      expect(mocked.setKeybindings).not.toHaveBeenCalled();
+      expect(field("Open Search")).toHaveTextContent("⌘K");
+      expect(field("Copy Link")).toHaveTextContent("unbound");
+    });
+
+    it("saves nothing when the sheet is dismissed with Escape", async () => {
+      await renderPage();
+      await record("Copy Link", "{Meta>}k{/Meta}");
+      await screen.findByRole("alertdialog");
+
+      await userEvent.keyboard("{Escape}");
+
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+      expect(mocked.setKeybindings).not.toHaveBeenCalled();
+    });
+
+    it("saves at once, without asking, when no command holds the key", async () => {
+      await renderPage();
+
+      await record("Copy Link", "{Meta>}l{/Meta}");
+
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+      expect(mocked.setKeybindings).toHaveBeenCalledWith({ "issue.copy": "Mod+L" });
+    });
+
+    it("asks when Reset would restore a default another command holds now", async () => {
+      mocked.getKeybindings.mockResolvedValue({ "search.open": "Mod+J", "issue.copy": "Mod+K" });
+      await renderPage();
+      await screen.findByRole("button", { name: "Reset Open Search" });
+
+      await userEvent.click(screen.getByRole("button", { name: "Reset Open Search" }));
+
+      const sheet = await screen.findByRole("alertdialog");
+      expect(sheet).toHaveTextContent("⌘K is used by “Copy Link”");
+      await userEvent.click(within(sheet).getByRole("button", { name: "Reassign" }));
+      expect(mocked.setKeybindings).toHaveBeenCalledWith({ "issue.copy": null });
+    });
+  });
+
+  describe("taking a key that belongs to the menu", () => {
+    it("refuses with a toast and saves nothing", async () => {
+      await renderPage();
+
+      await userEvent.click(field("Copy Link"));
+      await userEvent.keyboard("{Meta>}r{/Meta}");
+
+      expect(await screen.findByText("⌘R belongs to Refresh in the menu.")).toBeInTheDocument();
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+      expect(mocked.setKeybindings).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Reset and the default key", () => {
+    it("shows Reset while a command's key differs from its default", async () => {
+      mocked.getKeybindings.mockResolvedValue({ "search.open": "Mod+J" });
+      await renderPage();
+
+      expect(await screen.findByRole("button", { name: "Reset Open Search" })).toBeInTheDocument();
+    });
+
+    it("shows no Reset for a stored override equal to the default", async () => {
+      mocked.getKeybindings.mockResolvedValue({ "search.open": "Mod+K" });
+      await renderPage();
+      await screen.findByRole("button", { name: "Remove shortcut for Open Search" });
+
+      expect(screen.queryByRole("button", { name: "Reset Open Search" })).not.toBeInTheDocument();
+    });
+
+    it("saves without an override when the default key is recorded", async () => {
+      mocked.getKeybindings.mockResolvedValue({ "search.open": "Mod+J", "sidebar.toggle": "Mod+H" });
+      await renderPage();
+      await screen.findByText("⌘J");
+
+      await userEvent.click(field("Open Search"));
+      await userEvent.keyboard("{Meta>}k{/Meta}");
+
+      expect(mocked.setKeybindings).toHaveBeenCalledWith({ "sidebar.toggle": "Mod+H" });
     });
   });
 

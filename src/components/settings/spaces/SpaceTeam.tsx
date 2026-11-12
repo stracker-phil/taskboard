@@ -15,7 +15,7 @@ export function SpaceTeam({ projectId }: { projectId: string }) {
   const members = rows.filter((row) => row.cells[column].active).map((row) => row.person);
   const involved = rows.filter((row) => row.cells[column].involved).length;
   return (
-    <Group title="Team" anchor="team" description="Who is offered to assign this Space's issues to, as a person filter and as a drop target.">
+    <Group title="Team" description="Who is offered to assign this Space's issues to, as a person filter and as a drop target.">
       <Row label={members.length === 1 ? "1 person on the team" : `${members.length} people on the team`} description={`${involved} with activity in this Space`}>
         <button type="button" className="btn" onClick={() => void attempt(api.runCommand("app:settings:team"), "Could not open the Team settings")}>
           Edit Team…

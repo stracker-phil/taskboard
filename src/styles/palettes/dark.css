@@ -47,20 +47,23 @@
   --accent-blue-text: #8ab4ff;
   --accent-purple: #7c3aed;
   --accent-purple-text: #c4b5fd;
-  --accent-pink: #be185d;
-  --accent-pink-text: #f9a8d4;
+  --accent-indigo: #4f46e5;
+  --accent-indigo-text: #a5b4fc;
   --accent-red: #dc2626;
   --accent-red-text: #fca5a5;
+  --accent-magenta: #be185d;
+  --accent-magenta-text: #f9a8d4;
   --accent-orange: #c2410c;
   --accent-orange-text: #fdba74;
-  --accent-yellow: #a16207;
-  --accent-yellow-text: #fde047;
-  --accent-green: #15803d;
-  --accent-green-text: #86efac;
+  --accent-gold: #a16207;
+  --accent-gold-text: #fde047;
   --accent-teal: #0f766e;
   --accent-teal-text: #5eead4;
   --accent-graphite: #71717a;
   --accent-graphite-text: #d4d4d8;
+  /* System: the macOS accent color; its text shade keeps the lightness the panels need. */
+  --accent-system: AccentColor;
+  --accent-system-text: oklch(from AccentColor clamp(0.78, l, 1) c h);
 
   /* Accent and selection: the picked accent, and tints mixed from it */
   --accent: var(--accent-blue);

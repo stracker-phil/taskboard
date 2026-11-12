@@ -10,10 +10,10 @@ import { fieldErrorOf, type FieldErrors } from "../useBusyAction";
 type IntervalField = "focusedMinutes" | "backgroundMinutes" | "keepDoneDays";
 
 /** The bounds Rust checks (`SyncSettings::validate`). */
-const FIELDS: { field: IntervalField; label: string; suffix: string; min: number; max: number }[] = [
-  { field: "focusedMinutes", label: "While Taskboard is in front", suffix: "minutes", min: 1, max: 60 },
-  { field: "backgroundMinutes", label: "In the background", suffix: "minutes", min: 5, max: 120 },
-  { field: "keepDoneDays", label: "Keep done issues", suffix: "days", min: 7, max: 365 },
+const FIELDS: { field: IntervalField; label: string; anchor: string; suffix: string; min: number; max: number }[] = [
+  { field: "focusedMinutes", label: "While Taskboard is in front", anchor: "interval-front", suffix: "minutes", min: 1, max: 60 },
+  { field: "backgroundMinutes", label: "In the background", anchor: "interval-background", suffix: "minutes", min: 5, max: 120 },
+  { field: "keepDoneDays", label: "Keep done issues", anchor: "keep-done", suffix: "days", min: 7, max: 365 },
 ];
 
 /** Sync → Intervals: how often Taskboard asks Jira for changes, and how long done issues stay. */

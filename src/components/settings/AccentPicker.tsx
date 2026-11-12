@@ -1,15 +1,17 @@
 import type { Accent } from "../../api";
 
-export const ACCENTS: Accent[] = ["blue", "purple", "pink", "red", "orange", "yellow", "green", "teal", "graphite"];
+/** System (the macOS accent color), then the family's nine hues (ADR 0073). */
+export const ACCENTS: Accent[] = ["system", "orange", "gold", "red", "magenta", "purple", "indigo", "blue", "teal", "graphite"];
 
 export const ACCENT_NAMES: Record<Accent, string> = {
-  blue: "Blue",
-  purple: "Purple",
-  pink: "Pink",
-  red: "Red",
+  system: "System",
   orange: "Orange",
-  yellow: "Yellow",
-  green: "Green",
+  gold: "Gold",
+  red: "Red",
+  magenta: "Magenta",
+  purple: "Purple",
+  indigo: "Indigo",
+  blue: "Blue",
   teal: "Teal",
   graphite: "Graphite",
 };

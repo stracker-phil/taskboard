@@ -17,9 +17,10 @@ function Behaviour() {
   const save = (patch: Partial<BehaviourSettings>) =>
     void attempt(api.behaviourSet({ ...settings.behaviour, ...patch }), "Could not save the setting");
   return (
-    <Group title="Behavior" anchor="behaviour">
+    <Group>
       <NumberField
         label="Count an issue as read after"
+        anchor="read-after"
         description="How long it stays open in the preview or the Issue view; 0 marks it at once."
         suffix="seconds"
         min={0}
@@ -29,6 +30,7 @@ function Behaviour() {
       />
       <Segmented
         label="Open issues in"
+        anchor="open-in"
         description="What a click on an issue opens; each List or Table view can choose its own (Columns)."
         options={OPENINGS}
         labels={OPENING_LABELS}
@@ -37,6 +39,7 @@ function Behaviour() {
       />
       <Segmented
         label="Bookmark for"
+        anchor="bookmark-for"
         description="What a new bookmark starts with; the bookmark popover can change it."
         options={PIN_DURATIONS}
         labels={PIN_LABELS}

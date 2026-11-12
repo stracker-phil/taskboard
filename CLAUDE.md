@@ -1,14 +1,18 @@
 # Taskboard
 
-The owner's task and project manager for macOS: a local-first, read-only (for now) Jira Cloud client that
-mirrors the owner's issues into SQLite and shows them in a fast ClickUp-style UI. The spec, the mockup and the
+The owner's task and project manager for macOS: a local-first Jira Cloud client that mirrors the owner's
+issues into memory and shows them in a fast ClickUp-style UI; the few changes it makes go to Jira first. The spec, the mockup and the
 step plan live in `docs/plan/` (gitignored); build only what the current step asks for.
 
-Taskboard is the fourth app of the same owner and inherits their architecture, process and look. **Daybook**
-(`../daybook`) is the template: the newest, with the most mature design (on-demand scrollbars, the Settings
-window, a light native UI) and dev flow. **TimeTracker** (`../timetracker`) is the reference for SQLite,
-undo, the demo seed, the CLI and MCP; **DataBee** (`../databee`) for plugins and ports. Read them; never
-write to them. Taskboard differs only where its job differs; each deviation has an ADR.
+Taskboard is part of the owner's family of macOS apps and inherits its architecture, process and look from the
+family catalog (the user-level `app-blueprint` skill). The sibling apps:
+
+- **Daybook** (`../daybook`): the command bus, extra windows, the menu bar
+- **TimeTracker** (`../timetracker`): SQLite with sqlx, undo, seeds, MCP
+- **DataBee** (`../databee`): plugins and ports
+- **Launcher** (`../project-launcher`): the Settings search, Settings → Shortcuts, the accent choice
+
+Read them; never write to them. Taskboard differs only where its job differs; each deviation has an ADR.
 
 ## Rules
 
@@ -24,10 +28,12 @@ write to them. Taskboard differs only where its job differs; each deviation has 
   implementation exists today. No speculative abstractions.
 - No issue content on disk: Jira data lives in memory only; only ids, keys, timestamps and the owner's own setup
   are persisted, never text a person wrote in Jira (`.claude/rules/no-issue-data-on-disk.md`).
+- UI changes follow `docs/ux.md` and `.claude/rules/stable-controls.md`.
 - Demo data only: code, docs, tests, commits and screenshots never contain the owner's real data
   (`.claude/rules/demo-data.md`). The debug build runs on its own data folder with the demo seed.
 - The implementation plan lives in `docs/plan/` (gitignored). Work one step per session; set its status from
   PENDING to DONE when it is committed.
+- Changes to the family catalog go through the owner (`app-blueprint`, mode `record`); never edit it from here.
 
 ## Docs
 Technical docs live in `docs/` (index: `docs/README.md`). Read `docs/architecture.md` and the page of the
@@ -50,13 +56,16 @@ Document by file and symbol, never by line number.
 - No color literal outside `src/styles/palettes/` (ADR 0007); the look is native (ADR 0010, `docs/ux.md`).
 - Debug builds: `Taskboard (Debug)`, `com.philippstracker.taskboard.debug`, own data and socket, demo seed,
   dev hooks; never installed (ADR 0011).
+- Two SQLite files through rusqlite, the Jira cache in memory (ADR 0019, 0066); reads through TanStack Query
+  (ADR 0018); Automatic, Light or Dark with an accent choice (ADR 0028, 0073); only the Jira hosts, through one
+  gateway (ADR 0013, 0020, 0025); a Dock app whose window close keeps it running (ADR 0016).
 - Repository map: `docs/architecture.md`.
 
 ## Commands
 Test, lint and format-check commands run through the `ci` agent, never in the main context.
 - `bun run test`: Vitest and Rust unit tests
 - `bun run lint`: IPC types drift check, tsc, ESLint and clippy on production code (warnings are errors)
-- `bun run release major|minor|patch`: bumps the version, builds the signed release `.app` and `.dmg`, installs
+- `bun run release major|minor|patch`: bumps the version, builds the signed release `.app`, installs
   it (`scripts/install.sh`), commits "Release X.Y.Z", tags it and cleans the build folder (`scripts/release.sh`,
   `scripts/clean-build.sh`, ADR 0054)
 - `bun run build:app` + `scripts/dev/launch.sh`: debug build, restarted next to the terminal without stealing focus

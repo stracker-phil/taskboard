@@ -21,7 +21,7 @@ async function renderPage() {
       <ProjectsPage />
     </QueryClientProvider>,
   );
-  await screen.findByRole("region", { name: "Projects" });
+  await screen.findByText("Jira projects");
 }
 
 beforeEach(() => {

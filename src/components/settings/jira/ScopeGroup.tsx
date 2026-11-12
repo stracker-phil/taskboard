@@ -50,7 +50,7 @@ export function ScopeGroup() {
   const hint = scope?.isDefault && keepDays !== undefined ? `Default: open work plus done issues of the last ${keepDays} days in tracked projects.` : undefined;
   return (
     <Group title="Scope" anchor="scope" description="The issues Taskboard copies from Jira.">
-      <Row label="Query" htmlFor={id} description={hint} stacked>
+      <Row label="Query" anchor="scope-query" htmlFor={id} description={hint} stacked>
         <textarea
           id={id}
           className="input textarea mono"

@@ -1,7 +1,7 @@
 import type { MenuCommand } from "../api";
 import { acceleratorLabel, allCommands, bindingFor, bindingLabel, getCommand, type Command } from "../commands/registry";
 import type { MenuEntry, MenuItem } from "../components/menu";
-import { settingsPages } from "../registry/settingsPages";
+import { settingsPages, type SettingsPage } from "../registry/settingsPages";
 import { runBusCommand } from "../state/requests";
 import { paletteMenus } from "./menus";
 
@@ -70,13 +70,17 @@ function flatten(menu: { section: string; title: string }, entries: MenuEntry[],
   });
 }
 
-/** Each Settings page opens at its own place; its groups are searched too ("token" finds Connection). */
+/** The rows a page is found by in the palette: not the Shortcuts page's, which are the commands the palette lists
+ *  itself. */
+const paletteRows = (page: SettingsPage) => (page.id === "shortcuts" ? [] : (page.rows ?? []).filter((row) => row.title !== page.label));
+
+/** Each Settings page opens at its own place; its rows are searched too ("token" finds Connection). */
 function settingsCommands(): PaletteCommand[] {
   return settingsPages().map((page) => ({
     id: `settings:${page.id}`,
     label: `Settings: ${page.label}`,
     section: SETTINGS_SECTION,
-    detail: page.sections?.flatMap((s) => (s.title === page.label ? [] : [s.title])).join(", ") || undefined,
+    detail: [...(page.keywords ?? []), ...paletteRows(page).map((row) => row.title)].join(", ") || undefined,
     run: () => runBusCommand(`app:settings:${page.id}`, "Could not open Settings"),
   }));
 }

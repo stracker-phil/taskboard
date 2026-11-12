@@ -35,8 +35,10 @@ at the end of every step.
 - **Helpers** live in `src/test_support/`: `temp_config_dir`, builders, fakes and the demo seed. They compile
   under `cfg(any(test, feature = "test-util", debug_assertions))`
   ([ADR 0006](adr/0006-test-doubles-behind-test-util.md)).
-- **Contracts:** `lib.rs` tests compare `IDENTIFIER` and `LINK_SCHEME` with both Tauri configs; each
-  `#[ts(export)]` type has an `export_bindings_*` test (`bun run types`).
+- **Contracts:** `lib.rs` tests compare `APP_NAME`, `IDENTIFIER` and `LINK_SCHEME` with both Tauri configs and
+  keep the version equal in `Cargo.toml`, `tauri.conf.json` and `package.json`; each `#[ts(export)]` type has an
+  `export_bindings_*` test (`bun run types`). What Daybook calls (`taskboard open <KEY>`, the `issue/<KEY>` link) is
+  pinned in `cli/tests.rs` and `links.rs` ([ADR 0070](adr/0070-daybook-reaches-taskboard-through-its-cli-and-links.md)).
 - **Performance** (`tests/performance.rs`, ignored): `synthetic(5000)` synced from the fake Jira into a temp
   database; the median of 20 `view_rows` runs (Everything by status, by project, with a text narrowing) stays
   under 50 ms and of 20 `sidebar_tree` runs under 20 ms. The limits hold for the release profile
@@ -86,7 +88,7 @@ keep typing in the terminal. They are macOS-only (zsh, Swift, `screencapture`, `
 | `scripts/dev/screenshot.sh out.png [--overlay]` | captures the debug app's largest window, also in the background |
 | `scripts/dev/screenshot-looks.sh <dir>` | captures the window in the current macOS mode's palette ([ux.md](ux.md#palette-checks)) |
 | `scripts/dev/screens.sh [dir]` | captures the README screenshots (default `docs/screens/`, `<name>-light.png` or `<name>-dark.png`) from the debug build on a fresh demo seed: moves the debug data folder aside, drives the window with the `taskboard` CLI (`go`, `open`, `views`, `dev drift`) and `js.sh` (the Appearance setting, Subtasks, a Filter draft, a context menu, the palette) and restores the folder afterwards; macOS's own appearance stays as it is |
-| `bun run release major\|minor\|patch\|X.Y.Z` | `scripts/release.sh`: needs a clean tree, moves the version forward in `package.json`, `tauri.conf.json`, `Cargo.toml` and `Cargo.lock`, builds the release `.app` and `.dmg`, runs `scripts/install.sh` (signs it, links `~/Applications/Taskboard.app` and `~/.local/bin/taskboard`, restarts a running release app on it and leaves a debug app alone), then commits "Release X.Y.Z" and tags `vX.Y.Z`, and runs `scripts/clean-build.sh`; a failed build restores the version ([ADR 0054](adr/0054-every-release-build-gets-a-new-version.md)) |
+| `bun run release major\|minor\|patch\|X.Y.Z` | `scripts/release.sh`: needs a clean tree, moves the version forward in `package.json`, `tauri.conf.json`, `Cargo.toml` and `Cargo.lock`, builds the release `.app` (no `.dmg`: nothing uses it), runs `scripts/install.sh` (signs it, links `~/Applications/Taskboard.app` and `~/.local/bin/taskboard`, restarts a running release app on it and leaves a debug app alone), then commits "Release X.Y.Z" and tags `vX.Y.Z`, and runs `scripts/clean-build.sh`; a failed build restores the version ([ADR 0054](adr/0054-every-release-build-gets-a-new-version.md)) |
 | `scripts/clean-build.sh` | removes the app's own debug artifacts (each test rebuild leaves a copy) and the incremental caches; compiled dependencies stay. The dev profile keeps only line tables, dependencies no debug info (`Cargo.toml`), so `target/` stays small |
 
 Never use `bun run app`, `open` or AppleScript clicks and keystrokes to drive the app: they take focus.
