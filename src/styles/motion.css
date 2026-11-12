@@ -3,6 +3,12 @@
   --motion-fast: 120ms;
   --motion-base: 150ms;
   --motion-slow: 200ms;
+  /* An accent wash that fades out (useFlash, a found Settings row). */
+  --motion-highlight: 1200ms;
+  /* Loops: a skeleton breathing, a spinner turning; the wait before a skeleton shows. */
+  --motion-pulse: 1400ms;
+  --motion-spin: 900ms;
+  --motion-delay: 250ms;
   --ease-out: cubic-bezier(0.2, 0, 0, 1);
   --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -12,6 +18,7 @@
   :root {
     --motion-base: var(--motion-fast);
     --motion-slow: 0ms;
+    --motion-spin: 2400ms;
   }
 }
 
@@ -81,7 +88,7 @@
 }
 
 /* A row or card whose issue just changed (useFlash): an accent wash that fades out; no size or position change. */
-.flash { animation: flash 1200ms var(--ease-out); }
+.flash { animation: flash var(--motion-highlight) var(--ease-out); }
 @keyframes flash { from { box-shadow: inset 0 0 0 100vmax var(--flash-bg); } }
 @media (prefers-reduced-motion: reduce) { .flash { animation: none; } }
 

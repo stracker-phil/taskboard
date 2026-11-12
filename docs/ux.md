@@ -654,6 +654,10 @@ menu ([ADR 0034](adr/0034-menus-are-drawn-in-the-page.md)); only the app's menu 
   focused (`openMenu(…, { search })`): typing narrows the rows to those containing the text (ignoring case, captions
   kept with their rows), the first match highlighted; ↑ ↓ move, ↩ runs the highlighted row, Esc closes. "No match
   for …" when nothing fits. The panel keeps the width it opened with.
+- **Pop-up buttons** (`components/menu/PopUpButton`) replace `<select>`: the current choice and a chevron
+  (the filter's field and operator); its menu lists every choice with the current one checked, and the field
+  menu of a long list gets a search field. The container sets its width, so a choice never resizes it. Inside a
+  popover, Escape and a press outside close the open menu first and leave the popover open (`Popover`).
 - **Choices are inline**: a short set of choices is a captioned group with the current one checked (the view
   tab's Layout group), not a submenu; long ones (Sort by) stay a submenu.
 
@@ -676,7 +680,10 @@ leaves the key out.
 
 Nothing jumps from one state to another (`styles/motion.css`). Tokens: `--motion-fast` 120ms (hover, press),
 `--motion-base` 150ms (fades, chevrons, toggles, popover exit), `--motion-slow` 200ms (expand/collapse,
-popover entry), `--ease-out`, `--ease-in-out`; no literal durations elsewhere. Under `prefers-reduced-motion`
+popover entry, a toast rising in), `--motion-highlight` 1200ms (an accent wash that fades out: `useFlash`, a found
+Settings row), `--motion-pulse` 1400ms (a skeleton breathing), `--motion-spin` 900ms (a spinner's turn; 2.4s under
+reduced motion), `--motion-delay` 250ms (the wait before a skeleton shows), `--ease-out`, `--ease-in-out`; no literal
+durations elsewhere. Under `prefers-reduced-motion`
 movement is instant and fades are short.
 
 - Show and hide fade: popovers rise in and fade out (`lib/motion.ts` `usePresence` keeps them mounted for the

@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { isRecordingTarget } from "../commands/registry";
+import { useStore } from "../state/store";
 
 interface Props {
   label: string;
@@ -50,14 +51,16 @@ export function Popover({ label, anchor, onClose, className, style, children }: 
   }, [opener]);
 
   useEffect(() => {
+    // While a menu is open (a pop-up button inside), Escape and a press outside close the menu only.
+    const menuOpen = () => useStore.getState().menu !== null;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || isRecordingTarget(e.target)) return;
+      if (e.key !== "Escape" || isRecordingTarget(e.target) || menuOpen()) return;
       e.stopPropagation();
       onCloseRef.current();
     };
     const onPress = (e: MouseEvent) => {
       const target = e.target as Node;
-      if (ref.current?.contains(target) || anchor.current?.contains(target)) return;
+      if (menuOpen() || ref.current?.contains(target) || anchor.current?.contains(target)) return;
       onCloseRef.current();
     };
     window.addEventListener("keydown", onKey, true);

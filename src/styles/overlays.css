@@ -52,7 +52,7 @@ body:has(.bulk-bar:not(.bulk-bar--leaving)) .toasts { bottom: 96px; }
   box-shadow: var(--shadow-popover);
   color: var(--text);
   font-size: 13px;
-  animation: toast-in 0.16s ease-out;
+  animation: toast-in var(--motion-slow) var(--ease-out);
 }
 .toast.error svg:first-child { color: var(--banner-error-dot); }
 .toast.success svg:first-child { color: var(--progress-done); }

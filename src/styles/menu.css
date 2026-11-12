@@ -28,3 +28,14 @@
 .menu__search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text); font: inherit; font-size: 13px; }
 .menu__empty { padding: 6px 8px; font-size: 13px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .menu__separator { flex: none; height: 1px; margin: 4px 8px; background: var(--hairline); }
+
+/* A pop-up button (components/menu/PopUpButton): the current choice and a chevron; its container sets the width
+   and the box (outline, fill, height), a long choice truncates. */
+.popup-button {
+  display: flex; align-items: center; gap: 6px; min-width: 0; text-align: left; cursor: default;
+  transition: border-color var(--motion-fast) var(--ease-out), background-color var(--motion-fast) var(--ease-out);
+}
+.popup-button:hover:not(:disabled) { border-color: var(--border-strong); background-color: var(--hover-bg); }
+.popup-button:disabled { color: var(--text-muted); }
+.popup-button__value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.popup-button__chevron { flex: none; color: var(--text-muted); }

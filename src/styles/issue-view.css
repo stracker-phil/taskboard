@@ -263,7 +263,7 @@ button.web-link:hover { background: var(--row-hover-bg); }
 .attachment[aria-busy="true"] { cursor: progress; }
 .attachment__spinner {
   width: 12px; height: 12px; box-sizing: border-box; border: 2px solid var(--spinner-track); border-top-color: var(--accent);
-  border-radius: 50%; animation: spin 0.9s linear infinite;
+  border-radius: 50%; animation: spin var(--motion-spin) linear infinite;
 }
 .attachment__badge {
   display: flex; flex: none; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 6px;

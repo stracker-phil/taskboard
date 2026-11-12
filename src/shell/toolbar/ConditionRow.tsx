@@ -1,6 +1,7 @@
 import { X } from "lucide-react";
 import { useId, useState } from "react";
 import type { Condition, FilterField, FilterOptions, Op } from "../../api";
+import { PopUpButton } from "../../components/menu/PopUpButton";
 import { choicesFor, DEFAULT_DAYS, newCondition, OP_NAMES, opsFor, pickedValues, shownOp, startValue, takesDays, takesKeys, takesList, takesNoValue, withValues } from "./conditionEditing";
 import { KeysInput } from "./KeysInput";
 import { ValuePicker } from "./ValuePicker";
@@ -13,6 +14,8 @@ interface Props {
   onRemove?: () => void;
   ops?: Op[];
 }
+
+const FIELD_SEARCH_FROM = 12;
 
 /** The condition's field, also when the Space hides it or Jira no longer has it. */
 function fieldOf(condition: Condition, options: FilterOptions): FilterField {
@@ -54,23 +57,19 @@ export function ConditionRow({ condition, options, onChange, onRemove, ops: fixe
         <label className="visually-hidden" htmlFor={`${id}-field`}>
           Field
         </label>
-        <select id={`${id}-field`} className="condition-row__field" value={field.id} disabled={!onRemove} onChange={(e) => setField(e.target.value)}>
-          {listed.map((f) => (
-            <option key={f.id} value={f.id}>
-              {f.name}
-            </option>
-          ))}
-        </select>
+        <PopUpButton
+          id={`${id}-field`}
+          className="condition-row__field"
+          value={field.id}
+          options={listed.map((f) => ({ value: f.id, label: f.name }))}
+          disabled={!onRemove}
+          search={listed.length > FIELD_SEARCH_FROM ? "Find a field" : undefined}
+          onChange={setField}
+        />
         <label className="visually-hidden" htmlFor={`${id}-op`}>
           Operator
         </label>
-        <select id={`${id}-op`} className="condition-row__op" value={shownOp(condition.op)} onChange={(e) => setOp(e.target.value as Op)}>
-          {ops.map((op) => (
-            <option key={op} value={op}>
-              {OP_NAMES[op]}
-            </option>
-          ))}
-        </select>
+        <PopUpButton id={`${id}-op`} className="condition-row__op" value={shownOp(condition.op)} options={ops.map((op) => ({ value: op, label: OP_NAMES[op] }))} onChange={setOp} />
         <ValueEditor id={`${id}-value`} condition={condition} field={field} options={options} onChange={onChange} onError={setError} />
         {onRemove ? (
           <button type="button" className="condition-row__remove" aria-label="Remove condition" onClick={onRemove}>

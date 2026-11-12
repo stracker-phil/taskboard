@@ -1,18 +1,23 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useRef, useState } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { resetStore } from "../state/store";
+import { MenuHost } from "./menu";
+import { PopUpButton } from "./menu/PopUpButton";
 import { Popover } from "./Popover";
 
 function Harness({ onClose }: { onClose: () => void }) {
   const anchor = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
+  const [sort, setSort] = useState("name");
   return (
     <>
       <button ref={anchor} type="button" onClick={() => setOpen((o) => !o)}>
         Columns
       </button>
       <button type="button">Elsewhere</button>
+      <MenuHost />
       {open && (
         <Popover
           label="Columns for this view"
@@ -25,6 +30,16 @@ function Harness({ onClose }: { onClose: () => void }) {
         >
           <button type="button">First choice</button>
           <button type="button">Second choice</button>
+          <label htmlFor="sort">Sort by</label>
+          <PopUpButton
+            id="sort"
+            value={sort}
+            options={[
+              { value: "name", label: "Name" },
+              { value: "due", label: "Due date" },
+            ]}
+            onChange={setSort}
+          />
         </Popover>
       )}
     </>
@@ -36,6 +51,10 @@ async function openPopover(onClose = vi.fn()) {
   await userEvent.click(screen.getByRole("button", { name: "Columns" }));
   return onClose;
 }
+
+beforeEach(() => {
+  resetStore();
+});
 
 describe("Popover", () => {
   it("moves focus to the first control in the panel when it opens", async () => {
@@ -80,6 +99,45 @@ describe("Popover", () => {
 
     expect(onClose).not.toHaveBeenCalled();
     expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
+  describe("while a menu opened from inside it is open", () => {
+    async function openMenuInside() {
+      const onClose = await openPopover();
+      await userEvent.click(screen.getByLabelText("Sort by"));
+      expect(screen.getByRole("menu", { name: "Sort by" })).toBeInTheDocument();
+      return onClose;
+    }
+
+    it("closes the menu on Escape and keeps the popover open", async () => {
+      const onClose = await openMenuInside();
+
+      await userEvent.keyboard("{Escape}");
+
+      expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+      expect(screen.getByRole("dialog", { name: "Columns for this view" })).toBeInTheDocument();
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it("closes the menu when the mouse goes down outside both and keeps the popover open", async () => {
+      const onClose = await openMenuInside();
+
+      fireEvent.mouseDown(screen.getByRole("button", { name: "Elsewhere" }));
+
+      expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+      expect(screen.getByRole("dialog", { name: "Columns for this view" })).toBeInTheDocument();
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it("closes on the next Escape once the menu is gone", async () => {
+      const onClose = await openMenuInside();
+      await userEvent.keyboard("{Escape}");
+
+      await userEvent.keyboard("{Escape}");
+
+      expect(onClose).toHaveBeenCalled();
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
   });
 });
 

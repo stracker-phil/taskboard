@@ -13,7 +13,7 @@
   font-size: 12px;
 }
 
-.status-bar__spin { animation: spin 1s linear infinite; }
+.status-bar__spin { animation: spin var(--motion-spin) linear infinite; }
 @media (prefers-reduced-motion: reduce) {
   .status-bar__spin { animation: none; }
 }
@@ -57,7 +57,7 @@
 .status-activity__spinner {
   flex: none; width: 10px; height: 10px; box-sizing: border-box; border-radius: 50%;
   border: 1.5px solid var(--spinner-track); border-top-color: var(--accent);
-  animation: spin 0.9s linear infinite;
+  animation: spin var(--motion-spin) linear infinite;
 }
 @media (prefers-reduced-motion: reduce) {
   .status-activity__spinner { animation: none; }

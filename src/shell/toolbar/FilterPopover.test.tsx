@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../../api", async (orig) => ({ ...(await orig<object>()), api: (await import("../../test/apiMock")).createApiMock() }));
 
 import { api, type ListConditions } from "../../api";
+import { MenuHost } from "../../components/menu";
 import { createQueryClient } from "../../queries/queryClient";
 import { narrowingKey } from "../../state/slices/narrowing";
 import { resetStore, useStore } from "../../state/store";
@@ -58,6 +59,7 @@ function Harness({ listId, dirty }: { listId: number; dirty: boolean }) {
         Filter
       </button>
       {open && <FilterPopover listId={listId} viewId={VIEW_ID} anchor={anchor} dirty={dirty} onSave={onSave} onClose={() => setOpen(false)} />}
+      <MenuHost />
     </>
   );
 }
@@ -77,6 +79,20 @@ async function openFilter(conditions: ListConditions, listId = 21, dirty = false
 const LIST_SECTION = "All views of this list";
 const VIEW_SECTION = "This view";
 const section = (popover: HTMLElement, name: string) => within(popover).getByRole("group", { name });
+
+/** Opens a pop-up button's menu and chooses the row with the given name. */
+async function pick(button: HTMLElement, row: string) {
+  await userEvent.click(button);
+  await userEvent.click(screen.getByRole("menuitemradio", { name: row }));
+}
+
+/** The rows a pop-up button's menu offers, in order; the menu is closed again afterwards. */
+async function rowsOf(button: HTMLElement) {
+  await userEvent.click(button);
+  const rows = screen.getAllByRole("menuitemradio").map((row) => row.textContent);
+  await userEvent.keyboard("{Escape}");
+  return rows;
+}
 
 /** Unticks High and ticks Low in the open value picker. */
 async function swapPriority(popover: HTMLElement) {
@@ -104,7 +120,8 @@ describe("FilterPopover", () => {
       expect(within(locked).getByText("=")).toBeInTheDocument();
       expect(within(locked).getByText("NW")).toBeInTheDocument();
       expect(within(locked).getByText("this Space")).toBeInTheDocument();
-      expect(within(popover).queryByRole("combobox")).not.toBeInTheDocument();
+      expect(within(popover).queryByLabelText("Field")).not.toBeInTheDocument();
+      expect(within(popover).queryByLabelText("Operator")).not.toBeInTheDocument();
       expect(within(popover).queryByRole("button", { name: "Remove condition" })).not.toBeInTheDocument();
     });
 
@@ -116,25 +133,25 @@ describe("FilterPopover", () => {
   });
 
   describe("on a filter list", () => {
-    it("shows each own condition as field, operator and value selects", async () => {
+    it("shows each own condition as field, operator and value controls", async () => {
       const popover = await openFilter(FILTER_LIST);
 
-      expect(within(popover).getByLabelText("Field")).toHaveDisplayValue("Priority");
-      expect(within(popover).getByLabelText("Operator")).toHaveDisplayValue("is");
+      expect(within(popover).getByLabelText("Field")).toHaveTextContent(/^Priority$/);
+      expect(within(popover).getByLabelText("Operator")).toHaveTextContent(/^is$/);
       expect(within(popover).getByLabelText("Value")).toHaveTextContent("High");
     });
 
     it("shows a stored in condition as is, with all its values in the field", async () => {
       const popover = await openFilter(listConditions({ kind: "list", own: [{ field: "status", op: "in", value: ["3", "4"] }] }));
 
-      expect(within(popover).getByLabelText("Operator")).toHaveDisplayValue("is");
+      expect(within(popover).getByLabelText("Operator")).toHaveTextContent(/^is$/);
       expect(within(popover).getByLabelText("Value")).toHaveTextContent("In Progress, Done");
     });
 
     it("shows a stored not in condition as is not", async () => {
       const popover = await openFilter(listConditions({ kind: "list", own: [{ field: "status", op: "notIn", value: ["3", "4"] }] }));
 
-      expect(within(popover).getByLabelText("Operator")).toHaveDisplayValue("is not");
+      expect(within(popover).getByLabelText("Operator")).toHaveTextContent(/^is not$/);
     });
 
     it("drafts one condition with a list when a second status is ticked for is not", async () => {
@@ -158,7 +175,7 @@ describe("FilterPopover", () => {
     it("keeps the picked values when the operator switches between is and is not", async () => {
       const popover = await openFilter(listConditions({ kind: "list", own: [{ field: "status", op: "in", value: ["3", "4"] }] }));
 
-      await userEvent.selectOptions(within(popover).getByLabelText("Operator"), "is not");
+      await pick(within(popover).getByLabelText("Operator"), "is not");
 
       expect(within(popover).getByLabelText("Value")).toHaveTextContent("In Progress, Done");
       expect(draft()?.list).toEqual([{ field: "status", op: "notIn", value: ["3", "4"] }]);
@@ -167,7 +184,7 @@ describe("FilterPopover", () => {
     it("keeps a single picked value when the operator switches to is not", async () => {
       const popover = await openFilter(FILTER_LIST);
 
-      await userEvent.selectOptions(within(popover).getByLabelText("Operator"), "is not");
+      await pick(within(popover).getByLabelText("Operator"), "is not");
 
       expect(draft()?.list).toEqual([{ field: "priority", op: "isNot", value: "High" }]);
     });
@@ -232,7 +249,7 @@ describe("FilterPopover", () => {
       await userEvent.click(within(section(popover, LIST_SECTION)).getByRole("button", { name: "+ Add condition" }));
       expect(await within(popover).findByText("2 issues match")).toBeInTheDocument();
 
-      await userEvent.selectOptions(within(section(popover, LIST_SECTION)).getAllByLabelText("Field")[1], "Review notes");
+      await pick(within(section(popover, LIST_SECTION)).getAllByLabelText("Field")[1], "Review notes");
 
       expect(within(popover).getAllByLabelText("Value")[1]).toHaveValue("");
       expect(await within(popover).findByText("1 issue matches")).toBeInTheDocument();
@@ -240,7 +257,7 @@ describe("FilterPopover", () => {
 
     it("drafts a text condition once it has text", async () => {
       const popover = await openFilter(FILTER_LIST);
-      await userEvent.selectOptions(within(popover).getByLabelText("Field"), "Review notes");
+      await pick(within(popover).getByLabelText("Field"), "Review notes");
 
       await userEvent.type(within(popover).getByLabelText("Value"), "pricing");
 
@@ -250,7 +267,7 @@ describe("FilterPopover", () => {
     it("keeps the value of a text condition when the operator changes between value operators", async () => {
       const popover = await openFilter(listConditions({ kind: "list", own: [{ field: "customfield_10071", op: "contains", value: "pricing" }] }));
 
-      await userEvent.selectOptions(within(popover).getByLabelText("Operator"), "is");
+      await pick(within(popover).getByLabelText("Operator"), "is");
 
       expect(within(popover).getByLabelText("Value")).toHaveValue("pricing");
     });
@@ -258,7 +275,7 @@ describe("FilterPopover", () => {
     it("hides the value input for an operator that needs none", async () => {
       const popover = await openFilter(FILTER_LIST);
 
-      await userEvent.selectOptions(within(popover).getByLabelText("Operator"), "is empty");
+      await pick(within(popover).getByLabelText("Operator"), "is empty");
 
       expect(within(popover).queryByLabelText("Value")).not.toBeInTheDocument();
       expect(draft()?.list).toEqual([{ field: "priority", op: "isEmpty" }]);
@@ -267,8 +284,8 @@ describe("FilterPopover", () => {
     it("starts a days condition at 7", async () => {
       const popover = await openFilter(FILTER_LIST);
 
-      await userEvent.selectOptions(within(popover).getByLabelText("Field"), "Updated");
-      await userEvent.selectOptions(within(popover).getByLabelText("Operator"), "in last");
+      await pick(within(popover).getByLabelText("Field"), "Updated");
+      await pick(within(popover).getByLabelText("Operator"), "in last");
 
       expect(within(popover).getByLabelText("Value")).toHaveValue(7);
     });
@@ -276,8 +293,8 @@ describe("FilterPopover", () => {
     it("starts an hours condition at 7 for a timestamp field", async () => {
       const popover = await openFilter(FILTER_LIST);
 
-      await userEvent.selectOptions(within(popover).getByLabelText("Field"), "Last view");
-      await userEvent.selectOptions(within(popover).getByLabelText("Operator"), "in last (hours)");
+      await pick(within(popover).getByLabelText("Field"), "Last view");
+      await pick(within(popover).getByLabelText("Operator"), "in last (hours)");
 
       expect(within(popover).getByLabelText("Value")).toHaveValue(7);
       expect(draft()?.list).toEqual([{ field: "lastView", op: "withinLastHours", value: 7 }]);
@@ -286,11 +303,11 @@ describe("FilterPopover", () => {
     it("offers the hours operator for Last interaction but not for a date field", async () => {
       const popover = await openFilter(FILTER_LIST);
 
-      await userEvent.selectOptions(within(popover).getByLabelText("Field"), "Last interaction");
-      expect(within(popover).getByRole("option", { name: "in last (hours)" })).toBeInTheDocument();
-      await userEvent.selectOptions(within(popover).getByLabelText("Field"), "Due date");
+      await pick(within(popover).getByLabelText("Field"), "Last interaction");
+      expect(await rowsOf(within(popover).getByLabelText("Operator"))).toContain("in last (hours)");
+      await pick(within(popover).getByLabelText("Field"), "Due date");
 
-      expect(within(popover).queryByRole("option", { name: "in last (hours)" })).not.toBeInTheDocument();
+      expect(await rowsOf(within(popover).getByLabelText("Operator"))).not.toContain("in last (hours)");
     });
 
     it("takes a calendar date for a timestamp field's before operator", async () => {
@@ -312,11 +329,11 @@ describe("FilterPopover", () => {
   });
 
   describe("a keys field", () => {
-    const operatorNames = (popover: HTMLElement) => within(within(popover).getByLabelText("Operator")).getAllByRole("option").map((o) => o.textContent);
+    const operatorNames = (popover: HTMLElement) => rowsOf(within(popover).getByLabelText("Operator"));
 
     async function pickField(name: string) {
       const popover = await openFilter(FILTER_LIST);
-      await userEvent.selectOptions(within(popover).getByLabelText("Field"), name);
+      await pick(within(popover).getByLabelText("Field"), name);
       return popover;
     }
 
@@ -325,13 +342,13 @@ describe("FilterPopover", () => {
 
       expect(within(popover).getByLabelText("Value")).toHaveAttribute("placeholder", "NW-123, NW-124");
       expect(within(popover).getByLabelText("Value")).toHaveAttribute("type", "text");
-      expect(operatorNames(popover)).toEqual(["is", "is not"]);
+      expect(await operatorNames(popover)).toEqual(["is", "is not"]);
     });
 
     it("offers is empty and is set for Parent ID besides is and is not", async () => {
       const popover = await pickField("Parent ID");
 
-      expect(operatorNames(popover)).toEqual(["is", "is not", "is empty", "is set"]);
+      expect(await operatorNames(popover)).toEqual(["is", "is not", "is empty", "is set"]);
     });
 
     it("drafts several typed keys as in, and shows them normalized, on Enter", async () => {
@@ -390,7 +407,7 @@ describe("FilterPopover", () => {
       await userEvent.type(within(popover).getByLabelText("Value"), "nw 1{Enter}");
       await within(popover).findByText("“nw 1” is not an issue key");
 
-      await userEvent.selectOptions(within(popover).getByLabelText("Field"), "Parent ID");
+      await pick(within(popover).getByLabelText("Field"), "Parent ID");
 
       expect(within(popover).queryByText("“nw 1” is not an issue key")).not.toBeInTheDocument();
     });
@@ -564,19 +581,20 @@ describe("FilterPopover", () => {
   });
 
   describe("the Project field", () => {
-    const fieldNames = (popover: HTMLElement) => within(within(popover).getByLabelText("Field")).getAllByRole("option").map((o) => o.textContent);
+    const fieldNames = (popover: HTMLElement) => rowsOf(within(popover).getByLabelText("Field"));
 
     it("is offered on a global filter list", async () => {
       const popover = await openFilter(FILTER_LIST);
 
-      expect(fieldNames(popover)).toContain("Project");
+      expect(await fieldNames(popover)).toContain("Project");
     });
 
     it("is not offered in a condition of a filter list inside a Space", async () => {
       const popover = await openFilter({ ...FILTER_LIST, projectFixed: true });
 
-      expect(fieldNames(popover)).toContain("Priority");
-      expect(fieldNames(popover)).not.toContain("Project");
+      const names = await fieldNames(popover);
+      expect(names).toContain("Priority");
+      expect(names).not.toContain("Project");
     });
 
     it("is not the field of a condition added inside a Space", async () => {
@@ -584,32 +602,29 @@ describe("FilterPopover", () => {
 
       await userEvent.click(within(section(popover, LIST_SECTION)).getByRole("button", { name: "+ Add condition" }));
 
-      expect(within(popover).getByLabelText("Field")).toHaveDisplayValue("Status");
-      expect(fieldNames(popover)).not.toContain("Project");
+      expect(within(popover).getByLabelText("Field")).toHaveTextContent(/^Status$/);
+      expect(await fieldNames(popover)).not.toContain("Project");
     });
   });
 
   describe("a field the Space hides", () => {
     const REVIEW_NOTES = { id: "customfield_10071", name: "Review notes", kind: "text" } as const;
     const WITH_HIDDEN = filterOptions({ hiddenFields: [REVIEW_NOTES] });
-    const fieldNames = (select: HTMLElement) => within(select).getAllByRole("option").map((o) => o.textContent);
-
     beforeEach(() => {
       mocked.filterOptions.mockResolvedValue(WITH_HIDDEN);
     });
 
-    it("is not offered in the field select of a new condition", async () => {
+    it("is not offered in the field menu of a new condition", async () => {
       const popover = await openFilter(FILTER_LIST);
       await userEvent.click(within(section(popover, LIST_SECTION)).getByRole("button", { name: "+ Add condition" }));
 
-      for (const select of within(popover).getAllByLabelText("Field")) expect(fieldNames(select)).not.toContain("Review notes");
+      for (const button of within(popover).getAllByLabelText("Field")) expect(await rowsOf(button)).not.toContain("Review notes");
     });
 
     it("shows its name selected in a list condition that already uses it", async () => {
       const popover = await openFilter(listConditions({ kind: "list", own: [{ field: REVIEW_NOTES.id, op: "contains", value: "pricing" }] }));
 
-      const select = within(section(popover, LIST_SECTION)).getByLabelText("Field");
-      expect(select).toHaveDisplayValue("Review notes");
+      expect(within(section(popover, LIST_SECTION)).getByLabelText("Field")).toHaveTextContent("Review notes");
       expect(within(popover).getByLabelText("Value")).toHaveValue("pricing");
     });
 
@@ -617,9 +632,9 @@ describe("FilterPopover", () => {
       const popover = await openFilter(listConditions({ kind: "list", own: [HIGH_PRIORITY], view: [{ field: REVIEW_NOTES.id, op: "contains", value: "pricing" }] }));
 
       const viewField = within(section(popover, VIEW_SECTION)).getByLabelText("Field");
-      expect(viewField).toHaveDisplayValue("Review notes");
-      expect(fieldNames(viewField)).toContain("Review notes");
-      expect(fieldNames(within(section(popover, LIST_SECTION)).getByLabelText("Field"))).not.toContain("Review notes");
+      expect(viewField).toHaveTextContent("Review notes");
+      expect(await rowsOf(viewField)).toContain("Review notes");
+      expect(await rowsOf(within(section(popover, LIST_SECTION)).getByLabelText("Field"))).not.toContain("Review notes");
     });
   });
 
@@ -631,7 +646,7 @@ describe("FilterPopover", () => {
 
       const popover = await openFilter(listConditions({ kind: "list", own: [IN_PROGRESS] }), 21);
 
-      expect(within(popover).getByLabelText("Field")).toHaveDisplayValue("Status of 21");
+      expect(within(popover).getByLabelText("Field")).toHaveTextContent("Status of 21");
     });
   });
 
@@ -641,8 +656,8 @@ describe("FilterPopover", () => {
 
       const list = section(popover, LIST_SECTION);
       const own = section(popover, VIEW_SECTION);
-      expect(within(list).getByLabelText("Field")).toHaveDisplayValue("Priority");
-      expect(within(own).getByLabelText("Field")).toHaveDisplayValue("Due date");
+      expect(within(list).getByLabelText("Field")).toHaveTextContent("Priority");
+      expect(within(own).getByLabelText("Field")).toHaveTextContent("Due date");
       expect(within(list).getByRole("button", { name: "+ Add condition" })).toBeInTheDocument();
       expect(within(own).getByRole("button", { name: "+ Add condition" })).toBeInTheDocument();
     });
@@ -658,7 +673,7 @@ describe("FilterPopover", () => {
     it("drafts an edited view condition for the view and not the list", async () => {
       const popover = await openFilter(listConditions({ kind: "list", own: [HIGH_PRIORITY], view: [NO_DUE_DATE] }));
 
-      await userEvent.selectOptions(within(section(popover, VIEW_SECTION)).getByLabelText("Operator"), "is set");
+      await pick(within(section(popover, VIEW_SECTION)).getByLabelText("Operator"), "is set");
 
       expect(draft()).toMatchObject({ view: [{ field: "due", op: "isNotEmpty" }], list: null });
     });
@@ -718,7 +733,7 @@ describe("FilterPopover", () => {
 
         expect(within(popover).queryByRole("group", { name: LIST_SECTION })).not.toBeInTheDocument();
         expect(within(popover).getAllByRole("button", { name: "+ Add condition" })).toHaveLength(1);
-        expect(within(section(popover, VIEW_SECTION)).getByLabelText("Field")).toHaveDisplayValue("Due date");
+        expect(within(section(popover, VIEW_SECTION)).getByLabelText("Field")).toHaveTextContent("Due date");
 
         await userEvent.click(within(popover).getByRole("button", { name: "Remove condition" }));
 
@@ -752,7 +767,7 @@ describe("FilterPopover", () => {
       const popover = await openFilter(VIEWED);
 
       const page = section(popover, THIS_PAGE);
-      expect(within(page).getByLabelText("Field")).toHaveDisplayValue("Last view");
+      expect(within(page).getByLabelText("Field")).toHaveTextContent("Last view");
       expect(within(page).getByLabelText("Field")).toBeDisabled();
       expect(within(page).queryByRole("button", { name: "Remove condition" })).not.toBeInTheDocument();
       expect(within(page).queryByRole("button", { name: "+ Add condition" })).not.toBeInTheDocument();
@@ -761,8 +776,7 @@ describe("FilterPopover", () => {
     it("offers only the hours and days operators", async () => {
       const popover = await openFilter(VIEWED);
 
-      const operators = within(within(section(popover, THIS_PAGE)).getByLabelText("Operator")).getAllByRole("option");
-      expect(operators.map((o) => o.textContent)).toEqual(["in last (hours)", "in last"]);
+      expect(await rowsOf(within(section(popover, THIS_PAGE)).getByLabelText("Operator"))).toEqual(["in last (hours)", "in last"]);
     });
 
     it("keeps the other sections editable and shows no list section", async () => {
@@ -787,16 +801,16 @@ describe("FilterPopover", () => {
     it("keeps the span when hours switch to days: 24 hours become 1 day", async () => {
       const popover = await openFilter(VIEWED);
 
-      await userEvent.selectOptions(within(section(popover, THIS_PAGE)).getByLabelText("Operator"), "in last");
+      await pick(within(section(popover, THIS_PAGE)).getByLabelText("Operator"), "in last");
 
       expect(mocked.listSetWindow).toHaveBeenCalledWith(21, "withinLastDays", 1);
-      expect(within(section(popover, THIS_PAGE)).getByLabelText("Operator")).toHaveDisplayValue("in last");
+      expect(within(section(popover, THIS_PAGE)).getByLabelText("Operator")).toHaveTextContent(/^in last$/);
     });
 
     it("keeps the span when days switch to hours: 2 days become 48 hours", async () => {
       const popover = await openFilter(listConditions({ kind: "viewed", fixed: { field: "lastView", op: "withinLastDays", value: 2 } }));
 
-      await userEvent.selectOptions(within(section(popover, THIS_PAGE)).getByLabelText("Operator"), "in last (hours)");
+      await pick(within(section(popover, THIS_PAGE)).getByLabelText("Operator"), "in last (hours)");
 
       expect(mocked.listSetWindow).toHaveBeenCalledWith(21, "withinLastHours", 48);
       expect(within(section(popover, THIS_PAGE)).getByLabelText("Value")).toHaveValue(48);
