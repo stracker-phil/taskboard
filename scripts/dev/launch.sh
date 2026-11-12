@@ -7,8 +7,8 @@ APP="$ROOT/src-tauri/target/debug/bundle/macos/Taskboard (Debug).app"
 BIN="$APP/Contents/MacOS/taskboard"
 [[ -x "$BIN" ]] || { echo "Build first: bun run build:app"; exit 1; }
 # A failed build leaves the previous bundle behind; never start one older than the code it should run.
-STALE=$(find "$ROOT/src" "$ROOT/src-tauri/src" "$ROOT/src-tauri/Cargo.toml" "$ROOT/src-tauri/tauri.conf.json" \
-  "$ROOT/src-tauri/tauri.debug.conf.json" -type f -not -name '*.test.*' -not -name '*.gen.ts' -not -path '*/test/*' -not -path '*/test_support/*' -not -path '*/fixtures/*' -newer "$BIN" -print -quit)
+STALE=$(find "$ROOT/src" "$ROOT/src-tauri/src" "$ROOT/src-tauri/build.rs" "$ROOT/src-tauri/capabilities" "$ROOT/src-tauri/Cargo.toml" "$ROOT/src-tauri/tauri.conf.json" \
+  "$ROOT/src-tauri/tauri.debug.conf.json" -type f -not -name '*.test.*' -not -name '*.gen.ts' -not -path '*/test/*' -not -path '*/test_support/fixtures*' -not -path '*/fixtures/*' -newer "$BIN" -print -quit)
 [[ -z "$STALE" ]] || { echo "The debug build is older than ${STALE#$ROOT/}; run bun run build:app first"; exit 1; }
 
 "$ROOT/scripts/sign-app.sh" "$APP" com.philippstracker.taskboard.debug
