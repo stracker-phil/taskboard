@@ -7,6 +7,7 @@ export const SETTINGS_KEYS = {
   connection: ["connection"],
   projects: ["projects"],
   scope: ["scope"],
+  issueTypes: ["issueTypes"],
   keybindings: ["keybindings"],
   capabilities: ["capabilities"],
   changePermissions: ["changePermissions"],
@@ -16,6 +17,8 @@ export const useSettings = () => useQuery({ queryKey: SETTINGS_KEYS.settings, qu
 export const useConnection = () => useQuery({ queryKey: SETTINGS_KEYS.connection, queryFn: api.connectionGet });
 export const useProjects = () => useQuery({ queryKey: SETTINGS_KEYS.projects, queryFn: api.projectsList });
 export const useScope = () => useQuery({ queryKey: SETTINGS_KEYS.scope, queryFn: api.scopeGet });
+/** The issue types Settings → Sync can leave out. */
+export const useIssueTypes = () => useQuery({ queryKey: SETTINGS_KEYS.issueTypes, queryFn: api.syncIssueTypes });
 export const useKeybindings = () => useQuery({ queryKey: SETTINGS_KEYS.keybindings, queryFn: api.getKeybindings });
 export const useCapabilities = () => useQuery({ queryKey: SETTINGS_KEYS.capabilities, queryFn: api.jiraCapabilities });
 /** The changes Jira doesn't allow in some tracked projects; asked only while changes are on. */

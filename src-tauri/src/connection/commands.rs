@@ -126,8 +126,8 @@ pub async fn scope_save(
     super::scope_view(&state.db, &sync).await
 }
 
-/// Saves the sync settings; turning `memoryOnly` on or off replaces the cache with an empty one of the other
-/// kind and fetches everything again.
+/// Saves the sync settings. A newly excluded type leaves the cache at once; a type taken back, or `memoryOnly`
+/// switched (an empty cache of the other kind), fetches everything again.
 #[tauri::command]
 pub async fn sync_save(
     app: AppHandle,
@@ -135,15 +135,31 @@ pub async fn sync_save(
     engine: State<'_, SyncEngine>,
     sync: SyncSettings,
 ) -> AppResult<SyncSettings> {
+    let before = state.settings.get().sync.excluded_types;
     let saved = super::save_intervals(&state.settings, sync).await?;
     announce_settings(&app, &state.settings.get());
+    let types_came_back =
+        super::apply_excluded_types(&state.db, &before, &saved.excluded_types).await?;
     let kind = saved.cache_kind();
-    if kind != state.db.cache_kind() {
+    let switched = kind != state.db.cache_kind();
+    if switched {
         state.db.switch_cache(kind).await?;
         log::info!("Cache switched to {kind:?}");
+    }
+    if switched || types_came_back {
         engine.queue(Job::Full);
     }
     Ok(saved)
+}
+
+/// The issue types Settings → Sync offers to leave out: those of the cached issues and those left out already.
+#[tauri::command]
+pub async fn sync_issue_types(state: State<'_, AppState>) -> AppResult<Vec<String>> {
+    let excluded = state.settings.get().sync.excluded_types;
+    state
+        .db
+        .read(move |conn| super::issue_types(conn, &excluded))
+        .await
 }
 
 /// Deletes the Jira mirror; the next sync is a full one. Spaces, filter lists, views, pins and read marks stay.

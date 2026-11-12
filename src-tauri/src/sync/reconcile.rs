@@ -1,7 +1,7 @@
 //! Reconciliation: finds issues the scope no longer returns. Jira has no feed of deleted issues, so the ids
 //! are compared; a missing one is asked for directly, and what Jira doesn't return is gone. What Jira returns
 //! outside the scope (done longer than the scope keeps, moved to an untracked project) stays cached and is
-//! asked for again only after `RECHECK_LEFT_SCOPE`.
+//! asked for again only after `RECHECK_LEFT_SCOPE`. Cached issues of an excluded type leave the cache.
 
 use std::collections::HashSet;
 
@@ -9,7 +9,7 @@ use chrono::{Duration, Utc};
 
 use super::full::{current_scope, refresh_fields, search_fields};
 use super::retention::{live_issues, mark_gone, mark_left_scope, prune_seen_changes, purge_gone};
-use super::store::{Pass, record_reconcile, store_page};
+use super::store::{Pass, forget_types, record_reconcile, store_page};
 use super::{SyncContext, SyncEvent};
 use crate::error::AppResult;
 use crate::jira::{BULK_FETCH_MAX, SearchRequest};
@@ -95,11 +95,15 @@ pub async fn reconcile(
     let keep_history = Duration::days(i64::from(ctx.settings.get().sync.keep_history_days));
     let changes_before = format_utc(now - keep_history);
     let stamp = format_utc(now);
+    let excluded = ctx.settings.get().sync.excluded_types;
     let (purged, pruned) = ctx
         .db
-        .write(move |tx, _| {
+        .write(move |tx, changes| {
             record_reconcile(tx, &stamp)?;
             mark_left_scope(tx, &back, None)?;
+            for id in forget_types(tx, &excluded)? {
+                changes.issue_changed(id);
+            }
             Ok((
                 purge_gone(tx, &gone_before)?,
                 prune_seen_changes(tx, &changes_before)?,

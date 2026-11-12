@@ -28,6 +28,8 @@ pub struct SyncSettings {
     pub clear_cache_on_quit: bool,
     /// Keeps the Jira mirror in memory instead of `cache.sqlite` (ADR 0057).
     pub memory_only: bool,
+    /// Issue types (by name) the sync leaves out, whatever the scope.
+    pub excluded_types: Vec<String>,
 }
 
 impl Default for SyncSettings {
@@ -40,6 +42,7 @@ impl Default for SyncSettings {
             keep_history_days: 90,
             clear_cache_on_quit: false,
             memory_only: false,
+            excluded_types: Vec::new(),
         }
     }
 }
@@ -68,7 +71,7 @@ impl SyncSettings {
         )
     }
 
-    /// Values a hand-edited file put out of bounds, moved to the nearest bound.
+    /// Moves out-of-bounds values to the nearest bound and tidies the excluded types.
     pub fn clamped(self) -> Self {
         let clamp = |value: u32, (min, max): (u32, u32)| value.clamp(min, max);
         Self {
@@ -76,9 +79,25 @@ impl SyncSettings {
             background_minutes: clamp(self.background_minutes, BACKGROUND_MINUTES),
             keep_done_days: clamp(self.keep_done_days, KEEP_DONE_DAYS),
             keep_history_days: clamp(self.keep_history_days, KEEP_HISTORY_DAYS),
+            excluded_types: tidy_types(self.excluded_types),
             ..self
         }
     }
+}
+
+fn tidy_types(types: Vec<String>) -> Vec<String> {
+    let mut tidy: Vec<String> = types
+        .into_iter()
+        .map(|name| name.trim().to_string())
+        .filter(|name| !name.is_empty())
+        .collect();
+    tidy.sort_by(|a, b| {
+        a.to_lowercase()
+            .cmp(&b.to_lowercase())
+            .then_with(|| a.cmp(b))
+    });
+    tidy.dedup();
+    tidy
 }
 
 fn check(field: &str, value: u32, (min, max): (u32, u32)) -> AppResult<()> {
@@ -230,8 +249,57 @@ mod tests {
                 "keepHistoryDays": 90,
                 "clearCacheOnQuit": false,
                 "memoryOnly": false,
+                "excludedTypes": [],
             })
         );
+    }
+
+    fn excluding(names: &[&str]) -> SyncSettings {
+        SyncSettings {
+            excluded_types: names.iter().map(|name| name.to_string()).collect(),
+            ..SyncSettings::default()
+        }
+    }
+
+    #[test]
+    fn no_issue_types_are_excluded_by_default() {
+        assert_eq!(SyncSettings::default().excluded_types, Vec::<String>::new());
+    }
+
+    #[test]
+    fn a_file_without_the_excluded_types_key_reads_empty() {
+        let read: SyncSettings = serde_json::from_value(json!({ "focusedMinutes": 10 })).unwrap();
+        assert_eq!(read.excluded_types, Vec::<String>::new());
+    }
+
+    #[test]
+    fn the_excluded_types_round_trip_through_the_file() {
+        let settings = excluding(&["Test", "Test Execution"]);
+        let value = serde_json::to_value(&settings).unwrap();
+        assert_eq!(value["excludedTypes"], json!(["Test", "Test Execution"]));
+        assert_eq!(
+            serde_json::from_value::<SyncSettings>(value).unwrap(),
+            settings
+        );
+    }
+
+    #[test]
+    fn clamping_tidies_the_excluded_types() {
+        for (input, expected) in [
+            (vec!["  Test ", "Bug"], vec!["Bug", "Test"]),
+            (vec!["Bug", "", "   "], vec!["Bug"]),
+            (vec!["story", "Bug", "Epic"], vec!["Bug", "Epic", "story"]),
+            (vec!["Bug", "Bug", " Bug"], vec!["Bug"]),
+            (vec!["Bug", "bug"], vec!["Bug", "bug"]),
+            (vec!["Bug", "bug", "Bug"], vec!["Bug", "bug"]),
+            (vec![], vec![]),
+        ] {
+            assert_eq!(
+                excluding(&input).clamped().excluded_types,
+                expected,
+                "{input:?}"
+            );
+        }
     }
 
     #[test]

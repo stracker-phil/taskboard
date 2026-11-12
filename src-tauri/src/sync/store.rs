@@ -107,6 +107,22 @@ pub fn forget_issue(conn: &Connection, id: &str) -> AppResult<bool> {
     Ok(conn.execute("DELETE FROM cache.issue WHERE id = ?1", [id])? > 0)
 }
 
+/// Forgets the cached issues of the `types` (by name), as `forget_issue` does. Returns their ids.
+pub fn forget_types(conn: &Connection, types: &[String]) -> AppResult<Vec<String>> {
+    let ids: Vec<String> = {
+        let mut query = conn.prepare(
+            "SELECT id FROM cache.issue WHERE issue_type IN (SELECT value FROM json_each(?1))",
+        )?;
+        query
+            .query_map([serde_json::to_string(types)?], |row| row.get(0))?
+            .collect::<Result<_, _>>()?
+    };
+    for id in &ids {
+        forget_issue(conn, id)?;
+    }
+    Ok(ids)
+}
+
 /// Deletes a project's cached issues (their comments, changes and links go with them) and its sync record, so
 /// tracking it again fetches it anew; what the owner has read stays. Returns the deleted issues' ids.
 pub fn forget_project(conn: &Connection, project_id: &str) -> AppResult<Vec<String>> {
@@ -569,6 +585,78 @@ mod tests {
         db.write(|tx, _| forget_project(tx, NW)).await.unwrap();
 
         assert_eq!(count(&db, "SELECT COUNT(*) FROM issue_activity").await, 2);
+    }
+
+    async fn type_issues(db: &Db) {
+        db.write(|tx, _| {
+            tx.execute_batch(
+                "UPDATE cache.issue SET issue_type = 'Test' WHERE id IN ('1', '3');
+                 UPDATE cache.issue SET issue_type = 'Story' WHERE id = '2';",
+            )?;
+            Ok(())
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn forgetting_types_returns_and_deletes_their_issues_with_everything_attached() {
+        let (_dir, db) = lab().await;
+        type_issues(&db).await;
+        stamp_issues_1_and_2(&db).await;
+
+        let mut ids = db
+            .write(|tx, _| forget_types(tx, &["Test".to_string()]))
+            .await
+            .unwrap();
+        ids.sort();
+
+        assert_eq!(ids, vec!["1".to_string(), "3".to_string()]);
+        for sql in [
+            "SELECT COUNT(*) FROM cache.issue WHERE id IN ('1', '3')",
+            "SELECT COUNT(*) FROM cache.issue_fts WHERE rowid IN (1, 3)",
+            "SELECT COUNT(*) FROM cache.comment WHERE issue_id IN ('1', '3')",
+            "SELECT COUNT(*) FROM cache.issue_change WHERE issue_id IN ('1', '3')",
+            "SELECT COUNT(*) FROM issue_seen WHERE issue_id IN ('1', '3')",
+            "SELECT COUNT(*) FROM issue_activity WHERE issue_id IN ('1', '3')",
+        ] {
+            assert_eq!(count(&db, sql).await, 0, "{sql}");
+        }
+    }
+
+    #[tokio::test]
+    async fn forgetting_types_keeps_issues_of_other_types_with_their_marks() {
+        let (_dir, db) = lab().await;
+        type_issues(&db).await;
+        stamp_issues_1_and_2(&db).await;
+
+        db.write(|tx, _| forget_types(tx, &["Test".to_string()]))
+            .await
+            .unwrap();
+
+        for sql in [
+            "SELECT COUNT(*) FROM cache.issue WHERE id = '2'",
+            "SELECT COUNT(*) FROM cache.comment WHERE issue_id = '2'",
+            "SELECT COUNT(*) FROM issue_seen WHERE issue_id = '2'",
+            "SELECT COUNT(*) FROM issue_activity WHERE issue_id = '2'",
+        ] {
+            assert_eq!(count(&db, sql).await, 1, "{sql}");
+        }
+    }
+
+    #[tokio::test]
+    async fn forgetting_types_without_matching_issues_returns_nothing() {
+        let (_dir, db) = lab().await;
+        type_issues(&db).await;
+
+        for types in [vec![], vec!["Bug".to_string()]] {
+            let ids = db
+                .write(move |tx, _| forget_types(tx, &types))
+                .await
+                .unwrap();
+            assert_eq!(ids, Vec::<String>::new());
+        }
+        assert_eq!(count(&db, "SELECT COUNT(*) FROM cache.issue").await, 3);
     }
 
     #[tokio::test]

@@ -100,6 +100,7 @@ export function registerCoreSettingsPages() {
     order: 3,
     sections: [
       { id: "scope", title: "Scope" },
+      { id: "issue-types", title: "Issue types" },
       { id: "intervals", title: "Intervals" },
       { id: "synced", title: "Synced" },
     ],

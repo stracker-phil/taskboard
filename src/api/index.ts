@@ -132,6 +132,7 @@ export const api = {
   scopeSave: (jql: string | null) => invoke<ScopeView>("scope_save", { jql }),
   /** Saves the intervals and days to keep; the scope changes through `scopeSave`. */
   syncSave: (sync: SyncSettings) => invoke<SyncSettings>("sync_save", { sync }),
+  syncIssueTypes: () => invoke<string[]>("sync_issue_types"),
   /** What Taskboard is asking Jira right now; `jira_activity` events follow every change. */
   jiraActivity: () => invoke<JiraActivity>("jira_activity"),
   /** The sync state and what the cache holds per tracked project. */

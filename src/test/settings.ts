@@ -11,7 +11,7 @@ const emptyConnection = (): Connection => ({
   timeZone: null,
 });
 
-export const defaultSync = (): SyncSettings => ({ scopeOverride: null, focusedMinutes: 5, backgroundMinutes: 15, keepDoneDays: 90, keepHistoryDays: 90, clearCacheOnQuit: false, memoryOnly: false });
+export const defaultSync = (): SyncSettings => ({ scopeOverride: null, focusedMinutes: 5, backgroundMinutes: 15, keepDoneDays: 90, keepHistoryDays: 90, clearCacheOnQuit: false, memoryOnly: false, excludedTypes: [] });
 
 /** The behaviour of a fresh install (changes to Jira off), with overrides. */
 export const behaviour = (patch: Partial<Behaviour> = {}): Behaviour => ({

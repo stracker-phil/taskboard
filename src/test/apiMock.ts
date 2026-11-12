@@ -122,6 +122,7 @@ export function createApiMock(): Api {
     scopeValidate: done(),
     scopeSave: vi.fn(async (jql: string | null): Promise<ScopeView> => ({ jql: jql ?? "", isDefault: jql === null })),
     syncSave: vi.fn(async (sync: SyncSettings) => sync),
+    syncIssueTypes: vi.fn(async (): Promise<string[]> => []),
     cacheReset: done(),
     sidebarTree: vi.fn(async () => emptySidebar()),
     listCreate: vi.fn(),

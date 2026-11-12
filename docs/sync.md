@@ -26,6 +26,13 @@ directly. The engine passes each result through `backoff.rs` `Failures`: `since`
 
 ## Jobs
 
+Every job asks for `connection::sync_query`: the scope (the override, or the default over the tracked projects)
+with `AND issuetype NOT IN (…)` for the types Settings → Sync leaves out (`sync.excludedTypes`, `jql::without_types`).
+Saving a newly left-out type deletes its cached issues at once (`connection::apply_excluded_types`,
+`sync::store::forget_types`: comments, changes, read marks and activity go with them); a type taken back queues a
+full sync. Reconciliation forgets any cached issue of a left-out type that came back otherwise (Jira changed its
+type, the Issue view refetched it).
+
 **Full** (`full.rs`):
 
 1. Metadata: `/field` (the site's Sprint and Epic Color fields are found by their custom type), projects,

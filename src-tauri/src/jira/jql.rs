@@ -23,6 +23,15 @@ pub fn default_scope(project_keys: &[String], done_days: u32) -> AppResult<Strin
     ))
 }
 
+/// The scope without issues of the `types` (by name); unchanged without any.
+pub fn without_types(scope: &str, types: &[String]) -> String {
+    if types.is_empty() {
+        return scope.to_string();
+    }
+    let names: Vec<String> = types.iter().map(|name| quote(name)).collect();
+    format!("({scope}) AND issuetype NOT IN ({})", names.join(", "))
+}
+
 /// The scope narrowed to one project.
 pub fn and_project(scope: &str, project_key: &str) -> String {
     format!("({scope}) AND project = {}", quote(project_key))
@@ -85,6 +94,32 @@ mod tests {
             (r#"\""#, r#""\\\"""#),
         ] {
             assert_eq!(quote(input), expected, "{input}");
+        }
+    }
+
+    #[test]
+    fn a_scope_without_excluded_types_is_unchanged() {
+        assert_eq!(without_types("project = NW", &[]), "project = NW");
+    }
+
+    #[test]
+    fn excluded_types_are_quoted_and_listed_after_the_scope() {
+        for (types, expected) in [
+            (
+                vec!["Test"],
+                r#"(project = NW) AND issuetype NOT IN ("Test")"#,
+            ),
+            (
+                vec!["Test", "Test Execution"],
+                r#"(project = NW) AND issuetype NOT IN ("Test", "Test Execution")"#,
+            ),
+            (
+                vec![r#"Say "hi""#, r"a\b"],
+                r#"(project = NW) AND issuetype NOT IN ("Say \"hi\"", "a\\b")"#,
+            ),
+        ] {
+            let types: Vec<String> = types.into_iter().map(String::from).collect();
+            assert_eq!(without_types("project = NW", &types), expected, "{types:?}");
         }
     }
 

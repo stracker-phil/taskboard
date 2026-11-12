@@ -1,4 +1,5 @@
 import { IntervalsGroup } from "./IntervalsGroup";
+import { IssueTypesGroup } from "./IssueTypesGroup";
 import { ScopeGroup } from "./ScopeGroup";
 import { SyncedGroup } from "./SyncedGroup";
 
@@ -7,6 +8,7 @@ export function SyncPage() {
   return (
     <>
       <ScopeGroup />
+      <IssueTypesGroup />
       <IntervalsGroup />
       <SyncedGroup />
     </>

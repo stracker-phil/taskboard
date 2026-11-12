@@ -8,11 +8,13 @@ interface Props {
   selected: string[];
   /** Runs on every tick, so the view refreshes as values are picked. */
   onChange: (values: string[]) => void;
+  /** What the field says while nothing is picked. */
+  placeholder?: string;
 }
 
 /** A condition's values: the field shows the picked names; clicking it opens a searchable list with a
  *  checkbox per value. As many values as wanted; each tick applies at once. */
-export function ValuePicker({ id, choices, selected, onChange }: Props) {
+export function ValuePicker({ id, choices, selected, onChange, placeholder = "Choose…" }: Props) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   // The values picked when the list opened lead it; ticking one only changes its box, never the order.
@@ -51,7 +53,7 @@ export function ValuePicker({ id, choices, selected, onChange }: Props) {
           setOpen(!open);
         }}
       >
-        <span className="value-picker__names">{names.length > 0 ? names.join(", ") : "Choose…"}</span>
+        <span className="value-picker__names">{names.length > 0 ? names.join(", ") : placeholder}</span>
         {names.length > 1 && <span className="value-picker__count">{names.length}</span>}
         <ChevronDown size={13} strokeWidth={2} aria-hidden="true" />
       </button>

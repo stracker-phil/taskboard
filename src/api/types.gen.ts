@@ -1075,7 +1075,11 @@ clearCacheOnQuit: boolean,
 /**
  * Keeps the Jira mirror in memory instead of `cache.sqlite` (ADR 0057).
  */
-memoryOnly: boolean, };
+memoryOnly: boolean, 
+/**
+ * Issue types (by name) the sync leaves out, whatever the scope.
+ */
+excludedTypes: Array<string>, };
 
 export type SyncState = { "state": "idle", lastOk: string | null, } | { "state": "running", job: Job, } | { "state": "error", kind: ErrorKind, message: string, since: string, retryAt: string, lastOk: string | null, } | { "state": "offline", since: string, retryAt: string, lastOk: string | null, } | { "state": "paused", message: string, };
 

@@ -24,7 +24,8 @@ Scopes a scoped token needs, and why: [scopes.md](scopes.md).
 The expiry date warns 14 days ahead (`connection::token_expiry`).
 
 Settings → Sync sets the scope JQL (validated by Jira's `jql/parse` before it is saved; empty = the default
-over the tracked projects), the intervals and the days done issues stay. Settings → Privacy & Data → Jira data
+over the tracked projects), the issue types left out (`sync.excludedTypes`), the intervals and the days done issues
+stay. Settings → Privacy & Data → Jira data
 resets the cache (Refetch from Jira in memory mode).
 
 In the debug build the fake Jira runs at `http://127.0.0.1:47470` (`dev/fake.rs` `FAKE_JIRA_PORT`) with the demo site

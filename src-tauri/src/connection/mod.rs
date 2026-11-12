@@ -17,7 +17,8 @@ pub use projects::{
     tracked_keys, tracked_projects,
 };
 pub use scope::{
-    ScopeView, effective_scope, save_intervals, save_scope, scope_view, validate_scope,
+    ScopeView, apply_excluded_types, effective_scope, issue_types, save_intervals, save_scope,
+    scope_view, sync_query, validate_scope,
 };
 
 use crate::error::{AppError, AppResult};

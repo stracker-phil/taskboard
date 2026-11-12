@@ -920,7 +920,9 @@ no separate Settings design; owner, 2026-10-28). Its colors are the `--settings-
     and Show Data Folder.
   - **Projects**: Refresh after a successful test, "N of M tracked", a filter field (every word in the name or
     key, ignoring case) and a Track switch per project.
-  - **Sync**: *Scope* (the effective JQL in a monospaced field; Validate, Save, Reset to Default), *Intervals*
+  - **Sync**: *Scope* (the effective JQL in a monospaced field; Validate, Save, Reset to Default), *Issue types*
+    (Leave out: a `ValuePicker` of the cached issues' types plus those left out, "None" while empty; every tick
+    saves; the left-out types vanish from lists, counts, search and the Filter's type values), *Intervals*
     (minutes in front and in the background, days to keep done issues) and *Synced* (the sync state line with
     Sync Now, one row per tracked project with its key, last full sync and "N issues · M open"; while an emptied
     cache refills, the last rows stay).

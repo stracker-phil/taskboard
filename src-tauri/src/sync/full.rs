@@ -10,7 +10,7 @@ use super::store::{
     store_fields, store_page, store_statuses, store_versions,
 };
 use super::{Job, SyncContext, SyncEvent, SyncProgress};
-use crate::connection::{ProjectRow, effective_scope, store_spaces, tracked_projects};
+use crate::connection::{ProjectRow, store_spaces, sync_query, tracked_projects};
 use crate::db::Db;
 use crate::error::AppResult;
 use crate::jira::dto::Myself;
@@ -60,8 +60,8 @@ pub async fn full_sync(
     let source = ctx.source()?;
     let (ids, tracked) = sync_metadata(ctx, source.as_ref()).await?;
     let keys: Vec<String> = tracked.iter().map(|p| p.key.clone()).collect();
-    let scope = effective_scope(&settings.sync, &keys).jql;
-    if scope.is_empty() || tracked.is_empty() {
+    let scope = sync_query(&settings.sync, &keys);
+    if scope.is_empty() {
         return Ok(());
     }
     let fields = search_fields(&ctx.db, &ids).await?;
@@ -110,7 +110,7 @@ pub(super) async fn current_scope(ctx: &SyncContext) -> AppResult<String> {
         return Ok(String::new());
     }
     let keys: Vec<String> = tracked.iter().map(|p| p.key.clone()).collect();
-    Ok(effective_scope(&ctx.settings.get().sync, &keys).jql)
+    Ok(sync_query(&ctx.settings.get().sync, &keys))
 }
 
 /// Fields, projects, statuses, versions of the tracked projects, and who the user is.

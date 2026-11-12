@@ -69,6 +69,7 @@ pub fn handlers() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
         connection::scope_validate,
         connection::scope_save,
         connection::sync_save,
+        connection::sync_issue_types,
         connection::cache_reset,
         crate::sync::commands::sync_overview,
         crate::sync::commands::sync_run,

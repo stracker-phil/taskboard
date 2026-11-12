@@ -8,6 +8,7 @@ vi.mock("../../../api", async (orig) => ({ ...(await orig<object>()), api: (awai
 import { api } from "../../../api";
 import { createQueryClient } from "../../../queries/queryClient";
 import { resetStore } from "../../../state/store";
+import { defaultSync } from "../../../test/settings";
 import { SyncPage } from "./SyncPage";
 
 const mocked = vi.mocked(api, true);
@@ -138,9 +139,7 @@ describe("SyncPage", () => {
       await userEvent.type(screen.getByLabelText("While Taskboard is in front"), "10");
       await userEvent.tab();
 
-      await waitFor(() =>
-        expect(mocked.syncSave).toHaveBeenCalledWith({ scopeOverride: null, focusedMinutes: 10, backgroundMinutes: 15, keepDoneDays: 90, keepHistoryDays: 90, clearCacheOnQuit: false, memoryOnly: false }),
-      );
+      await waitFor(() => expect(mocked.syncSave).toHaveBeenCalledWith({ ...defaultSync(), focusedMinutes: 10 }));
     });
 
     it.each([

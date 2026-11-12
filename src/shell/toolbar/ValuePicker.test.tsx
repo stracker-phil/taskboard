@@ -33,6 +33,20 @@ describe("ValuePicker", () => {
       expect(field).toHaveAttribute("aria-haspopup", "listbox");
     });
 
+    it("shows its own placeholder when nothing is picked", () => {
+      render(<ValuePicker id="values" choices={CHOICES} selected={[]} onChange={vi.fn()} placeholder="None" />);
+
+      expect(screen.getByRole("button")).toHaveTextContent("None");
+      expect(screen.getByRole("button")).not.toHaveTextContent("Choose…");
+    });
+
+    it("shows the picked names instead of its placeholder", () => {
+      render(<ValuePicker id="values" choices={CHOICES} selected={["4"]} onChange={vi.fn()} placeholder="None" />);
+
+      expect(screen.getByRole("button")).toHaveTextContent("Done");
+      expect(screen.getByRole("button")).not.toHaveTextContent("None");
+    });
+
     it("shows a single picked name without a count", () => {
       const { field } = setup(["3"]);
 
