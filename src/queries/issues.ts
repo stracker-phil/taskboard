@@ -1,4 +1,5 @@
 import { keepPreviousData, useQuery, type QueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { api } from "../api";
 
 /** Every issue's detail; `issueKey` is one issue's. */
@@ -33,4 +34,15 @@ export const prefetchIssue = (client: QueryClient, id: string) =>
 export function refreshIssueExtras(id: string) {
   void api.issueSyncHistory(id).catch(() => {});
   void api.issueSyncWebLinks(id).catch(() => {});
+}
+
+/** A sync that stores the issue again (after the Jira data was dropped, which drops its history and web links
+ *  with it) makes an issue on screen ask for them again; Rust skips what is still fresh. */
+export function useExtrasWhenStored(id: string) {
+  useEffect(() => {
+    const unlisten = api.listen("issues_changed", (event) => {
+      if (event.ids.includes(id)) refreshIssueExtras(id);
+    });
+    return () => void unlisten.then((fn) => fn()).catch(() => {});
+  }, [id]);
 }

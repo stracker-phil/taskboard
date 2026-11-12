@@ -593,7 +593,8 @@ view with its place intact).
   changed priority Medium → High", "Changed description" for long text without values, other fields by their
   Jira name in lowercase. Selecting a row (List, Table) or opening an issue asks Rust to fetch the history and
   the web links (`refreshIssueExtras`; each at most every 5 minutes), so they are usually there by the time the
-  issue opens.
+  issue opens. An open issue or preview asks again whenever a sync stores the issue (`useExtrasWhenStored`), so
+  a refetch from Jira, which drops them, doesn't leave the pull requests and web links missing.
 - Rich text is rendered by Rust from ADF ([ADR 0036](adr/0036-rich-text-renders-from-adf-not-renderedfields.md),
   [jira.md](jira.md#rich-text-adf)) and sanitized (`lib/jiraHtml.ts`,
   [ADR 0027](adr/0027-jira-html-is-sanitised-and-shows-no-remote-content.md)): links open in the browser, remote

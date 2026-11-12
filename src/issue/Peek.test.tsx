@@ -9,6 +9,7 @@ import { api, type IssueDetail } from "../api";
 import { installCommands } from "../commands";
 import { onIssueKeys } from "../commands/issueKeys";
 import { clearCommands, resolveKeydown, setOverrides } from "../commands/registry";
+import { emitEvent } from "../test/apiMock";
 import { emulateContentEditable } from "../test/contentEditable";
 import { createQueryClient } from "../queries/queryClient";
 import { resetStore, useStore } from "../state/store";
@@ -604,6 +605,52 @@ describe("Peek", () => {
 
       expect(screen.getByRole("heading", { name: "Redesign the pricing page" })).toBeInTheDocument();
       expect(escape()?.id).toBe("peek.close");
+    });
+  });
+
+  describe("asking for the history and web links when the issue is stored again", () => {
+    async function showPeek() {
+      const view = render(
+        <QueryClientProvider client={createQueryClient()}>
+          <Peek id="10042" onClose={vi.fn()} onExpand={vi.fn()} />
+        </QueryClientProvider>,
+      );
+      await screen.findByRole("heading", { name: "Redesign the pricing page" });
+      await waitFor(() => expect(mocked.listen).toHaveBeenCalledWith("issues_changed", expect.any(Function)));
+      vi.clearAllMocks();
+      return view;
+    }
+
+    it("asks for both again when an issues_changed event includes the issue", async () => {
+      await showPeek();
+
+      act(() => emitEvent(api, "issues_changed", { ids: ["10041", "10042"], all: false }));
+
+      expect(mocked.issueSyncHistory).toHaveBeenLastCalledWith("10042");
+      expect(mocked.issueSyncWebLinks).toHaveBeenLastCalledWith("10042");
+    });
+
+    it.each([
+      ["only other issues", { ids: ["10043"], all: false }],
+      ["no ids, all issues", { ids: [], all: true }],
+    ])("does not ask again when issues_changed names %s", async (_case, payload) => {
+      await showPeek();
+
+      act(() => emitEvent(api, "issues_changed", payload));
+
+      expect(mocked.issueSyncHistory).not.toHaveBeenCalled();
+      expect(mocked.issueSyncWebLinks).not.toHaveBeenCalled();
+    });
+
+    it("stops asking once the peek is closed", async () => {
+      const { unmount } = await showPeek();
+
+      unmount();
+      await act(async () => {});
+      act(() => emitEvent(api, "issues_changed", { ids: ["10042"], all: false }));
+
+      expect(mocked.issueSyncHistory).not.toHaveBeenCalled();
+      expect(mocked.issueSyncWebLinks).not.toHaveBeenCalled();
     });
   });
 

@@ -7,7 +7,7 @@ import { EpicChip } from "../components/issue/EpicChip";
 import { PriorityFlag } from "../components/issue/PriorityFlag";
 import { PriorityMenuButton } from "../writes/PriorityMenuButton";
 import { EditableTitle } from "../writes/EditableTitle";
-import { useIssue, useIssueActivity } from "../queries/issues";
+import { useExtrasWhenStored, useIssue, useIssueActivity } from "../queries/issues";
 import { ActivityEntry } from "./Activity";
 import { hasContent } from "../lib/jiraHtml";
 import { JiraHtml } from "./JiraHtml";
@@ -34,6 +34,7 @@ export function Peek({ id, onClose, onExpand }: { id: string; onClose: () => voi
   const { key } = useShortcuts();
   useSeenAfter(id, issue?.unread ?? false);
   usePreviewedAfter(id);
+  useExtrasWhenStored(id);
 
   useEffect(() => {
     if (bodyRef.current) bodyRef.current.scrollTop = 0;

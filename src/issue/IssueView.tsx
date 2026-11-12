@@ -7,7 +7,7 @@ import { api, type IssueDetail } from "../api";
 import { onIssueKeys } from "../commands/issueKeys";
 import { SpaceTile } from "../components/SpaceTile";
 import { hasContent } from "../lib/jiraHtml";
-import { prefetchIssue, refreshIssueExtras, useIssue, useIssueRelated } from "../queries/issues";
+import { prefetchIssue, refreshIssueExtras, useExtrasWhenStored, useIssue, useIssueRelated } from "../queries/issues";
 import { useNavGo, useSidebar, useViews } from "../queries/sidebar";
 import { useRequestNarrowing, useViewRows } from "../queries/views";
 import { findLevel, spaceOf } from "../shell/levels";
@@ -65,6 +65,7 @@ export function IssueView({ id, origin }: { id: string; origin: IssueOrigin }) {
   const client = useQueryClient();
   const columnsRef = useRef<HTMLDivElement>(null);
   useSeenAfter(id, !isPlaceholderData && (issue?.unread ?? false));
+  useExtrasWhenStored(id);
 
   useEffect(() => {
     // Comments may be newer in Jira than in the cache; a failure (offline) leaves the cached ones.
