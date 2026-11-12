@@ -10,6 +10,8 @@ use crate::views::rows;
 pub enum Fact {
     /// New comments mention accounts; only mentions of "you" count.
     Mentioned(Vec<Mention>),
+    /// Accounts added to people fields; only "you" counts.
+    AddedAs(Vec<PeopleChange>),
     New,
     Comments(i64),
     /// To this status id.
@@ -30,11 +32,20 @@ pub struct Mention {
     pub account: String,
 }
 
+/// An account added to a people field (`issue_change` `people`).
+#[derive(Debug, Clone, PartialEq)]
+pub struct PeopleChange {
+    pub field: String,
+    pub account: String,
+}
+
 /// The ids in the facts resolved to names.
 pub struct Names<'a> {
     pub me: Option<&'a str>,
     pub statuses: &'a HashMap<String, String>,
     pub people: &'a HashMap<String, String>,
+    /// Custom field ids to their names.
+    pub fields: &'a HashMap<String, String>,
 }
 
 /// No priority ranks below Lowest.
@@ -67,6 +78,17 @@ pub fn facts(changes: &[Change]) -> Vec<Fact> {
         .collect();
     if !mentioned.is_empty() {
         facts.push(Fact::Mentioned(mentioned));
+    }
+    let added: Vec<PeopleChange> = of("people")
+        .filter_map(|c| {
+            Some(PeopleChange {
+                field: c.old_value.clone()?,
+                account: c.new_value.clone()?,
+            })
+        })
+        .collect();
+    if !added.is_empty() {
+        facts.push(Fact::AddedAs(added));
     }
     if of("created").next().is_some() {
         facts.push(Fact::New);
@@ -110,6 +132,25 @@ fn status<'a>(names: &'a Names, id: &'a str) -> &'a str {
     names.statuses.get(id).map_or(id, String::as_str)
 }
 
+/// "Developer", "Developer and Reviewer": each field once, unknown ids as they are.
+fn field_names(added: &[PeopleChange], names: &Names) -> String {
+    let mut fields: Vec<&str> = Vec::new();
+    for change in added {
+        let name = names
+            .fields
+            .get(&change.field)
+            .map_or(change.field.as_str(), String::as_str);
+        if !fields.contains(&name) {
+            fields.push(name);
+        }
+    }
+    match fields.split_last() {
+        Some((last, [])) => last.to_string(),
+        Some((last, rest)) => format!("{} and {last}", rest.join(", ")),
+        None => String::new(),
+    }
+}
+
 fn comments(n: i64) -> String {
     if n == 1 {
         "1 new comment".into()
@@ -134,6 +175,14 @@ fn for_me(facts: &[Fact], names: &Names) -> Vec<Fact> {
         .iter()
         .filter_map(|fact| match fact {
             Fact::Mentioned(_) if mine.is_empty() => None,
+            Fact::AddedAs(added) => {
+                let as_me: Vec<PeopleChange> = added
+                    .iter()
+                    .filter(|a| names.me == Some(a.account.as_str()))
+                    .cloned()
+                    .collect();
+                (!as_me.is_empty()).then_some(Fact::AddedAs(as_me))
+            }
             Fact::Comments(n) => {
                 let others = n - mine.len() as i64;
                 (others > 0).then_some(Fact::Comments(others))
@@ -149,6 +198,7 @@ pub fn sentence(facts: &[Fact], names: &Names) -> Option<String> {
         .iter()
         .map(|fact| match fact {
             Fact::Mentioned(_) => "mentioned you".into(),
+            Fact::AddedAs(added) => format!("added you as {}", field_names(added, names)),
             Fact::New => "created".into(),
             Fact::Comments(n) => comments(*n),
             Fact::Moved(id) => format!("moved to {}", status(names, id)),
@@ -197,10 +247,13 @@ mod tests {
         statuses: &'a HashMap<String, String>,
         people: &'a HashMap<String, String>,
     ) -> Names<'a> {
+        static NO_FIELDS: std::sync::LazyLock<HashMap<String, String>> =
+            std::sync::LazyLock::new(HashMap::new);
         Names {
             me,
             statuses,
             people,
+            fields: &NO_FIELDS,
         }
     }
 
@@ -430,6 +483,133 @@ mod tests {
             sentence(&facts, &names(None, &none, &none)).as_deref(),
             Some("1 new comment.")
         );
+    }
+
+    const DEVELOPER: &str = "customfield_10042";
+    const REVIEWER: &str = "customfield_10043";
+    const TESTER: &str = "customfield_10044";
+
+    fn people_change(field: &str, account: &str) -> Change {
+        change("people", Some(field), Some(account))
+    }
+
+    fn sentence_with_fields(changes: &[Change]) -> Option<String> {
+        let none = HashMap::new();
+        let fields = map(&[
+            (DEVELOPER, "Developer"),
+            (REVIEWER, "Reviewer"),
+            (TESTER, "Tester"),
+        ]);
+        sentence(
+            &facts(changes),
+            &Names {
+                me: Some(ME),
+                statuses: &none,
+                people: &none,
+                fields: &fields,
+            },
+        )
+    }
+
+    #[test]
+    fn being_added_to_people_fields_is_one_fact_that_ranks_after_mentions() {
+        let found = facts(&[
+            change("created", None, Some("NW-1")),
+            people_change(DEVELOPER, ME),
+            people_change(REVIEWER, MARTA),
+            mention("90001", ME),
+        ]);
+
+        assert_eq!(
+            found,
+            [
+                Fact::Mentioned(vec![Mention {
+                    comment: "90001".into(),
+                    account: ME.into()
+                }]),
+                Fact::AddedAs(vec![
+                    PeopleChange {
+                        field: DEVELOPER.into(),
+                        account: ME.into()
+                    },
+                    PeopleChange {
+                        field: REVIEWER.into(),
+                        account: MARTA.into()
+                    },
+                ]),
+                Fact::New,
+            ]
+        );
+    }
+
+    #[test]
+    fn the_sentence_says_added_you_as_the_field_names() {
+        let cases: Vec<(Vec<Change>, Option<&str>)> = vec![
+            (
+                vec![people_change(DEVELOPER, ME)],
+                Some("added you as Developer."),
+            ),
+            (
+                vec![people_change(DEVELOPER, ME), people_change(REVIEWER, ME)],
+                Some("added you as Developer and Reviewer."),
+            ),
+            (
+                vec![
+                    people_change(DEVELOPER, ME),
+                    people_change(REVIEWER, ME),
+                    people_change(TESTER, ME),
+                ],
+                Some("added you as Developer, Reviewer and Tester."),
+            ),
+            (
+                vec![people_change(DEVELOPER, ME), people_change(DEVELOPER, ME)],
+                Some("added you as Developer."),
+            ),
+            (
+                vec![people_change("customfield_10099", ME)],
+                Some("added you as customfield_10099."),
+            ),
+            (
+                vec![
+                    people_change(DEVELOPER, ME),
+                    change("comment_added", Some("1"), Some("2")),
+                ],
+                Some("added you as Developer, 1 new comment."),
+            ),
+        ];
+        for (changes, expected) in cases {
+            assert_eq!(
+                sentence_with_fields(&changes).as_deref(),
+                expected,
+                "{changes:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn rows_for_another_account_do_not_count_in_the_sentence() {
+        let cases: Vec<(Vec<Change>, Option<&str>)> = vec![
+            (vec![people_change(DEVELOPER, MARTA)], None),
+            (
+                vec![people_change(DEVELOPER, MARTA), people_change(REVIEWER, ME)],
+                Some("added you as Reviewer."),
+            ),
+        ];
+        for (changes, expected) in cases {
+            assert_eq!(
+                sentence_with_fields(&changes).as_deref(),
+                expected,
+                "{changes:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn without_a_connected_account_people_rows_never_count() {
+        let none = HashMap::new();
+        let facts = facts(&[people_change(DEVELOPER, ME)]);
+
+        assert_eq!(sentence(&facts, &names(None, &none, &none)), None);
     }
 
     #[test]

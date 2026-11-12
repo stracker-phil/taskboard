@@ -19,10 +19,16 @@ pub fn store_fields(conn: &Connection, fields: &[Field]) -> AppResult<FieldIds> 
             Some(EPIC_COLOR_TYPE) => ids.epic_color = Some(field.id.clone()),
             _ => {}
         }
+        let schema = field.schema.as_ref();
         conn.execute(
-            "INSERT INTO cache.field (id, name, type) VALUES (?1, ?2, ?3)
-             ON CONFLICT (id) DO UPDATE SET name = excluded.name, type = excluded.type",
-            params![field.id, field.name, field.schema.as_ref().map(|s| &s.kind)],
+            "INSERT INTO cache.field (id, name, type, items) VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT (id) DO UPDATE SET name = excluded.name, type = excluded.type, items = excluded.items",
+            params![
+                field.id,
+                field.name,
+                schema.map(|s| &s.kind),
+                schema.and_then(|s| s.items.as_ref())
+            ],
         )?;
     }
     Ok(ids)

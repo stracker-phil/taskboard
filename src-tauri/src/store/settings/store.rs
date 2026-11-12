@@ -3,6 +3,7 @@
 use std::path::Path;
 
 use super::Settings;
+use super::notifications::old_notify_about;
 use crate::error::AppResult;
 use crate::store::json_store::JsonStore;
 
@@ -15,8 +16,10 @@ pub struct SettingsStore {
 
 impl SettingsStore {
     pub fn open(dir: &Path) -> Self {
+        let path = dir.join(FILE_NAME);
+        let notify_about = old_notify_about(&path);
         Self {
-            store: JsonStore::open_with(dir.join(FILE_NAME), Settings::repaired),
+            store: JsonStore::open_with(path, move |s: Settings| s.loaded(notify_about)),
         }
     }
 
@@ -24,14 +27,15 @@ impl SettingsStore {
         self.store.read(Settings::clone)
     }
 
-    /// Replaces the settings the page owns and returns the settings before and after. The connection
-    /// and the sync settings stay: they change only through `edit`, after validation.
+    /// Replaces the settings the page owns and returns the settings before and after. The connection, the
+    /// sync and the notification settings stay: they change only through `edit`, after validation.
     pub async fn update(&self, settings: Settings) -> AppResult<(Settings, Settings)> {
         self.store
             .update_async(move |current| {
                 let mut next = settings;
                 next.connection = current.connection.clone();
                 next.sync = current.sync.clone();
+                next.notifications = current.notifications.clone();
                 let previous = std::mem::replace(current, next);
                 (previous, current.clone())
             })
@@ -58,7 +62,8 @@ mod tests {
     use crate::jira::capability::Capability;
     use crate::pins::PinDuration;
     use crate::store::settings::{
-        Appearance, Behaviour, Connection, MAX_SEEN_AFTER_SECONDS, SyncSettings,
+        Appearance, Behaviour, Connection, MAX_SEEN_AFTER_SECONDS, Notifications, NotifyEvent,
+        NotifyScope, SyncSettings,
     };
     use crate::test_support::temp_config_dir;
     use crate::views::IssueOpening;
@@ -368,7 +373,6 @@ mod tests {
                 open_issues_in: IssueOpening::Preview,
                 allow_jira_changes: false,
                 disabled_changes: Vec::new(),
-                notify_about: crate::store::settings::NotifyAbout::default(),
                 me_rules: crate::me_mode::default_rules(),
             }
         );
@@ -432,7 +436,6 @@ mod tests {
                 open_issues_in: IssueOpening::Preview,
                 allow_jira_changes: false,
                 disabled_changes: Vec::new(),
-                notify_about: crate::store::settings::NotifyAbout::default(),
                 me_rules: crate::me_mode::default_rules(),
             }
         );
@@ -468,7 +471,6 @@ mod tests {
             open_issues_in: IssueOpening::Full,
             allow_jira_changes: true,
             disabled_changes: vec![Capability::Comment, Capability::AddWebLink],
-            notify_about: crate::store::settings::NotifyAbout::MyIssues,
             me_rules: vec![
                 crate::me_mode::MeRule {
                     rule: crate::me_mode::MeMatch::Mentioned,
@@ -493,7 +495,7 @@ mod tests {
             serde_json::from_str(&fs::read_to_string(dir.path().join(FILE_NAME)).unwrap()).unwrap();
         assert_eq!(
             file["behaviour"],
-            serde_json::json!({"seenAfterSeconds": 5, "pinDefault": "twoDays", "openIssuesIn": "full", "allowJiraChanges": true, "disabledChanges": ["comment", "addWebLink"], "notifyAbout": "myIssues", "meRules": [{"rule": {"kind": "mentioned"}, "on": true}, {"rule": {"kind": "field", "field": "customfield_10071"}, "on": false}]})
+            serde_json::json!({"seenAfterSeconds": 5, "pinDefault": "twoDays", "openIssuesIn": "full", "allowJiraChanges": true, "disabledChanges": ["comment", "addWebLink"], "meRules": [{"rule": {"kind": "mentioned"}, "on": true}, {"rule": {"kind": "field", "field": "customfield_10071"}, "on": false}]})
         );
     }
 
@@ -531,7 +533,6 @@ mod tests {
                 open_issues_in: IssueOpening::Preview,
                 allow_jira_changes: false,
                 disabled_changes: Vec::new(),
-                notify_about: crate::store::settings::NotifyAbout::default(),
                 me_rules: crate::me_mode::default_rules(),
             }
         );
@@ -558,7 +559,6 @@ mod tests {
                     open_issues_in: IssueOpening::Preview,
                     allow_jira_changes: false,
                     disabled_changes: Vec::new(),
-                    notify_about: crate::store::settings::NotifyAbout::default(),
                     me_rules: crate::me_mode::default_rules(),
                 },
                 sync: SyncSettings {
@@ -569,6 +569,108 @@ mod tests {
             }
         );
         assert_eq!(file_names(dir.path()), vec![FILE_NAME.to_string()]);
+    }
+
+    fn written_file(dir: &Path) -> serde_json::Value {
+        serde_json::from_str(&fs::read_to_string(dir.join(FILE_NAME)).unwrap()).unwrap()
+    }
+
+    #[test]
+    fn an_old_choice_of_nothing_loads_with_the_macos_events_off() {
+        let dir = temp_config_dir();
+        fs::write(
+            dir.path().join(FILE_NAME),
+            r#"{"behaviour":{"notifyAbout":"nothing"}}"#,
+        )
+        .unwrap();
+
+        let notifications = SettingsStore::open(dir.path()).get().notifications;
+
+        assert_eq!(
+            notifications,
+            Notifications {
+                mac: Vec::new(),
+                ..Notifications::default()
+            }
+        );
+    }
+
+    #[test]
+    fn the_other_old_choices_load_the_default_notifications() {
+        for about in ["mentionsAndAssignments", "myIssues"] {
+            let dir = temp_config_dir();
+            fs::write(
+                dir.path().join(FILE_NAME),
+                format!(r#"{{"behaviour":{{"notifyAbout":"{about}"}}}}"#),
+            )
+            .unwrap();
+
+            assert_eq!(
+                SettingsStore::open(dir.path()).get().notifications,
+                Notifications::default(),
+                "{about}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_file_with_notifications_ignores_the_old_choice() {
+        let dir = temp_config_dir();
+        fs::write(
+            dir.path().join(FILE_NAME),
+            r#"{"behaviour":{"notifyAbout":"nothing"},"notifications":{"mac":["newComment"]}}"#,
+        )
+        .unwrap();
+
+        let notifications = SettingsStore::open(dir.path()).get().notifications;
+
+        assert_eq!(
+            notifications,
+            Notifications {
+                mac: vec![NotifyEvent::NewComment],
+                ..Notifications::default()
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn the_old_choice_is_not_written_back_and_the_converted_notifications_stay() {
+        let dir = temp_config_dir();
+        fs::write(
+            dir.path().join(FILE_NAME),
+            r#"{"behaviour":{"notifyAbout":"nothing"}}"#,
+        )
+        .unwrap();
+        let store = SettingsStore::open(dir.path());
+
+        store.edit(|s| s.sync.keep_done_days = 30).await.unwrap();
+
+        let file = written_file(dir.path());
+        assert_eq!(file["behaviour"].get("notifyAbout"), None);
+        assert_eq!(file["notifications"]["mac"], serde_json::json!([]));
+        assert_eq!(
+            SettingsStore::open(dir.path()).get().notifications.mac,
+            Vec::<NotifyEvent>::new()
+        );
+    }
+
+    #[tokio::test]
+    async fn update_keeps_the_stored_notifications() {
+        let dir = temp_config_dir();
+        let store = SettingsStore::open(dir.path());
+        let chosen = Notifications {
+            scope: NotifyScope::Involved,
+            mac: vec![NotifyEvent::Created],
+            ..Notifications::default()
+        };
+        let stored = chosen.clone();
+        store.edit(move |s| s.notifications = stored).await.unwrap();
+
+        let (previous, saved) = store.update(Settings::default()).await.unwrap();
+
+        assert_eq!(previous.notifications, chosen);
+        assert_eq!(saved.notifications, chosen);
+        assert_eq!(SettingsStore::open(dir.path()).get().notifications, chosen);
     }
 
     #[test]

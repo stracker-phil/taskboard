@@ -32,8 +32,8 @@ pub struct Since {
     pub text: String,
 }
 
-/// Changes over the last day or since the owner last saw the issue, whichever is longer; none without unseen
-/// changes.
+/// Changes over the last day or since the owner last saw the issue, whichever is longer; none while the issue
+/// isn't unread. Quiet changes are told too: the banner describes the issue.
 pub fn since(
     conn: &Connection,
     viewer: &Viewer,
@@ -44,11 +44,10 @@ pub fn since(
     let day_ago = format_utc(viewer.now - Duration::days(1));
     // Never seen: every recorded change counts.
     let start = seen.as_deref().map_or("", |s| s.min(day_ago.as_str()));
-    let changes = changes_after(conn, id, start)?;
-    let unseen = |c: &Change| seen.as_deref().is_none_or(|s| c.at.as_str() > s);
-    if !changes.iter().any(unseen) {
+    if !is_unseen(conn, id)? {
         return Ok(None);
     }
+    let changes = changes_after(conn, id, start)?;
     let older_than_a_day = changes.iter().any(|c| c.at < day_ago);
     Ok(sentence(&facts(&changes), names).map(|text| Since {
         label: if older_than_a_day {

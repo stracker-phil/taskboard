@@ -9,6 +9,7 @@ use super::{Job, SyncContext, SyncEvent, SyncProgress};
 use crate::error::{AppError, AppResult};
 use crate::issues::issue_sync_comments;
 use crate::jira::{SearchRequest, jql};
+use crate::notify::rules::settle;
 use crate::time::format_utc;
 
 /// Jira's JQL dates have minute precision; the overlap makes sure no change slips between two runs.
@@ -28,7 +29,8 @@ pub async fn delta_sync(
     if scope.is_empty() {
         return Ok(());
     }
-    let connection = ctx.settings.get().connection;
+    let settings = ctx.settings.get();
+    let (connection, notifications) = (settings.connection, settings.notifications);
     let source = ctx.source()?;
     let after = ctx.db.read(newest_change).await?;
     let ids = refresh_fields(&ctx.db, source.as_ref()).await?;
@@ -60,12 +62,14 @@ pub async fn delta_sync(
         let issues = page?.issues;
         let ids = ids.clone();
         let me = connection.account_id.clone();
+        let notifications = notifications.clone();
         let now = format_utc(Utc::now());
         let (page_newest, changed) = ctx
             .db
             .write(move |tx, changes| {
                 let newest =
                     store_page(tx, changes, &issues, &ids, Pass::Later, me.as_deref(), &now)?;
+                settle(tx, changes, &notifications, me.as_deref(), false)?;
                 Ok((newest, changes.issues.len() as u32))
             })
             .await?;

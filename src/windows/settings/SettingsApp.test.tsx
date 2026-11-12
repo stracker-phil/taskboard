@@ -48,13 +48,14 @@ describe("SettingsApp", () => {
       "Statuses",
       "Custom fields",
       "Behavior",
+      "Notifications",
       "Appearance",
       "Shortcuts",
       "Status",
       "About",
     ]);
     expect(nav.textContent).toMatch(
-      /Jira.*Connection.*Privacy & Data.*Projects.*Sync.*Workspace.*Spaces.*Team.*Statuses.*Custom fields.*Behavior.*System.*Appearance.*Shortcuts.*Status.*About/,
+      /Jira.*Connection.*Privacy & Data.*Projects.*Sync.*Workspace.*Spaces.*Team.*Statuses.*Custom fields.*Behavior.*Notifications.*System.*Appearance.*Shortcuts.*Status.*About/,
     );
     expect(screen.getByRole("heading", { name: "Connection" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Connection/ })).toHaveAttribute("aria-current", "page");
@@ -116,6 +117,16 @@ describe("SettingsApp", () => {
       const entries = within(nav).getAllByRole("button").map((b) => b.textContent?.trim());
       expect(entries).toEqual([expect.stringContaining("Spaces"), "Statuses"]);
       expect(entries[0]).toContain("Statuses");
+    });
+
+    it.each(["Which issues", "Notify me about"])("finds the Notifications page by its %s section", async (section) => {
+      await renderSettings();
+
+      await userEvent.type(screen.getByRole("searchbox", { name: "Search Settings" }), section);
+
+      const nav = screen.getByRole("navigation", { name: "Settings pages" });
+      expect(within(nav).getAllByRole("button").map((b) => b.textContent?.trim())).toEqual([expect.stringContaining("Notifications")]);
+      expect(within(nav).getByRole("button")).toHaveTextContent(section);
     });
 
     it("leaves no page when the text matches nothing", async () => {

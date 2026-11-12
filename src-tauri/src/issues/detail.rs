@@ -8,7 +8,7 @@ use serde::Serialize;
 use ts_rs::TS;
 
 use super::attachments::{Attachment, attachments_of, media_files};
-use super::{status_names, user_names};
+use super::{field_names, status_names, user_names};
 use crate::adf;
 use crate::changes::{Names, Since, since, unseen_since};
 use crate::db::Db;
@@ -204,6 +204,7 @@ fn since_banner(conn: &Connection, viewer: &Viewer, id: &str) -> AppResult<Optio
         me: viewer.me.as_deref(),
         statuses: &statuses,
         people: &user_names(conn)?,
+        fields: &field_names(conn)?,
     };
     since(conn, viewer, id, &names)
 }

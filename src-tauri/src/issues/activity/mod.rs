@@ -151,6 +151,13 @@ pub(crate) fn user_names(conn: &Connection) -> AppResult<HashMap<String, String>
     Ok(rows.collect::<Result<_, _>>()?)
 }
 
+/// Field ids to their names, as Jira's field list has them.
+pub(crate) fn field_names(conn: &Connection) -> AppResult<HashMap<String, String>> {
+    let mut query = conn.prepare("SELECT id, name FROM cache.field")?;
+    let rows = query.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?;
+    Ok(rows.collect::<Result<_, _>>()?)
+}
+
 /// A text value; blank is none.
 fn text(value: Option<String>) -> Option<ChangeValue> {
     value

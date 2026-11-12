@@ -13,6 +13,7 @@ use super::store::{Pass, forget_types, record_reconcile, store_page};
 use super::{SyncContext, SyncEvent};
 use crate::error::AppResult;
 use crate::jira::{BULK_FETCH_MAX, SearchRequest};
+use crate::notify::rules::settle;
 use crate::time::format_utc;
 
 /// Gone issues stay reachable from pins, links and search this long, then leave the cache.
@@ -72,7 +73,8 @@ pub async fn reconcile(
                 .cloned()
                 .partition(|id| found.issues.iter().any(|issue| issue.id == *id));
             let ids = ids.clone();
-            let me = ctx.settings.get().connection.account_id;
+            let settings = ctx.settings.get();
+            let (me, notifications) = (settings.connection.account_id, settings.notifications);
             let now = format_utc(Utc::now());
             // Returned but out of scope: stored as Jira has it, so views drop it, and not asked for hourly.
             ctx.db
@@ -86,6 +88,7 @@ pub async fn reconcile(
                         me.as_deref(),
                         &now,
                     )?;
+                    settle(tx, changes, &notifications, me.as_deref(), false)?;
                     mark_left_scope(tx, &returned, Some(&now))?;
                     mark_gone(tx, changes, &gone, &now)
                 })

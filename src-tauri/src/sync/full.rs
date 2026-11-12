@@ -15,7 +15,8 @@ use crate::db::Db;
 use crate::error::AppResult;
 use crate::jira::dto::Myself;
 use crate::jira::{SearchRequest, jql};
-use crate::store::settings::Connection;
+use crate::notify::rules::{resettle, settle};
+use crate::store::settings::{Connection, Notifications};
 use crate::time::format_utc;
 
 /// Every issue field the cache maps, besides the site's sprint and epic color fields.
@@ -49,6 +50,7 @@ struct Run<'a> {
     ids: FieldIds,
     /// The connected account, whose own changes aren't news.
     me: Option<String>,
+    notifications: Notifications,
     emit: &'a (dyn Fn(SyncEvent) + Send + Sync),
 }
 
@@ -74,6 +76,7 @@ pub async fn full_sync(
         ids,
         // Read again: `sync_metadata` just stored the account `/myself` named.
         me: ctx.settings.get().connection.account_id,
+        notifications: settings.notifications,
         emit,
     };
     let mut newest: Option<String> = None;
@@ -147,9 +150,12 @@ async fn sync_metadata(
     Ok((ids, tracked))
 }
 
-/// Kept only if the connection wasn't changed while Jira answered.
+/// Kept only if the connection wasn't changed while Jira answered. Another account settles the recorded changes
+/// again: what is about "me" changed.
 async fn remember_account(ctx: &SyncContext, asked: Connection, myself: Myself) -> AppResult<()> {
-    ctx.settings
+    let before = ctx.settings.get().connection.account_id;
+    let saved = ctx
+        .settings
         .edit(move |s| {
             if s.connection.same_account(&asked) {
                 s.connection.account_id = Some(myself.account_id);
@@ -158,6 +164,9 @@ async fn remember_account(ctx: &SyncContext, asked: Connection, myself: Myself) 
             }
         })
         .await?;
+    if saved.connection.account_id != before {
+        resettle(&ctx.db, &saved).await?;
+    }
     Ok(())
 }
 
@@ -191,11 +200,13 @@ async fn sync_project(run: &Run<'_>, project: &ProjectRow) -> AppResult<Option<S
         let count = issues.len() as u32;
         let ids = run.ids.clone();
         let me = run.me.clone();
+        let notifications = run.notifications.clone();
         let now = format_utc(Utc::now());
         let (page_newest, page_pass) = db
             .write(move |tx, changes| {
                 let pass = page_pass(tx, pass, &issues)?;
                 let newest = store_page(tx, changes, &issues, &ids, pass, me.as_deref(), &now)?;
+                settle(tx, changes, &notifications, me.as_deref(), false)?;
                 Ok((newest, pass))
             })
             .await?;

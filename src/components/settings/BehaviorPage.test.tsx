@@ -109,25 +109,6 @@ describe("BehaviorPage", () => {
       expect(mocked.behaviourSet).toHaveBeenCalledWith(behaviour({ seenAfterSeconds: 7, pinDefault: "week", openIssuesIn: "full" }));
     });
 
-    it("offers Nothing, Mentions and assignments and My issues with the saved one pressed", async () => {
-      await renderPage(behaviour({ notifyAbout: "myIssues" }));
-
-      const group = screen.getByRole("group", { name: "Notify me about" });
-      expect(within(group).getAllByRole("button").map((b) => b.textContent)).toEqual(["Nothing", "Mentions and assignments", "My issues"]);
-      expect(within(group).getByRole("button", { pressed: true })).toHaveTextContent("My issues");
-    });
-
-    it.each([
-      ["Nothing", "nothing"],
-      ["My issues", "myIssues"],
-    ] as const)("sends %s as what to notify about together with the other settings", async (label, notifyAbout) => {
-      await renderPage(behaviour({ seenAfterSeconds: 7, pinDefault: "week" }));
-
-      await userEvent.click(within(screen.getByRole("group", { name: "Notify me about" })).getByRole("button", { name: label }));
-
-      expect(mocked.behaviourSet).toHaveBeenCalledWith(behaviour({ seenAfterSeconds: 7, pinDefault: "week", notifyAbout }));
-    });
-
     it("shows an error toast when the setting cannot be saved", async () => {
       mocked.behaviourSet.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
       await renderPage();

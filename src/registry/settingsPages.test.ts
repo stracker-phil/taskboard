@@ -16,7 +16,7 @@ describe("core settings pages", () => {
 
   it.each([
     ["Jira", ["connection", "privacy", "projects", "sync"]],
-    ["Workspace", ["spaces", "team", "statuses", "fields", "behavior"]],
+    ["Workspace", ["spaces", "team", "statuses", "fields", "behavior", "notifications"]],
     ["System", ["appearance", "shortcuts", "status", "about"]],
   ])("lists the %s pages in order", (group, ids) => {
     const entry = settingsGroups("").find((g) => g.group === group);

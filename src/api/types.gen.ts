@@ -126,10 +126,6 @@ allowJiraChanges: boolean,
  */
 disabledChanges: Array<Capability>, 
 /**
- * Which changes a macOS notification announces.
- */
-notifyAbout: NotifyAbout, 
-/**
  * What else Me mode counts as mine, besides issues assigned to me; in the Me popup's order.
  */
 meRules: Array<MeRule>, };
@@ -415,6 +411,15 @@ changedAt: string,
  * Still unread; a row read while the inbox is open stays, read.
  */
 unread: boolean, };
+
+/**
+ * What makes the owner involved in an issue.
+ */
+export type Involvement = { assigned: boolean, reported: boolean, 
+/**
+ * Named in a fetched custom people field.
+ */
+peopleFields: boolean, };
 
 /**
  * A change to one of the picked issues.
@@ -720,10 +725,29 @@ issue: string | null,
  */
 canBack: boolean, canForward: boolean, };
 
+export type Notifications = { scope: NotifyScope, involvement: Involvement, 
 /**
- * What macOS notifications announce after a change sync (`notify/`).
+ * Issue types (by name) whose On-these-issues events count nowhere.
  */
-export type NotifyAbout = "nothing" | "mentionsAndAssignments" | "myIssues";
+excludedTypes: Array<string>, 
+/**
+ * The events that make an issue unread.
+ */
+inApp: Array<NotifyEvent>, 
+/**
+ * The events a macOS notification announces after a change sync.
+ */
+mac: Array<NotifyEvent>, };
+
+/**
+ * A kind of change, as the Notifications page lists it.
+ */
+export type NotifyEvent = "mentionsMe" | "assignsMe" | "unassignsMe" | "addsMeToPeopleField" | "newComment" | "movedToDone" | "reopened" | "otherChange" | "dueOrPriority" | "created";
+
+/**
+ * Which issues the other events are judged on.
+ */
+export type NotifyScope = "allIssues" | "involved";
 
 export type Op = "is" | "isNot" | "in" | "notIn" | "isEmpty" | "isNotEmpty" | "contains" | "before" | "after" | "withinLastDays" | "withinLastHours" | "withinNextDays";
 
@@ -737,6 +761,15 @@ views: Array<ViewHit>, };
  * What the palette searches: both kinds side by side, or one kind alone (its prefix typed) with room for more.
  */
 export type PaletteScope = "all" | "issues" | "lists";
+
+/**
+ * A people field, as Settings → Notifications lists it.
+ */
+export type PeopleField = { 
+/**
+ * The custom field's id (`customfield_10042`).
+ */
+id: string, name: string, };
 
 export type Person = { accountId: string, name: string, initials: string, 
 /**
@@ -911,7 +944,11 @@ connection: Connection,
 /**
  * Changed only through the sync commands, which validate it.
  */
-sync: SyncSettings, appearance: Appearance, accent: Accent, behaviour: Behaviour, };
+sync: SyncSettings, appearance: Appearance, accent: Accent, behaviour: Behaviour, 
+/**
+ * Changed only through `notifications_save`, which settles the recorded changes again.
+ */
+notifications: Notifications, };
 
 export type SidebarTree = { everything: ListNode, 
 /**

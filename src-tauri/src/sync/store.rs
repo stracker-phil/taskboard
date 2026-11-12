@@ -12,6 +12,7 @@ pub use super::news::{Pass, page_pass};
 use crate::db::Changes;
 use crate::error::AppResult;
 use crate::jira::dto::{Issue, Status, Version};
+use crate::notify::people::people_field_ids;
 use crate::writes;
 
 /// The `sync_state` row of the whole scope.
@@ -211,6 +212,7 @@ pub fn store_page(
     now: &str,
 ) -> AppResult<Option<String>> {
     let mut newest: Option<String> = None;
+    let people = people_field_ids(conn)?;
     for issue in issues {
         let Some(mapped) = map_issue(issue, ids) else {
             log::warn!(
@@ -222,7 +224,7 @@ pub fn store_page(
         if newest.as_deref() < Some(mapped.issue.updated_at.as_str()) {
             newest = Some(mapped.issue.updated_at.clone());
         }
-        if store_issue(conn, changes, &mapped, pass, me, now)? {
+        if store_issue(conn, changes, &mapped, pass, me, &people, now)? {
             changes.issue_changed(&mapped.issue.id);
         }
     }
@@ -231,8 +233,6 @@ pub fn store_page(
 
 struct CachedIssue {
     snapshot: Snapshot,
-    updated_at: String,
-    custom: Option<String>,
     raw: Option<String>,
     gone: bool,
 }
@@ -252,11 +252,11 @@ fn cached_issue(conn: &Connection, id: &str) -> AppResult<Option<CachedIssue>> {
                         due_date: r.get(2)?,
                         priority: r.get(3)?,
                         comment_count: r.get(4)?,
+                        custom: r.get(5)?,
+                        updated_at: r.get(8)?,
                     },
-                    custom: r.get(5)?,
                     raw: r.get(6)?,
                     gone: r.get(7)?,
-                    updated_at: r.get(8)?,
                 })
             },
         )
@@ -270,13 +270,14 @@ fn store_issue(
     mapped: &Mapped,
     pass: Pass,
     me: Option<&str>,
+    people: &[String],
     now: &str,
 ) -> AppResult<bool> {
     let cached = cached_issue(conn, &mapped.issue.id)?;
     if cached.as_ref().is_some_and(|c| {
-        let same =
-            c.custom == mapped.issue.custom && c.raw.as_deref() == Some(mapped.issue.raw.as_str());
-        !c.gone && (same || c.updated_at > mapped.issue.updated_at)
+        let same = c.snapshot.custom == mapped.issue.custom
+            && c.raw.as_deref() == Some(mapped.issue.raw.as_str());
+        !c.gone && (same || c.snapshot.updated_at > mapped.issue.updated_at)
     }) {
         return Ok(false);
     }
@@ -301,6 +302,7 @@ fn store_issue(
             new_comments: &new_comments,
             pass,
             me,
+            people,
             now,
         },
     )?;

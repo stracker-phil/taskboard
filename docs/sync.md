@@ -112,7 +112,10 @@ the cached ones is skipped, so a sync without changes announces nothing; the kep
 relative rendered dates and keeps each comment's edit time, so an edited comment still counts. Otherwise `diff.rs` compares the tracked fields with the cached row and writes
 `issue_change` rows (`status`, `assignee`, `due_date`, `priority`, `comment_added`, `created`), stamped with the
 new `updated`, and a `mention` row for each account an ADF `mention` node of a comment the cache hadn't seen
-names (`sync::mentions`, `adf::mentions`). A project's first sync compares with nothing ([Own changes](#own-changes)). When the search returned
+names (`sync::mentions`, `adf::mentions`), and a `people` row for each people field that newly names the
+connected account in a newer version (`diff::people_added`, [notifications.md](notifications.md#people-fields)).
+The sync then settles the page's new rows in the same transaction (`notify::rules::settle`): a change Settings →
+Notifications doesn't count in app is stored `quiet`. A project's first sync compares with nothing ([Own changes](#own-changes)). When the search returned
 all of an issue's comments, they replace the cached ones.
 
 ## Events

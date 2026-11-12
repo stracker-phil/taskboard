@@ -60,7 +60,7 @@ impl SyncSettings {
     }
 }
 
-fn tidy_types(types: Vec<String>) -> Vec<String> {
+pub(super) fn tidy_types(types: Vec<String>) -> Vec<String> {
     let mut tidy: Vec<String> = types
         .into_iter()
         .map(|name| name.trim().to_string())

@@ -2,6 +2,7 @@
 //! with a missing part keeps the rest.
 
 mod connection;
+mod notifications;
 mod store;
 mod sync;
 
@@ -15,6 +16,9 @@ use crate::pins::PinDuration;
 use crate::views::IssueOpening;
 
 pub use connection::Connection;
+pub use notifications::{
+    Channel, Involvement, Notifications, NotifyAbout, NotifyEvent, NotifyScope,
+};
 pub use store::{FILE_NAME as SETTINGS_FILE, SettingsStore};
 pub use sync::SyncSettings;
 
@@ -29,6 +33,8 @@ pub struct Settings {
     pub appearance: Appearance,
     pub accent: Accent,
     pub behaviour: Behaviour,
+    /// Changed only through `notifications_save`, which settles the recorded changes again.
+    pub notifications: Notifications,
 }
 
 /// How long an open issue takes to count as seen, the most a delay can be.
@@ -49,23 +55,8 @@ pub struct Behaviour {
     pub allow_jira_changes: bool,
     /// Kinds of change switched off while changes to Jira are on (`jira::capability`).
     pub disabled_changes: Vec<Capability>,
-    /// Which changes a macOS notification announces.
-    pub notify_about: NotifyAbout,
     /// What else Me mode counts as mine, besides issues assigned to me; in the Me popup's order.
     pub me_rules: Vec<MeRule>,
-}
-
-/// What macOS notifications announce after a change sync (`notify/`).
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq, TS)]
-#[ts(export, export_to = "src/api/types.gen.ts")]
-#[serde(rename_all = "camelCase")]
-pub enum NotifyAbout {
-    Nothing,
-    /// Mentions of me and issues assigned to me.
-    #[default]
-    MentionsAndAssignments,
-    /// Also any change of an issue assigned to or reported by me.
-    MyIssues,
 }
 
 impl Default for Behaviour {
@@ -76,7 +67,6 @@ impl Default for Behaviour {
             open_issues_in: IssueOpening::Preview,
             allow_jira_changes: false,
             disabled_changes: Vec::new(),
-            notify_about: NotifyAbout::default(),
             me_rules: default_rules(),
         }
     }
@@ -96,9 +86,18 @@ pub enum Appearance {
 }
 
 impl Settings {
+    /// As loaded from a file, with an old `notifyAbout` (`old_notify_about`) carried over.
+    fn loaded(mut self, notify_about: Option<NotifyAbout>) -> Self {
+        if let Some(about) = notify_about {
+            self.notifications = Notifications::from_notify_about(about);
+        }
+        self.repaired()
+    }
+
     fn repaired(self) -> Self {
         Self {
             sync: self.sync.clamped(),
+            notifications: self.notifications.tidied(),
             behaviour: Behaviour {
                 seen_after_seconds: self
                     .behaviour

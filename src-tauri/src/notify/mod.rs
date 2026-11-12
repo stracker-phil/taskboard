@@ -1,21 +1,25 @@
 //! macOS notifications for changes that concern the owner, after a change sync (`docs/notifications.md`).
 //! `Notifier` remembers which recorded changes it has looked at; `notices` decides what to say (pure SQL, tested
-//! on a temp cache); `show` hands them to macOS.
+//! on a temp cache) by the macOS column of Settings → Notifications (`rules`); `show` hands them to macOS.
 
 pub mod commands;
+pub mod people;
+pub mod rules;
+pub mod settings;
 pub mod show;
 
+use std::collections::btree_map::Entry;
 use std::collections::{BTreeMap, HashMap};
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::{Arc, Mutex};
 
-use rusqlite::Connection;
+use rusqlite::{Connection, OptionalExtension};
 
 use crate::changes::{Change, Names, facts, sentence};
 use crate::db::Db;
 use crate::error::AppResult;
 use crate::lock::MutexExt;
-use crate::store::settings::{NotifyAbout, Settings};
+use crate::store::settings::{Channel, Notifications, Settings};
 use crate::sync::{Job, SyncState};
 
 /// More issues than this in one sync make a single summary notification.
@@ -68,15 +72,15 @@ impl Notifier {
     ) -> AppResult<Vec<Notice>> {
         let looked_at = self.0.load(Ordering::SeqCst);
         let me = settings.connection.account_id.clone();
-        let about = settings.behaviour.notify_about;
+        let notifications = settings.notifications.clone();
         let (newest, notices) = db
             .read(move |conn| {
                 let newest = newest_change(conn)?;
                 // A reset cache numbers its changes from 1 again.
                 let after = if newest < looked_at { 0 } else { looked_at };
-                let notices = match (&me, announce, about) {
-                    (Some(me), true, about) if about != NotifyAbout::Nothing => {
-                        notices(conn, after, me, about)?
+                let notices = match (&me, announce) {
+                    (Some(me), true) if !notifications.mac.is_empty() => {
+                        notices(conn, after, me, &notifications)?
                     }
                     _ => Vec::new(),
                 };
@@ -99,58 +103,65 @@ fn newest_change(conn: &Connection) -> AppResult<i64> {
 struct Issue {
     key: String,
     summary: String,
+    /// The changes that count for macOS, in the order they were recorded.
     changes: Vec<Change>,
-    /// Assigned to or reported by the connected account.
-    mine: bool,
 }
 
-/// Notices for the changes after `after` that concern `me`, summarized past `MAX_SINGLE`.
+/// Notices for the changes after `after` that the macOS column counts, summarized past `MAX_SINGLE`.
 pub fn notices(
     conn: &Connection,
     after: i64,
     me: &str,
-    about: NotifyAbout,
+    settings: &Notifications,
 ) -> AppResult<Vec<Notice>> {
-    let issues = changed_issues(conn, after, me)?;
+    let issues = changed_issues(conn, after, me, settings)?;
     let statuses = names_of(conn, "SELECT id, name FROM cache.status")?;
     let people = names_of(conn, "SELECT account_id, name FROM cache.user")?;
+    let fields = names_of(conn, "SELECT id, name FROM cache.field")?;
     let names = Names {
         me: Some(me),
         statuses: &statuses,
         people: &people,
+        fields: &fields,
     };
-    let concerning = issues
+    let said = issues
         .into_values()
-        .filter(|issue| concerns(issue, me, about))
         .filter_map(|issue| notice_for(issue, &names))
         .collect();
-    Ok(summarized(concerning))
+    Ok(summarized(said))
 }
 
-/// The issues with changes after `after`, each with them in the order they were recorded.
-fn changed_issues(conn: &Connection, after: i64, me: &str) -> AppResult<BTreeMap<String, Issue>> {
-    let mut query = conn.prepare(
-        "SELECT c.issue_id, i.key, i.summary, c.field, c.old_value, c.new_value, c.changed_at,
-           COALESCE(i.assignee_id = ?2 OR i.reporter_id = ?2, 0)
-         FROM cache.issue_change c JOIN cache.issue i ON i.id = c.issue_id
-         WHERE c.rowid > ?1 AND i.gone = 0 AND c.field NOT IN ('created', 'gone')
-         ORDER BY c.rowid",
-    )?;
-    let mut rows = query.query(rusqlite::params![after, me])?;
+/// The live issues with changes after `after` that count, by id.
+fn changed_issues(
+    conn: &Connection,
+    after: i64,
+    me: &str,
+    settings: &Notifications,
+) -> AppResult<BTreeMap<String, Issue>> {
+    let mut issue =
+        conn.prepare_cached("SELECT key, summary FROM cache.issue WHERE id = ?1 AND gone = 0")?;
     let mut issues: BTreeMap<String, Issue> = BTreeMap::new();
-    while let Some(r) = rows.next()? {
-        let issue = issues.entry(r.get(0)?).or_insert(Issue {
-            key: r.get(1)?,
-            summary: r.get(2)?,
-            changes: Vec::new(),
-            mine: r.get(7)?,
-        });
-        issue.changes.push(Change {
-            field: r.get(3)?,
-            old_value: r.get(4)?,
-            new_value: r.get(5)?,
-            at: r.get(6)?,
-        });
+    for judged in rules::judged(conn, rules::Which::After(after), Some(me))? {
+        if !judged.counts(settings, Channel::Mac, Some(me)) {
+            continue;
+        }
+        let found = match issues.entry(judged.issue_id) {
+            Entry::Occupied(known) => known.into_mut(),
+            Entry::Vacant(new) => {
+                let Some((key, summary)) = issue
+                    .query_row([new.key()], |r| Ok((r.get(0)?, r.get(1)?)))
+                    .optional()?
+                else {
+                    continue;
+                };
+                new.insert(Issue {
+                    key,
+                    summary,
+                    changes: Vec::new(),
+                })
+            }
+        };
+        found.changes.push(judged.change);
     }
     Ok(issues)
 }
@@ -162,14 +173,6 @@ fn notice_for(issue: Issue, names: &Names) -> Option<Notice> {
         body: capitalized(&said),
         key: Some(issue.key),
     })
-}
-
-/// A mention of me or an assignment to me always concerns me; with `MyIssues` any change of my issue does.
-fn concerns(issue: &Issue, me: &str, about: NotifyAbout) -> bool {
-    let for_me = issue.changes.iter().any(|c| {
-        matches!(c.field.as_str(), "mention" | "assignee") && c.new_value.as_deref() == Some(me)
-    });
-    for_me || (about == NotifyAbout::MyIssues && issue.mine)
 }
 
 fn summarized(notices: Vec<Notice>) -> Vec<Notice> {

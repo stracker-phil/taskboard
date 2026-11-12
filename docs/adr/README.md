@@ -68,7 +68,7 @@ stands in Taskboard. The numbers in this table are Taskboard's.
 | [0056](0056-custom-fields-are-opted-in-app-wide-a-space-opts-out.md) | Custom fields are opted in app-wide; a Space opts out | Accepted (2026-11-10) |
 | [0057](0057-jira-data-can-live-in-memory-only.md) | Jira data can live in memory only (opt-in) | Superseded by [0066](0066-jira-data-lives-in-memory-only.md) |
 | [0058](0058-own-changes-are-not-news.md) | The owner's own changes aren't news | Accepted (2026-11-10) |
-| [0059](0059-the-inbox-replaces-unread-mode.md) | The inbox replaces Unread mode (supersedes 0046) | Accepted (2026-11-10) |
+| [0059](0059-the-inbox-replaces-unread-mode.md) | The inbox replaces Unread mode (supersedes 0046) | Superseded in part by 0068 |
 | [0060](0060-a-status-bar-under-the-panel.md) | A status bar under the content panel | Accepted (2026-11-11) |
 | [0061](0061-pull-request-status-comes-from-the-gh-cli.md) | Pull request status comes from the GitHub CLI | Accepted (2026-11-11) |
 | [0062](0062-only-open-pull-requests-refresh.md) | Only open and draft pull requests refresh | Accepted (2026-11-11) |
@@ -77,5 +77,6 @@ stands in Taskboard. The numbers in this table are Taskboard's.
 | [0065](0065-a-major-version-needs-the-owners-approval.md) | A major version needs the owner's approval (supersedes part of 0054) | Accepted (2026-11-11) |
 | [0066](0066-jira-data-lives-in-memory-only.md) | Jira data lives in memory only; no issue text on disk | Accepted (2026-11-12) |
 | [0067](0067-every-count-is-what-its-list-shows.md) | Every count is what its list shows | Accepted (2026-11-12) |
+| [0068](0068-notification-settings-decide-what-counts.md) | Notification settings decide what counts (supersedes `behaviour.notifyAbout`, part of 0059) | Accepted (2026-11-12) |
 
 Open: integrations with Daybook and TimeTracker.

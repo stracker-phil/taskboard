@@ -13,7 +13,7 @@ use ts_rs::TS;
 use crate::changes::{Names, UNSEEN, facts, is_unseen, sentence, unseen_changes};
 use crate::error::AppResult;
 use crate::filter::TRACKED_ISSUES;
-use crate::issues::{status_names, user_names};
+use crate::issues::{field_names, status_names, user_names};
 use crate::status_style::{Style, Styles};
 
 /// One unread issue, as the inbox lists it.
@@ -71,7 +71,8 @@ pub fn snapshot(conn: &Connection, me: Option<&str>) -> AppResult<Vec<Snapshot>>
     let mut query = conn.prepare(&format!(
         "SELECT i.id, COALESCE((SELECT MAX(c.changed_at) FROM cache.issue_change c
              LEFT JOIN issue_seen s ON s.issue_id = c.issue_id
-             WHERE c.issue_id = i.id AND c.field != 'gone' AND (s.seen_at IS NULL OR c.changed_at > s.seen_at)),
+             WHERE c.issue_id = i.id AND c.field != 'gone' AND COALESCE(c.quiet, 0) = 0
+               AND (s.seen_at IS NULL OR c.changed_at > s.seen_at)),
            i.updated_at) AS at
          FROM cache.issue i WHERE {TRACKED_ISSUES} AND {UNSEEN}
          ORDER BY at DESC, i.id"
@@ -100,10 +101,12 @@ fn notes(conn: &Connection, ids: &[&str], me: Option<&str>) -> AppResult<HashMap
         .map(|(id, (name, _))| (id, name))
         .collect();
     let people = user_names(conn)?;
+    let fields = field_names(conn)?;
     let names = Names {
         me,
         statuses: &statuses,
         people: &people,
+        fields: &fields,
     };
     Ok(unseen_changes(conn, ids)?
         .into_iter()

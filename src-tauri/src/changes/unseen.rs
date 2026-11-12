@@ -1,6 +1,7 @@
 //! Which recorded changes the owner hasn't seen: those after the issue's `issue_seen` time, or all of them
-//! when it has none (the first sync marks every issue it finds as seen). An issue the owner marked unread
-//! counts as unseen too, changes or not.
+//! when it has none (the first sync marks every issue it finds as seen). A `quiet` change (Settings →
+//! Notifications, `notify::rules`) never counts. An issue the owner marked unread counts as unseen too, changes
+//! or not.
 
 use std::collections::HashMap;
 
@@ -8,10 +9,11 @@ use rusqlite::{Connection, OptionalExtension, params};
 
 use crate::error::AppResult;
 
-/// An issue (alias `i`) with a change recorded after the owner last saw it, or marked unread.
+/// An issue (alias `i`) with a change that counts recorded after the owner last saw it, or marked unread.
 pub const UNSEEN: &str = "(EXISTS (SELECT 1 FROM cache.issue_change c
     LEFT JOIN issue_seen s ON s.issue_id = c.issue_id
-    WHERE c.issue_id = i.id AND c.field != 'gone' AND (s.seen_at IS NULL OR c.changed_at > s.seen_at))
+    WHERE c.issue_id = i.id AND c.field != 'gone' AND COALESCE(c.quiet, 0) = 0
+      AND (s.seen_at IS NULL OR c.changed_at > s.seen_at))
     OR EXISTS (SELECT 1 FROM issue_seen u WHERE u.issue_id = i.id AND u.unread = 1))";
 
 /// One row of `issue_change`.
@@ -33,14 +35,16 @@ fn change(r: &rusqlite::Row, from: usize) -> rusqlite::Result<Change> {
     })
 }
 
-/// The unseen changes of the issues `ids`, oldest first; an issue marked unread without any has an empty list.
+/// The unseen changes that count of the issues `ids`, oldest first; an issue marked unread without any has an
+/// empty list.
 pub fn unseen_changes(conn: &Connection, ids: &[&str]) -> AppResult<HashMap<String, Vec<Change>>> {
     let ids = serde_json::to_string(ids)?;
     let mut query = conn.prepare(
         "SELECT c.issue_id, c.field, c.old_value, c.new_value, c.changed_at
          FROM json_each(?1) j JOIN cache.issue_change c ON c.issue_id = j.value
          LEFT JOIN issue_seen s ON s.issue_id = c.issue_id
-         WHERE c.field != 'gone' AND (s.seen_at IS NULL OR c.changed_at > s.seen_at)
+         WHERE c.field != 'gone' AND COALESCE(c.quiet, 0) = 0
+           AND (s.seen_at IS NULL OR c.changed_at > s.seen_at)
          ORDER BY c.changed_at, c.id",
     )?;
     let rows = query.query_map([&ids], |r| Ok((r.get::<_, String>(0)?, change(r, 1)?)))?;

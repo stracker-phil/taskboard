@@ -111,7 +111,7 @@ mod the_cache {
         for dropped in ["used", "shown"] {
             assert!(!columns.contains(&dropped.to_string()), "{dropped}");
         }
-        assert_eq!(columns, ["id", "name", "type"]);
+        assert_eq!(columns, ["id", "name", "type", "items"]);
     }
 }
 

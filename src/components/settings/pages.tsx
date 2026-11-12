@@ -1,9 +1,10 @@
 /** The core settings pages. Modules register their own pages from their install function. */
-import { Activity, CircleDot, FolderKanban, Info, Keyboard, LayoutGrid, Palette, PlugZap, RefreshCw, ShieldCheck, SlidersHorizontal, TextCursorInput, Users } from "lucide-react";
+import { Activity, Bell, CircleDot, FolderKanban, Info, Keyboard, LayoutGrid, Palette, PlugZap, RefreshCw, ShieldCheck, SlidersHorizontal, TextCursorInput, Users } from "lucide-react";
 import { registerSettingsPage } from "../../registry/settingsPages";
 import { AppearancePage } from "./AppearancePage";
 import { AboutPage } from "./AboutPage";
 import { BehaviorPage } from "./BehaviorPage";
+import { NotificationsPage } from "./notifications/NotificationsPage";
 import { PrivacyPage } from "./privacy/PrivacyPage";
 import { ShortcutsPage } from "./ShortcutsPage";
 import { ConnectionPage } from "./jira/ConnectionPage";
@@ -107,6 +108,18 @@ export function registerCoreSettingsPages() {
     Body: SyncPage,
   });
   registerSettingsPage({ id: "behavior", group: "Workspace", label: "Behavior", icon: SlidersHorizontal, order: 4, sections: [{ id: "behaviour", title: "Behavior" }, { id: "meMode", title: "Me Mode" }], Body: BehaviorPage });
+  registerSettingsPage({
+    id: "notifications",
+    group: "Workspace",
+    label: "Notifications",
+    icon: Bell,
+    order: 5,
+    sections: [
+      { id: "which-issues", title: "Which issues" },
+      { id: "notify-about", title: "Notify me about" },
+    ],
+    Body: NotificationsPage,
+  });
   registerSettingsPage({ id: "appearance", group: "System", label: "Appearance", icon: Palette, order: 1, sections: [{ id: "appearance", title: "Appearance" }], Body: AppearancePage });
   registerSettingsPage({ id: "shortcuts", group: "System", label: "Shortcuts", icon: Keyboard, order: 2, sections: [{ id: "shortcuts", title: "Shortcuts" }], Body: ShortcutsPage });
   registerSettingsPage({ id: "status", group: "System", label: "Status", icon: Activity, order: 3, sections: [{ id: "status", title: "Status" }], Body: StatusPage });

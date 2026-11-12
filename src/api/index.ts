@@ -47,6 +47,8 @@ import type {
   IssueOpening,
   ListConditions,
   Narrowing,
+  Notifications,
+  PeopleField,
   Nav,
   PaletteResults,
   PaletteScope,
@@ -132,6 +134,12 @@ export const api = {
   /** Saves the intervals and days to keep; the scope changes through `scopeSave`. */
   syncSave: (sync: SyncSettings) => invoke<SyncSettings>("sync_save", { sync }),
   syncIssueTypes: () => invoke<string[]>("sync_issue_types"),
+  /** Saves Settings → Notifications; Rust settles every recorded change again, so it applies to what is unread too. */
+  notificationsSave: (notifications: Notifications) => invoke<Notifications>("notifications_save", { notifications }),
+  /** The cached issues' types plus those left out, for the Notifications type picker. */
+  notificationIssueTypes: () => invoke<string[]>("notification_issue_types"),
+  /** The opted-in custom fields of a user type. */
+  notificationPeopleFields: () => invoke<PeopleField[]>("notification_people_fields"),
   /** What Taskboard is asking Jira right now; `jira_activity` events follow every change. */
   jiraActivity: () => invoke<JiraActivity>("jira_activity"),
   /** The sync state and what the cache holds per tracked project. */

@@ -1,4 +1,4 @@
-import type { Behaviour, Connection, Settings, SyncSettings } from "../api/types";
+import type { Behaviour, Connection, Notifications, Settings, SyncSettings } from "../api/types";
 
 const emptyConnection = (): Connection => ({
   siteUrl: "",
@@ -20,12 +20,21 @@ export const behaviour = (patch: Partial<Behaviour> = {}): Behaviour => ({
   openIssuesIn: "preview",
   allowJiraChanges: false,
   disabledChanges: [],
-  notifyAbout: "mentionsAndAssignments",
   meRules: [
     { rule: { kind: "field", field: "reporter" }, on: false },
     { rule: { kind: "mentioned" }, on: false },
     { rule: { kind: "subtasks" }, on: false },
   ],
+  ...patch,
+});
+
+/** The notification settings of a fresh install: every event in app, the ones about you on macOS, with overrides. */
+export const notifications = (patch: Partial<Notifications> = {}): Notifications => ({
+  scope: "allIssues",
+  involvement: { assigned: true, reported: true, peopleFields: true },
+  excludedTypes: [],
+  inApp: ["mentionsMe", "assignsMe", "unassignsMe", "addsMeToPeopleField", "newComment", "movedToDone", "reopened", "otherChange", "dueOrPriority", "created"],
+  mac: ["mentionsMe", "assignsMe", "addsMeToPeopleField"],
   ...patch,
 });
 
@@ -36,5 +45,6 @@ export const settings = (patch: Partial<Settings> = {}): Settings => ({
   appearance: "system",
   accent: "blue",
   behaviour: behaviour(),
+  notifications: notifications(),
   ...patch,
 });

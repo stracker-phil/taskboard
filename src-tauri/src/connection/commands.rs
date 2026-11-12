@@ -6,6 +6,7 @@ use tauri::{AppHandle, State};
 use super::{ConnectionInput, ConnectionTest, ConnectionView, ProjectRow, ScopeView};
 use crate::error::AppResult;
 use crate::events::announce_settings;
+use crate::notify::rules::resettle;
 use crate::state::AppState;
 use crate::store::settings::SyncSettings;
 use crate::sync::{Job, SyncEngine};
@@ -50,10 +51,12 @@ pub async fn connection_save(
     input: ConnectionInput,
     token: Option<String>,
 ) -> AppResult<ConnectionView> {
+    let account = state.settings.get().connection.account_id;
     let saved = super::save(&state.settings, &state.jira, input, token, today()).await?;
     state.offers.clear();
     sync.connection_changed();
     announce_settings(&app, &state.settings.get());
+    settle_for_account(&state, account).await?;
     log::info!("Jira connection saved");
     Ok(saved)
 }
@@ -63,10 +66,21 @@ pub async fn connection_test(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> AppResult<ConnectionTest> {
+    let account = state.settings.get().connection.account_id;
     let tested = super::test(&state.settings, &state.jira).await;
     // Even a failed test may have found the cloud id.
     announce_settings(&app, &state.settings.get());
+    settle_for_account(&state, account).await?;
     tested
+}
+
+/// Another connected account changes which recorded changes are about "me".
+async fn settle_for_account(state: &AppState, before: Option<String>) -> AppResult<()> {
+    let settings = state.settings.get();
+    if settings.connection.account_id == before {
+        return Ok(());
+    }
+    resettle(&state.db, &settings).await
 }
 
 #[tauri::command]

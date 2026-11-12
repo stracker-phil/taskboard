@@ -404,7 +404,9 @@ unread (`src-tauri/src/changes/`). The UI says read and unread; the code says se
 
 ## Inbox
 
-The one place that lists unread issues ([ADR 0059](adr/0059-the-inbox-replaces-unread-mode.md), `src/inbox/`).
+The one place that lists unread issues ([ADR 0059](adr/0059-the-inbox-replaces-unread-mode.md), `src/inbox/`). Only
+changes Settings → Notifications counts in app make an issue unread; the others stay in its activity
+([notifications.md](notifications.md#in-app-notifyrulessettle)).
 
 - **Bell**: a 26px icon button in the content panel's top-right corner on every page, above the preview too
   (`InboxButton.tsx`). The rows it covers keep room for it (`--inbox-slot`: the content header, the Issue view's and
@@ -961,9 +963,21 @@ no separate Settings design; owner, 2026-10-28). Its colors are the `--settings-
   - **Custom fields** (`jira/CustomFieldsPage`): every custom field of the site (name, Jira type in tertiary
     text, a search field) against List (a column and filter choice) and Detail (the Issue view), in the Team grid
     (`SettingsMatrix`). A field without a box is hidden everywhere; rows keep their order while boxes are ticked.
-  - **Behavior** (Workspace): *Behavior* (read delay, where a click opens issues, default bookmark duration,
-    notifications), *Me Mode* (the Me popover's switches, plus "Add Field…" for a user field from `cache.field`,
+  - **Behavior** (Workspace): *Behavior* (read delay, where a click opens issues, default bookmark duration),
+    *Me Mode* (the Me popover's switches, plus "Add Field…" for a user field from `cache.field`,
     `me_user_fields`; a field rule can be removed).
+  - **Notifications** (Workspace; `components/settings/notifications/NotificationsPage`, ADR 0068; every change
+    saves at once, shown before Rust answers, `useSaveNotifications`): *Which issues* (`WhichIssuesGroup`): two radio
+    rows, All issues in my Spaces or Only issues I'm involved in, then the involvement ticks (Assigned to me, Created
+    by me, Named in a people field), always there and dimmed while all issues count, so picking a scope moves
+    nothing. The people-field row lists the opted-in user fields ("Developer, Reviewer"), or, with none, "Opt in a
+    user field under Custom fields to use it." with a link to that page. *Issue types*: one `ValuePicker` (a ticked
+    type counts; the excluded ones are stored, so a new type counts) whose field sums up the choice (`typesSummary`:
+    "All types", "All except Test, Test Execution", "Only Bug, Story", "3 types left out" past 40 characters).
+    *Notify me about* (`EventsGroup`): the changes against In app (unread, in the inbox) and macOS in one
+    `SettingsMatrix`, under the headings About you (Mentions me, Assigns me, Unassigns me, Adds me to a people field;
+    they always pass the filters) and On these issues (New comment, Moved to Done, Reopened, Other status change,
+    Due date or priority changed, Issue created). Rows never move; a tick flips only its box.
   - **Appearance** (System): Automatic, Light or Dark, and the accent color (`AccentPicker`; selection, links
     and focus; a Space can choose its own). **Shortcuts**: every command and its key, rebindable.
   - **Status** (`components/settings/status/`, Daybook's Status page): `diagnostics_get` reports groups of

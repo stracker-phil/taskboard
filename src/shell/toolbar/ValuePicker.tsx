@@ -10,11 +10,13 @@ interface Props {
   onChange: (values: string[]) => void;
   /** What the field says while nothing is picked. */
   placeholder?: string;
+  /** Replaces the picked names on the field, e.g. "All except Test". */
+  summary?: string;
 }
 
 /** A condition's values: the field shows the picked names; clicking it opens a searchable list with a
  *  checkbox per value. As many values as wanted; each tick applies at once. */
-export function ValuePicker({ id, choices, selected, onChange, placeholder = "Choose…" }: Props) {
+export function ValuePicker({ id, choices, selected, onChange, placeholder = "Choose…", summary }: Props) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   // The values picked when the list opened lead it; ticking one only changes its box, never the order.
@@ -47,14 +49,14 @@ export function ValuePicker({ id, choices, selected, onChange, placeholder = "Ch
         className="condition-row__value value-picker__field"
         aria-haspopup="listbox"
         aria-expanded={open}
-        title={names.join(", ")}
+        title={summary ?? names.join(", ")}
         onClick={() => {
           if (!open) setLeading(selected);
           setOpen(!open);
         }}
       >
-        <span className="value-picker__names">{names.length > 0 ? names.join(", ") : placeholder}</span>
-        {names.length > 1 && <span className="value-picker__count">{names.length}</span>}
+        <span className="value-picker__names">{summary ?? (names.length > 0 ? names.join(", ") : placeholder)}</span>
+        {summary === undefined && names.length > 1 && <span className="value-picker__count">{names.length}</span>}
         <ChevronDown size={13} strokeWidth={2} aria-hidden="true" />
       </button>
       {open && (

@@ -3,7 +3,7 @@
 
 use rusqlite::{Connection, params};
 
-use super::diff::{ChangeRow, Snapshot, diff};
+use super::diff::{ChangeRow, Snapshot, diff, people_added};
 use super::map::{IssueRow, Mapped};
 use crate::changes::{catch_up, seen_at, seen_until_updated};
 use crate::db::Changes;
@@ -57,6 +57,8 @@ pub struct Arrival<'a> {
     pub pass: Pass,
     /// The connected account.
     pub me: Option<&'a str>,
+    /// The people fields (`notify::people`), by id.
+    pub people: &'a [String],
     pub now: &'a str,
 }
 
@@ -68,6 +70,7 @@ pub fn record_news(conn: &Connection, changes: &mut Changes, arrival: Arrival) -
         new_comments,
         pass,
         me,
+        people,
         now,
     } = arrival;
     match (pass, previous) {
@@ -81,7 +84,11 @@ pub fn record_news(conn: &Connection, changes: &mut Changes, arrival: Arrival) -
         }
         (Pass::FirstOfKnownProject, None) => record_since_seen(conn, changes, row, me),
         (_, previous) => {
-            let theirs = not_mine(diff(previous, row), row, new_comments, me);
+            let mut found = diff(previous, row);
+            if let (Some(previous), Some(me)) = (previous, me) {
+                found.extend(people_added(previous, row, me, people));
+            }
+            let theirs = not_mine(found, row, new_comments, me);
             if theirs.dropped {
                 catch_up(conn, changes, &row.id)?;
             }

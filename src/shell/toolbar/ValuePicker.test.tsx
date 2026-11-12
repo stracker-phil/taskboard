@@ -68,6 +68,27 @@ describe("ValuePicker", () => {
     });
   });
 
+  describe("with a summary", () => {
+    it("shows the summary instead of the picked names, without a count", () => {
+      render(<ValuePicker id="values" choices={CHOICES} selected={["1", "4"]} onChange={vi.fn()} summary="All except In Progress" />);
+
+      const field = screen.getByRole("button");
+      expect(field).toHaveTextContent("All except In Progress");
+      expect(field).not.toHaveTextContent("To Do, Done");
+      expect(field).not.toHaveTextContent("2");
+    });
+
+    it("still ticks values in the panel", async () => {
+      const onChange = vi.fn();
+      render(<ValuePicker id="values" choices={CHOICES} selected={["1"]} onChange={onChange} summary="Only To Do" />);
+
+      await userEvent.click(screen.getByRole("button"));
+      await userEvent.click(screen.getByRole("option", { name: "Done" }));
+
+      expect(onChange).toHaveBeenLastCalledWith(["1", "4"]);
+    });
+  });
+
   describe("the panel", () => {
     it("opens on click with the search box focused", async () => {
       const { field } = setup();
