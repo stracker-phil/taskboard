@@ -60,4 +60,6 @@ Swift, `screencapture`).
 - No color literal outside the palettes; the native look of `ux.md`.
 - Tests through public interfaces only; test code written and run by the agents.
 - Debug is a separate app on demo data; nothing in the repo carries real data.
+- Siblings call Taskboard only through its CLI and links: `taskboard open <KEY>` and `issue/<KEY>` are Daybook's
+  contract, pinned by tests ([ADR 0070](adr/0070-daybook-reaches-taskboard-through-its-cli-and-links.md)).
 - Docs by file and symbol, never by line number; an ADR for every decision, never edited once accepted.

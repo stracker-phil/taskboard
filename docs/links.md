@@ -2,7 +2,9 @@
 
 `taskboard://…` links open a place in the app from anywhere: a note, a chat message, a calendar event, a
 shell (`open 'taskboard://issue/NW-12'`). Debug builds answer `taskboard-debug://` instead, so a link never
-reaches the wrong app ([adapting.md](adapting.md)).
+reaches the wrong app ([adapting.md](adapting.md)). Daybook opens issues with `taskboard open <KEY>` and, from its
+debug build, `taskboard-debug://issue/<KEY>`; both forms are a contract pinned by tests
+([ADR 0070](adr/0070-daybook-reaches-taskboard-through-its-cli-and-links.md)).
 
 | Link | Opens |
 |---|---|

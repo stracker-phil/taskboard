@@ -152,6 +152,18 @@ mod tests {
         format!("Taskboard doesn't know the link “{link}”.")
     }
 
+    // Daybook's debug build sends this (daybook: src-tauri/src/jira/taskboard.rs); a change needs the owner's
+    // approval (ADR 0070).
+    #[test]
+    fn the_issue_link_keeps_the_form_daybook_sends() {
+        assert_eq!(
+            parse(&link("issue/NW-12")),
+            Ok(Link::Issue {
+                key: "NW-12".into()
+            })
+        );
+    }
+
     #[test]
     fn an_issue_link_names_the_issue() {
         assert_eq!(

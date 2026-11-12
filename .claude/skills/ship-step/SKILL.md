@@ -26,7 +26,10 @@ description: Finish a development step in Taskboard - clean up and review the co
 7. Choose the bump from `git log v<last>..HEAD` (`git describe --tags --abbrev=0` names the last; with no
    tag yet, from the commit "Set the version to 1.0.1") per ADR 0054 and 0065: minor for new features, visible
    behavior and changes that break existing use, patch otherwise. Major only with the owner's explicit
-   approval, asked first. Run `bun run release major|minor|patch` (in the
+   approval, asked first. Output a sibling app reads (`taskboard open <KEY>`, the `issue/<KEY>` link; ADR 0070)
+   stays compatible: a new subcommand or argument is fine; renaming or removing one or changing what it takes
+   needs the owner's approval, asked first, and goes into the report with what Daybook has to change. Run
+   `bun run release major|minor|patch` (in the
    background; it takes minutes): `scripts/install.sh` installs the release build as
    `~/Applications/Taskboard.app` and `taskboard`, and restarts the running app on it, so the user's app
    always matches the last commit; then the script commits "Release X.Y.Z" and tags `vX.Y.Z` (never pushed).

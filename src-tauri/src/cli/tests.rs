@@ -441,6 +441,21 @@ fn dev_without_a_known_subcommand_is_a_usage_error() {
     }
 }
 
+// Daybook runs exactly this (daybook: src-tauri/src/jira/taskboard.rs); a change needs the owner's
+// approval (ADR 0070).
+#[test]
+fn open_keeps_the_arguments_daybook_passes() {
+    assert_eq!(
+        parse_args(&["open", "NW-12"]),
+        remote(
+            IpcMessage::Open {
+                key: "NW-12".into()
+            },
+            false
+        )
+    );
+}
+
 #[test]
 fn open_upper_cases_the_issue_key() {
     for (input, key) in [
