@@ -46,6 +46,16 @@ pub async fn attachment_file(
     local_copy(source, root, &attachment).await
 }
 
+/// The name the attachment's local copies get.
+pub async fn attachment_name(
+    db: &Db,
+    issue_id: String,
+    attachment_id: String,
+) -> AppResult<String> {
+    let attachment = issue_attachment(db, issue_id, attachment_id).await?;
+    Ok(safe_filename(&attachment.filename))
+}
+
 /// The attachment as the issue lists it; `NotFound` when it isn't one of the issue's.
 pub(super) async fn issue_attachment(
     db: &Db,

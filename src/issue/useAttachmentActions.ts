@@ -1,4 +1,4 @@
-import { useState, type MouseEvent } from "react";
+import { useRef, useState, type MouseEvent } from "react";
 import { api } from "../api";
 import { openContextMenu } from "../components/menu";
 import { attempt } from "../state/requests";
@@ -11,15 +11,27 @@ export interface AttachmentRef {
   url: string | null;
 }
 
-/** Quick Look (which Rust downloads for first) and the context menu: Quick Look, Open in Browser, Copy link. */
+/** One attachment's actions and context menu; `loading` covers Rust's download, and a request while one runs is ignored. */
 export function useAttachmentActions(issueId: string, { id, filename, url }: AttachmentRef) {
   const toast = useStore((s) => s.toast);
   const [loading, setLoading] = useState(false);
-  const preview = () => {
-    if (loading) return;
+  const busy = useRef(false);
+  const whileLoading = <T>(request: () => Promise<T>, failure: string) => {
+    if (busy.current) return Promise.resolve(null);
+    busy.current = true;
     setLoading(true);
-    void attempt(api.attachmentPreview(issueId, id), "Could not show the attachment").finally(() => setLoading(false));
+    return attempt(request(), failure).finally(() => {
+      busy.current = false;
+      setLoading(false);
+    });
   };
+  const preview = () => void whileLoading(() => api.attachmentPreview(issueId, id), "Could not show the attachment");
+  const download = () =>
+    void whileLoading(() => api.attachmentDownload(issueId, id), "Could not download the attachment");
+  const saveAs = () =>
+    void whileLoading(() => api.attachmentSaveAs(issueId, id), "Could not save the attachment").then((saved) => {
+      if (saved) toast("success", `Saved ${filename}`);
+    });
   const openInBrowser = () => {
     if (url) void attempt(api.openUrl(url), "Could not open the attachment");
   };
@@ -34,10 +46,13 @@ export function useAttachmentActions(issueId: string, { id, filename, url }: Att
       e,
       [
         { text: "Quick Look", run: preview },
+        { text: "Download", run: download },
+        { text: "Save As…", run: saveAs },
+        "separator",
         { text: "Open in Browser", enabled: url !== null, run: openInBrowser },
         { text: "Copy link", enabled: url !== null, run: copyLink },
       ],
       filename,
     );
-  return { loading, preview, menu };
+  return { loading, preview, download, menu };
 }

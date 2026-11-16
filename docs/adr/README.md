@@ -85,5 +85,6 @@ table are Taskboard's.
 | [0072](0072-a-taken-key-is-reassigned-after-asking.md) | A taken key is reassigned after asking; the menu's keys stay fixed for now | Accepted (2026-11-12) |
 | [0073](0073-the-accent-follows-the-family-system-or-nine-hues.md) | The accent follows the family: System or one of nine hues (supersedes part of 0028) | Accepted (2026-11-12) |
 | [0074](0074-the-owners-days-come-from-rust.md) | The owner's days come from Rust; the page formats with Intl | Accepted (2026-11-12) |
+| [0075](0075-attachments-download-to-the-owners-folders.md) | Attachments download to the owner's folders on request (amends 0035) | Accepted (2026-11-16) |
 
 Open: integrations with Daybook and TimeTracker.

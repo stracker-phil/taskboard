@@ -108,6 +108,8 @@ export function createApiMock(): Api {
     openUrl: done(),
     doubleClickMs: vi.fn().mockResolvedValue(500),
     attachmentPreview: done(),
+    attachmentDownload: done(),
+    attachmentSaveAs: vi.fn().mockResolvedValue(true),
     inlineImageUrl: vi.fn((issueId: string, attachmentId: string) => `inline-image://localhost/${issueId}/${attachmentId}`),
     logError: done(),
     takeLaunchEvents: vi.fn().mockResolvedValue([]),

@@ -149,7 +149,8 @@ src-tauri/
   src/inbox/                 the inbox: the unread issues' snapshot while it is open, its rows and the bell's count
   src/changes/               unseen (unread) changes: the Since-yesterday and inbox words, read and unread
   src/issues/                one issue: detail, custom fields, related issues, activity, comments, web links,
-                             attachments (preview.rs: the downloaded copies for Quick Look; inline_image.rs: images in
+                             attachments (preview.rs: the downloaded copies for Quick Look; download.rs: copies to Downloads or a
+                             saved place; inline_image.rs: images in
                              rich text as data URLs), history (fetched.rs: how often details are fetched), markdown/: the
                              issue as Markdown for the clipboard
   src/pull_requests/         an issue's pull requests with their GitHub state from `gh` (ADR 0061): github.rs names a

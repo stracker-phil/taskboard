@@ -110,6 +110,10 @@ export const api = {
   doubleClickMs: () => invoke<number>("double_click_ms"),
   /** Downloads the attachment from the Jira site (once per app run) and shows it in Quick Look. */
   attachmentPreview: (issueId: string, attachmentId: string) => invoke<void>("attachment_preview", { issueId, attachmentId }),
+  /** Saves the attachment to the Downloads folder under a free name and shows it in Finder. */
+  attachmentDownload: (issueId: string, attachmentId: string) => invoke<void>("attachment_download", { issueId, attachmentId }),
+  /** Asks where to save the attachment and saves it there; false when the owner cancels the panel. */
+  attachmentSaveAs: (issueId: string, attachmentId: string) => invoke<boolean>("attachment_save_as", { issueId, attachmentId }),
   /** Where the webview loads an image attached to the issue for rich text; it fails to load when there is none (ADR 0042). */
   inlineImageUrl: (issueId: string, attachmentId: string) => `inline-image://localhost/${encodeURIComponent(issueId)}/${encodeURIComponent(attachmentId)}`,
   logError: (message: string) => invoke<void>("log_frontend_error", { message }),

@@ -564,11 +564,14 @@ view with its place intact).
   open first, done behind "Show N done"; "Open as list view" narrows the origin view to the epic (a removable
   chip in the toolbar, never saved). Last, Attachments when there are any (`Attachments`): a 16/700 heading over
   a two-column grid (gap 8) of tiles (h 44, r 9, `--hairline` border): a 28 × 28 badge with the extension in caps
-  (`--fill-subtle`; "FILE" without one), the file name (13/500, ellipsis) and "1.2 MB · Marta Klein" (11, muted).
-  A click or Space shows the file in Quick Look ([ADR 0035](adr/0035-attachments-preview-in-quick-look.md)): Rust
-  downloads it first, while the badge spins and the meta line reads "Loading…"; a failure shows the error toast.
-  The context menu has Quick Look, Open in Browser and Copy link ("Copied the link to …"); the last two only for
-  an address on the connected https site (`open_url`). Names are plain text.
+  (`--fill-subtle`; "FILE" without one), the file name (13/500, ellipsis) and "1.2 MB · Marta Klein" (11, muted),
+  then a 28 × 28 download button (`Download` icon, `--text-faint`, always in its slot; "Download and show in
+  Finder"). A click or Space shows the file in Quick Look ([ADR 0035](adr/0035-attachments-preview-in-quick-look.md)):
+  Rust downloads it first, while the badge spins and the meta line reads "Loading…"; a failure shows the error toast.
+  The download button saves it to Downloads (a taken name gets " 2") and shows it in Finder
+  ([ADR 0075](adr/0075-attachments-download-to-the-owners-folders.md)). The context menu has Quick Look, Download,
+  Save As… (the save panel as a sheet; "Saved …"), a separator, Open in Browser and Copy link ("Copied the link to
+  …"); the last two only for an address on the connected https site (`open_url`). Names are plain text.
 - The breadcrumb's Space and list are buttons that go there. Going to the place already shown (sidebar, tabs,
   breadcrumb) closes the Issue view and the preview (`useNavGo`).
 - Pull requests (`issue/PullRequests.tsx`, [ADR 0061](adr/0061-pull-request-status-comes-from-the-gh-cli.md)):

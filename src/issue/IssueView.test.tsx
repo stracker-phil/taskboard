@@ -528,15 +528,15 @@ describe("IssueView", () => {
 
       expect(await screen.findByText("2 attachments")).toBeInTheDocument();
       const section = within(screen.getByRole("region", { name: "Attachments" }));
-      expect(section.getByRole("button", { name: /release-notes\.pdf/ })).toBeInTheDocument();
-      expect(section.getByRole("button", { name: /wireframes\.png/ })).toBeInTheDocument();
+      expect(section.getByRole("button", { name: /^release-notes\.pdf/ })).toBeInTheDocument();
+      expect(section.getByRole("button", { name: /^wireframes\.png/ })).toBeInTheDocument();
     });
 
     it("previews an attachment of the issue when its tile is clicked", async () => {
       serve(issueDetail({ attachments: [attachment({ id: "30002", filename: "wireframes.png", badge: "PNG" })] }));
       renderIssue();
 
-      await userEvent.click(await screen.findByRole("button", { name: /wireframes\.png/ }));
+      await userEvent.click(await screen.findByRole("button", { name: /^wireframes\.png/ }));
 
       expect(mocked.attachmentPreview).toHaveBeenCalledWith("10042", "30002");
     });

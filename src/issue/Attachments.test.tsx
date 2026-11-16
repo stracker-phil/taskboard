@@ -42,8 +42,15 @@ describe("Attachments", () => {
 
       const region = within(screen.getByRole("region", { name: "Attachments" }));
       expect(region.getByRole("heading", { name: "Attachments" })).toBeInTheDocument();
-      expect(region.getByRole("button", { name: /release-notes\.pdf/ })).toHaveTextContent("1.2 MB · Ada Example");
-      expect(region.getByRole("button", { name: /wireframes\.png/ })).toHaveTextContent("340 KB · Ada Example");
+      expect(region.getByRole("button", { name: /^release-notes\.pdf/ })).toHaveTextContent("1.2 MB · Ada Example");
+      expect(region.getByRole("button", { name: /^wireframes\.png/ })).toHaveTextContent("340 KB · Ada Example");
+    });
+
+    it("gives each file a download button named after it", () => {
+      renderAttachments(attachment(), attachment({ id: "30002", filename: "wireframes.png" }));
+
+      expect(screen.getByRole("button", { name: "Download release-notes.pdf" })).toHaveAttribute("title", "Download and show in Finder");
+      expect(screen.getByRole("button", { name: "Download wireframes.png" })).toBeInTheDocument();
     });
 
     it("shows the badge of the file type", () => {
@@ -71,7 +78,7 @@ describe("Attachments", () => {
   });
 
   describe("previewing", () => {
-    const tile = () => screen.getByRole("button", { name: /release-notes\.pdf/ });
+    const tile = () => screen.getByRole("button", { name: /^release-notes\.pdf/ });
 
     it("previews the file of the issue in Quick Look when its tile is clicked, without opening the browser", async () => {
       renderAttachments(attachment());
@@ -118,10 +125,55 @@ describe("Attachments", () => {
     });
   });
 
-  describe("context menu", () => {
-    const rightClick = () => userEvent.pointer({ keys: "[MouseRight]", target: screen.getByRole("button", { name: /release-notes\.pdf/ }) });
+  describe("downloading", () => {
+    const tile = () => screen.getByRole("button", { name: /^release-notes\.pdf/ });
+    const downloadButton = () => screen.getByRole("button", { name: "Download release-notes.pdf" });
 
-    it("offers Quick Look, Open in Browser and Copy link on right-click", async () => {
+    it("downloads the file of the issue when the download button is clicked, without opening Quick Look", async () => {
+      renderAttachments(attachment());
+
+      await userEvent.click(downloadButton());
+
+      expect(mocked.attachmentDownload).toHaveBeenCalledWith("10042", "30001");
+      expect(mocked.attachmentPreview).not.toHaveBeenCalled();
+    });
+
+    it("marks the tile busy while the download is pending and ignores further clicks", async () => {
+      let finish: () => void = () => {};
+      mocked.attachmentDownload.mockReturnValue(new Promise<void>((resolve) => (finish = resolve)));
+      renderAttachments(attachment());
+
+      await userEvent.click(downloadButton());
+
+      expect(tile()).toHaveAttribute("aria-busy", "true");
+      expect(tile()).toHaveTextContent("Loading…");
+
+      await userEvent.click(tile());
+      expect(mocked.attachmentPreview).not.toHaveBeenCalled();
+
+      finish();
+
+      await waitFor(() => expect(tile()).toHaveAttribute("aria-busy", "false"));
+      expect(tile()).toHaveTextContent("1.2 MB · Ada Example");
+    });
+
+    it("shows an error toast when the file cannot be downloaded", async () => {
+      mocked.attachmentDownload.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
+      renderAttachments(attachment());
+
+      await userEvent.click(downloadButton());
+
+      await waitFor(() => expect(useStore.getState().toasts.map((t) => t.message)).toContain("Could not download the attachment: Disk full"));
+      expect(tile()).toHaveAttribute("aria-busy", "false");
+    });
+  });
+
+  describe("context menu", () => {
+    const rightClick = () => userEvent.pointer({ keys: "[MouseRight]", target: screen.getByRole("button", { name: /^release-notes\.pdf/ }) });
+    const tile = () => screen.getByRole("button", { name: /^release-notes\.pdf/ });
+    const toasts = () => useStore.getState().toasts.map((t) => [t.kind, t.message]);
+
+    it("offers Quick Look, Download, Save As…, Open in Browser and Copy link on right-click", async () => {
       renderAttachments(attachment());
 
       await rightClick();
@@ -129,9 +181,12 @@ describe("Attachments", () => {
       const menu = within(screen.getByRole("menu"));
       expect(menu.getAllByRole("menuitem").map((item) => item.textContent)).toEqual([
         expect.stringContaining("Quick Look"),
+        expect.stringContaining("Download"),
+        expect.stringContaining("Save As…"),
         expect.stringContaining("Open in Browser"),
         expect.stringContaining("Copy link"),
       ]);
+      expect(menu.getByRole("separator")).toBeInTheDocument();
       expect(menu.getByRole("menuitem", { name: "Open in Browser" })).not.toHaveAttribute("aria-disabled");
       expect(menu.getByRole("menuitem", { name: "Copy link" })).not.toHaveAttribute("aria-disabled");
     });
@@ -143,6 +198,48 @@ describe("Attachments", () => {
       await userEvent.click(screen.getByRole("menuitem", { name: "Quick Look" }));
 
       expect(mocked.attachmentPreview).toHaveBeenCalledWith("10042", "30001");
+    });
+
+    it("downloads the file from Download", async () => {
+      renderAttachments(attachment());
+
+      await rightClick();
+      await userEvent.click(screen.getByRole("menuitem", { name: "Download" }));
+
+      expect(mocked.attachmentDownload).toHaveBeenCalledWith("10042", "30001");
+    });
+
+    it("confirms a saved file in a toast after Save As…", async () => {
+      mocked.attachmentSaveAs.mockResolvedValue(true);
+      renderAttachments(attachment());
+
+      await rightClick();
+      await userEvent.click(screen.getByRole("menuitem", { name: "Save As…" }));
+
+      expect(mocked.attachmentSaveAs).toHaveBeenCalledWith("10042", "30001");
+      await waitFor(() => expect(toasts()).toEqual([["success", "Saved release-notes.pdf"]]));
+    });
+
+    it("shows no toast when Save As… is cancelled", async () => {
+      mocked.attachmentSaveAs.mockResolvedValue(false);
+      renderAttachments(attachment());
+
+      await rightClick();
+      await userEvent.click(screen.getByRole("menuitem", { name: "Save As…" }));
+
+      await waitFor(() => expect(tile()).toHaveAttribute("aria-busy", "false"));
+      expect(mocked.attachmentSaveAs).toHaveBeenCalledWith("10042", "30001");
+      expect(toasts()).toEqual([]);
+    });
+
+    it("shows an error toast and no success toast when the file cannot be saved", async () => {
+      mocked.attachmentSaveAs.mockRejectedValue({ kind: "io", message: "Disk full", code: null });
+      renderAttachments(attachment());
+
+      await rightClick();
+      await userEvent.click(screen.getByRole("menuitem", { name: "Save As…" }));
+
+      await waitFor(() => expect(toasts()).toEqual([["error", "Could not save the attachment: Disk full"]]));
     });
 
     it("opens the file's address from Open in Browser", async () => {

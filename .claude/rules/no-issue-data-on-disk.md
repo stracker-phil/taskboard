@@ -14,6 +14,9 @@ written to disk: not to SQLite, JSON files, logs, exports or caches.
     and its first 10 characters.
   - Quick Look needs a file: an attachment being previewed is downloaded to the app's Caches folder and deleted
     at launch and quit.
+  - **Download and Save As… (owner, 2026-11-16):** an attachment the owner downloads or saves on purpose goes to
+    Downloads or the place they pick and is theirs, like a download from Jira's web page; Taskboard neither
+    records nor deletes it (ADR 0075). The rule is about storing data in the background.
 
 Before adding a column, a file or a log line, check it against this list. A new kind of stored data needs the
 owner's OK and a line here.

@@ -91,12 +91,84 @@ pub async fn attachment_preview(
     issue_id: String,
     attachment_id: String,
 ) -> AppResult<()> {
-    let connection = state.settings.get().connection;
-    let source = crate::sync::source_for(&state.jira, &connection)?;
-    let root = attachment_cache(&app)?;
+    let (source, root) = attachment_source(&app, &state)?;
     let path =
         super::attachment_file(&state.db, source.as_ref(), &root, issue_id, attachment_id).await?;
     quick_look(&app, path).await
+}
+
+/// Saves the attachment to the Downloads folder under a free name and shows it in Finder (ADR 0075).
+#[tauri::command]
+pub async fn attachment_download(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    issue_id: String,
+    attachment_id: String,
+) -> AppResult<()> {
+    let (source, root) = attachment_source(&app, &state)?;
+    let cached =
+        super::attachment_file(&state.db, source.as_ref(), &root, issue_id, attachment_id).await?;
+    let saved = super::save_new(&downloads_dir(&app)?, &cached).await?;
+    tauri_plugin_opener::reveal_item_in_dir(&saved)
+        .map_err(|e| AppError::Io(format!("Finder couldn't show the file: {e}")))
+}
+
+/// Asks where to save the attachment, then saves it there; false when the owner cancels (ADR 0075).
+#[tauri::command]
+pub async fn attachment_save_as(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    issue_id: String,
+    attachment_id: String,
+) -> AppResult<bool> {
+    let (source, root) = attachment_source(&app, &state)?;
+    let name = super::attachment_name(&state.db, issue_id.clone(), attachment_id.clone()).await?;
+    let Some(target) = save_panel(&app, name, downloads_dir(&app)?).await? else {
+        return Ok(false);
+    };
+    let cached =
+        super::attachment_file(&state.db, source.as_ref(), &root, issue_id, attachment_id).await?;
+    super::save_to(&target, &cached).await?;
+    Ok(true)
+}
+
+/// The system's save panel, as a sheet on the main window, starting in `folder` with `name`.
+async fn save_panel(app: &AppHandle, name: String, folder: PathBuf) -> AppResult<Option<PathBuf>> {
+    use tauri_plugin_dialog::DialogExt;
+    let (done, picked) = tokio::sync::oneshot::channel();
+    let mut panel = app
+        .dialog()
+        .file()
+        .set_file_name(name)
+        .set_directory(folder);
+    if let Some(window) = app.get_webview_window("main") {
+        panel = panel.set_parent(&window);
+    }
+    panel.save_file(move |path| {
+        let _ = done.send(path);
+    });
+    let picked = picked
+        .await
+        .map_err(|_| AppError::Internal("The save panel didn't answer".into()))?;
+    picked
+        .map(|path| path.into_path())
+        .transpose()
+        .map_err(|e| AppError::InvalidInput(format!("Not a place to save to: {e}")))
+}
+
+/// Where attachments come from and where their copies are kept.
+fn attachment_source(
+    app: &AppHandle,
+    state: &AppState,
+) -> AppResult<(Box<dyn crate::sync::source::Source>, PathBuf)> {
+    let source = crate::sync::source_for(&state.jira, &state.settings.get().connection)?;
+    Ok((source, attachment_cache(app)?))
+}
+
+fn downloads_dir(app: &AppHandle) -> AppResult<PathBuf> {
+    app.path()
+        .download_dir()
+        .map_err(|e| AppError::Io(format!("The Downloads folder wasn't found: {e}")))
 }
 
 /// The `inline-image:` scheme's answer for `/<issue id>/<attachment id>` (ADR 0042).

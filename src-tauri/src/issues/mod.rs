@@ -6,6 +6,7 @@ mod attachments;
 pub mod commands;
 mod comments;
 mod detail;
+mod download;
 mod fetched;
 mod history;
 mod inline_image;
@@ -19,6 +20,7 @@ pub(crate) use activity::{field_names, status_names, user_names};
 pub use attachments::{Attachment, attachments_of, is_on_site, keep_site_urls};
 pub use comments::{issue_sync_comments, store_comment};
 pub use detail::{CustomField, IssueDetail, issue_forget, issue_get};
+pub use download::{save_new, save_to};
 pub use history::{issue_sync_history, store_history};
 pub use inline_image::{
     INLINE_IMAGE_SCHEME, InlineImage, MAX_INLINE_IMAGE_BYTES, attachment_image, image_path,
@@ -26,8 +28,8 @@ pub use inline_image::{
 };
 pub use markdown::issue_markdown;
 pub use preview::{
-    attachment_file, cache_root, cached_path, clear as clear_attachment_cache, is_reusable,
-    safe_filename,
+    attachment_file, attachment_name, cache_root, cached_path, clear as clear_attachment_cache,
+    is_reusable, safe_filename,
 };
 pub use related::{Children, IssueLink, Related, RelatedIssue, issue_related};
 pub use web_links::{

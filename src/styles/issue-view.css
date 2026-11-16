@@ -255,12 +255,23 @@ button.web-link:hover { background: var(--row-hover-bg); }
 .attachments h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .attachments__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .attachment {
-  display: flex; align-items: center; gap: 10px; min-width: 0; height: 44px; padding: 0 12px; box-sizing: border-box;
-  border: 1px solid var(--hairline); border-radius: 9px; background: transparent; color: var(--text); text-align: left;
+  display: flex; align-items: center; gap: 4px; min-width: 0; height: 44px; padding-right: 8px; box-sizing: border-box;
+  border: 1px solid var(--hairline); border-radius: 9px; color: var(--text);
   transition: background-color var(--motion-fast) var(--ease-out);
 }
 .attachment:hover { background: var(--row-hover-bg); }
-.attachment[aria-busy="true"] { cursor: progress; }
+.attachment__open {
+  display: flex; flex: 1; align-items: center; gap: 10px; min-width: 0; height: 100%; padding: 0 0 0 12px;
+  border: 0; border-radius: 9px 0 0 9px; background: transparent; color: inherit; text-align: left;
+}
+.attachment__open[aria-busy="true"] { cursor: progress; }
+/* Always in its slot, faint until pointed at. */
+.attachment__download {
+  display: grid; flex: none; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 6px;
+  background: transparent; color: var(--text-faint);
+  transition: background-color var(--motion-fast) var(--ease-out), color var(--motion-fast) var(--ease-out);
+}
+.attachment__download:hover { background: var(--hover-bg); color: var(--text-secondary); }
 .attachment__spinner {
   width: 12px; height: 12px; box-sizing: border-box; border: 2px solid var(--spinner-track); border-top-color: var(--accent);
   border-radius: 50%; animation: spin var(--motion-spin) linear infinite;

@@ -33,6 +33,8 @@ pub fn handlers() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
         commands::open_url,
         commands::double_click_ms,
         crate::issues::commands::attachment_preview,
+        crate::issues::commands::attachment_download,
+        crate::issues::commands::attachment_save_as,
         commands::log_frontend_error,
         commands::take_launch_events,
         changes::issues_mark_seen,
