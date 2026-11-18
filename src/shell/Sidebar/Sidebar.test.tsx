@@ -921,9 +921,117 @@ describe("Sidebar", () => {
         expect(mocked.navGo).toHaveBeenCalledWith(EPICS.id, null);
         expect(screen.queryByRole("textbox", { name: "Filter list name" })).not.toBeInTheDocument();
       });
+
+      it("titles the current list's name 'Click to rename' while no Issue view is open", async () => {
+        await renderSidebar(treeWith(), navAt(EPICS.id, [NW_ID]));
+
+        expect(await screen.findByRole("button", { name: named("Epics") })).toHaveAttribute("title", "Click to rename");
+      });
+
+      describe("with the Issue view open", () => {
+        const openIssueAt = (listId: number, related: string[] = []) =>
+          act(() => {
+            useStore.getState().openIssue("10001", { listId, viewId: 0 });
+            related.forEach((id) => useStore.getState().openRelated(id));
+          });
+
+        it("closes the Issue view and does not rename the current list", async () => {
+          await renderSidebar(treeWith(), navAt(EPICS.id, [NW_ID]));
+          openIssueAt(EPICS.id);
+
+          await userEvent.click(await screen.findByRole("button", { name: named("Epics") }));
+
+          expect(useStore.getState().issueView).toBeNull();
+          expect(screen.queryByRole("textbox", { name: "Filter list name" })).not.toBeInTheDocument();
+        });
+
+        it("closes the Issue view even with several issues on its stack", async () => {
+          await renderSidebar(treeWith(), navAt(EPICS.id, [NW_ID]));
+          openIssueAt(EPICS.id, ["10002", "10003"]);
+
+          await userEvent.click(await screen.findByRole("button", { name: named("Epics") }));
+
+          expect(useStore.getState().issueView).toBeNull();
+        });
+
+        it("retitles the current list's name 'Back to the view' and back to 'Click to rename' once closed", async () => {
+          await renderSidebar(treeWith(), navAt(EPICS.id, [NW_ID]));
+          openIssueAt(EPICS.id);
+
+          const name = await screen.findByRole("button", { name: named("Epics") });
+          expect(name).toHaveAttribute("title", "Back to the view");
+          await userEvent.click(name);
+
+          expect(name).toHaveAttribute("title", "Click to rename");
+        });
+
+        it("still opens another list", async () => {
+          await renderSidebar(treeWith(), navAt(SPRINT.id, [NW_ID]));
+          openIssueAt(SPRINT.id);
+
+          await userEvent.click(await screen.findByRole("button", { name: named("Epics") }));
+
+          expect(mocked.navGo).toHaveBeenCalledWith(EPICS.id, null);
+          expect(screen.queryByRole("textbox", { name: "Filter list name" })).not.toBeInTheDocument();
+        });
+      });
     });
 
     describe("Space", () => {
+      it("titles the current Space's name 'Click to rename' while no Issue view is open", async () => {
+        await renderSidebar(treeWith(), navAt(NW_ID));
+
+        expect(await screen.findByRole("button", { name: named("Website relaunch"), current: "page" })).toHaveAttribute("title", "Click to rename");
+      });
+
+      describe("with the Issue view open", () => {
+        const openIssueAt = (listId: number, related: string[] = []) =>
+          act(() => {
+            useStore.getState().openIssue("10001", { listId, viewId: 0 });
+            related.forEach((id) => useStore.getState().openRelated(id));
+          });
+
+        it("closes the Issue view and does not rename the current Space", async () => {
+          await renderSidebar(treeWith(), navAt(NW_ID));
+          openIssueAt(NW_ID);
+
+          await userEvent.click(await screen.findByRole("button", { name: named("Website relaunch"), current: "page" }));
+
+          expect(useStore.getState().issueView).toBeNull();
+          expect(screen.queryByRole("textbox", { name: "Space name" })).not.toBeInTheDocument();
+        });
+
+        it("closes the Issue view even with several issues on its stack", async () => {
+          await renderSidebar(treeWith(), navAt(NW_ID));
+          openIssueAt(NW_ID, ["10002", "10003"]);
+
+          await userEvent.click(await screen.findByRole("button", { name: named("Website relaunch"), current: "page" }));
+
+          expect(useStore.getState().issueView).toBeNull();
+        });
+
+        it("retitles the current Space's name 'Back to the view' and back to 'Click to rename' once closed", async () => {
+          await renderSidebar(treeWith(), navAt(NW_ID));
+          openIssueAt(NW_ID);
+
+          const name = await screen.findByRole("button", { name: named("Website relaunch"), current: "page" });
+          expect(name).toHaveAttribute("title", "Back to the view");
+          await userEvent.click(name);
+
+          expect(name).toHaveAttribute("title", "Click to rename");
+        });
+
+        it("still opens another Space", async () => {
+          await renderSidebar(treeWith(), navAt(NW_ID));
+          openIssueAt(NW_ID);
+
+          await userEvent.click(spaceButton("Northwind support"));
+
+          expect(mocked.navGo).toHaveBeenCalledWith(NWS_ID, null);
+          expect(screen.queryByRole("textbox", { name: "Space name" })).not.toBeInTheDocument();
+        });
+      });
+
       it("starts the inline rename on the current Space and saves the new name", async () => {
         await renderSidebar(treeWith(), navAt(NW_ID));
         const name = await screen.findByRole("button", { name: named("Website relaunch"), current: "page" });

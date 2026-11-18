@@ -138,8 +138,9 @@ The owner's rule (2026-10-30), for every control, list and popover:
   the Space row's + create "New filter list", open it and start renaming it.
 - **Selected items edit in place**, like Finder: a first click on a Space or list selects it; a click on the
   selected one's name renames it, one on its tile or icon opens the look editor (`LookPopover`, saved with
-  `space_update` or `list_set_look`) under it. A double-click renames as well. The header and Home show the same
-  tile.
+  `space_update` or `list_set_look`) under it. A double-click renames as well. While the Issue view shows, a
+  click on the selected one's name goes back to its view instead, like esc (`useSelectedClick`). The header and
+  Home show the same tile.
 - **Footer** (`SidebarFooter`): 26px, in the status bar's row (the sidebar keeps 3px below it): the window's
   [sidebar toggle](#window), then Settings 4px after it (26px, gear 16/1.8).
 - **Hover**: rows, "+", Settings and the sidebar toggle take `--fill-hover`; the selected row keeps

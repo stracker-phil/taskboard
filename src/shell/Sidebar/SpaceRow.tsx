@@ -12,10 +12,11 @@ import { useStore } from "../../state/store";
 import { copyAppLink } from "../../views/list/useIssueActions";
 import { useTabs } from "../../queries/sidebar";
 import { useOpenInTab } from "../openInTab";
+import { useSelectedClick } from "./useSelectedClick";
 
 interface Props {
   space: SpaceNode;
-  /** The Space itself is the current level: a click on its name renames it, one on its tile edits the look. */
+  /** The Space itself is the current level: a click on its name renames it (`useSelectedClick`), one on its tile edits the look. */
   active: boolean;
   /** One of its filter lists is the current level. */
   holdsActive: boolean;
@@ -38,6 +39,7 @@ export function SpaceRow({ space, active, holdsActive, expanded, renaming, onOpe
   const [editingLook, setEditingLook] = useState(false);
   const tabs = useTabs();
   const openInTab = useOpenInTab();
+  const selectedClick = useSelectedClick(onRename);
   const openMenu = (e: MouseEvent) =>
     openContextMenu(
       e,
@@ -84,10 +86,10 @@ export function SpaceRow({ space, active, holdsActive, expanded, renaming, onOpe
           type="button"
           className="sb-space__main"
           aria-current={active ? "page" : undefined}
-          title={active ? "Click to rename" : undefined}
+          title={active ? selectedClick.title : undefined}
           onClick={(e) => {
             if (openInTab(e, space.listId)) return;
-            if (active) onRename();
+            if (active) selectedClick.click();
             else onOpen();
           }}
           onDoubleClick={onRename}

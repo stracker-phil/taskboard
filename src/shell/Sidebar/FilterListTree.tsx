@@ -11,6 +11,7 @@ import { useStore } from "../../state/store";
 import { copyAppLink } from "../../views/list/useIssueActions";
 import { useTabs } from "../../queries/sidebar";
 import { useOpenInTab } from "../openInTab";
+import { useSelectedClick } from "./useSelectedClick";
 import { DropLine } from "./DropLine";
 import { ListCount } from "./ListCount";
 import { useDragReorder } from "./useDragReorder";
@@ -78,12 +79,13 @@ interface RowProps {
   dragProps: HTMLAttributes<HTMLElement>;
 }
 
-/** A filter list: a click on the current list's name renames it, one on its icon edits the look. */
+/** A filter list: a click on the current list's name renames it (`useSelectedClick`), one on its icon edits the look. */
 function FilterListRow({ list, active, renaming, onOpen, onRename, onRenameDone, dragProps }: RowProps) {
   const pin = usePinOf("filterList", String(list.id));
   const [editingLook, setEditingLook] = useState(false);
   const tabs = useTabs();
   const openInTab = useOpenInTab();
+  const selectedClick = useSelectedClick(onRename);
   const openMenu = (e: MouseEvent) =>
     openContextMenu(
       e,
@@ -123,10 +125,10 @@ function FilterListRow({ list, active, renaming, onOpen, onRename, onRenameDone,
         className="sb-row sb-list"
         data-state={active ? "active" : undefined}
         aria-current={active ? "page" : undefined}
-        title={active ? "Click to rename" : undefined}
+        title={active ? selectedClick.title : undefined}
         onClick={(e) => {
           if (openInTab(e, list.id)) return;
-          if (active) onRename();
+          if (active) selectedClick.click();
           else onOpen();
         }}
         onDoubleClick={onRename}
